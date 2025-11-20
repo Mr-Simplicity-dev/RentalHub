@@ -1,0 +1,233 @@
+-- Add admin field to users table
+ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE;
+
+-- Create first admin user (run this manually after creating your account)
+-- UPDATE users SET is_admin = TRUE WHERE email = 'your-admin-email@example.com';
+
+-- Users Table (Both Landlords and Tenants)
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    user_type VARCHAR(20) NOT NULL CHECK (user_type IN ('landlord', 'tenant')),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    phone VARCHAR(20) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    
+    -- Personal Information
+    full_name VARCHAR(255) NOT NULL,
+    nin VARCHAR(11) UNIQUE NOT NULL, -- National Identification Number (11 digits)
+    passport_photo_url VARCHAR(500), -- URL to uploaded passport photo
+    
+    -- Verification Status
+    email_verified BOOLEAN DEFAULT FALSE,
+    phone_verified BOOLEAN DEFAULT FALSE,
+    nin_verified BOOLEAN DEFAULT FALSE,
+    identity_verified BOOLEAN DEFAULT FALSE, -- Admin approval after NIN + passport check
+    
+    -- Subscription Status (for tenants)
+    subscription_active BOOLEAN DEFAULT FALSE,
+    subscription_expires_at TIMESTAMP,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Nigerian States Table
+CREATE TABLE states (
+    id SERIAL PRIMARY KEY,
+    state_name VARCHAR(100) UNIQUE NOT NULL,
+    state_code VARCHAR(10) UNIQUE NOT NULL
+);
+
+-- Insert 36 States + FCT
+INSERT INTO states (state_name, state_code) VALUES
+    ('Abia', 'AB'),
+    ('Adamawa', 'AD'),
+    ('Akwa Ibom', 'AK'),
+    ('Anambra', 'AN'),
+    ('Bauchi', 'BA'),
+    ('Bayelsa', 'BY'),
+    ('Benue', 'BE'),
+    ('Borno', 'BO'),
+    ('Cross River', 'CR'),
+    ('Delta', 'DE'),
+    ('Ebonyi', 'EB'),
+    ('Edo', 'ED'),
+    ('Ekiti', 'EK'),
+    ('Enugu', 'EN'),
+    ('Federal Capital Territory', 'FCT'),
+    ('Gombe', 'GO'),
+    ('Imo', 'IM'),
+    ('Jigawa', 'JI'),
+    ('Kaduna', 'KD'),
+    ('Kano', 'KN'),
+    ('Katsina', 'KT'),
+    ('Kebbi', 'KE'),
+    ('Kogi', 'KO'),
+    ('Kwara', 'KW'),
+    ('Lagos', 'LA'),
+    ('Nasarawa', 'NA'),
+    ('Niger', 'NI'),
+    ('Ogun', 'OG'),
+    ('Ondo', 'ON'),
+    ('Osun', 'OS'),
+    ('Oyo', 'OY'),
+    ('Plateau', 'PL'),
+    ('Rivers', 'RI'),
+    ('Sokoto', 'SO'),
+    ('Taraba', 'TA'),
+    ('Yobe', 'YO'),
+    ('Zamfara', 'ZA');
+
+-- Properties Table
+CREATE TABLE properties (
+    id SERIAL PRIMARY KEY,
+    landlord_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Location
+    state_id INTEGER NOT NULL REFERENCES states(id),
+    city VARCHAR(100) NOT NULL,
+    area VARCHAR(100) NOT NULL,
+    full_address TEXT NOT NULL,
+    
+    -- Property Details
+    property_type VARCHAR(50) NOT NULL CHECK (property_type IN ('apartment', 'house', 'duplex', 'studio', 'bungalow', 'flat', 'room')),
+    bedrooms INTEGER NOT NULL,
+    bathrooms INTEGER NOT NULL,
+    
+    -- Pricing
+    rent_amount DECIMAL(12, 2) NOT NULL,
+    payment_frequency VARCHAR(20) DEFAULT 'yearly' CHECK (payment_frequency IN ('monthly', 'yearly')),
+    caution_deposit DECIMAL(12, 2),
+    
+    -- Description
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    
+    -- Amenities (stored as JSON array)
+    amenities JSONB DEFAULT '[]',
+    
+    -- Status
+    is_available BOOLEAN DEFAULT TRUE,
+    is_verified BOOLEAN DEFAULT FALSE, -- Admin verification
+    featured BOOLEAN DEFAULT FALSE,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP -- Listing expiry based on landlord payment
+);
+
+-- Property Photos Table
+CREATE TABLE property_photos (
+    id SERIAL PRIMARY KEY,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    photo_url VARCHAR(500) NOT NULL,
+    is_primary BOOLEAN DEFAULT FALSE,
+    upload_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Payments Table (3 Types of Payments)
+CREATE TABLE payments (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    
+    -- Payment Type
+    payment_type VARCHAR(50) NOT NULL CHECK (payment_type IN ('tenant_subscription', 'landlord_listing', 'rent_payment')),
+    
+    -- Payment Details
+    amount DECIMAL(12, 2) NOT NULL,
+    currency VARCHAR(10) DEFAULT 'NGN',
+    
+    -- Related References
+    property_id INTEGER REFERENCES properties(id), -- For listing fees and rent payments
+    subscription_duration_days INTEGER, -- For tenant subscriptions (30, 90, 365 days)
+    
+    -- Payment Gateway Info
+    payment_method VARCHAR(50), -- 'paystack', 'flutterwave', 'bank_transfer'
+    transaction_reference VARCHAR(255) UNIQUE,
+    payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'completed', 'failed', 'refunded')),
+    
+    -- Gateway Response
+    gateway_response JSONB,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+
+-- Property Applications Table
+CREATE TABLE applications (
+    id SERIAL PRIMARY KEY,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Application Details
+    message TEXT,
+    move_in_date DATE,
+    
+    -- Status
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'withdrawn')),
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Messages Table
+CREATE TABLE messages (
+    id SERIAL PRIMARY KEY,
+    sender_id INTEGER NOT NULL REFERENCES users(id),
+    receiver_id INTEGER NOT NULL REFERENCES users(id),
+    property_id INTEGER REFERENCES properties(id),
+    
+    message_text TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Saved Properties (Favorites)
+CREATE TABLE saved_properties (
+    id SERIAL PRIMARY KEY,
+    tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tenant_id, property_id)
+);
+
+-- Reviews Table
+CREATE TABLE reviews (
+    id SERIAL PRIMARY KEY,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+    review_text TEXT,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(property_id, tenant_id) -- One review per tenant per property
+);
+
+-- Create Indexes for Performance
+CREATE INDEX idx_properties_state ON properties(state_id);
+CREATE INDEX idx_properties_landlord ON properties(landlord_id);
+CREATE INDEX idx_properties_available ON properties(is_available);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_nin ON users(nin);
+CREATE INDEX idx_payments_user ON payments(user_id);
+CREATE INDEX idx_payments_status ON payments(payment_status);
+CREATE INDEX idx_messages_receiver ON messages(receiver_id);
+
+-- Property Views Table (for tracking)
+CREATE TABLE IF NOT EXISTS property_views (
+    id SERIAL PRIMARY KEY,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    viewer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(property_id, viewer_id, viewed_at)
+);
+
+CREATE INDEX idx_property_views_property ON property_views(property_id);
+CREATE INDEX idx_property_views_viewer ON property_views(viewer_id);
