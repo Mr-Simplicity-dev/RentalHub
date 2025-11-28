@@ -56,19 +56,16 @@ app.use('/api/admin', require('./routes/admin'));
 // Add at the top of server.js
 const { startPaymentJobs } = require('./jobs/paymentJobs');
 
-// Add after routes
-startPaymentJobs();
 
 // Add this line in server.js after other routes
 app.use('/api/property-utils', require('./routes/propertyUtils'));
 
-// Update the jobs import in server.js
-const { startPaymentJobs } = require('./jobs/paymentJobs');
-const { startPropertyJobs } = require('./jobs/propertyJobs');
+
+
 
 // Start all jobs
 startPaymentJobs();
-startPropertyJobs();
+
 
 // Add these lines in server.js after other routes
 app.use('/api/applications', require('./routes/applications'));
