@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const propertyController = require('../controllers/propertyController');
-const { authenticate, isLandlord, isTenant, isVerified, hasActiveSubscription } = require('../middleware/auth');
-const { uploadPropertyPhotos } = require('../middleware/upload');
+const { authenticate, isLandlord, isTenant, isVerified, hasActiveSubscription } = require('../config/middleware/auth');
+const { uploadPropertyPhotos } = require('../config/middleware/upload');
 
 // ============ PUBLIC ROUTES ============
 
