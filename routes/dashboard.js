@@ -1,4 +1,4 @@
- const express = require('express'); const router = express.Router(); const pool = require('../config/database'); const { authenticate, isTenant, isLandlord } = require('../middleware/auth');
+ const express = require('express'); const router = express.Router(); const pool = require('../config/middleware/database'); const { authenticate, isTenant, isLandlord } = require('../middleware/auth');
 
 // Tenant Dashboard Stats router.get('/tenant/stats', authenticate, isTenant, async (req, res) => { try { const userId = req.user.id;
 

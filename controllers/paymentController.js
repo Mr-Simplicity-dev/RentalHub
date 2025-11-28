@@ -1,4 +1,4 @@
- const axios = require('axios'); const crypto = require('crypto'); const pool = require('../config/database'); const { validationResult } = require('express-validator');
+ const axios = require('axios'); const crypto = require('crypto'); const pool = require('../config/middleware/database'); const { validationResult } = require('express-validator');
 
 // Paystack configuration const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY; const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 

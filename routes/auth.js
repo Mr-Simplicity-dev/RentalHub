@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const authController = require('../controllers/authController');
-const { uploadPassport } = require('../middleware/upload');
-const { authenticate } = require('../middleware/auth');
+const { uploadPassport } = require('../config/middleware/upload');
+const { authenticate } = require('../config/middleware/auth');
 
 // Register new user (Landlord or Tenant)
 router.post('/register',

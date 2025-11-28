@@ -1,4 +1,4 @@
-const pool = require('../config/database'); const { validationResult } = require('express-validator'); const { sendApplicationNotification, sendApplicationStatusUpdate } = require('../utils/emailService');
+const pool = require('../config/middleware/database'); const { validationResult } = require('express-validator'); const { sendApplicationNotification, sendApplicationStatusUpdate } = require('../utils/emailService');
 
 // ============ TENANT ENDPOINTS ============
 

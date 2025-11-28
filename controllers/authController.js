@@ -1,10 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
-const pool = require('../config/database');
-const { validateNIN } = require('../utils/ninValidator');
-const { sendVerificationEmail, sendWelcomeEmail } = require('../utils/emailService');
-const { sendVerificationCode } = require('../utils/smsService');
+const pool = require('../config/middleware/database');
+const { validateNIN } = require('../config/utils/ninValidator');
+const { sendVerificationEmail, sendWelcomeEmail } = require('../config/utils/emailService');
+const { sendVerificationCode } = require('../config/utils/smsService');
 
 // Store OTP codes temporarily (use Redis in production)
 const otpStore = new Map();

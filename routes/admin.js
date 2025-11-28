@@ -1,4 +1,4 @@
-const express = require('express'); const router = express.Router(); const pool = require('../config/database'); const { authenticate } = require('../middleware/auth');
+const express = require('express'); const router = express.Router(); const pool = require('../config/middleware/database'); const { authenticate } = require('../middleware/auth');
 
 // Middleware to check if user is admin (add admin field to users table) const isAdmin = async (req, res, next) => { // Check if user is admin const result = await pool.query( 'SELECT is_admin FROM users WHERE id = $1', [req.user.id] );
 
