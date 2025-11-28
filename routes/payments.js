@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const paymentController = require('../controllers/paymentController');
-const { authenticate, isTenant, isLandlord, isVerified } = require('../middleware/auth');
+const { authenticate, isTenant, isLandlord, isVerified } = require('../config/middleware/auth');
 
 // ============ TENANT SUBSCRIPTION PAYMENTS ============
 
