@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const applicationController = require('../controllers/applicationController');
-const { authenticate, isTenant, isLandlord, isVerified } = require('../middleware/auth');
+const { authenticate, isTenant, isLandlord, isVerified } = require('../config/middleware/auth');
 
 // ============ TENANT ROUTES ============
 

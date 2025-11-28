@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const messageController = require('../controllers/messageController');
-const { authenticate, isVerified } = require('../middleware/auth');
+const { authenticate, isVerified } = require('../config/middleware/auth');
 
 // Send message
 router.post('/',

@@ -1,6 +1,6 @@
 const pool = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
-const { sendMessageNotification } = require('../utils/emailService');
+const { sendMessageNotification } = require('../config/utils/emailService');
 
 // Send message
 exports.sendMessage = async (req, res) => {
