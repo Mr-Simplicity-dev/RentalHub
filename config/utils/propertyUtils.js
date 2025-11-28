@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const pool = require('../middleware/database');
 
 // Get popular locations (most properties)
 exports.getPopularLocations = async (limit = 10) => {

@@ -1,4 +1,5 @@
-const pool = require('../config/middleware/database');
+const pool = require('../middleware/database');
+
 
 // Check and update expired subscriptions (run as cron job)
 exports.checkExpiredSubscriptions = async () => {
