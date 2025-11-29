@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth');
+const { authenticate } = require('../config/middleware/auth');
 const {
   getUserNotifications,
   markAsRead,
   markAllAsRead,
   deleteNotification,
   getUnreadCount
-} = require('../utils/notificationService');
+} = require('../config/utils/notificationService');
 
 // Get user notifications
 router.get('/', authenticate, async (req, res) => {
