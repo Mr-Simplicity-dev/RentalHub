@@ -8,14 +8,15 @@ import { AuthProvider } from '../context/AuthContext';
 import { useAuth } from '../hooks/useAuth';
 
 import Header from '../components/common/Header';
-import Footer from './components/common/Footer';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Properties from './pages/Properties';
-import PropertyDetail from './pages/PropertyDetail';
-import Dashboard from './pages/Dashboard';
-import NotFound from './pages/NotFound';
+import Footer from '../components/common/Footer';
+
+import Home from './Home';
+import Login from './Login';
+import Register from './Register';
+import Properties from './Properties';
+import PropertyDetail from './PropertyDetail';
+import Dashboard from './Dashboard';
+import NotFound from './NotFound';
 
 const queryClient = new QueryClient();
 
@@ -66,13 +67,13 @@ function App() {
             </main>
             <Footer />
           </div>
+
           <ToastContainer
             position="top-right"
             autoClose={3000}
             hideProgressBar={false}
             newestOnTop={false}
             closeOnClick
-            rtl={false}
             pauseOnFocusLoss
             draggable
             pauseOnHover
