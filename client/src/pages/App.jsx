@@ -4,11 +4,11 @@ import { QueryClient, QueryClientProvider } from 'react-query';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import { AuthProvider } from './context/AuthContext';
-import { useAuth } from './hooks/useAuth';
+import { AuthProvider } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
-import Header from './components/common/Header';
-import Footer from './components/common/Footer';
+import Header from '../components/common/Header';
+import Footer from '../components/common/Footer';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
