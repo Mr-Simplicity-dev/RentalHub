@@ -22,11 +22,11 @@ const Home = () => {
         propertyService.getPopularLocations(6),
       ]);
 
-      if (featured.success) {
-        setFeaturedProperties(featured.data);
+      if (featured?.success) {
+        setFeaturedProperties(featured.data || []);
       }
-      if (locations.success) {
-        setPopularLocations(locations.data);
+      if (locations?.success) {
+        setPopularLocations(locations.data || []);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -37,7 +37,6 @@ const Home = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    // Navigate to properties page with search query
     window.location.href = `/properties?search=${searchQuery}`;
   };
 
@@ -54,7 +53,6 @@ const Home = () => {
               Browse thousands of verified properties across all 36 states + FCT
             </p>
 
-            {/* Search Bar */}
             <form onSubmit={handleSearch} className="flex max-w-2xl mx-auto">
               <input
                 type="text"
@@ -79,35 +77,31 @@ const Home = () => {
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FaShieldAlt className="text-primary-600 text-2xl" />
+            {[
+              {
+                icon: <FaShieldAlt className="text-primary-600 text-2xl" />,
+                title: 'Verified Properties',
+                text: 'All properties and landlords are verified with NIN for your safety',
+              },
+              {
+                icon: <FaHome className="text-primary-600 text-2xl" />,
+                title: 'Wide Selection',
+                text: 'Thousands of properties across Nigeria to choose from',
+              },
+              {
+                icon: <FaCheckCircle className="text-primary-600 text-2xl" />,
+                title: 'Easy Process',
+                text: 'Simple application and payment process, all online',
+              },
+            ].map((f, i) => (
+              <div key={i} className="text-center">
+                <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  {f.icon}
+                </div>
+                <h3 className="text-xl font-semibold mb-2">{f.title}</h3>
+                <p className="text-gray-600">{f.text}</p>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Verified Properties</h3>
-              <p className="text-gray-600">
-                All properties and landlords are verified with NIN for your safety
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FaHome className="text-primary-600 text-2xl" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Wide Selection</h3>
-              <p className="text-gray-600">
-                Thousands of properties across Nigeria to choose from
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FaCheckCircle className="text-primary-600 text-2xl" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Easy Process</h3>
-              <p className="text-gray-600">
-                Simple application and payment process, all online
-              </p>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -126,9 +120,9 @@ const Home = () => {
             <Loader />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredProperties.map((property) => (
+              {featuredProperties.map((property, index) => (
                 <PropertyCard
-                  key={property.id}
+                  key={property?.id ?? `featured-${index}`}
                   property={property}
                   showSaveButton={false}
                 />
@@ -143,15 +137,17 @@ const Home = () => {
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold mb-8 text-center">Popular Locations</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {popularLocations.map((location) => (
+            {popularLocations.map((location, index) => (
               <Link
-                key={location.state_id}
-                to={`/properties?state_id=${location.state_id}`}
+                key={location?.state_id ?? location?.state_name ?? `loc-${index}`}
+                to={`/properties?state_id=${location?.state_id ?? ''}`}
                 className="card text-center hover:shadow-lg transition-shadow"
               >
-                <h3 className="font-semibold text-gray-900">{location.state_name}</h3>
+                <h3 className="font-semibold text-gray-900">
+                  {location?.state_name ?? 'Unknown'}
+                </h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  {location.property_count} properties
+                  {location?.property_count ?? 0} properties
                 </p>
               </Link>
             ))}
