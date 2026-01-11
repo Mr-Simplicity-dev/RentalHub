@@ -69,7 +69,7 @@ const Footer = () => {
             <h3 className="text-lg font-bold mb-4">Contact Us</h3>
             <ul className="space-y-2 text-sm text-gray-400">
               <li>Email: support@rentalhub.ng</li>
-              <li>Phone: +234 800 123 4567</li>
+              <li>Phone: +234 706 701 2884</li>
               <li className="flex space-x-4 mt-4">
                 <a href="#" className="hover:text-white">
                   <FaFacebook className="text-xl" />

@@ -23,8 +23,15 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
+
+  if (!user) {
+    return <Loader fullScreen />;
+  }
+
 
   const loadDashboardData = async () => {
     setLoading(true);

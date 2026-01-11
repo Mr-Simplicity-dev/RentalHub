@@ -16,16 +16,24 @@ export const AuthProvider = ({ children }) => {
           const userData = authService.getUserFromStorage();
           setUser(userData);
           setIsAuthenticated(true);
-          
+
           // Refresh user data from server
-          const response = await authService.getCurrentUser();
-          if (response.success) {
-            setUser(response.data);
+          try {
+            const response = await authService.getCurrentUser();
+            if (response.success) {
+              setUser(response.data);
+            }
+          } catch (err) {
+            // Only logout if token is truly invalid
+            if (err?.response?.status === 401) {
+              authService.logout();
+              setUser(null);
+              setIsAuthenticated(false);
+            }
           }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        authService.logout();
       } finally {
         setLoading(false);
       }

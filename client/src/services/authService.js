@@ -6,8 +6,10 @@ export const authService = {
   register: async (userData) => {
     const response = await api.post('/auth/register', userData);
     if (response.data.success) {
-      localStorage.setItem('token', response.data.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      const { token, user } = response.data.data;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
     return response.data;
   },
@@ -16,17 +18,19 @@ export const authService = {
   login: async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
     if (response.data.success) {
-      localStorage.setItem('token', response.data.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      const { token, user } = response.data.data;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
     return response.data;
   },
 
-  // Logout
+  // Logout (NO redirect here)
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    delete api.defaults.headers.common['Authorization'];
   },
 
   // Get current user
@@ -61,7 +65,7 @@ export const authService = {
     const formData = new FormData();
     formData.append('passport', file);
     const response = await api.post('/auth/upload-passport', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
@@ -70,7 +74,7 @@ export const authService = {
   isAuthenticated: () => {
     const token = localStorage.getItem('token');
     if (!token) return false;
-    
+
     try {
       const decoded = jwtDecode(token);
       return decoded.exp * 1000 > Date.now();
