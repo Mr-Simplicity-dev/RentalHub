@@ -27,20 +27,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // -----------------------------------
-// ROOT & HEALTH ROUTES
-// -----------------------------------
-app.get('/', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'Rental Platform API is running'
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
-});
-
-// -----------------------------------
 // ROUTES
 // -----------------------------------
 app.use('/api/auth', require('./routes/auth'));
@@ -52,6 +38,15 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/notifications', require('./routes/notifications'));
+
+
+
+// -----------------------------------
+// HEALTH CHECK
+// -----------------------------------
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
+});
 
 // -----------------------------------
 // ERROR HANDLER
