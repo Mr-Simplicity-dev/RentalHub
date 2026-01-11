@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
 import Home from './Home';
-import Login from './pages/Login';
+import Login from './Login';
 import Register from './Register';
 import Properties from './Properties';
 import PropertyDetail from './PropertyDetail';
