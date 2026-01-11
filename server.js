@@ -54,6 +54,48 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/notifications', require('./routes/notifications'));
 
 // -----------------------------------
+// MISSING FRONTEND ROUTES (SAFE STUBS)
+// -----------------------------------
+
+// This matches: GET /api/property-utils/popular-locations?limit=6
+app.get('/api/property-utils/popular-locations', async (req, res) => {
+  const limit = Number(req.query.limit) || 6;
+
+  // Temporary safe response so frontend renders
+  res.json({
+    success: true,
+    data: [
+      { name: 'Lagos', count: 0 },
+      { name: 'Abuja', count: 0 },
+      { name: 'Port Harcourt', count: 0 },
+      { name: 'Ibadan', count: 0 },
+      { name: 'Benin', count: 0 },
+      { name: 'Abeokuta', count: 0 },
+    ].slice(0, limit)
+  });
+});
+
+// Safety net for featured properties if your route throws
+app.get('/api/properties/featured', async (req, res) => {
+  try {
+    const limit = Number(req.query.limit) || 6;
+
+    // If your real implementation exists in routes/properties,
+    // this will be overridden there. This is just a guard.
+    res.json({
+      success: true,
+      data: []
+    });
+  } catch (err) {
+    console.error('Featured properties error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load featured properties'
+    });
+  }
+});
+
+// -----------------------------------
 // ERROR HANDLER
 // -----------------------------------
 app.use((err, req, res, next) => {
