@@ -1,40 +1,55 @@
 const jwt = require('jsonwebtoken');
-const db = require("./database");
-
+const db = require('./database');
 
 // Verify JWT Token
 exports.authenticate = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1]; // Bearer TOKEN
-    
+    const authHeader = req.headers.authorization;
+    console.log('AUTH HEADER:', authHeader);
+
+    const token = authHeader?.split(' ')[1];
+    console.log('TOKEN:', token);
+
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Access denied. No token provided.'
+        message: 'Access denied. No token provided.',
       });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Get user from database
-    const result = await pool.query(
+    console.log('DECODED JWT:', decoded);
+
+    const userId = decoded.userId || decoded.id || decoded.user_id;
+    console.log('USER ID:', userId);
+
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token payload.',
+      });
+    }
+
+    const result = await db.query(
       'SELECT id, email, user_type, identity_verified, subscription_active FROM users WHERE id = $1',
-      [decoded.userId]
+      [userId]
     );
 
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid token. User not found.'
+        message: 'Invalid token. User not found.',
       });
     }
 
     req.user = result.rows[0];
     next();
   } catch (error) {
+    console.error('Auth error:', error);
     return res.status(401).json({
       success: false,
-      message: 'Invalid or expired token.'
+      message: 'Invalid or expired token.',
     });
   }
 };
@@ -44,7 +59,7 @@ exports.isLandlord = (req, res, next) => {
   if (req.user.user_type !== 'landlord') {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Landlords only.'
+      message: 'Access denied. Landlords only.',
     });
   }
   next();
@@ -55,7 +70,7 @@ exports.isTenant = (req, res, next) => {
   if (req.user.user_type !== 'tenant') {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Tenants only.'
+      message: 'Access denied. Tenants only.',
     });
   }
   next();
@@ -66,7 +81,7 @@ exports.isVerified = (req, res, next) => {
   if (!req.user.identity_verified) {
     return res.status(403).json({
       success: false,
-      message: 'Please complete identity verification (NIN + Passport) first.'
+      message: 'Please complete identity verification (NIN + Passport) first.',
     });
   }
   next();
@@ -77,7 +92,7 @@ exports.hasActiveSubscription = (req, res, next) => {
   if (req.user.user_type === 'tenant' && !req.user.subscription_active) {
     return res.status(403).json({
       success: false,
-      message: 'Please subscribe to access property details.'
+      message: 'Please subscribe to access property details.',
     });
   }
   next();
