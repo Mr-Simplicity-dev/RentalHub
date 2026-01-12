@@ -119,3 +119,12 @@ const PORT = process.env.APP_PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+app.use((err, req, res, next) => {
+  console.error('UNHANDLED ERROR:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal Server Error',
+    error: err.message
+  });
+});

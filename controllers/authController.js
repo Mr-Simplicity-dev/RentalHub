@@ -410,7 +410,7 @@ exports.getCurrentUser = async (req, res) => {
     const result = await db.query(
       `SELECT id, user_type, email, phone, full_name, nin,
               passport_photo_url, email_verified, phone_verified,
-              nin_verified, identity_verified, subscription_active,
+              identity_verified, subscription_active,
               subscription_expires_at, created_at
        FROM users WHERE id = $1`,
       [userId]
@@ -429,12 +429,15 @@ exports.getCurrentUser = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('GET /auth/me ERROR:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get user profile'
+      message: 'Failed to get user profile',
+      error: error.message
     });
   }
 };
+
 
 // REFRESH TOKEN
 exports.refreshToken = async (req, res) => {
