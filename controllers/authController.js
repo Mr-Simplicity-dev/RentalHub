@@ -42,7 +42,7 @@ exports.register = async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await pool.query(
+    const existingUser = await db.query(
       'SELECT id FROM users WHERE email = $1 OR phone = $2 OR nin = $3',
       [email, phone, nin]
     );
@@ -59,7 +59,7 @@ exports.register = async (req, res) => {
     const password_hash = await bcrypt.hash(password, salt);
 
     // Insert user into database
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO users (user_type, email, phone, password_hash, full_name, nin)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, email, full_name, user_type, created_at`,
@@ -121,7 +121,7 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     // Find user
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT id, email, password_hash, full_name, user_type, 
               email_verified, phone_verified, identity_verified,
               subscription_active, subscription_expires_at
@@ -181,7 +181,7 @@ exports.verifyEmail = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Update user email verification status
-    await pool.query(
+    await db.query(
       'UPDATE users SET email_verified = TRUE WHERE id = $1',
       [decoded.userId]
     );
@@ -204,7 +204,7 @@ exports.resendVerification = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT id, email, email_verified FROM users WHERE email = $1',
       [email]
     );
@@ -253,7 +253,7 @@ exports.sendPhoneOTP = async (req, res) => {
     const userId = req.user.id;
 
     // Get user phone
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT phone, phone_verified FROM users WHERE id = $1',
       [userId]
     );
@@ -330,7 +330,7 @@ exports.verifyPhone = async (req, res) => {
     }
 
     // Update phone verification status
-    await pool.query(
+    await db.query(
       'UPDATE users SET phone_verified = TRUE WHERE id = $1',
       [userId]
     );
@@ -364,13 +364,13 @@ exports.uploadPassport = async (req, res) => {
     }
 
     // Update user passport photo URL
-    await pool.query(
+    await db.query(
       'UPDATE users SET passport_photo_url = $1 WHERE id = $2',
       [req.file.path, userId]
     );
 
     // Check if user is now fully verified (email + phone + passport)
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT email_verified, phone_verified, passport_photo_url, nin
        FROM users WHERE id = $1`,
       [userId]
@@ -407,7 +407,7 @@ exports.getCurrentUser = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT id, user_type, email, phone, full_name, nin,
               passport_photo_url, email_verified, phone_verified,
               nin_verified, identity_verified, subscription_active,
@@ -479,7 +479,7 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT id, email FROM users WHERE email = $1',
       [email]
     );
@@ -540,7 +540,7 @@ exports.resetPassword = async (req, res) => {
     const password_hash = await bcrypt.hash(password, salt);
 
     // Update password
-    await pool.query(
+    await db.query(
       'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [password_hash, decoded.userId]
     );

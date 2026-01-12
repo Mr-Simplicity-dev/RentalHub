@@ -9,7 +9,7 @@ const { authenticate } = require("../config/middleware/auth");
 
 const isAdmin = async (req, res, next) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       "SELECT is_admin FROM users WHERE id = $1",
       [req.user.id]
     );
@@ -37,7 +37,7 @@ const isAdmin = async (req, res, next) => {
 
 router.get("/pending-verifications", authenticate, isAdmin, async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
         id, user_type, email, phone, full_name, nin, passport_photo_url, 
         email_verified, phone_verified, created_at
@@ -72,7 +72,7 @@ router.post("/approve-verification/:userId", authenticate, isAdmin, async (req, 
     const { userId } = req.params;
     const { nin_verified } = req.body;
 
-    await pool.query(
+    await db.query(
       `UPDATE users 
        SET identity_verified = TRUE,
            nin_verified = $1,
@@ -103,7 +103,7 @@ router.post("/reject-verification/:userId", authenticate, isAdmin, async (req, r
     const { userId } = req.params;
     const { reason } = req.body;
 
-    await pool.query(
+    await db.query(
       `UPDATE users 
        SET identity_verified = FALSE,
            updated_at = CURRENT_TIMESTAMP
@@ -154,9 +154,9 @@ router.get("/users", authenticate, isAdmin, async (req, res) => {
     query += ` ORDER BY created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(limit, offset);
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
 
-    const countResult = await pool.query("SELECT COUNT(*) FROM users");
+    const countResult = await db.query("SELECT COUNT(*) FROM users");
 
     res.json({
       success: true,

@@ -2,7 +2,7 @@ const pool = require('../middleware/database');
 
 // Create notification table
 const createNotificationTable = async () => {
-  await pool.query(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS notifications (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -22,7 +22,7 @@ const createNotificationTable = async () => {
 // Create notification
 exports.createNotification = async (userId, type, title, message, link = null) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO notifications (user_id, type, title, message, link)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
@@ -49,7 +49,7 @@ exports.getUserNotifications = async (userId, limit = 20, unreadOnly = false) =>
     query += ' ORDER BY created_at DESC LIMIT $2';
     params.push(limit);
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
     return result.rows;
   } catch (error) {
     console.error('Get notifications error:', error);
@@ -60,7 +60,7 @@ exports.getUserNotifications = async (userId, limit = 20, unreadOnly = false) =>
 // Mark notification as read
 exports.markAsRead = async (notificationId, userId) => {
   try {
-    await pool.query(
+    await db.query(
       'UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2',
       [notificationId, userId]
     );
@@ -74,7 +74,7 @@ exports.markAsRead = async (notificationId, userId) => {
 // Mark all notifications as read
 exports.markAllAsRead = async (userId) => {
   try {
-    await pool.query(
+    await db.query(
       'UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND is_read = FALSE',
       [userId]
     );
@@ -88,7 +88,7 @@ exports.markAllAsRead = async (userId) => {
 // Delete notification
 exports.deleteNotification = async (notificationId, userId) => {
   try {
-    await pool.query(
+    await db.query(
       'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
       [notificationId, userId]
     );
@@ -102,7 +102,7 @@ exports.deleteNotification = async (notificationId, userId) => {
 // Get unread count
 exports.getUnreadCount = async (userId) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE',
       [userId]
     );

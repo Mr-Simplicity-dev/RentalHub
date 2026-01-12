@@ -142,14 +142,14 @@ exports.initializeSubscription = async (req, res) => {
     }
 
     // Get user email
-    const userResult = await pool.query(
+    const userResult = await db.query(
       "SELECT email, full_name FROM users WHERE id = $1",
       [userId]
     );
     const user = userResult.rows[0];
 
     // Create payment record
-    const paymentResult = await pool.query(
+    const paymentResult = await db.query(
       `INSERT INTO payments (user_id, payment_type, amount, currency,
                              subscription_duration_days, payment_method, payment_status)
        VALUES ($1, 'tenant_subscription', $2, 'NGN', $3, $4, 'pending')
@@ -185,7 +185,7 @@ exports.initializeSubscription = async (req, res) => {
       );
 
       // Update DB with reference
-      await pool.query(
+      await db.query(
         "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
         [paystackResponse.data.data.reference, paymentId]
       );
@@ -255,7 +255,7 @@ exports.verifySubscription = async (req, res) => {
     }
 
     // Get payment record
-    const paymentResult = await pool.query(
+    const paymentResult = await db.query(
       "SELECT * FROM payments WHERE transaction_reference = $1",
       [reference]
     );
@@ -270,7 +270,7 @@ exports.verifySubscription = async (req, res) => {
     const payment = paymentResult.rows[0];
 
     // Update payment status
-    await pool.query(
+    await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = CURRENT_TIMESTAMP,
@@ -283,7 +283,7 @@ exports.verifySubscription = async (req, res) => {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + payment.subscription_duration_days);
 
-    await pool.query(
+    await db.query(
       `UPDATE users 
        SET subscription_active = TRUE,
            subscription_expires_at = $1,
@@ -318,7 +318,7 @@ exports.getSubscriptionStatus = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT subscription_active, subscription_expires_at 
        FROM users WHERE id = $1`,
       [userId]
@@ -375,13 +375,13 @@ exports.initializeListingPayment = async (req, res) => {
       });
     }
 
-    const userResult = await pool.query(
+    const userResult = await db.query(
       "SELECT email, full_name FROM users WHERE id = $1",
       [userId]
     );
     const user = userResult.rows[0];
 
-    const paymentResult = await pool.query(
+    const paymentResult = await db.query(
       `INSERT INTO payments (user_id, payment_type, amount, currency,
                              property_id, payment_method, payment_status)
        VALUES ($1, 'landlord_listing', $2, 'NGN', $3, $4, 'pending')
@@ -418,7 +418,7 @@ exports.initializeListingPayment = async (req, res) => {
         }
       );
 
-      await pool.query(
+      await db.query(
         "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
         [paystackResponse.data.data.reference, paymentId]
       );
@@ -487,7 +487,7 @@ exports.verifyListingPayment = async (req, res) => {
       });
     }
 
-    const paymentResult = await pool.query(
+    const paymentResult = await db.query(
       "SELECT * FROM payments WHERE transaction_reference = $1",
       [reference]
     );
@@ -503,7 +503,7 @@ exports.verifyListingPayment = async (req, res) => {
     const metadata = transaction.metadata;
 
     // Update payment status
-    await pool.query(
+    await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = CURRENT_TIMESTAMP,
@@ -519,7 +519,7 @@ exports.verifyListingPayment = async (req, res) => {
         expiryDate.getDate() + parseInt(metadata.duration_days || 30)
       );
 
-      await pool.query(
+      await db.query(
         `UPDATE properties 
          SET expires_at = $1,
              featured = $2,
@@ -573,7 +573,7 @@ exports.initializeRentPayment = async (req, res) => {
     const { property_id, amount, payment_method } = req.body;
 
     // Validate property
-    const propertyResult = await pool.query(
+    const propertyResult = await db.query(
       `SELECT p.id, p.landlord_id, p.title,
               u.email AS landlord_email, 
               u.full_name AS landlord_name
@@ -593,7 +593,7 @@ exports.initializeRentPayment = async (req, res) => {
     const property = propertyResult.rows[0];
 
     // Get tenant info
-    const userResult = await pool.query(
+    const userResult = await db.query(
       "SELECT email, full_name FROM users WHERE id = $1",
       [userId]
     );
@@ -605,7 +605,7 @@ exports.initializeRentPayment = async (req, res) => {
     const landlordAmount = amount - platformFee;
 
     // Save payment record
-    const paymentResult = await pool.query(
+    const paymentResult = await db.query(
       `INSERT INTO payments (user_id, payment_type, amount, currency,
                              property_id, payment_method, payment_status)
        VALUES ($1, 'rent_payment', $2, 'NGN', $3, $4, 'pending')
@@ -644,7 +644,7 @@ exports.initializeRentPayment = async (req, res) => {
         }
       );
 
-      await pool.query(
+      await db.query(
         "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
         [paystackResponse.data.data.reference, paymentId]
       );
@@ -716,7 +716,7 @@ exports.verifyRentPayment = async (req, res) => {
       });
     }
 
-    const paymentResult = await pool.query(
+    const paymentResult = await db.query(
       "SELECT * FROM payments WHERE transaction_reference = $1",
       [reference]
     );
@@ -730,7 +730,7 @@ exports.verifyRentPayment = async (req, res) => {
 
     const payment = paymentResult.rows[0];
 
-    await pool.query(
+    await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = CURRENT_TIMESTAMP,
@@ -789,9 +789,9 @@ exports.getPaymentHistory = async (req, res) => {
     query += ` ORDER BY created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(limit, offset);
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
 
-    const countResult = await pool.query(
+    const countResult = await db.query(
       "SELECT COUNT(*) FROM payments WHERE user_id = $1",
       [userId]
     );
@@ -820,7 +820,7 @@ exports.getPaymentDetails = async (req, res) => {
     const userId = req.user.id;
     const { paymentId } = req.params;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT p.*, 
               prop.title AS property_title,
               prop.full_address AS property_address
@@ -900,7 +900,7 @@ async function handleSuccessfulPayment(data) {
     const reference = data.reference;
     const metadata = data.metadata;
 
-    await pool.query(
+    await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = CURRENT_TIMESTAMP,
@@ -914,7 +914,7 @@ async function handleSuccessfulPayment(data) {
       const expiry = new Date();
       expiry.setDate(expiry.getDate() + (metadata.duration_days || 30));
 
-      await pool.query(
+      await db.query(
         `UPDATE users 
          SET subscription_active = TRUE,
              subscription_expires_at = $1
@@ -927,7 +927,7 @@ async function handleSuccessfulPayment(data) {
       const expiry = new Date();
       expiry.setDate(expiry.getDate() + (metadata.duration_days || 30));
 
-      await pool.query(
+      await db.query(
         `UPDATE properties 
          SET expires_at = $1,
              featured = $2
@@ -948,7 +948,7 @@ async function handleFailedPayment(data) {
   try {
     const reference = data.reference;
 
-    await pool.query(
+    await db.query(
       `UPDATE payments 
        SET payment_status = 'failed',
            gateway_response = $1

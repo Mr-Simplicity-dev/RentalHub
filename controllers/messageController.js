@@ -17,7 +17,7 @@ exports.sendMessage = async (req, res) => {
     const { receiver_id, message_text, property_id } = req.body;
 
     // Verify receiver exists
-    const receiverResult = await pool.query(
+    const receiverResult = await db.query(
       'SELECT id, email, full_name FROM users WHERE id = $1',
       [receiver_id]
     );
@@ -32,7 +32,7 @@ exports.sendMessage = async (req, res) => {
     const receiver = receiverResult.rows[0];
 
     // Get sender info
-    const senderResult = await pool.query(
+    const senderResult = await db.query(
       'SELECT full_name FROM users WHERE id = $1',
       [senderId]
     );
@@ -40,7 +40,7 @@ exports.sendMessage = async (req, res) => {
 
     // If property_id provided, verify it exists
     if (property_id) {
-      const propertyCheck = await pool.query(
+      const propertyCheck = await db.query(
         'SELECT id, title FROM properties WHERE id = $1',
         [property_id]
       );
@@ -54,7 +54,7 @@ exports.sendMessage = async (req, res) => {
     }
 
     // Insert message
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO messages (sender_id, receiver_id, property_id, message_text, is_read)
        VALUES ($1, $2, $3, $4, FALSE)
        RETURNING *`,
@@ -92,7 +92,7 @@ exports.getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const result = await pool.query(
+    const result = await db.query(
       `WITH latest_messages AS (
          SELECT DISTINCT ON (
            CASE 
@@ -161,7 +161,7 @@ exports.getConversationWithUser = async (req, res) => {
     const offset = (page - 1) * limit;
 
     // Get messages
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          m.*,
          s.full_name as sender_name,
@@ -179,7 +179,7 @@ exports.getConversationWithUser = async (req, res) => {
     );
 
     // Mark messages as read
-    await pool.query(
+    await db.query(
       `UPDATE messages 
        SET is_read = TRUE 
        WHERE sender_id = $1 AND receiver_id = $2 AND is_read = FALSE`,
@@ -187,7 +187,7 @@ exports.getConversationWithUser = async (req, res) => {
     );
 
     // Get total count
-    const countResult = await pool.query(
+    const countResult = await db.query(
       `SELECT COUNT(*) FROM messages
        WHERE (sender_id = $1 AND receiver_id = $2)
           OR (sender_id = $2 AND receiver_id = $1)`,
@@ -221,7 +221,7 @@ exports.getPropertyMessages = async (req, res) => {
     const { page = 1, limit = 50 } = req.query;
     const offset = (page - 1) * limit;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          m.*,
          s.full_name as sender_name,
@@ -257,7 +257,7 @@ exports.markAsRead = async (req, res) => {
     const userId = req.user.id;
     const { messageId } = req.params;
 
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE messages 
        SET is_read = TRUE 
        WHERE id = $1 AND receiver_id = $2
@@ -292,7 +292,7 @@ exports.markConversationAsRead = async (req, res) => {
     const userId = req.user.id;
     const { userId: otherUserId } = req.params;
 
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE messages 
        SET is_read = TRUE 
        WHERE sender_id = $1 AND receiver_id = $2 AND is_read = FALSE
@@ -320,7 +320,7 @@ exports.deleteMessage = async (req, res) => {
     const { messageId } = req.params;
 
     // Only sender can delete their message
-    const result = await pool.query(
+    const result = await db.query(
       'DELETE FROM messages WHERE id = $1 AND sender_id = $2 RETURNING id',
       [messageId, userId]
     );
@@ -350,7 +350,7 @@ exports.getUnreadCount = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT COUNT(*) as unread_count FROM messages WHERE receiver_id = $1 AND is_read = FALSE',
       [userId]
     );

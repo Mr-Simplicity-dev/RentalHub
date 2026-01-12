@@ -1,5 +1,5 @@
 // ====================== IMPORTS ======================
-const pool = require("../config/middleware/database");
+const db = require("../config/middleware/database");
 const { validationResult } = require("express-validator");
 const {
   sendApplicationNotification,
@@ -27,7 +27,7 @@ exports.submitApplication = async (req, res) => {
     const { property_id, message, move_in_date } = req.body;
 
     // Check if property exists
-    const propertyResult = await pool.query(
+    const propertyResult = await db.query(
       `SELECT p.id, p.title, p.landlord_id, p.is_available,
               u.email AS landlord_email, 
               u.full_name AS landlord_name
@@ -54,7 +54,8 @@ exports.submitApplication = async (req, res) => {
     }
 
     // Check existing application
-    const existingApplication = await pool.query(
+    const existingApplication = await db.query(
+
       "SELECT id, status FROM applications WHERE property_id = $1 AND tenant_id = $2",
       [property_id, userId]
     );
@@ -76,7 +77,7 @@ exports.submitApplication = async (req, res) => {
     }
 
     // Get tenant info
-    const tenantResult = await pool.query(
+    const tenantResult = await db.query(
       "SELECT email, full_name, phone FROM users WHERE id = $1",
       [userId]
     );
@@ -84,7 +85,7 @@ exports.submitApplication = async (req, res) => {
     const tenant = tenantResult.rows[0];
 
     // Create application
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO applications (property_id, tenant_id, message, move_in_date, status)
        VALUES ($1, $2, $3, $4, 'pending')
        RETURNING *`,
@@ -136,7 +137,7 @@ exports.getMyApplications = async (req, res) => {
       paramCount++;
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          a.*,
          p.title AS property_title,
@@ -160,7 +161,7 @@ exports.getMyApplications = async (req, res) => {
       [...params, limit, offset]
     );
 
-    const countResult = await pool.query(
+    const countResult = await db.query(
       `SELECT COUNT(*) FROM applications a ${whereClause}`,
       params
     );
@@ -237,7 +238,7 @@ exports.getApplicationById = async (req, res) => {
       params = [applicationId, userId];
     }
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -266,7 +267,7 @@ exports.withdrawApplication = async (req, res) => {
     const { applicationId } = req.params;
     const userId = req.user.id;
 
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE applications 
        SET status = 'withdrawn',
            updated_at = CURRENT_TIMESTAMP
@@ -319,7 +320,7 @@ exports.getReceivedApplications = async (req, res) => {
       paramCount++;
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          a.*,
          p.id AS property_id,
@@ -346,7 +347,7 @@ exports.getReceivedApplications = async (req, res) => {
       [...params, limit, offset]
     );
 
-    const countResult = await pool.query(
+    const countResult = await db.query(
       `SELECT COUNT(*)
        FROM applications a
        JOIN properties p ON a.property_id = p.id
@@ -382,7 +383,7 @@ exports.getPropertyApplications = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    const propertyCheck = await pool.query(
+    const propertyCheck = await db.query(
       "SELECT id FROM properties WHERE id = $1 AND landlord_id = $2",
       [propertyId, userId]
     );
@@ -394,7 +395,7 @@ exports.getPropertyApplications = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          a.*,
          u.full_name AS tenant_name,
@@ -416,7 +417,7 @@ exports.getPropertyApplications = async (req, res) => {
       [propertyId, limit, offset]
     );
 
-    const countResult = await pool.query(
+    const countResult = await db.query(
       "SELECT COUNT(*) FROM applications WHERE property_id = $1",
       [propertyId]
     );
@@ -446,7 +447,7 @@ exports.approveApplication = async (req, res) => {
     const { applicationId } = req.params;
     const userId = req.user.id;
 
-    const appResult = await pool.query(
+    const appResult = await db.query(
       `SELECT 
          a.*, p.landlord_id, p.title AS property_title,
          u.email AS tenant_email,
@@ -481,7 +482,7 @@ exports.approveApplication = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE applications 
        SET status = 'approved',
            updated_at = CURRENT_TIMESTAMP
@@ -520,7 +521,7 @@ exports.rejectApplication = async (req, res) => {
     const userId = req.user.id;
     const { reason } = req.body;
 
-    const appResult = await pool.query(
+    const appResult = await db.query(
       `SELECT a.*, p.landlord_id, p.title AS property_title,
               u.email AS tenant_email,
               u.full_name AS tenant_name
@@ -554,7 +555,7 @@ exports.rejectApplication = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE applications 
        SET status = 'rejected',
            updated_at = CURRENT_TIMESTAMP
@@ -592,7 +593,7 @@ exports.getApplicationStats = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const stats = await pool.query(
+    const stats = await db.query(
       `SELECT 
          COUNT(*) FILTER (WHERE a.status = 'pending') AS pending_count,
          COUNT(*) FILTER (WHERE a.status = 'approved') AS approved_count,

@@ -4,7 +4,7 @@ const pool = require('../middleware/database');
 // Check and update expired subscriptions (run as cron job)
 exports.checkExpiredSubscriptions = async () => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE users 
        SET subscription_active = FALSE
        WHERE subscription_active = TRUE 
@@ -25,7 +25,7 @@ exports.checkExpiredSubscriptions = async () => {
 // Check and update expired property listings
 exports.checkExpiredListings = async () => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE properties 
        SET is_available = FALSE
        WHERE is_available = TRUE 
@@ -46,7 +46,7 @@ exports.checkExpiredListings = async () => {
 // Calculate platform revenue
 exports.calculateRevenue = async (startDate, endDate) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          payment_type,
          COUNT(*) as transaction_count,
@@ -69,7 +69,7 @@ exports.calculateRevenue = async (startDate, endDate) => {
 // Get payment statistics for admin dashboard
 exports.getPaymentStats = async () => {
   try {
-    const stats = await pool.query(`
+    const stats = await db.query(`
       SELECT 
         COUNT(*) FILTER (WHERE payment_type = 'tenant_subscription' AND payment_status = 'completed') as total_subscriptions,
         COUNT(*) FILTER (WHERE payment_type = 'landlord_listing' AND payment_status = 'completed') as total_listings_paid,

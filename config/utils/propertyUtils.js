@@ -3,7 +3,7 @@ const pool = require('../middleware/database');
 // Get popular locations (most properties)
 exports.getPopularLocations = async (limit = 10) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          s.state_name, s.state_code, s.id as state_id,
          COUNT(p.id) as property_count
@@ -28,7 +28,7 @@ exports.getPopularLocations = async (limit = 10) => {
 // Get price statistics by state
 exports.getPriceStatsByState = async (stateId) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          MIN(rent_amount) as min_price,
          MAX(rent_amount) as max_price,
@@ -52,7 +52,7 @@ exports.getPriceStatsByState = async (stateId) => {
 exports.getSimilarProperties = async (propertyId, limit = 5) => {
   try {
     // Get the reference property
-    const refProperty = await pool.query(
+    const refProperty = await db.query(
       'SELECT state_id, property_type, rent_amount, bedrooms FROM properties WHERE id = $1',
       [propertyId]
     );
@@ -64,7 +64,7 @@ exports.getSimilarProperties = async (propertyId, limit = 5) => {
     const ref = refProperty.rows[0];
     const priceRange = ref.rent_amount * 0.2; // 20% price range
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
          p.rent_amount, p.payment_frequency, p.city, p.area,
@@ -104,7 +104,7 @@ exports.getSimilarProperties = async (propertyId, limit = 5) => {
 // Auto-expire properties (run as cron job)
 exports.expireProperties = async () => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE properties 
        SET is_available = FALSE
        WHERE is_available = TRUE 
@@ -125,7 +125,7 @@ exports.expireProperties = async () => {
 exports.getRecommendations = async (userId, limit = 10) => {
   try {
     // Get user's saved properties to understand preferences
-    const savedProperties = await pool.query(
+    const savedProperties = await db.query(
       `SELECT p.state_id, p.property_type, p.rent_amount, p.bedrooms
        FROM saved_properties sp
        JOIN properties p ON sp.property_id = p.id
@@ -136,7 +136,7 @@ exports.getRecommendations = async (userId, limit = 10) => {
 
     if (savedProperties.rows.length === 0) {
       // Return popular properties if no preferences
-      const result = await pool.query(
+      const result = await db.query(
         `SELECT 
            p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
            p.rent_amount, p.payment_frequency, p.city, p.area,
@@ -161,7 +161,7 @@ exports.getRecommendations = async (userId, limit = 10) => {
     const stateIds = savedProperties.rows.map(p => p.state_id);
     const propertyTypes = savedProperties.rows.map(p => p.property_type);
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
          p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
          p.rent_amount, p.payment_frequency, p.city, p.area,

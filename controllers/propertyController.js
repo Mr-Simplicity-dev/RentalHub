@@ -14,7 +14,7 @@ const { cloudinary } = require('../config/middleware/upload');
 // -----------------------------------------------------
 exports.getAllStates = async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT * FROM states ORDER BY state_name ASC'
     );
 
@@ -39,7 +39,7 @@ exports.browseProperties = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
         p.rent_amount, p.payment_frequency, p.city, p.area,
@@ -60,7 +60,7 @@ exports.browseProperties = async (req, res) => {
       [limit, offset]
     );
 
-    const countResult = await pool.query(
+    const countResult = await db.query(
       `SELECT COUNT(*) FROM properties 
        WHERE is_available = TRUE 
          AND is_verified = TRUE
@@ -93,7 +93,7 @@ exports.getFeaturedProperties = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
         p.rent_amount, p.payment_frequency, p.city, p.area,
@@ -236,7 +236,7 @@ exports.searchProperties = async (req, res) => {
 
     params.push(limit, offset);
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
 
     // Total count
     const countQuery = `
@@ -244,7 +244,7 @@ exports.searchProperties = async (req, res) => {
       FROM properties p
       WHERE ${whereConditions.join(' AND ')}
     `;
-    const countResult = await pool.query(countQuery, params.slice(0, -2));
+    const countResult = await db.query(countQuery, params.slice(0, -2));
 
     res.json({
       success: true,
@@ -272,7 +272,7 @@ exports.getPropertyById = async (req, res) => {
   try {
     const { propertyId } = req.params;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
         p.rent_amount, p.payment_frequency, p.city, p.area,
@@ -293,7 +293,7 @@ exports.getPropertyById = async (req, res) => {
       });
     }
 
-    const photosResult = await pool.query(
+    const photosResult = await db.query(
       `SELECT id, photo_url, is_primary, upload_order
        FROM property_photos
        WHERE property_id = $1
@@ -331,7 +331,7 @@ exports.getFullPropertyDetails = async (req, res) => {
   try {
     const { propertyId } = req.params;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
         p.*,
         s.state_name, s.state_code,
@@ -356,7 +356,7 @@ exports.getFullPropertyDetails = async (req, res) => {
       });
     }
 
-    const photosResult = await pool.query(
+    const photosResult = await db.query(
       `SELECT id, photo_url, is_primary, upload_order
        FROM property_photos
        WHERE property_id = $1
@@ -367,7 +367,7 @@ exports.getFullPropertyDetails = async (req, res) => {
     const property = result.rows[0];
     property.photos = photosResult.rows;
 
-    await pool.query(
+    await db.query(
       `INSERT INTO property_views (property_id, viewer_id, viewed_at)
        VALUES ($1, $2, CURRENT_TIMESTAMP)
        ON CONFLICT DO NOTHING`,
@@ -396,7 +396,7 @@ exports.saveProperty = async (req, res) => {
     const { propertyId } = req.params;
     const userId = req.user.id;
 
-    await pool.query(
+    await db.query(
       `INSERT INTO saved_properties (tenant_id, property_id)
        VALUES ($1, $2)
        ON CONFLICT (tenant_id, property_id) DO NOTHING`,
@@ -424,7 +424,7 @@ exports.unsaveProperty = async (req, res) => {
     const { propertyId } = req.params;
     const userId = req.user.id;
 
-    await pool.query(
+    await db.query(
       'DELETE FROM saved_properties WHERE tenant_id = $1 AND property_id = $2',
       [userId, propertyId]
     );
@@ -451,7 +451,7 @@ exports.getSavedProperties = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
         p.rent_amount, p.payment_frequency, p.city, p.area,
@@ -469,7 +469,7 @@ exports.getSavedProperties = async (req, res) => {
       [userId, limit, offset]
     );
 
-    const countResult = await pool.query(
+    const countResult = await db.query(
       'SELECT COUNT(*) FROM saved_properties WHERE tenant_id = $1',
       [userId]
     );
@@ -509,7 +509,7 @@ exports.addReview = async (req, res) => {
     const userId = req.user.id;
     const { rating, review_text } = req.body;
 
-    const propertyCheck = await pool.query(
+    const propertyCheck = await db.query(
       'SELECT id FROM properties WHERE id = $1',
       [propertyId]
     );
@@ -521,7 +521,7 @@ exports.addReview = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO reviews (property_id, tenant_id, rating, review_text)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (property_id, tenant_id)
@@ -553,7 +553,7 @@ exports.getPropertyReviews = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
         r.id, r.rating, r.review_text, r.created_at,
         u.full_name AS reviewer_name
@@ -565,7 +565,7 @@ exports.getPropertyReviews = async (req, res) => {
       [propertyId, limit, offset]
     );
 
-    const avgResult = await pool.query(
+    const avgResult = await db.query(
       `SELECT 
         AVG(rating) AS avg_rating,
         COUNT(*) AS total_reviews
@@ -630,7 +630,7 @@ exports.createProperty = async (req, res) => {
       amenities
     } = req.body;
 
-    const stateCheck = await pool.query(
+    const stateCheck = await db.query(
       'SELECT id FROM states WHERE id = $1',
       [state_id]
     );
@@ -642,7 +642,7 @@ exports.createProperty = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO properties (
         landlord_id, state_id, city, area, full_address,
         property_type, bedrooms, bathrooms, rent_amount,
@@ -682,7 +682,7 @@ exports.uploadPropertyPhotos = async (req, res) => {
     const { propertyId } = req.params;
     const userId = req.user.id;
 
-    const propertyCheck = await pool.query(
+    const propertyCheck = await db.query(
       'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
       [propertyId, userId]
     );
@@ -701,7 +701,7 @@ exports.uploadPropertyPhotos = async (req, res) => {
       });
     }
 
-    const countResult = await pool.query(
+    const countResult = await db.query(
       'SELECT COUNT(*) FROM property_photos WHERE property_id = $1',
       [propertyId]
     );
@@ -712,7 +712,7 @@ exports.uploadPropertyPhotos = async (req, res) => {
       const isPrimary = currentCount === 0 && index === 0;
       const uploadOrder = currentCount + index;
 
-      return pool.query(
+      return db.query(
         `INSERT INTO property_photos (property_id, photo_url, is_primary, upload_order)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
@@ -745,7 +745,7 @@ exports.updateProperty = async (req, res) => {
     const { propertyId } = req.params;
     const userId = req.user.id;
 
-    const propertyCheck = await pool.query(
+    const propertyCheck = await db.query(
       'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
       [propertyId, userId]
     );
@@ -796,7 +796,7 @@ exports.updateProperty = async (req, res) => {
       RETURNING *
     `;
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
 
     res.json({
       success: true,
@@ -821,7 +821,7 @@ exports.deleteProperty = async (req, res) => {
     const { propertyId } = req.params;
     const userId = req.user.id;
 
-    const propertyCheck = await pool.query(
+    const propertyCheck = await db.query(
       'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
       [propertyId, userId]
     );
@@ -833,12 +833,12 @@ exports.deleteProperty = async (req, res) => {
       });
     }
 
-    const photosResult = await pool.query(
+    const photosResult = await db.query(
       'SELECT photo_url FROM property_photos WHERE property_id = $1',
       [propertyId]
     );
 
-    await pool.query('DELETE FROM properties WHERE id = $1', [propertyId]);
+    await db.query('DELETE FROM properties WHERE id = $1', [propertyId]);
 
     for (const photo of photosResult.rows) {
       try {
@@ -884,7 +884,7 @@ exports.getMyProperties = async (req, res) => {
       whereClause += ` AND p.is_available = FALSE`;
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT 
         p.*, s.state_name, s.state_code,
         (SELECT photo_url FROM property_photos 
@@ -901,7 +901,7 @@ exports.getMyProperties = async (req, res) => {
       [...params, limit, offset]
     );
 
-    const countResult = await pool.query(
+    const countResult = await db.query(
       `SELECT COUNT(*) FROM properties p ${whereClause}`,
       params
     );
@@ -933,7 +933,7 @@ exports.toggleAvailability = async (req, res) => {
     const { propertyId } = req.params;
     const userId = req.user.id;
 
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE properties
        SET is_available = NOT is_available,
            updated_at = CURRENT_TIMESTAMP
@@ -973,7 +973,7 @@ exports.deletePropertyPhoto = async (req, res) => {
     const { propertyId, photoId } = req.params;
     const userId = req.user.id;
 
-    const propertyCheck = await pool.query(
+    const propertyCheck = await db.query(
       'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
       [propertyId, userId]
     );
@@ -985,7 +985,7 @@ exports.deletePropertyPhoto = async (req, res) => {
       });
     }
 
-    const photoResult = await pool.query(
+    const photoResult = await db.query(
       'SELECT photo_url, is_primary FROM property_photos WHERE id = $1 AND property_id = $2',
       [photoId, propertyId]
     );
@@ -999,10 +999,10 @@ exports.deletePropertyPhoto = async (req, res) => {
 
     const photo = photoResult.rows[0];
 
-    await pool.query('DELETE FROM property_photos WHERE id = $1', [photoId]);
+    await db.query('DELETE FROM property_photos WHERE id = $1', [photoId]);
 
     if (photo.is_primary) {
-      await pool.query(
+      await db.query(
         `UPDATE property_photos
          SET is_primary = TRUE
          WHERE property_id = $1
@@ -1043,7 +1043,7 @@ exports.getPropertyStats = async (req, res) => {
     const { propertyId } = req.params;
     const userId = req.user.id;
 
-    const propertyCheck = await pool.query(
+    const propertyCheck = await db.query(
       'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
       [propertyId, userId]
     );
@@ -1055,7 +1055,7 @@ exports.getPropertyStats = async (req, res) => {
       });
     }
 
-    const stats = await pool.query(
+    const stats = await db.query(
       `SELECT 
         (SELECT COUNT(*) FROM applications WHERE property_id = $1) AS total_applications,
         (SELECT COUNT(*) FROM applications WHERE property_id = $1 AND status = 'pending') AS pending_applications,

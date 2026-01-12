@@ -11,7 +11,7 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const stats = await pool.query(
+    const stats = await db.query(
       `SELECT 
         (SELECT COUNT(*) FROM saved_properties WHERE tenant_id = $1) AS saved_properties_count,
         (SELECT COUNT(*) FROM applications WHERE tenant_id = $1) AS total_applications,
@@ -40,7 +40,7 @@ router.get("/landlord/stats", authenticate, isLandlord, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const stats = await pool.query(
+    const stats = await db.query(
       `SELECT 
         (SELECT COUNT(*) FROM properties WHERE landlord_id = $1) AS total_properties,
         (SELECT COUNT(*) FROM properties WHERE landlord_id = $1 AND is_available = TRUE) AS available_properties,
@@ -72,7 +72,7 @@ router.get("/tenant/recent-activities", authenticate, isTenant, async (req, res)
     const userId = req.user.id;
     const { limit = 10 } = req.query;
 
-    const activities = await pool.query(
+    const activities = await db.query(
       `(
         SELECT 
           'application' AS type,
@@ -125,7 +125,7 @@ router.get("/landlord/recent-activities", authenticate, isLandlord, async (req, 
     const userId = req.user.id;
     const { limit = 10 } = req.query;
 
-    const activities = await pool.query(
+    const activities = await db.query(
       `(
         SELECT 
           'application' AS type,
@@ -196,7 +196,7 @@ router.get("/landlord/recent-activities", authenticate, isLandlord, async (req, 
 
 router.get("/admin/stats", authenticate, async (req, res) => {
   try {
-    const checkAdmin = await pool.query(
+    const checkAdmin = await db.query(
       "SELECT is_admin FROM users WHERE id = $1",
       [req.user.id]
     );
@@ -208,7 +208,7 @@ router.get("/admin/stats", authenticate, async (req, res) => {
       });
     }
 
-    const stats = await pool.query(`
+    const stats = await db.query(`
       SELECT 
         (SELECT COUNT(*) FROM users WHERE user_type = 'tenant') AS total_tenants,
         (SELECT COUNT(*) FROM users WHERE user_type = 'landlord') AS total_landlords,

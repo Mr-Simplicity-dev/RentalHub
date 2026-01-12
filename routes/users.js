@@ -9,7 +9,7 @@ router.get('/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT id, user_type, full_name, created_at,
               identity_verified
        FROM users WHERE id = $1`,
@@ -72,7 +72,7 @@ router.put('/profile', authenticate, async (req, res) => {
 
     const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
 
     // Remove sensitive data
     delete result.rows[0].password_hash;
@@ -112,7 +112,7 @@ router.put('/change-password', authenticate, async (req, res) => {
     }
 
     // Get current password hash
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT password_hash FROM users WHERE id = $1',
       [userId]
     );
@@ -133,7 +133,7 @@ router.put('/change-password', authenticate, async (req, res) => {
     const new_password_hash = await bcrypt.hash(new_password, salt);
 
     // Update password
-    await pool.query(
+    await db.query(
       'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [new_password_hash, userId]
     );
@@ -156,7 +156,7 @@ router.get('/verification/status', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT email_verified, phone_verified, nin_verified,
               identity_verified, passport_photo_url, nin
        FROM users WHERE id = $1`,
@@ -205,7 +205,7 @@ router.delete('/account', authenticate, async (req, res) => {
     }
 
     // Verify password
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT password_hash FROM users WHERE id = $1',
       [userId]
     );
@@ -221,7 +221,7 @@ router.delete('/account', authenticate, async (req, res) => {
     }
 
     // Delete user (cascade will delete related records)
-    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    await db.query('DELETE FROM users WHERE id = $1', [userId]);
 
     res.json({
       success: true,
