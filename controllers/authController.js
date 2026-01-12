@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
-const pool = require('../config/middleware/database');
+const db = require('../config/middleware/database');
 const { validateNIN } = require('../config/utils/ninValidator');
 const { sendVerificationEmail, sendWelcomeEmail } = require('../config/utils/emailService');
 const { sendVerificationCode } = require('../config/utils/smsService');

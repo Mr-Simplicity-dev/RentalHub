@@ -1,4 +1,4 @@
-const pool = require('../config/middleware/database');
+const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
 const { sendMessageNotification } = require('../config/utils/emailService');
 

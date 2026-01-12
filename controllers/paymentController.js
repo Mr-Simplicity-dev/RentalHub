@@ -1,7 +1,7 @@
 // ====================== IMPORTS ======================
 const axios = require("axios");
 const crypto = require("crypto");
-const pool = require("../config/middleware/database");
+const db = require('../config/middleware/database');
 const { validationResult } = require("express-validator");
 
 // ====================== PAYSTACK CONFIG ======================
