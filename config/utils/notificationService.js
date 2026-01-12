@@ -1,4 +1,4 @@
-const pool = require('../middleware/database');
+const db = require("../middleware/database");
 
 // Create notification table
 const createNotificationTable = async () => {
