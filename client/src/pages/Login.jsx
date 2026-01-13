@@ -19,7 +19,12 @@ const Login = () => {
       const response = await login(email, password);
       if (response.success) {
         toast.success('Login successful!');
-        navigate('/dashboard');
+        if (response.data?.user?.user_type === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
+
       } else {
         toast.error(response.message || 'Login failed');
       }
