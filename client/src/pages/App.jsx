@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
+
 import Home from './Home';
 import Login from './Login';
 import Register from './Register';
@@ -16,26 +17,27 @@ import Properties from './Properties';
 import PropertyDetail from './PropertyDetail';
 import Dashboard from './Dashboard';
 import NotFound from './NotFound';
-import AdminDashboard from '../AdminDashboard';
-import AdminLayout from './AdminLayout';
-import AdminUsers from '../AdminUsers';
-import AdminProperties from '../AdminProperties';
-import AdminApplications from '../AdminApplications';
-import AdminVerifications from '../AdminVerifications';
 
-import Profile from './pages/Profile';
-import Applications from './pages/Applications';
-import SavedProperties from './pages/SavedProperties';
-import Messages from './pages/Messages';
-import MyProperties from './pages/MyProperties';
-import AddProperty from './pages/AddProperty';
-import Subscribe from './pages/Subscribe';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Terms from './pages/Terms';
-import Privacy from './pages/Privacy';
+// Admin (inside src/pages/admin/)
+import AdminDashboard from './admin/AdminDashboard';
+import AdminLayout from './admin/AdminLayout';
+import AdminUsers from './admin/AdminUsers';
+import AdminProperties from './admin/AdminProperties';
+import AdminApplications from './admin/AdminApplications';
+import AdminVerifications from './admin/AdminVerifications';
 
-
+// User pages (inside src/pages/)
+import Profile from './Profile';
+import Applications from './Applications';
+import SavedProperties from './SavedProperties';
+import Messages from './Messages';
+import MyProperties from './MyProperties';
+import AddProperty from './AddProperty';
+import Subscribe from './Subscribe';
+import ForgotPassword from './ForgotPassword';
+import ResetPassword from './ResetPassword';
+import Terms from './Terms';
+import Privacy from './Privacy';
 
 
 
