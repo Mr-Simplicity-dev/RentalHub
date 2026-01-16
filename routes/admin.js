@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/middleware/database");
 const { authenticate } = require("../config/middleware/auth");
-const express = require('express');
 
 const adminController = require('../controllers/adminController');
 const { authenticate } = require('../config/middleware/auth');
