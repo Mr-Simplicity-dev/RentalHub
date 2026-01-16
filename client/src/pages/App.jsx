@@ -38,7 +38,10 @@ import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import Terms from './Terms';
 import Privacy from './Privacy';
-
+import Faq from './Faq';
+import HowItWorks from './HowItWorks';
+import Pricing from './Pricing';
+import LandlordGuide from './LandlordGuide';
 
 
 const queryClient = new QueryClient();
@@ -190,10 +193,15 @@ function App() {
                     <Route path="/reset-password/:token" element={<ResetPassword />} />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
-
-
+                  
                 {/* 404 */}
                 <Route path="*" element={<NotFound />} />
+                <Route path="/faq" element={<Faq />} />
+                    <Route path="/how-it-works" element={<HowItWorks />} />
+                    <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/landlord-guide" element={<LandlordGuide />} />
+                    <Route path="/privacy" element={<Privacy />} />
+                    <Route path="/terms" element={<Terms />} />
               </Routes>
             </main>
             <Footer />

@@ -1,12 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { propertyService } from '../../services/propertyService';
-import { PROPERTY_TYPES } from '../../utils/constants';
 import { FaSearch } from 'react-icons/fa';
+
+const FALLBACK_STATES = [
+  'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa',
+  'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo',
+  'Ekiti', 'Enugu', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano',
+  'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa',
+  'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers',
+  'Sokoto', 'Taraba', 'Yobe', 'Zamfara', 'FCT'
+];
+
+const PROPERTY_TYPES = [
+  { value: 'apartment', label: 'Apartment' },
+  { value: 'bungalow', label: 'Bungalow' },
+  { value: 'duplex', label: 'Duplex' },
+  { value: 'detached', label: 'Detached House' },
+  { value: 'semi-detached', label: 'Semi-Detached' },
+  { value: 'terrace', label: 'Terrace' },
+  { value: 'land', label: 'Land' },
+  { value: 'shop', label: 'Shop' },
+  { value: 'office', label: 'Office Space' },
+  { value: 'warehouse', label: 'Warehouse' },
+];
 
 const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
   const [states, setStates] = useState([]);
   const [filters, setFilters] = useState({
-    state_id: '',
+    state: '',
     city: '',
     property_type: '',
     min_price: '',
@@ -23,41 +44,41 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
   const loadStates = async () => {
     try {
       const response = await propertyService.getStates();
-      if (response.success) {
-        setStates(response.data);
+      if (response?.success && Array.isArray(response.data) && response.data.length) {
+        setStates(response.data.map(s => s.state_name));
+      } else {
+        setStates(FALLBACK_STATES);
       }
     } catch (error) {
-      console.error('Error loading states:', error);
+      console.error('Error loading states, using fallback:', error);
+      setStates(FALLBACK_STATES);
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFilters({
-      ...filters,
-      [name]: value,
-    });
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Remove empty filters
     const activeFilters = Object.fromEntries(
-      Object.entries(filters).filter(([_, value]) => value !== '')
+      Object.entries(filters).filter(([_, v]) => v !== '')
     );
     onFilterChange(activeFilters);
   };
 
   const handleReset = () => {
-    setFilters({
-      state_id: '',
+    const reset = {
+      state: '',
       city: '',
       property_type: '',
       min_price: '',
       max_price: '',
       bedrooms: '',
       bathrooms: '',
-    });
+    };
+    setFilters(reset);
     onFilterChange({});
   };
 
@@ -66,31 +87,21 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
       <h3 className="text-lg font-semibold mb-4">Filter Properties</h3>
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
           {/* State */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              State
-            </label>
-            <select
-              name="state_id"
-              value={filters.state_id}
-              onChange={handleChange}
-              className="input"
-            >
+            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+            <select name="state" value={filters.state} onChange={handleChange} className="input">
               <option value="">All States</option>
-              {states.map((state) => (
-                <option key={state.id} value={state.id}>
-                  {state.state_name}
-                </option>
+              {states.map((name) => (
+                <option key={name} value={name}>{name}</option>
               ))}
             </select>
           </div>
 
           {/* City */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              City/Area
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">City/Area</label>
             <input
               type="text"
               name="city"
@@ -103,9 +114,7 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
 
           {/* Property Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Property Type
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Property Type</label>
             <select
               name="property_type"
               value={filters.property_type}
@@ -123,15 +132,8 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
 
           {/* Bedrooms */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Min. Bedrooms
-            </label>
-            <select
-              name="bedrooms"
-              value={filters.bedrooms}
-              onChange={handleChange}
-              className="input"
-            >
+            <label className="block text-sm font-medium text-gray-700 mb-1">Min. Bedrooms</label>
+            <select name="bedrooms" value={filters.bedrooms} onChange={handleChange} className="input">
               <option value="">Any</option>
               <option value="1">1+</option>
               <option value="2">2+</option>
@@ -143,9 +145,7 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
 
           {/* Min Price */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Min. Price (₦)
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Min. Price (₦)</label>
             <input
               type="number"
               name="min_price"
@@ -158,9 +158,7 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
 
           {/* Max Price */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Max. Price (₦)
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Max. Price (₦)</label>
             <input
               type="number"
               name="max_price"
@@ -173,15 +171,8 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
 
           {/* Bathrooms */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Min. Bathrooms
-            </label>
-            <select
-              name="bathrooms"
-              value={filters.bathrooms}
-              onChange={handleChange}
-              className="input"
-            >
+            <label className="block text-sm font-medium text-gray-700 mb-1">Min. Bathrooms</label>
+            <select name="bathrooms" value={filters.bathrooms} onChange={handleChange} className="input">
               <option value="">Any</option>
               <option value="1">1+</option>
               <option value="2">2+</option>
@@ -196,14 +187,11 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
               <FaSearch className="inline mr-2" />
               Search
             </button>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="btn btn-secondary"
-            >
+            <button type="button" onClick={handleReset} className="btn btn-secondary">
               Reset
             </button>
           </div>
+
         </div>
       </form>
     </div>
