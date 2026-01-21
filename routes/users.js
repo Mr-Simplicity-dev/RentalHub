@@ -3,6 +3,37 @@ const router = express.Router();
 const pool = require('../config/middleware/database');
 const { authenticate } = require('../config/middleware/auth');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, '..', 'uploads', 'passports');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `passport_${req.user.id}_${Date.now()}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    cb(null, true);
+  }
+});
+
 
 // Get user profile by ID (public info only)
 router.get('/:userId', async (req, res) => {
@@ -235,5 +266,39 @@ router.delete('/account', authenticate, async (req, res) => {
     });
   }
 });
+
+// Upload passport photo
+router.post('/upload-passport', authenticate, upload.single('passport'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    const userId = req.user.id;
+    const relativePath = `/uploads/passports/${req.file.filename}`;
+
+    await pool.query(
+      'UPDATE users SET passport_photo_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [relativePath, userId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Passport uploaded successfully',
+      url: relativePath
+    });
+
+  } catch (error) {
+    console.error('Upload passport error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload passport'
+    });
+  }
+});
+
 
 module.exports = router;

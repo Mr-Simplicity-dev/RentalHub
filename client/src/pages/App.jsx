@@ -42,6 +42,9 @@ import Faq from './Faq';
 import HowItWorks from './HowItWorks';
 import Pricing from './Pricing';
 import LandlordGuide from './LandlordGuide';
+import VerifyEmail from './VerifyEmail';
+import VerifyPhone from './VerifyPhone';
+
 
 
 const queryClient = new QueryClient();
@@ -99,6 +102,9 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/properties" element={<Properties />} />
                 <Route path="/properties/:id" element={<PropertyDetail />} />
+                <Route path="/verify-email/:token" element={<VerifyEmail />} />
+                <Route path="/verify-phone" element={<VerifyPhone />} />
+
 
                 {/* Protected Routes */}
                 <Route
