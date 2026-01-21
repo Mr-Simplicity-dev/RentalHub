@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Use relative /api so React proxy handles routing in development
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -26,10 +27,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Only clear storage; let React handle navigation
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      // Do NOT redirect here
+      // Let React handle navigation
     }
     return Promise.reject(error);
   }
