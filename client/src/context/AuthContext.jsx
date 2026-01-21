@@ -9,38 +9,44 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in on mount
-    const initAuth = async () => {
-      try {
-        if (authService.isAuthenticated()) {
-          const userData = authService.getUserFromStorage();
-          setUser(userData);
-          setIsAuthenticated(true);
-
-          // Refresh user data from server
-          try {
-            const response = await authService.getCurrentUser();
-            if (response.success) {
-              setUser(response.data);
-            }
-          } catch (err) {
-            // Only logout if token is truly invalid
-            if (err?.response?.status === 401) {
-              authService.logout();
-              setUser(null);
-              setIsAuthenticated(false);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-      } finally {
-        setLoading(false);
+  const initAuth = async () => {
+    try {
+      if (!authService.isAuthenticated()) {
+        // No valid token → ensure clean state
+        authService.logout();
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
       }
-    };
 
-    initAuth();
-  }, []);
+      // Token exists – try to load real user from server
+      try {
+        const response = await authService.getCurrentUser();
+        if (response.success) {
+          setUser(response.data);
+          setIsAuthenticated(true);
+        } else {
+          throw new Error('Invalid session');
+        }
+      } catch (err) {
+        // If token is invalid or request fails, force logout
+        authService.logout();
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      authService.logout();
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  initAuth();
+}, []);
+
 
   const login = async (email, password) => {
     const response = await authService.login(email, password);
