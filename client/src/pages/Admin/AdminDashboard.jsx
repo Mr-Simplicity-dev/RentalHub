@@ -1,9 +1,47 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { FaUsers, FaHome, FaFileAlt, FaCheckCircle } from 'react-icons/fa';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+
+  const [stats, setStats] = useState({
+    totalUsers: '—',
+    totalProperties: '—',
+    applications: '—',
+    pendingVerifications: '—',
+  });
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const res = await fetch('/api/admin/stats', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          setStats({
+            totalUsers: data.data.totalUsers,
+            totalProperties: data.data.totalProperties,
+            applications: data.data.applications,
+            pendingVerifications: data.data.pendingVerifications,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load admin stats', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStats();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -22,22 +60,22 @@ const AdminDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <StatCard
             title="Total Users"
-            value="—"
+            value={stats.totalUsers}
             icon={<FaUsers className="text-blue-500" />}
           />
           <StatCard
             title="Total Properties"
-            value="—"
+            value={stats.totalProperties}
             icon={<FaHome className="text-green-500" />}
           />
           <StatCard
             title="Applications"
-            value="—"
+            value={stats.applications}
             icon={<FaFileAlt className="text-purple-500" />}
           />
           <StatCard
             title="Pending Verifications"
-            value="—"
+            value={stats.pendingVerifications}
             icon={<FaCheckCircle className="text-yellow-500" />}
           />
         </div>
