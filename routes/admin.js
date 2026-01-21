@@ -7,6 +7,9 @@ const adminController = require('../controllers/adminController');
 // All admin routes require auth + admin role
 router.use(authenticate, requireAdmin);
 
+// Dashboard Stats
+router.get('/stats', adminController.getStats);
+
 // Users
 router.get('/users', adminController.getAllUsers);
 

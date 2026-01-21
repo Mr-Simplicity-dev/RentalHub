@@ -1,5 +1,33 @@
 const db = require('../config/middleware/database');
 
+// GET /api/admin/stats
+exports.getStats = async (req, res) => {
+  try {
+    const totalUsers = await db.query(`SELECT COUNT(*) FROM users`);
+    const totalProperties = await db.query(`SELECT COUNT(*) FROM properties`);
+    const applications = await db.query(`SELECT COUNT(*) FROM applications`);
+    const pendingVerifications = await db.query(
+      `SELECT COUNT(*) FROM users WHERE identity_verified = FALSE`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        totalUsers: Number(totalUsers.rows[0].count),
+        totalProperties: Number(totalProperties.rows[0].count),
+        applications: Number(applications.rows[0].count),
+        pendingVerifications: Number(pendingVerifications.rows[0].count),
+      }
+    });
+  } catch (err) {
+    console.error('Admin stats error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load admin stats'
+    });
+  }
+};
+
 // GET /api/admin/users
 exports.getAllUsers = async (req, res) => {
   try {
