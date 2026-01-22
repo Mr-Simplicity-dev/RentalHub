@@ -26,6 +26,18 @@ const AdminUsers = () => {
     }
   };
 
+  const handleDisable = async (id) => {
+    if (!window.confirm('Disable this user? They will no longer access the system.')) return;
+
+    try {
+      await api.delete(`/admin/users/${id}`);
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (err) {
+      console.error('Failed to disable user:', err);
+      alert('Failed to disable user');
+    }
+  };
+
   const filteredUsers =
     filter === 'all'
       ? users
@@ -67,6 +79,7 @@ const AdminUsers = () => {
               <th className="py-3 px-4">Phone</th>
               <th className="py-3 px-4">Identity</th>
               <th className="py-3 px-4">Joined</th>
+              <th className="py-3 px-4 text-right">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -90,12 +103,20 @@ const AdminUsers = () => {
                 <td className="py-3 px-4 text-gray-500">
                   {new Date(u.created_at).toLocaleDateString()}
                 </td>
+                <td className="py-3 px-4 text-right">
+                  <button
+                    onClick={() => handleDisable(u.id)}
+                    className="text-red-600 hover:underline"
+                  >
+                    Disable
+                  </button>
+                </td>
               </tr>
             ))}
 
             {filteredUsers.length === 0 && (
               <tr>
-                <td colSpan="8" className="py-6 text-center text-gray-500">
+                <td colSpan="9" className="py-6 text-center text-gray-500">
                   No users found
                 </td>
               </tr>

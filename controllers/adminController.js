@@ -3,11 +3,19 @@ const db = require('../config/middleware/database');
 // GET /api/admin/stats
 exports.getStats = async (req, res) => {
   try {
-    const totalUsers = await db.query(`SELECT COUNT(*) FROM users`);
-    const totalProperties = await db.query(`SELECT COUNT(*) FROM properties`);
-    const applications = await db.query(`SELECT COUNT(*) FROM applications`);
+    const totalUsers = await db.query(
+      `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL`
+    );
+    const totalProperties = await db.query(
+      `SELECT COUNT(*) FROM properties`
+    );
+    const applications = await db.query(
+      `SELECT COUNT(*) FROM applications`
+    );
     const pendingVerifications = await db.query(
-      `SELECT COUNT(*) FROM users WHERE identity_verified = FALSE`
+      `SELECT COUNT(*) FROM users
+       WHERE deleted_at IS NULL
+         AND identity_verified = FALSE`
     );
 
     res.json({
@@ -36,6 +44,7 @@ exports.getAllUsers = async (req, res) => {
               email_verified, phone_verified, identity_verified,
               created_at
        FROM users
+       WHERE deleted_at IS NULL
        ORDER BY created_at DESC`
     );
 
@@ -52,7 +61,8 @@ exports.getPendingVerifications = async (req, res) => {
     const result = await db.query(
       `SELECT id, full_name, email, nin, passport_photo_url, user_type
        FROM users
-       WHERE email_verified = TRUE
+       WHERE deleted_at IS NULL
+         AND email_verified = TRUE
          AND phone_verified = TRUE
          AND identity_verified = FALSE
          AND passport_photo_url IS NOT NULL
@@ -72,7 +82,7 @@ exports.approveVerification = async (req, res) => {
     const userId = req.params.id;
 
     await db.query(
-      'UPDATE users SET identity_verified = TRUE WHERE id = $1',
+      'UPDATE users SET identity_verified = TRUE WHERE id = $1 AND deleted_at IS NULL',
       [userId]
     );
 
@@ -89,7 +99,7 @@ exports.rejectVerification = async (req, res) => {
     const userId = req.params.id;
 
     await db.query(
-      'UPDATE users SET passport_photo_url = NULL WHERE id = $1',
+      'UPDATE users SET passport_photo_url = NULL WHERE id = $1 AND deleted_at IS NULL',
       [userId]
     );
 
@@ -108,7 +118,7 @@ exports.getAllProperties = async (req, res) => {
               u.full_name AS landlord_name,
               p.city, s.name AS state_name
        FROM properties p
-       JOIN users u ON p.landlord_id = u.id
+       JOIN users u ON p.landlord_id = u.id AND u.deleted_at IS NULL
        LEFT JOIN states s ON p.state_id = s.id
        ORDER BY p.created_at DESC`
     );
@@ -129,9 +139,9 @@ exports.getAllApplications = async (req, res) => {
               l.full_name AS landlord_name,
               p.title AS property_title
        FROM applications a
-       JOIN users t ON a.tenant_id = t.id
+       JOIN users t ON a.tenant_id = t.id AND t.deleted_at IS NULL
        JOIN properties p ON a.property_id = p.id
-       JOIN users l ON p.landlord_id = l.id
+       JOIN users l ON p.landlord_id = l.id AND l.deleted_at IS NULL
        ORDER BY a.created_at DESC`
     );
 
@@ -139,5 +149,37 @@ exports.getAllApplications = async (req, res) => {
   } catch (err) {
     console.error('Admin applications error:', err);
     res.status(500).json({ success: false, message: 'Failed to load applications' });
+  }
+};
+
+// DELETE (soft) /api/admin/users/:id
+exports.deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Prevent deleting yourself
+    const currentUserId = req.user.userId || req.user.id;
+    if (Number(id) === Number(currentUserId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account',
+      });
+    }
+
+    await db.query(
+      'UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: 'User disabled successfully',
+    });
+  } catch (err) {
+    console.error('Soft delete user error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to disable user',
+    });
   }
 };

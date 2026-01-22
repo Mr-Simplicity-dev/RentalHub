@@ -24,4 +24,6 @@ router.get('/properties', adminController.getAllProperties);
 // Applications
 router.get('/applications', adminController.getAllApplications);
 
+router.delete('/users/:id', adminController.deleteUser);
+
 module.exports = router;
