@@ -6,6 +6,9 @@ require('dotenv').config();
 
 const app = express();
 
+// Tell Express it is behind a proxy (Render, Vercel, Nginx, etc.)
+app.set('trust proxy', 1);
+
 // -----------------------------------
 // Security Middleware
 // -----------------------------------

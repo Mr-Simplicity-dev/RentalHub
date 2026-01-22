@@ -111,46 +111,105 @@ exports.rejectVerification = async (req, res) => {
 };
 
 // GET /api/admin/properties
+// exports.getAllProperties = async (req, res) => {
+//   try {
+//     const result = await db.query(
+//       `SELECT p.id, p.title, p.rent_amount, p.status, p.created_at,
+//               u.full_name AS landlord_name,
+//               p.city, s.name AS state_name
+//        FROM properties p
+//        JOIN users u ON p.landlord_id = u.id AND u.deleted_at IS NULL
+//        LEFT JOIN states s ON p.state_id = s.id
+//        ORDER BY p.created_at DESC`
+//     );
+
+//     res.json({ success: true, data: result.rows });
+//   } catch (err) {
+//     console.error('Admin properties error:', err);
+//     res.status(500).json({ success: false, message: 'Failed to load properties' });
+//   }
+// };
+
 exports.getAllProperties = async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT p.id, p.title, p.rent_amount, p.status, p.created_at,
-              u.full_name AS landlord_name,
-              p.city, s.name AS state_name
+      `SELECT 
+         p.id,
+         p.title,
+         p.rent_amount,
+         p.status,
+         p.is_verified,
+         p.created_at,
+         p.city,
+         p.state,
+         u.full_name AS landlord_name,
+         u.email AS landlord_email
        FROM properties p
-       JOIN users u ON p.landlord_id = u.id AND u.deleted_at IS NULL
-       LEFT JOIN states s ON p.state_id = s.id
+       LEFT JOIN users u ON p.user_id = u.id
        ORDER BY p.created_at DESC`
     );
 
     res.json({ success: true, data: result.rows });
   } catch (err) {
     console.error('Admin properties error:', err);
-    res.status(500).json({ success: false, message: 'Failed to load properties' });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load properties',
+    });
   }
 };
 
+
 // GET /api/admin/applications
+// exports.getAllApplications = async (req, res) => {
+//   try {
+//     const result = await db.query(
+//       `SELECT a.id, a.status, a.created_at,
+//               t.full_name AS tenant_name,
+//               l.full_name AS landlord_name,
+//               p.title AS property_title
+//        FROM applications a
+//        JOIN users t ON a.tenant_id = t.id AND t.deleted_at IS NULL
+//        JOIN properties p ON a.property_id = p.id
+//        JOIN users l ON p.landlord_id = l.id AND l.deleted_at IS NULL
+//        ORDER BY a.created_at DESC`
+//     );
+
+//     res.json({ success: true, data: result.rows });
+//   } catch (err) {
+//     console.error('Admin applications error:', err);
+//     res.status(500).json({ success: false, message: 'Failed to load applications' });
+//   }
+// };
+
 exports.getAllApplications = async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT a.id, a.status, a.created_at,
-              t.full_name AS tenant_name,
-              l.full_name AS landlord_name,
-              p.title AS property_title
+      `SELECT 
+         a.id,
+         a.status,
+         a.created_at,
+         t.full_name AS tenant_name,
+         t.email AS tenant_email,
+         p.title AS property_title,
+         l.full_name AS landlord_name
        FROM applications a
-       JOIN users t ON a.tenant_id = t.id AND t.deleted_at IS NULL
+       JOIN users t ON a.tenant_id = t.id
        JOIN properties p ON a.property_id = p.id
-       JOIN users l ON p.landlord_id = l.id AND l.deleted_at IS NULL
+       LEFT JOIN users l ON p.user_id = l.id
        ORDER BY a.created_at DESC`
     );
 
     res.json({ success: true, data: result.rows });
   } catch (err) {
     console.error('Admin applications error:', err);
-    res.status(500).json({ success: false, message: 'Failed to load applications' });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load applications',
+    });
   }
 };
+
 
 // DELETE (soft) /api/admin/users/:id
 exports.deleteUser = async (req, res) => {
