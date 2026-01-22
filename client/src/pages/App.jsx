@@ -42,8 +42,8 @@ import Faq from './Faq';
 import HowItWorks from './HowItWorks';
 import Pricing from './Pricing';
 import LandlordGuide from './LandlordGuide';
-import VerifyEmail from './VerifyEmail';
-import VerifyPhone from './VerifyPhone';
+import VerifyEmail from './pages/VerifyEmail';
+import VerifyPhone from './pages/VerifyPhone';
 
 
 const queryClient = new QueryClient();
