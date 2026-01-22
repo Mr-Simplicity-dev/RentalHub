@@ -55,7 +55,7 @@ const VerifyEmail = () => {
                 onClick={() => navigate('/verify-phone')}
                 className="btn-primary w-full"
               >
-                Verify Phone Number
+                Continue to Phone Verification
               </button>
 
               <button
