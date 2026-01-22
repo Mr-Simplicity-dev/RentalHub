@@ -102,6 +102,7 @@ function App() {
                 <Route path="/properties" element={<Properties />} />
                 <Route path="/properties/:id" element={<PropertyDetail />} />
                 <Route path="/verify-email/:token" element={<VerifyEmail />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/verify-phone" element={<VerifyPhone />} />
 
 
