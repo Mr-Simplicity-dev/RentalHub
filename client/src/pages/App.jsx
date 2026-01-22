@@ -46,7 +46,6 @@ import VerifyEmail from './VerifyEmail';
 import VerifyPhone from './VerifyPhone';
 
 
-
 const queryClient = new QueryClient();
 
 // Protected Route Component
