@@ -180,24 +180,49 @@ exports.verifyEmail = async (req, res) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Update user email verification status
-    await db.query(
-      'UPDATE users SET email_verified = TRUE WHERE id = $1',
+    // Update user email verification status and return user
+    const result = await db.query(
+      `
+      UPDATE users
+      SET email_verified = TRUE, updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, email, user_type, email_verified
+      `,
       [decoded.userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const user = result.rows[0];
+
+    // 🔐 Auto-login token
+    const authToken = jwt.sign(
+      { id: user.id, user_type: user.user_type },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
     );
 
     res.json({
       success: true,
-      message: 'Email verified successfully!'
+      message: 'Email verified successfully!',
+      token: authToken,
+      user
     });
 
   } catch (error) {
+    console.error('Verify email error:', error.message);
     res.status(400).json({
       success: false,
       message: 'Invalid or expired verification token'
     });
   }
 };
+
 
 // RESEND EMAIL VERIFICATION
 exports.resendVerification = async (req, res) => {

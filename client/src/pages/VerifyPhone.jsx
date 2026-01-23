@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { toast } from 'react-toastify';
+
+const OTP_DURATION = 10 * 60; // 10 minutes in seconds
 
 const VerifyPhone = () => {
   const navigate = useNavigate();
@@ -9,6 +11,18 @@ const VerifyPhone = () => {
   const [otp, setOtp] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  // Countdown effect
+  useEffect(() => {
+    if (!sent || timeLeft <= 0) return;
+
+    const interval = setInterval(() => {
+      setTimeLeft(t => t - 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [sent, timeLeft]);
 
   const sendOtp = async () => {
     if (!phone) {
@@ -21,6 +35,8 @@ const VerifyPhone = () => {
       const res = await api.post('/auth/send-phone-otp', { phone });
       if (res.data.success) {
         setSent(true);
+        setTimeLeft(OTP_DURATION); // reset timer
+        setOtp('');
         toast.success('OTP sent to your phone');
       } else {
         toast.error(res.data.message || 'Failed to send OTP');
@@ -35,6 +51,11 @@ const VerifyPhone = () => {
   const verifyOtp = async () => {
     if (!otp) {
       toast.error('Enter the OTP');
+      return;
+    }
+
+    if (timeLeft <= 0) {
+      toast.error('OTP has expired. Please request a new one.');
       return;
     }
 
@@ -54,6 +75,12 @@ const VerifyPhone = () => {
     }
   };
 
+  const formatTime = (s) => {
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, '0')}`;
+  };
+
   return (
     <div className="container mx-auto px-4 py-16 max-w-md">
       <h1 className="text-2xl font-bold mb-6 text-center">Verify Phone</h1>
@@ -67,7 +94,11 @@ const VerifyPhone = () => {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
-            <button onClick={sendOtp} disabled={loading} className="btn btn-primary w-full">
+            <button
+              onClick={sendOtp}
+              disabled={loading}
+              className="btn btn-primary w-full"
+            >
               {loading ? 'Sending…' : 'Send OTP'}
             </button>
           </>
@@ -81,8 +112,29 @@ const VerifyPhone = () => {
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
             />
-            <button onClick={verifyOtp} disabled={loading} className="btn btn-primary w-full">
+
+            <button
+              onClick={verifyOtp}
+              disabled={loading}
+              className="btn btn-primary w-full"
+            >
               {loading ? 'Verifying…' : 'Verify'}
+            </button>
+
+            <div className="text-center text-sm text-gray-500">
+              {timeLeft > 0 ? (
+                <>Code expires in {formatTime(timeLeft)}</>
+              ) : (
+                <>OTP expired</>
+              )}
+            </div>
+
+            <button
+              onClick={sendOtp}
+              disabled={loading || timeLeft > 0}
+              className="btn btn-outline w-full"
+            >
+              Resend OTP
             </button>
           </>
         )}

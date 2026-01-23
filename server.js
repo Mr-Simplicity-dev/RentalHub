@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
+const db = require('./config/middleware/database'); // or wherever your pg Pool is exported from
+
 require('dotenv').config();
 
 const app = express();
@@ -46,6 +49,36 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
+
+// -----------------------------------
+// EMAIL VERIFICATION
+// -----------------------------------
+app.get('/api/auth/verify-email', async (req, res) => {
+  const { token } = req.query;
+
+  if (!token) {
+    return res.status(400).json({ success: false, message: 'Token missing' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const result = await pool.query(
+      'UPDATE users SET email_verified = TRUE, updated_at = NOW() WHERE id = $1 RETURNING id, email_verified',
+      [decoded.userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({ success: true, message: 'Email verified successfully' });
+  } catch (err) {
+    console.error('Verify email error:', err);
+    res.status(400).json({ success: false, message: 'Invalid or expired token' });
+  }
+});
+
 
 // -----------------------------------
 // ROUTES

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -18,7 +18,6 @@ import PropertyDetail from './PropertyDetail';
 import Dashboard from './Dashboard';
 import NotFound from './NotFound';
 
-// Admin (inside src/pages/admin/)
 import AdminDashboard from './admin/AdminDashboard';
 import AdminLayout from './admin/AdminLayout';
 import AdminUsers from './admin/AdminUsers';
@@ -26,7 +25,6 @@ import AdminProperties from './admin/AdminProperties';
 import AdminApplications from './admin/AdminApplications';
 import AdminVerifications from './admin/AdminVerifications';
 
-// User pages (inside src/pages/)
 import Profile from './Profile';
 import Applications from './Applications';
 import SavedProperties from './SavedProperties';
@@ -42,22 +40,16 @@ import Faq from './Faq';
 import HowItWorks from './HowItWorks';
 import Pricing from './Pricing';
 import LandlordGuide from './LandlordGuide';
-import VerifyEmail from './pages/VerifyEmail';
-import VerifyPhone from './pages/VerifyPhone';
-
+import VerifyEmail from './VerifyEmail';
+import VerifyPhone from './VerifyPhone';
 
 const queryClient = new QueryClient();
 
-// Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
   return isAuthenticated ? children : <Navigate to="/login" />;
@@ -67,162 +59,94 @@ const AdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
-
-  if (user?.user_type !== 'admin') {
-    return <Navigate to="/dashboard" />;
-  }
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'admin') return <Navigate to="/dashboard" />;
 
   return children;
 };
 
+function Layout({ children }) {
+  const location = useLocation();
+
+  const isVerificationPage =
+    location.pathname.startsWith('/verify-email') ||
+    location.pathname.startsWith('/verify-phone');
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      {!isVerificationPage && <Header />}
+      <main className="flex-grow">{children}</main>
+      {!isVerificationPage && <Footer />}
+    </div>
+  );
+}
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Router>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-grow">
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/properties" element={<Properties />} />
-                <Route path="/properties/:id" element={<PropertyDetail />} />
-                <Route path="/verify-email/:token" element={<VerifyEmail />} />
-                <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/verify-phone" element={<VerifyPhone />} />
+          <Layout>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/properties" element={<Properties />} />
+              <Route path="/properties/:id" element={<PropertyDetail />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/verify-phone" element={<VerifyPhone />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
+              <Route path="/faq" element={<Faq />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/landlord-guide" element={<LandlordGuide />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
 
+              {/* Protected */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-                {/* Protected Routes */}
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                />
+              <Route
+                path="/admin/*"
+                element={
+                  <AdminRoute>
+                    <AdminLayout />
+                  </AdminRoute>
+                }
+              >
+                <Route index element={<AdminDashboard />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="verifications" element={<AdminVerifications />} />
+                <Route path="properties" element={<AdminProperties />} />
+                <Route path="applications" element={<AdminApplications />} />
+              </Route>
 
-                   <Route
-                    path="/admin/*"
-                    element={
-                      <AdminRoute>
-                        <AdminLayout />
-                      </AdminRoute>
-                    }
-                  >
-                    <Route index element={<AdminDashboard />} />
-                    <Route path="users" element={<AdminUsers />} />
-                    <Route path="verifications" element={<AdminVerifications />} />
-                    <Route path="properties" element={<AdminProperties />} />
-                    <Route path="applications" element={<AdminApplications />} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/applications" element={<ProtectedRoute><Applications /></ProtectedRoute>} />
+              <Route path="/saved-properties" element={<ProtectedRoute><SavedProperties /></ProtectedRoute>} />
+              <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+              <Route path="/my-properties" element={<ProtectedRoute><MyProperties /></ProtectedRoute>} />
+              <Route path="/add-property" element={<ProtectedRoute><AddProperty /></ProtectedRoute>} />
+              <Route path="/subscribe" element={<ProtectedRoute><Subscribe /></ProtectedRoute>} />
 
-                  </Route>
-                    
-                    <Route
-                      path="/profile"
-                      element={
-                        <ProtectedRoute>
-                          <Profile />
-                        </ProtectedRoute>
-                      }
-                    />
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Layout>
 
-                    <Route
-                      path="/applications"
-                      element={
-                        <ProtectedRoute>
-                          <Applications />
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    <Route
-                      path="/saved-properties"
-                      element={
-                        <ProtectedRoute>
-                          <SavedProperties />
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    <Route
-                      path="/messages"
-                      element={
-                        <ProtectedRoute>
-                          <Messages />
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    <Route
-                      path="/my-properties"
-                      element={
-                        <ProtectedRoute>
-                          <MyProperties />
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    <Route
-                      path="/add-property"
-                      element={
-                        <ProtectedRoute>
-                          <AddProperty />
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    <Route
-                      path="/subscribe"
-                      element={
-                        <ProtectedRoute>
-                          <Subscribe />
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    <Route path="/forgot-password" element={<ForgotPassword />} />
-                    <Route path="/reset-password/:token" element={<ResetPassword />} />
-                    <Route path="/terms" element={<Terms />} />
-                    <Route path="/privacy" element={<Privacy />} />
-                  
-                {/* 404 */}
-                <Route path="*" element={<NotFound />} />
-                <Route path="/faq" element={<Faq />} />
-                    <Route path="/how-it-works" element={<HowItWorks />} />
-                    <Route path="/pricing" element={<Pricing />} />
-                    <Route path="/landlord-guide" element={<LandlordGuide />} />
-                    <Route path="/privacy" element={<Privacy />} />
-                    <Route path="/terms" element={<Terms />} />
-              </Routes>
-            </main>
-            <Footer />
-          </div>
-          <ToastContainer
-            position="top-right"
-            autoClose={3000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-          />
+          <ToastContainer position="top-right" autoClose={3000} />
         </Router>
       </AuthProvider>
     </QueryClientProvider>
