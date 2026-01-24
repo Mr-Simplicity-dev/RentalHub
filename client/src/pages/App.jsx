@@ -44,6 +44,7 @@ import Pricing from './Pricing';
 import LandlordGuide from './LandlordGuide';
 import VerifyEmail from './VerifyEmail';
 import VerifyPhone from './VerifyPhone';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
 
 const queryClient = new QueryClient();
 
@@ -134,6 +135,7 @@ function App() {
               <Route path="/landlord-guide" element={<LandlordGuide />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/super-admin" element={<SuperAdminDashboard />} />
 
               {/* Protected */}
               <Route
