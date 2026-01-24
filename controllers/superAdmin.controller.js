@@ -286,3 +286,55 @@ export const bulkPropertyAction = async (req, res) => {
     res.status(500).json({ message: 'Bulk action failed' });
   }
 };
+
+// feature flag 
+export const getFeatureFlags = async (req, res) => {
+  try {
+    const { rows } = await db.query(`SELECT * FROM feature_flags ORDER BY key`);
+    res.json({ success: true, flags: rows });
+  } catch {
+    res.status(500).json({ message: 'Failed to load flags' });
+  }
+};
+
+export const updateFeatureFlag = async (req, res) => {
+  const { key } = req.params;
+  const { enabled } = req.body;
+
+  try {
+    await db.query(
+      `UPDATE feature_flags SET enabled = $1, updated_at = NOW() WHERE key = $2`,
+      [enabled, key]
+    );
+
+    await logAction(db, req.user.id, `TOGGLE_FLAG_${key}`, 'feature_flag', null);
+
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ message: 'Failed to update flag' });
+  }
+};
+
+// fruad
+export const getFraudFlags = async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM fraud_flags
+       WHERE resolved = FALSE
+       ORDER BY score DESC, created_at DESC`
+    );
+
+    res.json({ success: true, flags: rows });
+  } catch {
+    res.status(500).json({ message: 'Failed to load fraud flags' });
+  }
+};
+
+export const resolveFraudFlag = async (req, res) => {
+  const { id } = req.params;
+
+  await db.query(`UPDATE fraud_flags SET resolved = TRUE WHERE id = $1`, [id]);
+  await logAction(db, req.user.id, 'RESOLVE_FRAUD_FLAG', 'fraud', id);
+
+  res.json({ success: true });
+};

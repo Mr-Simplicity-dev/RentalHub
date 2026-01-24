@@ -1,23 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
-import { FaCheckCircle, FaTimesCircle, FaIdCard } from 'react-icons/fa';
+import { FaCheckCircle, FaTimesCircle, FaIdCard, FaSearch } from 'react-icons/fa';
+
+const PAGE_SIZE = 20;
 
 const AdminVerifications = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
 
-  useEffect(() => {
-    loadPending();
-  }, []);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
 
-  const loadPending = async () => {
+  useEffect(() => {
+    const delay = setTimeout(() => {
+      loadPending(1);
+    }, 300);
+    return () => clearTimeout(delay);
+  }, [search]);
+
+  useEffect(() => {
+    loadPending(page);
+  }, [page]);
+
+  const loadPending = async (p = page) => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/verifications/pending');
+      const res = await api.get('/admin/verifications/pending', {
+        params: { search, page: p, limit: PAGE_SIZE },
+      });
       if (res.data?.success) {
         setUsers(res.data.data);
+        setPagination(res.data.pagination);
       }
     } catch (err) {
       console.error('Failed to load verifications:', err);
@@ -30,11 +46,7 @@ const AdminVerifications = () => {
     setProcessingId(userId);
     try {
       const res = await api.post(`/admin/verifications/${userId}/approve`);
-      if (res.data?.success) {
-        setUsers((prev) => prev.filter((u) => u.id !== userId));
-      }
-    } catch (err) {
-      console.error('Approval failed:', err);
+      if (res.data?.success) loadPending(page);
     } finally {
       setProcessingId(null);
     }
@@ -44,25 +56,39 @@ const AdminVerifications = () => {
     setProcessingId(userId);
     try {
       const res = await api.post(`/admin/verifications/${userId}/reject`);
-      if (res.data?.success) {
-        setUsers((prev) => prev.filter((u) => u.id !== userId));
-      }
-    } catch (err) {
-      console.error('Rejection failed:', err);
+      if (res.data?.success) loadPending(page);
     } finally {
       setProcessingId(null);
     }
   };
 
-  if (loading) return <Loader fullScreen />;
+  const from = (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, pagination.total);
+
+  if (loading && users.length === 0) return <Loader fullScreen />;
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Identity Verifications</h1>
-        <p className="text-gray-600">
-          Review users who have completed email, phone, and document steps
-        </p>
+      {/* Header */}
+      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Identity Verifications</h1>
+          <p className="text-gray-600">
+            {pagination.total
+              ? `Showing ${from}-${to} of ${pagination.total}`
+              : 'No pending verifications'}
+          </p>
+        </div>
+
+        <div className="relative">
+          <FaSearch className="absolute left-3 top-3 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, email, NIN..."
+            className="input pl-9"
+          />
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -114,12 +140,37 @@ const AdminVerifications = () => {
           </div>
         ))}
 
-        {users.length === 0 && (
+        {users.length === 0 && !loading && (
           <div className="card text-center py-12 text-gray-500">
             No pending verifications
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="flex justify-between items-center mt-6">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="btn btn-sm"
+          >
+            Prev
+          </button>
+
+          <span className="text-sm text-gray-600">
+            Page {page} of {pagination.pages}
+          </span>
+
+          <button
+            disabled={page === pagination.pages}
+            onClick={() => setPage((p) => p + 1)}
+            className="btn btn-sm"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 };

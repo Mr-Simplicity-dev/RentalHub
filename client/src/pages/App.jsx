@@ -44,7 +44,7 @@ import Pricing from './Pricing';
 import LandlordGuide from './LandlordGuide';
 import VerifyEmail from './VerifyEmail';
 import VerifyPhone from './VerifyPhone';
-import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import SuperAdminDashboard from './SuperAdminDashboard';
 
 const queryClient = new QueryClient();
 
@@ -136,6 +136,7 @@ function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/super-admin" element={<SuperAdminDashboard />} />
+              <Route path="/admin/users/:id" element={<AdminUserDetail />} />
 
               {/* Protected */}
               <Route
@@ -169,6 +170,9 @@ function App() {
               <Route path="/my-properties" element={<ProtectedRoute><MyProperties /></ProtectedRoute>} />
               <Route path="/add-property" element={<ProtectedRoute><AddProperty /></ProtectedRoute>} />
               <Route path="/subscribe" element={<ProtectedRoute><Subscribe /></ProtectedRoute>} />
+              <Route path="/admin/users/:id" element={<AdminUserDetail />} />
+              <Route path="/admin/properties/:id" element={<AdminPropertyDetail />} />
+              <Route path="/admin/applications/:id" element={<AdminApplicationDetail />} />
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />

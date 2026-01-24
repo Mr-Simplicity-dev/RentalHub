@@ -27,5 +27,12 @@ router.post('/broadcasts', auth, requireSuperAdmin, superCtrl.createBroadcast);
 router.post('/users/bulk', auth, requireSuperAdmin, superCtrl.bulkUserAction);
 router.post('/properties/bulk', auth, requireSuperAdmin, superCtrl.bulkPropertyAction);
 
+router.get('/flags', auth, requireSuperAdmin, superCtrl.getFeatureFlags);
+router.patch('/flags/:key', auth, requireSuperAdmin, superCtrl.updateFeatureFlag);
+
+router.get('/fraud', auth, requireSuperAdmin, superCtrl.getFraudFlags);
+router.patch('/fraud/:id/resolve', auth, requireSuperAdmin, superCtrl.resolveFraudFlag);
+
+
 
 export default router;

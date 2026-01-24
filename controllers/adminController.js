@@ -37,44 +37,159 @@ exports.getStats = async (req, res) => {
 };
 
 // GET /api/admin/users
+// GET /api/admin/users?search=&role=&page=&limit=
 exports.getAllUsers = async (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT id, full_name, email, phone, user_type,
-              email_verified, phone_verified, identity_verified,
-              created_at
-       FROM users
-       WHERE deleted_at IS NULL
-       ORDER BY created_at DESC`
-    );
+    const {
+      search = '',
+      role = 'all',
+      page = 1,
+      limit = 20,
+    } = req.query;
 
-    res.json({ success: true, data: result.rows });
+    const currentPage = Math.max(Number(page) || 1, 1);
+    const pageSize = Math.min(Number(limit) || 20, 100);
+    const offset = (currentPage - 1) * pageSize;
+
+    const where = [];
+    const params = [];
+    let i = 1;
+
+    // Base condition
+    where.push(`deleted_at IS NULL`);
+
+    // Role filter
+    if (role && role !== 'all') {
+      where.push(`user_type = $${i++}`);
+      params.push(role);
+    }
+
+    // Search filter (name, email, phone)
+    if (search) {
+      where.push(`(
+        full_name ILIKE $${i} OR
+        email ILIKE $${i} OR
+        phone ILIKE $${i}
+      )`);
+      params.push(`%${search}%`);
+      i++;
+    }
+
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    // Total count
+    const countQuery = `
+      SELECT COUNT(*) 
+      FROM users
+      ${whereClause}
+    `;
+    const countResult = await db.query(countQuery, params);
+    const total = Number(countResult.rows[0].count);
+
+    // Data query
+    const dataQuery = `
+      SELECT id, full_name, email, phone, user_type,
+             email_verified, phone_verified, identity_verified,
+             created_at
+      FROM users
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${i++} OFFSET $${i++}
+    `;
+
+    const dataParams = [...params, pageSize, offset];
+    const result = await db.query(dataQuery, dataParams);
+
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        total,
+        page: currentPage,
+        limit: pageSize,
+        pages: Math.ceil(total / pageSize),
+      },
+    });
   } catch (err) {
     console.error('Admin users error:', err);
-    res.status(500).json({ success: false, message: 'Failed to load users' });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load users',
+    });
   }
 };
+
 
 // GET /api/admin/verifications/pending
 exports.getPendingVerifications = async (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT id, full_name, email, nin, passport_photo_url, user_type
-       FROM users
-       WHERE deleted_at IS NULL
-         AND email_verified = TRUE
-         AND phone_verified = TRUE
-         AND identity_verified = FALSE
-         AND passport_photo_url IS NOT NULL
-       ORDER BY created_at ASC`
-    );
+    const {
+      search = '',
+      page = 1,
+      limit = 20,
+    } = req.query;
 
-    res.json({ success: true, data: result.rows });
+    const currentPage = Math.max(Number(page) || 1, 1);
+    const pageSize = Math.min(Number(limit) || 20, 100);
+    const offset = (currentPage - 1) * pageSize;
+
+    const where = [
+      `deleted_at IS NULL`,
+      `email_verified = TRUE`,
+      `phone_verified = TRUE`,
+      `identity_verified = FALSE`,
+      `passport_photo_url IS NOT NULL`,
+    ];
+
+    const params = [];
+    let i = 1;
+
+    if (search) {
+      where.push(`(
+        full_name ILIKE $${i} OR
+        email ILIKE $${i} OR
+        nin ILIKE $${i}
+      )`);
+      params.push(`%${search}%`);
+      i++;
+    }
+
+    const whereClause = `WHERE ${where.join(' AND ')}`;
+
+    const countQuery = `
+      SELECT COUNT(*)
+      FROM users
+      ${whereClause}
+    `;
+    const countResult = await db.query(countQuery, params);
+    const total = Number(countResult.rows[0].count);
+
+    const dataQuery = `
+      SELECT id, full_name, email, nin, passport_photo_url, user_type, created_at
+      FROM users
+      ${whereClause}
+      ORDER BY created_at ASC
+      LIMIT $${i++} OFFSET $${i++}
+    `;
+
+    const result = await db.query(dataQuery, [...params, pageSize, offset]);
+
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        total,
+        page: currentPage,
+        limit: pageSize,
+        pages: Math.ceil(total / pageSize),
+      },
+    });
   } catch (err) {
     console.error('Pending verifications error:', err);
     res.status(500).json({ success: false, message: 'Failed to load verifications' });
   }
 };
+
 
 // POST /api/admin/verifications/:id/approve
 exports.approveVerification = async (req, res) => {
@@ -111,45 +226,72 @@ exports.rejectVerification = async (req, res) => {
 };
 
 // GET /api/admin/properties
-// exports.getAllProperties = async (req, res) => {
-//   try {
-//     const result = await db.query(
-//       `SELECT p.id, p.title, p.rent_amount, p.status, p.created_at,
-//               u.full_name AS landlord_name,
-//               p.city, s.name AS state_name
-//        FROM properties p
-//        JOIN users u ON p.landlord_id = u.id AND u.deleted_at IS NULL
-//        LEFT JOIN states s ON p.state_id = s.id
-//        ORDER BY p.created_at DESC`
-//     );
-
-//     res.json({ success: true, data: result.rows });
-//   } catch (err) {
-//     console.error('Admin properties error:', err);
-//     res.status(500).json({ success: false, message: 'Failed to load properties' });
-//   }
-// };
-
 exports.getAllProperties = async (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT 
-         p.id,
-         p.title,
-         p.rent_amount,
-         p.status,
-         p.is_verified,
-         p.created_at,
-         p.city,
-         p.state,
-         u.full_name AS landlord_name,
-         u.email AS landlord_email
-       FROM properties p
-       LEFT JOIN users u ON p.user_id = u.id
-       ORDER BY p.created_at DESC`
-    );
+    const {
+      search = '',
+      page = 1,
+      limit = 20,
+    } = req.query;
 
-    res.json({ success: true, data: result.rows });
+    const currentPage = Math.max(Number(page) || 1, 1);
+    const pageSize = Math.min(Number(limit) || 20, 100);
+    const offset = (currentPage - 1) * pageSize;
+
+    const where = [];
+    const params = [];
+    let i = 1;
+
+    if (search) {
+      where.push(`(
+        p.title ILIKE $${i} OR
+        u.full_name ILIKE $${i} OR
+        p.city ILIKE $${i}
+      )`);
+      params.push(`%${search}%`);
+      i++;
+    }
+
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const countQuery = `
+      SELECT COUNT(*)
+      FROM properties p
+      LEFT JOIN users u ON p.user_id = u.id
+      ${whereClause}
+    `;
+    const countResult = await db.query(countQuery, params);
+    const total = Number(countResult.rows[0].count);
+
+    const dataQuery = `
+      SELECT 
+        p.id,
+        p.title,
+        p.rent_amount,
+        p.status,
+        p.created_at,
+        p.city,
+        p.state,
+        u.full_name AS landlord_name
+      FROM properties p
+      LEFT JOIN users u ON p.user_id = u.id
+      ${whereClause}
+      ORDER BY p.created_at DESC
+      LIMIT $${i++} OFFSET $${i++}
+    `;
+
+    const result = await db.query(dataQuery, [...params, pageSize, offset]);
+
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        total,
+        page: currentPage,
+        limit: pageSize,
+        pages: Math.ceil(total / pageSize),
+      },
+    });
   } catch (err) {
     console.error('Admin properties error:', err);
     res.status(500).json({
@@ -160,47 +302,76 @@ exports.getAllProperties = async (req, res) => {
 };
 
 
+
 // GET /api/admin/applications
-// exports.getAllApplications = async (req, res) => {
-//   try {
-//     const result = await db.query(
-//       `SELECT a.id, a.status, a.created_at,
-//               t.full_name AS tenant_name,
-//               l.full_name AS landlord_name,
-//               p.title AS property_title
-//        FROM applications a
-//        JOIN users t ON a.tenant_id = t.id AND t.deleted_at IS NULL
-//        JOIN properties p ON a.property_id = p.id
-//        JOIN users l ON p.landlord_id = l.id AND l.deleted_at IS NULL
-//        ORDER BY a.created_at DESC`
-//     );
-
-//     res.json({ success: true, data: result.rows });
-//   } catch (err) {
-//     console.error('Admin applications error:', err);
-//     res.status(500).json({ success: false, message: 'Failed to load applications' });
-//   }
-// };
-
 exports.getAllApplications = async (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT 
-         a.id,
-         a.status,
-         a.created_at,
-         t.full_name AS tenant_name,
-         t.email AS tenant_email,
-         p.title AS property_title,
-         l.full_name AS landlord_name
-       FROM applications a
-       JOIN users t ON a.tenant_id = t.id
-       JOIN properties p ON a.property_id = p.id
-       LEFT JOIN users l ON p.user_id = l.id
-       ORDER BY a.created_at DESC`
-    );
+    const {
+      search = '',
+      page = 1,
+      limit = 20,
+    } = req.query;
 
-    res.json({ success: true, data: result.rows });
+    const currentPage = Math.max(Number(page) || 1, 1);
+    const pageSize = Math.min(Number(limit) || 20, 100);
+    const offset = (currentPage - 1) * pageSize;
+
+    const where = [];
+    const params = [];
+    let i = 1;
+
+    if (search) {
+      where.push(`(
+        t.full_name ILIKE $${i} OR
+        p.title ILIKE $${i} OR
+        l.full_name ILIKE $${i}
+      )`);
+      params.push(`%${search}%`);
+      i++;
+    }
+
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const countQuery = `
+      SELECT COUNT(*)
+      FROM applications a
+      JOIN users t ON a.tenant_id = t.id
+      JOIN properties p ON a.property_id = p.id
+      LEFT JOIN users l ON p.user_id = l.id
+      ${whereClause}
+    `;
+    const countResult = await db.query(countQuery, params);
+    const total = Number(countResult.rows[0].count);
+
+    const dataQuery = `
+      SELECT 
+        a.id,
+        a.status,
+        a.created_at,
+        t.full_name AS tenant_name,
+        p.title AS property_title,
+        l.full_name AS landlord_name
+      FROM applications a
+      JOIN users t ON a.tenant_id = t.id
+      JOIN properties p ON a.property_id = p.id
+      LEFT JOIN users l ON p.user_id = l.id
+      ${whereClause}
+      ORDER BY a.created_at DESC
+      LIMIT $${i++} OFFSET $${i++}
+    `;
+
+    const result = await db.query(dataQuery, [...params, pageSize, offset]);
+
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        total,
+        page: currentPage,
+        limit: pageSize,
+        pages: Math.ceil(total / pageSize),
+      },
+    });
   } catch (err) {
     console.error('Admin applications error:', err);
     res.status(500).json({
@@ -209,7 +380,6 @@ exports.getAllApplications = async (req, res) => {
     });
   }
 };
-
 
 // DELETE (soft) /api/admin/users/:id
 exports.deleteUser = async (req, res) => {
@@ -239,6 +409,151 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to disable user',
+    });
+  }
+};
+
+
+// GET /api/admin/users/:id
+exports.getUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `SELECT id, full_name, email, phone, user_type,
+              email_verified, phone_verified, identity_verified,
+              created_at
+       FROM users
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to load user' });
+  }
+};
+
+// GET /api/admin/properties/:id
+exports.getPropertyById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `SELECT p.*, u.full_name AS landlord_name, u.email AS landlord_email
+       FROM properties p
+       LEFT JOIN users u ON p.user_id = u.id
+       WHERE p.id = $1`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Property not found' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to load property' });
+  }
+};
+
+// GET /api/admin/applications/:id
+exports.getApplicationById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `SELECT 
+         a.id, a.status, a.created_at,
+         t.full_name AS tenant_name, t.email AS tenant_email,
+         p.title AS property_title,
+         l.full_name AS landlord_name
+       FROM applications a
+       JOIN users t ON a.tenant_id = t.id
+       JOIN properties p ON a.property_id = p.id
+       LEFT JOIN users l ON p.user_id = l.id
+       WHERE a.id = $1`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to load application' });
+  }
+};
+
+// POST /api/admin/applications/:id/approve
+exports.approveApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `UPDATE applications
+       SET status = 'approved', updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, status`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Application approved',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('Approve application error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to approve application',
+    });
+  }
+};
+
+// POST /api/admin/applications/:id/reject
+exports.rejectApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `UPDATE applications
+       SET status = 'rejected', updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, status`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Application rejected',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('Reject application error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reject application',
     });
   }
 };

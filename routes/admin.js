@@ -12,6 +12,8 @@ router.get('/stats', adminController.getStats);
 
 // Users
 router.get('/users', adminController.getAllUsers);
+router.get('/users/:id', adminController.getUserById);
+router.delete('/users/:id', adminController.deleteUser);
 
 // Verifications
 router.get('/verifications/pending', adminController.getPendingVerifications);
@@ -20,10 +22,12 @@ router.post('/verifications/:id/reject', adminController.rejectVerification);
 
 // Properties
 router.get('/properties', adminController.getAllProperties);
+router.get('/properties/:id', adminController.getPropertyById);
 
 // Applications
 router.get('/applications', adminController.getAllApplications);
-
-router.delete('/users/:id', adminController.deleteUser);
+router.get('/applications/:id', adminController.getApplicationById);
+router.post('/applications/:id/approve', adminController.approveApplication);
+router.post('/applications/:id/reject', adminController.rejectApplication);
 
 module.exports = router;

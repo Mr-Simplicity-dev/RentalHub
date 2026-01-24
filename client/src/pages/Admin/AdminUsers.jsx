@@ -1,23 +1,53 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
-import { FaUserShield, FaUserTie, FaUser } from 'react-icons/fa';
+import { FaSearch } from 'react-icons/fa';
+
+const PAGE_SIZE = 20;
 
 const AdminUsers = () => {
+  const navigate = useNavigate();
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+
+  const [search, setSearch] = useState('');
+  const [role, setRole] = useState('all');
+  const [page, setPage] = useState(1);
+
+  const [pagination, setPagination] = useState({
+    total: 0,
+    pages: 1,
+  });
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    const delay = setTimeout(() => {
+      loadUsers(1);
+    }, 300);
 
-  const loadUsers = async () => {
+    return () => clearTimeout(delay);
+  }, [search, role]);
+
+  useEffect(() => {
+    loadUsers(page);
+  }, [page]);
+
+  const loadUsers = async (p = page) => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/users');
+      const res = await api.get('/admin/users', {
+        params: {
+          search,
+          role,
+          page: p,
+          limit: PAGE_SIZE,
+        },
+      });
+
       if (res.data?.success) {
         setUsers(res.data.data);
+        setPagination(res.data.pagination);
       }
     } catch (err) {
       console.error('Failed to load users:', err);
@@ -26,44 +56,46 @@ const AdminUsers = () => {
     }
   };
 
-  const handleDisable = async (id) => {
-    if (!window.confirm('Disable this user? They will no longer access the system.')) return;
+  const from = (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, pagination.total);
 
-    try {
-      await api.delete(`/admin/users/${id}`);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-    } catch (err) {
-      console.error('Failed to disable user:', err);
-      alert('Failed to disable user');
-    }
-  };
-
-  const filteredUsers =
-    filter === 'all'
-      ? users
-      : users.filter((u) => u.user_type === filter);
-
-  if (loading) return <Loader fullScreen />;
+  if (loading && users.length === 0) return <Loader fullScreen />;
 
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-          <p className="text-gray-600">Manage all platform users</p>
+          <p className="text-gray-600">
+            {pagination.total
+              ? `Showing ${from}-${to} of ${pagination.total}`
+              : 'No users'}
+          </p>
         </div>
 
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="input max-w-xs"
-        >
-          <option value="all">All Users</option>
-          <option value="tenant">Tenants</option>
-          <option value="landlord">Landlords</option>
-          <option value="admin">Admins</option>
-        </select>
+        <div className="flex gap-2 items-center">
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-3 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name, email, phone..."
+              className="input pl-9"
+            />
+          </div>
+
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="input"
+          >
+            <option value="all">All</option>
+            <option value="tenant">Tenants</option>
+            <option value="landlord">Landlords</option>
+            <option value="admin">Admins</option>
+          </select>
+        </div>
       </div>
 
       {/* Table */}
@@ -75,48 +107,38 @@ const AdminUsers = () => {
               <th className="py-3 px-4">Email</th>
               <th className="py-3 px-4">Phone</th>
               <th className="py-3 px-4">Role</th>
-              <th className="py-3 px-4">Email</th>
-              <th className="py-3 px-4">Phone</th>
-              <th className="py-3 px-4">Identity</th>
+              <th className="py-3 px-4">Verified</th>
               <th className="py-3 px-4">Joined</th>
               <th className="py-3 px-4 text-right">Action</th>
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map((u) => (
+            {users.map((u) => (
               <tr key={u.id} className="border-b hover:bg-gray-50">
                 <td className="py-3 px-4 font-medium">{u.full_name}</td>
                 <td className="py-3 px-4">{u.email}</td>
                 <td className="py-3 px-4">{u.phone}</td>
+                <td className="py-3 px-4 capitalize">{u.user_type}</td>
                 <td className="py-3 px-4">
-                  <RoleBadge role={u.user_type} />
-                </td>
-                <td className="py-3 px-4">
-                  <StatusBadge ok={u.email_verified} />
-                </td>
-                <td className="py-3 px-4">
-                  <StatusBadge ok={u.phone_verified} />
-                </td>
-                <td className="py-3 px-4">
-                  <StatusBadge ok={u.identity_verified} />
+                  {u.identity_verified ? 'Yes' : 'No'}
                 </td>
                 <td className="py-3 px-4 text-gray-500">
                   {new Date(u.created_at).toLocaleDateString()}
                 </td>
                 <td className="py-3 px-4 text-right">
                   <button
-                    onClick={() => handleDisable(u.id)}
-                    className="text-red-600 hover:underline"
+                    onClick={() => navigate(`/admin/users/${u.id}`)}
+                    className="text-primary-600 hover:underline"
                   >
-                    Disable
+                    View
                   </button>
                 </td>
               </tr>
             ))}
 
-            {filteredUsers.length === 0 && (
+            {users.length === 0 && !loading && (
               <tr>
-                <td colSpan="9" className="py-6 text-center text-gray-500">
+                <td colSpan="7" className="py-8 text-center text-gray-500">
                   No users found
                 </td>
               </tr>
@@ -124,49 +146,33 @@ const AdminUsers = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="flex justify-between items-center mt-6">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="btn btn-sm"
+          >
+            Prev
+          </button>
+
+          <span className="text-sm text-gray-600">
+            Page {page} of {pagination.pages}
+          </span>
+
+          <button
+            disabled={page === pagination.pages}
+            onClick={() => setPage((p) => p + 1)}
+            className="btn btn-sm"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 };
-
-const RoleBadge = ({ role }) => {
-  const map = {
-    admin: {
-      label: 'Admin',
-      class: 'bg-purple-100 text-purple-700',
-      icon: <FaUserShield className="mr-1" />,
-    },
-    landlord: {
-      label: 'Landlord',
-      class: 'bg-blue-100 text-blue-700',
-      icon: <FaUserTie className="mr-1" />,
-    },
-    tenant: {
-      label: 'Tenant',
-      class: 'bg-green-100 text-green-700',
-      icon: <FaUser className="mr-1" />,
-    },
-  };
-
-  const cfg = map[role] || map.tenant;
-
-  return (
-    <span
-      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${cfg.class}`}
-    >
-      {cfg.icon}
-      {cfg.label}
-    </span>
-  );
-};
-
-const StatusBadge = ({ ok }) => (
-  <span
-    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-      ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-    }`}
-  >
-    {ok ? 'Yes' : 'No'}
-  </span>
-);
 
 export default AdminUsers;
