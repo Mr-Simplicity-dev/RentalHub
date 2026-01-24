@@ -26,7 +26,7 @@ const SuperAdminDashboard = () => {
     message: '',
     target_role: ''
   });
-}
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -114,15 +114,15 @@ const SuperAdminDashboard = () => {
     }
   };
 
-    const loadFraud = async () => {
+  const loadFraud = async () => {
     setLoading(true);
     try {
-        const res = await api.get('/super/fraud');
-        setFraud(res.data.flags || []);
+      const res = await api.get('/super/fraud');
+      setFraud(res.data.flags || []);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-    };
+  };
 
   const banUser = async (id) => {
     if (!window.confirm('Ban this user?')) return;
@@ -185,35 +185,35 @@ const SuperAdminDashboard = () => {
     loadFlags();
   };
 
- const switchTab = (t) => {
-  setTab(t);
-  if (t === 'users') loadUsers();
-  if (t === 'properties') loadProperties();
-  if (t === 'logs') loadLogs();
-  if (t === 'analytics') loadAnalytics();
-  if (t === 'reports') loadReports();
-  if (t === 'broadcast') loadBroadcasts();
-  if (t === 'flags') loadFlags();
-  if (t === 'fraud') loadFraud();
-};
+  const switchTab = (t) => {
+    setTab(t);
+    if (t === 'users') loadUsers();
+    if (t === 'properties') loadProperties();
+    if (t === 'logs') loadLogs();
+    if (t === 'analytics') loadAnalytics();
+    if (t === 'reports') loadReports();
+    if (t === 'broadcast') loadBroadcasts();
+    if (t === 'flags') loadFlags();
+    if (t === 'fraud') loadFraud();
+  };
 
-return (
-  <div className="container mx-auto px-4 py-8">
-    <h1 className="text-2xl font-bold mb-6">Super Admin Control Center</h1>
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">Super Admin Control Center</h1>
 
-    <div className="flex flex-wrap gap-2 mb-6">
-      {['users', 'properties', 'analytics', 'reports', 'logs', 'broadcast', 'flags', 'fraud'].map(t => (
-        <button
-          key={t}
-          className={`btn ${tab === t ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => switchTab(t)}
-        >
-          {t.charAt(0).toUpperCase() + t.slice(1)}
-        </button>
-      ))}
-    </div>
+      <div className="flex flex-wrap gap-2 mb-6">
+        {['users', 'properties', 'analytics', 'reports', 'logs', 'broadcast', 'flags', 'fraud'].map(t => (
+          <button
+            key={t}
+            className={`btn ${tab === t ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => switchTab(t)}
+          >
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
 
-    {loading && <p>Loading...</p>}
+      {loading && <p>Loading...</p>}
 
     {tab === 'flags' && (
       <div className="card">
@@ -512,5 +512,8 @@ return (
     )}
   </div>
 );
+ 
+};
 
 export default SuperAdminDashboard;
+
