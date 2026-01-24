@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
+import i18n from '../i18n';
 
 import { AuthProvider } from '../context/AuthContext';
 import { useAuth } from '../hooks/useAuth';
@@ -75,10 +77,34 @@ function Layout({ children }) {
     location.pathname.startsWith('/verify-email') ||
     location.pathname.startsWith('/verify-phone');
 
+  // Handle RTL/LTR automatically
+  useEffect(() => {
+    document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen">
       {!isVerificationPage && <Header />}
+
+      {/* Global Language Switcher */}
+      <div className="flex justify-end px-4 py-2 border-b bg-white">
+        <select
+          onChange={(e) => {
+            i18n.changeLanguage(e.target.value);
+            document.documentElement.dir = e.target.value === 'ar' ? 'rtl' : 'ltr';
+          }}
+          defaultValue={i18n.language || 'en'}
+          className="border rounded px-2 py-1 text-sm"
+        >
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="ar">العربية</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
+
       <main className="flex-grow">{children}</main>
+
       {!isVerificationPage && <Footer />}
     </div>
   );
