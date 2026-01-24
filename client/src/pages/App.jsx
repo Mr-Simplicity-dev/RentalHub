@@ -45,9 +45,9 @@ import LandlordGuide from './LandlordGuide';
 import VerifyEmail from './VerifyEmail';
 import VerifyPhone from './VerifyPhone';
 import SuperAdminDashboard from './SuperAdminDashboard';
-import AdminUserDetail from './AdminUserDetail';
-import AdminPropertyDetail from './AdminPropertyDetail';
-import AdminApplicationDetail from './AdminApplicationDetail';
+import AdminUserDetail from './admin/AdminUserDetail';
+import AdminPropertyDetail from './admin/AdminPropertyDetail';
+import AdminApplicationDetail from './admin/AdminApplicationDetail';
 
 
 const queryClient = new QueryClient();
