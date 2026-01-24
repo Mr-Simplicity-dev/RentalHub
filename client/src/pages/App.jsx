@@ -97,6 +97,7 @@ function Layout({ children }) {
           className="border rounded px-2 py-1 text-sm"
         >
           <option value="en">English</option>
+          <option value="ru">Russia</option>
           <option value="fr">Français</option>
           <option value="ar">العربية</option>
           <option value="zh">中文</option>
