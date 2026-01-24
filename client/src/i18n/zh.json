@@ -1,16 +1,46 @@
 {
-  "login": "登录",
-  "register": "注册",
-  "verify_phone": "验证手机号",
-  "send_otp": "发送验证码",
-  "enter_phone": "输入手机号",
-  "verify": "验证",
-  "dashboard": "仪表板",
-  "email_verified": "邮箱已验证",
-  "redirecting": "正在跳转",
-  "otp_sent": "验证码已发送到您的手机",
-  "enter_otp": "输入验证码",
-  "resend_otp": "重新发送验证码",
-  "otp_expired": "验证码已过期",
-  "logout": "退出登录"
+  "login": {
+    "title": "登录到您的账户",
+    "or": "或",
+    "create": "创建新账户",
+    "email": "电子邮箱",
+    "email_placeholder": "请输入您的邮箱",
+    "password": "密码",
+    "password_placeholder": "请输入您的密码",
+    "remember": "记住我",
+    "forgot": "忘记密码？",
+    "submit": "登录",
+    "signing": "正在登录...",
+    "success": "登录成功！",
+    "failed": "登录失败"
+  },
+  "home": {
+    "hero_title": "在尼日利亚找到您的理想之家",
+    "hero_subtitle": "浏览覆盖全部36个州及首都的数千套已验证房源",
+    "search_placeholder": "按位置或房产类型搜索...",
+    "search": "搜索",
+    "features": {
+      "verified": {
+        "title": "已验证房源",
+        "text": "所有房源和房东均通过NIN验证，保障您的安全"
+      },
+      "wide": {
+        "title": "丰富选择",
+        "text": "尼日利亚各地数千套房源供您选择"
+      },
+      "easy": {
+        "title": "流程简便",
+        "text": "在线即可完成申请和支付"
+      }
+    },
+    "featured_title": "精选房源",
+    "view_all": "查看全部",
+    "popular_locations": "热门地区",
+    "unknown": "未知",
+    "properties": "套房源",
+    "cta_title": "准备好寻找您的下一个家了吗？",
+    "cta_text": "加入成千上万已找到理想租房的尼日利亚用户",
+    "get_started": "立即开始",
+    "browse": "浏览房源"
+  }
 }

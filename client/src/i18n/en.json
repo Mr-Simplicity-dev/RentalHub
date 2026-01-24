@@ -1,9 +1,50 @@
 {
-  "login": "Login",
-  "register": "Register",
-  "verify_phone": "Verify Phone",
-  "send_otp": "Send OTP",
-  "enter_phone": "Enter phone number",
-  "verify": "Verify",
-  "dashboard": "Dashboard"
+  "login": {
+    "title": "Sign in to your account",
+    "or": "Or",
+    "create": "create a new account",
+    "email": "Email address",
+    "email_placeholder": "Enter your email",
+    "password": "Password",
+    "password_placeholder": "Enter your password",
+    "remember": "Remember me",
+    "forgot": "Forgot password?",
+    "submit": "Sign in",
+    "signing": "Signing in...",
+    "success": "Login successful!",
+    "failed": "Login failed"
+  },
+
+  "home": {
+    "hero_title": "Find Your Perfect Home in Nigeria",
+    "hero_subtitle": "Browse thousands of verified properties across all 36 states + FCT",
+    "search_placeholder": "Search by location, property type...",
+    "search": "Search",
+
+    "features": {
+      "verified": {
+        "title": "Verified Properties",
+        "text": "All properties and landlords are verified with NIN for your safety"
+      },
+      "wide": {
+        "title": "Wide Selection",
+        "text": "Thousands of properties across Nigeria to choose from"
+      },
+      "easy": {
+        "title": "Easy Process",
+        "text": "Simple application and payment process, all online"
+      }
+    },
+
+    "featured_title": "Featured Properties",
+    "view_all": "View All",
+    "popular_locations": "Popular Locations",
+    "unknown": "Unknown",
+    "properties": "properties",
+
+    "cta_title": "Ready to find your next home?",
+    "cta_text": "Join thousands of Nigerians who have found their perfect rental",
+    "get_started": "Get Started",
+    "browse": "Browse Properties"
+  }
 }

@@ -1,9 +1,46 @@
 {
-  "login": "Connexion",
-  "register": "Créer un compte",
-  "verify_phone": "Vérifier le téléphone",
-  "send_otp": "Envoyer le code",
-  "enter_phone": "Entrez le numéro de téléphone",
-  "dashboard": "Tableau de bord",
-  "logout": "Déconnexion"
+  "login": {
+    "title": "Connectez-vous à votre compte",
+    "or": "Ou",
+    "create": "créer un nouveau compte",
+    "email": "Adresse e-mail",
+    "email_placeholder": "Entrez votre e-mail",
+    "password": "Mot de passe",
+    "password_placeholder": "Entrez votre mot de passe",
+    "remember": "Se souvenir de moi",
+    "forgot": "Mot de passe oublié ?",
+    "submit": "Se connecter",
+    "signing": "Connexion en cours...",
+    "success": "Connexion réussie !",
+    "failed": "Échec de la connexion"
+  },
+  "home": {
+    "hero_title": "Trouvez la maison parfaite au Nigeria",
+    "hero_subtitle": "Parcourez des milliers de propriétés vérifiées dans les 36 États + FCT",
+    "search_placeholder": "Rechercher par lieu ou type de propriété...",
+    "search": "Rechercher",
+    "features": {
+      "verified": {
+        "title": "Propriétés vérifiées",
+        "text": "Toutes les propriétés et les propriétaires sont vérifiés avec le NIN pour votre sécurité"
+      },
+      "wide": {
+        "title": "Large choix",
+        "text": "Des milliers de propriétés à travers le Nigeria"
+      },
+      "easy": {
+        "title": "Processus simple",
+        "text": "Demande et paiement faciles, entièrement en ligne"
+      }
+    },
+    "featured_title": "Propriétés en vedette",
+    "view_all": "Voir tout",
+    "popular_locations": "Lieux populaires",
+    "unknown": "Inconnu",
+    "properties": "propriétés",
+    "cta_title": "Prêt à trouver votre prochain logement ?",
+    "cta_text": "Rejoignez des milliers de Nigérians qui ont trouvé leur location idéale",
+    "get_started": "Commencer",
+    "browse": "Parcourir les propriétés"
+  }
 }

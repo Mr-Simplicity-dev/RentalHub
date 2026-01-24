@@ -4,8 +4,11 @@ import { propertyService } from '../services/propertyService';
 import PropertyCard from '../components/properties/PropertyCard';
 import Loader from '../components/common/Loader';
 import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 const Home = () => {
+  const { t } = useTranslation();
+
   const [featuredProperties, setFeaturedProperties] = useState([]);
   const [popularLocations, setPopularLocations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,10 +60,10 @@ const Home = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
-              Find Your Perfect Home in Nigeria
+              {t('home.hero_title')}
             </h1>
             <p className="text-xl mb-8 text-primary-100">
-              Browse thousands of verified properties across all 36 states + FCT
+              {t('home.hero_subtitle')}
             </p>
 
             <form onSubmit={handleSearch} className="flex max-w-2xl mx-auto">
@@ -68,7 +71,7 @@ const Home = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by location, property type..."
+                placeholder={t('home.search_placeholder')}
                 className="flex-1 px-6 py-4 rounded-l-lg text-gray-900 focus:outline-none"
               />
               <button
@@ -76,7 +79,7 @@ const Home = () => {
                 className="bg-primary-700 hover:bg-primary-800 px-8 py-4 rounded-r-lg font-semibold transition-colors"
               >
                 <FaSearch className="inline mr-2" />
-                Search
+                {t('home.search')}
               </button>
             </form>
           </div>
@@ -90,18 +93,18 @@ const Home = () => {
             {[
               {
                 icon: <FaShieldAlt className="text-primary-600 text-2xl" />,
-                title: 'Verified Properties',
-                text: 'All properties and landlords are verified with NIN for your safety',
+                title: t('home.features.verified.title'),
+                text: t('home.features.verified.text'),
               },
               {
                 icon: <FaHome className="text-primary-600 text-2xl" />,
-                title: 'Wide Selection',
-                text: 'Thousands of properties across Nigeria to choose from',
+                title: t('home.features.wide.title'),
+                text: t('home.features.wide.text'),
               },
               {
                 icon: <FaCheckCircle className="text-primary-600 text-2xl" />,
-                title: 'Easy Process',
-                text: 'Simple application and payment process, all online',
+                title: t('home.features.easy.title'),
+                text: t('home.features.easy.text'),
               },
             ].map((f, i) => (
               <div key={i} className="text-center">
@@ -120,9 +123,11 @@ const Home = () => {
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold">Featured Properties</h2>
+            <h2 className="text-3xl font-bold">
+              {t('home.featured_title')}
+            </h2>
             <Link to="/properties" className="text-primary-600 hover:text-primary-700 font-semibold">
-              View All →
+              {t('home.view_all')} →
             </Link>
           </div>
 
@@ -145,7 +150,9 @@ const Home = () => {
       {/* Popular Locations */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-8 text-center">Popular Locations</h2>
+          <h2 className="text-3xl font-bold mb-8 text-center">
+            {t('home.popular_locations')}
+          </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {popularLocations.map((location, index) => (
               <Link
@@ -154,10 +161,10 @@ const Home = () => {
                 className="card text-center hover:shadow-lg transition-shadow"
               >
                 <h3 className="font-semibold text-gray-900">
-                  {location?.state_name ?? 'Unknown'}
+                  {location?.state_name ?? t('home.unknown')}
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  {location?.property_count ?? 0} properties
+                  {location?.property_count ?? 0} {t('home.properties')}
                 </p>
               </Link>
             ))}
@@ -168,16 +175,18 @@ const Home = () => {
       {/* CTA */}
       <section className="py-16 bg-primary-600 text-white">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to find your next home?</h2>
+          <h2 className="text-3xl font-bold mb-4">
+            {t('home.cta_title')}
+          </h2>
           <p className="text-xl mb-8 text-primary-100">
-            Join thousands of Nigerians who have found their perfect rental
+            {t('home.cta_text')}
           </p>
           <div className="flex justify-center space-x-4">
             <Link to="/register" className="bg-white text-primary-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-              Get Started
+              {t('home.get_started')}
             </Link>
             <Link to="/properties" className="border-2 border-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors">
-              Browse Properties
+              {t('home.browse')}
             </Link>
           </div>
         </div>
