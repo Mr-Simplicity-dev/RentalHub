@@ -14,10 +14,13 @@ import {
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { formatCurrency, formatDate, getTimeAgo } from '../utils/helpers';
+import { useTranslation } from 'react-i18next';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+
   const [stats, setStats] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +34,6 @@ const Dashboard = () => {
   if (!user) {
     return <Loader fullScreen />;
   }
-
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -75,12 +77,12 @@ const Dashboard = () => {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {user?.full_name}!
+            {t('dashboard.welcome', { name: user?.full_name })}
           </h1>
           <p className="text-gray-600 mt-1">
             {user?.user_type === 'tenant'
-              ? 'Find your perfect home'
-              : 'Manage your properties'}
+              ? t('dashboard.tenant_subtitle')
+              : t('dashboard.landlord_subtitle')}
           </p>
         </div>
 
@@ -91,16 +93,16 @@ const Dashboard = () => {
               <FaClock className="text-yellow-600 mt-1 mr-3" />
               <div>
                 <h3 className="font-semibold text-yellow-800">
-                  Complete Your Verification
+                  {t('dashboard.verify_title')}
                 </h3>
                 <p className="text-sm text-yellow-700 mt-1">
-                  Please complete your identity verification to access all features.
+                  {t('dashboard.verify_text')}
                 </p>
                 <button
                   onClick={() => navigate('/profile')}
                   className="mt-2 text-sm font-semibold text-yellow-800 hover:text-yellow-900"
                 >
-                  Complete Verification →
+                  {t('dashboard.verify_action')} →
                 </button>
               </div>
             </div>
@@ -113,15 +115,17 @@ const Dashboard = () => {
             <div className="flex items-start">
               <FaCheckCircle className="text-blue-600 mt-1 mr-3" />
               <div>
-                <h3 className="font-semibold text-blue-800">Subscribe to Access Properties</h3>
+                <h3 className="font-semibold text-blue-800">
+                  {t('dashboard.subscribe_title')}
+                </h3>
                 <p className="text-sm text-blue-700 mt-1">
-                  Subscribe to view full property details and contact landlords.
+                  {t('dashboard.subscribe_text')}
                 </p>
                 <button
                   onClick={() => navigate('/subscribe')}
                   className="mt-2 btn btn-primary text-sm"
                 >
-                  View Plans
+                  {t('dashboard.subscribe_action')}
                 </button>
               </div>
             </div>
@@ -134,25 +138,25 @@ const Dashboard = () => {
             <>
               <StatCard
                 icon={<FaHeart className="text-red-500" />}
-                title="Saved Properties"
+                title={t('dashboard.saved')}
                 value={stats?.saved_properties_count || 0}
                 onClick={() => navigate('/saved-properties')}
               />
               <StatCard
                 icon={<FaFileAlt className="text-blue-500" />}
-                title="Total Applications"
+                title={t('dashboard.total_apps')}
                 value={stats?.total_applications || 0}
                 onClick={() => navigate('/applications')}
               />
               <StatCard
                 icon={<FaClock className="text-yellow-500" />}
-                title="Pending Applications"
+                title={t('dashboard.pending_apps')}
                 value={stats?.pending_applications || 0}
                 onClick={() => navigate('/applications?status=pending')}
               />
               <StatCard
                 icon={<FaCheckCircle className="text-green-500" />}
-                title="Approved Applications"
+                title={t('dashboard.approved_apps')}
                 value={stats?.approved_applications || 0}
                 onClick={() => navigate('/applications?status=approved')}
               />
@@ -161,25 +165,25 @@ const Dashboard = () => {
             <>
               <StatCard
                 icon={<FaHome className="text-blue-500" />}
-                title="Total Properties"
+                title={t('dashboard.total_props')}
                 value={stats?.total_properties || 0}
                 onClick={() => navigate('/my-properties')}
               />
               <StatCard
                 icon={<FaCheckCircle className="text-green-500" />}
-                title="Available Properties"
+                title={t('dashboard.available_props')}
                 value={stats?.available_properties || 0}
                 onClick={() => navigate('/my-properties?status=available')}
               />
               <StatCard
                 icon={<FaFileAlt className="text-yellow-500" />}
-                title="Pending Applications"
+                title={t('dashboard.pending_apps')}
                 value={stats?.pending_applications || 0}
                 onClick={() => navigate('/applications?status=pending')}
               />
               <StatCard
                 icon={<FaEnvelope className="text-purple-500" />}
-                title="Unread Messages"
+                title={t('dashboard.unread')}
                 value={stats?.unread_messages || 0}
                 onClick={() => navigate('/messages')}
               />
@@ -189,9 +193,13 @@ const Dashboard = () => {
 
         {/* Recent Activities */}
         <div className="card">
-          <h2 className="text-xl font-bold mb-4">Recent Activities</h2>
+          <h2 className="text-xl font-bold mb-4">
+            {t('dashboard.recent')}
+          </h2>
           {recentActivities.length === 0 ? (
-            <p className="text-gray-600 text-center py-8">No recent activities</p>
+            <p className="text-gray-600 text-center py-8">
+              {t('dashboard.no_recent')}
+            </p>
           ) : (
             <div className="space-y-4">
               {recentActivities.map((activity, index) => (
@@ -206,20 +214,20 @@ const Dashboard = () => {
           {user?.user_type === 'tenant' ? (
             <>
               <QuickActionCard
-                title="Browse Properties"
-                description="Find your perfect home"
+                title={t('dashboard.qa_browse')}
+                description={t('dashboard.qa_browse_desc')}
                 icon={<FaHome />}
                 onClick={() => navigate('/properties')}
               />
               <QuickActionCard
-                title="My Applications"
-                description="Track your applications"
+                title={t('dashboard.qa_apps')}
+                description={t('dashboard.qa_apps_desc')}
                 icon={<FaFileAlt />}
                 onClick={() => navigate('/applications')}
               />
               <QuickActionCard
-                title="Messages"
-                description="Chat with landlords"
+                title={t('dashboard.qa_messages')}
+                description={t('dashboard.qa_messages_desc')}
                 icon={<FaEnvelope />}
                 onClick={() => navigate('/messages')}
               />
@@ -227,20 +235,20 @@ const Dashboard = () => {
           ) : (
             <>
               <QuickActionCard
-                title="Add Property"
-                description="List a new property"
+                title={t('dashboard.qa_add')}
+                description={t('dashboard.qa_add_desc')}
                 icon={<FaHome />}
                 onClick={() => navigate('/add-property')}
               />
               <QuickActionCard
-                title="My Properties"
-                description="Manage your listings"
+                title={t('dashboard.qa_my_props')}
+                description={t('dashboard.qa_my_props_desc')}
                 icon={<FaHome />}
                 onClick={() => navigate('/my-properties')}
               />
               <QuickActionCard
-                title="Applications"
-                description="Review tenant applications"
+                title={t('dashboard.qa_apps_landlord')}
+                description={t('dashboard.qa_apps_landlord_desc')}
                 icon={<FaFileAlt />}
                 onClick={() => navigate('/applications')}
               />
@@ -270,6 +278,8 @@ const StatCard = ({ icon, title, value, onClick }) => (
 
 // Activity Item Component
 const ActivityItem = ({ activity }) => {
+  const { t } = useTranslation();
+
   const getActivityIcon = () => {
     switch (activity.type) {
       case 'application':
@@ -286,13 +296,21 @@ const ActivityItem = ({ activity }) => {
   const getActivityText = () => {
     switch (activity.type) {
       case 'application':
-        return `Application ${activity.status} for ${activity.property_title}`;
+        return t('dashboard.activity_application', {
+          status: activity.status,
+          title: activity.property_title,
+        });
       case 'message':
-        return `Message from ${activity.user_name || 'User'}`;
+        return t('dashboard.activity_message', {
+          name: activity.user_name || t('dashboard.user'),
+        });
       case 'review':
-        return `New review (${activity.status} stars) for ${activity.property_title}`;
+        return t('dashboard.activity_review', {
+          stars: activity.status,
+          title: activity.property_title,
+        });
       default:
-        return 'Activity';
+        return t('dashboard.activity_generic');
     }
   };
 
@@ -301,7 +319,9 @@ const ActivityItem = ({ activity }) => {
       <div className="mt-1">{getActivityIcon()}</div>
       <div className="flex-1">
         <p className="text-gray-900">{getActivityText()}</p>
-        <p className="text-sm text-gray-500">{getTimeAgo(activity.activity_date)}</p>
+        <p className="text-sm text-gray-500">
+          {getTimeAgo(activity.activity_date)}
+        </p>
       </div>
     </div>
   );

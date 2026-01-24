@@ -1,81 +1,207 @@
 {
   "login": {
-    "title": "Sign in to your account",
-    "or": "Or",
-    "create": "create a new account",
-    "email": "Email address",
-    "email_placeholder": "Enter your email",
-    "password": "Password",
-    "password_placeholder": "Enter your password",
-    "remember": "Remember me",
-    "forgot": "Forgot password?",
-    "submit": "Sign in",
-    "signing": "Signing in...",
-    "success": "Login successful!",
-    "failed": "Login failed"
+    "title": "تسجيل الدخول إلى حسابك",
+    "or": "أو",
+    "create": "إنشاء حساب جديد",
+    "email": "البريد الإلكتروني",
+    "email_placeholder": "أدخل بريدك الإلكتروني",
+    "password": "كلمة المرور",
+    "password_placeholder": "أدخل كلمة المرور",
+    "remember": "تذكرني",
+    "forgot": "هل نسيت كلمة المرور؟",
+    "submit": "تسجيل الدخول",
+    "signing": "جاري تسجيل الدخول...",
+    "success": "تم تسجيل الدخول بنجاح!",
+    "failed": "فشل تسجيل الدخول"
   },
 
   "home": {
-    "hero_title": "Find Your Perfect Home in Nigeria",
-    "hero_subtitle": "Browse thousands of verified properties across all 36 states + FCT",
-    "search_placeholder": "Search by location, property type...",
-    "search": "Search",
+    "hero_title": "اعثر على منزلك المثالي في نيجيريا",
+    "hero_subtitle": "تصفح آلاف العقارات الموثوقة في جميع الولايات الـ 36 + العاصمة",
+    "search_placeholder": "ابحث حسب الموقع أو نوع العقار...",
+    "search": "بحث",
 
     "features": {
       "verified": {
-        "title": "Verified Properties",
-        "text": "All properties and landlords are verified with NIN for your safety"
+        "title": "عقارات موثوقة",
+        "text": "جميع العقارات والمُلّاك موثوقون باستخدام رقم الهوية الوطنية لضمان سلامتك"
       },
       "wide": {
-        "title": "Wide Selection",
-        "text": "Thousands of properties across Nigeria to choose from"
+        "title": "خيارات واسعة",
+        "text": "آلاف العقارات في جميع أنحاء نيجيريا للاختيار من بينها"
       },
       "easy": {
-        "title": "Easy Process",
-        "text": "Simple application and payment process, all online"
+        "title": "إجراءات سهلة",
+        "text": "عملية تقديم ودفع بسيطة بالكامل عبر الإنترنت"
       }
     },
 
-    "featured_title": "Featured Properties",
-    "view_all": "View All",
-    "popular_locations": "Popular Locations",
-    "unknown": "Unknown",
-    "properties": "properties",
+    "featured_title": "عقارات مميزة",
+    "view_all": "عرض الكل",
+    "popular_locations": "مناطق شائعة",
+    "unknown": "غير معروف",
+    "properties": "عقارات",
 
-    "cta_title": "Ready to find your next home?",
-    "cta_text": "Join thousands of Nigerians who have found their perfect rental",
-    "get_started": "Get Started",
-    "browse": "Browse Properties"
+    "cta_title": "هل أنت مستعد للعثور على منزلك القادم؟",
+    "cta_text": "انضم إلى آلاف النيجيريين الذين وجدوا منزلهم المثالي",
+    "get_started": "ابدأ الآن",
+    "browse": "تصفح العقارات"
   },
 
   "footer": {
-    "about": "Nigeria's trusted platform for finding and listing rental properties. Connecting landlords and tenants across all 36 states + FCT.",
-    "quick_links": "Quick Links",
-    "browse": "Browse Properties",
-    "about_us": "About Us",
-    "how": "How It Works",
-    "faq": "FAQ",
-    "landlords": "For Landlords",
-    "list": "List Your Property",
-    "pricing": "Pricing Plans",
-    "guide": "Landlord Guide",
-    "contact": "Contact Us",
-    "email": "Email",
-    "phone": "Phone",
-    "rights": "All rights reserved.",
-    "privacy": "Privacy Policy",
-    "terms": "Terms of Service"
+    "about": "منصة نيجيريا الموثوقة للعثور على العقارات السكنية وعرضها. نربط بين المُلّاك والمستأجرين في جميع الولايات الـ 36 + العاصمة.",
+    "quick_links": "روابط سريعة",
+    "browse": "تصفح العقارات",
+    "about_us": "من نحن",
+    "how": "كيف يعمل",
+    "faq": "الأسئلة الشائعة",
+    "landlords": "للمُلّاك",
+    "list": "أضف عقارك",
+    "pricing": "خطط الأسعار",
+    "guide": "دليل المُلّاك",
+    "contact": "اتصل بنا",
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "rights": "جميع الحقوق محفوظة.",
+    "privacy": "سياسة الخصوصية",
+    "terms": "شروط الخدمة"
   },
 
   "header": {
-    "browse": "Browse Properties",
-    "my_properties": "My Properties",
-    "saved": "Saved Properties",
-    "dashboard": "Dashboard",
-    "profile": "Profile",
-    "applications": "Applications",
-    "logout": "Logout",
-    "login": "Login",
-    "register": "Register"
+    "browse": "تصفح العقارات",
+    "my_properties": "عقاراتي",
+    "saved": "العقارات المحفوظة",
+    "dashboard": "لوحة التحكم",
+    "profile": "الملف الشخصي",
+    "applications": "الطلبات",
+    "logout": "تسجيل الخروج",
+    "login": "تسجيل الدخول",
+    "register": "إنشاء حساب"
   }
+  ,
+
+  "applications": {
+    "load_failed": "فشل في تحميل الطلبات",
+    "my_title": "طلباتي",
+    "landlord_title": "الطلبات على عقاراتي",
+    "landlord": "المالك",
+    "tenant": "المستأجر",
+    "none": "لا توجد طلبات بعد",
+    "status": {
+      "pending": "قيد الانتظار",
+      "approved": "مقبول",
+      "rejected": "مرفوض"
+    }
+  },
+
+  "add_property": {
+    "title": "إضافة عقار",
+    "required": "يرجى إكمال جميع الحقول المطلوبة",
+    "invalid_code": "رمز التحقق غير صحيح",
+    "success": "تم إدراج العقار بنجاح",
+    "failed": "فشل في إنشاء العقار",
+    "continue": "متابعة",
+    "back": "رجوع",
+    "submitting": "جارٍ الإرسال...",
+    "publish": "تحقق وانشر",
+
+    "verify_title": "أدخل رمز التحقق",
+    "verify_text": "أدخل الرمز المكون من 6 أرقام الذي تم تزويدك به لتفعيل هذا الإعلان.",
+
+    "form": {
+      "title": "عنوان العقار *",
+      "description": "الوصف",
+      "state": "اختر الولاية *",
+      "city": "المدينة *",
+      "area": "المنطقة / المجمع",
+      "type": "نوع العقار *",
+      "rent": "قيمة الإيجار (₦) *",
+      "yearly": "سنوي",
+      "monthly": "شهري",
+      "bedrooms": "غرف النوم",
+      "bathrooms": "الحمامات",
+      "amenities": "المرافق (مفصولة بفواصل)",
+      "available": "متاح"
+    }
+  },
+
+  "dashboard": {
+    "welcome": "مرحبًا بعودتك، {{name}}!",
+    "tenant_subtitle": "اعثر على منزلك المثالي",
+    "landlord_subtitle": "أدر عقاراتك",
+
+    "verify_title": "أكمل التحقق الخاص بك",
+    "verify_text": "يرجى إكمال التحقق من هويتك للوصول إلى جميع الميزات.",
+    "verify_action": "أكمل التحقق",
+
+    "subscribe_title": "اشترك للوصول إلى العقارات",
+    "subscribe_text": "اشترك لعرض تفاصيل العقارات الكاملة والتواصل مع المُلّاك.",
+    "subscribe_action": "عرض الخطط",
+
+    "saved": "العقارات المحفوظة",
+    "total_apps": "إجمالي الطلبات",
+    "pending_apps": "الطلبات المعلقة",
+    "approved_apps": "الطلبات المقبولة",
+
+    "total_props": "إجمالي العقارات",
+    "available_props": "العقارات المتاحة",
+    "unread": "الرسائل غير المقروءة",
+
+    "recent": "الأنشطة الأخيرة",
+    "no_recent": "لا توجد أنشطة حديثة",
+    "user": "مستخدم",
+
+    "activity_application": "طلب {{status}} للعقار {{title}}",
+    "activity_message": "رسالة من {{name}}",
+    "activity_review": "مراجعة جديدة ({{stars}} نجوم) للعقار {{title}}",
+    "activity_generic": "نشاط",
+
+    "qa_browse": "تصفح العقارات",
+    "qa_browse_desc": "اعثر على منزلك المثالي",
+    "qa_apps": "طلباتي",
+    "qa_apps_desc": "تتبع طلباتك",
+    "qa_messages": "الرسائل",
+    "qa_messages_desc": "تواصل مع المُلّاك",
+
+    "qa_add": "إضافة عقار",
+    "qa_add_desc": "أدرج عقارًا جديدًا",
+    "qa_my_props": "عقاراتي",
+    "qa_my_props_desc": "إدارة إعلاناتك",
+    "qa_apps_landlord": "الطلبات",
+    "qa_apps_landlord_desc": "مراجعة طلبات المستأجرين"
+  },
+
+  "profile": {
+  "title": "ملفي الشخصي",
+  "account_title": "معلومات الحساب",
+  "name": "الاسم",
+  "email": "البريد الإلكتروني",
+  "phone": "الهاتف",
+  "role": "الدور",
+
+  "verify_title": "التحقق من الهوية",
+  "verified": "تم التحقق من هويتك ✔",
+  "verify_text": "قم برفع صورة جواز السفر للتحقق من هويتك.",
+
+  "select_image": "يرجى اختيار صورة",
+  "upload": "رفع المستند",
+  "uploading": "جارٍ الرفع...",
+  "upload_success": "تم رفع المستند. في انتظار مراجعة المشرف.",
+  "upload_failed": "فشل الرفع"
+},
+
+"properties": {
+  "title": "تصفح العقارات",
+  "loading": "جارٍ التحميل...",
+  "found": "تم العثور على {{count}} عقار",
+  "load_failed": "فشل في تحميل العقارات",
+
+  "saved_favorite": "تم حفظ العقار في المفضلة",
+  "removed_favorite": "تمت إزالة العقار من المفضلة",
+  "save_failed": "فشل في حفظ العقار",
+
+  "prev": "← السابق",
+  "next": "التالي →"
+}
+
 }

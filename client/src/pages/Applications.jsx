@@ -3,9 +3,11 @@ import { useAuth } from '../hooks/useAuth';
 import { applicationService } from '../services/applicationService';
 import Loader from '../components/common/Loader';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 
 const Applications = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +27,7 @@ const Applications = () => {
         setApps(res.data);
       }
     } catch (err) {
-      toast.error('Failed to load applications');
+      toast.error(t('applications.load_failed'));
     } finally {
       setLoading(false);
     }
@@ -37,8 +39,8 @@ const Applications = () => {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">
         {user?.user_type === 'tenant'
-          ? 'My Applications'
-          : 'Applications on My Properties'}
+          ? t('applications.my_title')
+          : t('applications.landlord_title')}
       </h1>
 
       <div className="space-y-4">
@@ -49,8 +51,8 @@ const Applications = () => {
                 <div className="font-semibold">{a.property_title}</div>
                 <div className="text-sm text-gray-600">
                   {user?.user_type === 'tenant'
-                    ? `Landlord: ${a.landlord_name}`
-                    : `Tenant: ${a.tenant_name}`}
+                    ? `${t('applications.landlord')}: ${a.landlord_name}`
+                    : `${t('applications.tenant')}: ${a.tenant_name}`}
                 </div>
               </div>
               <span
@@ -62,7 +64,7 @@ const Applications = () => {
                     : 'bg-yellow-100 text-yellow-700'
                 }`}
               >
-                {a.status}
+                {t(`applications.status.${a.status}`)}
               </span>
             </div>
 
@@ -76,7 +78,7 @@ const Applications = () => {
 
         {apps.length === 0 && (
           <div className="card text-center py-10 text-gray-500">
-            No applications yet
+            {t('applications.none')}
           </div>
         )}
       </div>

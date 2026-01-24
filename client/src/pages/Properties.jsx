@@ -5,9 +5,12 @@ import PropertyList from '../components/properties/PropertyList';
 import PropertyFilters from '../components/properties/PropertyFilters';
 import { toast } from 'react-toastify';
 import ReactPaginate from 'react-paginate';
+import { useTranslation } from 'react-i18next';
 
 const Properties = () => {
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation();
+
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -42,7 +45,7 @@ const Properties = () => {
         setPagination(response.pagination);
       }
     } catch (error) {
-      toast.error('Failed to load properties');
+      toast.error(t('properties.load_failed'));
       console.error('Error loading properties:', error);
     } finally {
       setLoading(false);
@@ -65,21 +68,23 @@ const Properties = () => {
       if (savedPropertyIds.includes(propertyId)) {
         await propertyService.unsaveProperty(propertyId);
         setSavedPropertyIds(savedPropertyIds.filter(id => id !== propertyId));
-        toast.success('Property removed from favorites');
+        toast.success(t('properties.removed_favorite'));
       } else {
         await propertyService.saveProperty(propertyId);
         setSavedPropertyIds([...savedPropertyIds, propertyId]);
-        toast.success('Property saved to favorites');
+        toast.success(t('properties.saved_favorite'));
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to save property');
+      toast.error(error.response?.data?.message || t('properties.save_failed'));
     }
   };
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-6">Browse Properties</h1>
+        <h1 className="text-3xl font-bold mb-6">
+          {t('properties.title')}
+        </h1>
 
         {/* Filters */}
         <PropertyFilters
@@ -90,7 +95,9 @@ const Properties = () => {
         {/* Results Count */}
         <div className="mb-4">
           <p className="text-gray-600">
-            {loading ? 'Loading...' : `${pagination.total} properties found`}
+            {loading
+              ? t('properties.loading')
+              : t('properties.found', { count: pagination.total })}
           </p>
         </div>
 
@@ -106,8 +113,8 @@ const Properties = () => {
         {!loading && pagination.total > pagination.limit && (
           <div className="mt-8 flex justify-center">
             <ReactPaginate
-              previousLabel="← Previous"
-              nextLabel="Next →"
+              previousLabel={t('properties.prev')}
+              nextLabel={t('properties.next')}
               pageCount={Math.ceil(pagination.total / pagination.limit)}
               onPageChange={handlePageChange}
               containerClassName="flex space-x-2"

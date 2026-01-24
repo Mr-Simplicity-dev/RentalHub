@@ -77,5 +77,130 @@
     "logout": "Logout",
     "login": "Login",
     "register": "Register"
-  }
+  },
+
+  "applications": {
+    "load_failed": "Failed to load applications",
+    "my_title": "My Applications",
+    "landlord_title": "Applications on My Properties",
+    "landlord": "Landlord",
+    "tenant": "Tenant",
+    "none": "No applications yet",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    }
+  },
+
+  "add_property": {
+    "title": "Add Property",
+    "required": "Please complete all required fields",
+    "invalid_code": "Invalid verification code",
+    "success": "Property listed successfully",
+    "failed": "Failed to create property",
+    "continue": "Continue",
+    "back": "Back",
+    "submitting": "Submitting...",
+    "publish": "Verify & Publish",
+
+    "verify_title": "Enter Verification Code",
+    "verify_text": "Enter the 6-digit code provided to you to activate this listing.",
+
+    "form": {
+      "title": "Property title *",
+      "description": "Description",
+      "state": "Select State *",
+      "city": "City *",
+      "area": "Area / Estate",
+      "type": "Property Type *",
+      "rent": "Rent Amount (₦) *",
+      "yearly": "Per Year",
+      "monthly": "Per Month",
+      "bedrooms": "Bedrooms",
+      "bathrooms": "Bathrooms",
+      "amenities": "Amenities (comma separated)",
+      "available": "Available"
+    }
+  },
+
+  "dashboard": {
+    "welcome": "Welcome back, {{name}}!",
+    "tenant_subtitle": "Find your perfect home",
+    "landlord_subtitle": "Manage your properties",
+
+    "verify_title": "Complete Your Verification",
+    "verify_text": "Please complete your identity verification to access all features.",
+    "verify_action": "Complete Verification",
+
+    "subscribe_title": "Subscribe to Access Properties",
+    "subscribe_text": "Subscribe to view full property details and contact landlords.",
+    "subscribe_action": "View Plans",
+
+    "saved": "Saved Properties",
+    "total_apps": "Total Applications",
+    "pending_apps": "Pending Applications",
+    "approved_apps": "Approved Applications",
+
+    "total_props": "Total Properties",
+    "available_props": "Available Properties",
+    "unread": "Unread Messages",
+
+    "recent": "Recent Activities",
+    "no_recent": "No recent activities",
+    "user": "User",
+
+    "activity_application": "Application {{status}} for {{title}}",
+    "activity_message": "Message from {{name}}",
+    "activity_review": "New review ({{stars}} stars) for {{title}}",
+    "activity_generic": "Activity",
+
+    "qa_browse": "Browse Properties",
+    "qa_browse_desc": "Find your perfect home",
+    "qa_apps": "My Applications",
+    "qa_apps_desc": "Track your applications",
+    "qa_messages": "Messages",
+    "qa_messages_desc": "Chat with landlords",
+
+    "qa_add": "Add Property",
+    "qa_add_desc": "List a new property",
+    "qa_my_props": "My Properties",
+    "qa_my_props_desc": "Manage your listings",
+    "qa_apps_landlord": "Applications",
+    "qa_apps_landlord_desc": "Review tenant applications"
+  },
+
+  "profile": {
+  "title": "My Profile",
+  "account_title": "Account Information",
+  "name": "Name",
+  "email": "Email",
+  "phone": "Phone",
+  "role": "Role",
+
+  "verify_title": "Identity Verification",
+  "verified": "Your identity has been verified ✔",
+  "verify_text": "Upload your passport photograph for identity verification.",
+
+  "select_image": "Please select an image",
+  "upload": "Upload Document",
+  "uploading": "Uploading...",
+  "upload_success": "Document uploaded. Awaiting admin verification.",
+  "upload_failed": "Upload failed"
+},
+
+"properties": {
+  "title": "Browse Properties",
+  "loading": "Loading...",
+  "found": "{{count}} properties found",
+  "load_failed": "Failed to load properties",
+
+  "saved_favorite": "Property saved to favorites",
+  "removed_favorite": "Property removed from favorites",
+  "save_failed": "Failed to save property",
+
+  "prev": "← Previous",
+  "next": "Next →"
+}
+
 }
