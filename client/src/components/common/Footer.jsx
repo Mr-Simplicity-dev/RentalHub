@@ -1,8 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaFacebook, FaTwitter, FaInstagram, FaLinkedin } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 const Footer = () => {
+  const { t } = useTranslation();
+
   return (
     <footer className="bg-gray-900 text-white">
       <div className="container mx-auto px-4 py-12">
@@ -11,32 +14,34 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-bold mb-4">RentalHub NG</h3>
             <p className="text-sm text-gray-400">
-              Nigeria's trusted platform for finding and listing rental properties. Connecting landlords and tenants across all 36 states + FCT.
+              {t('footer.about')}
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h3 className="text-lg font-bold mb-4">Quick Links</h3>
+            <h3 className="text-lg font-bold mb-4">
+              {t('footer.quick_links')}
+            </h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link to="/properties" className="text-gray-400 hover:text-white">
-                  Browse Properties
+                  {t('footer.browse')}
                 </Link>
               </li>
               <li>
                 <Link to="/about" className="text-gray-400 hover:text-white">
-                  About Us
+                  {t('footer.about_us')}
                 </Link>
               </li>
               <li>
                 <Link to="/how-it-works" className="text-gray-400 hover:text-white">
-                  How It Works
+                  {t('footer.how')}
                 </Link>
               </li>
               <li>
                 <Link to="/faq" className="text-gray-400 hover:text-white">
-                  FAQ
+                  {t('footer.faq')}
                 </Link>
               </li>
             </ul>
@@ -44,21 +49,23 @@ const Footer = () => {
 
           {/* For Landlords */}
           <div>
-            <h3 className="text-lg font-bold mb-4">For Landlords</h3>
+            <h3 className="text-lg font-bold mb-4">
+              {t('footer.landlords')}
+            </h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link to="/list-property" className="text-gray-400 hover:text-white">
-                  List Your Property
+                  {t('footer.list')}
                 </Link>
               </li>
               <li>
                 <Link to="/pricing" className="text-gray-400 hover:text-white">
-                  Pricing Plans
+                  {t('footer.pricing')}
                 </Link>
               </li>
               <li>
                 <Link to="/landlord-guide" className="text-gray-400 hover:text-white">
-                  Landlord Guide
+                  {t('footer.guide')}
                 </Link>
               </li>
             </ul>
@@ -66,10 +73,12 @@ const Footer = () => {
 
           {/* Contact */}
           <div>
-            <h3 className="text-lg font-bold mb-4">Contact Us</h3>
+            <h3 className="text-lg font-bold mb-4">
+              {t('footer.contact')}
+            </h3>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li>Email: support@rentalhub.ng</li>
-              <li>Phone: +234 706 701 2884</li>
+              <li>{t('footer.email')}: support@rentalhub.ng</li>
+              <li>{t('footer.phone')}: +234 706 701 2884</li>
               <li className="flex space-x-4 mt-4">
                 <a href="#" className="hover:text-white">
                   <FaFacebook className="text-xl" />
@@ -89,10 +98,14 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-          <p>&copy; 2024 RentalHub NG. All rights reserved.</p>
+          <p>&copy; 2024 RentalHub NG. {t('footer.rights')}</p>
           <div className="mt-2 space-x-4">
-            <Link to="/privacy" className="hover:text-white">Privacy Policy</Link>
-            <Link to="/terms" className="hover:text-white">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-white">
+              {t('footer.privacy')}
+            </Link>
+            <Link to="/terms" className="hover:text-white">
+              {t('footer.terms')}
+            </Link>
           </div>
         </div>
       </div>

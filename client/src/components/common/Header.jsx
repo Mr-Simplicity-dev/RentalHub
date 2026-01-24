@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { FaBell, FaUser, FaSignOutAlt, FaHome, FaEnvelope } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 const Header = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const { t } = useTranslation();
 
   const handleLogout = () => {
     logout();
@@ -26,16 +28,18 @@ const Header = () => {
           {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
             <Link to="/properties" className="text-gray-700 hover:text-primary-600">
-              Browse Properties
+              {t('header.browse')}
             </Link>
+
             {isAuthenticated && user?.user_type === 'landlord' && (
               <Link to="/my-properties" className="text-gray-700 hover:text-primary-600">
-                My Properties
+                {t('header.my_properties')}
               </Link>
             )}
+
             {isAuthenticated && user?.user_type === 'tenant' && (
               <Link to="/saved-properties" className="text-gray-700 hover:text-primary-600">
-                Saved Properties
+                {t('header.saved')}
               </Link>
             )}
           </nav>
@@ -47,7 +51,6 @@ const Header = () => {
                 {/* Messages */}
                 <Link to="/messages" className="relative text-gray-700 hover:text-primary-600">
                   <FaEnvelope className="text-xl" />
-                  {/* Unread badge - implement with context */}
                 </Link>
 
                 {/* Notifications */}
@@ -72,28 +75,31 @@ const Header = () => {
                         className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
                         onClick={() => setShowUserMenu(false)}
                       >
-                        Dashboard
+                        {t('header.dashboard')}
                       </Link>
+
                       <Link
                         to="/profile"
                         className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
                         onClick={() => setShowUserMenu(false)}
                       >
-                        Profile
+                        {t('header.profile')}
                       </Link>
+
                       <Link
                         to="/applications"
                         className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
                         onClick={() => setShowUserMenu(false)}
                       >
-                        Applications
+                        {t('header.applications')}
                       </Link>
+
                       <button
                         onClick={handleLogout}
                         className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 flex items-center space-x-2"
                       >
                         <FaSignOutAlt />
-                        <span>Logout</span>
+                        <span>{t('header.logout')}</span>
                       </button>
                     </div>
                   )}
@@ -102,10 +108,10 @@ const Header = () => {
             ) : (
               <div className="flex items-center space-x-4">
                 <Link to="/login" className="text-gray-700 hover:text-primary-600">
-                  Login
+                  {t('header.login')}
                 </Link>
                 <Link to="/register" className="btn btn-primary">
-                  Register
+                  {t('header.register')}
                 </Link>
               </div>
             )}

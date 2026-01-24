@@ -14,11 +14,13 @@
     "success": "Connexion réussie !",
     "failed": "Échec de la connexion"
   },
+
   "home": {
     "hero_title": "Trouvez la maison parfaite au Nigeria",
     "hero_subtitle": "Parcourez des milliers de propriétés vérifiées dans les 36 États + FCT",
     "search_placeholder": "Rechercher par lieu ou type de propriété...",
     "search": "Rechercher",
+
     "features": {
       "verified": {
         "title": "Propriétés vérifiées",
@@ -33,14 +35,47 @@
         "text": "Demande et paiement faciles, entièrement en ligne"
       }
     },
+
     "featured_title": "Propriétés en vedette",
     "view_all": "Voir tout",
     "popular_locations": "Lieux populaires",
     "unknown": "Inconnu",
     "properties": "propriétés",
+
     "cta_title": "Prêt à trouver votre prochain logement ?",
     "cta_text": "Rejoignez des milliers de Nigérians qui ont trouvé leur location idéale",
     "get_started": "Commencer",
     "browse": "Parcourir les propriétés"
+  },
+
+  "footer": {
+    "about": "La plateforme nigériane de confiance pour trouver et publier des biens locatifs, reliant propriétaires et locataires dans les 36 États + FCT.",
+    "quick_links": "Liens rapides",
+    "browse": "Parcourir les propriétés",
+    "about_us": "À propos",
+    "how": "Comment ça marche",
+    "faq": "FAQ",
+    "landlords": "Pour les propriétaires",
+    "list": "Lister votre propriété",
+    "pricing": "Plans tarifaires",
+    "guide": "Guide du propriétaire",
+    "contact": "Nous contacter",
+    "email": "E-mail",
+    "phone": "Téléphone",
+    "rights": "Tous droits réservés.",
+    "privacy": "Politique de confidentialité",
+    "terms": "Conditions d'utilisation"
+  },
+
+  "header": {
+    "browse": "Parcourir les propriétés",
+    "my_properties": "Mes propriétés",
+    "saved": "Propriétés sauvegardées",
+    "dashboard": "Tableau de bord",
+    "profile": "Profil",
+    "applications": "Candidatures",
+    "logout": "Déconnexion",
+    "login": "Connexion",
+    "register": "S'inscrire"
   }
 }

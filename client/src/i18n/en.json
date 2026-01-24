@@ -46,5 +46,36 @@
     "cta_text": "Join thousands of Nigerians who have found their perfect rental",
     "get_started": "Get Started",
     "browse": "Browse Properties"
+  },
+
+  "footer": {
+    "about": "Nigeria's trusted platform for finding and listing rental properties. Connecting landlords and tenants across all 36 states + FCT.",
+    "quick_links": "Quick Links",
+    "browse": "Browse Properties",
+    "about_us": "About Us",
+    "how": "How It Works",
+    "faq": "FAQ",
+    "landlords": "For Landlords",
+    "list": "List Your Property",
+    "pricing": "Pricing Plans",
+    "guide": "Landlord Guide",
+    "contact": "Contact Us",
+    "email": "Email",
+    "phone": "Phone",
+    "rights": "All rights reserved.",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service"
+  },
+
+  "header": {
+    "browse": "Browse Properties",
+    "my_properties": "My Properties",
+    "saved": "Saved Properties",
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "applications": "Applications",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register"
   }
 }

@@ -14,11 +14,13 @@
     "success": "登录成功！",
     "failed": "登录失败"
   },
+
   "home": {
     "hero_title": "在尼日利亚找到您的理想之家",
     "hero_subtitle": "浏览覆盖全部36个州及首都的数千套已验证房源",
     "search_placeholder": "按位置或房产类型搜索...",
     "search": "搜索",
+
     "features": {
       "verified": {
         "title": "已验证房源",
@@ -33,14 +35,47 @@
         "text": "在线即可完成申请和支付"
       }
     },
+
     "featured_title": "精选房源",
     "view_all": "查看全部",
     "popular_locations": "热门地区",
     "unknown": "未知",
     "properties": "套房源",
+
     "cta_title": "准备好寻找您的下一个家了吗？",
     "cta_text": "加入成千上万已找到理想租房的尼日利亚用户",
     "get_started": "立即开始",
     "browse": "浏览房源"
+  },
+
+  "footer": {
+    "about": "尼日利亚值得信赖的租赁平台，连接全国36个州及首都的房东与租客。",
+    "quick_links": "快速链接",
+    "browse": "浏览房源",
+    "about_us": "关于我们",
+    "how": "如何运作",
+    "faq": "常见问题",
+    "landlords": "房东专区",
+    "list": "发布房源",
+    "pricing": "价格方案",
+    "guide": "房东指南",
+    "contact": "联系我们",
+    "email": "邮箱",
+    "phone": "电话",
+    "rights": "版权所有。",
+    "privacy": "隐私政策",
+    "terms": "服务条款"
+  },
+
+  "header": {
+    "browse": "浏览房源",
+    "my_properties": "我的房源",
+    "saved": "已保存房源",
+    "dashboard": "控制面板",
+    "profile": "个人资料",
+    "applications": "申请记录",
+    "logout": "退出登录",
+    "login": "登录",
+    "register": "注册"
   }
 }
