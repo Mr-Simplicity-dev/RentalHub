@@ -1,0 +1,16 @@
+{
+  "login": "登录",
+  "register": "注册",
+  "verify_phone": "验证手机号",
+  "send_otp": "发送验证码",
+  "enter_phone": "输入手机号",
+  "verify": "验证",
+  "dashboard": "仪表板",
+  "email_verified": "邮箱已验证",
+  "redirecting": "正在跳转",
+  "otp_sent": "验证码已发送到您的手机",
+  "enter_otp": "输入验证码",
+  "resend_otp": "重新发送验证码",
+  "otp_expired": "验证码已过期",
+  "logout": "退出登录"
+}

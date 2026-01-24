@@ -1,0 +1,9 @@
+{
+  "login": "Connexion",
+  "register": "Créer un compte",
+  "verify_phone": "Vérifier le téléphone",
+  "send_otp": "Envoyer le code",
+  "enter_phone": "Entrez le numéro de téléphone",
+  "dashboard": "Tableau de bord",
+  "logout": "Déconnexion"
+}

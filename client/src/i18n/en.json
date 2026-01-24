@@ -1,0 +1,9 @@
+{
+  "login": "Login",
+  "register": "Register",
+  "verify_phone": "Verify Phone",
+  "send_otp": "Send OTP",
+  "enter_phone": "Enter phone number",
+  "verify": "Verify",
+  "dashboard": "Dashboard"
+}
