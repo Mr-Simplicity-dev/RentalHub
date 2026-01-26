@@ -1,11 +1,31 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const jwt = require('jsonwebtoken');
-const db = require('./config/middleware/database'); // or wherever your pg Pool is exported from
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
+import path from 'path';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 
-require('dotenv').config();
+import db from './config/middleware/database.js';
+
+import authRoutes from './routes/auth.js';
+import propertyRoutes from './routes/properties.js';
+import paymentRoutes from './routes/payments.js';
+import applicationRoutes from './routes/applications.js';
+import messageRoutes from './routes/messages.js';
+import userRoutes from './routes/users.js';
+import adminRoutes from './routes/admin.js';
+import dashboardRoutes from './routes/dashboard.js';
+import notificationRoutes from './routes/notifications.js';
+import superAdminRoutes from './routes/superAdmin.js';
+
+import { startPaymentJobs } from './jobs/paymentJobs.js';
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -16,19 +36,19 @@ app.set('trust proxy', 1);
 // Security Middleware
 // -----------------------------------
 app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true,
+  })
+);
 
-const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100
+  max: 100,
 });
 app.use('/api/', limiter);
 
@@ -42,7 +62,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',
-    message: 'Rental Platform API is running'
+    message: 'Rental Platform API is running',
   });
 });
 
@@ -63,7 +83,7 @@ app.get('/api/auth/verify-email', async (req, res) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const result = await pool.query(
+    const result = await db.query(
       'UPDATE users SET email_verified = TRUE, updated_at = NOW() WHERE id = $1 RETURNING id, email_verified',
       [decoded.userId]
     );
@@ -79,31 +99,26 @@ app.get('/api/auth/verify-email', async (req, res) => {
   }
 });
 
-
 // -----------------------------------
 // ROUTES
 // -----------------------------------
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/properties', require('./routes/properties'));
-app.use('/api/payments', require('./routes/payments'));
-app.use('/api/applications', require('./routes/applications'));
-app.use('/api/messages', require('./routes/messages'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/admin', require('./routes/admin'));
-app.use('/api/dashboard', require('./routes/dashboard'));
-app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/auth', authRoutes);
+app.use('/api/properties', propertyRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/applications', applicationRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/super', superAdminRoutes);
-
 
 // -----------------------------------
 // MISSING FRONTEND ROUTES (SAFE STUBS)
 // -----------------------------------
-
-// This matches: GET /api/property-utils/popular-locations?limit=6
 app.get('/api/property-utils/popular-locations', async (req, res) => {
   const limit = Number(req.query.limit) || 6;
 
-  // Temporary safe response so frontend renders
   res.json({
     success: true,
     data: [
@@ -113,26 +128,21 @@ app.get('/api/property-utils/popular-locations', async (req, res) => {
       { name: 'Ibadan', count: 0 },
       { name: 'Benin', count: 0 },
       { name: 'Abeokuta', count: 0 },
-    ].slice(0, limit)
+    ].slice(0, limit),
   });
 });
 
-// Safety net for featured properties if your route throws
 app.get('/api/properties/featured', async (req, res) => {
   try {
-    const limit = Number(req.query.limit) || 6;
-
-    // If your real implementation exists in routes/properties,
-    // this will be overridden there. This is just a guard.
     res.json({
       success: true,
-      data: []
+      data: [],
     });
   } catch (err) {
     console.error('Featured properties error:', err);
     res.status(500).json({
       success: false,
-      message: 'Failed to load featured properties'
+      message: 'Failed to load featured properties',
     });
   }
 });
@@ -144,14 +154,13 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || 'Internal Server Error'
+    message: err.message || 'Internal Server Error',
   });
 });
 
 // -----------------------------------
 // CRON JOBS
 // -----------------------------------
-const { startPaymentJobs } = require('./jobs/paymentJobs');
 startPaymentJobs();
 
 // -----------------------------------
@@ -167,6 +176,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({
     success: false,
     message: 'Internal Server Error',
-    error: err.message
+    error: err.message,
   });
 });

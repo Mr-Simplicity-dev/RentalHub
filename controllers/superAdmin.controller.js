@@ -1,4 +1,4 @@
-import db from '../db/index.js';
+import db from '../config/middleware/database.js';
 
 // ---- Audit Helper ----
 const logAction = async (actorId, action, targetType = null, targetId = null) => {
@@ -189,7 +189,6 @@ export const updateReportStatus = async (req, res) => {
 
 // ================= BROADCAST =================
 
-// GET /api/super/broadcasts
 export const getBroadcasts = async (req, res) => {
   try {
     const { rows } = await db.query(
@@ -205,7 +204,6 @@ export const getBroadcasts = async (req, res) => {
   }
 };
 
-// POST /api/super/broadcasts
 export const createBroadcast = async (req, res) => {
   const { title, message, target_role } = req.body;
 
@@ -226,7 +224,7 @@ export const createBroadcast = async (req, res) => {
 
 // Bulk actions
 export const bulkUserAction = async (req, res) => {
-  const { ids, action } = req.body; // ids = [1,2,3], action = ban | verify | promote
+  const { ids, action } = req.body;
 
   try {
     if (!Array.isArray(ids) || !ids.length) {
@@ -254,7 +252,7 @@ export const bulkUserAction = async (req, res) => {
     }
 
     await db.query(query, [ids]);
-    await logAction(db, req.user.id, logActionName, 'user', null);
+    await logAction(req.user.id, logActionName, 'user', null);
 
     res.json({ success: true });
   } catch (err) {
@@ -263,7 +261,7 @@ export const bulkUserAction = async (req, res) => {
 };
 
 export const bulkPropertyAction = async (req, res) => {
-  const { ids, action } = req.body; // action = unlist
+  const { ids, action } = req.body;
 
   try {
     if (!Array.isArray(ids) || !ids.length) {
@@ -279,7 +277,7 @@ export const bulkPropertyAction = async (req, res) => {
       [ids]
     );
 
-    await logAction(db, req.user.id, 'BULK_UNLIST_PROPERTIES', 'property', null);
+    await logAction(req.user.id, 'BULK_UNLIST_PROPERTIES', 'property', null);
 
     res.json({ success: true });
   } catch (err) {
@@ -287,7 +285,7 @@ export const bulkPropertyAction = async (req, res) => {
   }
 };
 
-// feature flag 
+// feature flags
 export const getFeatureFlags = async (req, res) => {
   try {
     const { rows } = await db.query(`SELECT * FROM feature_flags ORDER BY key`);
@@ -307,7 +305,7 @@ export const updateFeatureFlag = async (req, res) => {
       [enabled, key]
     );
 
-    await logAction(db, req.user.id, `TOGGLE_FLAG_${key}`, 'feature_flag', null);
+    await logAction(req.user.id, `TOGGLE_FLAG_${key}`, 'feature_flag', null);
 
     res.json({ success: true });
   } catch {
@@ -315,7 +313,7 @@ export const updateFeatureFlag = async (req, res) => {
   }
 };
 
-// fruad
+// fraud
 export const getFraudFlags = async (req, res) => {
   try {
     const { rows } = await db.query(
@@ -334,7 +332,7 @@ export const resolveFraudFlag = async (req, res) => {
   const { id } = req.params;
 
   await db.query(`UPDATE fraud_flags SET resolved = TRUE WHERE id = $1`, [id]);
-  await logAction(db, req.user.id, 'RESOLVE_FRAUD_FLAG', 'fraud', id);
+  await logAction(req.user.id, 'RESOLVE_FRAUD_FLAG', 'fraud', id);
 
   res.json({ success: true });
 };

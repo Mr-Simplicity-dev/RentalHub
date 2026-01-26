@@ -1,8 +1,8 @@
-const jwt = require('jsonwebtoken');
-const db = require('./database');
+import jwt from 'jsonwebtoken';
+import db from './database.js';
 
 // Verify JWT Token
-exports.authenticate = async (req, res, next) => {
+export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     console.log('AUTH HEADER:', authHeader);
@@ -22,7 +22,6 @@ exports.authenticate = async (req, res, next) => {
 
     const userId = decoded.userId || decoded.id || decoded.user_id;
     console.log('USER ID:', userId);
-
 
     if (!userId) {
       return res.status(401).json({
@@ -55,7 +54,7 @@ exports.authenticate = async (req, res, next) => {
 };
 
 // Check if user is a landlord
-exports.isLandlord = (req, res, next) => {
+export const isLandlord = (req, res, next) => {
   if (req.user.user_type !== 'landlord') {
     return res.status(403).json({
       success: false,
@@ -66,7 +65,7 @@ exports.isLandlord = (req, res, next) => {
 };
 
 // Check if user is a tenant
-exports.isTenant = (req, res, next) => {
+export const isTenant = (req, res, next) => {
   if (req.user.user_type !== 'tenant') {
     return res.status(403).json({
       success: false,
@@ -77,7 +76,7 @@ exports.isTenant = (req, res, next) => {
 };
 
 // Check if user is verified
-exports.isVerified = (req, res, next) => {
+export const isVerified = (req, res, next) => {
   if (!req.user.identity_verified) {
     return res.status(403).json({
       success: false,
@@ -88,7 +87,7 @@ exports.isVerified = (req, res, next) => {
 };
 
 // Check if tenant has active subscription
-exports.hasActiveSubscription = (req, res, next) => {
+export const hasActiveSubscription = (req, res, next) => {
   if (req.user.user_type === 'tenant' && !req.user.subscription_active) {
     return res.status(403).json({
       success: false,
@@ -100,7 +99,7 @@ exports.hasActiveSubscription = (req, res, next) => {
 
 // Check for super admin
 export const requireSuperAdmin = (req, res, next) => {
-  if (!req.user || req.user.role !== 'super_admin') {
+  if (!req.user || req.user.user_type !== 'super_admin') {
     return res.status(403).json({ message: 'Super admin access only' });
   }
   next();

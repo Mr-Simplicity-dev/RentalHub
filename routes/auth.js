@@ -1,28 +1,32 @@
-const express = require('express');
+import express from 'express';
+import { body } from 'express-validator';
+
+import authController from '../controllers/authController.js';
+import { uploadPassport } from '../config/middleware/upload.js';
+import { authenticate } from '../config/middleware/auth.js';
+
 const router = express.Router();
-const { body } = require('express-validator');
-const authController = require('../controllers/authController');
-const { uploadPassport } = require('../config/middleware/upload');
-const { authenticate } = require('../config/middleware/auth');
 
 // Register new user (Landlord or Tenant)
-router.post('/register',
+router.post(
+  '/register',
   [
     body('email').isEmail().normalizeEmail(),
     body('phone').isMobilePhone('en-NG'),
     body('password').isLength({ min: 8 }),
     body('full_name').trim().notEmpty(),
     body('nin').isLength({ min: 11, max: 11 }),
-    body('user_type').isIn(['landlord', 'tenant'])
+    body('user_type').isIn(['landlord', 'tenant']),
   ],
   authController.register
 );
 
 // Login
-router.post('/login',
+router.post(
+  '/login',
   [
     body('email').isEmail().normalizeEmail(),
-    body('password').notEmpty()
+    body('password').notEmpty(),
   ],
   authController.login
 );
@@ -40,7 +44,12 @@ router.post('/send-phone-otp', authenticate, authController.sendPhoneOTP);
 router.post('/verify-phone', authenticate, authController.verifyPhone);
 
 // Upload Passport Photo
-router.post('/upload-passport', authenticate, uploadPassport, authController.uploadPassport);
+router.post(
+  '/upload-passport',
+  authenticate,
+  uploadPassport,
+  authController.uploadPassport
+);
 
 // Get Current User Profile
 router.get('/me', authenticate, authController.getCurrentUser);
@@ -52,15 +61,17 @@ router.post('/refresh-token', authController.refreshToken);
 router.post('/logout', authenticate, authController.logout);
 
 // Request Password Reset
-router.post('/forgot-password',
+router.post(
+  '/forgot-password',
   [body('email').isEmail().normalizeEmail()],
   authController.forgotPassword
 );
 
 // Reset Password
-router.post('/reset-password/:token',
+router.post(
+  '/reset-password/:token',
   [body('password').isLength({ min: 8 })],
   authController.resetPassword
 );
 
-module.exports = router;
+export default router;
