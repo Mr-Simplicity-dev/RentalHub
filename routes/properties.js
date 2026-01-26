@@ -2,9 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const propertyController = require('../controllers/propertyController');
-const { authenticate, isLandlord, isTenant, isVerified, hasActiveSubscription } = require('../config/middleware/auth');
-const { uploadPropertyPhotos } = require('../config/middleware/upload');
-const { uploadPropertyMedia } = require('../config/middleware/upload');
+const {
+  authenticate,
+  isLandlord,
+  isTenant,
+  isVerified,
+  hasActiveSubscription,
+} = require('../config/middleware/auth');
+const { uploadPropertyMedia, uploadPropertyPhotos } = require('../config/middleware/upload');
 
 // ============ PUBLIC ROUTES ============
 
@@ -20,7 +25,7 @@ router.get('/featured', async (req, res) => {
 
   res.json({
     success: true,
-    data: [] // return empty list for now
+    data: [],
   });
 });
 
@@ -30,14 +35,16 @@ router.get('/search', propertyController.searchProperties);
 // ============ TENANT ROUTES ============
 
 // Get saved properties
-router.get('/user/saved',
+router.get(
+  '/user/saved',
   authenticate,
   isTenant,
   propertyController.getSavedProperties
 );
 
 // Get full property details (requires active subscription)
-router.get('/:propertyId/details',
+router.get(
+  '/:propertyId/details',
   authenticate,
   isTenant,
   hasActiveSubscription,
@@ -45,26 +52,29 @@ router.get('/:propertyId/details',
 );
 
 // Save/favorite property
-router.post('/:propertyId/save',
+router.post(
+  '/:propertyId/save',
   authenticate,
   isTenant,
   propertyController.saveProperty
 );
 
 // Unsave property
-router.delete('/:propertyId/save',
+router.delete(
+  '/:propertyId/save',
   authenticate,
   isTenant,
   propertyController.unsaveProperty
 );
 
 // Add review
-router.post('/:propertyId/review',
+router.post(
+  '/:propertyId/review',
   authenticate,
   isTenant,
   [
     body('rating').isInt({ min: 1, max: 5 }),
-    body('review_text').optional().trim()
+    body('review_text').optional().trim(),
   ],
   propertyController.addReview
 );
@@ -75,37 +85,47 @@ router.get('/:propertyId/reviews', propertyController.getPropertyReviews);
 // ============ LANDLORD ROUTES ============
 
 // Get landlord's properties
-router.get('/landlord/my-properties',
+router.get(
+  '/landlord/my-properties',
   authenticate,
   isLandlord,
   propertyController.getMyProperties
 );
 
-// Create new property
-router.post('/',
+// Create new property (with media)
+router.post(
+  '/',
   authenticate,
   isLandlord,
   isVerified,
   uploadPropertyMedia,
-  propertyController.createProperty
   [
     body('state_id').isInt(),
     body('city').trim().notEmpty(),
     body('area').trim().notEmpty(),
     body('full_address').trim().notEmpty(),
-    body('property_type').isIn(['apartment', 'house', 'duplex', 'studio', 'bungalow', 'flat', 'room']),
+    body('property_type').isIn([
+      'apartment',
+      'house',
+      'duplex',
+      'studio',
+      'bungalow',
+      'flat',
+      'room',
+    ]),
     body('bedrooms').isInt({ min: 0 }),
     body('bathrooms').isInt({ min: 0 }),
     body('rent_amount').isFloat({ min: 0 }),
     body('payment_frequency').isIn(['monthly', 'yearly']),
     body('title').trim().notEmpty(),
-    body('description').trim().notEmpty()
+    body('description').trim().notEmpty(),
   ],
   propertyController.createProperty
 );
 
-// Upload property photos
-router.post('/:propertyId/photos',
+// Upload property photos (legacy / optional)
+router.post(
+  '/:propertyId/photos',
   authenticate,
   isLandlord,
   uploadPropertyPhotos,
@@ -113,35 +133,40 @@ router.post('/:propertyId/photos',
 );
 
 // Update property
-router.put('/:propertyId',
+router.put(
+  '/:propertyId',
   authenticate,
   isLandlord,
   propertyController.updateProperty
 );
 
 // Delete property
-router.delete('/:propertyId',
+router.delete(
+  '/:propertyId',
   authenticate,
   isLandlord,
   propertyController.deleteProperty
 );
 
 // Toggle property availability
-router.patch('/:propertyId/availability',
+router.patch(
+  '/:propertyId/availability',
   authenticate,
   isLandlord,
   propertyController.toggleAvailability
 );
 
 // Delete property photo
-router.delete('/:propertyId/photos/:photoId',
+router.delete(
+  '/:propertyId/photos/:photoId',
   authenticate,
   isLandlord,
   propertyController.deletePropertyPhoto
 );
 
 // Get property statistics (for landlord)
-router.get('/:propertyId/stats',
+router.get(
+  '/:propertyId/stats',
   authenticate,
   isLandlord,
   propertyController.getPropertyStats

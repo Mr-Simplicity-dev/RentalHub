@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
+import MapPicker from '../components/MapPicker';
 
 const STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa',
@@ -46,11 +47,12 @@ const AddProperty = () => {
     bathrooms: '',
     amenities: '',
     is_available: true,
+    latitude: '',
+    longitude: '',
   });
 
   const [images, setImages] = useState([]);
   const [video, setVideo] = useState(null);
-
   const [code, setCode] = useState(['', '', '', '', '', '']);
 
   const handleChange = (e) => {
@@ -77,6 +79,11 @@ const AddProperty = () => {
 
     if (!form.title || !form.state || !form.city || !form.property_type || !form.rent_amount) {
       toast.error(t('add_property.required'));
+      return;
+    }
+
+    if (!form.latitude || !form.longitude) {
+      toast.error('Please pick the property location on the map.');
       return;
     }
 
@@ -107,7 +114,7 @@ const AddProperty = () => {
       images.forEach((img) => fd.append('images', img));
       if (video) fd.append('video', video);
 
-      const res = await propertyService.createProperty(fd, true); // true = multipart
+      const res = await propertyService.createProperty(fd, true);
 
       if (res.success) {
         toast.success(t('add_property.success'));
@@ -163,6 +170,25 @@ const AddProperty = () => {
           </div>
 
           <input name="amenities" value={form.amenities} onChange={handleChange} className="input" placeholder={t('add_property.form.amenities')} />
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Pick Property Location</label>
+            <MapPicker
+              value={
+                form.latitude && form.longitude
+                  ? { lat: Number(form.latitude), lng: Number(form.longitude) }
+                  : null
+              }
+              onChange={({ lat, lng }) =>
+                setForm(prev => ({ ...prev, latitude: lat, longitude: lng }))
+              }
+            />
+            {form.latitude && form.longitude && (
+              <p className="text-xs text-gray-500">
+                {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}
+              </p>
+            )}
+          </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Property Images</label>

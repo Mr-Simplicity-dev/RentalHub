@@ -25,44 +25,37 @@ const passportStorage = new CloudinaryStorage({
   },
 });
 
-// ---------------- PROPERTY IMAGE STORAGE ----------------
+// ---------------- PROPERTY MEDIA STORAGE ----------------
+// Handles BOTH images and video dynamically
 
-const propertyImageStorage = new CloudinaryStorage({
+const propertyMediaStorage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder: 'rental_platform/properties/images',
-    format: async () => 'jpg',
-    public_id: () => `property_img_${Date.now()}`,
-    transformation: [{ width: 1200, height: 800, crop: 'limit' }],
+  params: async (req, file) => {
+    const isVideo = file.mimetype.startsWith('video/');
+
+    return {
+      folder: isVideo
+        ? 'rental_platform/properties/videos'
+        : 'rental_platform/properties/images',
+      resource_type: isVideo ? 'video' : 'image',
+      public_id: `${isVideo ? 'property_vid' : 'property_img'}_${Date.now()}`,
+      transformation: isVideo
+        ? undefined
+        : [{ width: 1200, height: 800, crop: 'limit' }],
+    };
   },
 });
 
-// ---------------- PROPERTY VIDEO STORAGE ----------------
+// ---------------- FILTER ----------------
 
-const propertyVideoStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'rental_platform/properties/videos',
-    resource_type: 'video',
-    public_id: () => `property_vid_${Date.now()}`,
-  },
-});
-
-// ---------------- FILTERS ----------------
-
-const imageFilter = (req, file, cb) => {
-  if (file.mimetype && file.mimetype.startsWith('image/')) {
+const mediaFilter = (req, file, cb) => {
+  if (
+    (file.mimetype && file.mimetype.startsWith('image/')) ||
+    (file.mimetype && file.mimetype.startsWith('video/'))
+  ) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed!'), false);
-  }
-};
-
-const videoFilter = (req, file, cb) => {
-  if (file.mimetype && file.mimetype.startsWith('video/')) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only video files are allowed!'), false);
+    cb(new Error('Only image or video files are allowed!'), false);
   }
 };
 
@@ -70,22 +63,21 @@ const videoFilter = (req, file, cb) => {
 
 const uploadPassport = multer({
   storage: passportStorage,
-  fileFilter: imageFilter,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  },
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single('passport');
 
-// This handles BOTH images and one video
+// Handles: images[] (up to 20) + video (1)
 const uploadPropertyMedia = multer({
-  storage: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, propertyImageStorage);
-    } else if (file.mimetype.startsWith('video/')) {
-      cb(null, propertyVideoStorage);
-    } else {
-      cb(new Error('Invalid file type'), null);
-    }
-  },
-  limits: { fileSize: 50 * 1024 * 1024 }, // up to 50MB for video
+  storage: propertyMediaStorage,
+  fileFilter: mediaFilter,
+  limits: { fileSize: 50 * 1024 * 1024 },
 }).fields([
   { name: 'images', maxCount: 20 },
   { name: 'video', maxCount: 1 },

@@ -605,111 +605,76 @@ exports.getPropertyReviews = async (req, res) => {
 // -----------------------------------------------------
 exports.createProperty = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        errors: errors.array()
-      });
-    }
-
     const userId = req.user.id;
 
     const {
-      state_id,
+      state,
       city,
       area,
-      full_address,
       property_type,
       bedrooms,
       bathrooms,
       rent_amount,
       payment_frequency,
-      caution_deposit,
       title,
       description,
-      amenities
+      amenities,
+      latitude,
+      longitude,
     } = req.body;
 
-    // ---- MEDIA (from Cloudinary) ----
     const images = req.files?.images || [];
     const video = req.files?.video?.[0] || null;
 
     const imageUrls = images.map(f => f.path);
     const videoUrl = video ? video.path : null;
 
-    const stateCheck = await db.query(
-      'SELECT id FROM states WHERE id = $1',
-      [state_id]
-    );
-
-    if (stateCheck.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid state ID'
-      });
-    }
-
     const result = await db.query(
       `INSERT INTO properties (
-        landlord_id,
-        state_id,
-        city,
-        area,
-        full_address,
-        property_type,
-        bedrooms,
-        bathrooms,
-        rent_amount,
-        payment_frequency,
-        caution_deposit,
-        title,
-        description,
-        amenities,
-        images,
-        video_url
+        landlord_id, state, city, area,
+        property_type, bedrooms, bathrooms,
+        rent_amount, payment_frequency,
+        title, description, amenities,
+        latitude, longitude, images, video_url
       )
       VALUES (
-        $1, $2, $3, $4, $5,
-        $6, $7, $8, $9, $10,
-        $11, $12, $13, $14,
-        $15, $16
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
       )
       RETURNING *`,
       [
         userId,
-        state_id,
+        state,
         city,
         area,
-        full_address,
         property_type,
-        bedrooms,
-        bathrooms,
+        Number(bedrooms) || 0,
+        Number(bathrooms) || 0,
         rent_amount,
         payment_frequency,
-        caution_deposit || null,
         title,
         description,
         JSON.stringify(amenities || []),
+        latitude || null,
+        longitude || null,
         JSON.stringify(imageUrls),
-        videoUrl
+        videoUrl,
       ]
     );
 
     res.status(201).json({
       success: true,
-      message:
-        'Property created successfully. Please upload photos and make payment to activate listing.',
-      data: result.rows[0]
+      message: 'Property created successfully',
+      data: result.rows[0],
     });
   } catch (error) {
     console.error('Create property error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create property'
+      message: 'Failed to create property',
     });
   }
 };
+
 
 
 // -----------------------------------------------------
