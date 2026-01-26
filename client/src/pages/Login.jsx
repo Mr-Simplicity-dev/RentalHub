@@ -20,11 +20,18 @@ const Login = () => {
     try {
       const response = await login(email, password);
       if (response.success) {
-        toast.success(t('login.success'));
-        if (response.data?.user?.user_type === 'admin') {
+  toast.success(t('login.success'));
+
+  const role = response.data?.user?.user_type;
+
+        if (role === 'super_admin') {
+          navigate('/super-admin');
+        } else if (role === 'admin') {
           navigate('/admin');
-        } else {
+        } else if (role === 'landlord') {
           navigate('/dashboard');
+        } else {
+          navigate('/dashboard'); // tenant or default
         }
       } else {
         toast.error(response.message || t('login.failed'));
