@@ -7,15 +7,18 @@ const containerStyle = {
 };
 
 const defaultCenter = {
-  lat: 9.0820,  // Nigeria center
+  lat: 9.0820, // Nigeria center
   lng: 8.6753,
 };
+
+const libraries = ['places'];
 
 const MapPicker = ({ value, onChange }) => {
   const mapRef = useRef(null);
 
-  const { isLoaded } = useLoadScript({
+  const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY,
+    libraries,
   });
 
   const onMapLoad = useCallback((map) => {
@@ -23,12 +26,23 @@ const MapPicker = ({ value, onChange }) => {
   }, []);
 
   const handleClick = (e) => {
+    if (!e?.latLng) return;
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
     onChange({ lat, lng });
   };
 
-  if (!isLoaded) return <div className="text-sm text-gray-500">Loading map…</div>;
+  if (loadError) {
+    return (
+      <div className="text-sm text-red-500">
+        Failed to load Google Maps.
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return <div className="text-sm text-gray-500">Loading map…</div>;
+  }
 
   return (
     <div className="border rounded overflow-hidden">
