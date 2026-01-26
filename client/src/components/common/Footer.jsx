@@ -80,19 +80,46 @@ const Footer = () => {
               <li>{t('footer.email')}: support@rentalhub.ng</li>
               <li>{t('footer.phone')}: +234 706 701 2884</li>
               <li className="flex space-x-4 mt-4">
-                <a href="#" className="hover:text-white">
-                  <FaFacebook className="text-xl" />
-                </a>
-                <a href="#" className="hover:text-white">
-                  <FaTwitter className="text-xl" />
-                </a>
-                <a href="#" className="hover:text-white">
-                  <FaInstagram className="text-xl" />
-                </a>
-                <a href="#" className="hover:text-white">
-                  <FaLinkedin className="text-xl" />
-                </a>
-              </li>
+              <a
+                href="https://facebook.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                className="hover:text-white"
+              >
+                <FaFacebook className="text-xl" />
+              </a>
+
+              <a
+                href="https://twitter.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Twitter"
+                className="hover:text-white"
+              >
+                <FaTwitter className="text-xl" />
+              </a>
+
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className="hover:text-white"
+              >
+                <FaInstagram className="text-xl" />
+              </a>
+
+              <a
+                href="https://linkedin.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LinkedIn"
+                className="hover:text-white"
+              >
+                <FaLinkedin className="text-xl" />
+              </a>
+            </li>
             </ul>
           </div>
         </div>
