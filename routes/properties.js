@@ -124,13 +124,13 @@ router.post(
 );
 
 // Upload property photos (legacy / optional)
-router.post(
-  '/:propertyId/photos',
-  authenticate,
-  isLandlord,
-  uploadPropertyPhotos,
-  propertyController.uploadPropertyPhotos
-);
+// router.post(
+//   '/:propertyId/photos',
+//   authenticate,
+//   isLandlord,
+//   uploadPropertyPhotos,
+//   propertyController.uploadPropertyPhotos
+// );
 
 // Update property
 router.put(
