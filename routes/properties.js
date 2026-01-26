@@ -4,6 +4,7 @@ const { body } = require('express-validator');
 const propertyController = require('../controllers/propertyController');
 const { authenticate, isLandlord, isTenant, isVerified, hasActiveSubscription } = require('../config/middleware/auth');
 const { uploadPropertyPhotos } = require('../config/middleware/upload');
+const { uploadPropertyMedia } = require('../config/middleware/upload');
 
 // ============ PUBLIC ROUTES ============
 
@@ -85,6 +86,8 @@ router.post('/',
   authenticate,
   isLandlord,
   isVerified,
+  uploadPropertyMedia,
+  propertyController.createProperty
   [
     body('state_id').isInt(),
     body('city').trim().notEmpty(),

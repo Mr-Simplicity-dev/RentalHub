@@ -29,14 +29,22 @@ const SuperAdminDashboard = () => {
 
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!user) return;
-    if (user.role !== 'super_admin') {
-      navigate('/dashboard');
-      return;
-    }
-    loadUsers();
-  }, [user]);
+  // 🔐 Route guard – ONLY handles navigation
+        useEffect(() => {
+        if (!user) return;
+
+        if (user.user_type !== 'super_admin') {
+            navigate('/dashboard', { replace: true });
+        }
+        }, [user, navigate]);
+
+        // 📦 Data loader – ONLY handles fetching
+        useEffect(() => {
+        if (!user || user.user_type !== 'super_admin') return;
+
+        loadUsers();
+        }, [user]);
+
 
   const loadUsers = async () => {
     setLoading(true);

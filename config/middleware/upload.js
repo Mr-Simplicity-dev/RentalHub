@@ -13,7 +13,8 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Storage for passport photos
+// ---------------- PASSPORT STORAGE ----------------
+
 const passportStorage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -24,19 +25,32 @@ const passportStorage = new CloudinaryStorage({
   },
 });
 
-// Storage for property photos
-const propertyStorage = new CloudinaryStorage({
+// ---------------- PROPERTY IMAGE STORAGE ----------------
+
+const propertyImageStorage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: 'rental_platform/properties',
+    folder: 'rental_platform/properties/images',
     format: async () => 'jpg',
-    public_id: () => `property_${Date.now()}`,
+    public_id: () => `property_img_${Date.now()}`,
     transformation: [{ width: 1200, height: 800, crop: 'limit' }],
   },
 });
 
-// File filter
-const fileFilter = (req, file, cb) => {
+// ---------------- PROPERTY VIDEO STORAGE ----------------
+
+const propertyVideoStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'rental_platform/properties/videos',
+    resource_type: 'video',
+    public_id: () => `property_vid_${Date.now()}`,
+  },
+});
+
+// ---------------- FILTERS ----------------
+
+const imageFilter = (req, file, cb) => {
   if (file.mimetype && file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
@@ -44,20 +58,41 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+const videoFilter = (req, file, cb) => {
+  if (file.mimetype && file.mimetype.startsWith('video/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only video files are allowed!'), false);
+  }
+};
+
+// ---------------- UPLOADERS ----------------
+
 const uploadPassport = multer({
   storage: passportStorage,
-  fileFilter,
+  fileFilter: imageFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single('passport');
 
-const uploadPropertyPhotos = multer({
-  storage: propertyStorage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 },
-}).array('photos', 20);
+// This handles BOTH images and one video
+const uploadPropertyMedia = multer({
+  storage: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, propertyImageStorage);
+    } else if (file.mimetype.startsWith('video/')) {
+      cb(null, propertyVideoStorage);
+    } else {
+      cb(new Error('Invalid file type'), null);
+    }
+  },
+  limits: { fileSize: 50 * 1024 * 1024 }, // up to 50MB for video
+}).fields([
+  { name: 'images', maxCount: 20 },
+  { name: 'video', maxCount: 1 },
+]);
 
 module.exports = {
   uploadPassport,
-  uploadPropertyPhotos,
+  uploadPropertyMedia,
   cloudinary,
 };

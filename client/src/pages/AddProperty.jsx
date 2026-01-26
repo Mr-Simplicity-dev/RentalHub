@@ -48,6 +48,9 @@ const AddProperty = () => {
     is_available: true,
   });
 
+  const [images, setImages] = useState([]);
+  const [video, setVideo] = useState(null);
+
   const [code, setCode] = useState(['', '', '', '', '', '']);
 
   const handleChange = (e) => {
@@ -90,14 +93,21 @@ const AddProperty = () => {
 
     setLoading(true);
     try {
-      const payload = {
-        ...form,
-        amenities: form.amenities
-          ? form.amenities.split(',').map(a => a.trim())
-          : [],
-      };
+      const fd = new FormData();
 
-      const res = await propertyService.createProperty(payload);
+      Object.entries(form).forEach(([key, value]) => {
+        fd.append(key, value);
+      });
+
+      const amenities = form.amenities
+        ? form.amenities.split(',').map(a => a.trim())
+        : [];
+      fd.append('amenities', JSON.stringify(amenities));
+
+      images.forEach((img) => fd.append('images', img));
+      if (video) fd.append('video', video);
+
+      const res = await propertyService.createProperty(fd, true); // true = multipart
 
       if (res.success) {
         toast.success(t('add_property.success'));
@@ -152,13 +162,17 @@ const AddProperty = () => {
             <input type="number" name="bathrooms" value={form.bathrooms} onChange={handleChange} className="input" placeholder={t('add_property.form.bathrooms')} />
           </div>
 
-          <input
-            name="amenities"
-            value={form.amenities}
-            onChange={handleChange}
-            className="input"
-            placeholder={t('add_property.form.amenities')}
-          />
+          <input name="amenities" value={form.amenities} onChange={handleChange} className="input" placeholder={t('add_property.form.amenities')} />
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Property Images</label>
+            <input type="file" multiple accept="image/*" onChange={(e) => setImages([...e.target.files])} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Short Video Clip</label>
+            <input type="file" accept="video/*" onChange={(e) => setVideo(e.target.files[0])} />
+          </div>
 
           <label className="flex items-center space-x-2">
             <input type="checkbox" name="is_available" checked={form.is_available} onChange={handleChange} />
@@ -172,9 +186,6 @@ const AddProperty = () => {
       {step === 2 && (
         <div className="card text-center space-y-6">
           <h2 className="text-xl font-semibold">{t('add_property.verify_title')}</h2>
-          <p className="text-sm text-gray-600">
-            {t('add_property.verify_text')}
-          </p>
 
           <div className="flex justify-center space-x-2">
             {code.map((v, i) => (

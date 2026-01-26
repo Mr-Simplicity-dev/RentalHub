@@ -18,6 +18,8 @@ import { useTranslation } from 'react-i18next';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  console.log('AUTH USER OBJECT:', user);
+
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -25,15 +27,21 @@ const Dashboard = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      loadDashboardData();
-    }
-  }, [user]);
+ useEffect(() => {
+  if (!user) return;
 
-  if (!user) {
-    return <Loader fullScreen />;
+  if (user.user_type === 'super_admin') {
+    navigate('/super-admin', { replace: true });
+    return;
   }
+
+  loadDashboardData();
+}, [user, navigate]);
+
+
+    if (!user) {
+      return <Loader fullScreen />;
+    }
 
   const loadDashboardData = async () => {
     setLoading(true);

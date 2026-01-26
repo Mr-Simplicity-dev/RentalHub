@@ -614,6 +614,7 @@ exports.createProperty = async (req, res) => {
     }
 
     const userId = req.user.id;
+
     const {
       state_id,
       city,
@@ -630,6 +631,13 @@ exports.createProperty = async (req, res) => {
       amenities
     } = req.body;
 
+    // ---- MEDIA (from Cloudinary) ----
+    const images = req.files?.images || [];
+    const video = req.files?.video?.[0] || null;
+
+    const imageUrls = images.map(f => f.path);
+    const videoUrl = video ? video.path : null;
+
     const stateCheck = await db.query(
       'SELECT id FROM states WHERE id = $1',
       [state_id]
@@ -644,17 +652,47 @@ exports.createProperty = async (req, res) => {
 
     const result = await db.query(
       `INSERT INTO properties (
-        landlord_id, state_id, city, area, full_address,
-        property_type, bedrooms, bathrooms, rent_amount,
-        payment_frequency, caution_deposit, title, description, amenities
+        landlord_id,
+        state_id,
+        city,
+        area,
+        full_address,
+        property_type,
+        bedrooms,
+        bathrooms,
+        rent_amount,
+        payment_frequency,
+        caution_deposit,
+        title,
+        description,
+        amenities,
+        images,
+        video_url
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      VALUES (
+        $1, $2, $3, $4, $5,
+        $6, $7, $8, $9, $10,
+        $11, $12, $13, $14,
+        $15, $16
+      )
       RETURNING *`,
       [
-        userId, state_id, city, area, full_address,
-        property_type, bedrooms, bathrooms, rent_amount,
-        payment_frequency, caution_deposit || null, title,
-        description, JSON.stringify(amenities || [])
+        userId,
+        state_id,
+        city,
+        area,
+        full_address,
+        property_type,
+        bedrooms,
+        bathrooms,
+        rent_amount,
+        payment_frequency,
+        caution_deposit || null,
+        title,
+        description,
+        JSON.stringify(amenities || []),
+        JSON.stringify(imageUrls),
+        videoUrl
       ]
     );
 

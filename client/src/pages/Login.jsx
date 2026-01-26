@@ -22,6 +22,7 @@ const Login = () => {
       if (response.success) {
   toast.success(t('login.success'));
 
+  const user = response.data?.user;
   const role = response.data?.user?.user_type;
 
         if (role === 'super_admin') {
