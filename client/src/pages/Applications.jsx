@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { applicationService } from '../services/applicationService';
 import Loader from '../components/common/Loader';
@@ -11,11 +11,7 @@ const Applications = () => {
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadApplications();
-  }, []);
-
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async () => {
     setLoading(true);
     try {
       const res =
@@ -31,7 +27,11 @@ const Applications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, t]);
+
+  useEffect(() => {
+    loadApplications();
+  }, [loadApplications]);
 
   if (loading) return <Loader />;
 

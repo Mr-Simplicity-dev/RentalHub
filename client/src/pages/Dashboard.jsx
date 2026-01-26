@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import api from '../services/api';
 import {
   FaHome,
@@ -10,16 +9,13 @@ import {
   FaHeart,
   FaCheckCircle,
   FaClock,
-  FaTimesCircle,
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
-import { formatCurrency, formatDate, getTimeAgo } from '../utils/helpers';
+import { getTimeAgo } from '../utils/helpers';
 import { useTranslation } from 'react-i18next';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  console.log('AUTH USER OBJECT:', user);
-
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -27,23 +23,9 @@ const Dashboard = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
- useEffect(() => {
-  if (!user) return;
+  const loadDashboardData = useCallback(async () => {
+    if (!user) return;
 
-  if (user.user_type === 'super_admin') {
-    navigate('/super-admin', { replace: true });
-    return;
-  }
-
-  loadDashboardData();
-}, [user, navigate]);
-
-
-    if (!user) {
-      return <Loader fullScreen />;
-    }
-
-  const loadDashboardData = async () => {
     setLoading(true);
     try {
       const endpoint =
@@ -73,7 +55,22 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    if (user.user_type === 'super_admin') {
+      navigate('/super-admin', { replace: true });
+      return;
+    }
+
+    loadDashboardData();
+  }, [user, navigate, loadDashboardData]);
+
+  if (!user) {
+    return <Loader fullScreen />;
+  }
 
   if (loading) {
     return <Loader fullScreen />;
@@ -201,9 +198,7 @@ const Dashboard = () => {
 
         {/* Recent Activities */}
         <div className="card">
-          <h2 className="text-xl font-bold mb-4">
-            {t('dashboard.recent')}
-          </h2>
+          <h2 className="text-xl font-bold mb-4">{t('dashboard.recent')}</h2>
           {recentActivities.length === 0 ? (
             <p className="text-gray-600 text-center py-8">
               {t('dashboard.no_recent')}
