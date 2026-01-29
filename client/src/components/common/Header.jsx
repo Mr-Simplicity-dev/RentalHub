@@ -20,10 +20,17 @@ const Header = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <FaHome className="text-primary-600 text-2xl" />
-            <span className="text-xl font-bold text-gray-900">RentalHub NG</span>
-          </Link>
+          <Link to="/" className="flex items-center space-x-3">
+                <img
+                  src="/logo192.png"
+                  alt="RentalHub NG"
+                  className="h-12 md:h-14 lg:h-16 object-contain"
+                />
+                <span className="text-xl md:text-2xl font-bold text-gray-900">
+                  RentalHub NG
+                </span>
+              </Link>
+
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
