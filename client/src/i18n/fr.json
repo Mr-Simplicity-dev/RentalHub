@@ -45,7 +45,8 @@
     "cta_title": "Prêt à trouver votre prochain logement ?",
     "cta_text": "Rejoignez des milliers de Nigérians qui ont trouvé leur logement idéal",
     "get_started": "Commencer",
-    "browse": "Parcourir les biens"
+    "browse": "Parcourir les biens",
+    "whatsapp_message": "Bonjour RentalHub NG, j’ai besoin d’aide pour trouver une maison."
   },
 
   "footer": {
@@ -204,5 +205,6 @@
   "next": "Suivant →"
 }
 
+ 
 
 }

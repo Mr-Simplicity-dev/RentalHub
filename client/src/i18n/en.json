@@ -45,7 +45,8 @@
     "cta_title": "Ready to find your next home?",
     "cta_text": "Join thousands of Nigerians who have found their perfect rental",
     "get_started": "Get Started",
-    "browse": "Browse Properties"
+    "browse": "Browse Properties",
+    "whatsapp_message": "Hello RentalHub NG, I need help finding a home."
   },
 
   "footer": {
@@ -202,5 +203,7 @@
   "prev": "← Previous",
   "next": "Next →"
 }
+  
+
 
 }

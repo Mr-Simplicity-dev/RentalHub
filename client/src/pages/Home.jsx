@@ -7,26 +7,41 @@ import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 const Home = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [featuredProperties, setFeaturedProperties] = useState([]);
   const [popularLocations, setPopularLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    loadData();
+      useEffect(() => {
+      loadData();
 
-    // Load JivoChat only on Home
-    const script = document.createElement('script');
-    script.src = 'https://code.jivosite.com/widget/YOUR_JIVO_WIDGET_ID';
-    script.async = true;
-    document.body.appendChild(script);
+      // Load HubSpot Chat only once (globally)
+      if (!window.__hubspotLoaded) {
+        const script = document.createElement('script');
+        script.src = 'https://js.hubspot.com/livechat/v2.js';
+        script.async = true;
 
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
+        script.onload = () => {
+          // HubSpot auto-detects language from browser,
+          // but we can still align it with your app
+          if (window.HubSpotConversations) {
+            window.HubSpotConversations.widget.load();
+          }
+        };
+
+        document.body.appendChild(script);
+        window.__hubspotLoaded = true;
+      } else {
+        // If already loaded (navigating back to Home)
+        if (window.HubSpotConversations) {
+          window.HubSpotConversations.widget.load();
+        }
+      }
+    }, [i18n.language]);
+
+
 
   const loadData = async () => {
     try {
@@ -50,7 +65,7 @@ const Home = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    window.location.href = `/properties?search=${searchQuery}`;
+    window.location.href = `/properties?search=${encodeURIComponent(searchQuery)}`;
   };
 
   return (
@@ -192,12 +207,14 @@ const Home = () => {
         </div>
       </section>
 
-      {/* WhatsApp Floating Button */}
+      {/* WhatsApp Floating Button (Multilingual) */}
       <a
-        href="https://wa.me/2347067012884?text=Hello%20RentalHub%20NG"
+        href={`https://wa.me/2347067012884?text=${encodeURIComponent(
+          t('home.whatsapp_message')
+        )}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition"
+        className="fixed bottom-6 left-6 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
