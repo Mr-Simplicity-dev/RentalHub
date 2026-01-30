@@ -13,33 +13,40 @@ const Home = () => {
   const [popularLocations, setPopularLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const HUBSPOT_LANG_MAP = { en: 'en', ar: 'ar', ru: 'ru', fr: 'fr', zh: 'zh-cn', 'zh-CN': 'zh-cn', };
+
 
       useEffect(() => {
       loadData();
 
-      // Load HubSpot Chat only once (globally)
-      if (!window.__hubspotLoaded) {
-        const script = document.createElement('script');
-        script.src = 'https://js.hubspot.com/livechat/v2.js';
-        script.async = true;
+      // Sync HubSpot language with i18next
+      const hubspotLang =
+        HUBSPOT_LANG_MAP[i18n.language] ||
+        HUBSPOT_LANG_MAP[i18n.language?.split('-')[0]] ||
+        'en';
 
-        script.onload = () => {
-          // HubSpot auto-detects language from browser,
-          // but we can still align it with your app
-          if (window.HubSpotConversations) {
-            window.HubSpotConversations.widget.load();
-          }
-        };
+      window.hsConversationsSettings = {
+        language: hubspotLang,
+      };
+
+      // Load HubSpot Embed Script once
+      if (!document.getElementById('hs-script-loader')) {
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.id = 'hs-script-loader';
+        script.async = true;
+        script.defer = true;
+        script.src = '//js-eu1.hs-scripts.com/147691769.js';
 
         document.body.appendChild(script);
-        window.__hubspotLoaded = true;
       } else {
-        // If already loaded (navigating back to Home)
+        // Reload widget when language changes
         if (window.HubSpotConversations) {
-          window.HubSpotConversations.widget.load();
+          window.HubSpotConversations.widget.refresh();
         }
       }
     }, [i18n.language]);
+
 
 
 
