@@ -1,4 +1,6 @@
 const db = require('../config/middleware/database');
+const { sendEmail } = require('../utils/mailer');
+
 
 // GET /api/admin/stats
 exports.getStats = async (req, res) => {
@@ -301,6 +303,156 @@ exports.getAllProperties = async (req, res) => {
   }
 };
 
+// GET /api/admin/properties/pending
+exports.getPendingProperties = async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        p.*, 
+        u.full_name AS landlord_name,
+        u.email AS landlord_email
+      FROM properties p
+      LEFT JOIN users u ON p.landlord_id = u.id
+      WHERE p.is_verified = FALSE
+        AND p.deleted_at IS NULL
+      ORDER BY p.created_at DESC
+    `);
+
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (err) {
+    console.error('Pending properties error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load pending properties',
+    });
+  }
+};
+
+// PATCH /api/admin/properties/:id/approve
+exports.approveProperty = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user.id;
+
+    const result = await db.query(
+      `
+      UPDATE properties
+      SET is_verified = TRUE,
+          status = 'available',
+          verified_by = $2,
+          verified_at = NOW()
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING id, title, landlord_id
+      `,
+      [id, adminId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found',
+      });
+    }
+
+    const property = result.rows[0];
+
+    // 🔔 Notify landlord by email
+    const landlordResult = await db.query(
+      'SELECT email, full_name FROM users WHERE id = $1',
+      [property.landlord_id]
+    );
+
+    if (landlordResult.rows.length) {
+      const landlord = landlordResult.rows[0];
+
+      await sendEmail({
+        to: landlord.email,
+        subject: 'Your property has been approved 🎉',
+        html: `
+          <p>Hello ${landlord.full_name},</p>
+          <p>Your property <strong>${property.title}</strong> has been approved and is now live.</p>
+          <p>You can manage it from your dashboard.</p>
+        `,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Property approved successfully',
+      data: property,
+    });
+  } catch (err) {
+    console.error('Approve property error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to approve property',
+    });
+  }
+};
+
+
+// PATCH /api/admin/properties/:id/reject
+exports.rejectProperty = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+        const result = await db.query(
+      `
+      UPDATE properties
+      SET status = 'rejected',
+          is_verified = FALSE
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING id, title, landlord_id
+      `,
+      [id]
+    );
+
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found',
+      });
+    }
+
+    const property = result.rows[0];
+
+const landlord = await db.query(
+  'SELECT email, full_name FROM users WHERE id = $1',
+  [property.landlord_id]
+);
+
+    if (landlord.rows.length) {
+      await sendEmail({
+        to: landlord.rows[0].email,
+        subject: 'Your property needs changes',
+        html: `
+          <p>Hello ${landlord.rows[0].full_name},</p>
+          <p>Your property <b>${property.title}</b> was not approved.</p>
+          <p>Please review it and resubmit.</p>
+        `,
+      });
+    }
+
+
+    res.json({
+      success: true,
+      message: 'Property rejected successfully',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('Reject property error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reject property',
+    });
+  }
+};
 
 
 // GET /api/admin/applications
