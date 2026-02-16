@@ -337,19 +337,19 @@ exports.approveProperty = async (req, res) => {
     const { id } = req.params;
     const adminId = req.user.id;
 
-    const result = await db.query(
-      `
-      UPDATE properties
-      SET is_verified = TRUE,
-          status = 'available',
-          verified_by = $2,
-          verified_at = NOW()
-      WHERE id = $1
-        AND deleted_at IS NULL
-      RETURNING id, title, landlord_id
-      `,
-      [id, adminId]
-    );
+          const result = await db.query(
+        `
+        UPDATE properties
+        SET is_verified = TRUE,
+            status = 'available',
+            verified_by = $2,
+            verified_at = NOW()
+        WHERE id = $1
+          AND deleted_at IS NULL
+        RETURNING id, title, landlord_id
+        `,
+        [id, adminId]
+      );
 
     if (!result.rows.length) {
       return res.status(404).json({
@@ -404,7 +404,8 @@ exports.rejectProperty = async (req, res) => {
       `
       UPDATE properties
       SET status = 'rejected',
-          is_verified = FALSE
+    is_verified = FALSE,
+    rejection_reason = $2
       WHERE id = $1
         AND deleted_at IS NULL
       RETURNING id, title, landlord_id
