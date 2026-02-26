@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 
 const Profile = () => {
-  const { user, setUser } = useAuth();
+  const { user, updateUser } = useAuth();
   const { t } = useTranslation();
 
   const [passport, setPassport] = useState(null);
@@ -28,7 +28,9 @@ const Profile = () => {
 
       if (res.data?.success) {
         toast.success(t('profile.upload_success'));
-        setUser(res.data.user);
+        if (res.data.user) {
+          updateUser(res.data.user);
+        }
       }
     } catch (err) {
       toast.error(t('profile.upload_failed'));

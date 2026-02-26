@@ -12,10 +12,13 @@ router.post(
   '/register',
   [
     body('email').isEmail().normalizeEmail(),
-    body('phone').isMobilePhone('en-NG'),
+    body('phone').isMobilePhone('any'),
     body('password').isLength({ min: 8 }),
     body('full_name').trim().notEmpty(),
-    body('nin').isLength({ min: 11, max: 11 }),
+    body('identity_document_type').optional().isIn(['nin', 'passport']),
+    body('nin').optional().isLength({ min: 11, max: 11 }),
+    body('international_passport_number').optional().isLength({ min: 6, max: 20 }),
+    body('nationality').optional().trim().isLength({ min: 2, max: 80 }),
     body('user_type').isIn(['landlord', 'tenant']),
   ],
   authController.register

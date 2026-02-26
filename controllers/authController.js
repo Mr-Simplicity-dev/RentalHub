@@ -2,12 +2,37 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const db = require('../config/middleware/database');
-const { validateNIN } = require('../config/utils/ninValidator');
+const {
+  validateNIN,
+  verifyNINWithNIMC,
+  validateInternationalPassport
+} = require('../config/utils/ninValidator');
 const { sendVerificationEmail, sendWelcomeEmail } = require('../config/utils/emailService');
 const { sendVerificationCode } = require('../config/utils/smsService');
 
 // Store OTP codes temporarily (use Redis in production)
 const otpStore = new Map();
+let identitySchemaReady = false;
+
+const ensureIdentitySchema = async () => {
+  if (identitySchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+    ALTER COLUMN nin DROP NOT NULL;
+
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS identity_document_type VARCHAR(20) DEFAULT 'nin',
+    ADD COLUMN IF NOT EXISTS international_passport_number VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS nationality VARCHAR(80);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_international_passport_number
+    ON users(international_passport_number)
+    WHERE international_passport_number IS NOT NULL;
+  `);
+
+  identitySchemaReady = true;
+};
 
 // Generate JWT Token
 const generateToken = (userId, userType) => {
@@ -21,6 +46,8 @@ const generateToken = (userId, userType) => {
 // REGISTER NEW USER
 exports.register = async (req, res) => {
   try {
+    await ensureIdentitySchema();
+
     // Validate input
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -30,27 +57,119 @@ exports.register = async (req, res) => {
       });
     }
 
-    const { email, phone, password, full_name, nin, user_type } = req.body;
+    const {
+      email,
+      phone,
+      password,
+      full_name,
+      nin,
+      user_type,
+      date_of_birth,
+      identity_document_type = 'nin',
+      international_passport_number,
+      nationality
+    } = req.body;
 
-    // Validate NIN format
-    const ninValidation = validateNIN(nin);
-    if (!ninValidation.valid) {
-      return res.status(400).json({
-        success: false,
-        message: ninValidation.message
-      });
+    const identityType =
+      identity_document_type === 'passport' ? 'passport' : 'nin';
+
+    const cleanNIN = nin ? String(nin).trim() : null;
+    const cleanNationality = nationality
+      ? String(nationality).trim()
+      : identityType === 'passport'
+        ? 'Foreign'
+        : 'Nigeria';
+    const passportValidation = validateInternationalPassport(
+      international_passport_number
+    );
+    const cleanPassportNumber =
+      identityType === 'passport' && passportValidation.valid
+        ? passportValidation.value
+        : null;
+
+    let ninVerified = false;
+    let nimcMeta = null;
+
+    if (identityType === 'nin') {
+      const ninValidation = validateNIN(cleanNIN);
+      if (!ninValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: ninValidation.message
+        });
+      }
+
+      const names = String(full_name || '').trim().split(/\s+/).filter(Boolean);
+      const firstName = names[0] || '';
+      const lastName = names.slice(1).join(' ') || names[0] || '';
+
+      const nimcResult = await verifyNINWithNIMC(
+        cleanNIN,
+        firstName,
+        lastName,
+        date_of_birth
+      );
+
+      nimcMeta = {
+        status: nimcResult.status,
+        message: nimcResult.message
+      };
+
+      if (nimcResult.status === 'service_error') {
+        return res.status(503).json({
+          success: false,
+          message: nimcResult.message
+        });
+      }
+
+      if (nimcResult.status === 'not_verified') {
+        return res.status(400).json({
+          success: false,
+          message: nimcResult.message || 'NIN verification failed'
+        });
+      }
+
+      ninVerified = nimcResult.verified === true;
+    } else {
+      if (!passportValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: passportValidation.message
+        });
+      }
+
+      if (!cleanNationality) {
+        return res.status(400).json({
+          success: false,
+          message: 'Nationality is required for international passport verification'
+        });
+      }
     }
 
     // Check if user already exists
+    const duplicateConditions = ['email = $1', 'phone = $2'];
+    const duplicateParams = [email, phone];
+    let paramIndex = 3;
+
+    if (identityType === 'nin') {
+      duplicateConditions.push(`nin = $${paramIndex++}`);
+      duplicateParams.push(cleanNIN);
+    } else {
+      duplicateConditions.push(`international_passport_number = $${paramIndex++}`);
+      duplicateParams.push(cleanPassportNumber);
+    }
+
     const existingUser = await db.query(
-      'SELECT id FROM users WHERE email = $1 OR phone = $2 OR nin = $3',
-      [email, phone, nin]
+      `SELECT id FROM users WHERE ${duplicateConditions.join(' OR ')}`,
+      duplicateParams
     );
 
     if (existingUser.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'User with this email, phone, or NIN already exists'
+        message: identityType === 'nin'
+          ? 'User with this email, phone, or NIN already exists'
+          : 'User with this email, phone, or passport number already exists'
       });
     }
 
@@ -60,10 +179,33 @@ exports.register = async (req, res) => {
 
     // Insert user into database
     const result = await db.query(
-      `INSERT INTO users (user_type, email, phone, password_hash, full_name, nin)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, email, full_name, user_type, created_at`,
-      [user_type, email, phone, password_hash, full_name, nin]
+      `INSERT INTO users (
+         user_type,
+         email,
+         phone,
+         password_hash,
+         full_name,
+         nin,
+         nin_verified,
+         identity_document_type,
+         international_passport_number,
+         nationality
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, email, full_name, user_type, created_at,
+                 identity_document_type, nin_verified, nationality`,
+      [
+        user_type,
+        email,
+        phone,
+        password_hash,
+        full_name,
+        identityType === 'nin' ? cleanNIN : null,
+        ninVerified,
+        identityType,
+        identityType === 'passport' ? cleanPassportNumber : null,
+        cleanNationality
+      ]
     );
 
     const newUser = result.rows[0];
@@ -91,9 +233,13 @@ exports.register = async (req, res) => {
           email: newUser.email,
           full_name: newUser.full_name,
           user_type: newUser.user_type,
-          created_at: newUser.created_at
+          created_at: newUser.created_at,
+          identity_document_type: newUser.identity_document_type,
+          nin_verified: newUser.nin_verified,
+          nationality: newUser.nationality
         },
-        token
+        token,
+        verification: nimcMeta
       }
     });
 
@@ -379,6 +525,8 @@ exports.verifyPhone = async (req, res) => {
 // UPLOAD PASSPORT PHOTO
 exports.uploadPassport = async (req, res) => {
   try {
+    await ensureIdentitySchema();
+
     const userId = req.user.id;
 
     if (!req.file) {
@@ -396,15 +544,31 @@ exports.uploadPassport = async (req, res) => {
 
     // Check if user is now fully verified (email + phone + passport)
     const result = await db.query(
-      `SELECT email_verified, phone_verified, passport_photo_url, nin
+      `SELECT email_verified, phone_verified, passport_photo_url, nin, nin_verified,
+              identity_document_type, international_passport_number
        FROM users WHERE id = $1`,
       [userId]
     );
 
     const user = result.rows[0];
+    const nimcRequired = process.env.REQUIRE_NIMC_VERIFICATION === 'true';
+    const hasIdentityNumber =
+      user.identity_document_type === 'passport'
+        ? !!user.international_passport_number
+        : !!user.nin;
+    const ninCheckPassed =
+      user.identity_document_type !== 'nin' ||
+      !nimcRequired ||
+      user.nin_verified;
 
     // If all verification steps completed, mark for admin review
-    if (user.email_verified && user.phone_verified && user.passport_photo_url && user.nin) {
+    if (
+      user.email_verified &&
+      user.phone_verified &&
+      user.passport_photo_url &&
+      hasIdentityNumber &&
+      ninCheckPassed
+    ) {
       // In production, trigger admin notification for manual verification
       res.json({
         success: true,
@@ -430,10 +594,13 @@ exports.uploadPassport = async (req, res) => {
 // GET CURRENT USER
 exports.getCurrentUser = async (req, res) => {
   try {
+    await ensureIdentitySchema();
+
     const userId = req.user.id;
 
     const result = await db.query(
       `SELECT id, user_type, email, phone, full_name, nin,
+              identity_document_type, international_passport_number, nationality, nin_verified,
               passport_photo_url, email_verified, phone_verified,
               identity_verified, subscription_active,
               subscription_expires_at, created_at

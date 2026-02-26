@@ -150,7 +150,8 @@ exports.getPendingVerifications = async (req, res) => {
       where.push(`(
         full_name ILIKE $${i} OR
         email ILIKE $${i} OR
-        nin ILIKE $${i}
+        nin ILIKE $${i} OR
+        international_passport_number ILIKE $${i}
       )`);
       params.push(`%${search}%`);
       i++;
@@ -167,7 +168,9 @@ exports.getPendingVerifications = async (req, res) => {
     const total = Number(countResult.rows[0].count);
 
     const dataQuery = `
-      SELECT id, full_name, email, nin, passport_photo_url, user_type, created_at
+      SELECT id, full_name, email, nin, identity_document_type,
+             international_passport_number, nationality,
+             passport_photo_url, user_type, created_at
       FROM users
       ${whereClause}
       ORDER BY created_at ASC

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/middleware/database');
+const db = require('../config/middleware/database');
 const { authenticate } = require('../config/middleware/auth');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
@@ -189,24 +189,37 @@ router.get('/verification/status', authenticate, async (req, res) => {
 
     const result = await db.query(
       `SELECT email_verified, phone_verified, nin_verified,
-              identity_verified, passport_photo_url, nin
+              identity_verified, passport_photo_url, nin,
+              identity_document_type, international_passport_number
        FROM users WHERE id = $1`,
       [userId]
     );
 
     const user = result.rows[0];
+    const nimcRequired = process.env.REQUIRE_NIMC_VERIFICATION === 'true';
+    const hasIdentityNumber =
+      user.identity_document_type === 'passport'
+        ? !!user.international_passport_number
+        : !!user.nin;
+    const ninStepComplete =
+      user.identity_document_type !== 'nin' ||
+      !nimcRequired ||
+      user.nin_verified;
 
     const status = {
+      identity_document_type: user.identity_document_type || 'nin',
       email: user.email_verified,
       phone: user.phone_verified,
       nin: user.nin_verified,
+      has_identity_number: hasIdentityNumber,
       passport: !!user.passport_photo_url,
       identity: user.identity_verified,
       overall_complete: user.email_verified && 
                         user.phone_verified && 
-                        user.nin_verified && 
+                        ninStepComplete && 
                         user.identity_verified &&
-                        !!user.passport_photo_url
+                        !!user.passport_photo_url &&
+                        hasIdentityNumber
     };
 
     res.json({
@@ -280,15 +293,26 @@ router.post('/upload-passport', authenticate, upload.single('passport'), async (
     const userId = req.user.id;
     const relativePath = `/uploads/passports/${req.file.filename}`;
 
-    await pool.query(
+    await db.query(
       'UPDATE users SET passport_photo_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [relativePath, userId]
+    );
+
+    const userResult = await db.query(
+      `SELECT id, user_type, email, phone, full_name, nin,
+              identity_document_type, international_passport_number, nationality, nin_verified,
+              passport_photo_url, email_verified, phone_verified,
+              identity_verified, subscription_active,
+              subscription_expires_at, created_at
+       FROM users WHERE id = $1`,
+      [userId]
     );
 
     res.json({
       success: true,
       message: 'Passport uploaded successfully',
-      url: relativePath
+      url: relativePath,
+      user: userResult.rows[0]
     });
 
   } catch (error) {

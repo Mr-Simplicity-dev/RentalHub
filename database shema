@@ -14,14 +14,17 @@ CREATE TABLE users (
     
     -- Personal Information
     full_name VARCHAR(255) NOT NULL,
-    nin VARCHAR(11) UNIQUE NOT NULL, -- National Identification Number (11 digits)
-    passport_photo_url VARCHAR(500), -- URL to uploaded passport photo
+    nin VARCHAR(11) UNIQUE, -- Optional for Nigerians
+    identity_document_type VARCHAR(20) DEFAULT 'nin' CHECK (identity_document_type IN ('nin', 'passport')),
+    international_passport_number VARCHAR(50) UNIQUE, -- Optional for foreigners
+    nationality VARCHAR(80),
+    passport_photo_url VARCHAR(500), -- Uploaded face/passport photo for manual admin review
     
     -- Verification Status
     email_verified BOOLEAN DEFAULT FALSE,
     phone_verified BOOLEAN DEFAULT FALSE,
     nin_verified BOOLEAN DEFAULT FALSE,
-    identity_verified BOOLEAN DEFAULT FALSE, -- Admin approval after NIN + passport check
+    identity_verified BOOLEAN DEFAULT FALSE, -- Admin approval after NIN/passport + photo review
     
     -- Subscription Status (for tenants)
     subscription_active BOOLEAN DEFAULT FALSE,
