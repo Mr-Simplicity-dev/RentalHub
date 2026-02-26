@@ -229,6 +229,9 @@ exports.getApplicationById = async (req, res) => {
           u.phone AS tenant_phone,
           u.email AS tenant_email,
           u.nin AS tenant_nin,
+          u.identity_document_type AS tenant_identity_document_type,
+          u.international_passport_number AS tenant_passport_number,
+          u.nationality AS tenant_nationality,
           u.identity_verified AS tenant_verified
         FROM applications a
         JOIN properties p ON a.property_id = p.id

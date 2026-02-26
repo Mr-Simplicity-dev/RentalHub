@@ -141,6 +141,7 @@ exports.getPendingVerifications = async (req, res) => {
       `phone_verified = TRUE`,
       `identity_verified = FALSE`,
       `passport_photo_url IS NOT NULL`,
+      `(nin IS NOT NULL OR international_passport_number IS NOT NULL)`,
     ];
 
     const params = [];

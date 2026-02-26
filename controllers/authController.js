@@ -270,7 +270,9 @@ exports.login = async (req, res) => {
     const result = await db.query(
       `SELECT id, email, password_hash, full_name, user_type, 
               email_verified, phone_verified, identity_verified,
-              subscription_active, subscription_expires_at
+              subscription_active, subscription_expires_at,
+              identity_document_type, international_passport_number,
+              nationality, nin_verified
        FROM users WHERE email = $1`,
       [email]
     );

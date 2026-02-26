@@ -34,6 +34,23 @@ const upload = multer({
   }
 });
 
+let identitySchemaReady = false;
+const ensureIdentitySchema = async () => {
+  if (identitySchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+    ALTER COLUMN nin DROP NOT NULL;
+
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS identity_document_type VARCHAR(20) DEFAULT 'nin',
+    ADD COLUMN IF NOT EXISTS international_passport_number VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS nationality VARCHAR(80);
+  `);
+
+  identitySchemaReady = true;
+};
+
 
 // Get user profile by ID (public info only)
 router.get('/:userId', async (req, res) => {
@@ -185,6 +202,8 @@ router.put('/change-password', authenticate, async (req, res) => {
 // Get verification status
 router.get('/verification/status', authenticate, async (req, res) => {
   try {
+    await ensureIdentitySchema();
+
     const userId = req.user.id;
 
     const result = await db.query(
@@ -283,6 +302,8 @@ router.delete('/account', authenticate, async (req, res) => {
 // Upload passport photo
 router.post('/upload-passport', authenticate, upload.single('passport'), async (req, res) => {
   try {
+    await ensureIdentitySchema();
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
