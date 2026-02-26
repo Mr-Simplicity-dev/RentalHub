@@ -1,4 +1,17 @@
-const pool = require('../middleware/database');
+const db = require('../middleware/database');
+const { sendEmail } = require('./mailer');
+
+const sendEmailsSafely = async (messages) => {
+  await Promise.all(
+    messages.map(async (message) => {
+      try {
+        await sendEmail(message);
+      } catch (error) {
+        console.error('Failed to send expiration email:', error.message);
+      }
+    })
+  );
+};
 
 
 // Check and update expired subscriptions (run as cron job)
@@ -13,12 +26,28 @@ exports.checkExpiredSubscriptions = async () => {
     );
 
     console.log(`Deactivated ${result.rows.length} expired subscriptions`);
-    
-    // TODO: Send email notifications to users
+
+    if (result.rows.length) {
+      const messages = result.rows
+        .filter((user) => user.email)
+        .map((user) => ({
+          to: user.email,
+          subject: 'Your tenant subscription has expired',
+          html: `
+            <p>Hello ${user.full_name || 'there'},</p>
+            <p>Your subscription has expired and premium tenant access has been paused.</p>
+            <p>Renew your plan to continue contacting landlords and viewing full property details.</p>
+          `,
+        }));
+
+      await sendEmailsSafely(messages);
+    }
+
     return result.rows;
 
   } catch (error) {
     console.error('Error checking expired subscriptions:', error);
+    return [];
   }
 };
 
@@ -34,12 +63,54 @@ exports.checkExpiredListings = async () => {
     );
 
     console.log(`Deactivated ${result.rows.length} expired listings`);
-    
-    // TODO: Send email notifications to landlords
+
+    if (result.rows.length) {
+      const landlordIds = [
+        ...new Set(
+          result.rows
+            .map((property) => property.landlord_id)
+            .filter(Boolean)
+        ),
+      ];
+
+      if (landlordIds.length) {
+        const landlords = await db.query(
+          `SELECT id, email, full_name
+           FROM users
+           WHERE id = ANY($1::int[])`,
+          [landlordIds]
+        );
+
+        const landlordById = new Map(
+          landlords.rows.map((landlord) => [String(landlord.id), landlord])
+        );
+
+        const messages = result.rows
+          .map((property) => {
+            const landlord = landlordById.get(String(property.landlord_id));
+            if (!landlord || !landlord.email) return null;
+
+            return {
+              to: landlord.email,
+              subject: 'A property listing has expired',
+              html: `
+                <p>Hello ${landlord.full_name || 'there'},</p>
+                <p>Your property listing <strong>${property.title}</strong> has expired and is now unavailable.</p>
+                <p>Renew your listing plan to make the property visible again.</p>
+              `,
+            };
+          })
+          .filter(Boolean);
+
+        await sendEmailsSafely(messages);
+      }
+    }
+
     return result.rows;
 
   } catch (error) {
     console.error('Error checking expired listings:', error);
+    return [];
   }
 };
 

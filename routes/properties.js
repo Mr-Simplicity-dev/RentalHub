@@ -19,15 +19,8 @@ router.get('/states', propertyController.getAllStates);
 // Browse properties (limited info for non-subscribers)
 router.get('/browse', propertyController.browseProperties);
 
-// SAFE: Get featured properties (no DB crash)
-router.get('/featured', async (req, res) => {
-  const limit = Number(req.query.limit) || 6;
-
-  res.json({
-    success: true,
-    data: [],
-  });
-});
+// Get featured properties
+router.get('/featured', propertyController.getFeaturedProperties);
 
 // Search properties with filters
 router.get('/search', propertyController.searchProperties);

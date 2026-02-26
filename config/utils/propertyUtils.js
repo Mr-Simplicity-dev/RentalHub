@@ -1,21 +1,30 @@
-const pool = require('../middleware/database');
+const db = require('../middleware/database');
 
-// Get popular locations (most properties)
-exports.getPopularLocations = async (limit = 10) => {
+const clampLimit = (limit, fallback = 10) => {
+  const parsed = Number.parseInt(limit, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, 100);
+};
+
+// Get popular locations (states with most active verified properties)
+const getPopularLocations = async (limit = 10) => {
   try {
+    const safeLimit = clampLimit(limit, 10);
     const result = await db.query(
-      `SELECT 
-         s.state_name, s.state_code, s.id as state_id,
-         COUNT(p.id) as property_count
+      `SELECT
+         s.state_name,
+         s.state_code,
+         s.id AS state_id,
+         COUNT(p.id) AS property_count
        FROM states s
-       LEFT JOIN properties p ON s.id = p.state_id 
-         AND p.is_available = TRUE 
+       LEFT JOIN properties p ON s.id = p.state_id
+         AND p.is_available = TRUE
          AND p.is_verified = TRUE
        GROUP BY s.id, s.state_name, s.state_code
        HAVING COUNT(p.id) > 0
        ORDER BY property_count DESC
        LIMIT $1`,
-      [limit]
+      [safeLimit]
     );
 
     return result.rows;
@@ -26,22 +35,22 @@ exports.getPopularLocations = async (limit = 10) => {
 };
 
 // Get price statistics by state
-exports.getPriceStatsByState = async (stateId) => {
+const getPriceStatsByState = async (stateId) => {
   try {
     const result = await db.query(
-      `SELECT 
-         MIN(rent_amount) as min_price,
-         MAX(rent_amount) as max_price,
-         AVG(rent_amount) as avg_price,
-         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY rent_amount) as median_price
+      `SELECT
+         MIN(rent_amount) AS min_price,
+         MAX(rent_amount) AS max_price,
+         AVG(rent_amount) AS avg_price,
+         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY rent_amount) AS median_price
        FROM properties
-       WHERE state_id = $1 
-         AND is_available = TRUE 
+       WHERE state_id = $1
+         AND is_available = TRUE
          AND is_verified = TRUE`,
       [stateId]
     );
 
-    return result.rows[0];
+    return result.rows[0] || null;
   } catch (error) {
     console.error('Error getting price stats:', error);
     return null;
@@ -49,27 +58,30 @@ exports.getPriceStatsByState = async (stateId) => {
 };
 
 // Get similar properties
-exports.getSimilarProperties = async (propertyId, limit = 5) => {
+const getSimilarProperties = async (propertyId, limit = 5) => {
   try {
-    // Get the reference property
+    const safeLimit = clampLimit(limit, 5);
     const refProperty = await db.query(
-      'SELECT state_id, property_type, rent_amount, bedrooms FROM properties WHERE id = $1',
+      `SELECT state_id, property_type, rent_amount, bedrooms
+       FROM properties
+       WHERE id = $1`,
       [propertyId]
     );
 
-    if (refProperty.rows.length === 0) {
-      return [];
-    }
+    if (!refProperty.rows.length) return [];
 
     const ref = refProperty.rows[0];
-    const priceRange = ref.rent_amount * 0.2; // 20% price range
+    const priceRange = Number(ref.rent_amount) * 0.2;
 
     const result = await db.query(
-      `SELECT 
+      `SELECT
          p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
          p.rent_amount, p.payment_frequency, p.city, p.area,
          s.state_name,
-         (SELECT photo_url FROM property_photos WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) as primary_photo
+         (SELECT photo_url
+          FROM property_photos
+          WHERE property_id = p.id AND is_primary = TRUE
+          LIMIT 1) AS primary_photo
        FROM properties p
        JOIN states s ON p.state_id = s.id
        WHERE p.id != $1
@@ -78,7 +90,7 @@ exports.getSimilarProperties = async (propertyId, limit = 5) => {
          AND p.rent_amount BETWEEN $4 AND $5
          AND p.is_available = TRUE
          AND p.is_verified = TRUE
-       ORDER BY 
+       ORDER BY
          ABS(p.bedrooms - $6) ASC,
          ABS(p.rent_amount - $7) ASC
        LIMIT $8`,
@@ -86,11 +98,11 @@ exports.getSimilarProperties = async (propertyId, limit = 5) => {
         propertyId,
         ref.state_id,
         ref.property_type,
-        ref.rent_amount - priceRange,
-        ref.rent_amount + priceRange,
-        ref.bedrooms,
-        ref.rent_amount,
-        limit
+        Number(ref.rent_amount) - priceRange,
+        Number(ref.rent_amount) + priceRange,
+        Number(ref.bedrooms) || 0,
+        Number(ref.rent_amount) || 0,
+        safeLimit,
       ]
     );
 
@@ -102,12 +114,12 @@ exports.getSimilarProperties = async (propertyId, limit = 5) => {
 };
 
 // Auto-expire properties (run as cron job)
-exports.expireProperties = async () => {
+const expireProperties = async () => {
   try {
     const result = await db.query(
-      `UPDATE properties 
+      `UPDATE properties
        SET is_available = FALSE
-       WHERE is_available = TRUE 
+       WHERE is_available = TRUE
          AND expires_at IS NOT NULL
          AND expires_at < CURRENT_TIMESTAMP
        RETURNING id, title, landlord_id`
@@ -121,10 +133,10 @@ exports.expireProperties = async () => {
   }
 };
 
-// Get property recommendations for tenant
-exports.getRecommendations = async (userId, limit = 10) => {
+// Get recommended properties for a tenant
+const getRecommendations = async (userId, limit = 10) => {
   try {
-    // Get user's saved properties to understand preferences
+    const safeLimit = clampLimit(limit, 10);
     const savedProperties = await db.query(
       `SELECT p.state_id, p.property_type, p.rent_amount, p.bedrooms
        FROM saved_properties sp
@@ -134,54 +146,70 @@ exports.getRecommendations = async (userId, limit = 10) => {
       [userId]
     );
 
-    if (savedProperties.rows.length === 0) {
-      // Return popular properties if no preferences
-      const result = await db.query(
-        `SELECT 
+    if (!savedProperties.rows.length) {
+      const fallback = await db.query(
+        `SELECT
            p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
            p.rent_amount, p.payment_frequency, p.city, p.area,
            s.state_name,
-           (SELECT photo_url FROM property_photos WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) as primary_photo,
-           (SELECT AVG(rating) FROM reviews WHERE property_id = p.id) as avg_rating
+           (SELECT photo_url
+            FROM property_photos
+            WHERE property_id = p.id AND is_primary = TRUE
+            LIMIT 1) AS primary_photo,
+           (SELECT AVG(rating)
+            FROM reviews
+            WHERE property_id = p.id) AS avg_rating
          FROM properties p
          JOIN states s ON p.state_id = s.id
-         WHERE p.is_available = TRUE AND p.is_verified = TRUE
+         WHERE p.is_available = TRUE
+           AND p.is_verified = TRUE
          ORDER BY p.featured DESC, p.created_at DESC
          LIMIT $1`,
-        [limit]
+        [safeLimit]
       );
-      return result.rows;
+
+      return fallback.rows;
     }
 
-    // Calculate average preferences
-    const avgPrice = savedProperties.rows.reduce((sum, p) => sum + parseFloat(p.rent_amount), 0) / savedProperties.rows.length;
-    const priceRange = avgPrice * 0.3;
+    const prices = savedProperties.rows
+      .map((row) => Number(row.rent_amount))
+      .filter((value) => Number.isFinite(value) && value > 0);
 
-    // Get most common state and property type
-    const stateIds = savedProperties.rows.map(p => p.state_id);
-    const propertyTypes = savedProperties.rows.map(p => p.property_type);
+    if (!prices.length) return [];
+
+    const avgPrice = prices.reduce((sum, value) => sum + value, 0) / prices.length;
+    const priceRange = avgPrice * 0.3;
+    const stateIds = [...new Set(savedProperties.rows.map((row) => row.state_id).filter(Boolean))];
+    const propertyTypes = [
+      ...new Set(savedProperties.rows.map((row) => row.property_type).filter(Boolean)),
+    ];
 
     const result = await db.query(
-      `SELECT 
+      `SELECT
          p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
          p.rent_amount, p.payment_frequency, p.city, p.area,
          s.state_name,
-         (SELECT photo_url FROM property_photos WHERE property_id = p.id AND is_primary = TRUE LIMIT 1) as primary_photo,
-         (SELECT AVG(rating) FROM reviews WHERE property_id = p.id) as avg_rating
+         (SELECT photo_url
+          FROM property_photos
+          WHERE property_id = p.id AND is_primary = TRUE
+          LIMIT 1) AS primary_photo,
+         (SELECT AVG(rating)
+          FROM reviews
+          WHERE property_id = p.id) AS avg_rating
        FROM properties p
        JOIN states s ON p.state_id = s.id
-       WHERE p.is_available = TRUE 
+       WHERE p.is_available = TRUE
          AND p.is_verified = TRUE
          AND p.id NOT IN (SELECT property_id FROM saved_properties WHERE tenant_id = $1)
-         AND (p.state_id = ANY($2) OR p.property_type = ANY($3))
+         AND (p.state_id = ANY($2::int[]) OR p.property_type = ANY($3::text[]))
          AND p.rent_amount BETWEEN $4 AND $5
-       ORDER BY 
-         CASE WHEN p.state_id = ANY($2) THEN 1 ELSE 2 END,
-         CASE WHEN p.property_type = ANY($3) THEN 1 ELSE 2 END,
+       ORDER BY
+         CASE WHEN p.state_id = ANY($2::int[]) THEN 1 ELSE 2 END,
+         CASE WHEN p.property_type = ANY($3::text[]) THEN 1 ELSE 2 END,
          p.featured DESC,
          p.created_at DESC
        LIMIT $6`,
-      [userId, stateIds, propertyTypes, avgPrice - priceRange, avgPrice + priceRange, limit]
+      [userId, stateIds, propertyTypes, avgPrice - priceRange, avgPrice + priceRange, safeLimit]
     );
 
     return result.rows;
@@ -191,90 +219,10 @@ exports.getRecommendations = async (userId, limit = 10) => {
   }
 };
 
-module.exports = exports;
-
-const express = require('express');
-const router = express.Router();
-const { 
-  getPopularLocations, 
-  getPriceStatsByState, 
+module.exports = {
+  getPopularLocations,
+  getPriceStatsByState,
   getSimilarProperties,
-  getRecommendations 
-} = require('../utils/propertyUtils');
-const { authenticate, isTenant } = require('../middleware/auth');
-
-// Get popular locations
-router.get('/popular-locations', async (req, res) => {
-  try {
-    const { limit = 10 } = req.query;
-    const locations = await getPopularLocations(limit);
-
-    res.json({
-      success: true,
-      data: locations
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch popular locations'
-    });
-  }
-});
-
-// Get price statistics by state
-router.get('/price-stats/:stateId', async (req, res) => {
-  try {
-    const { stateId } = req.params;
-    const stats = await getPriceStatsByState(stateId);
-
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch price statistics'
-    });
-  }
-});
-
-// Get similar properties
-router.get('/similar/:propertyId', async (req, res) => {
-  try {
-    const { propertyId } = req.params;
-    const { limit = 5 } = req.query;
-    const properties = await getSimilarProperties(propertyId, limit);
-
-    res.json({
-      success: true,
-      data: properties
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch similar properties'
-    });
-  }
-});
-
-// Get recommendations for tenant
-router.get('/recommendations', authenticate, isTenant, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { limit = 10 } = req.query;
-    const recommendations = await getRecommendations(userId, limit);
-
-    res.json({
-      success: true,
-      data: recommendations
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch recommendations'
-    });
-  }
-});
-
-module.exports = router;
+  expireProperties,
+  getRecommendations,
+};

@@ -19,8 +19,9 @@ import adminRoutes from './routes/admin.js';
 import dashboardRoutes from './routes/dashboard.js';
 import notificationRoutes from './routes/notifications.js';
 import superAdminRoutes from './routes/superAdmin.js';
+import propertyUtilsRoutes from './routes/propertyUtils.js';
 
-import { startPaymentJobs } from './jobs/paymentJobs.js';
+import paymentJobs from './jobs/paymentJobs.js';
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const { startPaymentJobs, startPropertyJobs } = paymentJobs;
 
 // Tell Express it is behind a proxy (Render, Vercel, Nginx, etc.)
 app.set('trust proxy', 1);
@@ -112,40 +114,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/super', superAdminRoutes);
-
-// -----------------------------------
-// MISSING FRONTEND ROUTES (SAFE STUBS)
-// -----------------------------------
-app.get('/api/property-utils/popular-locations', async (req, res) => {
-  const limit = Number(req.query.limit) || 6;
-
-  res.json({
-    success: true,
-    data: [
-      { name: 'Lagos', count: 0 },
-      { name: 'Abuja', count: 0 },
-      { name: 'Port Harcourt', count: 0 },
-      { name: 'Ibadan', count: 0 },
-      { name: 'Benin', count: 0 },
-      { name: 'Abeokuta', count: 0 },
-    ].slice(0, limit),
-  });
-});
-
-app.get('/api/properties/featured', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: [],
-    });
-  } catch (err) {
-    console.error('Featured properties error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to load featured properties',
-    });
-  }
-});
+app.use('/api/property-utils', propertyUtilsRoutes);
 
 // -----------------------------------
 // ERROR HANDLER
@@ -162,6 +131,7 @@ app.use((err, req, res, next) => {
 // CRON JOBS
 // -----------------------------------
 startPaymentJobs();
+startPropertyJobs();
 
 // -----------------------------------
 // START SERVER

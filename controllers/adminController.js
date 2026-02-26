@@ -1,5 +1,5 @@
 const db = require('../config/middleware/database');
-const { sendEmail } = require('../utils/mailer');
+const { sendEmail } = require('../config/utils/mailer');
 
 
 // GET /api/admin/stats
