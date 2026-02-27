@@ -20,6 +20,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import notificationRoutes from './routes/notifications.js';
 import superAdminRoutes from './routes/superAdmin.js';
 import propertyUtilsRoutes from './routes/propertyUtils.js';
+import propertyAlertsRoutes from './routes/propertyAlerts.js';
 
 import paymentJobs from './jobs/paymentJobs.js';
 
@@ -115,6 +116,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/super', superAdminRoutes);
 app.use('/api/property-utils', propertyUtilsRoutes);
+app.use('/api/property-alerts', propertyAlertsRoutes);
 
 // -----------------------------------
 // ERROR HANDLER

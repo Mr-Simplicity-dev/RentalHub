@@ -104,6 +104,14 @@ const Home = () => {
                 {t('home.search')}
               </button>
             </form>
+            <div className="mt-4">
+              <Link
+                to="/properties"
+                className="underline text-primary-100 hover:text-white text-sm"
+              >
+                Can't find your preferred property type? Submit a request on the properties page.
+              </Link>
+            </div>
           </div>
         </div>
       </section>

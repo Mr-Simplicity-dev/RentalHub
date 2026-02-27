@@ -140,4 +140,10 @@ export const propertyService = {
     const response = await api.get('/property-utils/recommendations', { params: { limit } });
     return response.data;
   },
+
+  // Submit tenant request when desired property type is unavailable
+  requestPropertyAlert: async (requestData) => {
+    const response = await api.post('/property-alerts/request', requestData);
+    return response.data;
+  },
 };

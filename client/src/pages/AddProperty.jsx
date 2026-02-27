@@ -16,15 +16,12 @@ const STATES = [
 
 const PROPERTY_TYPES = [
   'apartment',
+  'house',
   'bungalow',
   'duplex',
-  'detached',
-  'semi-detached',
-  'terrace',
-  'land',
-  'shop',
-  'office',
-  'warehouse',
+  'studio',
+  'flat',
+  'room',
 ];
 
 const AddProperty = () => {
@@ -117,7 +114,7 @@ const AddProperty = () => {
       const res = await propertyService.createProperty(fd, true);
 
       if (res.success) {
-        toast.success(t('add_property.success'));
+        toast.success(res.message || t('add_property.success'));
         navigate('/my-properties');
       } else {
         toast.error(res.message || t('add_property.failed'));

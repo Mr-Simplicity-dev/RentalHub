@@ -102,6 +102,12 @@ const PropertyDetail = () => {
       return;
     }
 
+    if (!user?.subscription_active) {
+      toast.error('You need an active subscription to view full details and apply');
+      navigate('/subscribe');
+      return;
+    }
+
     setShowApplicationModal(true);
   };
 
@@ -137,6 +143,10 @@ const PropertyDetail = () => {
     );
   }
 
+  const landlordWhatsappLink = property?.landlord_phone
+    ? `https://wa.me/${String(property.landlord_phone).replace(/[^\d]/g, '')}`
+    : null;
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Image Gallery */}
@@ -166,6 +176,21 @@ const PropertyDetail = () => {
           </div>
         )}
       </div>
+
+      {!hasSubscription && (
+        <div className="card mb-6 border border-yellow-200 bg-yellow-50">
+          <h3 className="text-lg font-semibold mb-2">Pay to unlock full property details</h3>
+          <p className="text-sm text-gray-700 mb-3">
+            Full details (full address, landlord contact, and premium media) are available after subscription payment.
+          </p>
+          <button
+            onClick={() => (isAuthenticated ? navigate('/subscribe') : navigate('/login'))}
+            className="btn btn-primary"
+          >
+            {isAuthenticated ? 'Subscribe to Unlock Details' : 'Login to Continue'}
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
@@ -227,13 +252,22 @@ const PropertyDetail = () => {
             </div>
 
             {/* Description */}
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-3">Description</h2>
-              <p className="text-gray-700 whitespace-pre-line">{property.description}</p>
-            </div>
+            {hasSubscription ? (
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold mb-3">Description</h2>
+                <p className="text-gray-700 whitespace-pre-line">{property.description}</p>
+              </div>
+            ) : (
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold mb-3">Description</h2>
+                <p className="text-gray-500">
+                  Subscribe to view the full property description.
+                </p>
+              </div>
+            )}
 
             {/* Amenities */}
-            {property.amenities && property.amenities.length > 0 && (
+            {hasSubscription && property.amenities && property.amenities.length > 0 && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3">Amenities</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -244,6 +278,18 @@ const PropertyDetail = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Property Video - subscriber only */}
+            {hasSubscription && property.video_url && (
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold mb-3">Video Tour</h2>
+                <video
+                  controls
+                  className="w-full rounded-lg"
+                  src={property.video_url}
+                />
               </div>
             )}
 
@@ -283,6 +329,19 @@ const PropertyDetail = () => {
                     {property.landlord_phone}
                   </a>
                 </div>
+                {landlordWhatsappLink && (
+                  <div>
+                    <div className="text-sm text-gray-600">WhatsApp</div>
+                    <a
+                      href={landlordWhatsappLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold text-green-600 hover:text-green-700"
+                    >
+                      Chat on WhatsApp
+                    </a>
+                  </div>
+                )}
                 <div>
                   <div className="text-sm text-gray-600">Email</div>
                   <a

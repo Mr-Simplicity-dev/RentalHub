@@ -2,6 +2,16 @@
 const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
 const { cloudinary } = require('../config/middleware/upload');
+let propertySchemaReady = false;
+
+const ensurePropertySchema = async () => {
+  if (propertySchemaReady) return;
+  await db.query(`
+    ALTER TABLE properties
+    ADD COLUMN IF NOT EXISTS video_url VARCHAR(500);
+  `);
+  propertySchemaReady = true;
+};
 
 
 // =====================================================
@@ -270,13 +280,15 @@ exports.searchProperties = async (req, res) => {
 // -----------------------------------------------------
 exports.getPropertyById = async (req, res) => {
   try {
+    await ensurePropertySchema();
+
     const { propertyId } = req.params;
 
     const result = await db.query(
       `SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
         p.rent_amount, p.payment_frequency, p.city, p.area,
-        p.description, p.amenities, p.featured, p.created_at,
+        p.featured, p.created_at,
         s.state_name, s.state_code,
         (SELECT AVG(rating) FROM reviews WHERE property_id = p.id) AS avg_rating,
         (SELECT COUNT(*) FROM reviews WHERE property_id = p.id) AS review_count
@@ -302,7 +314,7 @@ exports.getPropertyById = async (req, res) => {
     );
 
     const property = result.rows[0];
-    property.photos = photosResult.rows;
+    property.photos = photosResult.rows.map((photo) => photo.photo_url);
     property.requires_subscription = true;
 
     res.json({
@@ -329,6 +341,8 @@ exports.getPropertyById = async (req, res) => {
 // -----------------------------------------------------
 exports.getFullPropertyDetails = async (req, res) => {
   try {
+    await ensurePropertySchema();
+
     const { propertyId } = req.params;
 
     const result = await db.query(
@@ -365,7 +379,7 @@ exports.getFullPropertyDetails = async (req, res) => {
     );
 
     const property = result.rows[0];
-    property.photos = photosResult.rows;
+    property.photos = photosResult.rows.map((photo) => photo.photo_url);
 
     await db.query(
       `INSERT INTO property_views (property_id, viewer_id, viewed_at)
@@ -604,13 +618,26 @@ exports.getPropertyReviews = async (req, res) => {
 // Create New Property
 // -----------------------------------------------------
 exports.createProperty = async (req, res) => {
+  let client;
   try {
+    await ensurePropertySchema();
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array(),
+      });
+    }
+
     const userId = req.user.id;
 
     const {
+      state_id,
       state,
       city,
       area,
+      full_address,
       property_type,
       bedrooms,
       bathrooms,
@@ -619,59 +646,129 @@ exports.createProperty = async (req, res) => {
       title,
       description,
       amenities,
-      latitude,
-      longitude,
+      is_available,
     } = req.body;
 
     const images = req.files?.images || [];
     const video = req.files?.video?.[0] || null;
+    const allowedTypes = [
+      'apartment',
+      'house',
+      'duplex',
+      'studio',
+      'bungalow',
+      'flat',
+      'room',
+    ];
 
-    const imageUrls = images.map(f => f.path);
-    const videoUrl = video ? video.path : null;
+    if (!allowedTypes.includes(property_type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid property type',
+      });
+    }
 
-    const result = await db.query(
+    const parsedAmenities = (() => {
+      if (!amenities) return [];
+      if (Array.isArray(amenities)) return amenities;
+      try {
+        const parsed = JSON.parse(amenities);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return String(amenities)
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+    })();
+
+    let resolvedStateId = state_id ? Number(state_id) : null;
+    if (!resolvedStateId && state) {
+      const stateLookup = await db.query(
+        'SELECT id FROM states WHERE LOWER(state_name) = LOWER($1) LIMIT 1',
+        [String(state).trim()]
+      );
+      resolvedStateId = stateLookup.rows[0]?.id || null;
+    }
+
+    if (!resolvedStateId) {
+      return res.status(400).json({
+        success: false,
+        message: 'State is required and must match a valid state',
+      });
+    }
+
+    const finalAddress =
+      full_address && String(full_address).trim()
+        ? String(full_address).trim()
+        : [area, city, state].filter(Boolean).join(', ');
+
+    client = await db.connect();
+    await client.query('BEGIN');
+
+    const result = await client.query(
       `INSERT INTO properties (
-        landlord_id, state, city, area,
-        property_type, bedrooms, bathrooms,
-        rent_amount, payment_frequency,
-        title, description, amenities,
-        latitude, longitude, images, video_url
-      )
-      VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
-      )
-      RETURNING *`,
+         landlord_id, state_id, city, area, full_address,
+         property_type, bedrooms, bathrooms,
+         rent_amount, payment_frequency,
+         title, description, amenities, is_available, video_url
+       )
+       VALUES (
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
+       )
+       RETURNING *`,
       [
         userId,
-        state,
+        resolvedStateId,
         city,
         area,
+        finalAddress,
         property_type,
         Number(bedrooms) || 0,
         Number(bathrooms) || 0,
         rent_amount,
-        payment_frequency,
+        payment_frequency || 'yearly',
         title,
         description,
-        JSON.stringify(amenities || []),
-        latitude || null,
-        longitude || null,
-        JSON.stringify(imageUrls),
-        videoUrl,
+        JSON.stringify(parsedAmenities),
+        is_available === false || is_available === 'false' ? false : true,
+        video ? video.path : null,
       ]
     );
 
+    const property = result.rows[0];
+
+    if (images.length) {
+      for (let i = 0; i < images.length; i++) {
+        const file = images[i];
+        await client.query(
+          `INSERT INTO property_photos (property_id, photo_url, is_primary, upload_order)
+           VALUES ($1, $2, $3, $4)`,
+          [property.id, file.path, i === 0, i]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
     res.status(201).json({
       success: true,
-      message: 'Property created successfully',
-      data: result.rows[0],
+      message: 'Property created and submitted for admin verification.',
+      data: property,
     });
   } catch (error) {
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {}
+    }
     console.error('Create property error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create property',
     });
+  } finally {
+    if (client) client.release();
   }
 };
 

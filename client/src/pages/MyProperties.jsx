@@ -40,7 +40,11 @@ const MyProperties = () => {
               <div className="font-semibold">{p.title}</div>
               <div className="text-sm text-gray-600">{p.city}, {p.state_name}</div>
             </div>
-            <span className="text-sm capitalize">{p.status}</span>
+            <span className="text-sm capitalize">
+              {p.is_verified
+                ? (p.is_available ? 'available' : 'unavailable')
+                : 'pending verification'}
+            </span>
           </div>
         ))}
         {items.length === 0 && (

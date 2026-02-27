@@ -1,5 +1,6 @@
 const db = require('../config/middleware/database');
 const { sendEmail } = require('../config/utils/mailer');
+const { notifyAlertsForProperty } = require('../config/utils/propertyAlertService');
 
 
 // GET /api/admin/stats
@@ -350,7 +351,7 @@ exports.approveProperty = async (req, res) => {
             verified_at = NOW()
         WHERE id = $1
           AND deleted_at IS NULL
-        RETURNING id, title, landlord_id
+        RETURNING id, title, landlord_id, property_type, state_id, city, area, rent_amount, bedrooms, bathrooms
         `,
         [id, adminId]
       );
@@ -383,6 +384,10 @@ exports.approveProperty = async (req, res) => {
         `,
       });
     }
+
+    notifyAlertsForProperty(property).catch((err) => {
+      console.error('Tenant alert notification failed:', err);
+    });
 
     res.json({
       success: true,

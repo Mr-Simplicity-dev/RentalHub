@@ -93,10 +93,15 @@ router.post(
   isVerified,
   uploadPropertyMedia,
   [
-    body('state_id').isInt(),
+    body('state_id').optional().isInt(),
+    body('state').optional().trim().notEmpty(),
+    body().custom((_, { req }) => {
+      if (req.body.state_id || req.body.state) return true;
+      throw new Error('state_id or state is required');
+    }),
     body('city').trim().notEmpty(),
     body('area').trim().notEmpty(),
-    body('full_address').trim().notEmpty(),
+    body('full_address').optional().trim().notEmpty(),
     body('property_type').isIn([
       'apartment',
       'house',
