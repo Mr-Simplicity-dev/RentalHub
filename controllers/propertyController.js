@@ -10,6 +10,9 @@ const ensurePropertySchema = async () => {
     ALTER TABLE properties
     ADD COLUMN IF NOT EXISTS full_address TEXT,
     ADD COLUMN IF NOT EXISTS video_url VARCHAR(500);
+
+    ALTER TABLE property_photos
+    ADD COLUMN IF NOT EXISTS upload_order INTEGER DEFAULT 0;
   `);
   propertySchemaReady = true;
 };

@@ -192,15 +192,22 @@ async function main() {
     });
 
     console.log('STEP: alert db check');
-    const alertRow = await db.query(
-      `SELECT id, notified_at, matched_property_id
-       FROM tenant_property_alerts
-       WHERE email = $1
-       ORDER BY id DESC
-       LIMIT 1`,
-      [tenant.email]
-    );
-    const latestAlert = alertRow.rows[0] || null;
+    let latestAlert = null;
+    for (let i = 0; i < 12; i++) {
+      const alertRow = await db.query(
+        `SELECT id, notified_at, matched_property_id
+         FROM tenant_property_alerts
+         WHERE email = $1
+         ORDER BY id DESC
+         LIMIT 1`,
+        [tenant.email]
+      );
+
+      latestAlert = alertRow.rows[0] || null;
+      if (latestAlert?.notified_at) break;
+
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
 
     console.log('STEP: browse/featured after');
     const browseAfter = await api('/properties/browse?limit=50');
@@ -234,10 +241,12 @@ async function main() {
     out.visitor_paywall = {
       public_detail_status: publicDetail.status,
       public_requires_subscription_flag: !!publicDetail.data?.data?.requires_subscription,
+      public_detail_message: publicDetail.data?.message || null,
       full_details_no_token_status: fullNoToken.status,
       full_details_tenant_no_sub_status: fullTenantNoSub.status,
       full_details_tenant_with_sub_status: fullTenantSub.status,
       full_details_has_landlord_phone: !!fullTenantSub.data?.data?.landlord_phone,
+      full_details_tenant_with_sub_message: fullTenantSub.data?.message || null,
     };
 
     out.tenant_alert_trigger = {

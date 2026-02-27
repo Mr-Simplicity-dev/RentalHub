@@ -31,6 +31,7 @@ exports.sendWhatsAppText = async ({ to, message }) => {
         text: { body: message },
       },
       {
+        timeout: Number(process.env.WHATSAPP_TIMEOUT_MS || 10000),
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
