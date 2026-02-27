@@ -80,7 +80,12 @@ const Register = () => {
 
       if (response.success) {
         toast.success('Registration successful. Verify email and phone next.');
-        navigate('/dashboard');
+        const role = response.data?.user?.user_type || registrationData.user_type;
+        if (role === 'tenant') {
+          navigate('/tenant/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         toast.error(response.message || 'Registration failed');
       }

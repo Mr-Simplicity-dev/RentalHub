@@ -75,6 +75,19 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+const TenantRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'tenant') return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
 function Layout({ children }) {
   const location = useLocation();
 
@@ -149,6 +162,14 @@ function App() {
                   <ProtectedRoute>
                     <Dashboard />
                   </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/tenant/dashboard"
+                element={
+                  <TenantRoute>
+                    <Dashboard />
+                  </TenantRoute>
                 }
               />
 

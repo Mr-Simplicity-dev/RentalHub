@@ -683,15 +683,26 @@ exports.createProperty = async (req, res) => {
     })();
 
     let resolvedStateId = state_id ? Number(state_id) : null;
-    if (!resolvedStateId && state) {
+    let resolvedStateName = state ? String(state).trim() : null;
+
+    if (resolvedStateId && !resolvedStateName) {
       const stateLookup = await db.query(
-        'SELECT id FROM states WHERE LOWER(state_name) = LOWER($1) LIMIT 1',
-        [String(state).trim()]
+        'SELECT state_name FROM states WHERE id = $1 LIMIT 1',
+        [resolvedStateId]
       );
-      resolvedStateId = stateLookup.rows[0]?.id || null;
+      resolvedStateName = stateLookup.rows[0]?.state_name || null;
     }
 
-    if (!resolvedStateId) {
+    if (!resolvedStateId && resolvedStateName) {
+      const stateLookup = await db.query(
+        'SELECT id, state_name FROM states WHERE LOWER(state_name) = LOWER($1) LIMIT 1',
+        [resolvedStateName]
+      );
+      resolvedStateId = stateLookup.rows[0]?.id || null;
+      resolvedStateName = stateLookup.rows[0]?.state_name || resolvedStateName;
+    }
+
+    if (!resolvedStateId || !resolvedStateName) {
       return res.status(400).json({
         success: false,
         message: 'State is required and must match a valid state',
@@ -701,24 +712,26 @@ exports.createProperty = async (req, res) => {
     const finalAddress =
       full_address && String(full_address).trim()
         ? String(full_address).trim()
-        : [area, city, state].filter(Boolean).join(', ');
+        : [area, city, resolvedStateName].filter(Boolean).join(', ');
 
     client = await db.connect();
     await client.query('BEGIN');
 
     const result = await client.query(
       `INSERT INTO properties (
-         landlord_id, state_id, city, area, full_address,
+         landlord_id, user_id, state, state_id, city, area, full_address,
          property_type, bedrooms, bathrooms,
-         rent_amount, payment_frequency,
-         title, description, amenities, is_available, video_url
+         price, rent_amount, payment_frequency,
+         title, description, amenities, is_available, is_verified, status, video_url
        )
        VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
        )
        RETURNING *`,
       [
         userId,
+        userId,
+        resolvedStateName,
         resolvedStateId,
         city,
         area,
@@ -727,11 +740,14 @@ exports.createProperty = async (req, res) => {
         Number(bedrooms) || 0,
         Number(bathrooms) || 0,
         rent_amount,
+        rent_amount,
         payment_frequency || 'yearly',
         title,
         description,
         JSON.stringify(parsedAmenities),
         is_available === false || is_available === 'false' ? false : true,
+        false,
+        'pending',
         video ? video.path : null,
       ]
     );

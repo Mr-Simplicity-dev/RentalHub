@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import PropertyList from '../components/properties/PropertyList';
@@ -6,6 +6,8 @@ import PropertyFilters from '../components/properties/PropertyFilters';
 import { toast } from 'react-toastify';
 import ReactPaginate from 'react-paginate';
 import { useTranslation } from 'react-i18next';
+
+const PAGE_SIZE = 20;
 
 const Properties = () => {
   const [searchParams] = useSearchParams();
@@ -15,7 +17,7 @@ const Properties = () => {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
+    limit: PAGE_SIZE,
     total: 0,
   });
   const [filters, setFilters] = useState({});
@@ -33,6 +35,27 @@ const Properties = () => {
     bathrooms: '',
   });
 
+  const loadProperties = useCallback(async (filterParams = {}, page = 1) => {
+    setLoading(true);
+    try {
+      const response = await propertyService.searchProperties({
+        ...filterParams,
+        page,
+        limit: PAGE_SIZE,
+      });
+
+      if (response.success) {
+        setProperties(response.data);
+        setPagination(response.pagination);
+      }
+    } catch (error) {
+      toast.error(t('properties.load_failed'));
+      console.error('Error loading properties:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
   useEffect(() => {
     // Get initial filters from URL
     const initialFilters = {};
@@ -46,28 +69,7 @@ const Properties = () => {
       city: initialFilters.city || '',
     }));
     loadProperties(initialFilters);
-  }, []);
-
-  const loadProperties = async (filterParams = {}, page = 1) => {
-    setLoading(true);
-    try {
-      const response = await propertyService.searchProperties({
-        ...filterParams,
-        page,
-        limit: pagination.limit,
-      });
-
-      if (response.success) {
-        setProperties(response.data);
-        setPagination(response.pagination);
-      }
-    } catch (error) {
-      toast.error(t('properties.load_failed'));
-      console.error('Error loading properties:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [searchParams, loadProperties]);
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);

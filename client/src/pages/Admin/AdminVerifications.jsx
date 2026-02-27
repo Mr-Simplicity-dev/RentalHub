@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
 import { FaCheckCircle, FaTimesCircle, FaIdCard, FaSearch } from 'react-icons/fa';
@@ -11,25 +11,15 @@ const AdminVerifications = () => {
   const [processingId, setProcessingId] = useState(null);
 
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 1 });
 
-  useEffect(() => {
-    const delay = setTimeout(() => {
-      loadPending(1);
-    }, 300);
-    return () => clearTimeout(delay);
-  }, [search]);
-
-  useEffect(() => {
-    loadPending(page);
-  }, [page]);
-
-  const loadPending = async (p = page) => {
+  const loadPending = useCallback(async (p = 1, query = '') => {
     setLoading(true);
     try {
       const res = await api.get('/admin/verifications/pending', {
-        params: { search, page: p, limit: PAGE_SIZE },
+        params: { search: query, page: p, limit: PAGE_SIZE },
       });
       if (res.data?.success) {
         setUsers(res.data.data);
@@ -40,13 +30,24 @@ const AdminVerifications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const delay = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(delay);
+  }, [search]);
+
+  useEffect(() => {
+    loadPending(page, debouncedSearch);
+  }, [page, debouncedSearch, loadPending]);
 
   const approveUser = async (userId) => {
     setProcessingId(userId);
     try {
       const res = await api.post(`/admin/verifications/${userId}/approve`);
-      if (res.data?.success) loadPending(page);
+      if (res.data?.success) loadPending(page, debouncedSearch);
     } finally {
       setProcessingId(null);
     }
@@ -56,7 +57,7 @@ const AdminVerifications = () => {
     setProcessingId(userId);
     try {
       const res = await api.post(`/admin/verifications/${userId}/reject`);
-      if (res.data?.success) loadPending(page);
+      if (res.data?.success) loadPending(page, debouncedSearch);
     } finally {
       setProcessingId(null);
     }
@@ -83,7 +84,10 @@ const AdminVerifications = () => {
           <FaSearch className="absolute left-3 top-3 text-gray-400" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search name, email, NIN, passport..."
             className="input pl-9"
           />

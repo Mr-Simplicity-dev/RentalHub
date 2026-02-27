@@ -32,7 +32,7 @@ const Login = () => {
         } else if (role === 'landlord') {
           navigate('/dashboard');
         } else {
-          navigate('/dashboard'); // tenant or default
+          navigate('/tenant/dashboard');
         }
       } else {
         toast.error(response.message || t('login.failed'));

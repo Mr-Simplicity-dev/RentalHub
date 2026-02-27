@@ -1,10 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import PropertyCard from '../components/properties/PropertyCard';
 import Loader from '../components/common/Loader';
 import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+
+const HUBSPOT_LANG_MAP = {
+  en: 'en',
+  ar: 'ar',
+  ru: 'ru',
+  fr: 'fr',
+  zh: 'zh-cn',
+  'zh-CN': 'zh-cn',
+};
 
 const Home = () => {
   const { t, i18n } = useTranslation();
@@ -13,44 +22,8 @@ const Home = () => {
   const [popularLocations, setPopularLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const HUBSPOT_LANG_MAP = { en: 'en', ar: 'ar', ru: 'ru', fr: 'fr', zh: 'zh-cn', 'zh-CN': 'zh-cn', };
 
-
-      useEffect(() => {
-      loadData();
-
-      // Sync HubSpot language with i18next
-      const hubspotLang =
-        HUBSPOT_LANG_MAP[i18n.language] ||
-        HUBSPOT_LANG_MAP[i18n.language?.split('-')[0]] ||
-        'en';
-
-      window.hsConversationsSettings = {
-        language: hubspotLang,
-      };
-
-      // Load HubSpot Embed Script once
-      if (!document.getElementById('hs-script-loader')) {
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.id = 'hs-script-loader';
-        script.async = true;
-        script.defer = true;
-        script.src = '//js-eu1.hs-scripts.com/147691769.js';
-
-        document.body.appendChild(script);
-      } else {
-        // Reload widget when language changes
-        if (window.HubSpotConversations) {
-          window.HubSpotConversations.widget.refresh();
-        }
-      }
-    }, [i18n.language]);
-
-
-
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [featured, locations] = await Promise.all([
         propertyService.getFeaturedProperties(6),
@@ -68,7 +41,36 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    // Sync HubSpot language with i18next
+    const hubspotLang =
+      HUBSPOT_LANG_MAP[i18n.language] ||
+      HUBSPOT_LANG_MAP[i18n.language?.split('-')[0]] ||
+      'en';
+
+    window.hsConversationsSettings = {
+      language: hubspotLang,
+    };
+
+    // Load HubSpot embed script once
+    if (!document.getElementById('hs-script-loader')) {
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.id = 'hs-script-loader';
+      script.async = true;
+      script.defer = true;
+      script.src = '//js-eu1.hs-scripts.com/147691769.js';
+      document.body.appendChild(script);
+    } else if (window.HubSpotConversations) {
+      window.HubSpotConversations.widget.refresh();
+    }
+  }, [i18n.language]);
 
   const handleSearch = (e) => {
     e.preventDefault();

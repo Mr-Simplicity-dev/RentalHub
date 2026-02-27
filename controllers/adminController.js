@@ -374,7 +374,8 @@ exports.approveProperty = async (req, res) => {
     if (landlordResult.rows.length) {
       const landlord = landlordResult.rows[0];
 
-      await sendEmail({
+      try {
+        await sendEmail({
         to: landlord.email,
         subject: 'Your property has been approved 🎉',
         html: `
@@ -382,7 +383,10 @@ exports.approveProperty = async (req, res) => {
           <p>Your property <strong>${property.title}</strong> has been approved and is now live.</p>
           <p>You can manage it from your dashboard.</p>
         `,
-      });
+        });
+      } catch (mailError) {
+        console.error('Failed to send approval email:', mailError.message);
+      }
     }
 
     notifyAlertsForProperty(property).catch((err) => {

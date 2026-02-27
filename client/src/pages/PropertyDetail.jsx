@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import { applicationService } from '../services/applicationService';
@@ -34,11 +34,7 @@ const PropertyDetail = () => {
   const [submittingApplication, setSubmittingApplication] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
 
-  useEffect(() => {
-    loadProperty();
-  }, [id]);
-
-  const loadProperty = async () => {
+  const loadProperty = useCallback(async () => {
     setLoading(true);
     try {
       // Try to get full details if user has subscription
@@ -60,7 +56,11 @@ const PropertyDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, isAuthenticated, user?.subscription_active, user?.user_type]);
+
+  useEffect(() => {
+    loadProperty();
+  }, [loadProperty]);
 
   const handleSave = async () => {
     if (!isAuthenticated) {
