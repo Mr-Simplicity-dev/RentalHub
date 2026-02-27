@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
-import { FaUser, FaEnvelope, FaPhone, FaLock, FaIdCard } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaPhone, FaLock, FaIdCard, FaEye, FaEyeSlash } from 'react-icons/fa';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -18,6 +18,8 @@ const Register = () => {
     nationality: '',
   });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -316,13 +318,21 @@ const Register = () => {
                 <input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="input pl-10"
+                  className="input pl-10 pr-10"
                   placeholder="Min. 8 characters"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
               </div>
             </div>
 
@@ -337,13 +347,21 @@ const Register = () => {
                 <input
                   id="confirm_password"
                   name="confirm_password"
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   required
                   value={formData.confirm_password}
                   onChange={handleChange}
-                  className="input pl-10"
+                  className="input pl-10 pr-10"
                   placeholder="Re-enter password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
               </div>
             </div>
           </div>
