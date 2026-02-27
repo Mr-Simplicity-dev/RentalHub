@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
@@ -11,11 +11,7 @@ const AdminUserDetail = () => {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
 
-  useEffect(() => {
-    loadUser();
-  }, [id]);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get(`/admin/users/${id}`);
@@ -23,7 +19,11 @@ const AdminUserDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
 
   const disableUser = async () => {
     if (!window.confirm('Disable this user?')) return;

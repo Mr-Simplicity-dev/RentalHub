@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
@@ -13,6 +13,7 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [role, setRole] = useState('all');
   const [page, setPage] = useState(1);
 
@@ -21,25 +22,13 @@ const AdminUsers = () => {
     pages: 1,
   });
 
-  useEffect(() => {
-    const delay = setTimeout(() => {
-      loadUsers(1);
-    }, 300);
-
-    return () => clearTimeout(delay);
-  }, [search, role]);
-
-  useEffect(() => {
-    loadUsers(page);
-  }, [page]);
-
-  const loadUsers = async (p = page) => {
+  const loadUsers = useCallback(async (p = 1, query = '', roleFilter = 'all') => {
     setLoading(true);
     try {
       const res = await api.get('/admin/users', {
         params: {
-          search,
-          role,
+          search: query,
+          role: roleFilter,
           page: p,
           limit: PAGE_SIZE,
         },
@@ -54,7 +43,19 @@ const AdminUsers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const delay = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+
+    return () => clearTimeout(delay);
+  }, [search]);
+
+  useEffect(() => {
+    loadUsers(page, debouncedSearch, role);
+  }, [page, debouncedSearch, role, loadUsers]);
 
   const from = (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, pagination.total);
@@ -78,16 +79,22 @@ const AdminUsers = () => {
           <div className="relative">
             <FaSearch className="absolute left-3 top-3 text-gray-400" />
             <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, email, phone..."
-              className="input pl-9"
-            />
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search name, email, phone..."
+            className="input pl-9"
+          />
           </div>
 
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value)}
+            onChange={(e) => {
+              setRole(e.target.value);
+              setPage(1);
+            }}
             className="input"
           >
             <option value="all">All</option>

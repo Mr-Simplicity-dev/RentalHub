@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { FaBell, FaUser, FaSignOutAlt, FaHome, FaEnvelope } from 'react-icons/fa';
+import { FaBell, FaUser, FaSignOutAlt, FaEnvelope } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 const Header = () => {

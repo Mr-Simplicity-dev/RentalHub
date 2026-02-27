@@ -12,8 +12,6 @@ const AdminDashboard = () => {
     pendingVerifications: '—',
   });
 
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     const loadStats = async () => {
       try {
@@ -35,8 +33,6 @@ const AdminDashboard = () => {
         }
       } catch (err) {
         console.error('Failed to load admin stats', err);
-      } finally {
-        setLoading(false);
       }
     };
 

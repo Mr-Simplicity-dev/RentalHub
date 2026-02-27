@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
@@ -13,6 +13,7 @@ const AdminApplications = () => {
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
 
   const [pagination, setPagination] = useState({
@@ -20,24 +21,12 @@ const AdminApplications = () => {
     pages: 1,
   });
 
-  useEffect(() => {
-    const delay = setTimeout(() => {
-      loadApplications(1);
-    }, 300);
-
-    return () => clearTimeout(delay);
-  }, [search]);
-
-  useEffect(() => {
-    loadApplications(page);
-  }, [page]);
-
-  const loadApplications = async (p = page) => {
+  const loadApplications = useCallback(async (p = 1, query = '') => {
     setLoading(true);
     try {
       const res = await api.get('/admin/applications', {
         params: {
-          search,
+          search: query,
           page: p,
           limit: PAGE_SIZE,
         },
@@ -52,7 +41,19 @@ const AdminApplications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const delay = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+
+    return () => clearTimeout(delay);
+  }, [search]);
+
+  useEffect(() => {
+    loadApplications(page, debouncedSearch);
+  }, [page, debouncedSearch, loadApplications]);
 
   const from = (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, pagination.total);
@@ -76,7 +77,10 @@ const AdminApplications = () => {
           <FaSearch className="absolute left-3 top-3 text-gray-400" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search tenant, property, landlord..."
             className="input pl-9"
           />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
@@ -11,11 +11,7 @@ const AdminApplicationDetail = () => {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
 
-  useEffect(() => {
-    loadApplication();
-  }, [id]);
-
-  const loadApplication = async () => {
+  const loadApplication = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get(`/admin/applications/${id}`);
@@ -23,7 +19,11 @@ const AdminApplicationDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    loadApplication();
+  }, [loadApplication]);
 
   const approve = async () => {
     if (!window.confirm('Approve this application?')) return;

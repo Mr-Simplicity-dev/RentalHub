@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
@@ -11,11 +11,7 @@ const AdminPropertyDetail = () => {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
 
-  useEffect(() => {
-    loadProperty();
-  }, [id]);
-
-  const loadProperty = async () => {
+  const loadProperty = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get(`/admin/properties/${id}`);
@@ -23,7 +19,11 @@ const AdminPropertyDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    loadProperty();
+  }, [loadProperty]);
 
   const unlist = async () => {
     if (!window.confirm('Unlist this property?')) return;
