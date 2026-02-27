@@ -15,6 +15,7 @@ router.post(
     body('phone').isMobilePhone('any'),
     body('password').isLength({ min: 8 }),
     body('full_name').trim().notEmpty(),
+    body('is_foreigner').optional().isBoolean(),
     body('identity_document_type').optional().isIn(['nin', 'passport']),
     body('nin').optional().isLength({ min: 11, max: 11 }),
     body('international_passport_number').optional().isLength({ min: 6, max: 20 }),

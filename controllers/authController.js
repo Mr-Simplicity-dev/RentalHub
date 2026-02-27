@@ -7,7 +7,11 @@ const {
   verifyNINWithNIMC,
   validateInternationalPassport
 } = require('../config/utils/ninValidator');
-const { sendVerificationEmail, sendWelcomeEmail } = require('../config/utils/emailService');
+const {
+  sendVerificationEmail,
+  sendWelcomeEmail,
+  sendPasswordResetEmail
+} = require('../config/utils/emailService');
 const { sendVerificationCode } = require('../config/utils/smsService');
 
 // Store OTP codes temporarily (use Redis in production)
@@ -66,19 +70,26 @@ exports.register = async (req, res) => {
       user_type,
       date_of_birth,
       identity_document_type = 'nin',
+      is_foreigner = false,
       international_passport_number,
       nationality
     } = req.body;
 
-    const identityType =
-      identity_document_type === 'passport' ? 'passport' : 'nin';
+    const isForeigner =
+      is_foreigner === true ||
+      is_foreigner === 'true' ||
+      is_foreigner === 1 ||
+      is_foreigner === '1';
+
+    const identityType = isForeigner ? 'passport' : 'nin';
 
     const cleanNIN = nin ? String(nin).trim() : null;
     const cleanNationality = nationality
       ? String(nationality).trim()
-      : identityType === 'passport'
+      : isForeigner
         ? 'Foreign'
         : 'Nigeria';
+    const isNigerianNationality = /^nigeria(n)?$/i.test(cleanNationality);
     const passportValidation = validateInternationalPassport(
       international_passport_number
     );
@@ -90,12 +101,26 @@ exports.register = async (req, res) => {
     let ninVerified = false;
     let nimcMeta = null;
 
-    if (identityType === 'nin') {
+    if (!isForeigner) {
+      if (identity_document_type === 'passport') {
+        return res.status(400).json({
+          success: false,
+          message: 'NIN is required for local Nigerian registration'
+        });
+      }
+
       const ninValidation = validateNIN(cleanNIN);
       if (!ninValidation.valid) {
         return res.status(400).json({
           success: false,
           message: ninValidation.message
+        });
+      }
+
+      if (nationality && !isNigerianNationality) {
+        return res.status(400).json({
+          success: false,
+          message: 'Foreign applicants must register with international passport'
         });
       }
 
@@ -131,6 +156,13 @@ exports.register = async (req, res) => {
 
       ninVerified = nimcResult.verified === true;
     } else {
+      if (identity_document_type === 'nin') {
+        return res.status(400).json({
+          success: false,
+          message: 'International passport is required for foreign applicants'
+        });
+      }
+
       if (!passportValidation.valid) {
         return res.status(400).json({
           success: false,
@@ -142,6 +174,13 @@ exports.register = async (req, res) => {
         return res.status(400).json({
           success: false,
           message: 'Nationality is required for international passport verification'
+        });
+      }
+
+      if (isNigerianNationality) {
+        return res.status(400).json({
+          success: false,
+          message: 'Nigerian applicants must register with NIN'
         });
       }
     }
@@ -698,10 +737,10 @@ exports.forgotPassword = async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-    // Send email (implement email template)
-    await sendVerificationEmail(email, resetToken); // Reuse or create specific function
+    // Send password reset email
+    await sendPasswordResetEmail(email, resetUrl);
 
     res.json({
       success: true,

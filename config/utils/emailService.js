@@ -54,6 +54,34 @@ exports.sendWelcomeEmail = async (email, fullName, userType) => {
   }
 };
 
+// Send password reset email
+exports.sendPasswordResetEmail = async (email, resetUrl) => {
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to: email,
+      subject: 'Reset Your Password - Rental Platform',
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6;">
+          <h2>Password Reset</h2>
+          <p>We received a request to reset your password.</p>
+          <p>
+            <a href="${resetUrl}" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">
+              Reset Password
+            </a>
+          </p>
+          <p>This link will expire in 1 hour.</p>
+        </div>
+      `,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Password reset email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send application notification to landlord
 exports.sendApplicationNotification = async (
   landlordEmail,

@@ -12,7 +12,7 @@ const Register = () => {
     phone: '',
     password: '',
     confirm_password: '',
-    identity_document_type: 'nin',
+    is_foreigner: false,
     nin: '',
     international_passport_number: '',
     nationality: '',
@@ -28,14 +28,13 @@ const Register = () => {
     }));
   };
 
-  const setIdentityType = (identityType) => {
+  const setApplicantType = (isForeigner) => {
     setFormData((prev) => ({
       ...prev,
-      identity_document_type: identityType,
-      nin: identityType === 'nin' ? prev.nin : '',
-      international_passport_number:
-        identityType === 'passport' ? prev.international_passport_number : '',
-      nationality: identityType === 'passport' ? prev.nationality : '',
+      is_foreigner: isForeigner,
+      nin: isForeigner ? '' : prev.nin,
+      international_passport_number: isForeigner ? prev.international_passport_number : '',
+      nationality: isForeigner ? prev.nationality : '',
     }));
   };
 
@@ -52,7 +51,7 @@ const Register = () => {
       return;
     }
 
-    if (formData.identity_document_type === 'nin') {
+    if (!formData.is_foreigner) {
       if (!/^\d{11}$/.test(formData.nin || '')) {
         toast.error('NIN must be exactly 11 digits');
         return;
@@ -72,6 +71,11 @@ const Register = () => {
 
     try {
       const { confirm_password, ...registrationData } = formData;
+      registrationData.identity_document_type = registrationData.is_foreigner ? 'passport' : 'nin';
+      registrationData.nationality = registrationData.is_foreigner
+        ? registrationData.nationality
+        : 'Nigeria';
+
       const response = await register(registrationData);
 
       if (response.success) {
@@ -137,30 +141,30 @@ const Register = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Verification document:
+              Applicant type:
             </label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setIdentityType('nin')}
+                onClick={() => setApplicantType(false)}
                 className={`p-3 border rounded-lg text-sm transition-colors ${
-                  formData.identity_document_type === 'nin'
+                  !formData.is_foreigner
                     ? 'border-primary-600 bg-primary-50'
                     : 'border-gray-300 hover:border-primary-300'
                 }`}
               >
-                Nigerian NIN
+                Local (Nigeria)
               </button>
               <button
                 type="button"
-                onClick={() => setIdentityType('passport')}
+                onClick={() => setApplicantType(true)}
                 className={`p-3 border rounded-lg text-sm transition-colors ${
-                  formData.identity_document_type === 'passport'
+                  formData.is_foreigner
                     ? 'border-primary-600 bg-primary-50'
                     : 'border-gray-300 hover:border-primary-300'
                 }`}
               >
-                International Passport
+                Foreign Applicant
               </button>
             </div>
           </div>
@@ -229,7 +233,7 @@ const Register = () => {
               </div>
             </div>
 
-            {formData.identity_document_type === 'nin' ? (
+            {!formData.is_foreigner ? (
               <div>
                 <label htmlFor="nin" className="block text-sm font-medium text-gray-700 mb-1">
                   NIN (National ID Number) *
