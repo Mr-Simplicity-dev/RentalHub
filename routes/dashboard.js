@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const pool = require("../config/middleware/database");
+const db = require("../config/middleware/database");
 const { authenticate, isTenant, isLandlord } = require("../config/middleware/auth");
 
 // =====================================================
