@@ -8,6 +8,7 @@ const ensurePropertySchema = async () => {
   if (propertySchemaReady) return;
   await db.query(`
     ALTER TABLE properties
+    ADD COLUMN IF NOT EXISTS full_address TEXT,
     ADD COLUMN IF NOT EXISTS video_url VARCHAR(500);
   `);
   propertySchemaReady = true;
