@@ -281,6 +281,8 @@ const ActivityItem = ({ activity }) => {
     switch (activity.type) {
       case 'application':
         return <FaFileAlt className="text-blue-500" />;
+      case 'unlock':
+        return <FaCheckCircle className="text-green-500" />;
       case 'message':
         return <FaEnvelope className="text-purple-500" />;
       case 'review':
@@ -297,6 +299,8 @@ const ActivityItem = ({ activity }) => {
           status: activity.status,
           title: activity.property_title,
         });
+      case 'unlock':
+        return `You unlocked full details for ${activity.property_title}`;
       case 'message':
         return t('dashboard.activity_message', {
           name: activity.user_name || t('dashboard.user'),

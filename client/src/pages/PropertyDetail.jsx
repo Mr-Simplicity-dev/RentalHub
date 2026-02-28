@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import { applicationService } from '../services/applicationService';
+import { paymentService } from '../services/paymentService';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
 import Loader from '../components/common/Loader';
@@ -21,6 +22,7 @@ import { formatCurrency, formatDate } from '../utils/helpers';
 
 const PropertyDetail = () => {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [property, setProperty] = useState(null);
@@ -32,19 +34,30 @@ const PropertyDetail = () => {
     move_in_date: '',
   });
   const [submittingApplication, setSubmittingApplication] = useState(false);
-  const [hasSubscription, setHasSubscription] = useState(false);
+  const [hasFullAccess, setHasFullAccess] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
 
   const loadProperty = useCallback(async () => {
     setLoading(true);
     try {
-      // Try to get full details if user has subscription
-      let response;
-      if (isAuthenticated && user?.user_type === 'tenant' && user?.subscription_active) {
-        response = await propertyService.getFullPropertyDetails(id);
-        setHasSubscription(true);
+      let response = null;
+      const isTenant = isAuthenticated && user?.user_type === 'tenant';
+
+      if (isTenant) {
+        try {
+          response = await propertyService.getFullPropertyDetails(id);
+          setHasFullAccess(true);
+        } catch (error) {
+          if (error.response?.status === 402 || error.response?.status === 403) {
+            response = await propertyService.getPropertyById(id);
+            setHasFullAccess(false);
+          } else {
+            throw error;
+          }
+        }
       } else {
         response = await propertyService.getPropertyById(id);
-        setHasSubscription(false);
+        setHasFullAccess(false);
       }
 
       if (response.success) {
@@ -56,11 +69,32 @@ const PropertyDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, isAuthenticated, user?.subscription_active, user?.user_type]);
+  }, [id, isAuthenticated, user?.user_type]);
 
   useEffect(() => {
     loadProperty();
   }, [loadProperty]);
+
+  useEffect(() => {
+    const verifyUnlock = async () => {
+      const reference = searchParams.get('unlock_ref') || searchParams.get('reference');
+      if (!reference || !isAuthenticated || user?.user_type !== 'tenant') return;
+
+      try {
+        const result = await paymentService.verifyPropertyUnlock(reference);
+        if (result.success) {
+          toast.success('Property unlocked successfully');
+          setHasFullAccess(true);
+          setSearchParams({}, { replace: true });
+          loadProperty();
+        }
+      } catch (error) {
+        console.error('Property unlock verification failed:', error);
+      }
+    };
+
+    verifyUnlock();
+  }, [searchParams, setSearchParams, isAuthenticated, user?.user_type, loadProperty]);
 
   const handleSave = async () => {
     if (!isAuthenticated) {
@@ -102,13 +136,57 @@ const PropertyDetail = () => {
       return;
     }
 
-    if (!user?.subscription_active) {
-      toast.error('You need an active subscription to view full details and apply');
-      navigate('/subscribe');
+    if (!hasFullAccess) {
+      toast.error('Please unlock this property details first');
       return;
     }
 
     setShowApplicationModal(true);
+  };
+
+  const handleUnlockPayment = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to unlock full details');
+      navigate('/login');
+      return;
+    }
+
+    if (user?.user_type !== 'tenant') {
+      toast.error('Only tenants can unlock property details');
+      return;
+    }
+
+    if (!user?.identity_verified) {
+      toast.error('Please complete identity verification first');
+      navigate('/profile');
+      return;
+    }
+
+    setUnlocking(true);
+    try {
+      const result = await paymentService.initializePropertyUnlock(Number(id), 'paystack');
+      if (!result.success) {
+        toast.error(result.message || 'Failed to start unlock payment');
+        return;
+      }
+
+      if (result.data?.already_unlocked) {
+        setHasFullAccess(true);
+        loadProperty();
+        return;
+      }
+
+      if (result.data?.authorization_url) {
+        window.location.href = `${result.data.authorization_url}`;
+        return;
+      }
+
+      toast.info(result.message || 'Complete payment with provided details');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to initialize unlock payment');
+    } finally {
+      setUnlocking(false);
+    }
   };
 
   const submitApplication = async () => {
@@ -177,17 +255,18 @@ const PropertyDetail = () => {
         )}
       </div>
 
-      {!hasSubscription && (
+      {!hasFullAccess && (
         <div className="card mb-6 border border-yellow-200 bg-yellow-50">
           <h3 className="text-lg font-semibold mb-2">Pay to unlock full property details</h3>
           <p className="text-sm text-gray-700 mb-3">
-            Full details (full address, landlord contact, and premium media) are available after subscription payment.
+            Full details (full address, landlord contact, and premium media) are available after one-time payment for this property.
           </p>
           <button
-            onClick={() => (isAuthenticated ? navigate('/subscribe') : navigate('/login'))}
+            onClick={handleUnlockPayment}
+            disabled={unlocking}
             className="btn btn-primary"
           >
-            {isAuthenticated ? 'Subscribe to Unlock Details' : 'Login to Continue'}
+            {unlocking ? 'Processing...' : isAuthenticated ? 'Pay to Unlock Details' : 'Login to Continue'}
           </button>
         </div>
       )}
@@ -252,7 +331,7 @@ const PropertyDetail = () => {
             </div>
 
             {/* Description */}
-            {hasSubscription ? (
+            {hasFullAccess ? (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3">Description</h2>
                 <p className="text-gray-700 whitespace-pre-line">{property.description}</p>
@@ -267,7 +346,7 @@ const PropertyDetail = () => {
             )}
 
             {/* Amenities */}
-            {hasSubscription && property.amenities && property.amenities.length > 0 && (
+            {hasFullAccess && property.amenities && property.amenities.length > 0 && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3">Amenities</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -281,8 +360,8 @@ const PropertyDetail = () => {
               </div>
             )}
 
-            {/* Property Video - subscriber only */}
-            {hasSubscription && property.video_url && (
+            {/* Property Video - unlocked details only */}
+            {hasFullAccess && property.video_url && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3">Video Tour</h2>
                 <video
@@ -293,8 +372,8 @@ const PropertyDetail = () => {
               </div>
             )}
 
-            {/* Full Address - Only for subscribers */}
-            {hasSubscription && property.full_address && (
+            {/* Full Address - unlocked details only */}
+            {hasFullAccess && property.full_address && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3">Full Address</h2>
                 <p className="text-gray-700">{property.full_address}</p>
@@ -306,7 +385,7 @@ const PropertyDetail = () => {
         {/* Sidebar */}
         <div className="lg:col-span-1">
           {/* Contact Card */}
-          {hasSubscription && property.landlord_name ? (
+          {hasFullAccess && property.landlord_name ? (
             <div className="card mb-6">
               <h3 className="text-lg font-semibold mb-4">Contact Landlord</h3>
               <div className="space-y-3">
@@ -358,13 +437,14 @@ const PropertyDetail = () => {
             <div className="card mb-6 bg-yellow-50 border border-yellow-200">
               <h3 className="text-lg font-semibold mb-2">Subscribe to View Contact</h3>
               <p className="text-sm text-gray-700 mb-4">
-                Subscribe to access landlord contact information and full property details
+                Make one-time payment to access landlord contact information and full property details for this property
               </p>
               <button
-                onClick={() => navigate('/subscribe')}
+                onClick={handleUnlockPayment}
+                disabled={unlocking}
                 className="btn btn-primary w-full"
               >
-                Subscribe Now
+                {unlocking ? 'Processing...' : 'Pay to Unlock'}
               </button>
             </div>
           )}
