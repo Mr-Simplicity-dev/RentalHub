@@ -33,7 +33,7 @@ export const propertyService = {
     return response.data;
   },
 
-  // Get full property details (requires subscription)
+  // Get full property details (requires property unlock payment)
   getFullPropertyDetails: async (id) => {
     const response = await api.get(`/properties/${id}/details`);
     return response.data;

@@ -3,23 +3,41 @@ const router = express.Router();
 const db = require("../config/middleware/database");
 const { authenticate, isTenant, isLandlord } = require("../config/middleware/auth");
 
+let tenantDashboardSchemaReady = false;
+const ensureTenantDashboardSchema = async () => {
+  if (tenantDashboardSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS tenant_property_unlocks (
+      id SERIAL PRIMARY KEY,
+      tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+      payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+      transaction_reference VARCHAR(120),
+      unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (tenant_id, property_id)
+    );
+  `);
+
+  tenantDashboardSchemaReady = true;
+};
+
 // =====================================================
 //                 TENANT DASHBOARD STATS
 // =====================================================
 
 router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
   try {
+    await ensureTenantDashboardSchema();
     const userId = req.user.id;
 
     const stats = await db.query(
       `SELECT 
         (SELECT COUNT(*) FROM saved_properties WHERE tenant_id = $1) AS saved_properties_count,
-        (SELECT COUNT(*) FROM applications WHERE tenant_id = $1) AS total_applications,
-        (SELECT COUNT(*) FROM applications WHERE tenant_id = $1 AND status = 'pending') AS pending_applications,
-        (SELECT COUNT(*) FROM applications WHERE tenant_id = $1 AND status = 'approved') AS approved_applications,
+        (SELECT COUNT(*) FROM tenant_property_unlocks WHERE tenant_id = $1) AS unlocked_properties_count,
         (SELECT COUNT(*) FROM messages WHERE receiver_id = $1 AND is_read = FALSE) AS unread_messages,
-        (SELECT subscription_expires_at FROM users WHERE id = $1) AS subscription_expires_at,
-        (SELECT subscription_active FROM users WHERE id = $1) AS subscription_active`,
+        (SELECT subscription_expires_at FROM users WHERE id = $1) AS subscription_expires_at`,
       [userId]
     );
 
@@ -69,22 +87,23 @@ router.get("/landlord/stats", authenticate, isLandlord, async (req, res) => {
 
 router.get("/tenant/recent-activities", authenticate, isTenant, async (req, res) => {
   try {
+    await ensureTenantDashboardSchema();
     const userId = req.user.id;
     const { limit = 10 } = req.query;
 
     const activities = await db.query(
       `(
         SELECT 
-          'application' AS type,
-          a.id,
-          a.status,
-          a.created_at AS activity_date,
+          'unlock' AS type,
+          tu.id,
+          'paid' AS status,
+          tu.unlocked_at AS activity_date,
           p.title AS property_title,
           p.id AS property_id
-        FROM applications a
-        JOIN properties p ON a.property_id = p.id
-        WHERE a.tenant_id = $1
-        ORDER BY a.created_at DESC
+        FROM tenant_property_unlocks tu
+        JOIN properties p ON tu.property_id = p.id
+        WHERE tu.tenant_id = $1
+        ORDER BY tu.unlocked_at DESC
         LIMIT $2
       )
       UNION ALL

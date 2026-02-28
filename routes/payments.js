@@ -34,6 +34,37 @@ router.get('/subscription-status',
   paymentController.getSubscriptionStatus
 );
 
+// Initialize one-time property detail unlock payment
+router.post(
+  '/unlock-property',
+  authenticate,
+  isTenant,
+  isVerified,
+  [
+    body('property_id').isInt().withMessage('property_id is required'),
+    body('payment_method')
+      .isIn(['paystack', 'bank_transfer'])
+      .withMessage('payment_method must be paystack or bank_transfer'),
+  ],
+  paymentController.initializePropertyUnlock
+);
+
+// Verify one-time property detail unlock payment
+router.get(
+  '/verify-unlock/:reference',
+  authenticate,
+  isTenant,
+  paymentController.verifyPropertyUnlock
+);
+
+// Check if a tenant has unlocked a property
+router.get(
+  '/unlock-status/:propertyId',
+  authenticate,
+  isTenant,
+  paymentController.getPropertyUnlockStatus
+);
+
 // ============ LANDLORD LISTING PAYMENTS ============
 
 // Get listing plans

@@ -114,23 +114,23 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Subscription Alert (for tenants) */}
-        {user?.user_type === 'tenant' && !user?.subscription_active && (
+        {/* Tenant Unlock Alert */}
+        {user?.user_type === 'tenant' && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-start">
               <FaCheckCircle className="text-blue-600 mt-1 mr-3" />
               <div>
                 <h3 className="font-semibold text-blue-800">
-                  {t('dashboard.subscribe_title')}
+                  Pay Per Property Details
                 </h3>
                 <p className="text-sm text-blue-700 mt-1">
-                  {t('dashboard.subscribe_text')}
+                  Save properties first, then pay to unlock each property's full details and landlord contact.
                 </p>
                 <button
-                  onClick={() => navigate('/subscribe')}
+                  onClick={() => navigate('/properties')}
                   className="mt-2 btn btn-primary text-sm"
                 >
-                  {t('dashboard.subscribe_action')}
+                  Browse Properties
                 </button>
               </div>
             </div>
@@ -143,27 +143,21 @@ const Dashboard = () => {
             <>
               <StatCard
                 icon={<FaHeart className="text-red-500" />}
-                title={t('dashboard.saved')}
+                title="Saved Properties"
                 value={stats?.saved_properties_count || 0}
                 onClick={() => navigate('/saved-properties')}
               />
               <StatCard
-                icon={<FaFileAlt className="text-blue-500" />}
-                title={t('dashboard.total_apps')}
-                value={stats?.total_applications || 0}
-                onClick={() => navigate('/applications')}
+                icon={<FaCheckCircle className="text-blue-500" />}
+                title="Unlocked Details"
+                value={stats?.unlocked_properties_count || 0}
+                onClick={() => navigate('/properties')}
               />
               <StatCard
-                icon={<FaClock className="text-yellow-500" />}
-                title={t('dashboard.pending_apps')}
-                value={stats?.pending_applications || 0}
-                onClick={() => navigate('/applications?status=pending')}
-              />
-              <StatCard
-                icon={<FaCheckCircle className="text-green-500" />}
-                title={t('dashboard.approved_apps')}
-                value={stats?.approved_applications || 0}
-                onClick={() => navigate('/applications?status=approved')}
+                icon={<FaEnvelope className="text-green-500" />}
+                title="Unread Messages"
+                value={stats?.unread_messages || 0}
+                onClick={() => navigate('/messages')}
               />
             </>
           ) : (
@@ -223,16 +217,16 @@ const Dashboard = () => {
                 onClick={() => navigate('/properties')}
               />
               <QuickActionCard
-                title={t('dashboard.qa_apps')}
-                description={t('dashboard.qa_apps_desc')}
-                icon={<FaFileAlt />}
-                onClick={() => navigate('/applications')}
+                title="Saved Properties"
+                description="Check properties you saved for shortlist"
+                icon={<FaHeart />}
+                onClick={() => navigate('/saved-properties')}
               />
               <QuickActionCard
-                title={t('dashboard.qa_messages')}
-                description={t('dashboard.qa_messages_desc')}
-                icon={<FaEnvelope />}
-                onClick={() => navigate('/messages')}
+                title="Payment History"
+                description="Track your property detail unlock payments"
+                icon={<FaFileAlt />}
+                onClick={() => navigate('/profile')}
               />
             </>
           ) : (

@@ -78,6 +78,13 @@ const Register = () => {
         ? registrationData.nationality
         : 'Nigeria';
 
+      // Send only identity fields relevant to applicant type
+      if (registrationData.is_foreigner) {
+        registrationData.nin = '';
+      } else {
+        registrationData.international_passport_number = '';
+      }
+
       const response = await register(registrationData);
 
       if (response.success) {
@@ -89,10 +96,22 @@ const Register = () => {
           navigate('/dashboard');
         }
       } else {
-        toast.error(response.message || 'Registration failed');
+        const firstError = response.errors?.[0];
+        const errorText =
+          firstError?.msg ||
+          response.message ||
+          'Registration failed';
+        toast.error(errorText);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Registration failed');
+      const serverError = error.response?.data;
+      const firstError = serverError?.errors?.[0];
+      const errorText =
+        firstError?.msg ||
+        serverError?.message ||
+        'Registration failed';
+      toast.error(errorText);
+      console.error('Registration error response:', serverError || error.message);
     } finally {
       setLoading(false);
     }

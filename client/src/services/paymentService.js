@@ -77,4 +77,25 @@ export const paymentService = {
     const response = await api.get(`/payments/${paymentId}`);
     return response.data;
   },
+
+  // Initialize one-time property unlock payment
+  initializePropertyUnlock: async (propertyId, paymentMethod = 'paystack') => {
+    const response = await api.post('/payments/unlock-property', {
+      property_id: propertyId,
+      payment_method: paymentMethod,
+    });
+    return response.data;
+  },
+
+  // Verify one-time property unlock payment
+  verifyPropertyUnlock: async (reference) => {
+    const response = await api.get(`/payments/verify-unlock/${reference}`);
+    return response.data;
+  },
+
+  // Check unlock status for a property
+  getPropertyUnlockStatus: async (propertyId) => {
+    const response = await api.get(`/payments/unlock-status/${propertyId}`);
+    return response.data;
+  },
 };

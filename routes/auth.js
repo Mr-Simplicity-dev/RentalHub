@@ -11,16 +11,46 @@ const router = express.Router();
 router.post(
   '/register',
   [
-    body('email').isEmail().normalizeEmail(),
-    body('phone').isMobilePhone('any'),
-    body('password').isLength({ min: 8 }),
-    body('full_name').trim().notEmpty(),
-    body('is_foreigner').optional().isBoolean(),
-    body('identity_document_type').optional().isIn(['nin', 'passport']),
-    body('nin').optional().isLength({ min: 11, max: 11 }),
-    body('international_passport_number').optional().isLength({ min: 6, max: 20 }),
-    body('nationality').optional().trim().isLength({ min: 2, max: 80 }),
-    body('user_type').isIn(['landlord', 'tenant']),
+    body('email')
+      .isEmail()
+      .withMessage('Please enter a valid email address')
+      .normalizeEmail(),
+    body('phone')
+      .trim()
+      .customSanitizer((value) => String(value || '').replace(/\s+/g, ''))
+      .matches(/^\+?\d{10,15}$/)
+      .withMessage('Please enter a valid phone number (10-15 digits, optional +)'),
+    body('password')
+      .isLength({ min: 8 })
+      .withMessage('Password must be at least 8 characters'),
+    body('full_name')
+      .trim()
+      .notEmpty()
+      .withMessage('Full name is required'),
+    body('is_foreigner')
+      .optional()
+      .isBoolean()
+      .withMessage('is_foreigner must be true or false'),
+    body('identity_document_type')
+      .optional()
+      .isIn(['nin', 'passport'])
+      .withMessage('identity_document_type must be nin or passport'),
+    body('nin')
+      .optional({ checkFalsy: true })
+      .matches(/^\d{11}$/)
+      .withMessage('NIN must be exactly 11 digits'),
+    body('international_passport_number')
+      .optional({ checkFalsy: true })
+      .isLength({ min: 6, max: 20 })
+      .withMessage('International passport number must be 6-20 characters'),
+    body('nationality')
+      .optional({ checkFalsy: true })
+      .trim()
+      .isLength({ min: 2, max: 80 })
+      .withMessage('Nationality must be between 2 and 80 characters'),
+    body('user_type')
+      .isIn(['landlord', 'tenant'])
+      .withMessage('User type must be tenant or landlord'),
   ],
   authController.register
 );

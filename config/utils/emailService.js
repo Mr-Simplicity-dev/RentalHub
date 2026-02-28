@@ -3,13 +3,23 @@ const { Resend } = require('resend');
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FROM = process.env.EMAIL_FROM || 'Rental Platform <onboarding@resend.dev>';
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 12000);
+
+const sendWithTimeout = async (payload) => {
+  return Promise.race([
+    resend.emails.send(payload),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Email send timeout')), EMAIL_TIMEOUT_MS)
+    ),
+  ]);
+};
 
 // Send verification email
 exports.sendVerificationEmail = async (email, verificationToken) => {
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
 
   try {
-    await resend.emails.send({
+    await sendWithTimeout({
       from: FROM,
       to: email,
       subject: 'Verify Your Email - Rental Platform',
@@ -37,7 +47,7 @@ exports.sendVerificationEmail = async (email, verificationToken) => {
 // Send welcome email
 exports.sendWelcomeEmail = async (email, fullName, userType) => {
   try {
-    await resend.emails.send({
+    await sendWithTimeout({
       from: FROM,
       to: email,
       subject: 'Welcome to Rental Platform',
@@ -57,7 +67,7 @@ exports.sendWelcomeEmail = async (email, fullName, userType) => {
 // Send password reset email
 exports.sendPasswordResetEmail = async (email, resetUrl) => {
   try {
-    await resend.emails.send({
+    await sendWithTimeout({
       from: FROM,
       to: email,
       subject: 'Reset Your Password - Rental Platform',
@@ -91,7 +101,7 @@ exports.sendApplicationNotification = async (
   applicationId
 ) => {
   try {
-    await resend.emails.send({
+    await sendWithTimeout({
       from: FROM,
       to: landlordEmail,
       subject: 'New Property Application Received',
@@ -129,7 +139,7 @@ exports.sendApplicationStatusUpdate = async (
         }`;
 
   try {
-    await resend.emails.send({
+    await sendWithTimeout({
       from: FROM,
       to: tenantEmail,
       subject: `Application ${status.charAt(0).toUpperCase() + status.slice(1)} - ${propertyTitle}`,
@@ -160,7 +170,7 @@ exports.sendMessageNotification = async (
     messageText.length > 100 ? messageText.substring(0, 100) + '...' : messageText;
 
   try {
-    await resend.emails.send({
+    await sendWithTimeout({
       from: FROM,
       to: receiverEmail,
       subject: `New Message from ${senderName}`,

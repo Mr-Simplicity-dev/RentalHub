@@ -7,7 +7,6 @@ const {
   isLandlord,
   isTenant,
   isVerified,
-  hasActiveSubscription,
 } = require('../config/middleware/auth');
 const { uploadPropertyMedia, uploadPropertyPhotos } = require('../config/middleware/upload');
 
@@ -40,7 +39,6 @@ router.get(
   '/:propertyId/details',
   authenticate,
   isTenant,
-  hasActiveSubscription,
   propertyController.getFullPropertyDetails
 );
 

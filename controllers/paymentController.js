@@ -7,6 +7,34 @@ const { validationResult } = require("express-validator");
 // ====================== PAYSTACK CONFIG ======================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
+const PROPERTY_UNLOCK_PRICE_NGN = Number(process.env.PROPERTY_UNLOCK_PRICE_NGN || 1000);
+
+let propertyUnlockSchemaReady = false;
+
+const ensurePropertyUnlockSchema = async () => {
+  if (propertyUnlockSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS tenant_property_unlocks (
+      id SERIAL PRIMARY KEY,
+      tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+      payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+      transaction_reference VARCHAR(120),
+      unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (tenant_id, property_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tenant_property_unlocks_tenant
+    ON tenant_property_unlocks(tenant_id);
+
+    CREATE INDEX IF NOT EXISTS idx_tenant_property_unlocks_property
+    ON tenant_property_unlocks(property_id);
+  `);
+
+  propertyUnlockSchemaReady = true;
+};
 
 
 // =====================================================
@@ -348,6 +376,274 @@ exports.getSubscriptionStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get subscription status"
+    });
+  }
+};
+
+// =====================================================
+//          TENANT PROPERTY UNLOCK PAYMENT
+// =====================================================
+
+exports.initializePropertyUnlock = async (req, res) => {
+  try {
+    await ensurePropertyUnlockSchema();
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const userId = req.user.id;
+    const { property_id, payment_method } = req.body;
+
+    const propertyResult = await db.query(
+      `SELECT id, title
+       FROM properties
+       WHERE id = $1
+         AND is_available = TRUE
+         AND is_verified = TRUE`,
+      [property_id]
+    );
+
+    if (!propertyResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Property not found or unavailable",
+      });
+    }
+
+    const existingUnlock = await db.query(
+      `SELECT id, unlocked_at
+       FROM tenant_property_unlocks
+       WHERE tenant_id = $1 AND property_id = $2`,
+      [userId, property_id]
+    );
+
+    if (existingUnlock.rows.length) {
+      return res.json({
+        success: true,
+        message: "Property already unlocked for this tenant",
+        data: {
+          already_unlocked: true,
+          property_id,
+          unlocked_at: existingUnlock.rows[0].unlocked_at,
+        },
+      });
+    }
+
+    const userResult = await db.query(
+      "SELECT email, full_name FROM users WHERE id = $1",
+      [userId]
+    );
+    const user = userResult.rows[0];
+
+    const paymentResult = await db.query(
+      `INSERT INTO payments (
+         user_id, payment_type, amount, currency,
+         property_id, payment_method, payment_status
+       )
+       VALUES ($1, 'property_unlock', $2, 'NGN', $3, $4, 'pending')
+       RETURNING id`,
+      [userId, PROPERTY_UNLOCK_PRICE_NGN, property_id, payment_method]
+    );
+    const paymentId = paymentResult.rows[0].id;
+
+    if (payment_method === "paystack") {
+      const paystackResponse = await axios.post(
+        `${PAYSTACK_BASE_URL}/transaction/initialize`,
+        {
+          email: user.email,
+          amount: PROPERTY_UNLOCK_PRICE_NGN * 100,
+          reference: `UNLOCK_${paymentId}_${Date.now()}`,
+          callback_url: `${process.env.FRONTEND_URL}/properties/${property_id}`,
+          metadata: {
+            payment_id: paymentId,
+            user_id: userId,
+            property_id,
+            payment_type: "property_unlock",
+            full_name: user.full_name,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      await db.query(
+        "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
+        [paystackResponse.data.data.reference, paymentId]
+      );
+
+      return res.json({
+        success: true,
+        message: "Property unlock payment initialized",
+        data: {
+          payment_id: paymentId,
+          property_id,
+          amount: PROPERTY_UNLOCK_PRICE_NGN,
+          authorization_url: paystackResponse.data.data.authorization_url,
+          access_code: paystackResponse.data.data.access_code,
+          reference: paystackResponse.data.data.reference,
+        },
+      });
+    }
+
+    if (payment_method === "bank_transfer") {
+      const reference = `UNLOCK_${paymentId}_${Date.now()}`;
+      await db.query(
+        "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
+        [reference, paymentId]
+      );
+
+      return res.json({
+        success: true,
+        message: "Please transfer to unlock this property",
+        data: {
+          payment_id: paymentId,
+          property_id,
+          amount: PROPERTY_UNLOCK_PRICE_NGN,
+          reference,
+          bank_name: "Your Bank Name",
+          account_number: "1234567890",
+          account_name: "Rental Platform Ltd",
+        },
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      message: "Unsupported payment method",
+    });
+  } catch (error) {
+    console.error("Property unlock initialization error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to initialize property unlock payment",
+      error: error.message,
+    });
+  }
+};
+
+exports.verifyPropertyUnlock = async (req, res) => {
+  try {
+    await ensurePropertyUnlockSchema();
+
+    const { reference } = req.params;
+    const userId = req.user.id;
+
+    const paymentResult = await db.query(
+      `SELECT *
+       FROM payments
+       WHERE transaction_reference = $1
+         AND user_id = $2
+         AND payment_type = 'property_unlock'`,
+      [reference, userId]
+    );
+
+    if (!paymentResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Property unlock payment not found",
+      });
+    }
+
+    const payment = paymentResult.rows[0];
+
+    if (payment.payment_status !== "completed") {
+      const paystackResponse = await axios.get(
+        `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
+        {
+          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+        }
+      );
+
+      const transaction = paystackResponse.data.data;
+      if (transaction.status !== "success") {
+        return res.status(400).json({
+          success: false,
+          message: "Payment verification failed",
+          status: transaction.status,
+        });
+      }
+
+      await db.query(
+        `UPDATE payments
+         SET payment_status = 'completed',
+             completed_at = CURRENT_TIMESTAMP,
+             gateway_response = $1
+         WHERE id = $2`,
+        [JSON.stringify(transaction), payment.id]
+      );
+    }
+
+    await db.query(
+      `INSERT INTO tenant_property_unlocks (
+         tenant_id, property_id, payment_id, transaction_reference
+       )
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (tenant_id, property_id)
+       DO UPDATE SET
+         payment_id = EXCLUDED.payment_id,
+         transaction_reference = EXCLUDED.transaction_reference,
+         unlocked_at = CURRENT_TIMESTAMP`,
+      [userId, payment.property_id, payment.id, reference]
+    );
+
+    res.json({
+      success: true,
+      message: "Property unlocked successfully",
+      data: {
+        property_id: payment.property_id,
+        reference,
+      },
+    });
+  } catch (error) {
+    console.error("Property unlock verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify property unlock payment",
+    });
+  }
+};
+
+exports.getPropertyUnlockStatus = async (req, res) => {
+  try {
+    await ensurePropertyUnlockSchema();
+
+    const userId = req.user.id;
+    const propertyId = Number(req.params.propertyId);
+
+    const result = await db.query(
+      `SELECT id, unlocked_at, transaction_reference
+       FROM tenant_property_unlocks
+       WHERE tenant_id = $1 AND property_id = $2`,
+      [userId, propertyId]
+    );
+
+    if (!result.rows.length) {
+      return res.json({
+        success: true,
+        data: { unlocked: false, property_id: propertyId },
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        unlocked: true,
+        property_id: propertyId,
+        unlocked_at: result.rows[0].unlocked_at,
+        reference: result.rows[0].transaction_reference,
+      },
+    });
+  } catch (error) {
+    console.error("Property unlock status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get property unlock status",
     });
   }
 };
@@ -933,6 +1229,29 @@ async function handleSuccessfulPayment(data) {
              featured = $2
          WHERE id = $3`,
         [expiry, metadata.featured === "true", metadata.property_id]
+      );
+    }
+
+    if (metadata.payment_type === "property_unlock") {
+      await ensurePropertyUnlockSchema();
+
+      const paymentResult = await db.query(
+        "SELECT id FROM payments WHERE transaction_reference = $1 LIMIT 1",
+        [reference]
+      );
+      const paymentId = paymentResult.rows[0]?.id || null;
+
+      await db.query(
+        `INSERT INTO tenant_property_unlocks (
+           tenant_id, property_id, payment_id, transaction_reference
+         )
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (tenant_id, property_id)
+         DO UPDATE SET
+           payment_id = EXCLUDED.payment_id,
+           transaction_reference = EXCLUDED.transaction_reference,
+           unlocked_at = CURRENT_TIMESTAMP`,
+        [metadata.user_id, metadata.property_id, paymentId, reference]
       );
     }
 

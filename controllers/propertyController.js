@@ -13,6 +13,17 @@ const ensurePropertySchema = async () => {
 
     ALTER TABLE property_photos
     ADD COLUMN IF NOT EXISTS upload_order INTEGER DEFAULT 0;
+
+    CREATE TABLE IF NOT EXISTS tenant_property_unlocks (
+      id SERIAL PRIMARY KEY,
+      tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+      payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+      transaction_reference VARCHAR(120),
+      unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (tenant_id, property_id)
+    );
   `);
   propertySchemaReady = true;
 };
@@ -319,12 +330,12 @@ exports.getPropertyById = async (req, res) => {
 
     const property = result.rows[0];
     property.photos = photosResult.rows.map((photo) => photo.photo_url);
-    property.requires_subscription = true;
+    property.requires_payment = true;
 
     res.json({
       success: true,
       data: property,
-      message: 'Subscribe to view landlord contact and full address'
+      message: 'Pay to view landlord contact and full address for this property'
     });
   } catch (error) {
     res.status(500).json({
@@ -348,6 +359,22 @@ exports.getFullPropertyDetails = async (req, res) => {
     await ensurePropertySchema();
 
     const { propertyId } = req.params;
+    const userId = req.user.id;
+
+    const unlockResult = await db.query(
+      `SELECT id, unlocked_at
+       FROM tenant_property_unlocks
+       WHERE tenant_id = $1 AND property_id = $2`,
+      [userId, propertyId]
+    );
+
+    if (!unlockResult.rows.length) {
+      return res.status(402).json({
+        success: false,
+        code: 'PROPERTY_UNLOCK_REQUIRED',
+        message: 'Payment is required to unlock full details for this property',
+      });
+    }
 
     const result = await db.query(
       `SELECT 
@@ -389,7 +416,7 @@ exports.getFullPropertyDetails = async (req, res) => {
       `INSERT INTO property_views (property_id, viewer_id, viewed_at)
        VALUES ($1, $2, CURRENT_TIMESTAMP)
        ON CONFLICT DO NOTHING`,
-      [propertyId, req.user.id]
+      [propertyId, userId]
     ).catch(() => {});
 
     res.json({
