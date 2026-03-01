@@ -184,7 +184,7 @@
   "verify_text": "Upload your passport photograph for identity verification.",
 
   "select_image": "Please select an image",
-  "upload": "Upload Document",
+  "upload": "Submit",
   "uploading": "Uploading...",
   "upload_success": "Document uploaded. Awaiting admin verification.",
   "upload_failed": "Upload failed"

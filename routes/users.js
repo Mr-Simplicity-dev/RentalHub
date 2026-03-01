@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, '..', 'uploads', 'passports');
@@ -33,6 +34,53 @@ const upload = multer({
     cb(null, true);
   }
 });
+
+const LIVE_CAPTURE_SESSION_TTL_MS = 10 * 60 * 1000;
+const liveCaptureSessions = new Map();
+
+const getSessionKey = (userId, token) => `${userId}:${token}`;
+
+const pruneExpiredCaptureSessions = () => {
+  const now = Date.now();
+  for (const [key, value] of liveCaptureSessions.entries()) {
+    if (!value || value.expiresAt <= now) {
+      liveCaptureSessions.delete(key);
+    }
+  }
+};
+
+const createLiveCaptureSession = (userId) => {
+  pruneExpiredCaptureSessions();
+  const token = crypto.randomBytes(24).toString('hex');
+  const key = getSessionKey(userId, token);
+
+  liveCaptureSessions.set(key, {
+    expiresAt: Date.now() + LIVE_CAPTURE_SESSION_TTL_MS,
+  });
+
+  return token;
+};
+
+const consumeLiveCaptureSession = (userId, token) => {
+  if (!token || typeof token !== 'string') return false;
+
+  pruneExpiredCaptureSessions();
+  const key = getSessionKey(userId, token);
+  const session = liveCaptureSessions.get(key);
+  if (!session) return false;
+
+  liveCaptureSessions.delete(key);
+  return session.expiresAt > Date.now();
+};
+
+const cleanupUploadedFile = (file) => {
+  if (!file?.path) return;
+  try {
+    fs.unlinkSync(file.path);
+  } catch (err) {
+    console.warn('Failed to clean up uploaded file:', err.message);
+  }
+};
 
 let identitySchemaReady = false;
 const ensureIdentitySchema = async () => {
@@ -254,6 +302,27 @@ router.get('/verification/status', authenticate, async (req, res) => {
   }
 });
 
+// Create a one-time live-capture session for passport upload
+router.post('/verification/live-capture/session', authenticate, async (req, res) => {
+  try {
+    const token = createLiveCaptureSession(req.user.id);
+
+    res.json({
+      success: true,
+      data: {
+        token,
+        expires_in_seconds: Math.floor(LIVE_CAPTURE_SESSION_TTL_MS / 1000),
+      },
+    });
+  } catch (error) {
+    console.error('Create live capture session error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create live capture session',
+    });
+  }
+});
+
 // Delete account
 router.delete('/account', authenticate, async (req, res) => {
   try {
@@ -312,6 +381,26 @@ router.post('/upload-passport', authenticate, upload.single('passport'), async (
     }
 
     const userId = req.user.id;
+    const captureSource = req.body?.capture_source;
+    const liveCaptureToken = req.body?.live_capture_token;
+
+    if (captureSource !== 'live_camera') {
+      cleanupUploadedFile(req.file);
+      return res.status(400).json({
+        success: false,
+        message: 'Live camera capture is required',
+      });
+    }
+
+    const isValidSession = consumeLiveCaptureSession(userId, liveCaptureToken);
+    if (!isValidSession) {
+      cleanupUploadedFile(req.file);
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid or expired live capture session. Please retake photo.',
+      });
+    }
+
     const relativePath = `/uploads/passports/${req.file.filename}`;
 
     await db.query(

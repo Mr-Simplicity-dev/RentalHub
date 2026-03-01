@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import PropertyList from '../components/properties/PropertyList';
@@ -23,12 +23,16 @@ const Properties = () => {
   const [filters, setFilters] = useState({});
   const [savedPropertyIds, setSavedPropertyIds] = useState([]);
   const [requestLoading, setRequestLoading] = useState(false);
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [states, setStates] = useState([]);
+  const requestSectionRef = useRef(null);
   const [requestForm, setRequestForm] = useState({
     full_name: '',
     email: '',
     phone: '',
     property_type: '',
-    city: '',
+    state_id: '',
+    location: '',
     min_price: '',
     max_price: '',
     bedrooms: '',
@@ -56,18 +60,51 @@ const Properties = () => {
     }
   }, [t]);
 
+  const loadStates = useCallback(async () => {
+    try {
+      const response = await propertyService.getStates();
+      if (response?.success && Array.isArray(response.data)) {
+        setStates(response.data);
+      } else {
+        setStates([]);
+      }
+    } catch {
+      setStates([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStates();
+  }, [loadStates]);
+
   useEffect(() => {
     // Get initial filters from URL
     const initialFilters = {};
     searchParams.forEach((value, key) => {
-      initialFilters[key] = value;
+      if (key !== 'request') {
+        initialFilters[key] = value;
+      }
     });
+
+    const shouldOpenRequestForm =
+      searchParams.get('request') === '1' ||
+      window.location.hash === '#tenant-request';
+
     setFilters(initialFilters);
+    setShowRequestForm(shouldOpenRequestForm);
     setRequestForm((prev) => ({
       ...prev,
       property_type: initialFilters.property_type || '',
-      city: initialFilters.city || '',
+      state_id: initialFilters.state_id || '',
+      location: initialFilters.city || '',
     }));
+
+    if (shouldOpenRequestForm) {
+      setTimeout(() => {
+        requestSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+
     loadProperties(initialFilters);
   }, [searchParams, loadProperties]);
 
@@ -114,7 +151,12 @@ const Properties = () => {
     setRequestLoading(true);
     try {
       const payload = {
-        ...requestForm,
+        full_name: requestForm.full_name,
+        email: requestForm.email,
+        phone: requestForm.phone || undefined,
+        property_type: requestForm.property_type,
+        state_id: requestForm.state_id ? Number(requestForm.state_id) : undefined,
+        city: requestForm.location || undefined,
         min_price: requestForm.min_price || undefined,
         max_price: requestForm.max_price || undefined,
         bedrooms: requestForm.bedrooms || undefined,
@@ -127,6 +169,7 @@ const Properties = () => {
         setRequestForm((prev) => ({
           ...prev,
           phone: '',
+          location: '',
           min_price: '',
           max_price: '',
           bedrooms: '',
@@ -160,6 +203,20 @@ const Properties = () => {
               ? t('properties.loading')
               : t('properties.found', { count: pagination.total })}
           </p>
+          <button
+            type="button"
+            className="mt-2 text-primary-600 hover:text-primary-700 font-medium underline"
+            onClick={() => {
+              setShowRequestForm((prev) => !prev);
+              setTimeout(() => {
+                requestSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 0);
+            }}
+          >
+            {showRequestForm
+              ? 'Hide request form'
+              : "Can't find your preferred property? Submit a request"}
+          </button>
         </div>
 
         {/* Property List */}
@@ -170,8 +227,8 @@ const Properties = () => {
           savedPropertyIds={savedPropertyIds}
         />
 
-        {!loading && properties.length === 0 && (
-          <div className="card mt-8">
+        {(showRequestForm || (!loading && properties.length === 0)) && (
+          <div id="tenant-request" ref={requestSectionRef} className="card mt-8">
             <h2 className="text-xl font-bold text-gray-900 mb-2">
               Not finding what you need?
             </h2>
@@ -217,11 +274,24 @@ const Properties = () => {
                 <option value="flat">Flat</option>
                 <option value="room">Room</option>
               </select>
-              <input
-                name="city"
+              <select
+                name="state_id"
                 className="input"
-                placeholder="Preferred city"
-                value={requestForm.city}
+                value={requestForm.state_id}
+                onChange={handleRequestChange}
+              >
+                <option value="">Preferred state</option>
+                {states.map((state) => (
+                  <option key={state.id} value={state.id}>
+                    {state.state_name}
+                  </option>
+                ))}
+              </select>
+              <input
+                name="location"
+                className="input"
+                placeholder="Preferred location (city/area)"
+                value={requestForm.location}
                 onChange={handleRequestChange}
               />
               <input

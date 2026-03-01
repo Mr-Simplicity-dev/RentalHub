@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import { applicationService } from '../services/applicationService';
@@ -21,6 +21,7 @@ import {
 import { formatCurrency, formatDate } from '../utils/helpers';
 
 const PropertyDetail = () => {
+  const POST_VERIFY_REDIRECT_KEY = 'pending_unlock_redirect';
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ const PropertyDetail = () => {
   const [submittingApplication, setSubmittingApplication] = useState(false);
   const [hasFullAccess, setHasFullAccess] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
+  const autoUnlockAttemptedRef = useRef(false);
 
   const loadProperty = useCallback(async () => {
     setLoading(true);
@@ -85,6 +87,7 @@ const PropertyDetail = () => {
         if (result.success) {
           toast.success('Property unlocked successfully');
           setHasFullAccess(true);
+          localStorage.removeItem(POST_VERIFY_REDIRECT_KEY);
           setSearchParams({}, { replace: true });
           loadProperty();
         }
@@ -144,7 +147,7 @@ const PropertyDetail = () => {
     setShowApplicationModal(true);
   };
 
-  const handleUnlockPayment = async () => {
+  const handleUnlockPayment = useCallback(async () => {
     if (!isAuthenticated) {
       toast.error('Please login to unlock full details');
       navigate('/login');
@@ -158,8 +161,16 @@ const PropertyDetail = () => {
 
     if (!user?.identity_verified) {
       toast.error('Please complete identity verification first');
-      navigate('/profile');
+      const redirectPath = `/properties/${id}?autounlock=1`;
+      localStorage.setItem(POST_VERIFY_REDIRECT_KEY, redirectPath);
+      navigate(`/profile?next=${encodeURIComponent(redirectPath)}`);
       return;
+    }
+
+    const updatedParams = new URLSearchParams(searchParams);
+    if (updatedParams.has('autounlock')) {
+      updatedParams.delete('autounlock');
+      setSearchParams(updatedParams, { replace: true });
     }
 
     setUnlocking(true);
@@ -172,11 +183,13 @@ const PropertyDetail = () => {
 
       if (result.data?.already_unlocked) {
         setHasFullAccess(true);
+        localStorage.removeItem(POST_VERIFY_REDIRECT_KEY);
         loadProperty();
         return;
       }
 
       if (result.data?.authorization_url) {
+        localStorage.removeItem(POST_VERIFY_REDIRECT_KEY);
         window.location.href = `${result.data.authorization_url}`;
         return;
       }
@@ -187,7 +200,29 @@ const PropertyDetail = () => {
     } finally {
       setUnlocking(false);
     }
-  };
+  }, [id, isAuthenticated, navigate, user?.identity_verified, user?.user_type, loadProperty, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const shouldAutoUnlock =
+      searchParams.get('autounlock') === '1' &&
+      isAuthenticated &&
+      user?.user_type === 'tenant' &&
+      user?.identity_verified &&
+      !hasFullAccess &&
+      !autoUnlockAttemptedRef.current;
+
+    if (!shouldAutoUnlock) return;
+
+    autoUnlockAttemptedRef.current = true;
+    handleUnlockPayment();
+  }, [
+    searchParams,
+    isAuthenticated,
+    user?.user_type,
+    user?.identity_verified,
+    hasFullAccess,
+    handleUnlockPayment,
+  ]);
 
   const submitApplication = async () => {
     setSubmittingApplication(true);
