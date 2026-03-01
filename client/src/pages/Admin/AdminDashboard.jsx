@@ -79,7 +79,7 @@ const AdminDashboard = () => {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <QuickCard title="Manage Users" href="/admin/users" />
-          <QuickCard title="Verify Identities" href="/admin/verifications" />
+          <QuickCard title="Verify NIN/Passport" href="/admin/verifications" />
           <QuickCard title="View Properties" href="/admin/properties" />
           <QuickCard title="View Applications" href="/admin/applications" />
         </div>

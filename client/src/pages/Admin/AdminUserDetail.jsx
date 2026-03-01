@@ -37,6 +37,10 @@ const AdminUserDetail = () => {
   };
 
   const verifyUser = async () => {
+    if (!['tenant', 'landlord'].includes(user?.user_type)) {
+      return;
+    }
+
     setWorking(true);
     try {
       await api.post(`/admin/verifications/${id}/approve`);
@@ -60,7 +64,7 @@ const AdminUserDetail = () => {
           <h2 className="text-xl font-bold">{user.full_name}</h2>
 
           <div className="flex gap-2">
-            {!user.identity_verified && (
+            {!user.identity_verified && ['tenant', 'landlord'].includes(user.user_type) && (
               <button
                 onClick={verifyUser}
                 disabled={working}

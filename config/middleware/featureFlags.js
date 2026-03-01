@@ -4,7 +4,7 @@ export const enforceFlags = async (req, res, next) => {
   const { rows } = await db.query(`SELECT key, enabled FROM feature_flags`);
   const flags = Object.fromEntries(rows.map(r => [r.key, r.enabled]));
 
-  if (flags.maintenance_mode && !req.user?.role?.includes('super_admin')) {
+  if (flags.maintenance_mode && req.user?.user_type !== 'super_admin') {
     return res.status(503).json({ message: 'System under maintenance' });
   }
 

@@ -34,19 +34,19 @@ router.delete('/users/:id', requireAdminOrSuperAdmin, adminController.deleteUser
  */
 router.get(
   '/verifications/pending',
-  requireAdminOrSuperAdmin,
+  requireAdmin,
   adminController.getPendingVerifications
 );
 
 router.post(
   '/verifications/:id/approve',
-  requireAdminOrSuperAdmin,
+  requireAdmin,
   adminController.approveVerification
 );
 
 router.post(
   '/verifications/:id/reject',
-  requireAdminOrSuperAdmin,
+  requireAdmin,
   adminController.rejectVerification
 );
 

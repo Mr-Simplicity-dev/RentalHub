@@ -50,7 +50,7 @@ const AdminLayout = () => {
 
           <NavLink to="/admin/verifications" className={navItem}>
             <FaCheckCircle className="mr-3" />
-            Verifications
+            NIN/Passport Verification
           </NavLink>
 
           <NavLink to="/admin/properties" className={navItem}>

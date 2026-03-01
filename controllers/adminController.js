@@ -2,6 +2,22 @@ const db = require('../config/middleware/database');
 const { sendEmail } = require('../config/utils/mailer');
 const { notifyAlertsForProperty } = require('../config/utils/propertyAlertService');
 
+let verificationAuditSchemaReady = false;
+
+const ensureVerificationAuditSchema = async () => {
+  if (verificationAuditSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS identity_verified_by INTEGER REFERENCES users(id),
+    ADD COLUMN IF NOT EXISTS identity_verified_at TIMESTAMP;
+
+    CREATE INDEX IF NOT EXISTS idx_users_identity_verified_by
+      ON users(identity_verified_by);
+  `);
+
+  verificationAuditSchemaReady = true;
+};
 
 // GET /api/admin/stats
 exports.getStats = async (req, res) => {
@@ -18,7 +34,8 @@ exports.getStats = async (req, res) => {
     const pendingVerifications = await db.query(
       `SELECT COUNT(*) FROM users
        WHERE deleted_at IS NULL
-         AND identity_verified = FALSE`
+         AND identity_verified = FALSE
+         AND user_type IN ('tenant', 'landlord')`
     );
 
     res.json({
@@ -45,6 +62,7 @@ exports.getAllUsers = async (req, res) => {
   try {
     const {
       search = '',
+      state = '',
       role = 'all',
       page = 1,
       limit = 20,
@@ -59,31 +77,51 @@ exports.getAllUsers = async (req, res) => {
     let i = 1;
 
     // Base condition
-    where.push(`deleted_at IS NULL`);
+    where.push(`u.deleted_at IS NULL`);
+    if (req.user?.user_type === 'admin') {
+      where.push(`u.user_type <> 'super_admin'`);
+    }
 
     // Role filter
     if (role && role !== 'all') {
-      where.push(`user_type = $${i++}`);
+      where.push(`u.user_type = $${i++}`);
       params.push(role);
     }
 
     // Search filter (name, email, phone)
     if (search) {
       where.push(`(
-        full_name ILIKE $${i} OR
-        email ILIKE $${i} OR
-        phone ILIKE $${i}
+        u.full_name ILIKE $${i} OR
+        u.email ILIKE $${i} OR
+        u.phone ILIKE $${i} OR
+        ls.state ILIKE $${i}
       )`);
       params.push(`%${search}%`);
       i++;
     }
 
+    // State filter (landlord's latest property state)
+    if (state) {
+      where.push(`ls.state ILIKE $${i++}`);
+      params.push(`%${state}%`);
+    }
+
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const fromClause = `
+      FROM users u
+      LEFT JOIN LATERAL (
+        SELECT p.state
+        FROM properties p
+        WHERE p.landlord_id = u.id
+        ORDER BY p.created_at DESC
+        LIMIT 1
+      ) ls ON TRUE
+    `;
 
     // Total count
     const countQuery = `
       SELECT COUNT(*) 
-      FROM users
+      ${fromClause}
       ${whereClause}
     `;
     const countResult = await db.query(countQuery, params);
@@ -91,12 +129,12 @@ exports.getAllUsers = async (req, res) => {
 
     // Data query
     const dataQuery = `
-      SELECT id, full_name, email, phone, user_type,
-             email_verified, phone_verified, identity_verified,
-             created_at
-      FROM users
+      SELECT u.id, u.full_name, u.email, u.phone, u.user_type,
+             u.email_verified, u.phone_verified, u.identity_verified,
+             u.created_at, ls.state
+      ${fromClause}
       ${whereClause}
-      ORDER BY created_at DESC
+      ORDER BY u.created_at DESC
       LIMIT $${i++} OFFSET $${i++}
     `;
 
@@ -126,6 +164,8 @@ exports.getAllUsers = async (req, res) => {
 // GET /api/admin/verifications/pending
 exports.getPendingVerifications = async (req, res) => {
   try {
+    await ensureVerificationAuditSchema();
+
     const {
       search = '',
       page = 1,
@@ -143,6 +183,7 @@ exports.getPendingVerifications = async (req, res) => {
       `identity_verified = FALSE`,
       `passport_photo_url IS NOT NULL`,
       `(nin IS NOT NULL OR international_passport_number IS NOT NULL)`,
+      `user_type IN ('tenant', 'landlord')`,
     ];
 
     const params = [];
@@ -201,12 +242,32 @@ exports.getPendingVerifications = async (req, res) => {
 // POST /api/admin/verifications/:id/approve
 exports.approveVerification = async (req, res) => {
   try {
-    const userId = req.params.id;
+    await ensureVerificationAuditSchema();
 
-    await db.query(
-      'UPDATE users SET identity_verified = TRUE WHERE id = $1 AND deleted_at IS NULL',
-      [userId]
+    const userId = req.params.id;
+    const adminId = req.user.id;
+
+    const result = await db.query(
+      `UPDATE users
+       SET identity_verified = TRUE,
+           identity_verified_by = $2,
+           identity_verified_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1
+         AND deleted_at IS NULL
+         AND user_type IN ('tenant', 'landlord')
+         AND passport_photo_url IS NOT NULL
+         AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
+       RETURNING id`,
+      [userId, adminId]
     );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found or not eligible for admin verification',
+      });
+    }
 
     res.json({ success: true, message: 'User verified successfully' });
   } catch (err) {
@@ -218,12 +279,30 @@ exports.approveVerification = async (req, res) => {
 // POST /api/admin/verifications/:id/reject
 exports.rejectVerification = async (req, res) => {
   try {
+    await ensureVerificationAuditSchema();
+
     const userId = req.params.id;
 
-    await db.query(
-      'UPDATE users SET passport_photo_url = NULL WHERE id = $1 AND deleted_at IS NULL',
+    const result = await db.query(
+      `UPDATE users
+       SET passport_photo_url = NULL,
+           identity_verified = FALSE,
+           identity_verified_by = NULL,
+           identity_verified_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+         AND deleted_at IS NULL
+         AND user_type IN ('tenant', 'landlord')
+       RETURNING id`,
       [userId]
     );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found or not eligible for admin rejection',
+      });
+    }
 
     res.json({ success: true, message: 'Verification rejected' });
   } catch (err) {
@@ -561,6 +640,26 @@ exports.deleteUser = async (req, res) => {
       });
     }
 
+    const targetResult = await db.query(
+      'SELECT user_type FROM users WHERE id = $1 AND deleted_at IS NULL',
+      [id]
+    );
+
+    if (!targetResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const targetType = targetResult.rows[0].user_type;
+    if (req.user?.user_type === 'admin' && targetType === 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin cannot delete super admin accounts',
+      });
+    }
+
     await db.query(
       'UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
       [id]
@@ -584,13 +683,16 @@ exports.deleteUser = async (req, res) => {
 exports.getUserById = async (req, res) => {
   try {
     const { id } = req.params;
+    const isAdminRequester = req.user?.user_type === 'admin';
 
     const result = await db.query(
       `SELECT id, full_name, email, phone, user_type,
               email_verified, phone_verified, identity_verified,
               created_at
        FROM users
-       WHERE id = $1 AND deleted_at IS NULL`,
+       WHERE id = $1
+         AND deleted_at IS NULL
+         ${isAdminRequester ? `AND user_type <> 'super_admin'` : ''}`,
       [id]
     );
 

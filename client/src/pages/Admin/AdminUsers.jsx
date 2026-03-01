@@ -14,6 +14,8 @@ const AdminUsers = () => {
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [stateSearch, setStateSearch] = useState('');
+  const [debouncedStateSearch, setDebouncedStateSearch] = useState('');
   const [role, setRole] = useState('all');
   const [page, setPage] = useState(1);
 
@@ -22,12 +24,13 @@ const AdminUsers = () => {
     pages: 1,
   });
 
-  const loadUsers = useCallback(async (p = 1, query = '', roleFilter = 'all') => {
+  const loadUsers = useCallback(async (p = 1, query = '', roleFilter = 'all', stateQuery = '') => {
     setLoading(true);
     try {
       const res = await api.get('/admin/users', {
         params: {
           search: query,
+          state: stateQuery,
           role: roleFilter,
           page: p,
           limit: PAGE_SIZE,
@@ -54,8 +57,16 @@ const AdminUsers = () => {
   }, [search]);
 
   useEffect(() => {
-    loadUsers(page, debouncedSearch, role);
-  }, [page, debouncedSearch, role, loadUsers]);
+    const delay = setTimeout(() => {
+      setDebouncedStateSearch(stateSearch);
+    }, 300);
+
+    return () => clearTimeout(delay);
+  }, [stateSearch]);
+
+  useEffect(() => {
+    loadUsers(page, debouncedSearch, role, debouncedStateSearch);
+  }, [page, debouncedSearch, role, debouncedStateSearch, loadUsers]);
 
   const from = (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, pagination.total);
@@ -89,6 +100,16 @@ const AdminUsers = () => {
           />
           </div>
 
+          <input
+            value={stateSearch}
+            onChange={(e) => {
+              setStateSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search by state..."
+            className="input"
+          />
+
           <select
             value={role}
             onChange={(e) => {
@@ -113,6 +134,7 @@ const AdminUsers = () => {
               <th className="py-3 px-4">Name</th>
               <th className="py-3 px-4">Email</th>
               <th className="py-3 px-4">Phone</th>
+              <th className="py-3 px-4">State</th>
               <th className="py-3 px-4">Role</th>
               <th className="py-3 px-4">Verified</th>
               <th className="py-3 px-4">Joined</th>
@@ -125,6 +147,7 @@ const AdminUsers = () => {
                 <td className="py-3 px-4 font-medium">{u.full_name}</td>
                 <td className="py-3 px-4">{u.email}</td>
                 <td className="py-3 px-4">{u.phone}</td>
+                <td className="py-3 px-4">{u.state || '—'}</td>
                 <td className="py-3 px-4 capitalize">{u.user_type}</td>
                 <td className="py-3 px-4">
                   {u.identity_verified ? 'Yes' : 'No'}
@@ -145,7 +168,7 @@ const AdminUsers = () => {
 
             {users.length === 0 && !loading && (
               <tr>
-                <td colSpan="7" className="py-8 text-center text-gray-500">
+                <td colSpan="8" className="py-8 text-center text-gray-500">
                   No users found
                 </td>
               </tr>
@@ -155,7 +178,7 @@ const AdminUsers = () => {
       </div>
 
       {/* Pagination */}
-      {pagination.pages > 1 && (
+      {pagination.total > 0 && (
         <div className="flex justify-between items-center mt-6">
           <button
             disabled={page === 1}

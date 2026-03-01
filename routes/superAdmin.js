@@ -12,6 +12,10 @@ router.get('/properties', authenticate, requireSuperAdmin, superCtrl.getAllPrope
 router.patch('/properties/:id/unlist', authenticate, requireSuperAdmin, superCtrl.unlistProperty);
 
 router.patch('/verify/:userId', authenticate, requireSuperAdmin, superCtrl.verifyUser);
+router.get('/verifications', authenticate, requireSuperAdmin, superCtrl.getIdentityVerifications);
+router.patch('/verifications/:userId/approve', authenticate, requireSuperAdmin, superCtrl.approveIdentityVerification);
+router.patch('/verifications/:userId/reject', authenticate, requireSuperAdmin, superCtrl.rejectIdentityVerification);
+router.get('/admins/performance', authenticate, requireSuperAdmin, superCtrl.getAdminPerformance);
 
 router.get('/logs', authenticate, requireSuperAdmin, superCtrl.getAuditLogs);
 
