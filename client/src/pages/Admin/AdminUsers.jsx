@@ -38,7 +38,10 @@ const AdminUsers = () => {
       });
 
       if (res.data?.success) {
-        setUsers(res.data.data);
+        const safeUsers = (res.data.data || []).filter(
+          (u) => u.user_type !== 'super_admin'
+        );
+        setUsers(safeUsers);
         setPagination(res.data.pagination);
       }
     } catch (err) {

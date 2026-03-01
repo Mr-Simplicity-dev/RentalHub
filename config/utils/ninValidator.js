@@ -120,3 +120,83 @@ exports.verifyNINWithNIMC = async (nin, firstName, lastName, dateOfBirth) => {
     };
   }
 };
+
+// Verify international passport with a configurable endpoint
+// Required env vars:
+// - PASSPORT_API_URL (full endpoint URL)
+// - PASSPORT_API_KEY
+exports.verifyInternationalPassportWithAPI = async (
+  passportNumber,
+  fullName,
+  nationality,
+  dateOfBirth
+) => {
+  const endpoint = process.env.PASSPORT_API_URL;
+  const apiKey = process.env.PASSPORT_API_KEY;
+
+  if (!endpoint || !apiKey) {
+    return {
+      verified: false,
+      status: 'not_configured',
+      message: 'Passport verification integration is not configured'
+    };
+  }
+
+  try {
+    const authScheme = process.env.PASSPORT_AUTH_SCHEME || 'Bearer';
+    const timeout = Number(process.env.PASSPORT_API_TIMEOUT_MS || 12000);
+
+    const response = await axios.post(
+      endpoint,
+      {
+        passportNumber,
+        fullName,
+        nationality,
+        dateOfBirth
+      },
+      {
+        timeout,
+        headers: {
+          Authorization: `${authScheme} ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const body = response.data || {};
+    const payload = body.data || body.result || body;
+    const statusValue = String(payload.status || body.status || '').toLowerCase();
+
+    const verified =
+      payload.verified === true ||
+      payload.is_verified === true ||
+      statusValue === 'verified' ||
+      statusValue === 'success';
+
+    if (!verified) {
+      return {
+        verified: false,
+        status: 'not_verified',
+        message: payload.message || body.message || 'Passport could not be verified'
+      };
+    }
+
+    return {
+      verified: true,
+      status: 'verified',
+      message: payload.message || body.message || 'Passport verified successfully',
+      raw: payload
+    };
+  } catch (error) {
+    const apiMessage =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message;
+
+    return {
+      verified: false,
+      status: 'service_error',
+      message: `Passport verification failed: ${apiMessage}`
+    };
+  }
+};

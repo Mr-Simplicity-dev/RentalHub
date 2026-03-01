@@ -78,9 +78,7 @@ exports.getAllUsers = async (req, res) => {
 
     // Base condition
     where.push(`u.deleted_at IS NULL`);
-    if (req.user?.user_type === 'admin') {
-      where.push(`u.user_type <> 'super_admin'`);
-    }
+    where.push(`u.user_type <> 'super_admin'`);
 
     // Role filter
     if (role && role !== 'all') {
@@ -683,8 +681,6 @@ exports.deleteUser = async (req, res) => {
 exports.getUserById = async (req, res) => {
   try {
     const { id } = req.params;
-    const isAdminRequester = req.user?.user_type === 'admin';
-
     const result = await db.query(
       `SELECT id, full_name, email, phone, user_type,
               email_verified, phone_verified, identity_verified,
@@ -692,7 +688,7 @@ exports.getUserById = async (req, res) => {
        FROM users
        WHERE id = $1
          AND deleted_at IS NULL
-         ${isAdminRequester ? `AND user_type <> 'super_admin'` : ''}`,
+         AND user_type <> 'super_admin'`,
       [id]
     );
 

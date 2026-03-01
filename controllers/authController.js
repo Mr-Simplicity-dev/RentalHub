@@ -5,7 +5,8 @@ const db = require('../config/middleware/database');
 const {
   validateNIN,
   verifyNINWithNIMC,
-  validateInternationalPassport
+  validateInternationalPassport,
+  verifyInternationalPassportWithAPI
 } = require('../config/utils/ninValidator');
 const {
   sendVerificationEmail,
@@ -84,6 +85,10 @@ exports.register = async (req, res) => {
     const identityType = isForeigner ? 'passport' : 'nin';
 
     const cleanNIN = nin ? String(nin).trim() : null;
+    const testNIN = String(process.env.NIMC_TEST_NIN || '00000000000').trim();
+    const allowTestNINBypass =
+      process.env.ALLOW_TEST_NIN_BYPASS === 'true' ||
+      (process.env.NODE_ENV !== 'production' && process.env.ALLOW_TEST_NIN_BYPASS !== 'false');
     const cleanNationality = nationality
       ? String(nationality).trim()
       : isForeigner
@@ -128,33 +133,49 @@ exports.register = async (req, res) => {
       const firstName = names[0] || '';
       const lastName = names.slice(1).join(' ') || names[0] || '';
 
-      const nimcResult = await verifyNINWithNIMC(
-        cleanNIN,
-        firstName,
-        lastName,
-        date_of_birth
-      );
+      const isTestNIN = cleanNIN === testNIN;
+      if (isTestNIN && allowTestNINBypass) {
+        ninVerified = true;
+        nimcMeta = {
+          status: 'test_bypass',
+          message: 'Test NIN bypass enabled'
+        };
+      } else {
+        const nimcResult = await verifyNINWithNIMC(
+          cleanNIN,
+          firstName,
+          lastName,
+          date_of_birth
+        );
 
-      nimcMeta = {
-        status: nimcResult.status,
-        message: nimcResult.message
-      };
-
-      if (nimcResult.status === 'service_error') {
-        return res.status(503).json({
-          success: false,
+        nimcMeta = {
+          status: nimcResult.status,
           message: nimcResult.message
-        });
-      }
+        };
 
-      if (nimcResult.status === 'not_verified') {
-        return res.status(400).json({
-          success: false,
-          message: nimcResult.message || 'NIN verification failed'
-        });
-      }
+        if (nimcResult.status === 'not_configured') {
+          return res.status(503).json({
+            success: false,
+            message: 'NIMC verification is required but not configured on the server'
+          });
+        }
 
-      ninVerified = nimcResult.verified === true;
+        if (nimcResult.status === 'service_error') {
+          return res.status(503).json({
+            success: false,
+            message: nimcResult.message
+          });
+        }
+
+        if (nimcResult.status === 'not_verified') {
+          return res.status(400).json({
+            success: false,
+            message: nimcResult.message || 'NIN verification failed'
+          });
+        }
+
+        ninVerified = nimcResult.verified === true;
+      }
     } else {
       if (identity_document_type === 'nin') {
         return res.status(400).json({
@@ -181,6 +202,34 @@ exports.register = async (req, res) => {
         return res.status(400).json({
           success: false,
           message: 'Nigerian applicants must register with NIN'
+        });
+      }
+
+      const passportResult = await verifyInternationalPassportWithAPI(
+        cleanPassportNumber,
+        full_name,
+        cleanNationality,
+        date_of_birth
+      );
+
+      if (passportResult.status === 'not_configured') {
+        return res.status(503).json({
+          success: false,
+          message: 'Passport verification API is required but not configured on the server'
+        });
+      }
+
+      if (passportResult.status === 'service_error') {
+        return res.status(503).json({
+          success: false,
+          message: passportResult.message
+        });
+      }
+
+      if (passportResult.status === 'not_verified') {
+        return res.status(400).json({
+          success: false,
+          message: passportResult.message || 'Passport verification failed'
         });
       }
     }
