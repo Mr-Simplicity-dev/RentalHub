@@ -36,6 +36,7 @@ const upload = multer({
 });
 
 const LIVE_CAPTURE_SESSION_TTL_MS = 10 * 60 * 1000;
+const REQUIRE_LIVE_CAPTURE_SESSION = process.env.REQUIRE_LIVE_CAPTURE_SESSION === 'true';
 const liveCaptureSessions = new Map();
 
 const getSessionKey = (userId, token) => `${userId}:${token}`;
@@ -392,13 +393,15 @@ router.post('/upload-passport', authenticate, upload.single('passport'), async (
       });
     }
 
-    const isValidSession = consumeLiveCaptureSession(userId, liveCaptureToken);
-    if (!isValidSession) {
-      cleanupUploadedFile(req.file);
-      return res.status(403).json({
-        success: false,
-        message: 'Invalid or expired live capture session. Please retake photo.',
-      });
+    if (REQUIRE_LIVE_CAPTURE_SESSION) {
+      const isValidSession = consumeLiveCaptureSession(userId, liveCaptureToken);
+      if (!isValidSession) {
+        cleanupUploadedFile(req.file);
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid or expired live capture session. Please retake photo.',
+        });
+      }
     }
 
     const relativePath = `/uploads/passports/${req.file.filename}`;

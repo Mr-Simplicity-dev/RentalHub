@@ -70,12 +70,17 @@ const Profile = () => {
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [showCameraModal, setShowCameraModal] = useState(false);
-  const [countdown, setCountdown] = useState(0);
   const [livenessError, setLivenessError] = useState('');
   const [livenessChecks, setLivenessChecks] = useState(DEFAULT_LIVENESS);
   const [faceBox, setFaceBox] = useState(null);
   const [faceMeshReady, setFaceMeshReady] = useState(false);
   const [liveCaptureToken, setLiveCaptureToken] = useState('');
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    full_name: '',
+    phone: '',
+  });
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const faceMeshRef = useRef(null);
@@ -86,6 +91,7 @@ const Profile = () => {
     eyesClosed: false,
     baseArea: null,
   });
+  const autoCaptureTriggeredRef = useRef(false);
 
   const canCaptureLive = useMemo(() => (
     livenessChecks.faceDetected &&
@@ -159,6 +165,13 @@ const Profile = () => {
   }, [pendingRedirect, user?.identity_verified, navigate, updateUser]);
 
   useEffect(() => {
+    setProfileForm({
+      full_name: user?.full_name || '',
+      phone: user?.phone || '',
+    });
+  }, [user?.full_name, user?.phone]);
+
+  useEffect(() => {
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -194,11 +207,11 @@ const Profile = () => {
     }
     setCameraActive(false);
     setCameraLoading(false);
-    setCountdown(0);
     setFaceMeshReady(false);
     setFaceBox(null);
     setLivenessChecks(DEFAULT_LIVENESS);
     setLivenessError('');
+    autoCaptureTriggeredRef.current = false;
     metricsRef.current = {
       baselineEar: null,
       eyesClosed: false,
@@ -387,6 +400,7 @@ const Profile = () => {
         eyesClosed: false,
         baseArea: null,
       };
+      autoCaptureTriggeredRef.current = false;
       setCameraActive(true);
       setShowCameraModal(true);
     } catch (error) {
@@ -431,8 +445,6 @@ const Profile = () => {
 
   const captureFromCamera = useCallback(async () => {
     if (!canCaptureLive) {
-      const reason = missingChecks[0] || 'Complete all liveness checks first.';
-      toast.error(reason);
       return;
     }
 
@@ -458,20 +470,7 @@ const Profile = () => {
       setShowCameraModal(false);
       stopCamera();
     }, 'image/jpeg', 0.92);
-  }, [canCaptureLive, missingChecks, setPassportFromFile, stopCamera]);
-
-  useEffect(() => {
-    if (!cameraActive || countdown <= 0) return undefined;
-
-    const timer = setTimeout(() => {
-      if (countdown === 1) {
-        captureFromCamera();
-      }
-      setCountdown((prev) => Math.max(prev - 1, 0));
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [countdown, cameraActive, captureFromCamera]);
+  }, [canCaptureLive, setPassportFromFile, stopCamera]);
 
   useEffect(() => {
     if (!showCameraModal || !cameraActive || !streamRef.current || !videoRef.current) return;
@@ -506,24 +505,21 @@ const Profile = () => {
       }
       setFaceMeshReady(false);
       setFaceBox(null);
+      autoCaptureTriggeredRef.current = false;
     };
   }, [showCameraModal, cameraActive, initFaceMesh]);
 
   useEffect(() => {
-    if (countdown <= 0) return;
-    if (!canCaptureLive) {
-      setCountdown(0);
-    }
-  }, [canCaptureLive, countdown]);
+    if (!showCameraModal || !cameraActive || !canCaptureLive) return undefined;
+    if (autoCaptureTriggeredRef.current) return undefined;
 
-  const startAutoCapture = () => {
-    if (!cameraActive) return;
-    if (!canCaptureLive) {
-      toast.error(missingChecks[0] || 'Complete all liveness checks first.');
-      return;
-    }
-    setCountdown(3);
-  };
+    autoCaptureTriggeredRef.current = true;
+    const timer = setTimeout(() => {
+      captureFromCamera();
+    }, 650);
+
+    return () => clearTimeout(timer);
+  }, [showCameraModal, cameraActive, canCaptureLive, captureFromCamera]);
 
   const handleUpload = async () => {
     if (!passport) {
@@ -538,16 +534,13 @@ const Profile = () => {
         tokenToUse = await requestLiveCaptureSession();
       }
 
-      if (!tokenToUse) {
-        toast.error('Could not create secure capture session. Check network and try again.');
-        return;
-      }
-
       const sendUpload = async (token) => {
         const formData = new FormData();
         formData.append('passport', passport);
         formData.append('capture_source', 'live_camera');
-        formData.append('live_capture_token', token);
+        if (token) {
+          formData.append('live_capture_token', token);
+        }
 
         return api.post('/users/upload-passport', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -592,17 +585,128 @@ const Profile = () => {
     }
   };
 
+  const handleProfileInputChange = (field) => (event) => {
+    const value = event.target.value;
+    setProfileForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleProfileSave = async () => {
+    const payload = {
+      full_name: profileForm.full_name?.trim(),
+      phone: profileForm.phone?.trim(),
+    };
+
+    if (!payload.full_name) {
+      toast.error('Full name is required.');
+      return;
+    }
+
+    if (!payload.phone) {
+      toast.error('Phone number is required.');
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      const res = await api.put('/users/profile', payload);
+      if (res.data?.success && res.data?.data) {
+        updateUser(res.data.data);
+      }
+      toast.success('Account information updated.');
+      setEditingProfile(false);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to update account information.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <h1 className="text-2xl font-bold mb-6">{t('profile.title')}</h1>
+      <div className="mb-6 flex justify-center">
+        <div className="rounded-xl border border-teal-200 bg-teal-50 px-6 py-2">
+          <h1 className="text-2xl font-bold text-teal-700">My Profile</h1>
+        </div>
+      </div>
 
       <div className="card mb-6">
         <h2 className="font-semibold mb-4">{t('profile.account_title')}</h2>
-        <div className="space-y-2 text-sm">
-          <div><strong>{t('profile.name')}:</strong> {user?.full_name}</div>
-          <div><strong>{t('profile.email')}:</strong> {user?.email}</div>
-          <div><strong>{t('profile.phone')}:</strong> {user?.phone}</div>
-          <div><strong>{t('profile.role')}:</strong> {user?.user_type}</div>
+        <div className="space-y-3 text-sm">
+          <div>
+            <strong>{t('profile.name')}:</strong>
+            {editingProfile ? (
+              <input
+                type="text"
+                className="input mt-1"
+                value={profileForm.full_name}
+                onChange={handleProfileInputChange('full_name')}
+              />
+            ) : (
+              <span className="ml-2">{user?.full_name}</span>
+            )}
+          </div>
+          <div>
+            <strong>{t('profile.email')}:</strong>
+            <span className="ml-2">{user?.email}</span>
+          </div>
+          <div>
+            <strong>{t('profile.phone')}:</strong>
+            {editingProfile ? (
+              <input
+                type="tel"
+                className="input mt-1"
+                value={profileForm.phone}
+                onChange={handleProfileInputChange('phone')}
+              />
+            ) : (
+              <span className="ml-2">{user?.phone}</span>
+            )}
+          </div>
+          <div><strong>NIN:</strong> <span className="ml-2">{user?.nin || 'Not provided'}</span></div>
+          <div><strong>{t('profile.role')}:</strong> <span className="ml-2">{user?.user_type}</span></div>
+          {editingProfile && (
+            <p className="text-xs text-gray-500">Email, NIN, and role cannot be edited here.</p>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-center gap-3">
+          {editingProfile ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary w-full sm:w-48"
+                onClick={handleProfileSave}
+                disabled={savingProfile}
+              >
+                {savingProfile ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary w-full sm:w-32"
+                onClick={() => {
+                  setEditingProfile(false);
+                  setProfileForm({
+                    full_name: user?.full_name || '',
+                    phone: user?.phone || '',
+                  });
+                }}
+                disabled={savingProfile}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-secondary w-full sm:w-72"
+              onClick={() => setEditingProfile(true)}
+            >
+              Edit Account Information
+            </button>
+          )}
         </div>
       </div>
 
@@ -626,12 +730,12 @@ const Profile = () => {
             </div>
 
             <div className="mb-4">
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex justify-center">
                 {!cameraActive ? (
                   <button
                     onClick={startCamera}
                     disabled={cameraLoading}
-                    className="btn btn-secondary w-full"
+                    className="btn btn-secondary w-full sm:w-72"
                     type="button"
                   >
                     {cameraLoading ? 'Opening camera...' : 'Start Live Capture'}
@@ -639,31 +743,12 @@ const Profile = () => {
                 ) : (
                   <button
                     onClick={() => setShowCameraModal(true)}
-                    className="btn btn-secondary w-full"
+                    className="btn btn-secondary w-full sm:w-72"
                     type="button"
                   >
                     Open Live Camera
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  className="btn btn-secondary w-full"
-                  onClick={startCamera}
-                  disabled={cameraLoading}
-                >
-                  Retake Live Photo
-                </button>
-              </div>
-
-              <div className="mt-3 flex justify-center">
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading || !passport}
-                  className="btn btn-primary w-full sm:w-72"
-                >
-                  {uploading ? t('profile.uploading') : t('profile.upload')}
-                </button>
               </div>
             </div>
 
@@ -684,19 +769,31 @@ const Profile = () => {
                 </div>
               </div>
             )}
+
+            {passport && (
+              <div className="mt-3 flex justify-center">
+                <button
+                  onClick={handleUpload}
+                  disabled={uploading || !passport}
+                  className="btn btn-primary w-full sm:w-72"
+                >
+                  {uploading ? t('profile.uploading') : t('profile.upload')}
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
 
       {showCameraModal && cameraActive && (
-        <div className="fixed inset-0 z-50 bg-black/65 flex items-end sm:items-center justify-center p-2 sm:p-4">
-          <div className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-white/20 bg-zinc-950 p-4">
-            <div className="mb-3">
+        <div className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-2 sm:p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/20 bg-zinc-950 p-3 sm:p-4">
+            <div className="mb-3 text-center">
               <h3 className="text-white font-semibold text-lg">Live Passport Capture</h3>
               <p className="text-zinc-300 text-sm">Keep your face inside the guide and complete all checks.</p>
             </div>
 
-            <div className="relative aspect-[4/5] sm:aspect-[3/4] max-h-[52vh] overflow-hidden rounded-xl border border-white/20 bg-black">
+            <div className="relative h-[34vh] sm:h-[42vh] overflow-hidden rounded-xl border border-white/20 bg-black">
               <video
                 ref={videoRef}
                 autoPlay
@@ -723,18 +820,13 @@ const Profile = () => {
                 />
               )}
 
-              {countdown > 0 && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-white text-7xl font-bold drop-shadow-lg">{countdown}</div>
-                </div>
-              )}
             </div>
 
-            <div className="mt-4 rounded-xl bg-black/40 px-3 py-3 text-xs text-white">
+            <div className="mt-3 rounded-xl bg-black/40 px-3 py-3 text-xs text-white text-center">
               <div className="font-semibold mb-2">
                 {faceMeshReady ? 'Live Checks' : 'Initializing live checks...'}
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 justify-items-center">
                 <span>{livenessChecks.faceDetected ? 'Done' : 'Pending'} Face</span>
                 <span>{livenessChecks.centered ? 'Done' : 'Pending'} Center</span>
                 <span>{livenessChecks.blink ? 'Done' : 'Pending'} Blink</span>
@@ -748,7 +840,7 @@ const Profile = () => {
 
             <div className="mt-3 text-center text-white text-sm">
               {canCaptureLive
-                ? 'Liveness checks passed. You can capture now.'
+                ? 'Liveness checks passed. Capturing now...'
                 : (missingChecks[0] || 'Center your face inside the frame.')}
             </div>
 
@@ -758,41 +850,13 @@ const Profile = () => {
               </div>
             )}
 
-            <div className="sticky bottom-0 mt-4 grid grid-cols-2 gap-2 bg-zinc-950/95 pt-3 pb-1">
+            <div className="mt-3 flex justify-center">
               <button
                 type="button"
-                className="btn btn-primary"
-                onClick={startAutoCapture}
-                disabled={countdown > 0 || !canCaptureLive}
-              >
-                {countdown > 0 ? 'Capturing...' : 'Auto Capture (3s)'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={captureFromCamera}
-                disabled={countdown > 0 || !canCaptureLive}
-              >
-                Capture Now
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
+                className="btn btn-secondary w-full sm:w-48"
                 onClick={() => setShowCameraModal(false)}
-                disabled={countdown > 0}
               >
                 Close
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowCameraModal(false);
-                  stopCamera();
-                }}
-                disabled={countdown > 0}
-              >
-                Stop Camera
               </button>
             </div>
           </div>
