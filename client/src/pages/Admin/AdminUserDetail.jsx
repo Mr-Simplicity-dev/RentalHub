@@ -15,7 +15,11 @@ const AdminUserDetail = () => {
     setLoading(true);
     try {
       const res = await api.get(`/admin/users/${id}`);
-      if (res.data?.success) setUser(res.data.data);
+      if (res.data?.success) {
+        setUser(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load user:', err);
     } finally {
       setLoading(false);
     }
@@ -27,75 +31,119 @@ const AdminUserDetail = () => {
 
   const disableUser = async () => {
     if (!window.confirm('Disable this user?')) return;
+
     setWorking(true);
     try {
       await api.delete(`/admin/users/${id}`);
       navigate('/admin/users');
+    } catch (err) {
+      console.error('Failed to disable user:', err);
     } finally {
       setWorking(false);
     }
   };
 
   const verifyUser = async () => {
-    if (!['tenant', 'landlord'].includes(user?.user_type)) {
-      return;
-    }
+    if (!['tenant', 'landlord'].includes(user?.user_type)) return;
 
     setWorking(true);
     try {
       await api.post(`/admin/verifications/${id}/approve`);
       loadUser();
+    } catch (err) {
+      console.error('Verification failed:', err);
     } finally {
       setWorking(false);
     }
   };
 
   if (loading) return <Loader fullScreen />;
-  if (!user) return <div className="card">User not found</div>;
+  if (!user) return <div className="p-6">User not found</div>;
 
   return (
-    <div className="max-w-3xl">
-      <button onClick={() => navigate(-1)} className="text-sm text-gray-600 mb-4 hover:underline">
-        ← Back
+    <div className="max-w-4xl mx-auto p-6">
+      <button
+        onClick={() => navigate(-1)}
+        className="text-sm text-gray-500 mb-6 hover:text-black"
+      >
+        ← Back to Users
       </button>
 
-      <div className="card space-y-4">
-        <div className="flex justify-between items-start">
-          <h2 className="text-xl font-bold">{user.full_name}</h2>
+      <div className="bg-white shadow-lg rounded-xl p-6 border">
+        {/* Header Section */}
+        <div className="flex justify-between items-center border-b pb-4 mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">
+              {user.full_name}
+            </h2>
+            <p className="text-gray-500 text-sm">{user.email}</p>
+          </div>
 
-          <div className="flex gap-2">
-            {!user.identity_verified && ['tenant', 'landlord'].includes(user.user_type) && (
-              <button
-                onClick={verifyUser}
-                disabled={working}
-                className="btn btn-sm btn-primary"
-              >
-                Verify
-              </button>
-            )}
+          <div className="flex gap-3">
+            {!user.identity_verified &&
+              ['tenant', 'landlord'].includes(user.user_type) && (
+                <button
+                  onClick={verifyUser}
+                  disabled={working}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Verify User
+                </button>
+              )}
 
             <button
               onClick={disableUser}
               disabled={working}
-              className="btn btn-sm btn-danger"
+              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50"
             >
-              Disable
+              Disable User
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div><strong>Email:</strong> {user.email}</div>
-          <div><strong>Phone:</strong> {user.phone}</div>
-          <div><strong>Role:</strong> {user.user_type}</div>
-          <div><strong>Joined:</strong> {new Date(user.created_at).toLocaleString()}</div>
-          <div><strong>Email Verified:</strong> {user.email_verified ? 'Yes' : 'No'}</div>
-          <div><strong>Phone Verified:</strong> {user.phone_verified ? 'Yes' : 'No'}</div>
-          <div><strong>Identity Verified:</strong> {user.identity_verified ? 'Yes' : 'No'}</div>
+        {/* Details Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+          <Info label="Phone" value={user.phone} />
+          <Info label="Role" value={user.user_type} />
+          <Info
+            label="Joined"
+            value={new Date(user.created_at).toLocaleString()}
+          />
+          <Status label="Email Verified" status={user.email_verified} />
+          <Status label="Phone Verified" status={user.phone_verified} />
+          <Status label="Identity Verified" status={user.identity_verified} />
         </div>
       </div>
     </div>
   );
 };
+
+/* ---------------- Reusable Components ---------------- */
+
+const Info = ({ label, value }) => (
+  <div className="bg-gray-50 p-4 rounded-lg border">
+    <p className="text-gray-500 text-xs uppercase tracking-wide">
+      {label}
+    </p>
+    <p className="mt-1 font-medium text-gray-800">
+      {value || 'N/A'}
+    </p>
+  </div>
+);
+
+const Status = ({ label, status }) => (
+  <div className="bg-gray-50 p-4 rounded-lg border">
+    <p className="text-gray-500 text-xs uppercase tracking-wide">
+      {label}
+    </p>
+    <p
+      className={`mt-1 font-semibold ${
+        status ? 'text-green-600' : 'text-red-600'
+      }`}
+    >
+      {status ? 'Yes' : 'No'}
+    </p>
+  </div>
+);
 
 export default AdminUserDetail;
