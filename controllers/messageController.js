@@ -2,9 +2,49 @@ const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
 const { sendMessageNotification } = require('../config/utils/emailService');
 
+let messageSchemaReady = false;
+
+const ensureMessageSchema = async () => {
+  if (messageSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE messages
+    ADD COLUMN IF NOT EXISTS subject VARCHAR(180),
+    ADD COLUMN IF NOT EXISTS message_type VARCHAR(20) NOT NULL DEFAULT 'general';
+
+    CREATE INDEX IF NOT EXISTS idx_messages_receiver_unread
+      ON messages(receiver_id, is_read);
+
+    CREATE INDEX IF NOT EXISTS idx_messages_message_type
+      ON messages(message_type);
+  `);
+
+  messageSchemaReady = true;
+};
+
+const canSendMessage = (senderRole, receiverRole, messageType) => {
+  // Super admin can send to admins, tenants, and landlords.
+  if (senderRole === 'super_admin') {
+    return ['admin', 'tenant', 'landlord'].includes(receiverRole);
+  }
+
+  // Admin can message tenants/landlords and can escalate to super admin.
+  if (senderRole === 'admin') {
+    if (messageType === 'escalation') return receiverRole === 'super_admin';
+    return ['tenant', 'landlord'].includes(receiverRole);
+  }
+
+  // Tenant and landlord are receive-only in internal messaging.
+  if (['tenant', 'landlord'].includes(senderRole)) return false;
+
+  return false;
+};
+
 // Send message
 exports.sendMessage = async (req, res) => {
   try {
+    await ensureMessageSchema();
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -14,11 +54,18 @@ exports.sendMessage = async (req, res) => {
     }
 
     const senderId = req.user.id;
-    const { receiver_id, message_text, property_id } = req.body;
+    const senderRole = req.user.user_type;
+    const {
+      receiver_id,
+      message_text,
+      property_id,
+      subject,
+      message_type = 'general',
+    } = req.body;
 
     // Verify receiver exists
     const receiverResult = await db.query(
-      'SELECT id, email, full_name FROM users WHERE id = $1',
+      'SELECT id, email, full_name, user_type FROM users WHERE id = $1',
       [receiver_id]
     );
 
@@ -30,6 +77,28 @@ exports.sendMessage = async (req, res) => {
     }
 
     const receiver = receiverResult.rows[0];
+    const messageType = String(message_type || 'general').toLowerCase();
+
+    if (!['general', 'escalation'].includes(messageType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'message_type must be either general or escalation',
+      });
+    }
+
+    if (messageType === 'escalation' && senderRole !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can send escalation messages',
+      });
+    }
+
+    if (!canSendMessage(senderRole, receiver.user_type, messageType)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not allowed to send messages to this user',
+      });
+    }
 
     // Get sender info
     const senderResult = await db.query(
@@ -55,10 +124,17 @@ exports.sendMessage = async (req, res) => {
 
     // Insert message
     const result = await db.query(
-      `INSERT INTO messages (sender_id, receiver_id, property_id, message_text, is_read)
-       VALUES ($1, $2, $3, $4, FALSE)
+      `INSERT INTO messages (sender_id, receiver_id, property_id, message_text, subject, message_type, is_read)
+       VALUES ($1, $2, $3, $4, $5, $6, FALSE)
        RETURNING *`,
-      [senderId, receiver_id, property_id || null, message_text]
+      [
+        senderId,
+        receiver_id,
+        property_id || null,
+        message_text,
+        subject ? String(subject).trim() : null,
+        messageType,
+      ]
     );
 
     const message = result.rows[0];
@@ -90,6 +166,8 @@ exports.sendMessage = async (req, res) => {
 // Get conversations list
 exports.getConversations = async (req, res) => {
   try {
+    await ensureMessageSchema();
+
     const userId = req.user.id;
 
     const result = await db.query(
@@ -108,6 +186,8 @@ exports.getConversations = async (req, res) => {
            sender_id,
            receiver_id,
            message_text,
+           subject,
+           message_type,
            is_read,
            created_at,
            property_id
@@ -155,6 +235,8 @@ exports.getConversations = async (req, res) => {
 // Get conversation with specific user
 exports.getConversationWithUser = async (req, res) => {
   try {
+    await ensureMessageSchema();
+
     const userId = req.user.id;
     const { userId: otherUserId } = req.params;
     const { page = 1, limit = 50 } = req.query;
@@ -216,6 +298,8 @@ exports.getConversationWithUser = async (req, res) => {
 // Get messages for specific property
 exports.getPropertyMessages = async (req, res) => {
   try {
+    await ensureMessageSchema();
+
     const userId = req.user.id;
     const { propertyId } = req.params;
     const { page = 1, limit = 50 } = req.query;
@@ -254,6 +338,8 @@ exports.getPropertyMessages = async (req, res) => {
 // Mark message as read
 exports.markAsRead = async (req, res) => {
   try {
+    await ensureMessageSchema();
+
     const userId = req.user.id;
     const { messageId } = req.params;
 
@@ -289,6 +375,8 @@ exports.markAsRead = async (req, res) => {
 // Mark all messages in conversation as read
 exports.markConversationAsRead = async (req, res) => {
   try {
+    await ensureMessageSchema();
+
     const userId = req.user.id;
     const { userId: otherUserId } = req.params;
 
@@ -316,6 +404,8 @@ exports.markConversationAsRead = async (req, res) => {
 // Delete message
 exports.deleteMessage = async (req, res) => {
   try {
+    await ensureMessageSchema();
+
     const userId = req.user.id;
     const { messageId } = req.params;
 
@@ -348,6 +438,8 @@ exports.deleteMessage = async (req, res) => {
 // Get unread count
 exports.getUnreadCount = async (req, res) => {
   try {
+    await ensureMessageSchema();
+
     const userId = req.user.id;
 
     const result = await db.query(
@@ -366,6 +458,148 @@ exports.getUnreadCount = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch unread count'
+    });
+  }
+};
+
+// Get recipients allowed for current user
+exports.getEligibleRecipients = async (req, res) => {
+  try {
+    await ensureMessageSchema();
+
+    const { role = '', q = '' } = req.query;
+    const userId = req.user.id;
+    const userRole = req.user.user_type;
+    const requestedRole = String(role || '').trim().toLowerCase();
+    const search = String(q || '').trim();
+
+    let allowedRoles = [];
+    if (userRole === 'super_admin') {
+      allowedRoles = ['admin', 'tenant', 'landlord'];
+    } else if (userRole === 'admin') {
+      allowedRoles = ['tenant', 'landlord', 'super_admin'];
+    } else if (['tenant', 'landlord'].includes(userRole)) {
+      // Receive-only roles do not get sender recipient list.
+      allowedRoles = [];
+    } else {
+      return res.json({ success: true, data: [] });
+    }
+
+    if (requestedRole && !allowedRoles.includes(requestedRole)) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const rolesFilter = requestedRole ? [requestedRole] : allowedRoles;
+    if (!rolesFilter.length) {
+      return res.json({ success: true, data: [] });
+    }
+    const params = [userId, rolesFilter];
+    let idx = 3;
+
+    let where = `
+      WHERE u.id <> $1
+        AND u.user_type = ANY($2)
+        AND COALESCE(u.is_active, TRUE) = TRUE
+    `;
+
+    if (search) {
+      where += ` AND (
+        u.full_name ILIKE $${idx}
+        OR u.email ILIKE $${idx}
+      )`;
+      params.push(`%${search}%`);
+      idx += 1;
+    }
+
+    const result = await db.query(
+      `SELECT u.id, u.full_name, u.email, u.user_type
+       FROM users u
+       ${where}
+       ORDER BY
+         CASE u.user_type
+           WHEN 'super_admin' THEN 1
+           WHEN 'admin' THEN 2
+           WHEN 'landlord' THEN 3
+           WHEN 'tenant' THEN 4
+           ELSE 5
+         END,
+         u.full_name ASC
+       LIMIT 200`,
+      params
+    );
+
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get eligible recipients error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch eligible recipients',
+    });
+  }
+};
+
+// Escalation feed: admins see their escalations; super admins see escalations sent to them.
+exports.getEscalations = async (req, res) => {
+  try {
+    await ensureMessageSchema();
+
+    const userId = req.user.id;
+    const userRole = req.user.user_type;
+
+    if (!['admin', 'super_admin'].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
+      });
+    }
+
+    let query = '';
+    let params = [];
+
+    if (userRole === 'admin') {
+      query = `
+        SELECT m.id, m.subject, m.message_text, m.is_read, m.created_at,
+               s.id AS sender_id, s.full_name AS sender_name, s.user_type AS sender_role,
+               r.id AS receiver_id, r.full_name AS receiver_name, r.user_type AS receiver_role
+        FROM messages m
+        JOIN users s ON s.id = m.sender_id
+        JOIN users r ON r.id = m.receiver_id
+        WHERE m.message_type = 'escalation'
+          AND m.sender_id = $1
+        ORDER BY m.created_at DESC
+        LIMIT 200
+      `;
+      params = [userId];
+    } else {
+      query = `
+        SELECT m.id, m.subject, m.message_text, m.is_read, m.created_at,
+               s.id AS sender_id, s.full_name AS sender_name, s.user_type AS sender_role,
+               r.id AS receiver_id, r.full_name AS receiver_name, r.user_type AS receiver_role
+        FROM messages m
+        JOIN users s ON s.id = m.sender_id
+        JOIN users r ON r.id = m.receiver_id
+        WHERE m.message_type = 'escalation'
+          AND m.receiver_id = $1
+        ORDER BY m.created_at DESC
+        LIMIT 200
+      `;
+      params = [userId];
+    }
+
+    const result = await db.query(query, params);
+
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get escalations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch escalations',
     });
   }
 };

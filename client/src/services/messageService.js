@@ -48,4 +48,16 @@ export const messageService = {
     const response = await api.get('/messages/unread/count');
     return response.data;
   },
+
+  // Get eligible recipients based on current user role
+  getRecipients: async (params = {}) => {
+    const response = await api.get('/messages/recipients', { params });
+    return response.data;
+  },
+
+  // Get escalations feed
+  getEscalations: async () => {
+    const response = await api.get('/messages/escalations');
+    return response.data;
+  },
 };

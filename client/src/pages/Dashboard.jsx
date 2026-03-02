@@ -22,6 +22,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const hasSubmittedVerification = !!user?.passport_photo_url;
 
   const loadDashboardData = useCallback(async () => {
     if (!user) return;
@@ -91,8 +92,8 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Verification Alert */}
-        {!user?.identity_verified && (
+                {/* Verification Alert */}
+        {!user?.identity_verified && !hasSubmittedVerification && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-start">
               <FaClock className="text-yellow-600 mt-1 mr-3" />
@@ -107,7 +108,29 @@ const Dashboard = () => {
                   onClick={() => navigate('/profile')}
                   className="mt-2 text-sm font-semibold text-yellow-800 hover:text-yellow-900"
                 >
-                  {t('dashboard.verify_action')} →
+                  {t('dashboard.verify_action')} ->
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!user?.identity_verified && hasSubmittedVerification && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start">
+              <FaClock className="text-blue-600 mt-1 mr-3" />
+              <div>
+                <h3 className="font-semibold text-blue-800">
+                  Verification Submitted
+                </h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  Your passport was submitted. It is pending admin review.
+                </p>
+                <button
+                  onClick={() => navigate('/profile')}
+                  className="mt-2 text-sm font-semibold text-blue-800 hover:text-blue-900"
+                >
+                  View Verification Status ->
                 </button>
               </div>
             </div>
@@ -341,3 +364,4 @@ const QuickActionCard = ({ title, description, icon, onClick }) => (
 );
 
 export default Dashboard;
+
