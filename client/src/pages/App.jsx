@@ -49,7 +49,7 @@ import AdminUserDetail from './admin/AdminUserDetail';
 import AdminPropertyDetail from './admin/AdminPropertyDetail';
 import AdminApplicationDetail from './admin/AdminApplicationDetail';
 import AdminCompliance from './admin/AdminCompliance';
-
+import LawyerDashboard from './lawyer/LawyerDashboard';
 
 const queryClient = new QueryClient();
 
@@ -156,6 +156,7 @@ function App() {
               <Route path="/super-admin" element={<SuperAdminDashboard />} />
               <Route path="/admin/users/:id" element={<AdminUserDetail />} />
               <Route path="compliance" element={<AdminCompliance />} />
+              <Route path="/lawyer" element={<ProtectedRoute><LawyerDashboard /></ProtectedRoute>}/>
 
               {/* Protected */}
               <Route

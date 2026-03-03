@@ -123,6 +123,7 @@ app.use('/api/property-utils', propertyUtilsRoutes);
 app.use('/api/property-alerts', propertyAlertsRoutes);
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/compliance', require('./routes/compliance'));
+app.use('/api/export', require('./routes/export'));
 
 // -----------------------------------
 // ERROR HANDLER

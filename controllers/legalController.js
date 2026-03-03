@@ -25,3 +25,25 @@ exports.grantLawyerAccess = async (req, res) => {
     });
   }
 };
+
+// controllers/legalController.js
+
+exports.getAuthorizedProperties = async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT p.*
+       FROM legal_authorizations l
+       JOIN properties p ON p.id = l.property_id
+       WHERE l.lawyer_user_id = $1
+       AND l.status = 'active'`,
+      [req.user.id]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    res.status(500).json({ success: false });
+  }
+};

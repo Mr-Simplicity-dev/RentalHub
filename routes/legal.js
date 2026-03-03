@@ -5,6 +5,14 @@ const { allowRoles } = require('../middleware/roleMiddleware');
 const { canLawyerAccessProperty } = require('../middleware/legalAccessMiddleware');
 const disputeController = require('../controllers/disputeController');
 const { audit } = require('../middleware/auditMiddleware');
+const legalController = require('../controllers/legalController');
+
+router.get(
+  '/properties',
+  authenticate,
+  allowRoles('lawyer'),
+  legalController.getAuthorizedProperties
+);
 
 router.get(
   '/property/:propertyId/disputes',
