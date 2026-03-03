@@ -238,8 +238,17 @@ exports.getConversationWithUser = async (req, res) => {
     await ensureMessageSchema();
 
     const userId = req.user.id;
-    const { userId: otherUserId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
+    const otherUserId = parseInt(req.params.userId, 10);
+
+    if (!otherUserId || isNaN(otherUserId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
     const offset = (page - 1) * limit;
 
     // Get messages
@@ -260,14 +269,22 @@ exports.getConversationWithUser = async (req, res) => {
       [userId, otherUserId, limit, offset]
     );
 
-    // Mark messages as read
+    // Mark unread messages as read
     await db.query(
       `UPDATE messages 
        SET is_read = TRUE 
-       WHERE sender_id = $1 AND receiver_id = $2 AND is_read = FALSE`,
+       WHERE sender_id = $1 
+         AND receiver_id = $2 
+         AND is_read = FALSE`,
       [otherUserId, userId]
     );
-
+// 🔐 Audit Log
+await db.query(
+  `INSERT INTO audit_logs 
+   (actor_id, action, target_type, target_id, ip_address)
+   VALUES ($1, $2, $3, $4, $5)`,
+  [req.user.id, 'Viewed conversation', 'conversation', otherUserId, req.ip]
+);
     // Get total count
     const countResult = await db.query(
       `SELECT COUNT(*) FROM messages
@@ -276,19 +293,34 @@ exports.getConversationWithUser = async (req, res) => {
       [userId, otherUserId]
     );
 
-    res.json({
+    // 🔐 AUDIT LOG (Safe + Non-blocking)
+    try {
+      const { logAction } = require('../utils/auditLogger');
+
+      await logAction({
+        actorId: userId,
+        action: 'Viewed conversation',
+        targetType: 'conversation',
+        targetId: otherUserId,
+        ip: req.ip
+      });
+    } catch (logError) {
+      console.error('Audit log error:', logError.message);
+    }
+
+    return res.json({
       success: true,
-      data: result.rows.reverse(), // Reverse to show oldest first
+      data: result.rows.reverse(), // Oldest first
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: parseInt(countResult.rows[0].count)
+        page,
+        limit,
+        total: parseInt(countResult.rows[0].count, 10)
       }
     });
 
   } catch (error) {
     console.error('Get conversation error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to fetch conversation'
     });

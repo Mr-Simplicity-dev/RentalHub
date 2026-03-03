@@ -821,3 +821,49 @@ exports.rejectApplication = async (req, res) => {
     });
   }
 };
+
+
+exports.verifyLedgerIntegrity = async (req, res) => {
+  try {
+    const logs = await db.query(
+      `SELECT * FROM audit_logs ORDER BY id ASC`
+    );
+
+    let previousHash = 'GENESIS';
+
+    for (const log of logs.rows) {
+      const dataString =
+        log.actor_id +
+        log.action +
+        log.target_type +
+        log.target_id +
+        log.created_at.toISOString() +
+        previousHash;
+
+      const recalculated = require('crypto')
+        .createHash('sha256')
+        .update(dataString)
+        .digest('hex');
+
+      if (recalculated !== log.current_hash) {
+        return res.json({
+          success: false,
+          compromisedAt: log.id
+        });
+      }
+
+      previousHash = log.current_hash;
+    }
+
+    res.json({
+      success: true,
+      message: 'Ledger integrity intact'
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Ledger verification failed'
+    });
+  }
+};

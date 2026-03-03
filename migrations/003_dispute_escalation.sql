@@ -1,0 +1,6 @@
+ALTER TABLE disputes
+ADD COLUMN IF NOT EXISTS escalated BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_disputes_escalated
+ON disputes(escalated);

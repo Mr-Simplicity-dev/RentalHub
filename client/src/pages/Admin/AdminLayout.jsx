@@ -7,7 +7,9 @@ import {
   FaHome,
   FaFileAlt,
   FaCheckCircle,
-  FaSignOutAlt,
+  FaShieldAlt,
+  FaLock,
+  FaSignOutAlt
 } from 'react-icons/fa';
 
 const AdminLayout = () => {
@@ -37,33 +39,83 @@ const AdminLayout = () => {
           </p>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          <NavLink to="/admin" end className={navItem}>
-            <FaTachometerAlt className="mr-3" />
-            Dashboard
-          </NavLink>
+        <nav className="flex-1 p-4 space-y-6">
 
-          <NavLink to="/admin/users" className={navItem}>
-            <FaUsers className="mr-3" />
-            Users
-          </NavLink>
+          {/* CORE SECTION */}
+          <div>
+            <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+              Core
+            </p>
 
-          <NavLink to="/admin/verifications" className={navItem}>
-            <FaCheckCircle className="mr-3" />
-            NIN/Passport Verification
-          </NavLink>
+            <div className="space-y-2">
+              <NavLink to="/admin" end className={navItem}>
+                <FaTachometerAlt className="mr-3" />
+                Dashboard
+              </NavLink>
 
-          <NavLink to="/admin/properties" className={navItem}>
-            <FaHome className="mr-3" />
-            Properties
-          </NavLink>
+              <NavLink to="/admin/users" className={navItem}>
+                <FaUsers className="mr-3" />
+                Users
+              </NavLink>
 
-          <NavLink to="/admin/applications" className={navItem}>
-            <FaFileAlt className="mr-3" />
-            Applications
-          </NavLink>
-        </nav>
+              <NavLink to="/admin/properties" className={navItem}>
+                <FaHome className="mr-3" />
+                Properties
+              </NavLink>
 
+              <NavLink to="/admin/applications" className={navItem}>
+                <FaFileAlt className="mr-3" />
+                Applications
+              </NavLink>
+            </div>
+          </div>
+
+
+          {/* LEGAL SECTION */}
+          <div>
+            <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+              Legal
+            </p>
+
+            <div className="space-y-2">
+              <NavLink to="/admin/verifications" className={navItem}>
+                <FaCheckCircle className="mr-3" />
+                Identity Verification
+              </NavLink>
+
+              <NavLink to="/admin/compliance" className={navItem}>
+                <FaShieldAlt className="mr-3" />
+                Compliance & Risk
+                {riskScore > 12 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                    High
+                  </span>
+                )}
+              </NavLink>
+            </div>
+          </div>
+
+
+          {/* MONITORING SECTION */}
+          <div>
+            <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+              Monitoring
+            </p>
+
+            <div className="space-y-2">
+              <NavLink to="/admin/ledger" className={navItem}>
+                <FaLock className="mr-3" />
+                Ledger Integrity
+                {!ledgerIntegrity && (
+                  <span className="ml-auto bg-red-600 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+                    !
+                  </span>
+                )}
+              </NavLink>
+            </div>
+          </div>
+
+</nav>
         <div className="p-4 border-t">
           <button
             onClick={handleLogout}

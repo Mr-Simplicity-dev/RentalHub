@@ -18,16 +18,19 @@ const formatDateTime = (value) => {
 
 const Messages = () => {
   const { user } = useAuth();
+
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [loadingConversations, setLoadingConversations] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [recipients, setRecipients] = useState([]);
   const [escalations, setEscalations] = useState([]);
+
+  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [loadingEscalations, setLoadingEscalations] = useState(false);
+  const [sending, setSending] = useState(false);
+
   const [recipientRoleFilter, setRecipientRoleFilter] = useState('');
   const [compose, setCompose] = useState({
     receiver_id: '',
@@ -51,11 +54,13 @@ const Messages = () => {
     return [];
   }, [user, canCompose]);
 
+  /* ---------------- LOADERS ---------------- */
+
   const loadConversations = useCallback(async () => {
     setLoadingConversations(true);
     try {
       const res = await messageService.getConversations();
-      setConversations(res.data || []);
+      setConversations(res?.data || []);
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to load conversations');
     } finally {
@@ -69,8 +74,9 @@ const Messages = () => {
     setLoadingMessages(true);
     try {
       const res = await messageService.getConversationWithUser(otherUserId);
-      setMessages(res.data || []);
+      setMessages(res?.data || []);
       await messageService.markConversationAsRead(otherUserId);
+
       setConversations((prev) =>
         prev.map((c) =>
           c.other_user_id === otherUserId ? { ...c, unread_count: 0 } : c
@@ -87,9 +93,10 @@ const Messages = () => {
     setLoadingRecipients(true);
     try {
       const res = await messageService.getRecipients({ role });
-      setRecipients(res.data || []);
+      setRecipients(res?.data || []);
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to load recipients');
+      setRecipients([]);
     } finally {
       setLoadingRecipients(false);
     }
@@ -101,13 +108,15 @@ const Messages = () => {
     setLoadingEscalations(true);
     try {
       const res = await messageService.getEscalations();
-      setEscalations(res.data || []);
+      setEscalations(res?.data || []);
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to load escalations');
     } finally {
       setLoadingEscalations(false);
     }
   }, [canViewEscalations]);
+
+  /* ---------------- EFFECTS ---------------- */
 
   useEffect(() => {
     loadConversations();
@@ -126,6 +135,8 @@ const Messages = () => {
     }
   }, [canUseEscalation, compose.message_type, recipientRoleFilter]);
 
+  /* ---------------- ACTIONS ---------------- */
+
   const handleSelectConversation = async (conversation) => {
     setSelectedConversation(conversation);
     setCompose((prev) => ({
@@ -137,6 +148,7 @@ const Messages = () => {
 
   const handleSendMessage = async (event) => {
     event.preventDefault();
+
     if (!canCompose) {
       toast.error('You can only receive messages.');
       return;
@@ -145,36 +157,27 @@ const Messages = () => {
     const receiverId =
       Number(compose.receiver_id) || Number(selectedConversation?.other_user_id);
 
-    if (!receiverId) {
-      toast.error('Select a recipient');
-      return;
-    }
-
-    if (!compose.message_text.trim()) {
-      toast.error('Message text is required');
-      return;
-    }
-
-    if (compose.message_type === 'escalation' && !compose.subject.trim()) {
-      toast.error('Escalation subject is required');
-      return;
-    }
+    if (!receiverId) return toast.error('Select a recipient');
+    if (!compose.message_text.trim()) return toast.error('Message text is required');
+    if (compose.message_type === 'escalation' && !compose.subject.trim())
+      return toast.error('Escalation subject is required');
 
     setSending(true);
+
     try {
       const payload = {
         receiver_id: receiverId,
         message_text: compose.message_text.trim(),
         subject: compose.subject.trim() || null,
-        message_type: compose.message_type || 'general',
+        message_type: compose.message_type,
       };
 
       const res = await messageService.sendMessage(payload);
-      if (!res.success) {
-        throw new Error(res.message || 'Failed to send');
-      }
+
+      if (!res.success) throw new Error(res.message);
 
       toast.success('Message sent');
+
       setCompose((prev) => ({
         ...prev,
         message_text: '',
@@ -194,6 +197,8 @@ const Messages = () => {
       setSending(false);
     }
   };
+
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="container mx-auto px-4 py-8">

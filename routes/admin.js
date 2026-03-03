@@ -4,6 +4,8 @@ const { authenticate } = require("../config/middleware/auth");
 const { requireAdmin } = require('../config/middleware/requireAdmin');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const adminController = require('../controllers/adminController');
+const { allowRoles } = require('../middleware/roleMiddleware');
+const adminController = require('../controllers/adminController');
 
 /**
  * AUTH
@@ -118,6 +120,14 @@ router.post(
   '/applications/:id/reject',
   requireAdminOrSuperAdmin,
   adminController.rejectApplication
+);
+
+
+router.get(
+  '/ledger/verify',
+  authenticate,
+  allowRoles('admin','super_admin'),
+  adminController.verifyLedgerIntegrity
 );
 
 module.exports = router;

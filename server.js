@@ -23,6 +23,10 @@ import propertyUtilsRoutes from './routes/propertyUtils.js';
 import propertyAlertsRoutes from './routes/propertyAlerts.js';
 
 import paymentJobs from './jobs/paymentJobs.js';
+const auditMiddleware = require('./middleware/auditMiddleware');
+app.use('/api/disputes', require('./routes/disputes'));
+app.use(auditMiddleware);
+app.use('/api/legal', require('./routes/legal'));
 
 dotenv.config();
 
@@ -117,6 +121,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/super', superAdminRoutes);
 app.use('/api/property-utils', propertyUtilsRoutes);
 app.use('/api/property-alerts', propertyAlertsRoutes);
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/compliance', require('./routes/compliance'));
 
 // -----------------------------------
 // ERROR HANDLER
@@ -151,3 +157,6 @@ app.use((err, req, res, next) => {
     error: err.message,
   });
 });
+const startScheduler = require('./utils/scheduler');
+
+startScheduler();
