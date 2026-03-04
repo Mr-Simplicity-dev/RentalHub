@@ -15,6 +15,18 @@ import BroadcastTab from "../components/admin/BroadcastTab";
 import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
 
+const tabs = [
+  "users",
+  "verifications",
+  "properties",
+  "analytics",
+  "reports",
+  "logs",
+  "broadcast",
+  "flags",
+  "fraud",
+];
+
 export default function SuperAdminDashboard() {
 
   const { user } = useAuth();
@@ -33,11 +45,31 @@ export default function SuperAdminDashboard() {
   const [fraud, setFraud] = useState([]);
   const [verifications, setVerifications] = useState([]);
 
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [selectedProps, setSelectedProps] = useState([]);
+
+  const [verificationSearch, setVerificationSearch] = useState("");
+  const [verificationStatus, setVerificationStatus] = useState("pending");
+  const [verificationUserType, setVerificationUserType] = useState("all");
+  const [verificationPagination, setVerificationPagination] = useState({
+    total: 0,
+    pages: 1,
+  });
+
+  const [adminPerformance, setAdminPerformance] = useState([]);
+
+  const [broadcastForm, setBroadcastForm] = useState({
+    title: "",
+    message: "",
+    target_role: "",
+  });
+
   const guardedLoad = async (fn, msg) => {
     try {
       setLoading(true);
       await fn();
     } catch (e) {
+      console.error(e);
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -84,6 +116,97 @@ export default function SuperAdminDashboard() {
     setVerifications(res.data.verifications || []);
   };
 
+  const loadBroadcasts = async () => {
+    const res = await api.get("/super/broadcasts");
+    setBroadcasts(res.data.broadcasts || []);
+  };
+
+  const loadTab = (name) => {
+    setTab(name);
+
+    if (name === "users") guardedLoad(loadUsers,"Failed loading users");
+    if (name === "properties") guardedLoad(loadProperties,"Failed loading properties");
+    if (name === "logs") guardedLoad(loadLogs,"Failed loading logs");
+    if (name === "analytics") guardedLoad(loadAnalytics,"Failed loading analytics");
+    if (name === "reports") guardedLoad(loadReports,"Failed loading reports");
+    if (name === "fraud") guardedLoad(loadFraud,"Failed loading fraud");
+    if (name === "flags") guardedLoad(loadFlags,"Failed loading flags");
+    if (name === "verifications") guardedLoad(loadVerifications,"Failed loading verifications");
+    if (name === "broadcast") guardedLoad(loadBroadcasts,"Failed loading broadcasts");
+  };
+
+  const verifyIdentity = async (id) => {
+    await api.patch(`/super/verifications/${id}/approve`);
+    toast.success("Identity verified");
+    loadVerifications();
+  };
+
+  const rejectIdentity = async (id) => {
+    await api.patch(`/super/verifications/${id}/reject`);
+    toast.success("Identity rejected");
+    loadVerifications();
+  };
+
+  const banUser = async (id) => {
+    await api.patch(`/super/users/${id}/ban`);
+    toast.success("User banned");
+    loadUsers();
+  };
+
+  const promoteUser = async (id) => {
+    await api.patch(`/super/users/${id}/promote`);
+    toast.success("User promoted");
+    loadUsers();
+  };
+
+  const unlistProperty = async (id) => {
+    await api.patch(`/super/properties/${id}/unlist`);
+    toast.success("Property unlisted");
+    loadProperties();
+  };
+
+  const bulkUsers = async (action) => {
+    await api.post("/super/users/bulk", {
+      ids: selectedUsers,
+      action,
+    });
+    toast.success("Bulk action completed");
+    loadUsers();
+  };
+
+  const bulkProps = async () => {
+    await api.post("/super/properties/bulk", {
+      ids: selectedProps,
+      action: "unlist",
+    });
+    toast.success("Bulk unlist completed");
+    loadProperties();
+  };
+
+  const updateReport = async (id, status) => {
+    await api.patch(`/super/reports/${id}`, { status });
+    loadReports();
+  };
+
+  const sendBroadcast = async () => {
+    await api.post("/super/broadcasts", broadcastForm);
+
+    toast.success("Broadcast sent");
+
+    setBroadcastForm({
+      title: "",
+      message: "",
+      target_role: "",
+    });
+
+    loadBroadcasts();
+  };
+
+  const toggleFlag = async (key, enabled) => {
+    await api.patch(`/super/flags/${key}`, { enabled });
+    loadFlags();
+  };
+
   useEffect(() => {
 
     if (!user) navigate("/login");
@@ -93,95 +216,85 @@ export default function SuperAdminDashboard() {
 
   }, [user]);
 
-  useEffect(() => {
-
-    if (tab === "users") guardedLoad(loadUsers,"Failed loading users");
-    if (tab === "properties") guardedLoad(loadProperties,"Failed loading properties");
-    if (tab === "logs") guardedLoad(loadLogs,"Failed loading logs");
-    if (tab === "analytics") guardedLoad(loadAnalytics,"Failed loading analytics");
-    if (tab === "reports") guardedLoad(loadReports,"Failed loading reports");
-    if (tab === "fraud") guardedLoad(loadFraud,"Failed loading fraud");
-    if (tab === "flags") guardedLoad(loadFlags,"Failed loading flags");
-    if (tab === "verifications") guardedLoad(loadVerifications,"Failed loading verifications");
-
-  }, [tab]);
-
   return (
-
     <div className="max-w-7xl mx-auto px-4 py-8">
 
       <h1 className="text-3xl font-bold mb-6">
         Super Admin Control Center
       </h1>
 
-     <AdminTabs tabs={tabs} tab={tab} loadTab={loadTab} />
+      <AdminTabs tabs={tabs} tab={tab} loadTab={loadTab} />
 
-     {loading && <p className="text-gray-500">Loading...</p>}
+      {loading && <p className="text-gray-500">Loading...</p>}
 
-{tab === "users" && (
-  <UsersTab
-    users={users}
-    selectedUsers={selectedUsers}
-    setSelectedUsers={setSelectedUsers}
-    bulkUsers={bulkUsers}
-    verifyIdentity={verifyIdentity}
-    promoteUser={promoteUser}
-    banUser={banUser}
-  />
-)}
+      {tab === "users" && (
+        <UsersTab
+          users={users}
+          selectedUsers={selectedUsers}
+          setSelectedUsers={setSelectedUsers}
+          bulkUsers={bulkUsers}
+          verifyIdentity={verifyIdentity}
+          promoteUser={promoteUser}
+          banUser={banUser}
+        />
+      )}
 
-{tab === "verifications" && (
-  <VerificationsTab
-    verifications={verifications}
-    verificationSearch={verificationSearch}
-    setVerificationSearch={setVerificationSearch}
-    verificationStatus={verificationStatus}
-    setVerificationStatus={setVerificationStatus}
-    verificationUserType={verificationUserType}
-    setVerificationUserType={setVerificationUserType}
-    verificationPagination={verificationPagination}
-    loadVerifications={loadVerifications}
-    verifyIdentity={verifyIdentity}
-    rejectIdentity={rejectIdentity}
-    adminPerformance={adminPerformance}
-  />
-)}
+      {tab === "verifications" && (
+        <VerificationsTab
+          verifications={verifications}
+          verificationSearch={verificationSearch}
+          setVerificationSearch={setVerificationSearch}
+          verificationStatus={verificationStatus}
+          setVerificationStatus={setVerificationStatus}
+          verificationUserType={verificationUserType}
+          setVerificationUserType={setVerificationUserType}
+          verificationPagination={verificationPagination}
+          loadVerifications={loadVerifications}
+          verifyIdentity={verifyIdentity}
+          rejectIdentity={rejectIdentity}
+          adminPerformance={adminPerformance}
+        />
+      )}
 
-{tab === "properties" && (
-  <PropertiesTab
-    properties={properties}
-    selectedProps={selectedProps}
-    setSelectedProps={setSelectedProps}
-    bulkProps={bulkProps}
-    unlistProperty={unlistProperty}
-  />
-)}
+      {tab === "properties" && (
+        <PropertiesTab
+          properties={properties}
+          selectedProps={selectedProps}
+          setSelectedProps={setSelectedProps}
+          bulkProps={bulkProps}
+          unlistProperty={unlistProperty}
+        />
+      )}
 
-{tab === "analytics" && (
-  <AnalyticsTab analytics={analytics} />
-)}
+      {tab === "analytics" && (
+        <AnalyticsTab analytics={analytics} />
+      )}
 
-{tab === "reports" && (
-  <ReportsTab reports={reports} updateReport={updateReport} />
-)}
+      {tab === "reports" && (
+        <ReportsTab reports={reports} updateReport={updateReport} />
+      )}
 
-{tab === "logs" && (
-  <LogsTab logs={logs} />
-)}
+      {tab === "logs" && (
+        <LogsTab logs={logs} />
+      )}
 
-{tab === "broadcast" && (
-  <BroadcastTab
-    broadcastForm={broadcastForm}
-    setBroadcastForm={setBroadcastForm}
-    sendBroadcast={sendBroadcast}
-    broadcasts={broadcasts}
-  />
-)}
+      {tab === "broadcast" && (
+        <BroadcastTab
+          broadcastForm={broadcastForm}
+          setBroadcastForm={setBroadcastForm}
+          sendBroadcast={sendBroadcast}
+          broadcasts={broadcasts}
+        />
+      )}
 
-{tab === "flags" && (
-  <FlagsTab flags={flags} toggleFlag={toggleFlag} />
-)}
+      {tab === "flags" && (
+        <FlagsTab flags={flags} toggleFlag={toggleFlag} />
+      )}
 
-{tab === "fraud" && (
-  <FraudTab fraud={fraud} loadFraud={loadFraud} />
-)}
+      {tab === "fraud" && (
+        <FraudTab fraud={fraud} loadFraud={loadFraud} />
+      )}
+
+    </div>
+  );
+}
