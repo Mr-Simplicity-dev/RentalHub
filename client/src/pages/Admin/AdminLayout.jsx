@@ -16,6 +16,10 @@ const AdminLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  // TEMP default values (until backend supplies them)
+  const riskScore = user?.riskScore || 0;
+  const ledgerIntegrity = user?.ledgerIntegrity ?? true;
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -30,8 +34,10 @@ const AdminLayout = () => {
 
   return (
     <div className="min-h-screen flex bg-gray-100">
+
       {/* Sidebar */}
       <aside className="w-64 bg-white shadow-lg flex flex-col">
+
         <div className="px-6 py-5 border-b">
           <h2 className="text-xl font-bold text-primary-600">Admin Panel</h2>
           <p className="text-xs text-gray-500 mt-1">
@@ -41,13 +47,14 @@ const AdminLayout = () => {
 
         <nav className="flex-1 p-4 space-y-6">
 
-          {/* CORE SECTION */}
+          {/* CORE */}
           <div>
             <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
               Core
             </p>
 
             <div className="space-y-2">
+
               <NavLink to="/admin" end className={navItem}>
                 <FaTachometerAlt className="mr-3" />
                 Dashboard
@@ -67,17 +74,20 @@ const AdminLayout = () => {
                 <FaFileAlt className="mr-3" />
                 Applications
               </NavLink>
+
             </div>
           </div>
 
 
-          {/* LEGAL SECTION */}
+          {/* LEGAL */}
           <div>
+
             <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
               Legal
             </p>
 
             <div className="space-y-2">
+
               <NavLink to="/admin/verifications" className={navItem}>
                 <FaCheckCircle className="mr-3" />
                 Identity Verification
@@ -86,37 +96,50 @@ const AdminLayout = () => {
               <NavLink to="/admin/compliance" className={navItem}>
                 <FaShieldAlt className="mr-3" />
                 Compliance & Risk
+
                 {riskScore > 12 && (
                   <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
                     High
                   </span>
                 )}
+
               </NavLink>
+
             </div>
+
           </div>
 
 
-          {/* MONITORING SECTION */}
+          {/* MONITORING */}
           <div>
+
             <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
               Monitoring
             </p>
 
             <div className="space-y-2">
+
               <NavLink to="/admin/ledger" className={navItem}>
                 <FaLock className="mr-3" />
                 Ledger Integrity
+
                 {!ledgerIntegrity && (
                   <span className="ml-auto bg-red-600 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
                     !
                   </span>
                 )}
+
               </NavLink>
+
             </div>
+
           </div>
 
-</nav>
+        </nav>
+
+
         <div className="p-4 border-t">
+
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
@@ -124,13 +147,17 @@ const AdminLayout = () => {
             <FaSignOutAlt className="mr-2" />
             Logout
           </button>
+
         </div>
+
       </aside>
 
-      {/* Main Content */}
+
+      {/* MAIN CONTENT */}
       <main className="flex-1 p-6 overflow-y-auto">
         <Outlet />
       </main>
+
     </div>
   );
 };
