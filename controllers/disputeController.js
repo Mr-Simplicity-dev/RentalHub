@@ -1,5 +1,5 @@
 const db = require('../config/middleware/database');
-const { logAction } = require('../utils/auditLogger');
+const { logAction } = require('../config/utils/auditLogger');
 const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');

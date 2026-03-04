@@ -1,4 +1,4 @@
-const db = require('../config/middleware/database');
+const db = require('../middleware/database');
 const crypto = require('crypto');
 
 exports.logAction = async ({
