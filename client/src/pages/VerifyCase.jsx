@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 
@@ -12,7 +12,7 @@ export default function VerifyCase() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const verifyCase = async (id) => {
+  const verifyCase = useCallback(async (id) => {
 
     const targetId = id || disputeId;
 
@@ -35,11 +35,11 @@ export default function VerifyCase() {
       console.error(err);
       setError('Verification failed. Dispute may not exist.');
 
+    } finally {
+      setLoading(false);
     }
 
-    setLoading(false);
-
-  };
+  }, [disputeId]);
 
   // Auto verify if QR code opened the page
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function VerifyCase() {
       verifyCase(disputeFromUrl);
     }
 
-  }, [disputeFromUrl]);
+  }, [disputeFromUrl, verifyCase]);
 
   return (
     <div style={{ padding: 40 }}>
