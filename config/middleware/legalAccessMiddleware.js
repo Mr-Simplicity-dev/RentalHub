@@ -1,4 +1,4 @@
-const db = require('../config/middleware/database');
+const db = require('./database');
 
 exports.canLawyerAccessProperty = async (req, res, next) => {
   try {

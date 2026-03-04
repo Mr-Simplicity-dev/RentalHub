@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../config/middleware/auth');
-const { allowRoles } = require('../middleware/roleMiddleware');
+const { allowRoles } = require('../config/middleware/roleMiddleware');
 const exportController = require('../controllers/exportController');
 
 router.get(

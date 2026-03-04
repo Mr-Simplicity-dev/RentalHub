@@ -31,9 +31,9 @@ const verificationRoutes = require('./routes/evidenceVerification.routes');
 const paymentJobs = require('./jobs/paymentJobs');
 const { startPaymentJobs, startPropertyJobs } = paymentJobs;
 
-const auditMiddleware = require('./middleware/auditMiddleware');
+const { audit } = require('./config/middleware/auditMiddleware');
 
-const startScheduler = require('./utils/scheduler');
+const scheduler = require('./config/utils/scheduler');
 
 dotenv.config();
 
@@ -70,7 +70,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Audit middleware
-app.use(auditMiddleware);
+app.use(audit('API Request', 'system'));
 
 // -----------------------------------
 // ROOT & HEALTH

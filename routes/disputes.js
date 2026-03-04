@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 
 const disputeController = require('../controllers/disputeController');
+
 const { authenticate } = require('../config/middleware/auth');
-const { allowRoles } = require('../middleware/roleMiddleware');
-const { canAccessProperty } = require('../middleware/propertyAccessMiddleware');
-const { canAccessDispute } = require('../middleware/disputeAccessMiddleware');
-const upload = require('../middleware/uploadEvidence');
+const { allowRoles } = require('../config/middleware/roleMiddleware');
+const { canAccessProperty } = require('../config/middleware/propertyAccessMiddleware');
+const { canAccessDispute } = require('../config/middleware/disputeAccessMiddleware');
+const upload = require('../config/middleware/uploadEvidence');
 
 /**
  * Create dispute
@@ -32,7 +33,6 @@ router.get(
 
 /**
  * Add message to dispute
- * Must be part of dispute or admin
  */
 router.post(
   '/:disputeId/messages',
@@ -52,6 +52,9 @@ router.patch(
   disputeController.resolveDispute
 );
 
+/**
+ * Upload evidence
+ */
 router.post(
   '/:disputeId/evidence',
   authenticate,
@@ -60,10 +63,12 @@ router.post(
   disputeController.uploadEvidence
 );
 
+/**
+ * Verify evidence integrity
+ */
 router.get(
   '/evidence/:evidenceId/verify',
   authenticate,
-  canAccessDispute,
   disputeController.verifyEvidenceIntegrity
 );
 

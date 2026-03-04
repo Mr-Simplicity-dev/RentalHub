@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../config/middleware/auth');
-const { allowRoles } = require('../middleware/roleMiddleware');
-const { canLawyerAccessProperty } = require('../middleware/legalAccessMiddleware');
+
 const disputeController = require('../controllers/disputeController');
-const { audit } = require('../middleware/auditMiddleware');
 const legalController = require('../controllers/legalController');
+
+const { authenticate } = require('../config/middleware/auth');
+const { allowRoles } = require('../config/middleware/roleMiddleware');
+const { canLawyerAccessProperty, canAccessLegal } = require('../config/middleware/legalAccessMiddleware');
+const { audit } = require('../config/middleware/auditMiddleware');
 
 router.get(
   '/properties',

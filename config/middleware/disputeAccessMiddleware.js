@@ -1,4 +1,4 @@
-const db = require('../config/middleware/database');
+const db = require('./database');
 
 exports.canAccessDispute = async (req, res, next) => {
   try {
