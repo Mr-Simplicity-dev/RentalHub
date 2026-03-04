@@ -50,6 +50,7 @@ import AdminPropertyDetail from './admin/AdminPropertyDetail';
 import AdminApplicationDetail from './admin/AdminApplicationDetail';
 import AdminCompliance from './admin/AdminCompliance';
 import LawyerDashboard from './lawyer/LawyerDashboard';
+import VerifyCase from './pages/VerifyCase';
 
 const queryClient = new QueryClient();
 
@@ -157,6 +158,7 @@ function App() {
               <Route path="/admin/users/:id" element={<AdminUserDetail />} />
               <Route path="compliance" element={<AdminCompliance />} />
               <Route path="/lawyer" element={<ProtectedRoute><LawyerDashboard /></ProtectedRoute>}/>
+              <Route path="/verify-case" element={<VerifyCase />} />
 
               {/* Protected */}
               <Route

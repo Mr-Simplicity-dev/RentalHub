@@ -1,6 +1,6 @@
 const db = require('../config/middleware/database');
  const crypto = require('crypto');
- 
+
 const auditMiddleware = async (req, res, next) => {
   const start = Date.now();
 
@@ -28,8 +28,7 @@ const targetId =
   req.params.id ||
   null;
 
-const actionText =
-  action || `${req.method} ${req.originalUrl}`;
+const actionText = `${req.method} ${req.originalUrl}`;
 
 // Create deterministic data string
 const dataString =

@@ -36,6 +36,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const { startPaymentJobs, startPropertyJobs } = paymentJobs;
 
+const verificationRoutes =
+  require('./routes/evidenceVerification.routes');
+
 // Tell Express it is behind a proxy (Render, Vercel, Nginx, etc.)
 app.set('trust proxy', 1);
 
@@ -124,6 +127,7 @@ app.use('/api/property-alerts', propertyAlertsRoutes);
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/compliance', require('./routes/compliance'));
 app.use('/api/export', require('./routes/export'));
+app.use('/evidence', verificationRoutes);
 
 // -----------------------------------
 // ERROR HANDLER

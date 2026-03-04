@@ -3,6 +3,8 @@ const { logAction } = require('../utils/auditLogger');
 const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
+const { buildMerkleRoot } = require('../services/merkleEvidence.service');
+const { anchorEvidence } = require('../services/evidenceAnchor.service');
 
 // Create dispute
 exports.createDispute = async (req, res) => {
@@ -93,6 +95,26 @@ exports.addDisputeMessage = async (req, res) => {
       });
     }
 
+    // 🔒 Check if dispute exists and if it is legally sealed
+    const disputeCheck = await db.query(
+      `SELECT is_legally_sealed FROM disputes WHERE id = $1`,
+      [disputeId]
+    );
+
+    if (disputeCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Dispute not found'
+      });
+    }
+
+    if (disputeCheck.rows[0].is_legally_sealed) {
+      return res.status(403).json({
+        success: false,
+        message: 'This dispute is legally sealed and cannot be modified'
+      });
+    }
+
     const result = await db.query(
       `INSERT INTO dispute_messages (dispute_id, sender_id, message)
        VALUES ($1,$2,$3)
@@ -127,21 +149,25 @@ exports.resolveDispute = async (req, res) => {
   try {
     const { disputeId } = req.params;
 
-    const result = await db.query(
-      `UPDATE disputes
-       SET status = 'resolved',
-           resolved_at = CURRENT_TIMESTAMP
-       WHERE id = $1
-       RETURNING *`,
-      [disputeId]
-    );
+    // Prevent resolving a legally sealed dispute
+            const result = await db.query(
+            `UPDATE disputes
+            SET status = 'resolved',
+                resolved_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+            AND is_legally_sealed = FALSE
+            RETURNING *`,
+            [disputeId]
+            );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Dispute not found'
-      });
-    }
+            if (result.rows.length === 0) {
+            return res.status(403).json({
+                success: false,
+                message: 'Dispute not found or it is legally sealed and cannot be modified'
+            });
+            }
+
+    
 
     await logAction({
       actorId: req.user.id,
@@ -176,8 +202,29 @@ exports.uploadEvidence = async (req, res) => {
       });
     }
 
+    // 🔒 Check if dispute exists and is not legally sealed
+    const disputeCheck = await db.query(
+      `SELECT id, is_legally_sealed FROM disputes WHERE id = $1`,
+      [disputeId]
+    );
+
+    if (disputeCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Dispute not found'
+      });
+    }
+
+    if (disputeCheck.rows[0].is_legally_sealed) {
+      return res.status(403).json({
+        success: false,
+        message: 'This dispute is legally sealed. Evidence cannot be added.'
+      });
+    }
+
     // Generate SHA256 hash
     const fileBuffer = fs.readFileSync(req.file.path);
+
     const hash = crypto
       .createHash('sha256')
       .update(fileBuffer)
@@ -199,6 +246,7 @@ exports.uploadEvidence = async (req, res) => {
       ]
     );
 
+    // Audit log
     await db.query(
       `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
        VALUES ($1,$2,$3,$4)`,
@@ -212,6 +260,7 @@ exports.uploadEvidence = async (req, res) => {
 
   } catch (error) {
     console.error('Evidence upload error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to upload evidence'
@@ -273,5 +322,121 @@ exports.verifyEvidenceIntegrity = async (req, res) => {
       success: false,
       message: 'Integrity verification failed'
     });
+  }
+};
+
+exports.verifySignature = async ({ signatureId }) => {
+  const record = await DocumentSignature.findById(signatureId)
+    .populate('signerId');
+
+  const userKey = await UserKey.findOne({ userId: record.signerId._id });
+
+  const verify = crypto.createVerify('SHA256');
+  verify.update(record.signedHash);
+  verify.end();
+
+  const isValid = verify.verify(userKey.publicKey, record.signature, 'hex');
+
+  return isValid;
+};
+
+exports.sealDispute = async (req, res) => {
+  try {
+    const { disputeId } = req.params;
+    const actorId = req.user.id;
+
+    // Check dispute exists
+    const disputeCheck = await db.query(
+      `SELECT id, is_legally_sealed, status
+       FROM disputes
+       WHERE id = $1`,
+      [disputeId]
+    );
+
+    if (disputeCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Dispute not found'
+      });
+    }
+
+    const dispute = disputeCheck.rows[0];
+
+    // Already sealed
+    if (dispute.is_legally_sealed) {
+      return res.status(400).json({
+        success: false,
+        message: 'Dispute already sealed'
+      });
+    }
+
+    // Only resolved disputes should be sealed
+    if (dispute.status !== 'resolved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only resolved disputes can be sealed'
+      });
+    }
+
+    
+                // =============================
+            // Build Evidence Merkle Root
+            // =============================
+
+            const evidenceResult = await db.query(
+            `SELECT file_hash FROM dispute_evidence WHERE dispute_id = $1`,
+            [disputeId]
+            );
+
+            const evidenceHashes = evidenceResult.rows.map(e => e.file_hash);
+
+            const merkleRoot = buildMerkleRoot(evidenceHashes);
+
+            // =============================
+            // Seal Dispute
+            // =============================
+
+            const result = await db.query(
+            `UPDATE disputes
+            SET is_legally_sealed = TRUE,
+                sealed_at = CURRENT_TIMESTAMP,
+                sealed_by = $1,
+                evidence_merkle_root = $2
+            WHERE id = $3
+            RETURNING *`,
+            [actorId, merkleRoot, disputeId]
+            );
+
+        // =============================
+        // Public Timestamp Anchor
+        // =============================
+
+        await anchorEvidence(disputeId, merkleRoot);
+
+            // Audit log
+            await db.query(
+            `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
+            VALUES ($1,$2,$3,$4)`,
+            [
+                actorId,
+                'Legally sealed dispute',
+                'dispute',
+                disputeId
+            ]
+            );
+
+            res.json({
+            success: true,
+            message: 'Dispute sealed successfully',
+            data: result.rows[0]
+            });
+
+        } catch (error) {
+            console.error('Seal dispute error:', error);
+
+        res.status(500).json({
+        success: false,
+        message: 'Failed to seal dispute'
+        });
   }
 };
