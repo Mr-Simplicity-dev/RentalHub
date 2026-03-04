@@ -1,26 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import api from "../../services/api";
 
-export default function FraudTab() {
+const FraudTab = ({ fraud, loadFraud }) => {
 
-  const [fraud, setFraud] = useState([]);
-
-  useEffect(() => {
-
+  const resolveFraud = async (id) => {
+    await api.patch(`/super/fraud/${id}/resolve`);
     loadFraud();
-
-  }, []);
-
-  const loadFraud = async () => {
-
-    const res = await api.get("/super/fraud");
-
-    setFraud(res.data.flags || []);
-
   };
 
   return (
-
     <div className="card overflow-x-auto">
 
       <table className="w-full text-sm">
@@ -28,11 +16,12 @@ export default function FraudTab() {
         <thead>
 
           <tr className="border-b">
-
             <th>Type</th>
+            <th>ID</th>
             <th>Rule</th>
             <th>Score</th>
-
+            <th>Time</th>
+            <th>Action</th>
           </tr>
 
         </thead>
@@ -44,8 +33,27 @@ export default function FraudTab() {
             <tr key={f.id} className="border-b">
 
               <td>{f.entity_type}</td>
+
+              <td>{f.entity_id}</td>
+
               <td>{f.rule}</td>
+
               <td>{f.score}</td>
+
+              <td>
+                {new Date(f.created_at).toLocaleString()}
+              </td>
+
+              <td>
+
+                <button
+                  onClick={() => resolveFraud(f.id)}
+                  className="btn btn-xs"
+                >
+                  Resolve
+                </button>
+
+              </td>
 
             </tr>
 
@@ -56,6 +64,7 @@ export default function FraudTab() {
       </table>
 
     </div>
-
   );
-}
+};
+
+export default FraudTab;

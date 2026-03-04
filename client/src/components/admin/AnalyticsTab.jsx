@@ -1,51 +1,45 @@
-import React, { useEffect, useState } from "react";
-import api from "../../services/api";
+import React from "react";
 
-export default function AnalyticsTab() {
+const AnalyticsTab = ({ analytics }) => {
 
-  const [analytics, setAnalytics] = useState(null);
-
-  useEffect(() => {
-
-    loadAnalytics();
-
-  }, []);
-
-  const loadAnalytics = async () => {
-
-    const res = await api.get("/super/analytics");
-
-    setAnalytics(res.data.data);
-
-  };
-
-  if (!analytics) return <p>Loading...</p>;
+  if (!analytics) {
+    return <p className="text-gray-500">No analytics data</p>;
+  }
 
   return (
-
-    <div className="grid grid-cols-4 gap-4">
-
-      <div className="card">
-        <h3>Total Users</h3>
-        <p>{analytics.totalUsers}</p>
-      </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
       <div className="card">
         <h3>Total Properties</h3>
-        <p>{analytics.totalProperties}</p>
+        <p className="text-2xl">{analytics.totalProperties}</p>
       </div>
 
       <div className="card">
         <h3>Applications</h3>
-        <p>{analytics.totalApplications}</p>
+        <p className="text-2xl">{analytics.totalApplications}</p>
       </div>
 
       <div className="card">
-        <h3>Revenue</h3>
-        <p>₦{analytics.totalRevenue}</p>
+        <h3>Verified Users</h3>
+        <p className="text-2xl">{analytics.verifiedUsers}</p>
+      </div>
+
+      <div className="card col-span-full">
+
+        <h3 className="font-semibold mb-2">
+          Users by Role
+        </h3>
+
+        {(analytics.usersByRole || []).map((r) => (
+          <div key={r.role}>
+            {r.role}: {r.count}
+          </div>
+        ))}
+
       </div>
 
     </div>
-
   );
-}
+};
+
+export default AnalyticsTab;

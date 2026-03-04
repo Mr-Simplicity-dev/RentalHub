@@ -1,19 +1,55 @@
 import React from "react";
 
-export default function LogsTab() {
+const LogsTab = ({ logs }) => {
 
   return (
-    <div className="card p-4">
+    <div className="card overflow-x-auto">
 
-      <h2 className="text-xl font-semibold mb-4">
-        System Logs
-      </h2>
+      <table className="w-full text-sm">
 
-      <p className="text-gray-600">
-        Audit logs and admin actions will appear here.
-      </p>
+        <thead>
+
+          <tr className="border-b">
+            <th>Actor</th>
+            <th>Action</th>
+            <th>Target</th>
+            <th>Time</th>
+          </tr>
+
+        </thead>
+
+        <tbody>
+
+          {logs.map((l) => (
+
+            <tr key={l.id} className="border-b">
+
+              <td>
+                {l.actor_name || "System"}
+              </td>
+
+              <td>
+                {l.action}
+              </td>
+
+              <td>
+                {l.target_type} #{l.target_id}
+              </td>
+
+              <td>
+                {new Date(l.created_at).toLocaleString()}
+              </td>
+
+            </tr>
+
+          ))}
+
+        </tbody>
+
+      </table>
 
     </div>
   );
+};
 
-}
+export default LogsTab;
