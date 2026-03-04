@@ -8,7 +8,7 @@ const dotenv = require('dotenv');
 
 const db = require('./config/middleware/database');
 
-const authRoutes = require('./routes/auth');
+// const authRoutes = require('./routes/auth');
 const propertyRoutes = require('./routes/properties');
 const paymentRoutes = require('./routes/payments');
 const applicationRoutes = require('./routes/applications');
@@ -17,7 +17,7 @@ const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
 const dashboardRoutes = require('./routes/dashboard');
 const notificationRoutes = require('./routes/notifications');
-const superAdminRoutes = require('./routes/superAdmin');
+// const superAdminRoutes = require('./routes/superAdmin');
 const propertyUtilsRoutes = require('./routes/propertyUtils');
 const propertyAlertsRoutes = require('./routes/propertyAlerts');
 
@@ -28,12 +28,12 @@ const exportRoutes = require('./routes/export');
 
 const verificationRoutes = require('./routes/evidenceVerification.routes');
 
-const paymentJobs = require('./jobs/paymentJobs');
-const { startPaymentJobs, startPropertyJobs } = paymentJobs;
+const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 
-const { audit } = require('./config/middleware/auditMiddleware');
-
-const scheduler = require('./config/utils/scheduler');
+const audit = require('./config/middleware/auditMiddleware');
+const startScheduler = require('./config/utils/scheduler');
+const authRoutes = require('./routes/auth').default;
+const superAdminRoutes = require('./routes/superAdmin').default;
 
 dotenv.config();
 
@@ -134,6 +134,24 @@ app.get('/api/auth/verify-email', async (req, res) => {
     });
   }
 });
+
+console.log('authRoutes:', typeof authRoutes);
+console.log('propertyRoutes:', typeof propertyRoutes);
+console.log('paymentRoutes:', typeof paymentRoutes);
+console.log('applicationRoutes:', typeof applicationRoutes);
+console.log('messageRoutes:', typeof messageRoutes);
+console.log('userRoutes:', typeof userRoutes);
+console.log('adminRoutes:', typeof adminRoutes);
+console.log('dashboardRoutes:', typeof dashboardRoutes);
+console.log('notificationRoutes:', typeof notificationRoutes);
+console.log('superAdminRoutes:', typeof superAdminRoutes);
+console.log('propertyUtilsRoutes:', typeof propertyUtilsRoutes);
+console.log('propertyAlertsRoutes:', typeof propertyAlertsRoutes);
+console.log('disputesRoutes:', typeof disputesRoutes);
+console.log('legalRoutes:', typeof legalRoutes);
+console.log('complianceRoutes:', typeof complianceRoutes);
+console.log('exportRoutes:', typeof exportRoutes);
+console.log('verificationRoutes:', typeof verificationRoutes);
 
 // -----------------------------------
 // ROUTES

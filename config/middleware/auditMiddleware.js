@@ -2,7 +2,7 @@ const db = require('./database');
 const crypto = require('crypto');
 
 const audit = (action, targetType) => {
-  return async (req, res, next) => {
+  return (req, res, next) => {
     const start = Date.now();
 
     res.on('finish', async () => {
@@ -17,7 +17,7 @@ const audit = (action, targetType) => {
         );
 
         const previousHash =
-          lastLog.rows.length > 0
+          lastLog.rows && lastLog.rows.length > 0
             ? lastLog.rows[0].current_hash
             : 'GENESIS';
 
@@ -46,7 +46,7 @@ const audit = (action, targetType) => {
           .update(dataString)
           .digest('hex');
 
-        // Insert ledger entry
+        // Insert audit ledger entry
         await db.query(
           `INSERT INTO audit_logs
            (actor_id, action, target_type, target_id,
@@ -82,4 +82,4 @@ const audit = (action, targetType) => {
   };
 };
 
-module.exports = { audit };
+module.exports = audit;

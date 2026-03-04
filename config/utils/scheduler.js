@@ -1,16 +1,22 @@
 const { checkAndEscalateDisputes } = require('../../services/disputeEscalationService');
 
-const startScheduler = () => {
+function startScheduler() {
   console.log('Dispute escalation scheduler started');
 
-  // Run every 24 hours
-  setInterval(async () => {
+  const runEscalation = async () => {
     try {
       await checkAndEscalateDisputes();
+      console.log('Dispute escalation check completed');
     } catch (err) {
       console.error('Dispute escalation error:', err.message);
     }
-  }, 24 * 60 * 60 * 1000);
-};
+  };
+
+  // Run immediately once on server start
+  runEscalation();
+
+  // Then run every 24 hours
+  setInterval(runEscalation, 24 * 60 * 60 * 1000);
+}
 
 module.exports = startScheduler;

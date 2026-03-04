@@ -7,7 +7,7 @@ const legalController = require('../controllers/legalController');
 const { authenticate } = require('../config/middleware/auth');
 const { allowRoles } = require('../config/middleware/roleMiddleware');
 const { canLawyerAccessProperty, canAccessLegal } = require('../config/middleware/legalAccessMiddleware');
-const { audit } = require('../config/middleware/auditMiddleware');
+const audit = require('../config/middleware/auditMiddleware');
 
 router.get(
   '/properties',
