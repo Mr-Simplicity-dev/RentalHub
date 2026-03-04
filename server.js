@@ -1,51 +1,52 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import jwt from 'jsonwebtoken';
-import path from 'path';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
+const path = require('path');
+const dotenv = require('dotenv');
 
-import db from './config/middleware/database.js';
+const db = require('./config/middleware/database');
 
-import authRoutes from './routes/auth.js';
-import propertyRoutes from './routes/properties.js';
-import paymentRoutes from './routes/payments.js';
-import applicationRoutes from './routes/applications.js';
-import messageRoutes from './routes/messages.js';
-import userRoutes from './routes/users.js';
-import adminRoutes from './routes/admin.js';
-import dashboardRoutes from './routes/dashboard.js';
-import notificationRoutes from './routes/notifications.js';
-import superAdminRoutes from './routes/superAdmin.js';
-import propertyUtilsRoutes from './routes/propertyUtils.js';
-import propertyAlertsRoutes from './routes/propertyAlerts.js';
+const authRoutes = require('./routes/auth');
+const propertyRoutes = require('./routes/properties');
+const paymentRoutes = require('./routes/payments');
+const applicationRoutes = require('./routes/applications');
+const messageRoutes = require('./routes/messages');
+const userRoutes = require('./routes/users');
+const adminRoutes = require('./routes/admin');
+const dashboardRoutes = require('./routes/dashboard');
+const notificationRoutes = require('./routes/notifications');
+const superAdminRoutes = require('./routes/superAdmin');
+const propertyUtilsRoutes = require('./routes/propertyUtils');
+const propertyAlertsRoutes = require('./routes/propertyAlerts');
 
-import paymentJobs from './jobs/paymentJobs.js';
+const disputesRoutes = require('./routes/disputes');
+const legalRoutes = require('./routes/legal');
+const complianceRoutes = require('./routes/compliance');
+const exportRoutes = require('./routes/export');
+
+const verificationRoutes = require('./routes/evidenceVerification.routes');
+
+const paymentJobs = require('./jobs/paymentJobs');
+const { startPaymentJobs, startPropertyJobs } = paymentJobs;
+
 const auditMiddleware = require('./middleware/auditMiddleware');
-app.use('/api/disputes', require('./routes/disputes'));
-app.use(auditMiddleware);
-app.use('/api/legal', require('./routes/legal'));
+
+const startScheduler = require('./utils/scheduler');
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
-const { startPaymentJobs, startPropertyJobs } = paymentJobs;
 
-const verificationRoutes =
-  require('./routes/evidenceVerification.routes');
-
-// Tell Express it is behind a proxy (Render, Vercel, Nginx, etc.)
+// Trust proxy (Render, Nginx etc)
 app.set('trust proxy', 1);
 
 // -----------------------------------
 // Security Middleware
 // -----------------------------------
 app.use(helmet());
+
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -53,21 +54,26 @@ app.use(
   })
 );
 
+// Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Rate Limiting
+// Rate limit
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
 });
+
 app.use('/api/', limiter);
 
-// Body Parser
+// Body parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Audit middleware
+app.use(auditMiddleware);
+
 // -----------------------------------
-// ROOT & HEALTH ROUTES
+// ROOT & HEALTH
 // -----------------------------------
 app.get('/', (req, res) => {
   res.json({
@@ -77,7 +83,10 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+  res.json({
+    status: 'OK',
+    message: 'Server is running',
+  });
 });
 
 // -----------------------------------
@@ -87,25 +96,42 @@ app.get('/api/auth/verify-email', async (req, res) => {
   const { token } = req.query;
 
   if (!token) {
-    return res.status(400).json({ success: false, message: 'Token missing' });
+    return res.status(400).json({
+      success: false,
+      message: 'Token missing',
+    });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const result = await db.query(
-      'UPDATE users SET email_verified = TRUE, updated_at = NOW() WHERE id = $1 RETURNING id, email_verified',
+      `UPDATE users
+       SET email_verified = TRUE,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, email_verified`,
       [decoded.userId]
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
     }
 
-    res.json({ success: true, message: 'Email verified successfully' });
+    res.json({
+      success: true,
+      message: 'Email verified successfully',
+    });
   } catch (err) {
     console.error('Verify email error:', err);
-    res.status(400).json({ success: false, message: 'Invalid or expired token' });
+
+    res.status(400).json({
+      success: false,
+      message: 'Invalid or expired token',
+    });
   }
 });
 
@@ -124,16 +150,20 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/super', superAdminRoutes);
 app.use('/api/property-utils', propertyUtilsRoutes);
 app.use('/api/property-alerts', propertyAlertsRoutes);
-app.use('/api/admin', require('./routes/admin'));
-app.use('/api/compliance', require('./routes/compliance'));
-app.use('/api/export', require('./routes/export'));
+
+app.use('/api/disputes', disputesRoutes);
+app.use('/api/legal', legalRoutes);
+app.use('/api/compliance', complianceRoutes);
+app.use('/api/export', exportRoutes);
+
 app.use('/evidence', verificationRoutes);
 
 // -----------------------------------
 // ERROR HANDLER
 // -----------------------------------
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('UNHANDLED ERROR:', err);
+
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal Server Error',
@@ -145,23 +175,13 @@ app.use((err, req, res, next) => {
 // -----------------------------------
 startPaymentJobs();
 startPropertyJobs();
+startScheduler();
 
 // -----------------------------------
 // START SERVER
 // -----------------------------------
 const PORT = process.env.APP_PORT || 5000;
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-
-app.use((err, req, res, next) => {
-  console.error('UNHANDLED ERROR:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Internal Server Error',
-    error: err.message,
-  });
-});
-const startScheduler = require('./utils/scheduler');
-
-startScheduler();
