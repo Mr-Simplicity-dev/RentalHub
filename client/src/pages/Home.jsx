@@ -118,7 +118,7 @@ const Home = () => {
                   to="/properties?request=1#tenant-request"
                   className="inline-block bg-white text-primary-700 px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
                 >
-                  Submit Request Shortcut
+                  Submit Request 
                 </Link>
               </div>
             </div>
