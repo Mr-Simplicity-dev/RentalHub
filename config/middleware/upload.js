@@ -83,8 +83,21 @@ const uploadPropertyMedia = multer({
   { name: 'video', maxCount: 1 },
 ]);
 
+const uploadPropertyPhotos = multer({
+  storage: propertyMediaStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  },
+  limits: { fileSize: 20 * 1024 * 1024 },
+}).array('photos', 20);
+
 module.exports = {
   uploadPassport,
   uploadPropertyMedia,
+  uploadPropertyPhotos,
   cloudinary,
 };

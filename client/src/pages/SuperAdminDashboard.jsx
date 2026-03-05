@@ -302,7 +302,11 @@ export default function SuperAdminDashboard() {
   };
 
   const updateReport = async (id, status) => {
-    await api.patch(`/super/reports/${id}`, { status });
+    if (status === "resolved") {
+      await api.patch(`/super/reports/${id}/resolve`);
+    } else {
+      await api.patch(`/super/reports/${id}`, { status });
+    }
     loadReports();
   };
 
