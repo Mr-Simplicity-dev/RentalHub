@@ -81,14 +81,12 @@ const Dashboard = () => {
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="container mx-auto px-4">
         {/* Welcome Section */}
-        <div className="mb-8">
+        <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">
-            {t('dashboard.welcome', { name: user?.full_name })}
+            Welcome back, {user?.full_name || 'User'}
           </h1>
           <p className="text-gray-600 mt-1">
-            {user?.user_type === 'tenant'
-              ? t('dashboard.tenant_subtitle')
-              : t('dashboard.landlord_subtitle')}
+            Manage your properties
           </p>
         </div>
 
@@ -215,7 +213,7 @@ const Dashboard = () => {
 
         {/* Recent Activities */}
         <div className="card">
-          <h2 className="text-xl font-bold mb-4">{t('dashboard.recent')}</h2>
+          <h2 className="text-xl font-bold mb-4 text-center">{t('dashboard.recent')}</h2>
           {recentActivities.length === 0 ? (
             <p className="text-gray-600 text-center py-8">
               {t('dashboard.no_recent')}

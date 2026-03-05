@@ -51,7 +51,7 @@ const AdminApplicationDetail = () => {
   if (!app) return <div className="card">Application not found</div>;
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl mx-auto">
       <button
         onClick={() => navigate(-1)}
         className="text-sm text-gray-600 mb-4 hover:underline"
@@ -60,8 +60,8 @@ const AdminApplicationDetail = () => {
       </button>
 
       <div className="card space-y-4">
-        <div className="flex justify-between items-start">
-          <h2 className="text-xl font-bold">Application #{app.id}</h2>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+          <h2 className="text-xl font-bold text-center md:text-left">Application #{app.id}</h2>
 
           <div className="flex gap-2">
             {app.status === 'pending' && (

@@ -241,6 +241,19 @@ export default function SuperAdminDashboard() {
     loadUsers();
   };
 
+  const unbanUser = async (id) => {
+    await api.patch(`/super/users/${id}/unban`);
+    toast.success("User unbanned");
+    loadUsers();
+  };
+
+  const deleteUser = async (id) => {
+    if (!window.confirm("Delete this user? This action hides the user account.")) return;
+    await api.delete(`/super/users/${id}`);
+    toast.success("User deleted");
+    loadUsers();
+  };
+
   const promoteUser = async (id) => {
     await api.patch(`/super/users/${id}/promote`);
     toast.success("User promoted");
@@ -368,6 +381,8 @@ export default function SuperAdminDashboard() {
             verifyIdentity={verifyIdentity}
             promoteUser={promoteUser}
             banUser={banUser}
+            unbanUser={unbanUser}
+            deleteUser={deleteUser}
           />
           <PaginationControls
             currentPage={usersPage}

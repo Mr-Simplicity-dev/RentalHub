@@ -105,7 +105,7 @@ const AdminPropertyDetail = () => {
 
         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
 
-          <div>
+          <div className="text-center md:text-left">
 
             <h2 className="text-2xl font-semibold">
               {property.title}

@@ -6,6 +6,8 @@ const router = express.Router();
 
 router.get('/users', authenticate, requireSuperAdmin, superCtrl.getAllUsers);
 router.patch('/users/:id/ban', authenticate, requireSuperAdmin, superCtrl.banUser);
+router.patch('/users/:id/unban', authenticate, requireSuperAdmin, superCtrl.unbanUser);
+router.delete('/users/:id', authenticate, requireSuperAdmin, superCtrl.deleteUser);
 router.patch('/users/:id/promote', authenticate, requireSuperAdmin, superCtrl.promoteToAdmin);
 
 router.get('/properties', authenticate, requireSuperAdmin, superCtrl.getAllProperties);

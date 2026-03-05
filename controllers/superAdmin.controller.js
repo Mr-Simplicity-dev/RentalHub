@@ -8,7 +8,8 @@ const ensureVerificationAuditSchema = async () => {
   await db.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS identity_verified_by INTEGER REFERENCES users(id),
-    ADD COLUMN IF NOT EXISTS identity_verified_at TIMESTAMP;
+    ADD COLUMN IF NOT EXISTS identity_verified_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 
     CREATE INDEX IF NOT EXISTS idx_users_identity_verified_by
       ON users(identity_verified_by);
@@ -80,6 +81,64 @@ export const banUser = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to ban user' });
+  }
+};
+
+// PATCH /api/super/users/:id/unban
+export const unbanUser = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await db.query(
+      `UPDATE users
+       SET is_active = TRUE, updated_at = NOW()
+       WHERE id = $1
+         AND user_type <> 'super_admin'
+         AND deleted_at IS NULL
+       RETURNING id`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: 'User not found or cannot be unbanned' });
+    }
+
+    await logAction(req.user.id, 'UNBAN_USER', 'user', id);
+
+    res.json({ success: true, message: 'User unbanned' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to unban user' });
+  }
+};
+
+// DELETE /api/super/users/:id
+export const deleteUser = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await db.query(
+      `UPDATE users
+       SET deleted_at = NOW(),
+           is_active = FALSE,
+           updated_at = NOW()
+       WHERE id = $1
+         AND user_type <> 'super_admin'
+         AND deleted_at IS NULL
+       RETURNING id`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: 'User not found or cannot be deleted' });
+    }
+
+    await logAction(req.user.id, 'DELETE_USER', 'user', id);
+
+    res.json({ success: true, message: 'User deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to delete user' });
   }
 };
 

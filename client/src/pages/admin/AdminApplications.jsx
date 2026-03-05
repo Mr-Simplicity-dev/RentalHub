@@ -63,8 +63,8 @@ const AdminApplications = () => {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
+      <div className="mb-6 flex flex-col items-center gap-4">
+        <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
           <p className="text-gray-600">
             {pagination.total
@@ -73,7 +73,7 @@ const AdminApplications = () => {
           </p>
         </div>
 
-        <div className="relative">
+        <div className="relative w-full md:w-80">
           <FaSearch className="absolute left-3 top-3 text-gray-400" />
           <input
             value={search}

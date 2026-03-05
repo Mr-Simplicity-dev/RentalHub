@@ -8,6 +8,8 @@ const UsersTab = ({
   verifyIdentity,
   promoteUser,
   banUser,
+  unbanUser,
+  deleteUser,
 }) => {
 
   const toggleUser = (id) => {
@@ -205,12 +207,30 @@ const UsersTab = ({
                       </button>
                     )}
 
-                    {u.user_type !== "super_admin" && (
+                    {u.user_type !== "super_admin" && u.is_active && (
                       <button
                         onClick={() => banUser(u.id)}
                         className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
                       >
                         Ban
+                      </button>
+                    )}
+
+                    {!u.is_active && u.user_type !== "super_admin" && (
+                      <button
+                        onClick={() => unbanUser(u.id)}
+                        className="rounded-lg bg-indigo-600 px-2 py-1 text-xs text-white transition-colors hover:bg-indigo-700"
+                      >
+                        Unban
+                      </button>
+                    )}
+
+                    {u.user_type !== "super_admin" && (
+                      <button
+                        onClick={() => deleteUser(u.id)}
+                        className="rounded-lg bg-gray-700 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-800"
+                      >
+                        Delete
                       </button>
                     )}
 

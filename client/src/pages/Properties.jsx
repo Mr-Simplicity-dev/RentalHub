@@ -186,7 +186,7 @@ const Properties = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-6">
+        <h1 className="text-3xl font-bold mb-6 text-center">
           {t('properties.title')}
         </h1>
 
@@ -229,7 +229,7 @@ const Properties = () => {
 
         {(showRequestForm || (!loading && properties.length === 0)) && (
           <div id="tenant-request" ref={requestSectionRef} className="card mt-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">
+            <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
               Not finding what you need?
             </h2>
             <p className="text-gray-600 mb-4">
