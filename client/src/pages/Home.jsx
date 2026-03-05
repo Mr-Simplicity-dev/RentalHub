@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import PropertyCard from '../components/properties/PropertyCard';
 import Loader from '../components/common/Loader';
-import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt } from 'react-icons/fa';
+import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt, FaMobileAlt, FaTimes } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../hooks/useAuth';
 
 const HUBSPOT_LANG_MAP = {
   en: 'en',
@@ -17,11 +18,16 @@ const HUBSPOT_LANG_MAP = {
 
 const Home = () => {
   const { t, i18n } = useTranslation();
+  const { isAuthenticated } = useAuth();
 
   const [featuredProperties, setFeaturedProperties] = useState([]);
   const [popularLocations, setPopularLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAppPrompt, setShowAppPrompt] = useState(false);
+
+  const androidAppUrl = process.env.REACT_APP_ANDROID_APP_URL || '';
+  const iosAppUrl = process.env.REACT_APP_IOS_APP_URL || '';
 
   const loadData = useCallback(async () => {
     try {
@@ -46,6 +52,22 @@ const Home = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setShowAppPrompt(false);
+      return;
+    }
+
+    const dismissedUntil = Number(localStorage.getItem('home_app_prompt_dismissed_until') || 0);
+    setShowAppPrompt(Date.now() > dismissedUntil);
+  }, [isAuthenticated]);
+
+  const dismissAppPrompt = () => {
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    localStorage.setItem('home_app_prompt_dismissed_until', String(Date.now() + oneDayMs));
+    setShowAppPrompt(false);
+  };
 
   useEffect(() => {
     // Sync HubSpot language with i18next
@@ -79,6 +101,58 @@ const Home = () => {
 
   return (
     <div>
+      {showAppPrompt && (
+        <section className="bg-white border border-soft shadow-card rounded-xl2 p-4 m-4 animate-slideInRight">
+          <div className="container mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center">
+                <FaMobileAlt />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">Get the RentalHub mobile app</p>
+                <p className="text-sm text-gray-600">
+                  Faster search alerts, instant chats, and case updates directly on your phone.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {androidAppUrl && (
+                <a
+                  href={androidAppUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition"
+                >
+                  Download Android
+                </a>
+              )}
+
+              {iosAppUrl && (
+                <a
+                  href={iosAppUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-soft px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Download iPhone
+                </a>
+              )}
+
+              <button
+                type="button"
+                onClick={dismissAppPrompt}
+                className="p-2 text-gray-500 hover:text-gray-700 transition"
+                aria-label="Close app download notification"
+                title="Close"
+              >
+                <FaTimes />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-primary-600 to-primary-800 text-white py-20">
         <div className="container mx-auto px-4">
@@ -124,7 +198,7 @@ const Home = () => {
                   to="/verify-case"
                   className="inline-block border border-white px-5 py-2 rounded-lg font-semibold text-white hover:bg-primary-700 transition-colors"
                 >
-                  Verify Evidence
+                  Verify Dispute Evidence
                 </Link>
               </div>
             </div>

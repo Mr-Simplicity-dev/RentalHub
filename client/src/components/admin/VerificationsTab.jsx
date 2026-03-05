@@ -1,4 +1,5 @@
 import React from "react";
+import PaginationControls from "./PaginationControls";
 
 const VerificationsTab = ({
   verifications,
@@ -9,6 +10,8 @@ const VerificationsTab = ({
   verificationUserType,
   setVerificationUserType,
   verificationPagination,
+  verificationPage,
+  onVerificationPageChange,
   loadVerifications,
   verifyIdentity,
   rejectIdentity,
@@ -231,6 +234,13 @@ const VerificationsTab = ({
           </table>
 
         </div>
+
+        <PaginationControls
+          currentPage={verificationPage}
+          totalPages={verificationPagination.pages || 1}
+          onPageChange={onVerificationPageChange}
+          summary={`Page ${verificationPage} of ${verificationPagination.pages || 1}`}
+        />
 
       </div>
 
