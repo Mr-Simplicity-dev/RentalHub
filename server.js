@@ -136,23 +136,6 @@ app.get('/api/auth/verify-email', async (req, res) => {
   }
 });
 
-console.log('authRoutes:', typeof authRoutes);
-console.log('propertyRoutes:', typeof propertyRoutes);
-console.log('paymentRoutes:', typeof paymentRoutes);
-console.log('applicationRoutes:', typeof applicationRoutes);
-console.log('messageRoutes:', typeof messageRoutes);
-console.log('userRoutes:', typeof userRoutes);
-console.log('adminRoutes:', typeof adminRoutes);
-console.log('dashboardRoutes:', typeof dashboardRoutes);
-console.log('notificationRoutes:', typeof notificationRoutes);
-console.log('superAdminRoutes:', typeof superAdminRoutes);
-console.log('propertyUtilsRoutes:', typeof propertyUtilsRoutes);
-console.log('propertyAlertsRoutes:', typeof propertyAlertsRoutes);
-console.log('disputesRoutes:', typeof disputesRoutes);
-console.log('legalRoutes:', typeof legalRoutes);
-console.log('complianceRoutes:', typeof complianceRoutes);
-console.log('exportRoutes:', typeof exportRoutes);
-console.log('verificationRoutes:', typeof verificationRoutes);
 
 // -----------------------------------
 // ROUTES

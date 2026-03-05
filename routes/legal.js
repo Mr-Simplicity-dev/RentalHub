@@ -6,23 +6,48 @@ const legalController = require('../controllers/legalController');
 
 const { authenticate } = require('../config/middleware/auth');
 const { allowRoles } = require('../config/middleware/roleMiddleware');
-const { canLawyerAccessProperty, canAccessLegal } = require('../config/middleware/legalAccessMiddleware');
+const { canLawyerAccessProperty } = require('../config/middleware/legalAccessMiddleware');
 const audit = require('../config/middleware/auditMiddleware');
+
+
+/* ---------------------------------------------------
+   Get Properties Accessible To Lawyer
+--------------------------------------------------- */
 
 router.get(
   '/properties',
   authenticate,
   allowRoles('lawyer'),
+  audit('view_authorized_properties', 'property'),
   legalController.getAuthorizedProperties
 );
+
+
+/* ---------------------------------------------------
+   Get Disputes For A Property
+--------------------------------------------------- */
 
 router.get(
   '/property/:propertyId/disputes',
   authenticate,
   allowRoles('lawyer'),
   canLawyerAccessProperty,
-  audit('Lawyer viewed disputes', 'property'),
+  audit('view_property_disputes', 'property'),
   disputeController.getDisputes
 );
+
+
+/* ---------------------------------------------------
+   Resolve Dispute
+--------------------------------------------------- */
+
+router.patch(
+  '/disputes/:disputeId/resolve',
+  authenticate,
+  allowRoles('lawyer'),
+  audit('resolve_dispute', 'dispute'),
+  legalController.resolveDispute
+);
+
 
 module.exports = router;
