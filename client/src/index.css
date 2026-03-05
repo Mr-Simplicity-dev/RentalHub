@@ -26,10 +26,10 @@
   }
   
   .input {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-4 py-2 border border-soft rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent;
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-md p-6;
+    @apply bg-white rounded-xl2 border border-soft shadow-card hover:shadow-cardHover transition p-6;
   }
 }

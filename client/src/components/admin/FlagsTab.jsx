@@ -3,44 +3,92 @@ import React from "react";
 const FlagsTab = ({ flags, toggleFlag }) => {
 
   return (
-    <div className="animate-fadeIn rounded-xl2 border border-soft bg-white p-6 shadow-card transition hover:shadow-cardHover">
+    <div className="bg-white border border-soft rounded-xl2 shadow-card p-6 animate-fadeIn">
 
-      <h3 className="font-semibold mb-3">
-        Platform Controls
-      </h3>
+      <div className="mb-6">
 
-      <ul className="space-y-3">
+        <h3 className="text-lg font-semibold">
+          Platform Feature Flags
+        </h3>
+
+        <p className="text-sm text-gray-500">
+          Enable or disable platform-wide features in real time.
+        </p>
+
+      </div>
+
+      <div className="space-y-4">
+
+        {flags.length === 0 && (
+          <div className="text-center text-gray-500 py-10">
+            No feature flags configured
+          </div>
+        )}
 
         {flags.map((f) => (
 
-          <li key={f.key} className="flex items-center justify-between rounded-lg border border-soft px-3 py-2 transition hover:bg-gray-50">
+          <div
+            key={f.key}
+            className="flex items-center justify-between border border-soft rounded-lg px-4 py-3 hover:bg-gray-50 transition"
+          >
+
+            {/* FLAG INFO */}
 
             <div>
 
-              <strong>
+              <p className="font-medium">
                 {f.key}
-              </strong>
+              </p>
 
-              <div className="text-xs text-gray-500">
+              <p className="text-sm text-gray-500">
                 {f.description}
-              </div>
+              </p>
 
             </div>
 
-            <input
-              type="checkbox"
-              checked={f.enabled}
-              onChange={() =>
-                toggleFlag(f.key, !f.enabled)
-              }
-              className="h-4 w-4 accent-blue-600"
-            />
+            {/* STATUS + TOGGLE */}
 
-          </li>
+            <div className="flex items-center gap-4">
+
+              <span
+                className={`px-2 py-1 text-xs rounded-full
+                ${
+                  f.enabled
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-200 text-gray-600"
+                }`}
+              >
+                {f.enabled ? "Enabled" : "Disabled"}
+              </span>
+
+              <button
+                onClick={() => toggleFlag(f.key, !f.enabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition
+                ${
+                  f.enabled
+                    ? "bg-green-500"
+                    : "bg-gray-300"
+                }`}
+              >
+
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition
+                  ${
+                    f.enabled
+                      ? "translate-x-6"
+                      : "translate-x-1"
+                  }`}
+                />
+
+              </button>
+
+            </div>
+
+          </div>
 
         ))}
 
-      </ul>
+      </div>
 
     </div>
   );

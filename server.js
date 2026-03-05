@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const dotenv = require('dotenv');
+const { Server } = require("socket.io");
 
 const db = require('./config/middleware/database');
 
@@ -200,6 +201,14 @@ startScheduler();
 // -----------------------------------
 const PORT = process.env.APP_PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
+
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+  },
+});
+
+global.io = io;

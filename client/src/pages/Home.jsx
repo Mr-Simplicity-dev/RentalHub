@@ -198,7 +198,7 @@ const Home = () => {
               <Link
                 key={location?.state_id ?? location?.state_name ?? `loc-${index}`}
                 to={`/properties?state_id=${location?.state_id ?? ''}`}
-                className="card text-center hover:shadow-lg transition-shadow"
+                className="card text-center"
               >
                 <h3 className="font-semibold text-gray-900">
                   {location?.state_name ?? t('home.unknown')}

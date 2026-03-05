@@ -284,7 +284,7 @@ const Dashboard = () => {
 const StatCard = ({ icon, title, value, onClick }) => (
   <div
     onClick={onClick}
-    className="card hover:shadow-lg transition-shadow cursor-pointer"
+    className="card cursor-pointer"
   >
     <div className="flex items-center justify-between">
       <div>
@@ -355,7 +355,7 @@ const ActivityItem = ({ activity }) => {
 const QuickActionCard = ({ title, description, icon, onClick }) => (
   <div
     onClick={onClick}
-    className="card hover:shadow-lg transition-shadow cursor-pointer text-center"
+    className="card cursor-pointer text-center"
   >
     <div className="text-4xl text-primary-600 mb-3">{icon}</div>
     <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>

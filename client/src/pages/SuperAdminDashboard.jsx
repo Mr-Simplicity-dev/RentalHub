@@ -16,6 +16,7 @@ import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
 import ModerationOverview from "../components/admin/ModerationOverview";
 import LiveModerationQueue from "../components/admin/LiveModerationQueue";
+import AdminNotifications from "../components/admin/AdminNotifications";
 
 const tabs = [
   "overview",
@@ -235,6 +236,8 @@ export default function SuperAdminDashboard() {
         <div className="flex justify-center">
           <AdminTabs tabs={tabs} tab={tab} loadTab={loadTab} />
         </div>
+
+      <AdminNotifications />
 
       {loading && <p className="text-gray-500">Loading...</p>}
 

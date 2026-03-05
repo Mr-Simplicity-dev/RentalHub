@@ -103,7 +103,7 @@ const StatCard = ({ title, value, icon }) => (
 const QuickCard = ({ title, href }) => (
   <a
     href={href}
-    className="card hover:shadow-lg transition-shadow block text-center"
+    className="card block text-center"
   >
     <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
     <p className="text-sm text-gray-600 mt-1">Open →</p>

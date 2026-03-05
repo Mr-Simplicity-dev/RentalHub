@@ -125,7 +125,7 @@ function Layout({ children }) {
         </select>
       </div>
 
-      <main className="flex-grow">{children}</main>
+      <main className="flex-grow animate-fadeIn">{children}</main>
 
       {!isVerificationPage && <Footer />}
     </div>
