@@ -37,6 +37,9 @@ const Header = () => {
             <Link to="/properties" className="text-gray-700 hover:text-primary-600">
               {t('header.browse')}
             </Link>
+            <Link to="/verify-case" className="text-gray-700 hover:text-primary-600">
+              Verify Evidence
+            </Link>
 
             {isAuthenticated && user?.user_type === 'landlord' && (
               <Link to="/my-properties" className="text-gray-700 hover:text-primary-600">

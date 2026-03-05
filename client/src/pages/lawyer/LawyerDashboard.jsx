@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
 
 const LawyerDashboard = () => {
@@ -37,7 +38,15 @@ const LawyerDashboard = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Lawyer Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Lawyer Dashboard</h1>
+        <Link
+          to="/verify-case"
+          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+        >
+          Verify Case Evidence
+        </Link>
+      </div>
 
       {/* Authorized Properties */}
       <div className="card p-4">
@@ -125,6 +134,13 @@ const LawyerDashboard = () => {
                     >
                       View Evidence
                     </button>
+
+                    <Link
+                      to={`/verify-case?dispute=${d.id}`}
+                      className="text-sm text-primary-700 hover:underline"
+                    >
+                      Verify Integrity
+                    </Link>
                   </div>
                 </div>
               ))}
