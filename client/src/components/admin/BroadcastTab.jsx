@@ -8,9 +8,9 @@ const BroadcastTab = ({
 }) => {
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn">
 
-      <div className="card">
+      <div className="rounded-xl2 border border-soft bg-white p-6 shadow-card transition hover:shadow-cardHover">
 
         <h3 className="font-semibold mb-3">
           Send Broadcast
@@ -66,7 +66,7 @@ const BroadcastTab = ({
       </div>
 
 
-      <div className="card">
+      <div className="rounded-xl2 border border-soft bg-white p-6 shadow-card transition hover:shadow-cardHover">
 
         <h3 className="font-semibold mb-3">
           Previous Broadcasts
@@ -76,7 +76,7 @@ const BroadcastTab = ({
 
           {broadcasts.map((b) => (
 
-            <li key={b.id} className="border-b pb-2">
+            <li key={b.id} className="border-b border-soft pb-2 transition hover:bg-gray-50">
 
               <strong>
                 {b.title}

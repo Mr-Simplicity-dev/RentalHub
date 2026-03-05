@@ -5,102 +5,162 @@ const PropertiesTab = ({
   selectedProps,
   setSelectedProps,
   bulkProps,
-  unlistProperty
+  unlistProperty,
 }) => {
+
+  const toggleProperty = (id) => {
+    setSelectedProps((prev) =>
+      prev.includes(id)
+        ? prev.filter((i) => i !== id)
+        : [...prev, id]
+    );
+  };
+
+  const toggleAll = (checked) => {
+    if (checked) {
+      setSelectedProps(properties.map((p) => p.id));
+    } else {
+      setSelectedProps([]);
+    }
+  };
+
   return (
-    <div className="card overflow-x-auto">
+    <div className="space-y-4 animate-fadeIn">
+
+      {/* BULK ACTION BAR */}
 
       {selectedProps.length > 0 && (
-        <div className="mb-3">
+        <div className="flex items-center justify-between rounded-xl2 border border-soft bg-white px-4 py-3 shadow-card transition hover:shadow-cardHover">
+
+          <span className="text-sm text-gray-600">
+            {selectedProps.length} properties selected
+          </span>
+
           <button
             onClick={bulkProps}
-            className="btn btn-sm btn-danger"
+            className="rounded-lg bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-700"
           >
             Unlist Selected
           </button>
+
         </div>
       )}
 
-      <table className="w-full text-sm">
+      {/* TABLE */}
 
-        <thead>
+      <div className="rounded-xl2 border border-soft bg-white shadow-card transition hover:shadow-cardHover overflow-x-auto">
 
-          <tr className="border-b">
+        <table className="min-w-full text-sm">
 
-            <th>
+          <thead className="bg-gray-50 text-gray-700">
 
-              <input
-                type="checkbox"
-                onChange={(e) =>
-                  setSelectedProps(
-                    e.target.checked
-                      ? properties.map((p) => p.id)
-                      : []
-                  )
-                }
-              />
+            <tr>
 
-            </th>
-
-            <th>Title</th>
-            <th>Landlord</th>
-            <th>Status</th>
-            <th>Actions</th>
-
-          </tr>
-
-        </thead>
-
-        <tbody>
-
-          {properties.map((p) => (
-
-            <tr key={p.id} className="border-b">
-
-              <td>
-
+              <th className="p-3 w-10">
                 <input
                   type="checkbox"
-                  checked={selectedProps.includes(p.id)}
-                  onChange={(e) =>
-                    setSelectedProps((prev) =>
-                      e.target.checked
-                        ? [...prev, p.id]
-                        : prev.filter((id) => id !== p.id)
-                    )
-                  }
+                  onChange={(e) => toggleAll(e.target.checked)}
                 />
+              </th>
 
-              </td>
-
-              <td>{p.title}</td>
-
-              <td>{p.landlord_name}</td>
-
-              <td>
-                {p.is_active ? "Active" : "Unlisted"}
-              </td>
-
-              <td>
-
-                {p.is_active && (
-                  <button
-                    onClick={() => unlistProperty(p.id)}
-                    className="btn btn-xs btn-danger"
-                  >
-                    Unlist
-                  </button>
-                )}
-
-              </td>
+              <th className="p-3 text-left">Property</th>
+              <th className="p-3 text-left">Landlord</th>
+              <th className="p-3 text-left">Status</th>
+              <th className="p-3 text-center w-40">Actions</th>
 
             </tr>
 
-          ))}
+          </thead>
 
-        </tbody>
+          <tbody>
 
-      </table>
+            {properties.length === 0 && (
+              <tr>
+                <td
+                  colSpan="5"
+                  className="text-center py-10 text-gray-500"
+                >
+                  No properties found
+                </td>
+              </tr>
+            )}
+
+            {properties.map((p) => (
+
+              <tr
+                key={p.id}
+                className="border-t border-soft hover:bg-gray-50 transition"
+              >
+
+                {/* CHECKBOX */}
+
+                <td className="p-3">
+
+                  <input
+                    type="checkbox"
+                    checked={selectedProps.includes(p.id)}
+                    onChange={() => toggleProperty(p.id)}
+                  />
+
+                </td>
+
+                {/* TITLE */}
+
+                <td className="p-3 font-medium">
+                  {p.title}
+                </td>
+
+                {/* LANDLORD */}
+
+                <td className="p-3 text-gray-600">
+                  {p.landlord_name}
+                </td>
+
+                {/* STATUS */}
+
+                <td className="p-3">
+
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full
+                    ${
+                      p.is_active
+                        ? "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {p.is_active ? "Active" : "Unlisted"}
+                  </span>
+
+                </td>
+
+                {/* ACTIONS */}
+
+                <td className="p-3">
+
+                  <div className="flex justify-center gap-2">
+
+                    {p.is_active && (
+                      <button
+                        onClick={() => unlistProperty(p.id)}
+                        className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
+                      >
+                        Unlist
+                      </button>
+                    )}
+
+                  </div>
+
+                </td>
+
+              </tr>
+
+            ))}
+
+          </tbody>
+
+        </table>
+
+      </div>
 
     </div>
   );

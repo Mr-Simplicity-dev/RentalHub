@@ -3,7 +3,7 @@ import React from "react";
 const FlagsTab = ({ flags, toggleFlag }) => {
 
   return (
-    <div className="card">
+    <div className="animate-fadeIn rounded-xl2 border border-soft bg-white p-6 shadow-card transition hover:shadow-cardHover">
 
       <h3 className="font-semibold mb-3">
         Platform Controls
@@ -13,10 +13,7 @@ const FlagsTab = ({ flags, toggleFlag }) => {
 
         {flags.map((f) => (
 
-          <li
-            key={f.key}
-            className="flex justify-between items-center"
-          >
+          <li key={f.key} className="flex items-center justify-between rounded-lg border border-soft px-3 py-2 transition hover:bg-gray-50">
 
             <div>
 
@@ -36,6 +33,7 @@ const FlagsTab = ({ flags, toggleFlag }) => {
               onChange={() =>
                 toggleFlag(f.key, !f.enabled)
               }
+              className="h-4 w-4 accent-blue-600"
             />
 
           </li>

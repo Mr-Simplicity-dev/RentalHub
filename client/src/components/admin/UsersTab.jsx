@@ -1,3 +1,5 @@
+import React from "react";
+
 const UsersTab = ({
   users,
   selectedUsers,
@@ -7,91 +9,226 @@ const UsersTab = ({
   promoteUser,
   banUser,
 }) => {
+
+  const toggleUser = (id) => {
+    setSelectedUsers((prev) =>
+      prev.includes(id)
+        ? prev.filter((i) => i !== id)
+        : [...prev, id]
+    );
+  };
+
+  const toggleAll = (checked) => {
+    if (checked) {
+      const ids = users
+        .filter((u) => u.user_type !== "super_admin")
+        .map((u) => u.id);
+
+      setSelectedUsers(ids);
+    } else {
+      setSelectedUsers([]);
+    }
+  };
+
   return (
-    <>
+    <div className="space-y-4 animate-fadeIn">
+
+      {/* BULK ACTION BAR */}
+
       {selectedUsers.length > 0 && (
-        <div className="mb-3 flex gap-2">
-          <button onClick={() => bulkUsers("ban")} className="btn btn-sm btn-danger">
-            Ban Selected
+        <div className="flex flex-wrap justify-center gap-3 rounded-xl2 border border-soft bg-white p-3 shadow-card transition hover:shadow-cardHover">
+
+          <span className="text-sm text-gray-600">
+            {selectedUsers.length} selected
+          </span>
+
+          <button
+            onClick={() => bulkUsers("ban")}
+            className="rounded-lg bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-700"
+          >
+            Ban
           </button>
 
-          <button onClick={() => bulkUsers("verify")} className="btn btn-sm">
-            Verify Selected
+          <button
+            onClick={() => bulkUsers("verify")}
+            className="rounded-lg bg-green-600 px-3 py-1 text-sm text-white transition-colors hover:bg-green-700"
+          >
+            Verify
           </button>
 
-          <button onClick={() => bulkUsers("promote")} className="btn btn-sm">
+          <button
+            onClick={() => bulkUsers("promote")}
+            className="rounded-lg bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700"
+          >
             Make Admin
           </button>
+
         </div>
       )}
 
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b">
-              <th></th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Active</th>
-              <th>Verified</th>
-              <th>Verified By</th>
-              <th>Work Count</th>
-              <th>Actions</th>
+      {/* TABLE */}
+
+      <div className="rounded-xl2 border border-soft bg-white shadow-card transition hover:shadow-cardHover overflow-x-auto">
+
+        <table className="min-w-full text-sm">
+
+          <thead className="bg-gray-50 text-gray-700">
+
+            <tr>
+
+              <th className="p-3 w-10">
+                <input
+                  type="checkbox"
+                  onChange={(e) => toggleAll(e.target.checked)}
+                />
+              </th>
+
+              <th className="p-3 text-left">Name</th>
+              <th className="p-3 text-left">Email</th>
+              <th className="p-3 text-left">Role</th>
+              <th className="p-3 text-left">Active</th>
+              <th className="p-3 text-left">Verified</th>
+              <th className="p-3 text-left">Verified By</th>
+              <th className="p-3 text-left">Work Count</th>
+
+              <th className="p-3 text-center w-56">
+                Actions
+              </th>
+
             </tr>
+
           </thead>
 
           <tbody>
+
+            {users.length === 0 && (
+              <tr>
+                <td
+                  colSpan="9"
+                  className="text-center py-10 text-gray-500"
+                >
+                  No users found
+                </td>
+              </tr>
+            )}
+
             {users.map((u) => (
-              <tr key={u.id} className="border-b">
-                <td>
+
+              <tr
+                key={u.id}
+                className="border-t border-soft hover:bg-gray-50 transition"
+              >
+
+                <td className="p-3">
                   <input
                     type="checkbox"
                     disabled={u.user_type === "super_admin"}
                     checked={selectedUsers.includes(u.id)}
-                    onChange={(e) =>
-                      setSelectedUsers((prev) =>
-                        e.target.checked
-                          ? [...prev, u.id]
-                          : prev.filter((id) => id !== u.id)
-                      )
-                    }
+                    onChange={() => toggleUser(u.id)}
                   />
                 </td>
 
-                <td>{u.full_name}</td>
-                <td>{u.email}</td>
-                <td className="capitalize">{u.user_type}</td>
-                <td>{u.is_active ? "Active" : "Inactive"}</td>
-                <td>{u.identity_verified ? "Yes" : "No"}</td>
-                <td>{u.identity_verified_by_name || "-"}</td>
-                <td>{u.credentials_verified_count ?? 0}</td>
-
-                <td className="space-x-2">
-                  {!u.identity_verified && u.user_type !== "super_admin" && (
-                    <button onClick={() => verifyIdentity(u.id)} className="btn btn-xs">
-                      Verify
-                    </button>
-                  )}
-
-                  {!["admin", "super_admin"].includes(u.user_type) && (
-                    <button onClick={() => promoteUser(u.id)} className="btn btn-xs">
-                      Make Admin
-                    </button>
-                  )}
-
-                  {u.user_type !== "super_admin" && (
-                    <button onClick={() => banUser(u.id)} className="btn btn-xs btn-danger">
-                      Ban
-                    </button>
-                  )}
+                <td className="p-3 font-medium">
+                  {u.full_name}
                 </td>
+
+                <td className="p-3 text-gray-600">
+                  {u.email}
+                </td>
+
+                <td className="p-3 capitalize">
+                  {u.user_type}
+                </td>
+
+                <td className="p-3">
+
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full
+                      ${
+                        u.is_active
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-200 text-gray-600"
+                      }`}
+                  >
+                    {u.is_active ? "Active" : "Inactive"}
+                  </span>
+
+                </td>
+
+                <td className="p-3">
+
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full
+                      ${
+                        u.identity_verified
+                          ? "bg-green-100 text-green-700"
+                          : "bg-yellow-100 text-yellow-700"
+                      }`}
+                  >
+                    {u.identity_verified ? "Verified" : "Pending"}
+                  </span>
+
+                </td>
+
+                <td className="p-3 text-gray-600">
+                  {u.identity_verified_by_name || "-"}
+                </td>
+
+                <td className="p-3">
+                  {u.credentials_verified_count ?? 0}
+                </td>
+
+                {/* ACTIONS */}
+
+                <td className="p-3">
+
+                  <div className="flex justify-center flex-wrap gap-2">
+
+                    {!u.identity_verified &&
+                      u.user_type !== "super_admin" && (
+                        <button
+                          onClick={() => verifyIdentity(u.id)}
+                          className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700"
+                        >
+                          Verify
+                        </button>
+                      )}
+
+                    {!["admin", "super_admin"].includes(
+                      u.user_type
+                    ) && (
+                      <button
+                        onClick={() => promoteUser(u.id)}
+                        className="rounded-lg bg-blue-600 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-700"
+                      >
+                        Promote
+                      </button>
+                    )}
+
+                    {u.user_type !== "super_admin" && (
+                      <button
+                        onClick={() => banUser(u.id)}
+                        className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
+                      >
+                        Ban
+                      </button>
+                    )}
+
+                  </div>
+
+                </td>
+
               </tr>
+
             ))}
+
           </tbody>
+
         </table>
+
       </div>
-    </>
+
+    </div>
   );
 };
 

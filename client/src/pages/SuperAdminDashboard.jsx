@@ -14,8 +14,11 @@ import LogsTab from "../components/admin/LogsTab";
 import BroadcastTab from "../components/admin/BroadcastTab";
 import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
+import ModerationOverview from "../components/admin/ModerationOverview";
+import LiveModerationQueue from "../components/admin/LiveModerationQueue";
 
 const tabs = [
+  "overview",
   "users",
   "verifications",
   "properties",
@@ -217,13 +220,21 @@ export default function SuperAdminDashboard() {
   }, [user]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 py-8 text-center animate-fadeIn">
 
-      <h1 className="text-3xl font-bold mb-6">
-        Super Admin Control Center
-      </h1>
+          <LiveModerationQueue
+          loadReports={loadReports}
+          loadVerifications={loadVerifications}
+          loadFraud={loadFraud}
+        />
 
-      <AdminTabs tabs={tabs} tab={tab} loadTab={loadTab} />
+        <h1 className="text-3xl font-bold mb-6">
+          Super Admin Control Center
+        </h1>
+
+        <div className="flex justify-center">
+          <AdminTabs tabs={tabs} tab={tab} loadTab={loadTab} />
+        </div>
 
       {loading && <p className="text-gray-500">Loading...</p>}
 
@@ -294,6 +305,17 @@ export default function SuperAdminDashboard() {
       {tab === "fraud" && (
         <FraudTab fraud={fraud} loadFraud={loadFraud} />
       )}
+
+      {tab === "overview" && (
+
+          <ModerationOverview
+            reports={reports}
+            verifications={verifications}
+            fraud={fraud}
+            loadTab={loadTab}
+          />
+
+        )}
 
     </div>
   );
