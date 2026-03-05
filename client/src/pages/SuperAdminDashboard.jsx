@@ -116,9 +116,36 @@ export default function SuperAdminDashboard() {
   };
 
   const loadVerifications = async () => {
-    const res = await api.get("/super/verifications");
-    setVerifications(res.data.verifications || []);
+    const res = await api.get("/super/verifications", {
+      params: {
+        search: verificationSearch,
+        status: verificationStatus,
+        user_type: verificationUserType,
+        page: 1,
+        limit: 50,
+      },
+    });
+
+    const records = res.data.data || res.data.verifications || [];
+
+    setVerifications(records);
+    setVerificationPagination(
+      res.data.pagination || { total: records.length, pages: 1 }
+    );
   };
+
+  const loadAdminPerformance = async () => {
+    const res = await api.get("/super/admins/performance");
+    setAdminPerformance(res.data.data || []);
+  };
+
+  const applyVerificationFilters = () =>
+    guardedLoad(async () => {
+      await Promise.all([
+        loadVerifications(),
+        loadAdminPerformance(),
+      ]);
+    }, "Failed loading verifications");
 
   const loadBroadcasts = async () => {
     const res = await api.get("/super/broadcasts");
@@ -135,7 +162,7 @@ export default function SuperAdminDashboard() {
     if (name === "reports") guardedLoad(loadReports,"Failed loading reports");
     if (name === "fraud") guardedLoad(loadFraud,"Failed loading fraud");
     if (name === "flags") guardedLoad(loadFlags,"Failed loading flags");
-    if (name === "verifications") guardedLoad(loadVerifications,"Failed loading verifications");
+    if (name === "verifications") applyVerificationFilters();
     if (name === "broadcast") guardedLoad(loadBroadcasts,"Failed loading broadcasts");
   };
 
@@ -143,12 +170,15 @@ export default function SuperAdminDashboard() {
     await api.patch(`/super/verifications/${id}/approve`);
     toast.success("Identity verified");
     loadVerifications();
+    loadUsers();
+    loadAdminPerformance();
   };
 
   const rejectIdentity = async (id) => {
     await api.patch(`/super/verifications/${id}/reject`);
     toast.success("Identity rejected");
     loadVerifications();
+    loadAdminPerformance();
   };
 
   const banUser = async (id) => {
@@ -161,6 +191,7 @@ export default function SuperAdminDashboard() {
     await api.patch(`/super/users/${id}/promote`);
     toast.success("User promoted");
     loadUsers();
+    loadAdminPerformance();
   };
 
   const unlistProperty = async (id) => {
@@ -176,6 +207,10 @@ export default function SuperAdminDashboard() {
     });
     toast.success("Bulk action completed");
     loadUsers();
+    if (action === "verify" || action === "promote") {
+      loadVerifications();
+      loadAdminPerformance();
+    }
   };
 
   const bulkProps = async () => {
@@ -218,6 +253,12 @@ export default function SuperAdminDashboard() {
     if (user?.user_type !== "super_admin")
       navigate("/dashboard");
 
+  }, [user]);
+
+  useEffect(() => {
+    if (user?.user_type === "super_admin") {
+      loadTab("users");
+    }
   }, [user]);
 
   return (
@@ -263,7 +304,7 @@ export default function SuperAdminDashboard() {
           verificationUserType={verificationUserType}
           setVerificationUserType={setVerificationUserType}
           verificationPagination={verificationPagination}
-          loadVerifications={loadVerifications}
+          loadVerifications={applyVerificationFilters}
           verifyIdentity={verifyIdentity}
           rejectIdentity={rejectIdentity}
           adminPerformance={adminPerformance}

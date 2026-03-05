@@ -3,7 +3,7 @@ import { QRCodeCanvas } from "qrcode.react";
 
 export default function DisputeQRCode({ disputeId }) {
 
-  const verifyUrl = `${window.location.origin}/verify?dispute=${disputeId}`;
+  const verifyUrl = `${window.location.origin}/verify-case?dispute=${disputeId}`;
 
   return (
     <div style={{ textAlign: "center", marginTop: 20 }}>

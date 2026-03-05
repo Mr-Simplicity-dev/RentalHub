@@ -44,6 +44,7 @@ import Pricing from './Pricing';
 import LandlordGuide from './LandlordGuide';
 import VerifyEmail from './VerifyEmail';
 import VerifyPhone from './VerifyPhone';
+import VerifyEmailToken from './auth/VerifyEmail';
 import SuperAdminDashboard from './SuperAdminDashboard';
 import AdminUserDetail from './admin/AdminUserDetail';
 import AdminPropertyDetail from './admin/AdminPropertyDetail';
@@ -146,6 +147,8 @@ function App() {
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/verify-email/:token" element={<VerifyEmailToken />} />
+              <Route path="/auth/verify-email/:token" element={<VerifyEmailToken />} />
               <Route path="/verify-phone" element={<VerifyPhone />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
@@ -156,12 +159,10 @@ function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/super-admin" element={<SuperAdminDashboard />} />
-              <Route path="/admin/users/:id" element={<AdminUserDetail />} />
-              <Route path="compliance" element={<AdminCompliance />} />
               <Route path="/lawyer" element={<ProtectedRoute><LawyerDashboard /></ProtectedRoute>}/>
+              <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
-              <Route path="/dispute/:disputeId" element={<DisputeDetails />}
-/>
+              <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
 
               {/* Protected */}
               <Route
@@ -194,6 +195,10 @@ function App() {
                 <Route path="verifications" element={<AdminVerifications />} />
                 <Route path="properties" element={<AdminProperties />} />
                 <Route path="applications" element={<AdminApplications />} />
+                <Route path="compliance" element={<AdminCompliance />} />
+                <Route path="users/:id" element={<AdminUserDetail />} />
+                <Route path="properties/:id" element={<AdminPropertyDetail />} />
+                <Route path="applications/:id" element={<AdminApplicationDetail />} />
               </Route>
 
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
@@ -203,9 +208,6 @@ function App() {
               <Route path="/my-properties" element={<ProtectedRoute><MyProperties /></ProtectedRoute>} />
               <Route path="/add-property" element={<ProtectedRoute><AddProperty /></ProtectedRoute>} />
               <Route path="/subscribe" element={<ProtectedRoute><Subscribe /></ProtectedRoute>} />
-              <Route path="/admin/users/:id" element={<AdminUserDetail />} />
-              <Route path="/admin/properties/:id" element={<AdminPropertyDetail />} />
-              <Route path="/admin/applications/:id" element={<AdminApplicationDetail />} />
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />

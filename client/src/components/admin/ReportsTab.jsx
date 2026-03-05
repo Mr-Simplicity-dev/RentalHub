@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
+import ReportDrawer from "./ReportDrawer";
 
 const ReportsTab = ({ reports, updateReport }) => {
+  const [selectedReport, setSelectedReport] = useState(null);
 
   const getStatusStyle = (status) => {
     if (status === "resolved")
@@ -12,114 +14,136 @@ const ReportsTab = ({ reports, updateReport }) => {
     return "bg-yellow-100 text-yellow-700";
   };
 
+  const handleUpdateReport = async (id, status) => {
+    await updateReport(id, status);
+
+    setSelectedReport((prev) =>
+      prev && prev.id === id ? { ...prev, status } : prev
+    );
+  };
+
   return (
-    <div className="animate-fadeIn rounded-xl2 border border-soft bg-white shadow-card transition hover:shadow-cardHover overflow-x-auto">
+    <>
+      <div className="animate-fadeIn rounded-xl2 border border-soft bg-white shadow-card transition hover:shadow-cardHover overflow-x-auto">
 
-      <table className="min-w-full text-sm">
+        <table className="min-w-full text-sm">
 
-        <thead className="bg-gray-50 text-gray-700">
-
-          <tr>
-
-            <th className="p-3 text-left">Reporter</th>
-            <th className="p-3 text-left">Target</th>
-            <th className="p-3 text-left">Reason</th>
-            <th className="p-3 text-left">Status</th>
-            <th className="p-3 text-center w-44">Actions</th>
-
-          </tr>
-
-        </thead>
-
-        <tbody>
-
-          {reports.length === 0 && (
+          <thead className="bg-gray-50 text-gray-700">
 
             <tr>
-              <td
-                colSpan="5"
-                className="text-center py-10 text-gray-500"
-              >
-                No reports found
-              </td>
+
+              <th className="p-3 text-left">Reporter</th>
+              <th className="p-3 text-left">Target</th>
+              <th className="p-3 text-left">Reason</th>
+              <th className="p-3 text-left">Status</th>
+              <th className="p-3 text-center w-44">Actions</th>
+
             </tr>
 
-          )}
+          </thead>
 
-          {reports.map((r) => (
+          <tbody>
 
-            <tr
-              key={r.id}
-              className="border-t border-soft hover:bg-gray-50 transition"
-            >
+            {reports.length === 0 && (
 
-              <td className="p-3 font-medium">
-                {r.reporter_name || "Anonymous"}
-              </td>
-
-              <td className="p-3 text-gray-600">
-                {r.target_type} #{r.target_id}
-              </td>
-
-              <td className="p-3 max-w-xs truncate text-gray-700">
-                {r.reason}
-              </td>
-
-              <td className="p-3">
-
-                <span
-                  className={`px-2 py-1 text-xs rounded-full ${getStatusStyle(
-                    r.status
-                  )}`}
+              <tr>
+                <td
+                  colSpan="5"
+                  className="text-center py-10 text-gray-500"
                 >
-                  {r.status}
-                </span>
+                  No reports found
+                </td>
+              </tr>
 
-              </td>
+            )}
 
-              <td className="p-3">
+            {reports.map((r) => (
 
-                <div className="flex justify-center gap-2">
+              <tr
+                key={r.id}
+                className="border-t border-soft hover:bg-gray-50 transition"
+              >
 
-                  {r.status !== "resolved" && (
+                <td className="p-3 font-medium">
+                  {r.reporter_name || "Anonymous"}
+                </td>
 
+                <td className="p-3 text-gray-600">
+                  {r.target_type} #{r.target_id}
+                </td>
+
+                <td className="p-3 max-w-xs truncate text-gray-700">
+                  {r.reason}
+                </td>
+
+                <td className="p-3">
+
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full ${getStatusStyle(
+                      r.status
+                    )}`}
+                  >
+                    {r.status}
+                  </span>
+
+                </td>
+
+                <td className="p-3">
+
+                  <div className="flex justify-center gap-2">
                     <button
-                      onClick={() =>
-                        updateReport(r.id, "resolved")
-                      }
-                      className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700"
+                      onClick={() => setSelectedReport(r)}
+                      className="rounded-lg border border-soft bg-white px-2 py-1 text-xs text-gray-700 transition hover:bg-gray-50"
                     >
-                      Resolve
+                      View
                     </button>
 
-                  )}
+                    {r.status !== "resolved" && (
 
-                  {r.status !== "dismissed" && (
+                      <button
+                        onClick={() =>
+                          handleUpdateReport(r.id, "resolved")
+                        }
+                        className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700"
+                      >
+                        Resolve
+                      </button>
 
-                    <button
-                      onClick={() =>
-                        updateReport(r.id, "dismissed")
-                      }
-                      className="rounded-lg bg-gray-600 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-700"
-                    >
-                      Dismiss
-                    </button>
+                    )}
 
-                  )}
+                    {r.status !== "dismissed" && (
 
-                </div>
+                      <button
+                        onClick={() =>
+                          handleUpdateReport(r.id, "dismissed")
+                        }
+                        className="rounded-lg bg-gray-600 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-700"
+                      >
+                        Dismiss
+                      </button>
 
-              </td>
+                    )}
 
-            </tr>
+                  </div>
 
-          ))}
+                </td>
 
-        </tbody>
+              </tr>
 
-      </table>
+            ))}
 
-    </div>
+          </tbody>
+
+        </table>
+
+      </div>
+
+      <ReportDrawer
+        report={selectedReport}
+        closeDrawer={() => setSelectedReport(null)}
+        updateReport={handleUpdateReport}
+      />
+    </>
   );
 };
 
