@@ -1111,6 +1111,45 @@ exports.toggleAvailability = async (req, res) => {
   }
 };
 
+// -----------------------------------------------------
+// Unlist Property (Landlord)
+// -----------------------------------------------------
+exports.unlistProperty = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const result = await db.query(
+      `UPDATE properties
+       SET is_available = FALSE,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+         AND landlord_id = $2
+       RETURNING id, is_available`,
+      [id, userId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found or unauthorized',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Property unlisted successfully',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Unlist property error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unlist property',
+    });
+  }
+};
+
 
 // -----------------------------------------------------
 // Delete Property Photo

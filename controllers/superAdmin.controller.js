@@ -89,6 +89,8 @@ export const unbanUser = async (req, res) => {
   const { id } = req.params;
 
   try {
+    await ensureVerificationAuditSchema();
+
     const result = await db.query(
       `UPDATE users
        SET is_active = TRUE, updated_at = NOW()
@@ -117,6 +119,8 @@ export const deleteUser = async (req, res) => {
   const { id } = req.params;
 
   try {
+    await ensureVerificationAuditSchema();
+
     const result = await db.query(
       `UPDATE users
        SET deleted_at = NOW(),
@@ -430,12 +434,50 @@ export const getAuditLogs = async (req, res) => {
 // GET /api/super/analytics
 export const getAnalytics = async (req, res) => {
   try {
-    const [users, properties, apps, verified, byState] = await Promise.all([
-      db.query(`SELECT user_type AS role, COUNT(*) FROM users GROUP BY user_type`),
+    await ensureVerificationAuditSchema();
+
+    const [users, properties, apps, verified, byState, userGrowth] = await Promise.all([
+      db.query(
+        `SELECT user_type AS role, COUNT(*)::INT AS count
+         FROM users
+         WHERE deleted_at IS NULL
+         GROUP BY user_type`
+      ),
       db.query(`SELECT COUNT(*) FROM properties`),
       db.query(`SELECT COUNT(*) FROM applications`),
-      db.query(`SELECT COUNT(*) FROM users WHERE identity_verified = TRUE`),
-      db.query(`SELECT state, COUNT(*) FROM properties GROUP BY state ORDER BY COUNT(*) DESC`)
+      db.query(
+        `SELECT COUNT(*)
+         FROM users
+         WHERE identity_verified = TRUE
+           AND deleted_at IS NULL`
+      ),
+      db.query(
+        `SELECT
+           COALESCE(s.state_name, 'Unknown') AS state,
+           COUNT(*)::INT AS count
+         FROM properties p
+         LEFT JOIN states s ON s.id = p.state_id
+         GROUP BY COALESCE(s.state_name, 'Unknown')
+         ORDER BY COUNT(*) DESC`
+      ),
+      db.query(
+        `WITH months AS (
+           SELECT generate_series(
+             date_trunc('month', CURRENT_DATE) - INTERVAL '5 months',
+             date_trunc('month', CURRENT_DATE),
+             INTERVAL '1 month'
+           ) AS month_start
+         )
+         SELECT
+           TO_CHAR(m.month_start, 'Mon YYYY') AS month,
+           COALESCE(COUNT(u.id), 0)::INT AS users
+         FROM months m
+         LEFT JOIN users u
+           ON date_trunc('month', u.created_at) = m.month_start
+          AND u.deleted_at IS NULL
+         GROUP BY m.month_start
+         ORDER BY m.month_start`
+      )
     ]);
 
     res.json({
@@ -445,7 +487,8 @@ export const getAnalytics = async (req, res) => {
         totalProperties: Number(properties.rows[0].count),
         totalApplications: Number(apps.rows[0].count),
         verifiedUsers: Number(verified.rows[0].count),
-        propertiesByState: byState.rows
+        propertiesByState: byState.rows,
+        userGrowth: userGrowth.rows
       }
     });
   } catch (err) {
@@ -484,6 +527,19 @@ export const updateReportStatus = async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: 'Failed to update report' });
+  }
+};
+
+// PATCH /api/super/reports/:reportId/resolve
+export const resolveReport = async (req, res) => {
+  const { reportId } = req.params;
+
+  try {
+    await db.query(`UPDATE reports SET status = 'resolved' WHERE id = $1`, [reportId]);
+    await logAction(req.user.id, 'RESOLVE_REPORT', 'report', reportId);
+    res.json({ success: true, message: 'Report resolved' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to resolve report' });
   }
 };
 

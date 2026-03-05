@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, requireSuperAdmin } from '../config/middleware/auth.js';
 import * as superCtrl from '../controllers/superAdmin.controller.js';
+import audit from '../config/middleware/auditMiddleware.js';
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ router.delete('/users/:id', authenticate, requireSuperAdmin, superCtrl.deleteUse
 router.patch('/users/:id/promote', authenticate, requireSuperAdmin, superCtrl.promoteToAdmin);
 
 router.get('/properties', authenticate, requireSuperAdmin, superCtrl.getAllProperties);
-router.patch('/properties/:id/unlist', authenticate, requireSuperAdmin, superCtrl.unlistProperty);
+router.patch('/properties/:id/unlist', authenticate, requireSuperAdmin, audit('unlist_property', 'property'), superCtrl.unlistProperty);
 
 router.patch('/verify/:userId', authenticate, requireSuperAdmin, superCtrl.verifyUser);
 router.get('/verifications', authenticate, requireSuperAdmin, superCtrl.getIdentityVerifications);
@@ -25,6 +26,7 @@ router.get('/analytics', authenticate, requireSuperAdmin, superCtrl.getAnalytics
 
 router.get('/reports', authenticate, requireSuperAdmin, superCtrl.getReports);
 router.patch('/reports/:id', authenticate, requireSuperAdmin, superCtrl.updateReportStatus);
+router.patch('/reports/:reportId/resolve', authenticate, requireSuperAdmin, audit('resolve_report', 'report'), superCtrl.resolveReport);
 
 router.get('/broadcasts', authenticate, requireSuperAdmin, superCtrl.getBroadcasts);
 router.post('/broadcasts', authenticate, requireSuperAdmin, superCtrl.createBroadcast);

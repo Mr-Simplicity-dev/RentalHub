@@ -236,22 +236,34 @@ export default function SuperAdminDashboard() {
   };
 
   const banUser = async (id) => {
-    await api.patch(`/super/users/${id}/ban`);
-    toast.success("User banned");
-    loadUsers();
+    try {
+      await api.patch(`/super/users/${id}/ban`);
+      toast.success("User banned");
+      loadUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to ban user");
+    }
   };
 
   const unbanUser = async (id) => {
-    await api.patch(`/super/users/${id}/unban`);
-    toast.success("User unbanned");
-    loadUsers();
+    try {
+      await api.patch(`/super/users/${id}/unban`);
+      toast.success("User unbanned");
+      loadUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to unban user");
+    }
   };
 
   const deleteUser = async (id) => {
     if (!window.confirm("Delete this user? This action hides the user account.")) return;
-    await api.delete(`/super/users/${id}`);
-    toast.success("User deleted");
-    loadUsers();
+    try {
+      await api.delete(`/super/users/${id}`);
+      toast.success("User deleted");
+      loadUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete user");
+    }
   };
 
   const promoteUser = async (id) => {

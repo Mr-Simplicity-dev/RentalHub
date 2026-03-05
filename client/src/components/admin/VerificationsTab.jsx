@@ -1,6 +1,29 @@
 import React from "react";
 import PaginationControls from "./PaginationControls";
 
+const getPassportPhotoUrl = (rawUrl) => {
+  if (!rawUrl) return "";
+
+  const normalized = String(rawUrl).replace(/\\/g, "/").trim();
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized;
+  }
+
+  const apiBase = process.env.REACT_APP_API_URL || "/api";
+  const serverOrigin = apiBase.startsWith("http")
+    ? new URL(apiBase).origin
+    : window.location.origin;
+
+  const uploadsIndex = normalized.toLowerCase().indexOf("uploads/");
+  const uploadPath =
+    uploadsIndex >= 0
+      ? normalized.slice(uploadsIndex)
+      : normalized.replace(/^\/+/, "");
+
+  return `${serverOrigin}/${uploadPath}`;
+};
+
 const VerificationsTab = ({
   verifications,
   verificationSearch,
@@ -182,7 +205,7 @@ const VerificationsTab = ({
 
                       {v.passport_photo_url ? (
                         <a
-                          href={v.passport_photo_url}
+                          href={getPassportPhotoUrl(v.passport_photo_url)}
                           target="_blank"
                           rel="noreferrer"
                           className="text-blue-600 hover:underline text-sm"

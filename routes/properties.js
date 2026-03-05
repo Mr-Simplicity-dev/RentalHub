@@ -8,6 +8,7 @@ const {
   isTenant,
   isVerified,
 } = require('../config/middleware/auth');
+const audit = require('../config/middleware/auditMiddleware');
 const { uploadPropertyMedia, uploadPropertyPhotos } = require('../config/middleware/upload');
 
 // ============ PUBLIC ROUTES ============
@@ -150,6 +151,14 @@ router.patch(
   authenticate,
   isLandlord,
   propertyController.toggleAvailability
+);
+
+router.patch(
+  '/:id/unlist',
+  authenticate,
+  isLandlord,
+  audit('unlist_property', 'property'),
+  propertyController.unlistProperty
 );
 
 // Delete property photo
