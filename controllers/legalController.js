@@ -31,11 +31,25 @@ exports.grantLawyerAccess = async (req, res) => {
 exports.getAuthorizedProperties = async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT p.*
-       FROM legal_authorizations l
-       JOIN properties p ON p.id = l.property_id
-       WHERE l.lawyer_user_id = $1
-       AND l.status = 'active'`,
+      `SELECT DISTINCT p.*
+       FROM properties p
+       WHERE EXISTS (
+         SELECT 1
+         FROM legal_authorizations la
+         WHERE la.lawyer_user_id = $1
+           AND la.status = 'active'
+           AND la.property_id = p.id
+       )
+       OR EXISTS (
+         SELECT 1
+         FROM legal_authorizations la
+         JOIN disputes d ON d.property_id = p.id
+         WHERE la.lawyer_user_id = $1
+           AND la.status = 'active'
+           AND la.property_id IS NULL
+           AND la.client_user_id IN (d.opened_by, d.against_user)
+       )
+       ORDER BY p.created_at DESC`,
       [req.user.id]
     );
 

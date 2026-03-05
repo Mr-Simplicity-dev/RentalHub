@@ -53,6 +53,7 @@ import AdminCompliance from './admin/AdminCompliance';
 import LawyerDashboard from './lawyer/LawyerDashboard';
 import VerifyCase from './VerifyCase';
 import DisputeDetails from "./DisputeDetails";
+import AcceptLawyerInvite from './AcceptLawyerInvite';
 
 const queryClient = new QueryClient();
 
@@ -88,6 +89,19 @@ const TenantRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.user_type !== 'tenant') return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
+const LawyerRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'lawyer') return <Navigate to="/dashboard" />;
 
   return children;
 };
@@ -144,6 +158,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/lawyer/accept-invite" element={<AcceptLawyerInvite />} />
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
@@ -159,7 +174,7 @@ function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/super-admin" element={<SuperAdminDashboard />} />
-              <Route path="/lawyer" element={<ProtectedRoute><LawyerDashboard /></ProtectedRoute>}/>
+              <Route path="/lawyer" element={<LawyerRoute><LawyerDashboard /></LawyerRoute>}/>
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />

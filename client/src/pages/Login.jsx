@@ -30,6 +30,8 @@ const Login = () => {
           navigate('/super-admin');
         } else if (role === 'admin') {
           navigate('/admin');
+        } else if (role === 'lawyer') {
+          navigate('/lawyer');
         } else if (role === 'landlord') {
           navigate('/dashboard');
         } else {

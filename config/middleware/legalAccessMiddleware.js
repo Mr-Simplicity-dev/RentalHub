@@ -13,10 +13,23 @@ exports.canLawyerAccessProperty = async (req, res, next) => {
     }
 
     const result = await db.query(
-      `SELECT id FROM legal_authorizations
-       WHERE property_id = $1
-       AND lawyer_user_id = $2
-       AND status = 'active'`,
+      `SELECT 1
+       FROM legal_authorizations la
+       WHERE la.lawyer_user_id = $2
+         AND la.status = 'active'
+         AND (
+           la.property_id = $1
+           OR (
+             la.property_id IS NULL
+             AND EXISTS (
+               SELECT 1
+               FROM disputes d
+               WHERE d.property_id = $1
+                 AND la.client_user_id IN (d.opened_by, d.against_user)
+             )
+           )
+         )
+       LIMIT 1`,
       [propertyId, lawyerId]
     );
 

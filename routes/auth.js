@@ -3,7 +3,7 @@ import { body } from 'express-validator';
 
 import authController from '../controllers/authController.js';
 import { uploadPassport } from '../config/middleware/upload.js';
-import { authenticate } from '../config/middleware/auth.js';
+import { authenticate, requireSuperAdmin } from '../config/middleware/auth.js';
 
 const router = express.Router();
 
@@ -27,6 +27,10 @@ router.post(
       .trim()
       .notEmpty()
       .withMessage('Full name is required'),
+    body('lawyer_email')
+      .isEmail()
+      .withMessage('One lawyer email is required at registration')
+      .normalizeEmail(),
     body('is_foreigner')
       .optional()
       .isBoolean()
@@ -63,6 +67,58 @@ router.post(
     body('password').notEmpty(),
   ],
   authController.login
+);
+
+// Lawyer invite acceptance (password setup)
+router.post(
+  '/lawyer/accept-invite',
+  [
+    body('token')
+      .trim()
+      .notEmpty()
+      .withMessage('Invite token is required'),
+    body('full_name')
+      .trim()
+      .notEmpty()
+      .withMessage('Full name is required'),
+    body('phone')
+      .trim()
+      .customSanitizer((value) => String(value || '').replace(/\s+/g, ''))
+      .matches(/^\+?\d{10,15}$/)
+      .withMessage('Please enter a valid phone number (10-15 digits, optional +)'),
+    body('password')
+      .isLength({ min: 8 })
+      .withMessage('Password must be at least 8 characters'),
+  ],
+  authController.acceptLawyerInvite
+);
+
+// Super admin invite management
+router.get(
+  '/lawyer-invites',
+  authenticate,
+  requireSuperAdmin,
+  authController.getLawyerInvites
+);
+
+router.patch(
+  '/lawyer-invites/:inviteId/resend',
+  authenticate,
+  requireSuperAdmin,
+  authController.resendLawyerInvite
+);
+
+router.patch(
+  '/lawyer-invites/:inviteId/email',
+  [
+    authenticate,
+    requireSuperAdmin,
+    body('lawyer_email')
+      .isEmail()
+      .withMessage('Please provide a valid lawyer email')
+      .normalizeEmail(),
+  ],
+  authController.updateLawyerInviteEmail
 );
 
 // Verify Email

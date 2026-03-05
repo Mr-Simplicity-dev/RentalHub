@@ -64,6 +64,39 @@ exports.sendWelcomeEmail = async (email, fullName, userType) => {
   }
 };
 
+exports.sendLawyerInviteEmail = async ({
+  email,
+  clientName,
+  clientRole,
+  inviteUrl,
+  expiresInHours = 72,
+}) => {
+  try {
+    await sendWithTimeout({
+      from: FROM,
+      to: email,
+      subject: 'Lawyer Invitation - Rental Platform',
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6;">
+          <h2>You have been invited as a lawyer</h2>
+          <p><strong>${clientName}</strong> (${clientRole}) invited you to represent them on Rental Platform.</p>
+          <p>
+            <a href="${inviteUrl}" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">
+              Set Password & Activate Lawyer Access
+            </a>
+          </p>
+          <p>This link expires in ${expiresInHours} hours.</p>
+        </div>
+      `,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Lawyer invite email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send password reset email
 exports.sendPasswordResetEmail = async (email, resetUrl) => {
   try {

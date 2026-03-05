@@ -9,6 +9,7 @@ const Register = () => {
     user_type: 'tenant',
     full_name: '',
     email: '',
+    lawyer_email: '',
     phone: '',
     password: '',
     confirm_password: '',
@@ -50,6 +51,11 @@ const Register = () => {
 
     if (formData.password.length < 8) {
       toast.error('Password must be at least 8 characters');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.lawyer_email || '')) {
+      toast.error('Enter one valid lawyer email');
       return;
     }
 
@@ -257,6 +263,30 @@ const Register = () => {
                   placeholder="+2348012345678"
                 />
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="lawyer_email" className="block text-sm font-medium text-gray-700 mb-1">
+                Lawyer Email *
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaEnvelope className="text-gray-400" />
+                </div>
+                <input
+                  id="lawyer_email"
+                  name="lawyer_email"
+                  type="email"
+                  required
+                  value={formData.lawyer_email}
+                  onChange={handleChange}
+                  className="input pl-10"
+                  placeholder="lawyer@example.com"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Invitation will be sent immediately after registration.
+              </p>
             </div>
 
             {!formData.is_foreigner ? (

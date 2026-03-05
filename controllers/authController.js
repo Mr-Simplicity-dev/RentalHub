@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const db = require('../config/middleware/database');
@@ -11,13 +12,21 @@ const {
 const {
   sendVerificationEmail,
   sendWelcomeEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendLawyerInviteEmail
 } = require('../config/utils/emailService');
 const { sendVerificationCode } = require('../config/utils/smsService');
 
 // Store OTP codes temporarily (use Redis in production)
 const otpStore = new Map();
 let identitySchemaReady = false;
+let lawyerInviteSchemaReady = false;
+
+const LAWYER_INVITE_EXPIRY_HOURS = 72;
+const LAWYER_INVITE_EXPIRY_MS = LAWYER_INVITE_EXPIRY_HOURS * 60 * 60 * 1000;
+
+const hashInviteToken = (token) =>
+  crypto.createHash('sha256').update(String(token)).digest('hex');
 
 const ensureIdentitySchema = async () => {
   if (identitySchemaReady) return;
@@ -37,6 +46,67 @@ const ensureIdentitySchema = async () => {
   `);
 
   identitySchemaReady = true;
+};
+
+const ensureLawyerInviteSchema = async () => {
+  if (lawyerInviteSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS lawyer_invites (
+      id SERIAL PRIMARY KEY,
+      client_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      lawyer_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      lawyer_email VARCHAR(255) NOT NULL,
+      token_hash VARCHAR(64) NOT NULL UNIQUE,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      expires_at TIMESTAMP NOT NULL,
+      accepted_at TIMESTAMP,
+      last_sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      resent_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_lawyer_invites_client
+      ON lawyer_invites(client_user_id);
+
+    CREATE INDEX IF NOT EXISTS idx_lawyer_invites_email
+      ON lawyer_invites(lawyer_email);
+
+    CREATE INDEX IF NOT EXISTS idx_lawyer_invites_status
+      ON lawyer_invites(status, expires_at);
+  `);
+
+  lawyerInviteSchemaReady = true;
+};
+
+const createLawyerInvite = async ({ clientUserId, lawyerEmail, clientName, clientRole }) => {
+  await ensureLawyerInviteSchema();
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashInviteToken(rawToken);
+  const expiresAt = new Date(Date.now() + LAWYER_INVITE_EXPIRY_MS);
+
+  const inviteResult = await db.query(
+    `INSERT INTO lawyer_invites (client_user_id, lawyer_email, token_hash, expires_at, status)
+     VALUES ($1, $2, $3, $4, 'pending')
+     RETURNING id, lawyer_email, expires_at`,
+    [clientUserId, lawyerEmail, tokenHash, expiresAt]
+  );
+
+  const inviteUrl = `${process.env.FRONTEND_URL}/lawyer/accept-invite?token=${rawToken}`;
+  const emailResult = await sendLawyerInviteEmail({
+    email: lawyerEmail,
+    clientName,
+    clientRole,
+    inviteUrl,
+    expiresInHours: LAWYER_INVITE_EXPIRY_HOURS,
+  });
+
+  return {
+    ...inviteResult.rows[0],
+    email_sent: !!emailResult?.success,
+  };
 };
 
 // Generate JWT Token
@@ -67,6 +137,7 @@ exports.register = async (req, res) => {
       phone,
       password,
       full_name,
+      lawyer_email,
       nin,
       user_type,
       date_of_birth,
@@ -75,6 +146,17 @@ exports.register = async (req, res) => {
       international_passport_number,
       nationality
     } = req.body;
+
+    const cleanLawyerEmail = lawyer_email
+      ? String(lawyer_email).trim().toLowerCase()
+      : '';
+
+    if (cleanLawyerEmail && cleanLawyerEmail === String(email).trim().toLowerCase()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lawyer email must be different from your account email'
+      });
+    }
 
     const isForeigner =
       is_foreigner === true ||
@@ -297,6 +379,20 @@ exports.register = async (req, res) => {
     );
 
     const newUser = result.rows[0];
+    let lawyerInvite = null;
+
+    if (cleanLawyerEmail) {
+      try {
+        lawyerInvite = await createLawyerInvite({
+          clientUserId: newUser.id,
+          lawyerEmail: cleanLawyerEmail,
+          clientName: newUser.full_name,
+          clientRole: newUser.user_type,
+        });
+      } catch (inviteError) {
+        console.error('Lawyer invite creation error:', inviteError);
+      }
+    }
 
     // Generate email verification token
     const verificationToken = jwt.sign(
@@ -327,7 +423,8 @@ exports.register = async (req, res) => {
           nationality: newUser.nationality
         },
         token,
-        verification: nimcMeta
+        verification: nimcMeta,
+        lawyer_invite: lawyerInvite
       }
     });
 
@@ -406,6 +503,431 @@ exports.login = async (req, res) => {
       success: false,
       message: 'Login failed',
       error: error.message
+    });
+  }
+};
+
+exports.acceptLawyerInvite = async (req, res) => {
+  try {
+    await ensureIdentitySchema();
+    await ensureLawyerInviteSchema();
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { token, full_name, phone, password } = req.body;
+    const inviteToken = String(token || '').trim();
+    const cleanPhone = String(phone || '').replace(/\s+/g, '');
+    const cleanFullName = String(full_name || '').trim();
+    const tokenHash = hashInviteToken(inviteToken);
+
+    const inviteResult = await db.query(
+      `SELECT li.*, u.full_name AS client_name, u.user_type AS client_role
+       FROM lawyer_invites li
+       JOIN users u ON u.id = li.client_user_id
+       WHERE li.token_hash = $1
+       LIMIT 1`,
+      [tokenHash]
+    );
+
+    if (!inviteResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invite link is invalid'
+      });
+    }
+
+    const invite = inviteResult.rows[0];
+
+    if (invite.status === 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'This invite has already been accepted'
+      });
+    }
+
+    if (new Date(invite.expires_at).getTime() < Date.now()) {
+      await db.query(
+        `UPDATE lawyer_invites
+         SET status = 'expired', updated_at = NOW()
+         WHERE id = $1`,
+        [invite.id]
+      );
+
+      return res.status(410).json({
+        success: false,
+        message: 'Invite has expired. Ask super admin to resend a fresh invite.'
+      });
+    }
+
+    const existingByPhone = await db.query(
+      `SELECT id, email FROM users WHERE phone = $1 LIMIT 1`,
+      [cleanPhone]
+    );
+
+    if (
+      existingByPhone.rows.length &&
+      String(existingByPhone.rows[0].email).toLowerCase() !== String(invite.lawyer_email).toLowerCase()
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: 'Phone number already belongs to another account'
+      });
+    }
+
+    const existingLawyerResult = await db.query(
+      `SELECT id, user_type
+       FROM users
+       WHERE email = $1
+       LIMIT 1`,
+      [invite.lawyer_email]
+    );
+
+    let lawyerUserId;
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(password, salt);
+
+    if (existingLawyerResult.rows.length) {
+      const existingUser = existingLawyerResult.rows[0];
+
+      if (existingUser.user_type !== 'lawyer') {
+        return res.status(409).json({
+          success: false,
+          message: 'Invite email already belongs to a non-lawyer account'
+        });
+      }
+
+      await db.query(
+        `UPDATE users
+         SET full_name = $1,
+             phone = $2,
+             password_hash = $3,
+             email_verified = TRUE,
+             updated_at = NOW()
+         WHERE id = $4`,
+        [cleanFullName, cleanPhone, password_hash, existingUser.id]
+      );
+
+      lawyerUserId = existingUser.id;
+    } else {
+      const lawyerInsert = await db.query(
+        `INSERT INTO users
+         (user_type, email, phone, password_hash, full_name, identity_document_type, nationality, email_verified)
+         VALUES ('lawyer', $1, $2, $3, $4, 'nin', 'Nigeria', TRUE)
+         RETURNING id`,
+        [invite.lawyer_email, cleanPhone, password_hash, cleanFullName]
+      );
+
+      lawyerUserId = lawyerInsert.rows[0].id;
+    }
+
+    const linkExists = await db.query(
+      `SELECT id
+       FROM legal_authorizations
+       WHERE property_id IS NULL
+         AND client_user_id = $1
+         AND lawyer_user_id = $2
+       LIMIT 1`,
+      [invite.client_user_id, lawyerUserId]
+    );
+
+    if (!linkExists.rows.length) {
+      await db.query(
+        `INSERT INTO legal_authorizations
+         (property_id, client_user_id, lawyer_user_id, granted_by, status)
+         VALUES (NULL, $1, $2, $3, 'active')`,
+        [invite.client_user_id, lawyerUserId, invite.client_user_id]
+      );
+    } else {
+      await db.query(
+        `UPDATE legal_authorizations
+         SET status = 'active', revoked_at = NULL
+         WHERE id = $1`,
+        [linkExists.rows[0].id]
+      );
+    }
+
+    await db.query(
+      `UPDATE lawyer_invites
+       SET status = 'accepted',
+           accepted_at = NOW(),
+           lawyer_user_id = $2,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [invite.id, lawyerUserId]
+    );
+
+    const lawyerResult = await db.query(
+      `SELECT id, email, full_name, user_type, email_verified, phone_verified, created_at
+       FROM users
+       WHERE id = $1`,
+      [lawyerUserId]
+    );
+
+    const user = lawyerResult.rows[0];
+    const authToken = generateToken(user.id, user.user_type);
+
+    return res.json({
+      success: true,
+      message: 'Lawyer invite accepted successfully',
+      data: {
+        user,
+        token: authToken
+      }
+    });
+  } catch (error) {
+    console.error('Accept lawyer invite error:', error);
+
+    if (error.code === '23505') {
+      return res.status(409).json({
+        success: false,
+        message: 'Account details conflict with an existing user record'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to accept lawyer invite'
+    });
+  }
+};
+
+exports.getLawyerInvites = async (req, res) => {
+  try {
+    await ensureLawyerInviteSchema();
+
+    const { status = 'all', search = '' } = req.query;
+    const where = [];
+    const params = [];
+    let i = 1;
+
+    if (status && status !== 'all') {
+      where.push(`li.status = $${i++}`);
+      params.push(status);
+    }
+
+    if (search) {
+      where.push(`(
+        li.lawyer_email ILIKE $${i} OR
+        client.full_name ILIKE $${i} OR
+        client.email ILIKE $${i}
+      )`);
+      params.push(`%${search}%`);
+      i++;
+    }
+
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const result = await db.query(
+      `SELECT
+         li.id,
+         li.client_user_id,
+         li.lawyer_user_id,
+         li.lawyer_email,
+         li.status,
+         li.expires_at,
+         li.accepted_at,
+         li.last_sent_at,
+         li.resent_count,
+         li.created_at,
+         client.full_name AS client_name,
+         client.user_type AS client_role,
+         lawyer.full_name AS lawyer_name
+       FROM lawyer_invites li
+       JOIN users client ON client.id = li.client_user_id
+       LEFT JOIN users lawyer ON lawyer.id = li.lawyer_user_id
+       ${whereClause}
+       ORDER BY li.created_at DESC`,
+      params
+    );
+
+    return res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Get lawyer invites error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch lawyer invites'
+    });
+  }
+};
+
+exports.resendLawyerInvite = async (req, res) => {
+  try {
+    await ensureLawyerInviteSchema();
+
+    const { inviteId } = req.params;
+    const inviteResult = await db.query(
+      `SELECT li.*, client.full_name AS client_name, client.user_type AS client_role
+       FROM lawyer_invites li
+       JOIN users client ON client.id = li.client_user_id
+       WHERE li.id = $1
+       LIMIT 1`,
+      [inviteId]
+    );
+
+    if (!inviteResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invite not found'
+      });
+    }
+
+    const invite = inviteResult.rows[0];
+    if (invite.status === 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Accepted invites cannot be resent'
+      });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashInviteToken(rawToken);
+    const expiresAt = new Date(Date.now() + LAWYER_INVITE_EXPIRY_MS);
+    const inviteUrl = `${process.env.FRONTEND_URL}/lawyer/accept-invite?token=${rawToken}`;
+
+    await db.query(
+      `UPDATE lawyer_invites
+       SET token_hash = $2,
+           status = 'pending',
+           expires_at = $3,
+           last_sent_at = NOW(),
+           resent_count = resent_count + 1,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [invite.id, tokenHash, expiresAt]
+    );
+
+    const emailResult = await sendLawyerInviteEmail({
+      email: invite.lawyer_email,
+      clientName: invite.client_name,
+      clientRole: invite.client_role,
+      inviteUrl,
+      expiresInHours: LAWYER_INVITE_EXPIRY_HOURS,
+    });
+
+    return res.json({
+      success: true,
+      message: emailResult?.success
+        ? 'Invite resent successfully'
+        : 'Invite token refreshed, but email delivery failed',
+      data: {
+        invite_id: invite.id,
+        lawyer_email: invite.lawyer_email,
+        expires_at: expiresAt,
+        email_sent: !!emailResult?.success,
+      }
+    });
+  } catch (error) {
+    console.error('Resend lawyer invite error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to resend invite'
+    });
+  }
+};
+
+exports.updateLawyerInviteEmail = async (req, res) => {
+  try {
+    await ensureLawyerInviteSchema();
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { inviteId } = req.params;
+    const lawyerEmail = String(req.body.lawyer_email || '').trim().toLowerCase();
+
+    const inviteResult = await db.query(
+      `SELECT li.*, client.full_name AS client_name, client.user_type AS client_role
+       FROM lawyer_invites li
+       JOIN users client ON client.id = li.client_user_id
+       WHERE li.id = $1
+       LIMIT 1`,
+      [inviteId]
+    );
+
+    if (!inviteResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invite not found'
+      });
+    }
+
+    const invite = inviteResult.rows[0];
+    if (invite.status === 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Accepted invites cannot be changed'
+      });
+    }
+
+    const userByEmail = await db.query(
+      `SELECT id, user_type FROM users WHERE email = $1 LIMIT 1`,
+      [lawyerEmail]
+    );
+
+    if (userByEmail.rows.length && userByEmail.rows[0].user_type !== 'lawyer') {
+      return res.status(409).json({
+        success: false,
+        message: 'Email already belongs to a non-lawyer account'
+      });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashInviteToken(rawToken);
+    const expiresAt = new Date(Date.now() + LAWYER_INVITE_EXPIRY_MS);
+    const inviteUrl = `${process.env.FRONTEND_URL}/lawyer/accept-invite?token=${rawToken}`;
+
+    await db.query(
+      `UPDATE lawyer_invites
+       SET lawyer_email = $2,
+           token_hash = $3,
+           status = 'pending',
+           expires_at = $4,
+           last_sent_at = NOW(),
+           resent_count = resent_count + 1,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [invite.id, lawyerEmail, tokenHash, expiresAt]
+    );
+
+    const emailResult = await sendLawyerInviteEmail({
+      email: lawyerEmail,
+      clientName: invite.client_name,
+      clientRole: invite.client_role,
+      inviteUrl,
+      expiresInHours: LAWYER_INVITE_EXPIRY_HOURS,
+    });
+
+    return res.json({
+      success: true,
+      message: emailResult?.success
+        ? 'Invite email updated and resent'
+        : 'Invite email updated, but delivery failed',
+      data: {
+        invite_id: invite.id,
+        lawyer_email: lawyerEmail,
+        expires_at: expiresAt,
+        email_sent: !!emailResult?.success,
+      }
+    });
+  } catch (error) {
+    console.error('Update lawyer invite email error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update invite email'
     });
   }
 };
