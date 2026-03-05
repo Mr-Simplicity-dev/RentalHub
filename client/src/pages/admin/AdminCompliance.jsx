@@ -105,8 +105,8 @@ const AdminCompliance = () => {
   return (
     <div className="p-6 space-y-8">
 
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800">
+      <div className="flex flex-col items-center gap-3">
+        <h1 className="text-2xl font-bold text-gray-800 text-center">
           Compliance & Risk Overview
         </h1>
         <button
@@ -133,7 +133,7 @@ const AdminCompliance = () => {
       {/* Risk Score */}
       <div className="rounded-xl shadow-sm p-6 border bg-white space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-800">
+          <h2 className="text-lg font-semibold text-gray-800 text-center w-full">
             Platform Risk Score
           </h2>
           <span
@@ -167,7 +167,7 @@ const AdminCompliance = () => {
 
       {/* Risk Trend */}
       <div className="rounded-xl shadow-sm p-6 border bg-white">
-        <h2 className="text-lg font-semibold mb-4 text-gray-800">
+        <h2 className="text-lg font-semibold mb-4 text-gray-800 text-center">
           Risk Trend (Over Time)
         </h2>
 

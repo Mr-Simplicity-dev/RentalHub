@@ -71,8 +71,8 @@ const AdminUserDetail = () => {
 
       <div className="bg-white shadow-lg rounded-xl p-6 border">
         {/* Header Section */}
-        <div className="flex justify-between items-center border-b pb-4 mb-6">
-          <div>
+        <div className="flex flex-col md:flex-row justify-between items-center border-b pb-4 mb-6 gap-3">
+          <div className="text-center md:text-left">
             <h2 className="text-2xl font-bold text-gray-800">
               {user.full_name}
             </h2>

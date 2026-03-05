@@ -109,7 +109,7 @@ const Home = () => {
                 <FaMobileAlt />
               </div>
               <div>
-                <p className="font-semibold text-gray-900">Get the RentalHub mobile app</p>
+                <p className="font-semibold text-gray-900">Click Here to Get the RentalHub mobile app</p>
                 <p className="text-sm text-gray-600">
                   Faster search alerts, instant chats, and case updates directly on your phone.
                 </p>
