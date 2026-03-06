@@ -5,7 +5,7 @@ const { requireAdmin } = require('../config/middleware/requireAdmin');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const adminController = require('../controllers/adminController');
 const { allowRoles } = require('../config/middleware/roleMiddleware');
-const superAdminOnly = require('../middleware/superAdminOnly');
+const superAdminOnly = require('../config/middleware/superAdminOnly');
 
 
 /**

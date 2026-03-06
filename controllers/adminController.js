@@ -1,6 +1,7 @@
 const db = require('../config/middleware/database');
 const { sendEmail } = require('../config/utils/mailer');
 const { notifyAlertsForProperty } = require('../config/utils/propertyAlertService');
+const bcrypt = require('bcryptjs');
 
 let verificationAuditSchemaReady = false;
 
@@ -865,5 +866,34 @@ exports.verifyLedgerIntegrity = async (req, res) => {
       success: false,
       message: 'Ledger verification failed'
     });
+  }
+};
+
+exports.createAdmin = async (req, res) => {
+  try {
+    const { email, phone, full_name, nin, password, user_type } = req.body;
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const result = await db.query(
+      `INSERT INTO users (
+        user_type, email, phone, password_hash,
+        full_name, nin,
+        email_verified, phone_verified, identity_verified
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,TRUE,TRUE,TRUE)
+      RETURNING id, email, user_type`,
+      [user_type, email, phone, passwordHash, full_name, nin]
+    );
+
+    res.json({
+      message: 'Admin created successfully',
+      admin: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 };

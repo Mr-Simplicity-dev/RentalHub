@@ -1,7 +1,7 @@
-import express from 'express';
-import { authenticate, requireSuperAdmin } from '../config/middleware/auth.js';
-import * as superCtrl from '../controllers/superAdmin.controller.js';
-import audit from '../config/middleware/auditMiddleware.js';
+const express = require('express');
+const { authenticate, requireSuperAdmin } = require('../config/middleware/auth');
+const superCtrl = require('../controllers/superAdmin.controller');
+const audit = require('../config/middleware/auditMiddleware');
 
 const router = express.Router();
 
@@ -40,4 +40,4 @@ router.patch('/flags/:key', authenticate, requireSuperAdmin, superCtrl.updateFea
 router.get('/fraud', authenticate, requireSuperAdmin, superCtrl.getFraudFlags);
 router.patch('/fraud/:id/resolve', authenticate, requireSuperAdmin, superCtrl.resolveFraudFlag);
 
-export default router;
+module.exports = router;

@@ -1,9 +1,8 @@
-import express from 'express';
-import { body } from 'express-validator';
-
-import authController from '../controllers/authController.js';
-import { uploadPassport } from '../config/middleware/upload.js';
-import { authenticate, requireSuperAdmin } from '../config/middleware/auth.js';
+const express = require('express');
+const { body } = require('express-validator');
+const authController = require('../controllers/authController');
+const { uploadPassport } = require('../config/middleware/upload');
+const { authenticate, requireSuperAdmin } = require('../config/middleware/auth');
 
 const router = express.Router();
 
@@ -164,4 +163,4 @@ router.post(
   authController.resetPassword
 );
 
-export default router;
+module.exports = router;

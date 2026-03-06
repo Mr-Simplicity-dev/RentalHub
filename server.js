@@ -9,7 +9,7 @@ const { Server } = require("socket.io");
 
 const db = require('./config/middleware/database');
 
-// const authRoutes = require('./routes/auth');
+const authRoutes = require('./routes/auth');
 const propertyRoutes = require('./routes/properties');
 const paymentRoutes = require('./routes/payments');
 const applicationRoutes = require('./routes/applications');
@@ -18,7 +18,7 @@ const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
 const dashboardRoutes = require('./routes/dashboard');
 const notificationRoutes = require('./routes/notifications');
-// const superAdminRoutes = require('./routes/superAdmin');
+const superAdminRoutes = require('./routes/superAdmin');
 const propertyUtilsRoutes = require('./routes/propertyUtils');
 const propertyAlertsRoutes = require('./routes/propertyAlerts');
 
@@ -33,8 +33,6 @@ const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 
 const audit = require('./config/middleware/auditMiddleware');
 const startScheduler = require('./config/utils/scheduler');
-const authRoutes = require('./routes/auth').default;
-const superAdminRoutes = require('./routes/superAdmin').default;
 
 dotenv.config();
 

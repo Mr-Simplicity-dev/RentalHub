@@ -1,8 +1,8 @@
-import jwt from 'jsonwebtoken';
-import db from './database.js';
+const jwt = require('jsonwebtoken');
+const db = require('./database');
 
 // Verify JWT Token
-export const authenticate = async (req, res, next) => {
+const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     console.log('AUTH HEADER:', authHeader);
@@ -54,7 +54,7 @@ export const authenticate = async (req, res, next) => {
 };
 
 // Check if user is a landlord
-export const isLandlord = (req, res, next) => {
+const isLandlord = (req, res, next) => {
   if (req.user.user_type !== 'landlord') {
     return res.status(403).json({
       success: false,
@@ -65,7 +65,7 @@ export const isLandlord = (req, res, next) => {
 };
 
 // Check if user is a tenant
-export const isTenant = (req, res, next) => {
+const isTenant = (req, res, next) => {
   if (req.user.user_type !== 'tenant') {
     return res.status(403).json({
       success: false,
@@ -76,7 +76,7 @@ export const isTenant = (req, res, next) => {
 };
 
 // Check if user is verified
-export const isVerified = (req, res, next) => {
+const isVerified = (req, res, next) => {
   if (!req.user.identity_verified) {
     return res.status(403).json({
       success: false,
@@ -87,7 +87,7 @@ export const isVerified = (req, res, next) => {
 };
 
 // Check if tenant has active subscription
-export const hasActiveSubscription = (req, res, next) => {
+const hasActiveSubscription = (req, res, next) => {
   if (req.user.user_type === 'tenant' && !req.user.subscription_active) {
     return res.status(403).json({
       success: false,
@@ -98,7 +98,7 @@ export const hasActiveSubscription = (req, res, next) => {
 };
 
 // Check for super admin
-export const requireSuperAdmin = (req, res, next) => {
+const requireSuperAdmin = (req, res, next) => {
   if (!req.user || req.user.user_type !== 'super_admin') {
     return res.status(403).json({ message: 'Super admin access only' });
   }
@@ -106,7 +106,7 @@ export const requireSuperAdmin = (req, res, next) => {
 };
 
 // Check if user is admin OR super admin
-export const requireAdminOrSuperAdmin = (req, res, next) => {
+const requireAdminOrSuperAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
@@ -122,4 +122,14 @@ export const requireAdminOrSuperAdmin = (req, res, next) => {
   }
 
   next();
+};
+
+module.exports = {
+  authenticate,
+  isLandlord,
+  isTenant,
+  isVerified,
+  hasActiveSubscription,
+  requireSuperAdmin,
+  requireAdminOrSuperAdmin,
 };

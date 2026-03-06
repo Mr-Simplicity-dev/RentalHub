@@ -1,4 +1,4 @@
-import db from '../config/middleware/database.js';
+const db = require('../config/middleware/database');
 
 let verificationAuditSchemaReady = false;
 
@@ -30,7 +30,7 @@ const logAction = async (actorId, action, targetType = null, targetId = null) =>
 // ================= USERS =================
 
 // GET /api/super/users
-export const getAllUsers = async (req, res) => {
+const getAllUsers = async (req, res) => {
   try {
     await ensureVerificationAuditSchema();
 
@@ -65,7 +65,7 @@ export const getAllUsers = async (req, res) => {
 };
 
 // PATCH /api/super/users/:id/ban
-export const banUser = async (req, res) => {
+const banUser = async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -85,7 +85,7 @@ export const banUser = async (req, res) => {
 };
 
 // PATCH /api/super/users/:id/unban
-export const unbanUser = async (req, res) => {
+const unbanUser = async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -115,7 +115,7 @@ export const unbanUser = async (req, res) => {
 };
 
 // DELETE /api/super/users/:id
-export const deleteUser = async (req, res) => {
+const deleteUser = async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -147,7 +147,7 @@ export const deleteUser = async (req, res) => {
 };
 
 // PATCH /api/super/users/:id/promote
-export const promoteToAdmin = async (req, res) => {
+const promoteToAdmin = async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -175,7 +175,7 @@ export const promoteToAdmin = async (req, res) => {
 // ================= IDENTITY VERIFICATIONS =================
 
 // GET /api/super/verifications
-export const getIdentityVerifications = async (req, res) => {
+const getIdentityVerifications = async (req, res) => {
   try {
     await ensureVerificationAuditSchema();
 
@@ -273,7 +273,7 @@ export const getIdentityVerifications = async (req, res) => {
 };
 
 // PATCH /api/super/verifications/:userId/approve
-export const approveIdentityVerification = async (req, res) => {
+const approveIdentityVerification = async (req, res) => {
   const { userId } = req.params;
 
   try {
@@ -308,7 +308,7 @@ export const approveIdentityVerification = async (req, res) => {
 };
 
 // PATCH /api/super/verifications/:userId/reject
-export const rejectIdentityVerification = async (req, res) => {
+const rejectIdentityVerification = async (req, res) => {
   const { userId } = req.params;
 
   try {
@@ -343,10 +343,10 @@ export const rejectIdentityVerification = async (req, res) => {
 
 // Backward-compatible route handler
 // PATCH /api/super/verify/:userId
-export const verifyUser = approveIdentityVerification;
+const verifyUser = approveIdentityVerification;
 
 // GET /api/super/admins/performance
-export const getAdminPerformance = async (req, res) => {
+const getAdminPerformance = async (req, res) => {
   try {
     await ensureVerificationAuditSchema();
 
@@ -379,7 +379,7 @@ export const getAdminPerformance = async (req, res) => {
 // ================= PROPERTIES =================
 
 // GET /api/super/properties
-export const getAllProperties = async (req, res) => {
+const getAllProperties = async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT p.*, u.full_name AS landlord_name
@@ -396,7 +396,7 @@ export const getAllProperties = async (req, res) => {
 };
 
 // PATCH /api/super/properties/:id/unlist
-export const unlistProperty = async (req, res) => {
+const unlistProperty = async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -413,7 +413,7 @@ export const unlistProperty = async (req, res) => {
 // ================= AUDIT LOGS =================
 
 // GET /api/super/logs
-export const getAuditLogs = async (req, res) => {
+const getAuditLogs = async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT l.*, u.full_name AS actor_name
@@ -432,7 +432,7 @@ export const getAuditLogs = async (req, res) => {
 // ================= ANALYTICS =================
 
 // GET /api/super/analytics
-export const getAnalytics = async (req, res) => {
+const getAnalytics = async (req, res) => {
   try {
     await ensureVerificationAuditSchema();
 
@@ -500,7 +500,7 @@ export const getAnalytics = async (req, res) => {
 // ================= REPORTS =================
 
 // GET /api/super/reports
-export const getReports = async (req, res) => {
+const getReports = async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT r.*, u.full_name AS reporter_name
@@ -516,7 +516,7 @@ export const getReports = async (req, res) => {
 };
 
 // PATCH /api/super/reports/:id
-export const updateReportStatus = async (req, res) => {
+const updateReportStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
@@ -531,7 +531,7 @@ export const updateReportStatus = async (req, res) => {
 };
 
 // PATCH /api/super/reports/:reportId/resolve
-export const resolveReport = async (req, res) => {
+const resolveReport = async (req, res) => {
   const { reportId } = req.params;
 
   try {
@@ -545,7 +545,7 @@ export const resolveReport = async (req, res) => {
 
 // ================= BROADCAST =================
 
-export const getBroadcasts = async (req, res) => {
+const getBroadcasts = async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT b.*, u.full_name AS sender_name
@@ -560,7 +560,7 @@ export const getBroadcasts = async (req, res) => {
   }
 };
 
-export const createBroadcast = async (req, res) => {
+const createBroadcast = async (req, res) => {
   const { title, message, target_role } = req.body;
 
   try {
@@ -579,7 +579,7 @@ export const createBroadcast = async (req, res) => {
 };
 
 // Bulk actions
-export const bulkUserAction = async (req, res) => {
+const bulkUserAction = async (req, res) => {
   const { ids, action } = req.body;
 
   try {
@@ -628,7 +628,7 @@ export const bulkUserAction = async (req, res) => {
   }
 };
 
-export const bulkPropertyAction = async (req, res) => {
+const bulkPropertyAction = async (req, res) => {
   const { ids, action } = req.body;
 
   try {
@@ -654,7 +654,7 @@ export const bulkPropertyAction = async (req, res) => {
 };
 
 // feature flags
-export const getFeatureFlags = async (req, res) => {
+const getFeatureFlags = async (req, res) => {
   try {
     const { rows } = await db.query(`SELECT * FROM feature_flags ORDER BY key`);
     res.json({ success: true, flags: rows });
@@ -663,7 +663,7 @@ export const getFeatureFlags = async (req, res) => {
   }
 };
 
-export const updateFeatureFlag = async (req, res) => {
+const updateFeatureFlag = async (req, res) => {
   const { key } = req.params;
   const { enabled } = req.body;
 
@@ -682,7 +682,7 @@ export const updateFeatureFlag = async (req, res) => {
 };
 
 // fraud
-export const getFraudFlags = async (req, res) => {
+const getFraudFlags = async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT * FROM fraud_flags
@@ -696,11 +696,39 @@ export const getFraudFlags = async (req, res) => {
   }
 };
 
-export const resolveFraudFlag = async (req, res) => {
+const resolveFraudFlag = async (req, res) => {
   const { id } = req.params;
 
   await db.query(`UPDATE fraud_flags SET resolved = TRUE WHERE id = $1`, [id]);
   await logAction(req.user.id, 'RESOLVE_FRAUD_FLAG', 'fraud', id);
 
   res.json({ success: true });
+};
+
+module.exports = {
+  getAllUsers,
+  banUser,
+  unbanUser,
+  deleteUser,
+  promoteToAdmin,
+  getIdentityVerifications,
+  approveIdentityVerification,
+  rejectIdentityVerification,
+  verifyUser,
+  getAdminPerformance,
+  getAllProperties,
+  unlistProperty,
+  getAuditLogs,
+  getAnalytics,
+  getReports,
+  updateReportStatus,
+  resolveReport,
+  getBroadcasts,
+  createBroadcast,
+  bulkUserAction,
+  bulkPropertyAction,
+  getFeatureFlags,
+  updateFeatureFlag,
+  getFraudFlags,
+  resolveFraudFlag,
 };
