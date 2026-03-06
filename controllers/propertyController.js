@@ -157,7 +157,10 @@ exports.getFeaturedProperties = async (req, res) => {
 exports.searchProperties = async (req, res) => {
   try {
     const {
+      search,
+      featured,
       state_id,
+      state,
       city,
       property_type,
       min_price,
@@ -181,6 +184,14 @@ exports.searchProperties = async (req, res) => {
       '(p.expires_at IS NULL OR p.expires_at > CURRENT_TIMESTAMP)'
     ];
 
+    const featuredOnly =
+      String(featured).toLowerCase() === 'true' ||
+      String(featured) === '1';
+
+    if (featuredOnly) {
+      whereConditions.push('p.featured = TRUE');
+    }
+
     // State Filter
     if (state_id) {
       whereConditions.push(`p.state_id = $${paramCount}`);
@@ -188,9 +199,31 @@ exports.searchProperties = async (req, res) => {
       paramCount++;
     }
 
-    // City Filter
+    if (state) {
+      whereConditions.push(`LOWER(s.state_name) LIKE LOWER($${paramCount})`);
+      params.push(`%${state}%`);
+      paramCount++;
+    }
+
+    if (search) {
+      whereConditions.push(`(
+        LOWER(p.title) LIKE LOWER($${paramCount}) OR
+        LOWER(COALESCE(p.description, '')) LIKE LOWER($${paramCount}) OR
+        LOWER(COALESCE(p.city, '')) LIKE LOWER($${paramCount}) OR
+        LOWER(COALESCE(p.area, '')) LIKE LOWER($${paramCount}) OR
+        LOWER(COALESCE(s.state_name, '')) LIKE LOWER($${paramCount}) OR
+        LOWER(COALESCE(s.state_code, '')) LIKE LOWER($${paramCount})
+      )`);
+      params.push(`%${search}%`);
+      paramCount++;
+    }
+
+    // City / Area Filter
     if (city) {
-      whereConditions.push(`LOWER(p.city) LIKE LOWER($${paramCount})`);
+      whereConditions.push(`(
+        LOWER(COALESCE(p.city, '')) LIKE LOWER($${paramCount}) OR
+        LOWER(COALESCE(p.area, '')) LIKE LOWER($${paramCount})
+      )`);
       params.push(`%${city}%`);
       paramCount++;
     }
@@ -267,6 +300,7 @@ exports.searchProperties = async (req, res) => {
     const countQuery = `
       SELECT COUNT(*)
       FROM properties p
+      JOIN states s ON p.state_id = s.id
       WHERE ${whereConditions.join(' AND ')}
     `;
     const countResult = await db.query(countQuery, params.slice(0, -2));
@@ -509,13 +543,20 @@ exports.getSavedProperties = async (req, res) => {
       JOIN properties p ON sp.property_id = p.id
       JOIN states s ON p.state_id = s.id
       WHERE sp.tenant_id = $1
+        AND p.is_available = TRUE
+        AND p.is_verified = TRUE
       ORDER BY sp.created_at DESC
       LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
     );
 
     const countResult = await db.query(
-      'SELECT COUNT(*) FROM saved_properties WHERE tenant_id = $1',
+      `SELECT COUNT(*)
+       FROM saved_properties sp
+       JOIN properties p ON sp.property_id = p.id
+       WHERE sp.tenant_id = $1
+         AND p.is_available = TRUE
+         AND p.is_verified = TRUE`,
       [userId]
     );
 
@@ -1135,6 +1176,11 @@ exports.unlistProperty = async (req, res) => {
         message: 'Property not found or unauthorized',
       });
     }
+
+    await db.query(
+      'DELETE FROM saved_properties WHERE property_id = $1',
+      [id]
+    );
 
     res.json({
       success: true,

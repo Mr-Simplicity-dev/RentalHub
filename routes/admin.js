@@ -94,6 +94,30 @@ router.patch(
   adminController.rejectProperty
 );
 
+router.patch(
+  '/properties/:id/unlist',
+  requireAdminOrSuperAdmin,
+  adminController.unlistProperty
+);
+
+router.patch(
+  '/properties/:id/relist',
+  requireAdminOrSuperAdmin,
+  adminController.relistProperty
+);
+
+router.patch(
+  '/properties/:id/feature',
+  requireAdminOrSuperAdmin,
+  adminController.featureProperty
+);
+
+router.patch(
+  '/properties/:id/unfeature',
+  requireAdminOrSuperAdmin,
+  adminController.unfeatureProperty
+);
+
 /**
  * =========================
  * APPLICATIONS

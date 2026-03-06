@@ -155,16 +155,23 @@ const AdminProperties = () => {
 
                 <td className="py-3 px-4">
 
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold
-                      ${
-                        p.status === "available"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-700"
-                      }`}
-                  >
-                    {p.status}
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-semibold
+                        ${
+                          p.is_available
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                    >
+                      {p.is_available ? "available" : "unlisted"}
+                    </span>
+                    {p.featured && (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                        featured
+                      </span>
+                    )}
+                  </div>
 
                 </td>
 

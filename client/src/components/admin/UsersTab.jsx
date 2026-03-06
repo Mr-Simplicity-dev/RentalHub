@@ -11,6 +11,9 @@ const UsersTab = ({
   unbanUser,
   deleteUser,
 }) => {
+  const visibleUsers = users.filter((u) =>
+    ["tenant", "landlord"].includes(u.user_type)
+  );
 
   const toggleUser = (id) => {
     setSelectedUsers((prev) =>
@@ -22,8 +25,7 @@ const UsersTab = ({
 
   const toggleAll = (checked) => {
     if (checked) {
-      const ids = users
-        .filter((u) => u.user_type !== "super_admin")
+      const ids = visibleUsers
         .map((u) => u.id);
 
       setSelectedUsers(ids);
@@ -103,7 +105,7 @@ const UsersTab = ({
 
           <tbody>
 
-            {users.length === 0 && (
+            {visibleUsers.length === 0 && (
               <tr>
                 <td
                   colSpan="9"
@@ -114,7 +116,7 @@ const UsersTab = ({
               </tr>
             )}
 
-            {users.map((u) => (
+            {visibleUsers.map((u) => (
 
               <tr
                 key={u.id}

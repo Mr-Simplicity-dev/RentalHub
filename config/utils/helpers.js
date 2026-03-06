@@ -1,4 +1,4 @@
-export const formatCurrency = (amount) => {
+const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
     currency: 'NGN',
@@ -6,7 +6,7 @@ export const formatCurrency = (amount) => {
   }).format(amount);
 };
 
-export const formatDate = (date) => {
+const formatDate = (date) => {
   return new Date(date).toLocaleDateString('en-NG', {
     year: 'numeric',
     month: 'long',
@@ -14,7 +14,7 @@ export const formatDate = (date) => {
   });
 };
 
-export const formatDateTime = (date) => {
+const formatDateTime = (date) => {
   return new Date(date).toLocaleString('en-NG', {
     year: 'numeric',
     month: 'short',
@@ -24,7 +24,7 @@ export const formatDateTime = (date) => {
   });
 };
 
-export const getTimeAgo = (date) => {
+const getTimeAgo = (date) => {
   const seconds = Math.floor((new Date() - new Date(date)) / 1000);
   
   let interval = seconds / 31536000;
@@ -45,20 +45,20 @@ export const getTimeAgo = (date) => {
   return Math.floor(seconds) + ' seconds ago';
 };
 
-export const truncateText = (text, maxLength) => {
+const truncateText = (text, maxLength) => {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';
 };
 
-export const validateNIN = (nin) => {
+const validateNIN = (nin) => {
   return /^\d{11}$/.test(nin);
 };
 
-export const validatePhone = (phone) => {
+const validatePhone = (phone) => {
   return /^(\+234|0)[789]\d{9}$/.test(phone);
 };
 
-export const getStatusColor = (status) => {
+const getStatusColor = (status) => {
   const colors = {
     pending: 'bg-yellow-100 text-yellow-800',
     approved: 'bg-green-100 text-green-800',
@@ -68,4 +68,15 @@ export const getStatusColor = (status) => {
     failed: 'bg-red-100 text-red-800',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
+};
+
+module.exports = {
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+  getTimeAgo,
+  truncateText,
+  validateNIN,
+  validatePhone,
+  getStatusColor,
 };

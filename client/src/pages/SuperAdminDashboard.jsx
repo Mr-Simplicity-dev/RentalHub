@@ -282,6 +282,16 @@ export default function SuperAdminDashboard() {
     loadProperties();
   };
 
+  const toggleFeaturedProperty = async (id, shouldFeature) => {
+    await api.patch(
+      `/super/properties/${id}/${shouldFeature ? "feature" : "unfeature"}`
+    );
+    toast.success(
+      shouldFeature ? "Property featured" : "Property removed from featured"
+    );
+    loadProperties();
+  };
+
   const bulkUsers = async (action) => {
     await api.post("/super/users/bulk", {
       ids: selectedUsers,
@@ -439,6 +449,7 @@ export default function SuperAdminDashboard() {
             setSelectedProps={setSelectedProps}
             bulkProps={bulkProps}
             unlistProperty={unlistProperty}
+            toggleFeatured={toggleFeaturedProperty}
           />
           <PaginationControls
             currentPage={propertiesPage}

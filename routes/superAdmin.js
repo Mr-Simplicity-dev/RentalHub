@@ -13,6 +13,8 @@ router.patch('/users/:id/promote', authenticate, requireSuperAdmin, superCtrl.pr
 
 router.get('/properties', authenticate, requireSuperAdmin, superCtrl.getAllProperties);
 router.patch('/properties/:id/unlist', authenticate, requireSuperAdmin, audit('unlist_property', 'property'), superCtrl.unlistProperty);
+router.patch('/properties/:id/feature', authenticate, requireSuperAdmin, superCtrl.featureProperty);
+router.patch('/properties/:id/unfeature', authenticate, requireSuperAdmin, superCtrl.unfeatureProperty);
 
 router.patch('/verify/:userId', authenticate, requireSuperAdmin, superCtrl.verifyUser);
 router.get('/verifications', authenticate, requireSuperAdmin, superCtrl.getIdentityVerifications);

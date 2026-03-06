@@ -45,7 +45,7 @@ const AdminPropertyDetail = () => {
 
     try {
 
-      await api.patch(`/super/properties/${id}/unlist`);
+      await api.patch(`/admin/properties/${id}/unlist`);
       await loadProperty();
 
     } finally {
@@ -63,13 +63,33 @@ const AdminPropertyDetail = () => {
 
     try {
 
-      await api.patch(`/super/properties/${id}/relist`);
+      await api.patch(`/admin/properties/${id}/relist`);
       await loadProperty();
 
     } finally {
       setWorking(false);
     }
 
+  };
+
+  const toggleFeatured = async () => {
+
+    if (!window.confirm(
+      property.featured
+        ? "Remove this property from featured listings?"
+        : "Add this property to featured listings?"
+    )) return;
+
+    setWorking(true);
+
+    try {
+      await api.patch(
+        `/admin/properties/${id}/${property.featured ? "unfeature" : "feature"}`
+      );
+      await loadProperty();
+    } finally {
+      setWorking(false);
+    }
   };
 
 
@@ -83,7 +103,7 @@ const AdminPropertyDetail = () => {
     );
   }
 
-  const isActive = property.status === "available";
+  const isActive = Boolean(property.is_available);
 
   return (
 
@@ -120,8 +140,14 @@ const AdminPropertyDetail = () => {
                 }
               `}
             >
-              {property.status}
+              {isActive ? "available" : "unlisted"}
             </span>
+
+            {property.featured && (
+              <span className="inline-block mt-2 ml-2 px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700">
+                featured
+              </span>
+            )}
 
           </div>
 
@@ -151,6 +177,18 @@ const AdminPropertyDetail = () => {
               </button>
 
             )}
+
+            <button
+              onClick={toggleFeatured}
+              disabled={working}
+              className={`px-3 py-2 text-sm rounded-lg disabled:opacity-50 ${
+                property.featured
+                  ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                  : "bg-amber-600 text-white hover:bg-amber-700"
+              }`}
+            >
+              {property.featured ? "Unfeature" : "Feature Property"}
+            </button>
 
           </div>
 
@@ -194,6 +232,11 @@ const AdminPropertyDetail = () => {
             <p className="font-medium">
               ₦{Number(property.rent_amount || 0).toLocaleString()}
             </p>
+          </div>
+
+          <div>
+            <span className="text-gray-500">Featured</span>
+            <p className="font-medium">{property.featured ? "Yes" : "No"}</p>
           </div>
 
           <div>

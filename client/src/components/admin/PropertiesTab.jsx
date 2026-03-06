@@ -6,6 +6,7 @@ const PropertiesTab = ({
   setSelectedProps,
   bulkProps,
   unlistProperty,
+  toggleFeatured,
 }) => {
 
   const toggleProperty = (id) => {
@@ -123,13 +124,19 @@ const PropertiesTab = ({
                   <span
                     className={`px-2 py-1 text-xs rounded-full
                     ${
-                      p.is_active
+                      (p.is_available ?? p.is_active)
                         ? "bg-green-100 text-green-700"
                         : "bg-red-100 text-red-700"
                     }`}
                   >
-                    {p.is_active ? "Active" : "Unlisted"}
+                    {(p.is_available ?? p.is_active) ? "Active" : "Unlisted"}
                   </span>
+
+                  {p.featured && (
+                    <span className="ml-2 px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700">
+                      Featured
+                    </span>
+                  )}
 
                 </td>
 
@@ -139,7 +146,7 @@ const PropertiesTab = ({
 
                   <div className="flex justify-center gap-2">
 
-                    {p.is_active && (
+                    {(p.is_available ?? p.is_active) && (
                       <button
                         onClick={() => unlistProperty(p.id)}
                         className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
@@ -147,6 +154,17 @@ const PropertiesTab = ({
                         Unlist
                       </button>
                     )}
+
+                    <button
+                      onClick={() => toggleFeatured(p.id, !p.featured)}
+                      className={`rounded-lg px-2 py-1 text-xs transition-colors ${
+                        p.featured
+                          ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                          : "bg-amber-600 text-white hover:bg-amber-700"
+                      }`}
+                    >
+                      {p.featured ? "Unfeature" : "Feature"}
+                    </button>
 
                   </div>
 

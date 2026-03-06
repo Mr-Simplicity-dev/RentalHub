@@ -79,7 +79,7 @@ exports.getAllUsers = async (req, res) => {
 
     // Base condition
     where.push(`u.deleted_at IS NULL`);
-    where.push(`u.user_type <> 'super_admin'`);
+    where.push(`u.user_type IN ('tenant', 'landlord')`);
 
     // Role filter
     if (role && role !== 'all') {
@@ -354,6 +354,8 @@ exports.getAllProperties = async (req, res) => {
         p.title,
         p.rent_amount,
         p.status,
+        p.is_available,
+        p.featured,
         p.created_at,
         p.city,
         p.state,
@@ -652,10 +654,10 @@ exports.deleteUser = async (req, res) => {
     }
 
     const targetType = targetResult.rows[0].user_type;
-    if (req.user?.user_type === 'admin' && targetType === 'super_admin') {
+    if (!['tenant', 'landlord'].includes(targetType)) {
       return res.status(403).json({
         success: false,
-        message: 'Admin cannot delete super admin accounts',
+        message: 'Admin can only manage tenant and landlord accounts',
       });
     }
 
@@ -689,7 +691,7 @@ exports.getUserById = async (req, res) => {
        FROM users
        WHERE id = $1
          AND deleted_at IS NULL
-         AND user_type <> 'super_admin'`,
+         AND user_type IN ('tenant', 'landlord')`,
       [id]
     );
 
@@ -895,5 +897,162 @@ exports.createAdmin = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// PATCH /api/admin/properties/:id/unlist
+exports.unlistProperty = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `
+      UPDATE properties
+      SET is_available = FALSE,
+          updated_at = NOW()
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING id, title, is_available
+      `,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found',
+      });
+    }
+
+    await db.query(
+      'DELETE FROM saved_properties WHERE property_id = $1',
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Property unlisted successfully',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('Admin unlist property error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unlist property',
+    });
+  }
+};
+
+// PATCH /api/admin/properties/:id/relist
+exports.relistProperty = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `
+      UPDATE properties
+      SET is_available = TRUE,
+          updated_at = NOW()
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING id, title, is_available
+      `,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Property relisted successfully',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('Admin relist property error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to relist property',
+    });
+  }
+};
+
+// PATCH /api/admin/properties/:id/feature
+exports.featureProperty = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `
+      UPDATE properties
+      SET featured = TRUE,
+          updated_at = NOW()
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING id, title, featured
+      `,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Property marked as featured',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('Admin feature property error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to feature property',
+    });
+  }
+};
+
+// PATCH /api/admin/properties/:id/unfeature
+exports.unfeatureProperty = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `
+      UPDATE properties
+      SET featured = FALSE,
+          updated_at = NOW()
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING id, title, featured
+      `,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Property removed from featured',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('Admin unfeature property error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unfeature property',
+    });
   }
 };

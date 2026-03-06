@@ -54,6 +54,7 @@ const getAllUsers = async (req, res) => {
          WHERE uv.identity_verified_by = u.id
        ) vc ON TRUE
        WHERE u.deleted_at IS NULL
+         AND u.user_type IN ('tenant', 'landlord')
        ORDER BY u.created_at DESC`
     );
 
@@ -384,7 +385,7 @@ const getAllProperties = async (req, res) => {
     const { rows } = await db.query(
       `SELECT p.*, u.full_name AS landlord_name
        FROM properties p
-       JOIN users u ON u.id = p.landlord_id
+       LEFT JOIN users u ON u.id = COALESCE(p.landlord_id, p.user_id)
        ORDER BY p.created_at DESC`
     );
 
@@ -400,13 +401,65 @@ const unlistProperty = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await db.query(`UPDATE properties SET is_active = FALSE WHERE id = $1`, [id]);
+    await db.query(
+      `UPDATE properties
+       SET is_available = FALSE,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+    await db.query(
+      'DELETE FROM saved_properties WHERE property_id = $1',
+      [id]
+    );
     await logAction(req.user.id, 'UNLIST_PROPERTY', 'property', id);
 
     res.json({ success: true, message: 'Property unlisted' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to unlist property' });
+  }
+};
+
+// PATCH /api/super/properties/:id/feature
+const featureProperty = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await db.query(
+      `UPDATE properties
+       SET featured = TRUE,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+    await logAction(req.user.id, 'FEATURE_PROPERTY', 'property', id);
+
+    res.json({ success: true, message: 'Property marked as featured' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to feature property' });
+  }
+};
+
+// PATCH /api/super/properties/:id/unfeature
+const unfeatureProperty = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await db.query(
+      `UPDATE properties
+       SET featured = FALSE,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+    await logAction(req.user.id, 'UNFEATURE_PROPERTY', 'property', id);
+
+    res.json({ success: true, message: 'Property removed from featured' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to unfeature property' });
   }
 };
 
@@ -641,7 +694,14 @@ const bulkPropertyAction = async (req, res) => {
     }
 
     await db.query(
-      `UPDATE properties SET is_active = FALSE WHERE id = ANY($1)`,
+      `UPDATE properties
+       SET is_available = FALSE,
+           updated_at = NOW()
+       WHERE id = ANY($1)`,
+      [ids]
+    );
+    await db.query(
+      'DELETE FROM saved_properties WHERE property_id = ANY($1)',
       [ids]
     );
 
@@ -718,6 +778,8 @@ module.exports = {
   getAdminPerformance,
   getAllProperties,
   unlistProperty,
+  featureProperty,
+  unfeatureProperty,
   getAuditLogs,
   getAnalytics,
   getReports,

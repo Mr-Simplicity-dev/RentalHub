@@ -20,6 +20,7 @@ const Properties = () => {
     limit: PAGE_SIZE,
     total: 0,
   });
+  const [resultNote, setResultNote] = useState('');
   const [filters, setFilters] = useState({});
   const [savedPropertyIds, setSavedPropertyIds] = useState([]);
   const [requestLoading, setRequestLoading] = useState(false);
@@ -41,6 +42,7 @@ const Properties = () => {
 
   const loadProperties = useCallback(async (filterParams = {}, page = 1) => {
     setLoading(true);
+    setResultNote('');
     try {
       const response = await propertyService.searchProperties({
         ...filterParams,
@@ -49,7 +51,59 @@ const Properties = () => {
       });
 
       if (response.success) {
-        setProperties(response.data);
+        const exactResults = response.data || [];
+
+        if (exactResults.length > 0 || page !== 1) {
+          setProperties(exactResults);
+          setPagination(response.pagination);
+          return;
+        }
+
+        const hasStateFilter = Boolean(filterParams.state || filterParams.state_id);
+        const hasNarrowSearch = Boolean(
+          filterParams.search ||
+          filterParams.city ||
+          filterParams.property_type ||
+          filterParams.min_price ||
+          filterParams.max_price ||
+          filterParams.bedrooms ||
+          filterParams.bathrooms
+        );
+
+        if (hasStateFilter && hasNarrowSearch) {
+          const fallbackParams = {};
+
+          if (filterParams.state_id) {
+            fallbackParams.state_id = filterParams.state_id;
+          }
+
+          if (filterParams.state) {
+            fallbackParams.state = filterParams.state;
+          }
+
+          if (filterParams.featured) {
+            fallbackParams.featured = filterParams.featured;
+          }
+
+          const fallbackResponse = await propertyService.searchProperties({
+            ...fallbackParams,
+            page: 1,
+            limit: PAGE_SIZE,
+          });
+
+          if (fallbackResponse.success && (fallbackResponse.data || []).length > 0) {
+            setProperties(fallbackResponse.data || []);
+            setPagination(fallbackResponse.pagination);
+            setResultNote(
+              filterParams.state
+                ? `No exact matches found. Showing related properties in ${filterParams.state}.`
+                : 'No exact matches found. Showing related properties in the selected state.'
+            );
+            return;
+          }
+        }
+
+        setProperties(exactResults);
         setPagination(response.pagination);
       }
     } catch (error) {
@@ -109,8 +163,12 @@ const Properties = () => {
   }, [searchParams, loadProperties]);
 
   const handleFilterChange = (newFilters) => {
-    setFilters(newFilters);
-    loadProperties(newFilters, 1);
+    const mergedFilters = filters.featured
+      ? { ...newFilters, featured: filters.featured }
+      : newFilters;
+
+    setFilters(mergedFilters);
+    loadProperties(mergedFilters, 1);
   };
 
   const handlePageChange = (selectedPage) => {
@@ -187,7 +245,7 @@ const Properties = () => {
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="container mx-auto px-4">
         <h1 className="text-3xl font-bold mb-6 text-center">
-          {t('properties.title')}
+          {filters.featured ? 'Featured Properties' : t('properties.title')}
         </h1>
 
         {/* Filters */}
@@ -203,6 +261,16 @@ const Properties = () => {
               ? t('properties.loading')
               : t('properties.found', { count: pagination.total })}
           </p>
+          {filters.featured && !loading && (
+            <p className="mt-2 text-sm text-primary-700">
+              Showing featured listings ordered by creation date.
+            </p>
+          )}
+          {resultNote && (
+            <p className="mt-2 text-sm text-amber-700">
+              {resultNote}
+            </p>
+          )}
           <button
             type="button"
             className="mt-2 text-primary-600 hover:text-primary-700 font-medium underline"

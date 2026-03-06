@@ -1,4 +1,4 @@
-export const PROPERTY_TYPES = [
+const PROPERTY_TYPES = [
   { value: 'apartment', label: 'Apartment' },
   { value: 'house', label: 'House' },
   { value: 'duplex', label: 'Duplex' },
@@ -8,12 +8,12 @@ export const PROPERTY_TYPES = [
   { value: 'room', label: 'Room' },
 ];
 
-export const PAYMENT_FREQUENCIES = [
+const PAYMENT_FREQUENCIES = [
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' },
 ];
 
-export const AMENITIES = [
+const AMENITIES = [
   'Parking',
   'Security',
   'Generator',
@@ -31,19 +31,19 @@ export const AMENITIES = [
   'Laundry',
 ];
 
-export const APPLICATION_STATUS = {
+const APPLICATION_STATUS = {
   pending: { label: 'Pending', color: 'yellow' },
   approved: { label: 'Approved', color: 'green' },
   rejected: { label: 'Rejected', color: 'red' },
   withdrawn: { label: 'Withdrawn', color: 'gray' },
 };
 
-export const PAYMENT_METHODS = [
+const PAYMENT_METHODS = [
   { value: 'paystack', label: 'Paystack (Card Payment)' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
 ];
 
-export const NIGERIAN_STATES = [
+const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa',
   'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo',
   'Ekiti', 'Enugu', 'Federal Capital Territory', 'Gombe', 'Imo',
@@ -51,3 +51,12 @@ export const NIGERIAN_STATES = [
   'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo',
   'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'
 ];
+
+module.exports = {
+  PROPERTY_TYPES,
+  PAYMENT_FREQUENCIES,
+  AMENITIES,
+  APPLICATION_STATUS,
+  PAYMENT_METHODS,
+  NIGERIAN_STATES,
+};

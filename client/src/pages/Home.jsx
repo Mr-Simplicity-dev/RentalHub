@@ -32,7 +32,7 @@ const Home = () => {
   const loadData = useCallback(async () => {
     try {
       const [featured, locations] = await Promise.all([
-        propertyService.getFeaturedProperties(6),
+        propertyService.getFeaturedProperties(10),
         propertyService.getPopularLocations(6),
       ]);
 
@@ -246,7 +246,7 @@ const Home = () => {
             <h2 className="text-3xl font-bold">
               {t('home.featured_title')}
             </h2>
-            <Link to="/properties" className="text-primary-600 hover:text-primary-700 font-semibold">
+            <Link to="/properties?featured=true" className="text-primary-600 hover:text-primary-700 font-semibold">
               {t('home.view_all')} →
             </Link>
           </div>

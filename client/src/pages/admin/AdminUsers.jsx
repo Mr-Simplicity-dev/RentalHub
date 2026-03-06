@@ -39,7 +39,7 @@ const AdminUsers = () => {
 
       if (res.data?.success) {
         const safeUsers = (res.data.data || []).filter(
-          (u) => u.user_type !== 'super_admin'
+          (u) => ['tenant', 'landlord'].includes(u.user_type)
         );
         setUsers(safeUsers);
         setPagination(res.data.pagination);
@@ -124,7 +124,6 @@ const AdminUsers = () => {
             <option value="all">All</option>
             <option value="tenant">Tenants</option>
             <option value="landlord">Landlords</option>
-            <option value="admin">Admins</option>
           </select>
         </div>
       </div>

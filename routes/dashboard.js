@@ -34,7 +34,14 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
 
     const stats = await db.query(
       `SELECT 
-        (SELECT COUNT(*) FROM saved_properties WHERE tenant_id = $1) AS saved_properties_count,
+        (
+          SELECT COUNT(*)
+          FROM saved_properties sp
+          JOIN properties p ON sp.property_id = p.id
+          WHERE sp.tenant_id = $1
+            AND p.is_available = TRUE
+            AND p.is_verified = TRUE
+        ) AS saved_properties_count,
         (SELECT COUNT(*) FROM tenant_property_unlocks WHERE tenant_id = $1) AS unlocked_properties_count,
         (SELECT COUNT(*) FROM messages WHERE receiver_id = $1 AND is_read = FALSE) AS unread_messages,
         (SELECT subscription_expires_at FROM users WHERE id = $1) AS subscription_expires_at`,

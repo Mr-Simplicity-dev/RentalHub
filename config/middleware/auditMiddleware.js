@@ -23,10 +23,14 @@ const audit = (action, targetType) => {
 
         const timestamp = new Date().toISOString();
 
+        const params = req.params || {};
+
         const targetId =
-          req.params.disputeId ||
-          req.params.propertyId ||
-          req.params.id ||
+          params.disputeId ||
+          params.propertyId ||
+          params.reportId ||
+          params.userId ||
+          params.id ||
           null;
 
         const actionText = action || `${req.method} ${req.originalUrl}`;

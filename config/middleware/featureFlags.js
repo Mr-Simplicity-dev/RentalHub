@@ -1,6 +1,6 @@
-import db from '../db/index.js';
+const db = require('./database');
 
-export const enforceFlags = async (req, res, next) => {
+const enforceFlags = async (req, res, next) => {
   const { rows } = await db.query(`SELECT key, enabled FROM feature_flags`);
   const flags = Object.fromEntries(rows.map(r => [r.key, r.enabled]));
 
@@ -21,4 +21,8 @@ export const enforceFlags = async (req, res, next) => {
   }
 
   next();
+};
+
+module.exports = {
+  enforceFlags,
 };
