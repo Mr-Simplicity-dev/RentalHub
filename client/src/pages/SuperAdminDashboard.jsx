@@ -18,6 +18,7 @@ import PaginationControls from "../components/admin/PaginationControls";
 import ModerationOverview from "../components/admin/ModerationOverview";
 import LiveModerationQueue from "../components/admin/LiveModerationQueue";
 import AdminNotifications from "../components/admin/AdminNotifications";
+import AdminManagementTab from "../components/admin/AdminManagementTab";
 
 const tabs = [
   "overview",
@@ -30,6 +31,7 @@ const tabs = [
   "broadcast",
   "flags",
   "fraud",
+  "admin",
 ];
 
 const PAGE_LIMITS = {
@@ -81,6 +83,7 @@ export default function SuperAdminDashboard() {
   const [reportsPage, setReportsPage] = useState(1);
   const [logsPage, setLogsPage] = useState(1);
   const [fraudPage, setFraudPage] = useState(1);
+  
   const [verificationPage, setVerificationPage] = useState(1);
 
   const [verificationSearch, setVerificationSearch] = useState("");
@@ -516,6 +519,10 @@ export default function SuperAdminDashboard() {
             loadTab={loadTab}
           />
 
+        )}
+
+        {tab === "admin" && (
+          <AdminManagementTab />
         )}
 
     </div>

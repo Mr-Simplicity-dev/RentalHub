@@ -5,6 +5,8 @@ const { requireAdmin } = require('../config/middleware/requireAdmin');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const adminController = require('../controllers/adminController');
 const { allowRoles } = require('../config/middleware/roleMiddleware');
+const superAdminOnly = require('../middleware/superAdminOnly');
+
 
 /**
  * AUTH
@@ -128,5 +130,13 @@ router.get(
   allowRoles('admin','super_admin'),
   adminController.verifyLedgerIntegrity
 );
+
+router.post(
+  '/create-admin',
+  authenticate,
+  superAdminOnly,
+  adminController.createAdmin
+);
+
 
 module.exports = router;
