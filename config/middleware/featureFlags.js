@@ -19,7 +19,12 @@ const enforceFlags = async (req, res, next) => {
   if (!flags.allow_applications && req.path.includes('/applications') && req.method === 'POST') {
     return res.status(403).json({ message: 'Applications disabled' });
   }
-
+  if (!flags.nin_number && req.path.includes('/nin') && req.method === 'POST') {
+    return res.status(403).json({ message: 'NIN disabled' });
+  }
+  if (!flags.passport_number && req.path.includes('/passport') && req.method === 'POST') {
+    return res.status(403).json({ message: 'Passport disabled' });
+  }
   next();
 };
 
