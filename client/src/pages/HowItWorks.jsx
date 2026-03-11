@@ -14,10 +14,12 @@ const landlordSteps = [
 
 const HowitWorks = () => (
   <div className="container mx-auto px-4 py-12 max-w-5xl">
-    <h1 className="text-3xl font-bold">How It Works</h1>
-    <p className="mt-3 text-gray-600">
-      A simple flow for tenants and landlords to transact safely.
-    </p>
+    <div className="text-center">
+      <h1 className="text-3xl font-bold">How It Works</h1>
+      <p className="mt-3 text-gray-600">
+        A simple flow for tenants and landlords to transact safely.
+      </p>
+    </div>
 
     <div className="grid md:grid-cols-2 gap-6 mt-8">
       <section className="card">
