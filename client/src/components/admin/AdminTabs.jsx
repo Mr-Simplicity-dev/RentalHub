@@ -1,6 +1,13 @@
 import React from "react";
 
 const AdminTabs = ({ tabs, tab, loadTab }) => {
+  const formatLabel = (name) =>
+    String(name)
+      .split(/[_-]/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
   return (
     <div className="flex flex-wrap justify-center gap-3 mb-8">
 
@@ -16,7 +23,7 @@ const AdminTabs = ({ tabs, tab, loadTab }) => {
           }`}
           onClick={() => loadTab(name)}
         >
-          {name.charAt(0).toUpperCase() + name.slice(1)}
+          {formatLabel(name)}
         </button>
 
       ))}

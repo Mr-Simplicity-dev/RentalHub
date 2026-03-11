@@ -19,11 +19,13 @@ import ModerationOverview from "../components/admin/ModerationOverview";
 import LiveModerationQueue from "../components/admin/LiveModerationQueue";
 import AdminNotifications from "../components/admin/AdminNotifications";
 import AdminManagementTab from "../components/admin/AdminManagementTab";
+import LawyerInvitesManager from "../components/admin/LawyerInvitesManager";
 
 const tabs = [
   "overview",
   "users",
   "verifications",
+  "lawyer_invites",
   "properties",
   "analytics",
   "reports",
@@ -507,6 +509,13 @@ export default function SuperAdminDashboard() {
 
       {tab === "flags" && (
         <FlagsTab flags={flags} toggleFlag={toggleFlag} />
+      )}
+
+      {tab === "lawyer_invites" && (
+        <LawyerInvitesManager
+          title="Lawyer Invites"
+          description="Resend pending lawyer invitations or change the invited lawyer email."
+        />
       )}
 
       {tab === "fraud" && (

@@ -1,11 +1,31 @@
 const { Resend } = require('resend');
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+const { sendEmail } = require('./mailer');
 
 const FROM = process.env.EMAIL_FROM || 'Rental Platform <onboarding@resend.dev>';
 const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 12000);
+const FRONTEND_URL =
+  process.env.FRONTEND_URL && process.env.FRONTEND_URL !== '...'
+    ? process.env.FRONTEND_URL
+    : 'http://localhost:3000';
+const SMTP_USER = String(process.env.SMTP_USER || '').trim().toLowerCase();
+const SMTP_PASSWORD = String(
+  process.env.SMTP_PASS || process.env.SMTP_PASSWORD || ''
+).trim();
 
-const sendWithTimeout = async (payload) => {
+const hasSmtpConfig = () =>
+  Boolean(
+    process.env.SMTP_HOST &&
+    SMTP_USER &&
+    SMTP_PASSWORD &&
+    SMTP_USER !== 'your_email@gmail.com' &&
+    SMTP_PASSWORD !== 'your_email_password'
+  );
+
+const hasResendConfig = () => Boolean(process.env.RESEND_API_KEY);
+
+const sendWithResend = async (payload) => {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   return Promise.race([
     resend.emails.send(payload),
     new Promise((_, reject) =>
@@ -14,13 +34,46 @@ const sendWithTimeout = async (payload) => {
   ]);
 };
 
+const sendTransactionalEmail = async ({ to, subject, html }) => {
+  const errors = [];
+
+  if (hasSmtpConfig()) {
+    try {
+      await sendEmail({ to, subject, html });
+      return { success: true, provider: 'smtp' };
+    } catch (error) {
+      console.error('SMTP email send error:', error);
+      errors.push(`SMTP: ${error.message}`);
+    }
+  }
+
+  if (hasResendConfig()) {
+    try {
+      await sendWithResend({
+        from: FROM,
+        to,
+        subject,
+        html,
+      });
+      return { success: true, provider: 'resend' };
+    } catch (error) {
+      console.error('Resend email send error:', error);
+      errors.push(`Resend: ${error.message}`);
+    }
+  }
+
+  return {
+    success: false,
+    error: errors.join(' | ') || 'No email provider configured',
+  };
+};
+
 // Send verification email
 exports.sendVerificationEmail = async (email, verificationToken) => {
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+  const verificationUrl = `${FRONTEND_URL}/verify-email?token=${verificationToken}`;
 
   try {
-    await sendWithTimeout({
-      from: FROM,
+    return await sendTransactionalEmail({
       to: email,
       subject: 'Verify Your Email - Rental Platform',
       html: `
@@ -36,8 +89,6 @@ exports.sendVerificationEmail = async (email, verificationToken) => {
         </div>
       `,
     });
-
-    return { success: true };
   } catch (error) {
     console.error('Email send error:', error);
     return { success: false, error: error.message };
@@ -47,8 +98,7 @@ exports.sendVerificationEmail = async (email, verificationToken) => {
 // Send welcome email
 exports.sendWelcomeEmail = async (email, fullName, userType) => {
   try {
-    await sendWithTimeout({
-      from: FROM,
+    await sendTransactionalEmail({
       to: email,
       subject: 'Welcome to Rental Platform',
       html: `
@@ -72,8 +122,7 @@ exports.sendLawyerInviteEmail = async ({
   expiresInHours = 72,
 }) => {
   try {
-    await sendWithTimeout({
-      from: FROM,
+    return await sendTransactionalEmail({
       to: email,
       subject: 'Lawyer Invitation - Rental Platform',
       html: `
@@ -89,8 +138,6 @@ exports.sendLawyerInviteEmail = async ({
         </div>
       `,
     });
-
-    return { success: true };
   } catch (error) {
     console.error('Lawyer invite email error:', error);
     return { success: false, error: error.message };
@@ -100,8 +147,7 @@ exports.sendLawyerInviteEmail = async ({
 // Send password reset email
 exports.sendPasswordResetEmail = async (email, resetUrl) => {
   try {
-    await sendWithTimeout({
-      from: FROM,
+    return await sendTransactionalEmail({
       to: email,
       subject: 'Reset Your Password - Rental Platform',
       html: `
@@ -117,8 +163,6 @@ exports.sendPasswordResetEmail = async (email, resetUrl) => {
         </div>
       `,
     });
-
-    return { success: true };
   } catch (error) {
     console.error('Password reset email error:', error);
     return { success: false, error: error.message };
@@ -134,8 +178,7 @@ exports.sendApplicationNotification = async (
   applicationId
 ) => {
   try {
-    await sendWithTimeout({
-      from: FROM,
+    await sendTransactionalEmail({
       to: landlordEmail,
       subject: 'New Property Application Received',
       html: `
@@ -145,7 +188,7 @@ exports.sendApplicationNotification = async (
           <p><strong>${tenantName}</strong> has submitted an application for your property:</p>
           <p><strong>${propertyTitle}</strong></p>
           <p>Please log in to your dashboard to review the application.</p>
-          <a href="${process.env.FRONTEND_URL}/landlord/applications/${applicationId}">
+          <a href="${FRONTEND_URL}/landlord/applications/${applicationId}">
             View Application
           </a>
         </div>
@@ -172,8 +215,7 @@ exports.sendApplicationStatusUpdate = async (
         }`;
 
   try {
-    await sendWithTimeout({
-      from: FROM,
+    await sendTransactionalEmail({
       to: tenantEmail,
       subject: `Application ${status.charAt(0).toUpperCase() + status.slice(1)} - ${propertyTitle}`,
       html: `
@@ -183,7 +225,7 @@ exports.sendApplicationStatusUpdate = async (
           <p>${statusMessage}</p>
           <p><strong>Property:</strong> ${propertyTitle}</p>
           <p>Log in to view more details.</p>
-          <a href="${process.env.FRONTEND_URL}/tenant/applications">View My Applications</a>
+          <a href="${FRONTEND_URL}/tenant/applications">View My Applications</a>
         </div>
       `,
     });
@@ -203,8 +245,7 @@ exports.sendMessageNotification = async (
     messageText.length > 100 ? messageText.substring(0, 100) + '...' : messageText;
 
   try {
-    await sendWithTimeout({
-      from: FROM,
+    await sendTransactionalEmail({
       to: receiverEmail,
       subject: `New Message from ${senderName}`,
       html: `
@@ -216,7 +257,7 @@ exports.sendMessageNotification = async (
             ${truncatedMessage}
           </blockquote>
           <p>Log in to read and reply to the message.</p>
-          <a href="${process.env.FRONTEND_URL}/messages">View Messages</a>
+          <a href="${FRONTEND_URL}/messages">View Messages</a>
         </div>
       `,
     });

@@ -2,7 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const { uploadPassport } = require('../config/middleware/upload');
-const { authenticate, requireSuperAdmin } = require('../config/middleware/auth');
+const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 
 const router = express.Router();
 
@@ -92,18 +92,18 @@ router.post(
   authController.acceptLawyerInvite
 );
 
-// Super admin invite management
+// Admin + super admin invite management
 router.get(
   '/lawyer-invites',
   authenticate,
-  requireSuperAdmin,
+  requireAdminOrSuperAdmin,
   authController.getLawyerInvites
 );
 
 router.patch(
   '/lawyer-invites/:inviteId/resend',
   authenticate,
-  requireSuperAdmin,
+  requireAdminOrSuperAdmin,
   authController.resendLawyerInvite
 );
 
@@ -111,7 +111,7 @@ router.patch(
   '/lawyer-invites/:inviteId/email',
   [
     authenticate,
-    requireSuperAdmin,
+    requireAdminOrSuperAdmin,
     body('lawyer_email')
       .isEmail()
       .withMessage('Please provide a valid lawyer email')

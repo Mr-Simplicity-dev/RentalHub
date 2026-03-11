@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { FaUsers, FaHome, FaFileAlt, FaCheckCircle } from 'react-icons/fa';
+import {
+  FaUsers,
+  FaHome,
+  FaFileAlt,
+  FaCheckCircle,
+  FaEnvelope,
+} from 'react-icons/fa';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
 
   const [stats, setStats] = useState({
-    totalUsers: '—',
-    totalProperties: '—',
-    applications: '—',
-    pendingVerifications: '—',
+    totalUsers: '-',
+    totalProperties: '-',
+    applications: '-',
+    pendingVerifications: '-',
   });
 
   useEffect(() => {
@@ -41,19 +47,17 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
+      <div className="mx-auto max-w-7xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">
             Admin Dashboard
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="mt-1 text-gray-600">
             Welcome, {user?.full_name || 'Administrator'}
           </p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        <div className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Total Users"
             value={stats.totalUsers}
@@ -76,12 +80,16 @@ const AdminDashboard = () => {
           />
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
           <QuickCard title="Manage Users" href="/admin/users" />
           <QuickCard title="Verify NIN/Passport" href="/admin/verifications" />
           <QuickCard title="View Properties" href="/admin/properties" />
           <QuickCard title="View Applications" href="/admin/applications" />
+          <QuickCard
+            title="Lawyer Invites"
+            href="/admin/lawyer-invites"
+            icon={<FaEnvelope className="text-sky-500" />}
+          />
         </div>
       </div>
     </div>
@@ -92,7 +100,7 @@ const StatCard = ({ title, value, icon }) => (
   <div className="card">
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-sm text-gray-600 mb-1">{title}</p>
+        <p className="mb-1 text-sm text-gray-600">{title}</p>
         <p className="text-3xl font-bold text-gray-900">{value}</p>
       </div>
       <div className="text-4xl">{icon}</div>
@@ -100,13 +108,11 @@ const StatCard = ({ title, value, icon }) => (
   </div>
 );
 
-const QuickCard = ({ title, href }) => (
-  <a
-    href={href}
-    className="card block text-center"
-  >
+const QuickCard = ({ title, href, icon = null }) => (
+  <a href={href} className="card block text-center">
+    {icon && <div className="mb-2 flex justify-center text-2xl">{icon}</div>}
     <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-    <p className="text-sm text-gray-600 mt-1">Open →</p>
+    <p className="mt-1 text-sm text-gray-600">Open</p>
   </a>
 );
 

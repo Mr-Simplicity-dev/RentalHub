@@ -7,6 +7,7 @@ import {
   FaHome,
   FaFileAlt,
   FaCheckCircle,
+  FaEnvelope,
   FaShieldAlt,
   FaLock,
   FaSignOutAlt
@@ -91,6 +92,11 @@ const AdminLayout = () => {
               <NavLink to="/admin/verifications" className={navItem}>
                 <FaCheckCircle className="mr-3" />
                 Identity Verification
+              </NavLink>
+
+              <NavLink to="/admin/lawyer-invites" className={navItem}>
+                <FaEnvelope className="mr-3" />
+                Lawyer Invites
               </NavLink>
 
               <NavLink to="/admin/compliance" className={navItem}>

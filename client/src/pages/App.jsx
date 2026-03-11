@@ -26,6 +26,7 @@ import AdminUsers from './admin/AdminUsers';
 import AdminProperties from './admin/AdminProperties';
 import AdminApplications from './admin/AdminApplications';
 import AdminVerifications from './admin/AdminVerifications';
+import AdminLawyerInvites from './admin/AdminLawyerInvites';
 
 import Profile from './Profile';
 import Applications from './Applications';
@@ -208,6 +209,7 @@ function App() {
                 <Route index element={<AdminDashboard />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="verifications" element={<AdminVerifications />} />
+                <Route path="lawyer-invites" element={<AdminLawyerInvites />} />
                 <Route path="properties" element={<AdminProperties />} />
                 <Route path="applications" element={<AdminApplications />} />
                 <Route path="compliance" element={<AdminCompliance />} />

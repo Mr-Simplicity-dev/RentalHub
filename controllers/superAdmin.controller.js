@@ -1,4 +1,5 @@
 const db = require('../config/middleware/database');
+const { ensureFeatureFlagsTable } = require('../config/middleware/featureFlags');
 
 let verificationAuditSchemaReady = false;
 
@@ -716,6 +717,7 @@ const bulkPropertyAction = async (req, res) => {
 // feature flags
 const getFeatureFlags = async (req, res) => {
   try {
+    await ensureFeatureFlagsTable();
     const { rows } = await db.query(`SELECT * FROM feature_flags ORDER BY key`);
     res.json({ success: true, flags: rows });
   } catch {
@@ -728,10 +730,16 @@ const updateFeatureFlag = async (req, res) => {
   const { enabled } = req.body;
 
   try {
-    await db.query(
+    await ensureFeatureFlagsTable();
+
+    const result = await db.query(
       `UPDATE feature_flags SET enabled = $1, updated_at = NOW() WHERE key = $2`,
       [enabled, key]
     );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'Feature flag not found' });
+    }
 
     await logAction(req.user.id, `TOGGLE_FLAG_${key}`, 'feature_flag', null);
 

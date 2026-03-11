@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const db = require('../config/middleware/database');
+const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
 const {
   validateNIN,
   verifyNINWithNIMC,
@@ -24,6 +25,10 @@ let lawyerInviteSchemaReady = false;
 
 const LAWYER_INVITE_EXPIRY_HOURS = 72;
 const LAWYER_INVITE_EXPIRY_MS = LAWYER_INVITE_EXPIRY_HOURS * 60 * 60 * 1000;
+const FRONTEND_URL =
+  process.env.FRONTEND_URL && process.env.FRONTEND_URL !== '...'
+    ? process.env.FRONTEND_URL
+    : 'http://localhost:3000';
 
 const hashInviteToken = (token) =>
   crypto.createHash('sha256').update(String(token)).digest('hex');
@@ -94,7 +99,7 @@ const createLawyerInvite = async ({ clientUserId, lawyerEmail, clientName, clien
     [clientUserId, lawyerEmail, tokenHash, expiresAt]
   );
 
-  const inviteUrl = `${process.env.FRONTEND_URL}/lawyer/accept-invite?token=${rawToken}`;
+  const inviteUrl = `${FRONTEND_URL}/lawyer/accept-invite?token=${rawToken}`;
   const emailResult = await sendLawyerInviteEmail({
     email: lawyerEmail,
     clientName,
@@ -122,6 +127,7 @@ const generateToken = (userId, userType) => {
 exports.register = async (req, res) => {
   try {
     await ensureIdentitySchema();
+    const flags = await getFeatureFlagsMap();
 
     // Validate input
     const errors = validationResult(req);
@@ -164,43 +170,29 @@ exports.register = async (req, res) => {
       is_foreigner === 1 ||
       is_foreigner === '1';
 
-    const identityType = isForeigner ? 'passport' : 'nin';
-
-    const cleanNIN = nin ? String(nin).trim() : null;
+    const isNINEnabled = flags.nin_number !== false;
+    const isPassportEnabled = flags.passport_number !== false;
+    const submittedNIN = String(nin || '').trim();
+    const submittedPassportNumber = String(international_passport_number || '').trim();
+    let identityType = null;
+    let cleanNIN = null;
+    let cleanPassportNumber = null;
     const testNIN = String(process.env.NIMC_TEST_NIN || '00000000000').trim();
     const allowTestNINBypass =
       process.env.ALLOW_TEST_NIN_BYPASS === 'true' ||
       (process.env.NODE_ENV !== 'production' && process.env.ALLOW_TEST_NIN_BYPASS !== 'false');
-    const cleanNationality = nationality
-      ? String(nationality).trim()
-      : isForeigner
-        ? 'Foreign'
-        : 'Nigeria';
+    const submittedNationality = nationality ? String(nationality).trim() : '';
+    const cleanNationality = submittedNationality || (isForeigner ? 'Foreign' : 'Nigeria');
     const isNigerianNationality = /^nigeria(n)?$/i.test(cleanNationality);
-    const passportValidation = validateInternationalPassport(
-      international_passport_number
-    );
-    const cleanPassportNumber =
-      identityType === 'passport' && passportValidation.valid
-        ? passportValidation.value
-        : null;
 
     let ninVerified = false;
     let nimcMeta = null;
 
     if (!isForeigner) {
-      if (identity_document_type === 'passport') {
+      if (identity_document_type === 'passport' || submittedPassportNumber) {
         return res.status(400).json({
           success: false,
           message: 'NIN is required for local Nigerian registration'
-        });
-      }
-
-      const ninValidation = validateNIN(cleanNIN);
-      if (!ninValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: ninValidation.message
         });
       }
 
@@ -211,72 +203,78 @@ exports.register = async (req, res) => {
         });
       }
 
-      const names = String(full_name || '').trim().split(/\s+/).filter(Boolean);
-      const firstName = names[0] || '';
-      const lastName = names.slice(1).join(' ') || names[0] || '';
-
-      const isTestNIN = cleanNIN === testNIN;
-      if (isTestNIN && allowTestNINBypass) {
-        ninVerified = true;
-        nimcMeta = {
-          status: 'test_bypass',
-          message: 'Test NIN bypass enabled'
-        };
+      if (!isNINEnabled) {
+        if (submittedNIN) {
+          return res.status(403).json({
+            success: false,
+            message: 'NIN disabled'
+          });
+        }
       } else {
-        const nimcResult = await verifyNINWithNIMC(
-          cleanNIN,
-          firstName,
-          lastName,
-          date_of_birth
-        );
-
-        nimcMeta = {
-          status: nimcResult.status,
-          message: nimcResult.message
-        };
-
-        if (nimcResult.status === 'not_configured') {
-          return res.status(503).json({
-            success: false,
-            message: 'NIMC verification is required but not configured on the server'
-          });
-        }
-
-        if (nimcResult.status === 'service_error') {
-          return res.status(503).json({
-            success: false,
-            message: nimcResult.message
-          });
-        }
-
-        if (nimcResult.status === 'not_verified') {
+        const ninValidation = validateNIN(submittedNIN);
+        if (!ninValidation.valid) {
           return res.status(400).json({
             success: false,
-            message: nimcResult.message || 'NIN verification failed'
+            message: ninValidation.message
           });
         }
 
-        ninVerified = nimcResult.verified === true;
+        identityType = 'nin';
+        cleanNIN = ninValidation.value;
+
+        const names = String(full_name || '').trim().split(/\s+/).filter(Boolean);
+        const firstName = names[0] || '';
+        const lastName = names.slice(1).join(' ') || names[0] || '';
+
+        const isTestNIN = cleanNIN === testNIN;
+        if (isTestNIN && allowTestNINBypass) {
+          ninVerified = true;
+          nimcMeta = {
+            status: 'test_bypass',
+            message: 'Test NIN bypass enabled'
+          };
+        } else {
+          const nimcResult = await verifyNINWithNIMC(
+            cleanNIN,
+            firstName,
+            lastName,
+            date_of_birth
+          );
+
+          nimcMeta = {
+            status: nimcResult.status,
+            message: nimcResult.message
+          };
+
+          if (nimcResult.status === 'not_configured') {
+            return res.status(503).json({
+              success: false,
+              message: 'NIMC verification is required but not configured on the server'
+            });
+          }
+
+          if (nimcResult.status === 'service_error') {
+            return res.status(503).json({
+              success: false,
+              message: nimcResult.message
+            });
+          }
+
+          if (nimcResult.status === 'not_verified') {
+            return res.status(400).json({
+              success: false,
+              message: nimcResult.message || 'NIN verification failed'
+            });
+          }
+
+          ninVerified = nimcResult.verified === true;
+        }
       }
     } else {
       if (identity_document_type === 'nin') {
         return res.status(400).json({
           success: false,
           message: 'International passport is required for foreign applicants'
-        });
-      }
-
-      if (!passportValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: passportValidation.message
-        });
-      }
-
-      if (!cleanNationality) {
-        return res.status(400).json({
-          success: false,
-          message: 'Nationality is required for international passport verification'
         });
       }
 
@@ -287,32 +285,62 @@ exports.register = async (req, res) => {
         });
       }
 
-      const passportResult = await verifyInternationalPassportWithAPI(
-        cleanPassportNumber,
-        full_name,
-        cleanNationality,
-        date_of_birth
-      );
+      if (!isPassportEnabled) {
+        if (submittedPassportNumber) {
+          return res.status(403).json({
+            success: false,
+            message: 'Passport disabled'
+          });
+        }
+      } else {
+        const passportValidation = validateInternationalPassport(
+          submittedPassportNumber
+        );
 
-      if (passportResult.status === 'not_configured') {
-        return res.status(503).json({
-          success: false,
-          message: 'Passport verification API is required but not configured on the server'
-        });
-      }
+        if (!passportValidation.valid) {
+          return res.status(400).json({
+            success: false,
+            message: passportValidation.message
+          });
+        }
 
-      if (passportResult.status === 'service_error') {
-        return res.status(503).json({
-          success: false,
-          message: passportResult.message
-        });
-      }
+        if (!cleanNationality) {
+          return res.status(400).json({
+            success: false,
+            message: 'Nationality is required for international passport verification'
+          });
+        }
 
-      if (passportResult.status === 'not_verified') {
-        return res.status(400).json({
-          success: false,
-          message: passportResult.message || 'Passport verification failed'
-        });
+        identityType = 'passport';
+        cleanPassportNumber = passportValidation.value;
+
+        const passportResult = await verifyInternationalPassportWithAPI(
+          cleanPassportNumber,
+          full_name,
+          cleanNationality,
+          date_of_birth
+        );
+
+        if (passportResult.status === 'not_configured') {
+          return res.status(503).json({
+            success: false,
+            message: 'Passport verification API is required but not configured on the server'
+          });
+        }
+
+        if (passportResult.status === 'service_error') {
+          return res.status(503).json({
+            success: false,
+            message: passportResult.message
+          });
+        }
+
+        if (passportResult.status === 'not_verified') {
+          return res.status(400).json({
+            success: false,
+            message: passportResult.message || 'Passport verification failed'
+          });
+        }
       }
     }
 
@@ -321,10 +349,12 @@ exports.register = async (req, res) => {
     const duplicateParams = [email, phone];
     let paramIndex = 3;
 
-    if (identityType === 'nin') {
+    if (cleanNIN) {
       duplicateConditions.push(`nin = $${paramIndex++}`);
       duplicateParams.push(cleanNIN);
-    } else {
+    }
+
+    if (cleanPassportNumber) {
       duplicateConditions.push(`international_passport_number = $${paramIndex++}`);
       duplicateParams.push(cleanPassportNumber);
     }
@@ -337,9 +367,11 @@ exports.register = async (req, res) => {
     if (existingUser.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: identityType === 'nin'
+        message: cleanNIN
           ? 'User with this email, phone, or NIN already exists'
-          : 'User with this email, phone, or passport number already exists'
+          : cleanPassportNumber
+            ? 'User with this email, phone, or passport number already exists'
+            : 'User with this email or phone already exists'
       });
     }
 
@@ -370,10 +402,10 @@ exports.register = async (req, res) => {
         phone,
         password_hash,
         full_name,
-        identityType === 'nin' ? cleanNIN : null,
+        cleanNIN,
         ninVerified,
         identityType,
-        identityType === 'passport' ? cleanPassportNumber : null,
+        cleanPassportNumber,
         cleanNationality
       ]
     );
@@ -503,6 +535,27 @@ exports.login = async (req, res) => {
       success: false,
       message: 'Login failed',
       error: error.message
+    });
+  }
+};
+
+exports.getRegistrationFlags = async (req, res) => {
+  try {
+    const flags = await getFeatureFlagsMap();
+
+    res.json({
+      success: true,
+      data: {
+        allow_registration: flags.allow_registration !== false,
+        nin_number: flags.nin_number !== false,
+        passport_number: flags.passport_number !== false,
+      },
+    });
+  } catch (error) {
+    console.error('Registration flags error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load registration flags',
     });
   }
 };
@@ -791,7 +844,7 @@ exports.resendLawyerInvite = async (req, res) => {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = hashInviteToken(rawToken);
     const expiresAt = new Date(Date.now() + LAWYER_INVITE_EXPIRY_MS);
-    const inviteUrl = `${process.env.FRONTEND_URL}/lawyer/accept-invite?token=${rawToken}`;
+    const inviteUrl = `${FRONTEND_URL}/lawyer/accept-invite?token=${rawToken}`;
 
     await db.query(
       `UPDATE lawyer_invites
@@ -888,7 +941,7 @@ exports.updateLawyerInviteEmail = async (req, res) => {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = hashInviteToken(rawToken);
     const expiresAt = new Date(Date.now() + LAWYER_INVITE_EXPIRY_MS);
-    const inviteUrl = `${process.env.FRONTEND_URL}/lawyer/accept-invite?token=${rawToken}`;
+    const inviteUrl = `${FRONTEND_URL}/lawyer/accept-invite?token=${rawToken}`;
 
     await db.query(
       `UPDATE lawyer_invites
@@ -1310,7 +1363,7 @@ exports.forgotPassword = async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+    const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}`;
 
     // Send password reset email
     await sendPasswordResetEmail(email, resetUrl);
