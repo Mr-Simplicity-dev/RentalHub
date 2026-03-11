@@ -10,6 +10,9 @@ const Applications = () => {
   const { t } = useTranslation();
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
+  const totalApplications = apps.length;
+  const pendingApplications = apps.filter((app) => app.status === 'pending').length;
+  const approvedApplications = apps.filter((app) => app.status === 'approved').length;
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -37,11 +40,28 @@ const Applications = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">
+      <h1 className="text-2xl font-bold mb-3 text-center">
         {user?.user_type === 'tenant'
           ? t('applications.my_title')
           : t('applications.landlord_title')}
       </h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="card text-center">
+          <p className="text-sm text-gray-600 mb-1">{t('dashboard.total_apps')}</p>
+          <p className="text-3xl font-bold text-gray-900">{totalApplications}</p>
+        </div>
+
+        <div className="card text-center">
+          <p className="text-sm text-gray-600 mb-1">{t('dashboard.pending_apps')}</p>
+          <p className="text-3xl font-bold text-yellow-600">{pendingApplications}</p>
+        </div>
+
+        <div className="card text-center">
+          <p className="text-sm text-gray-600 mb-1">{t('dashboard.approved_apps')}</p>
+          <p className="text-3xl font-bold text-green-600">{approvedApplications}</p>
+        </div>
+      </div>
 
       <div className="space-y-4">
         {apps.map((a) => (

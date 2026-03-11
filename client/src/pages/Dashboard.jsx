@@ -88,6 +88,31 @@ const Dashboard = () => {
     };
   }, [user, loadDashboardData]);
 
+  const getTenantSubscriptionValue = () => {
+    if (!stats?.subscription_expires_at) {
+      return 'Inactive';
+    }
+
+    const expiresAt = new Date(stats.subscription_expires_at);
+
+    if (Number.isNaN(expiresAt.getTime())) {
+      return 'Inactive';
+    }
+
+    const now = new Date();
+
+    if (expiresAt <= now) {
+      return 'Expired';
+    }
+
+    const daysLeft = Math.max(
+      1,
+      Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    );
+
+    return `${daysLeft}d left`;
+  };
+
   if (!user) {
     return <Loader fullScreen />;
   }
@@ -215,10 +240,10 @@ const Dashboard = () => {
                 onClick={() => navigate('/messages')}
               />
               <StatCard
-                icon={<FaFileAlt className="text-yellow-500" />}
-                title={t('dashboard.total_apps')}
-                value={stats?.total_applications || 0}
-                onClick={() => navigate('/applications')}
+                icon={<FaClock className="text-yellow-500" />}
+                title="Subscription"
+                value={getTenantSubscriptionValue()}
+                onClick={() => navigate('/subscribe')}
               />
             </>
           ) : (
