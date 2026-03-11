@@ -199,75 +199,75 @@ const AdminPropertyDetail = () => {
 
       {/* PROPERTY DETAILS */}
 
-      <div className="bg-white border border-soft rounded-xl2 shadow-card p-6">
+    <div className="bg-white border border-soft rounded-xl2 shadow-card p-6">
 
-        <h3 className="text-lg font-semibold mb-4">
-          Property Information
-        </h3>
+  <h3 className="text-lg font-semibold mb-4 text-center">
+    Property Information
+  </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
 
-          <div>
-            <span className="text-gray-500">Owner</span>
-            <p className="font-medium">{property.landlord_name}</p>
-          </div>
+    <div>
+      <span className="text-gray-500">Owner</span>
+      <p className="font-medium">{property.landlord_name}</p>
+    </div>
 
-          <div>
-            <span className="text-gray-500">Email</span>
-            <p className="font-medium">{property.landlord_email}</p>
-          </div>
+    <div>
+      <span className="text-gray-500">Email</span>
+      <p className="font-medium">{property.landlord_email}</p>
+    </div>
 
-          <div>
-            <span className="text-gray-500">City</span>
-            <p className="font-medium">{property.city}</p>
-          </div>
+    <div>
+      <span className="text-gray-500">City</span>
+      <p className="font-medium">{property.city}</p>
+    </div>
 
-          <div>
-            <span className="text-gray-500">State</span>
-            <p className="font-medium">{property.state}</p>
-          </div>
+    <div>
+      <span className="text-gray-500">State</span>
+      <p className="font-medium">{property.state}</p>
+    </div>
 
-          <div>
-            <span className="text-gray-500">Rent</span>
-            <p className="font-medium">
-              ₦{Number(property.rent_amount || 0).toLocaleString()}
-            </p>
-          </div>
+    <div>
+      <span className="text-gray-500">Rent</span>
+      <p className="font-medium">
+        ₦{Number(property.rent_amount || 0).toLocaleString()}
+      </p>
+    </div>
 
-          <div>
-            <span className="text-gray-500">Featured</span>
-            <p className="font-medium">{property.featured ? "Yes" : "No"}</p>
-          </div>
+    <div>
+      <span className="text-gray-500">Featured</span>
+      <p className="font-medium">{property.featured ? "Yes" : "No"}</p>
+    </div>
 
-          <div>
-            <span className="text-gray-500">Created</span>
-            <p className="font-medium">
-              {new Date(property.created_at).toLocaleString()}
-            </p>
-          </div>
+    <div>
+      <span className="text-gray-500">Created</span>
+      <p className="font-medium">
+        {new Date(property.created_at).toLocaleString()}
+      </p>
+    </div>
 
-        </div>
+  </div>
 
-      </div>
+</div>
 
 
-      {/* DESCRIPTION */}
+{/* DESCRIPTION */}
 
-      {property.description && (
+{property.description && (
 
-        <div className="bg-white border border-soft rounded-xl2 shadow-card p-6">
+  <div className="bg-white border border-soft rounded-xl2 shadow-card p-6">
 
-          <h3 className="text-lg font-semibold mb-3">
-            Description
-          </h3>
+    <h3 className="text-lg font-semibold mb-3 text-center">
+      Description
+    </h3>
 
-          <p className="text-gray-700 text-sm leading-relaxed">
-            {property.description}
-          </p>
+    <p className="text-gray-700 text-sm leading-relaxed">
+      {property.description}
+    </p>
 
-        </div>
+  </div>
 
-      )}
+)}
 
     </div>
 

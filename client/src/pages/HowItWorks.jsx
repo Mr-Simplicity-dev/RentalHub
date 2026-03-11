@@ -22,8 +22,12 @@ const HowitWorks = () => (
     </div>
 
     <div className="grid md:grid-cols-2 gap-6 mt-8">
+
       <section className="card">
-        <h2 className="text-xl font-semibold">For Tenants</h2>
+        <h2 className="text-xl font-semibold text-center">
+          For Tenants
+        </h2>
+
         <ol className="mt-4 space-y-2 list-decimal list-inside text-gray-700">
           {tenantSteps.map((step) => (
             <li key={step}>{step}</li>
@@ -32,13 +36,17 @@ const HowitWorks = () => (
       </section>
 
       <section className="card">
-        <h2 className="text-xl font-semibold">For Landlords</h2>
+        <h2 className="text-xl font-semibold text-center">
+          For Landlords
+        </h2>
+
         <ol className="mt-4 space-y-2 list-decimal list-inside text-gray-700">
           {landlordSteps.map((step) => (
             <li key={step}>{step}</li>
           ))}
         </ol>
       </section>
+
     </div>
   </div>
 );

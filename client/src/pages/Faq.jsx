@@ -28,19 +28,27 @@ const faqs = [
 
 const Faq = () => (
   <div className="container mx-auto px-4 py-12 max-w-4xl">
-    <h1 className="text-3xl font-bold">Frequently Asked Questions</h1>
-    <p className="mt-3 text-gray-600">
-      Common questions from tenants and landlords.
-    </p>
+
+    <div className="text-center">
+      <h1 className="text-3xl font-bold">Frequently Asked Questions</h1>
+      <p className="mt-3 text-gray-600">
+        Common questions from tenants and landlords.
+      </p>
+    </div>
 
     <div className="mt-8 space-y-4">
       {faqs.map((item) => (
         <div key={item.question} className="card">
-          <h2 className="text-lg font-semibold text-gray-900">{item.question}</h2>
-          <p className="mt-2 text-gray-600">{item.answer}</p>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {item.question}
+          </h2>
+          <p className="mt-2 text-gray-600">
+            {item.answer}
+          </p>
         </div>
       ))}
     </div>
+
   </div>
 );
 

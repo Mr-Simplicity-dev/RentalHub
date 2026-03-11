@@ -704,7 +704,7 @@ const Profile = () => {
               className="btn btn-secondary w-full sm:w-72"
               onClick={() => setEditingProfile(true)}
             >
-              Edit Account Information
+              Edit Information
             </button>
           )}
         </div>

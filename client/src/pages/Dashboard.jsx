@@ -90,71 +90,86 @@ const Dashboard = () => {
           </p>
         </div>
 
+                
                 {/* Verification Alert */}
-        {!user?.identity_verified && !hasSubmittedVerification && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start">
-              <FaClock className="text-yellow-600 mt-1 mr-3" />
-              <div>
-                <h3 className="font-semibold text-yellow-800">
-                  {t('dashboard.verify_title')}
-                </h3>
-                <p className="text-sm text-yellow-700 mt-1">
-                  {t('dashboard.verify_text')}
-                </p>
-                <button
-                  onClick={() => navigate('/profile')}
-                  className="mt-2 text-sm font-semibold text-yellow-800 hover:text-yellow-900"
-                >
-                  {t('dashboard.verify_action')} ->
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+                {!user?.identity_verified && !hasSubmittedVerification && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
 
-        {!user?.identity_verified && hasSubmittedVerification && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start">
-              <FaClock className="text-blue-600 mt-1 mr-3" />
-              <div>
-                <h3 className="font-semibold text-blue-800">
-                  Verification Submitted
-                </h3>
-                <p className="text-sm text-blue-700 mt-1">
-                  Your passport was submitted. It is pending admin review.
-                </p>
-                <button
-                  onClick={() => navigate('/profile')}
-                  className="mt-2 text-sm font-semibold text-blue-800 hover:text-blue-900"
-                >
-                  View Verification Status ->
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+                    <div className="flex flex-col items-center">
 
-        {/* Tenant Unlock Alert */}
+                      <FaClock className="text-yellow-600 text-2xl mb-3" />
+
+                      <h3 className="font-semibold text-yellow-800">
+                        {t('dashboard.verify_title')}
+                      </h3>
+
+                      <p className="text-sm text-yellow-700 mt-2">
+                        {t('dashboard.verify_text')}
+                      </p>
+
+                      <button
+                        onClick={() => navigate('/profile')}
+                        className="mt-3 text-sm font-semibold text-yellow-800 hover:text-yellow-900"
+                      >
+                        {t('dashboard.verify_action')} →
+                      </button>
+
+                    </div>
+
+                  </div>
+                )}
+
+                {!user?.identity_verified && hasSubmittedVerification && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
+
+                    <div className="flex flex-col items-center">
+
+                      <FaClock className="text-blue-600 text-2xl mb-3" />
+
+                      <h3 className="font-semibold text-blue-800">
+                        Verification Submitted
+                      </h3>
+
+                      <p className="text-sm text-blue-700 mt-2">
+                        Your passport was submitted. It is pending admin review.
+                      </p>
+
+                      <button
+                        onClick={() => navigate('/profile')}
+                        className="mt-3 text-sm font-semibold text-blue-800 hover:text-blue-900"
+                      >
+                        View Verification Status →
+                      </button>
+
+                    </div>
+
+                  </div>
+                )}
+                        {/* Tenant Unlock Alert */}
         {user?.user_type === 'tenant' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start">
-              <FaCheckCircle className="text-blue-600 mt-1 mr-3" />
-              <div>
-                <h3 className="font-semibold text-blue-800">
-                  Pay Per Property Details
-                </h3>
-                <p className="text-sm text-blue-700 mt-1">
-                  Save properties first, then pay to unlock each property's full details and landlord contact.
-                </p>
-                <button
-                  onClick={() => navigate('/properties')}
-                  className="mt-2 btn btn-primary text-sm"
-                >
-                  Browse Properties
-                </button>
-              </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
+
+            <div className="flex flex-col items-center">
+
+              <FaCheckCircle className="text-blue-600 text-2xl mb-3" />
+
+              <h3 className="font-semibold text-blue-800">
+                Pay Per Property Details
+              </h3>
+
+              <p className="text-sm text-blue-700 mt-2 text-center">
+                Save properties first, then pay to unlock each property's full details and landlord contact.
+              </p>
+
+              <button
+                onClick={() => navigate('/properties')}
+                className="mt-4 btn btn-primary text-sm"
+              >
+                Browse Properties
+              </button>
+
             </div>
+
           </div>
         )}
 
