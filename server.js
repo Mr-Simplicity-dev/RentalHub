@@ -32,6 +32,7 @@ const verificationRoutes = require('./routes/evidenceVerification.routes');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 
 const audit = require('./config/middleware/auditMiddleware');
+const { enforceFlags } = require('./config/middleware/featureFlags');
 const startScheduler = require('./config/utils/scheduler');
 
 dotenv.config();
@@ -87,6 +88,8 @@ app.get('/api/health', (req, res) => {
     message: 'Server is running',
   });
 });
+
+app.use('/api', enforceFlags);
 
 // -----------------------------------
 // EMAIL VERIFICATION

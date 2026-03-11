@@ -6,6 +6,8 @@ const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware
 
 const router = express.Router();
 
+router.get('/registration-flags', authController.getRegistrationFlags);
+
 // Register new user (Landlord or Tenant)
 router.post(
   '/register',

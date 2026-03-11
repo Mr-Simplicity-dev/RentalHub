@@ -1,23 +1,30 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false,
-  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 10000),
-  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 10000),
-  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 15000),
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS || process.env.SMTP_PASSWORD,
-  },
-});
+const FROM = process.env.EMAIL_FROM || 'Rental Platform <onboarding@resend.dev>';
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 12000);
+
+const sendWithTimeout = async (payload) => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  return Promise.race([
+    resend.emails.send(payload),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Email send timeout')), EMAIL_TIMEOUT_MS)
+    ),
+  ]);
+};
 
 exports.sendEmail = async ({ to, subject, html }) => {
-  await transporter.sendMail({
-    from: `"Rental Platform" <${process.env.SMTP_USER}>`,
+  await sendWithTimeout({
+    from: FROM,
     to,
     subject,
     html,
   });
+
+  return { success: true };
 };

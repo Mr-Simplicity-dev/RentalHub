@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
 import { FaUser, FaEnvelope, FaPhone, FaLock, FaIdCard, FaEye, FaEyeSlash } from 'react-icons/fa';
+import api from '../services/api';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -19,10 +20,60 @@ const Register = () => {
     nationality: '',
   });
   const [loading, setLoading] = useState(false);
+  const [registrationFlags, setRegistrationFlags] = useState({
+    loaded: false,
+    allow_registration: true,
+    nin_number: true,
+    passport_number: true,
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadRegistrationFlags = async () => {
+      try {
+        const res = await api.get('/auth/registration-flags');
+        const data = res.data?.data || {};
+
+        if (!mounted) return;
+
+        setRegistrationFlags({
+          loaded: true,
+          allow_registration: data.allow_registration !== false,
+          nin_number: data.nin_number !== false,
+          passport_number: data.passport_number !== false,
+        });
+
+        setFormData((prev) => ({
+          ...prev,
+          nin: data.nin_number === false ? '' : prev.nin,
+          international_passport_number:
+            data.passport_number === false
+              ? ''
+              : prev.international_passport_number,
+        }));
+      } catch (error) {
+        console.error('Failed to load registration flags', error);
+
+        if (mounted) {
+          setRegistrationFlags((prev) => ({
+            ...prev,
+            loaded: true,
+          }));
+        }
+      }
+    };
+
+    loadRegistrationFlags();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -44,6 +95,11 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!registrationFlags.allow_registration) {
+      toast.error('Registration is currently disabled');
+      return;
+    }
+
     if (formData.password !== formData.confirm_password) {
       toast.error('Passwords do not match');
       return;
@@ -59,12 +115,12 @@ const Register = () => {
       return;
     }
 
-    if (!formData.is_foreigner) {
+    if (!formData.is_foreigner && registrationFlags.nin_number) {
       if (!/^\d{11}$/.test(formData.nin || '')) {
         toast.error('NIN must be exactly 11 digits');
         return;
       }
-    } else {
+    } else if (formData.is_foreigner && registrationFlags.passport_number) {
       if (!/^[A-Za-z0-9]{6,20}$/.test(formData.international_passport_number || '')) {
         toast.error('Enter a valid international passport number');
         return;
@@ -79,7 +135,9 @@ const Register = () => {
 
     try {
       const { confirm_password, ...registrationData } = formData;
-      registrationData.identity_document_type = registrationData.is_foreigner ? 'passport' : 'nin';
+      registrationData.identity_document_type = registrationData.is_foreigner
+        ? (registrationFlags.passport_number ? 'passport' : undefined)
+        : (registrationFlags.nin_number ? 'nin' : undefined);
       registrationData.nationality = registrationData.is_foreigner
         ? registrationData.nationality
         : 'Nigeria';
@@ -87,8 +145,18 @@ const Register = () => {
       // Send only identity fields relevant to applicant type
       if (registrationData.is_foreigner) {
         registrationData.nin = '';
+        if (!registrationFlags.passport_number) {
+          registrationData.international_passport_number = '';
+        }
       } else {
         registrationData.international_passport_number = '';
+        if (!registrationFlags.nin_number) {
+          registrationData.nin = '';
+        }
+      }
+
+      if (!registrationData.identity_document_type) {
+        delete registrationData.identity_document_type;
       }
 
       const response = await register(registrationData);
@@ -139,6 +207,12 @@ const Register = () => {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {!registrationFlags.allow_registration && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Registration is currently disabled by the platform administrator.
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               I am a:
@@ -290,6 +364,7 @@ const Register = () => {
             </div>
 
             {!formData.is_foreigner ? (
+              registrationFlags.nin_number ? (
               <div>
                 <label htmlFor="nin" className="block text-sm font-medium text-gray-700 mb-1">
                   NIN (National ID Number) *
@@ -312,41 +387,52 @@ const Register = () => {
                 </div>
                 <p className="mt-1 text-xs text-gray-500">11 digits required</p>
               </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-soft bg-gray-50 p-4 text-sm text-gray-600">
+                  NIN is currently not required for registration.
+                </div>
+              )
             ) : (
               <>
-                <div>
-                  <label
-                    htmlFor="international_passport_number"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    International Passport No. *
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FaIdCard className="text-gray-400" />
+                {registrationFlags.passport_number ? (
+                  <div>
+                    <label
+                      htmlFor="international_passport_number"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      International Passport No. *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FaIdCard className="text-gray-400" />
+                      </div>
+                      <input
+                        id="international_passport_number"
+                        name="international_passport_number"
+                        type="text"
+                        required
+                        value={formData.international_passport_number}
+                        onChange={handleChange}
+                        className="input pl-10"
+                        placeholder="A12345678"
+                      />
                     </div>
-                    <input
-                      id="international_passport_number"
-                      name="international_passport_number"
-                      type="text"
-                      required
-                      value={formData.international_passport_number}
-                      onChange={handleChange}
-                      className="input pl-10"
-                      placeholder="A12345678"
-                    />
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-soft bg-gray-50 p-4 text-sm text-gray-600">
+                    Passport number is currently not required for foreign applicant registration.
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="nationality" className="block text-sm font-medium text-gray-700 mb-1">
-                    Nationality *
+                    Nationality {registrationFlags.passport_number ? '*' : ''}
                   </label>
                   <input
                     id="nationality"
                     name="nationality"
                     type="text"
-                    required
+                    required={registrationFlags.passport_number}
                     value={formData.nationality}
                     onChange={handleChange}
                     className="input"
@@ -438,7 +524,7 @@ const Register = () => {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !registrationFlags.loaded || !registrationFlags.allow_registration}
               className="w-full btn btn-primary py-3 text-lg"
             >
               {loading ? 'Creating account...' : 'Create Account'}
