@@ -69,6 +69,31 @@ const Dashboard = () => {
     loadDashboardData();
   }, [user, navigate, loadDashboardData]);
 
+  const getTenantSubscriptionValue = () => {
+    if (!stats?.subscription_expires_at) {
+      return 'Inactive';
+    }
+
+    const expiresAt = new Date(stats.subscription_expires_at);
+
+    if (Number.isNaN(expiresAt.getTime())) {
+      return 'Inactive';
+    }
+
+    const now = new Date();
+
+    if (expiresAt <= now) {
+      return 'Expired';
+    }
+
+    const daysLeft = Math.max(
+      1,
+      Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    );
+
+    return `${daysLeft}d left`;
+  };
+
   if (!user) {
     return <Loader fullScreen />;
   }
@@ -194,6 +219,12 @@ const Dashboard = () => {
                 title="Unread Messages"
                 value={stats?.unread_messages || 0}
                 onClick={() => navigate('/messages')}
+              />
+              <StatCard
+                icon={<FaClock className="text-yellow-500" />}
+                title="Subscription"
+                value={getTenantSubscriptionValue()}
+                onClick={() => navigate('/subscribe')}
               />
             </>
           ) : (
