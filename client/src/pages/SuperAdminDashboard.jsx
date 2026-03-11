@@ -351,13 +351,13 @@ export default function SuperAdminDashboard() {
     if (user?.user_type !== "super_admin")
       navigate("/dashboard");
 
-  }, [user]);
+  }, [user, navigate]);
 
   useEffect(() => {
     if (user?.user_type === "super_admin") {
       loadTab("users");
     }
-  }, [user]);
+  }, [user, loadTab]);
 
   const usersTotalPages = getTotalPages(users.length, PAGE_LIMITS.users);
   const pagedUsers = getPageSlice(users, usersPage, PAGE_LIMITS.users);

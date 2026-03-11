@@ -1066,31 +1066,40 @@ exports.getPaymentHistory = async (req, res) => {
     const { payment_type, status, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = "SELECT * FROM payments WHERE user_id = $1";
+    let query = `
+      SELECT
+        p.*,
+        prop.title AS property_title
+      FROM payments p
+      LEFT JOIN properties prop ON p.property_id = prop.id
+      WHERE p.user_id = $1
+    `;
+    let countQuery = "SELECT COUNT(*) FROM payments p WHERE p.user_id = $1";
     const params = [userId];
+    const countParams = [userId];
     let paramCount = 2;
 
     if (payment_type) {
-      query += ` AND payment_type = $${paramCount}`;
+      query += ` AND p.payment_type = $${paramCount}`;
+      countQuery += ` AND p.payment_type = $${paramCount}`;
       params.push(payment_type);
+      countParams.push(payment_type);
       paramCount++;
     }
 
     if (status) {
-      query += ` AND payment_status = $${paramCount}`;
+      query += ` AND p.payment_status = $${paramCount}`;
+      countQuery += ` AND p.payment_status = $${paramCount}`;
       params.push(status);
+      countParams.push(status);
       paramCount++;
     }
 
-    query += ` ORDER BY created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    query += ` ORDER BY p.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(limit, offset);
 
     const result = await db.query(query, params);
-
-    const countResult = await db.query(
-      "SELECT COUNT(*) FROM payments WHERE user_id = $1",
-      [userId]
-    );
+    const countResult = await db.query(countQuery, countParams);
 
     res.json({
       success: true,

@@ -35,6 +35,7 @@ import Messages from './Messages';
 import MyProperties from './MyProperties';
 import AddProperty from './AddProperty';
 import Subscribe from './Subscribe';
+import PaymentHistory from './PaymentHistory';
 import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import Terms from './Terms';
@@ -222,6 +223,7 @@ function App() {
               <Route path="/applications" element={<ProtectedRoute><Applications /></ProtectedRoute>} />
               <Route path="/saved-properties" element={<ProtectedRoute><SavedProperties /></ProtectedRoute>} />
               <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+              <Route path="/payment-history" element={<ProtectedRoute><PaymentHistory /></ProtectedRoute>} />
               <Route path="/my-properties" element={<ProtectedRoute><MyProperties /></ProtectedRoute>} />
               <Route path="/add-property" element={<ProtectedRoute><AddProperty /></ProtectedRoute>} />
               <Route path="/subscribe" element={<ProtectedRoute><Subscribe /></ProtectedRoute>} />

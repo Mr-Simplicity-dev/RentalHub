@@ -69,30 +69,24 @@ const Dashboard = () => {
     loadDashboardData();
   }, [user, navigate, loadDashboardData]);
 
-  const getTenantSubscriptionValue = () => {
-    if (!stats?.subscription_expires_at) {
-      return 'Inactive';
-    }
+  useEffect(() => {
+    if (!user) return undefined;
 
-    const expiresAt = new Date(stats.subscription_expires_at);
+    const intervalId = setInterval(() => {
+      loadDashboardData();
+    }, 30000);
 
-    if (Number.isNaN(expiresAt.getTime())) {
-      return 'Inactive';
-    }
+    const handleWindowFocus = () => {
+      loadDashboardData();
+    };
 
-    const now = new Date();
+    window.addEventListener('focus', handleWindowFocus);
 
-    if (expiresAt <= now) {
-      return 'Expired';
-    }
-
-    const daysLeft = Math.max(
-      1,
-      Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    );
-
-    return `${daysLeft}d left`;
-  };
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [user, loadDashboardData]);
 
   if (!user) {
     return <Loader fullScreen />;
@@ -221,10 +215,10 @@ const Dashboard = () => {
                 onClick={() => navigate('/messages')}
               />
               <StatCard
-                icon={<FaClock className="text-yellow-500" />}
-                title="Subscription"
-                value={getTenantSubscriptionValue()}
-                onClick={() => navigate('/subscribe')}
+                icon={<FaFileAlt className="text-yellow-500" />}
+                title={t('dashboard.total_apps')}
+                value={stats?.total_applications || 0}
+                onClick={() => navigate('/applications')}
               />
             </>
           ) : (
@@ -293,7 +287,7 @@ const Dashboard = () => {
                 title="Payment History"
                 description="Track your property detail unlock payments"
                 icon={<FaFileAlt />}
-                onClick={() => navigate('/profile')}
+                onClick={() => navigate('/payment-history')}
               />
             </>
           ) : (
@@ -363,7 +357,9 @@ const ActivityItem = ({ activity }) => {
     switch (activity.type) {
       case 'application':
         return t('dashboard.activity_application', {
-          status: activity.status,
+          status: t(`applications.status.${activity.status}`, {
+            defaultValue: activity.status,
+          }),
           title: activity.property_title,
         });
       case 'unlock':

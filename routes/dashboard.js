@@ -42,6 +42,7 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
             AND p.is_available = TRUE
             AND p.is_verified = TRUE
         ) AS saved_properties_count,
+        (SELECT COUNT(*) FROM applications WHERE tenant_id = $1) AS total_applications,
         (SELECT COUNT(*) FROM tenant_property_unlocks WHERE tenant_id = $1) AS unlocked_properties_count,
         (SELECT COUNT(*) FROM messages WHERE receiver_id = $1 AND is_read = FALSE) AS unread_messages,
         (SELECT subscription_expires_at FROM users WHERE id = $1) AS subscription_expires_at`,
@@ -100,13 +101,30 @@ router.get("/tenant/recent-activities", authenticate, isTenant, async (req, res)
 
     const activities = await db.query(
       `(
+        SELECT
+          'application' AS type,
+          a.id,
+          a.status,
+          GREATEST(a.created_at, COALESCE(a.updated_at, a.created_at)) AS activity_date,
+          p.title AS property_title,
+          p.id AS property_id,
+          NULL::text AS user_name
+        FROM applications a
+        JOIN properties p ON a.property_id = p.id
+        WHERE a.tenant_id = $1
+        ORDER BY GREATEST(a.created_at, COALESCE(a.updated_at, a.created_at)) DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
         SELECT 
           'unlock' AS type,
           tu.id,
           'paid' AS status,
           tu.unlocked_at AS activity_date,
           p.title AS property_title,
-          p.id AS property_id
+          p.id AS property_id,
+          NULL::text AS user_name
         FROM tenant_property_unlocks tu
         JOIN properties p ON tu.property_id = p.id
         WHERE tu.tenant_id = $1
@@ -121,9 +139,11 @@ router.get("/tenant/recent-activities", authenticate, isTenant, async (req, res)
           CASE WHEN m.is_read THEN 'read' ELSE 'unread' END AS status,
           m.created_at AS activity_date,
           COALESCE(p.title, 'General Message') AS property_title,
-          m.property_id
+          m.property_id,
+          u.full_name AS user_name
         FROM messages m
         LEFT JOIN properties p ON m.property_id = p.id
+        LEFT JOIN users u ON m.sender_id = u.id
         WHERE m.receiver_id = $1
         ORDER BY m.created_at DESC
         LIMIT $2
