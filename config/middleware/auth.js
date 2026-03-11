@@ -5,10 +5,8 @@ const db = require('./database');
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    console.log('AUTH HEADER:', authHeader);
 
     const token = authHeader?.split(' ')[1];
-    console.log('TOKEN:', token);
 
     if (!token) {
       return res.status(401).json({
@@ -18,10 +16,8 @@ const authenticate = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('DECODED JWT:', decoded);
 
     const userId = decoded.userId || decoded.id || decoded.user_id;
-    console.log('USER ID:', userId);
 
     if (!userId) {
       return res.status(401).json({

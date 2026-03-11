@@ -9,12 +9,17 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
 });
 
+let hasLoggedConnection = false;
+
 pool.on('connect', () => {
-  console.log('✅ Database connected successfully');
+  if (!hasLoggedConnection) {
+    console.log('Database connected successfully');
+    hasLoggedConnection = true;
+  }
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Database connection error:', err);
+  console.error('Database connection error:', err);
   process.exit(-1);
 });
 
