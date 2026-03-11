@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { applicationService } from '../services/applicationService';
 import Loader from '../components/common/Loader';
@@ -98,7 +99,18 @@ const Applications = () => {
 
         {apps.length === 0 && (
           <div className="card text-center py-10 text-gray-500">
-            {t('applications.none')}
+            <p>{t('applications.none')}</p>
+
+            {user?.user_type === 'tenant' && (
+              <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link to="/saved-properties" className="btn btn-primary">
+                  Open Saved Properties
+                </Link>
+                <Link to="/properties" className="btn btn-secondary">
+                  Browse Properties
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>

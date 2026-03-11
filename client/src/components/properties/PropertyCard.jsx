@@ -3,7 +3,17 @@ import { Link } from 'react-router-dom';
 import { FaBed, FaBath, FaMapMarkerAlt, FaHeart, FaRegHeart, FaStar } from 'react-icons/fa';
 import { formatCurrency } from '../../utils/helpers';
 
-const PropertyCard = ({ property, onSave, isSaved = false, showSaveButton = true }) => {
+const PropertyCard = ({
+  property,
+  onSave,
+  isSaved = false,
+  showSaveButton = true,
+  showApplyButton = false,
+  applyLink,
+}) => {
+  const detailLink = `/properties/${property.id}`;
+  const resolvedApplyLink = applyLink || `${detailLink}?apply=1`;
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
       {/* Image */}
@@ -73,12 +83,22 @@ const PropertyCard = ({ property, onSave, isSaved = false, showSaveButton = true
               per {property.payment_frequency === 'yearly' ? 'year' : 'month'}
             </div>
           </div>
-          <Link
-            to={`/properties/${property.id}`}
-            className="btn btn-primary text-sm"
-          >
-            View Details
-          </Link>
+          <div className="flex items-center gap-2">
+            {showApplyButton && (
+              <Link
+                to={resolvedApplyLink}
+                className="btn btn-primary text-sm"
+              >
+                Apply Now
+              </Link>
+            )}
+            <Link
+              to={detailLink}
+              className={showApplyButton ? 'btn btn-secondary text-sm' : 'btn btn-primary text-sm'}
+            >
+              View Details
+            </Link>
+          </div>
         </div>
       </div>
     </div>

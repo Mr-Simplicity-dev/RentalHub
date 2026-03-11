@@ -2,7 +2,14 @@ import React from 'react';
 import PropertyCard from './PropertyCard';
 import Loader from '../common/Loader';
 
-const PropertyList = ({ properties, loading, onSave, savedPropertyIds = [] }) => {
+const PropertyList = ({
+  properties,
+  loading,
+  onSave,
+  savedPropertyIds = [],
+  showApplyButton = false,
+  applyLinkBuilder,
+}) => {
   if (loading) {
     return <Loader />;
   }
@@ -24,6 +31,12 @@ const PropertyList = ({ properties, loading, onSave, savedPropertyIds = [] }) =>
           property={property}
           onSave={onSave}
           isSaved={savedPropertyIds.includes(property.id)}
+          showApplyButton={showApplyButton}
+          applyLink={
+            applyLinkBuilder
+              ? applyLinkBuilder(property)
+              : `/properties/${property.id}?apply=1`
+          }
         />
       ))}
     </div>

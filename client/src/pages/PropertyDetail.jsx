@@ -22,6 +22,7 @@ import { formatCurrency, formatDate } from '../utils/helpers';
 
 const PropertyDetail = () => {
   const POST_VERIFY_REDIRECT_KEY = 'pending_unlock_redirect';
+  const PENDING_APPLICATION_KEY = 'pending_property_application';
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -78,6 +79,16 @@ const PropertyDetail = () => {
   }, [loadProperty]);
 
   useEffect(() => {
+    if (
+      searchParams.get('apply') === '1' &&
+      isAuthenticated &&
+      user?.user_type === 'tenant'
+    ) {
+      localStorage.setItem(PENDING_APPLICATION_KEY, String(id));
+    }
+  }, [id, isAuthenticated, searchParams, user?.user_type]);
+
+  useEffect(() => {
     const verifyUnlock = async () => {
       const reference = searchParams.get('unlock_ref') || searchParams.get('reference');
       if (!reference || !isAuthenticated || user?.user_type !== 'tenant') return;
@@ -98,6 +109,35 @@ const PropertyDetail = () => {
 
     verifyUnlock();
   }, [searchParams, setSearchParams, isAuthenticated, user?.user_type, loadProperty]);
+
+  useEffect(() => {
+    const shouldOpenApplication =
+      isAuthenticated &&
+      user?.user_type === 'tenant' &&
+      hasFullAccess &&
+      localStorage.getItem(PENDING_APPLICATION_KEY) === String(id);
+
+    if (!shouldOpenApplication) {
+      return;
+    }
+
+    localStorage.removeItem(PENDING_APPLICATION_KEY);
+
+    if (searchParams.get('apply') === '1') {
+      const updatedParams = new URLSearchParams(searchParams);
+      updatedParams.delete('apply');
+      setSearchParams(updatedParams, { replace: true });
+    }
+
+    setShowApplicationModal(true);
+  }, [
+    hasFullAccess,
+    id,
+    isAuthenticated,
+    searchParams,
+    setSearchParams,
+    user?.user_type,
+  ]);
 
   const handleSave = async () => {
     if (!isAuthenticated) {

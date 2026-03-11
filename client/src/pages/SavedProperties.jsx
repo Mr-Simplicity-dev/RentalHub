@@ -37,6 +37,8 @@ const SavedProperties = () => {
         loading={false}
         onSave={loadSaved}
         savedPropertyIds={properties.map((p) => p.id)}
+        showApplyButton
+        applyLinkBuilder={(property) => `/properties/${property.id}?apply=1`}
       />
 
       {properties.length === 0 && (
