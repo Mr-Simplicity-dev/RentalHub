@@ -359,8 +359,13 @@ export default function SuperAdminDashboard() {
   };
 
   const toggleFlag = async (key, enabled) => {
-    await api.patch(`/super/flags/${key}`, { enabled });
-    loadFlags();
+    try {
+      await api.patch(`/super/flags/${key}`, { enabled });
+      toast.success(`Flag ${enabled ? "enabled" : "disabled"}`);
+      loadFlags();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update flag");
+    }
   };
 
  useEffect(() => {

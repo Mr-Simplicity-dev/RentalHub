@@ -8,10 +8,15 @@ import ReactPaginate from 'react-paginate';
 import { useTranslation } from 'react-i18next';
 
 const PAGE_SIZE = 20;
+const ALERT_REQUEST_FEE_LABEL = 'N5,000';
 
 const Properties = () => {
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
+  const alertRequestReference =
+    searchParams.get('alert_ref') ||
+    searchParams.get('reference') ||
+    searchParams.get('trxref');
 
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +31,9 @@ const Properties = () => {
   const [requestLoading, setRequestLoading] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [states, setStates] = useState([]);
+  const [alertPaymentEnabled, setAlertPaymentEnabled] = useState(false);
   const requestSectionRef = useRef(null);
+  const handledAlertRequestRef = useRef('');
   const [requestForm, setRequestForm] = useState({
     full_name: '',
     email: '',
@@ -127,15 +134,25 @@ const Properties = () => {
     }
   }, []);
 
+  const loadAlertRequestConfig = useCallback(async () => {
+    try {
+      const response = await propertyService.getPropertyAlertConfig();
+      setAlertPaymentEnabled(response?.data?.payment_required === true);
+    } catch {
+      setAlertPaymentEnabled(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadStates();
-  }, [loadStates]);
+    loadAlertRequestConfig();
+  }, [loadStates, loadAlertRequestConfig]);
 
   useEffect(() => {
     // Get initial filters from URL
     const initialFilters = {};
     searchParams.forEach((value, key) => {
-      if (key !== 'request') {
+      if (!['request', 'alert_ref', 'reference', 'trxref'].includes(key)) {
         initialFilters[key] = value;
       }
     });
@@ -198,7 +215,68 @@ const Properties = () => {
     setRequestForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const submitTenantRequest = async (e) => {
+  const clearCompletedAlertRequestParams = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('alert_ref');
+    url.searchParams.delete('reference');
+    url.searchParams.delete('trxref');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
+  const resetRequestOptionalFields = useCallback(() => {
+    setRequestForm((prev) => ({
+      ...prev,
+      phone: '',
+      location: '',
+      min_price: '',
+      max_price: '',
+      bedrooms: '',
+      bathrooms: '',
+    }));
+  }, []);
+
+  const completeTenantRequestPayment = useCallback(
+    async (reference) => {
+      if (!reference) {
+        return;
+      }
+
+      setRequestLoading(true);
+      setShowRequestForm(true);
+
+      try {
+        const res = await propertyService.completePropertyAlertRequest(reference);
+
+        if (res.success) {
+          toast.success(
+            res.message ||
+              'Request submitted successfully. We will notify you when a matching property is available.'
+          );
+          resetRequestOptionalFields();
+          clearCompletedAlertRequestParams();
+        }
+      } catch (error) {
+        toast.error(
+          error.response?.data?.message || 'Failed to complete notification request'
+        );
+      } finally {
+        setRequestLoading(false);
+      }
+    },
+    [clearCompletedAlertRequestParams, resetRequestOptionalFields]
+  );
+
+  useEffect(() => {
+    if (
+      alertRequestReference &&
+      handledAlertRequestRef.current !== alertRequestReference
+    ) {
+      handledAlertRequestRef.current = alertRequestReference;
+      completeTenantRequestPayment(alertRequestReference);
+    }
+  }, [alertRequestReference, completeTenantRequestPayment]);
+
+  const submitTenantRequest = useCallback(async (e) => {
     e.preventDefault();
 
     if (!requestForm.full_name || !requestForm.email || !requestForm.property_type) {
@@ -222,24 +300,30 @@ const Properties = () => {
       };
 
       const res = await propertyService.requestPropertyAlert(payload);
-      if (res.success) {
-        toast.success(res.message || 'Request submitted successfully');
-        setRequestForm((prev) => ({
-          ...prev,
-          phone: '',
-          location: '',
-          min_price: '',
-          max_price: '',
-          bedrooms: '',
-          bathrooms: '',
-        }));
+
+      if (res.data?.authorization_url) {
+        window.location.href = res.data.authorization_url;
+        return;
       }
+
+      if (res.success) {
+        toast.success(
+          res.message ||
+            'Request submitted successfully. We will notify you when a matching property is available.'
+        );
+        resetRequestOptionalFields();
+        return;
+      }
+
+      toast.error(res.message || 'Unable to submit notification request');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to submit request');
+      toast.error(
+        error.response?.data?.message || 'Failed to submit notification request'
+      );
     } finally {
       setRequestLoading(false);
     }
-  };
+  }, [requestForm, resetRequestOptionalFields]);
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -302,6 +386,11 @@ const Properties = () => {
             </h2>
             <p className="text-gray-600 mb-4">
               Submit your request and we will notify you by email and WhatsApp once a matching property is available.
+            </p>
+            <p className={`text-sm mb-4 ${alertPaymentEnabled ? 'text-primary-700' : 'text-green-700'}`}>
+              {alertPaymentEnabled
+                ? `A one-time ${ALERT_REQUEST_FEE_LABEL} payment is required before the request is processed.`
+                : 'Requests are currently submitted immediately without payment.'}
             </p>
 
             <form onSubmit={submitTenantRequest} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -396,7 +485,13 @@ const Properties = () => {
               />
 
               <button disabled={requestLoading} className="btn btn-primary md:col-span-2">
-                {requestLoading ? 'Submitting request...' : 'Notify me when available'}
+                {requestLoading
+                  ? (alertRequestReference
+                    ? 'Confirming payment and submitting request...'
+                    : (alertPaymentEnabled ? 'Redirecting to payment...' : 'Submitting request...'))
+                  : (alertPaymentEnabled
+                    ? `Pay ${ALERT_REQUEST_FEE_LABEL} to Notify Me`
+                    : 'Notify me when available')}
               </button>
             </form>
           </div>

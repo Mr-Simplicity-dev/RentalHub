@@ -42,23 +42,16 @@ const DEFAULT_FEATURE_FLAGS = [
     enabled: false,
     description: 'Require N5,000 payment before landlord account creation.',
   },
+  {
+    key: 'property_alert_payment',
+    enabled: false,
+    description: 'Require N5,000 payment before processing "Notify me when available" requests.',
+  },
 ];
 
 let featureFlagsReady = false;
 
-const ensureFeatureFlagsTable = async () => {
-  if (featureFlagsReady) return;
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS feature_flags (
-      key VARCHAR(100) PRIMARY KEY,
-      enabled BOOLEAN NOT NULL DEFAULT TRUE,
-      description TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
+const syncDefaultFeatureFlags = async () => {
   await Promise.all(
     DEFAULT_FEATURE_FLAGS.map((flag) =>
       db.query(
@@ -70,8 +63,30 @@ const ensureFeatureFlagsTable = async () => {
       )
     )
   );
+};
 
-  featureFlagsReady = true;
+const ensureFeatureFlagsTable = async (options = {}) => {
+  const { syncDefaults = false } = options;
+  let shouldSyncDefaults = syncDefaults;
+
+  if (!featureFlagsReady) {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS feature_flags (
+        key VARCHAR(100) PRIMARY KEY,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        description TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    featureFlagsReady = true;
+    shouldSyncDefaults = true;
+  }
+
+  if (shouldSyncDefaults) {
+    await syncDefaultFeatureFlags();
+  }
 };
 
 const getFeatureFlagsMap = async () => {
@@ -179,6 +194,7 @@ const enforceFlags = async (req, res, next) => {
 module.exports = {
   DEFAULT_FEATURE_FLAGS,
   ensureFeatureFlagsTable,
+  syncDefaultFeatureFlags,
   getFeatureFlagsMap,
   enforceFlags,
 };

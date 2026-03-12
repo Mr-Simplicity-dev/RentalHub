@@ -142,8 +142,18 @@ export const propertyService = {
   },
 
   // Submit tenant request when desired property type is unavailable
+  getPropertyAlertConfig: async () => {
+    const response = await api.get('/property-alerts/config');
+    return response.data;
+  },
+
   requestPropertyAlert: async (requestData) => {
     const response = await api.post('/property-alerts/request', requestData);
+    return response.data;
+  },
+
+  completePropertyAlertRequest: async (reference) => {
+    const response = await api.post(`/property-alerts/request/complete/${reference}`);
     return response.data;
   },
 };

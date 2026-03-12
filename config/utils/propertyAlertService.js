@@ -3,6 +3,7 @@ const { sendEmail } = require('./mailer');
 const { sendWhatsAppText } = require('./whatsappService');
 
 let schemaReady = false;
+const ALERT_REQUEST_FEE_NGN = 5000;
 
 const ensureAlertSchema = async () => {
   if (schemaReady) return;
@@ -32,10 +33,53 @@ const ensureAlertSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_tenant_alerts_email
     ON tenant_property_alerts(email);
+
+    CREATE TABLE IF NOT EXISTS tenant_property_alert_payments (
+      id SERIAL PRIMARY KEY,
+      full_name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      phone VARCHAR(30),
+      property_type VARCHAR(50) NOT NULL,
+      state_id INTEGER REFERENCES states(id) ON DELETE SET NULL,
+      city VARCHAR(120),
+      min_price NUMERIC(12,2),
+      max_price NUMERIC(12,2),
+      bedrooms INTEGER,
+      bathrooms INTEGER,
+      amount DECIMAL(12,2) NOT NULL DEFAULT 5000,
+      currency VARCHAR(10) NOT NULL DEFAULT 'NGN',
+      payment_method VARCHAR(50) NOT NULL DEFAULT 'paystack',
+      transaction_reference VARCHAR(255) NOT NULL UNIQUE,
+      payment_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      created_alert_id INTEGER REFERENCES tenant_property_alerts(id) ON DELETE SET NULL,
+      gateway_response JSONB,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TIMESTAMP,
+      processed_at TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tenant_alert_payments_reference
+    ON tenant_property_alert_payments(transaction_reference);
+
+    CREATE INDEX IF NOT EXISTS idx_tenant_alert_payments_status
+    ON tenant_property_alert_payments(payment_status, processed_at);
   `);
 
   schemaReady = true;
 };
+
+const buildAlertPayloadFromPayment = (payment) => ({
+  full_name: payment.full_name,
+  email: payment.email,
+  phone: payment.phone,
+  property_type: payment.property_type,
+  state_id: payment.state_id,
+  city: payment.city,
+  min_price: payment.min_price,
+  max_price: payment.max_price,
+  bedrooms: payment.bedrooms,
+  bathrooms: payment.bathrooms,
+});
 
 exports.createTenantAlert = async (payload) => {
   await ensureAlertSchema();
@@ -77,6 +121,124 @@ exports.createTenantAlert = async (payload) => {
   );
 
   return result.rows[0];
+};
+
+exports.ALERT_REQUEST_FEE_NGN = ALERT_REQUEST_FEE_NGN;
+
+exports.createTenantAlertPayment = async (payload) => {
+  await ensureAlertSchema();
+
+  const {
+    full_name,
+    email,
+    phone = null,
+    property_type,
+    state_id = null,
+    city = null,
+    min_price = null,
+    max_price = null,
+    bedrooms = null,
+    bathrooms = null,
+    transaction_reference,
+    payment_method = 'paystack',
+  } = payload;
+
+  const result = await db.query(
+    `INSERT INTO tenant_property_alert_payments (
+      full_name, email, phone, property_type, state_id, city,
+      min_price, max_price, bedrooms, bathrooms, amount,
+      payment_method, transaction_reference
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    RETURNING *`,
+    [
+      full_name,
+      email,
+      phone,
+      property_type,
+      state_id || null,
+      city || null,
+      min_price || null,
+      max_price || null,
+      bedrooms || null,
+      bathrooms || null,
+      ALERT_REQUEST_FEE_NGN,
+      payment_method,
+      transaction_reference,
+    ]
+  );
+
+  return result.rows[0];
+};
+
+exports.getTenantAlertPaymentByReference = async (reference) => {
+  await ensureAlertSchema();
+
+  const result = await db.query(
+    `SELECT *
+     FROM tenant_property_alert_payments
+     WHERE transaction_reference = $1
+     LIMIT 1`,
+    [reference]
+  );
+
+  return result.rows[0] || null;
+};
+
+exports.markTenantAlertPaymentCompleted = async (reference, gatewayResponse) => {
+  await ensureAlertSchema();
+
+  const result = await db.query(
+    `UPDATE tenant_property_alert_payments
+     SET payment_status = 'completed',
+         completed_at = CURRENT_TIMESTAMP,
+         gateway_response = $1
+     WHERE transaction_reference = $2
+     RETURNING *`,
+    [JSON.stringify(gatewayResponse), reference]
+  );
+
+  return result.rows[0] || null;
+};
+
+exports.markTenantAlertPaymentProcessed = async (reference, alertId) => {
+  await ensureAlertSchema();
+
+  const result = await db.query(
+    `UPDATE tenant_property_alert_payments
+     SET processed_at = CURRENT_TIMESTAMP,
+         created_alert_id = $2
+     WHERE transaction_reference = $1
+     RETURNING *`,
+    [reference, alertId]
+  );
+
+  return result.rows[0] || null;
+};
+
+exports.createTenantAlertFromPayment = async (payment) => {
+  const alert = await exports.createTenantAlert(buildAlertPayloadFromPayment(payment));
+
+  await exports.markTenantAlertPaymentProcessed(
+    payment.transaction_reference,
+    alert.id
+  );
+
+  return alert;
+};
+
+exports.getTenantAlertById = async (alertId) => {
+  await ensureAlertSchema();
+
+  const result = await db.query(
+    `SELECT *
+     FROM tenant_property_alerts
+     WHERE id = $1
+     LIMIT 1`,
+    [alertId]
+  );
+
+  return result.rows[0] || null;
 };
 
 const findMatchingAlerts = async (property) => {

@@ -1,5 +1,9 @@
 const db = require('../config/middleware/database');
-const { ensureFeatureFlagsTable } = require('../config/middleware/featureFlags');
+const {
+  DEFAULT_FEATURE_FLAGS,
+  ensureFeatureFlagsTable,
+  syncDefaultFeatureFlags,
+} = require('../config/middleware/featureFlags');
 
 let verificationAuditSchemaReady = false;
 
@@ -717,9 +721,24 @@ const bulkPropertyAction = async (req, res) => {
 // feature flags
 const getFeatureFlags = async (req, res) => {
   try {
-    await ensureFeatureFlagsTable();
+    await ensureFeatureFlagsTable({ syncDefaults: true });
     const { rows } = await db.query(`SELECT * FROM feature_flags ORDER BY key`);
-    res.json({ success: true, flags: rows });
+    const flagMap = new Map(
+      DEFAULT_FEATURE_FLAGS.map((flag) => [flag.key, { ...flag }])
+    );
+
+    rows.forEach((row) => {
+      flagMap.set(row.key, {
+        ...(flagMap.get(row.key) || {}),
+        ...row,
+      });
+    });
+
+    const flags = Array.from(flagMap.values()).sort((a, b) =>
+      a.key.localeCompare(b.key)
+    );
+
+    res.json({ success: true, flags });
   } catch {
     res.status(500).json({ message: 'Failed to load flags' });
   }
@@ -731,11 +750,26 @@ const updateFeatureFlag = async (req, res) => {
 
   try {
     await ensureFeatureFlagsTable();
+    await syncDefaultFeatureFlags();
 
-    const result = await db.query(
-      `UPDATE feature_flags SET enabled = $1, updated_at = NOW() WHERE key = $2`,
-      [enabled, key]
-    );
+    const defaultFlag = DEFAULT_FEATURE_FLAGS.find((flag) => flag.key === key);
+    let result;
+
+    if (defaultFlag) {
+      result = await db.query(
+        `INSERT INTO feature_flags (key, enabled, description, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (key)
+         DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = NOW()
+         RETURNING key`,
+        [key, enabled, defaultFlag.description]
+      );
+    } else {
+      result = await db.query(
+        `UPDATE feature_flags SET enabled = $1, updated_at = NOW() WHERE key = $2 RETURNING key`,
+        [enabled, key]
+      );
+    }
 
     if (!result.rowCount) {
       return res.status(404).json({ message: 'Feature flag not found' });
