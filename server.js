@@ -38,6 +38,15 @@ const startScheduler = require('./config/utils/scheduler');
 dotenv.config();
 
 const app = express();
+const isProduction = process.env.NODE_ENV === 'production';
+const apiRateLimitWindowMs =
+  Number(process.env.API_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+const apiRateLimitMax =
+  Number(process.env.API_RATE_LIMIT_MAX) || (isProduction ? 2000 : 10000);
+const authRateLimitWindowMs =
+  Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+const authRateLimitMax =
+  Number(process.env.AUTH_RATE_LIMIT_MAX) || (isProduction ? 30 : 200);
 
 // Trust proxy (Render, Nginx etc)
 app.set('trust proxy', 1);
@@ -59,8 +68,27 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Rate limit
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: apiRateLimitWindowMs,
+  max: apiRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many requests. Please wait a moment and try again.',
+  },
+  skip: (req) => req.path === '/health',
+});
+
+const authLimiter = rateLimit({
+  windowMs: authRateLimitWindowMs,
+  max: authRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many authentication requests. Please wait a moment and try again.',
+  },
+  skip: (req) => req.method === 'GET',
 });
 
 app.use('/api/', limiter);
@@ -141,7 +169,7 @@ app.get('/api/auth/verify-email', async (req, res) => {
 // -----------------------------------
 // ROUTES
 // -----------------------------------
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/applications', applicationRoutes);
