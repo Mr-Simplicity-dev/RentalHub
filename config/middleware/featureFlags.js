@@ -32,6 +32,16 @@ const DEFAULT_FEATURE_FLAGS = [
     enabled: true,
     description: 'Require and allow passport collection for foreign registrations.',
   },
+  {
+    key: 'tenant_registration_payment',
+    enabled: false,
+    description: 'Require N2,500 payment before tenant account creation.',
+  },
+  {
+    key: 'landlord_registration_payment',
+    enabled: false,
+    description: 'Require N5,000 payment before landlord account creation.',
+  },
 ];
 
 let featureFlagsReady = false;
@@ -111,7 +121,16 @@ const enforceFlags = async (req, res, next) => {
       return res.status(503).json({ message: 'System under maintenance' });
     }
 
-    if (!flags.allow_registration && req.path.includes('/auth/register')) {
+    const isDirectRegistrationRequest =
+      req.method === 'POST' && req.path === '/auth/register';
+    const isRegistrationPaymentInitRequest =
+      req.method === 'POST' &&
+      (
+        req.path === '/auth/register/payment' ||
+        req.path === '/auth/register/tenant-payment'
+      );
+
+    if (!flags.allow_registration && (isDirectRegistrationRequest || isRegistrationPaymentInitRequest)) {
       return res.status(403).json({ message: 'Registration disabled' });
     }
 
@@ -131,7 +150,7 @@ const enforceFlags = async (req, res, next) => {
       return res.status(403).json({ message: 'Passport disabled' });
     }
 
-    if (req.method === 'POST' && req.path.includes('/auth/register')) {
+    if (isDirectRegistrationRequest || isRegistrationPaymentInitRequest) {
       const body = req.body || {};
       const isForeigner =
         body.is_foreigner === true ||

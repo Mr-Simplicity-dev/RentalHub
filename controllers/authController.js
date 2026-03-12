@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const axios = require('axios');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
@@ -22,9 +23,14 @@ const { sendVerificationCode } = require('../config/utils/smsService');
 const otpStore = new Map();
 let identitySchemaReady = false;
 let lawyerInviteSchemaReady = false;
+let tenantRegistrationPaymentSchemaReady = false;
 
 const LAWYER_INVITE_EXPIRY_HOURS = 72;
 const LAWYER_INVITE_EXPIRY_MS = LAWYER_INVITE_EXPIRY_HOURS * 60 * 60 * 1000;
+const PAYSTACK_BASE_URL = 'https://api.paystack.co';
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const TENANT_REGISTRATION_FEE_NGN = 2500;
+const LANDLORD_REGISTRATION_FEE_NGN = 5000;
 const FRONTEND_URL =
   process.env.FRONTEND_URL && process.env.FRONTEND_URL !== '...'
     ? process.env.FRONTEND_URL
@@ -85,6 +91,93 @@ const ensureLawyerInviteSchema = async () => {
   lawyerInviteSchemaReady = true;
 };
 
+const ensureTenantRegistrationPaymentSchema = async () => {
+  if (tenantRegistrationPaymentSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS tenant_registration_payments (
+      id SERIAL PRIMARY KEY,
+      user_type VARCHAR(20) NOT NULL DEFAULT 'tenant',
+      email VARCHAR(255) NOT NULL,
+      phone VARCHAR(20) NOT NULL,
+      full_name VARCHAR(255) NOT NULL,
+      amount DECIMAL(12, 2) NOT NULL DEFAULT 2500,
+      currency VARCHAR(10) NOT NULL DEFAULT 'NGN',
+      payment_method VARCHAR(50) NOT NULL DEFAULT 'paystack',
+      transaction_reference VARCHAR(255) NOT NULL UNIQUE,
+      payment_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      registration_payload JSONB NOT NULL,
+      verification_meta JSONB,
+      gateway_response JSONB,
+      registered_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      consumed_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TIMESTAMP
+    );
+
+    ALTER TABLE tenant_registration_payments
+      ADD COLUMN IF NOT EXISTS user_type VARCHAR(20) NOT NULL DEFAULT 'tenant';
+
+    CREATE INDEX IF NOT EXISTS idx_tenant_registration_payments_reference
+      ON tenant_registration_payments(transaction_reference);
+
+    CREATE INDEX IF NOT EXISTS idx_tenant_registration_payments_email
+      ON tenant_registration_payments(email);
+
+    DO $$
+    DECLARE
+      existing_check_name TEXT;
+    BEGIN
+      SELECT c.conname
+        INTO existing_check_name
+      FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+      WHERE t.relname = 'payments'
+        AND c.contype = 'c'
+        AND pg_get_constraintdef(c.oid) ILIKE '%payment_type%';
+
+      IF existing_check_name IS NOT NULL THEN
+        EXECUTE format('ALTER TABLE payments DROP CONSTRAINT %I', existing_check_name);
+      END IF;
+    END $$;
+
+    ALTER TABLE payments
+      ADD CONSTRAINT payments_payment_type_check
+      CHECK (
+        payment_type IN (
+          'tenant_subscription',
+          'landlord_listing',
+          'rent_payment',
+          'property_unlock',
+          'general_platform_fee'
+        )
+      );
+  `);
+
+  tenantRegistrationPaymentSchemaReady = true;
+};
+
+const getRegistrationPaymentConfig = (userType, flags) => {
+  if (userType === 'tenant') {
+    return {
+      enabled: flags.tenant_registration_payment === true,
+      amount: TENANT_REGISTRATION_FEE_NGN,
+    };
+  }
+
+  if (userType === 'landlord') {
+    return {
+      enabled: flags.landlord_registration_payment === true,
+      amount: LANDLORD_REGISTRATION_FEE_NGN,
+    };
+  }
+
+  return {
+    enabled: false,
+    amount: 0,
+  };
+};
+
 const createLawyerInvite = async ({ clientUserId, lawyerEmail, clientName, clientRole }) => {
   await ensureLawyerInviteSchema();
 
@@ -123,264 +216,287 @@ const generateToken = (userId, userType) => {
   );
 };
 
-// REGISTER NEW USER
-exports.register = async (req, res) => {
-  try {
-    await ensureIdentitySchema();
-    const flags = await getFeatureFlagsMap();
+const assertUniqueUserFields = async (executor, {
+  email,
+  phone,
+  cleanNIN,
+  cleanPassportNumber
+}) => {
+  const duplicateConditions = ['email = $1', 'phone = $2'];
+  const duplicateParams = [email, phone];
+  let paramIndex = 3;
 
-    // Validate input
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        errors: errors.array()
-      });
+  if (cleanNIN) {
+    duplicateConditions.push(`nin = $${paramIndex++}`);
+    duplicateParams.push(cleanNIN);
+  }
+
+  if (cleanPassportNumber) {
+    duplicateConditions.push(`international_passport_number = $${paramIndex++}`);
+    duplicateParams.push(cleanPassportNumber);
+  }
+
+  const existingUser = await executor.query(
+    `SELECT id FROM users WHERE ${duplicateConditions.join(' OR ')}`,
+    duplicateParams
+  );
+
+  if (existingUser.rows.length > 0) {
+    const error = new Error(
+      cleanNIN
+        ? 'User with this email, phone, or NIN already exists'
+        : cleanPassportNumber
+          ? 'User with this email, phone, or passport number already exists'
+          : 'User with this email or phone already exists'
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
+const validateAndPrepareRegistration = async (payload) => {
+  await ensureIdentitySchema();
+  const flags = await getFeatureFlagsMap();
+
+  const {
+    email,
+    phone,
+    password,
+    full_name,
+    lawyer_email,
+    nin,
+    user_type,
+    date_of_birth,
+    identity_document_type = 'nin',
+    is_foreigner = false,
+    international_passport_number,
+    nationality
+  } = payload;
+
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanPhone = String(phone || '').replace(/\s+/g, '');
+  const cleanFullName = String(full_name || '').trim();
+  const cleanLawyerEmail = lawyer_email
+    ? String(lawyer_email).trim().toLowerCase()
+    : '';
+
+  if (cleanLawyerEmail && cleanLawyerEmail === cleanEmail) {
+    const error = new Error('Lawyer email must be different from your account email');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const isForeigner =
+    is_foreigner === true ||
+    is_foreigner === 'true' ||
+    is_foreigner === 1 ||
+    is_foreigner === '1';
+
+  const isNINEnabled = flags.nin_number !== false;
+  const isPassportEnabled = flags.passport_number !== false;
+  const submittedNIN = String(nin || '').trim();
+  const submittedPassportNumber = String(international_passport_number || '').trim();
+  let identityType = null;
+  let cleanNIN = null;
+  let cleanPassportNumber = null;
+  const testNIN = String(process.env.NIMC_TEST_NIN || '00000000000').trim();
+  const allowTestNINBypass =
+    process.env.ALLOW_TEST_NIN_BYPASS === 'true' ||
+    (process.env.NODE_ENV !== 'production' && process.env.ALLOW_TEST_NIN_BYPASS !== 'false');
+  const submittedNationality = nationality ? String(nationality).trim() : '';
+  const cleanNationality = submittedNationality || (isForeigner ? 'Foreign' : 'Nigeria');
+  const isNigerianNationality = /^nigeria(n)?$/i.test(cleanNationality);
+
+  let ninVerified = false;
+  let verificationMeta = null;
+
+  if (!isForeigner) {
+    if (identity_document_type === 'passport' || submittedPassportNumber) {
+      const error = new Error('NIN is required for local Nigerian registration');
+      error.statusCode = 400;
+      throw error;
     }
 
-    const {
-      email,
-      phone,
-      password,
-      full_name,
-      lawyer_email,
-      nin,
-      user_type,
-      date_of_birth,
-      identity_document_type = 'nin',
-      is_foreigner = false,
-      international_passport_number,
-      nationality
-    } = req.body;
-
-    const cleanLawyerEmail = lawyer_email
-      ? String(lawyer_email).trim().toLowerCase()
-      : '';
-
-    if (cleanLawyerEmail && cleanLawyerEmail === String(email).trim().toLowerCase()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Lawyer email must be different from your account email'
-      });
+    if (nationality && !isNigerianNationality) {
+      const error = new Error('Foreign applicants must register with international passport');
+      error.statusCode = 400;
+      throw error;
     }
 
-    const isForeigner =
-      is_foreigner === true ||
-      is_foreigner === 'true' ||
-      is_foreigner === 1 ||
-      is_foreigner === '1';
-
-    const isNINEnabled = flags.nin_number !== false;
-    const isPassportEnabled = flags.passport_number !== false;
-    const submittedNIN = String(nin || '').trim();
-    const submittedPassportNumber = String(international_passport_number || '').trim();
-    let identityType = null;
-    let cleanNIN = null;
-    let cleanPassportNumber = null;
-    const testNIN = String(process.env.NIMC_TEST_NIN || '00000000000').trim();
-    const allowTestNINBypass =
-      process.env.ALLOW_TEST_NIN_BYPASS === 'true' ||
-      (process.env.NODE_ENV !== 'production' && process.env.ALLOW_TEST_NIN_BYPASS !== 'false');
-    const submittedNationality = nationality ? String(nationality).trim() : '';
-    const cleanNationality = submittedNationality || (isForeigner ? 'Foreign' : 'Nigeria');
-    const isNigerianNationality = /^nigeria(n)?$/i.test(cleanNationality);
-
-    let ninVerified = false;
-    let nimcMeta = null;
-
-    if (!isForeigner) {
-      if (identity_document_type === 'passport' || submittedPassportNumber) {
-        return res.status(400).json({
-          success: false,
-          message: 'NIN is required for local Nigerian registration'
-        });
-      }
-
-      if (nationality && !isNigerianNationality) {
-        return res.status(400).json({
-          success: false,
-          message: 'Foreign applicants must register with international passport'
-        });
-      }
-
-      if (!isNINEnabled) {
-        if (submittedNIN) {
-          return res.status(403).json({
-            success: false,
-            message: 'NIN disabled'
-          });
-        }
-      } else {
-        const ninValidation = validateNIN(submittedNIN);
-        if (!ninValidation.valid) {
-          return res.status(400).json({
-            success: false,
-            message: ninValidation.message
-          });
-        }
-
-        identityType = 'nin';
-        cleanNIN = ninValidation.value;
-
-        const names = String(full_name || '').trim().split(/\s+/).filter(Boolean);
-        const firstName = names[0] || '';
-        const lastName = names.slice(1).join(' ') || names[0] || '';
-
-        const isTestNIN = cleanNIN === testNIN;
-        if (isTestNIN && allowTestNINBypass) {
-          ninVerified = true;
-          nimcMeta = {
-            status: 'test_bypass',
-            message: 'Test NIN bypass enabled'
-          };
-        } else {
-          const nimcResult = await verifyNINWithNIMC(
-            cleanNIN,
-            firstName,
-            lastName,
-            date_of_birth
-          );
-
-          nimcMeta = {
-            status: nimcResult.status,
-            message: nimcResult.message
-          };
-
-          if (nimcResult.status === 'not_configured') {
-            return res.status(503).json({
-              success: false,
-              message: 'NIMC verification is required but not configured on the server'
-            });
-          }
-
-          if (nimcResult.status === 'service_error') {
-            return res.status(503).json({
-              success: false,
-              message: nimcResult.message
-            });
-          }
-
-          if (nimcResult.status === 'not_verified') {
-            return res.status(400).json({
-              success: false,
-              message: nimcResult.message || 'NIN verification failed'
-            });
-          }
-
-          ninVerified = nimcResult.verified === true;
-        }
+    if (!isNINEnabled) {
+      if (submittedNIN) {
+        const error = new Error('NIN disabled');
+        error.statusCode = 403;
+        throw error;
       }
     } else {
-      if (identity_document_type === 'nin') {
-        return res.status(400).json({
-          success: false,
-          message: 'International passport is required for foreign applicants'
-        });
+      const ninValidation = validateNIN(submittedNIN);
+      if (!ninValidation.valid) {
+        const error = new Error(ninValidation.message);
+        error.statusCode = 400;
+        throw error;
       }
 
-      if (isNigerianNationality) {
-        return res.status(400).json({
-          success: false,
-          message: 'Nigerian applicants must register with NIN'
-        });
-      }
+      identityType = 'nin';
+      cleanNIN = ninValidation.value;
 
-      if (!isPassportEnabled) {
-        if (submittedPassportNumber) {
-          return res.status(403).json({
-            success: false,
-            message: 'Passport disabled'
-          });
-        }
+      const names = cleanFullName.split(/\s+/).filter(Boolean);
+      const firstName = names[0] || '';
+      const lastName = names.slice(1).join(' ') || names[0] || '';
+
+      const isTestNIN = cleanNIN === testNIN;
+      if (isTestNIN && allowTestNINBypass) {
+        ninVerified = true;
+        verificationMeta = {
+          status: 'test_bypass',
+          message: 'Test NIN bypass enabled'
+        };
       } else {
-        const passportValidation = validateInternationalPassport(
-          submittedPassportNumber
-        );
-
-        if (!passportValidation.valid) {
-          return res.status(400).json({
-            success: false,
-            message: passportValidation.message
-          });
-        }
-
-        if (!cleanNationality) {
-          return res.status(400).json({
-            success: false,
-            message: 'Nationality is required for international passport verification'
-          });
-        }
-
-        identityType = 'passport';
-        cleanPassportNumber = passportValidation.value;
-
-        const passportResult = await verifyInternationalPassportWithAPI(
-          cleanPassportNumber,
-          full_name,
-          cleanNationality,
+        const nimcResult = await verifyNINWithNIMC(
+          cleanNIN,
+          firstName,
+          lastName,
           date_of_birth
         );
 
-        if (passportResult.status === 'not_configured') {
-          return res.status(503).json({
-            success: false,
-            message: 'Passport verification API is required but not configured on the server'
-          });
+        verificationMeta = {
+          status: nimcResult.status,
+          message: nimcResult.message
+        };
+
+        if (nimcResult.status === 'not_configured') {
+          const error = new Error('NIMC verification is required but not configured on the server');
+          error.statusCode = 503;
+          throw error;
         }
 
-        if (passportResult.status === 'service_error') {
-          return res.status(503).json({
-            success: false,
-            message: passportResult.message
-          });
+        if (nimcResult.status === 'service_error') {
+          const error = new Error(nimcResult.message);
+          error.statusCode = 503;
+          throw error;
         }
 
-        if (passportResult.status === 'not_verified') {
-          return res.status(400).json({
-            success: false,
-            message: passportResult.message || 'Passport verification failed'
-          });
+        if (nimcResult.status === 'not_verified') {
+          const error = new Error(nimcResult.message || 'NIN verification failed');
+          error.statusCode = 400;
+          throw error;
         }
+
+        ninVerified = nimcResult.verified === true;
       }
     }
-
-    // Check if user already exists
-    const duplicateConditions = ['email = $1', 'phone = $2'];
-    const duplicateParams = [email, phone];
-    let paramIndex = 3;
-
-    if (cleanNIN) {
-      duplicateConditions.push(`nin = $${paramIndex++}`);
-      duplicateParams.push(cleanNIN);
+  } else {
+    if (identity_document_type === 'nin') {
+      const error = new Error('International passport is required for foreign applicants');
+      error.statusCode = 400;
+      throw error;
     }
 
-    if (cleanPassportNumber) {
-      duplicateConditions.push(`international_passport_number = $${paramIndex++}`);
-      duplicateParams.push(cleanPassportNumber);
+    if (isNigerianNationality) {
+      const error = new Error('Nigerian applicants must register with NIN');
+      error.statusCode = 400;
+      throw error;
     }
 
-    const existingUser = await db.query(
-      `SELECT id FROM users WHERE ${duplicateConditions.join(' OR ')}`,
-      duplicateParams
-    );
+    if (!isPassportEnabled) {
+      if (submittedPassportNumber) {
+        const error = new Error('Passport disabled');
+        error.statusCode = 403;
+        throw error;
+      }
+    } else {
+      const passportValidation = validateInternationalPassport(
+        submittedPassportNumber
+      );
 
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: cleanNIN
-          ? 'User with this email, phone, or NIN already exists'
-          : cleanPassportNumber
-            ? 'User with this email, phone, or passport number already exists'
-            : 'User with this email or phone already exists'
-      });
+      if (!passportValidation.valid) {
+        const error = new Error(passportValidation.message);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (!cleanNationality) {
+        const error = new Error('Nationality is required for international passport verification');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      identityType = 'passport';
+      cleanPassportNumber = passportValidation.value;
+
+      const passportResult = await verifyInternationalPassportWithAPI(
+        cleanPassportNumber,
+        cleanFullName,
+        cleanNationality,
+        date_of_birth
+      );
+
+      if (passportResult.status === 'not_configured') {
+        const error = new Error('Passport verification API is required but not configured on the server');
+        error.statusCode = 503;
+        throw error;
+      }
+
+      if (passportResult.status === 'service_error') {
+        const error = new Error(passportResult.message);
+        error.statusCode = 503;
+        throw error;
+      }
+
+      if (passportResult.status === 'not_verified') {
+        const error = new Error(passportResult.message || 'Passport verification failed');
+        error.statusCode = 400;
+        throw error;
+      }
     }
+  }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const password_hash = await bcrypt.hash(password, salt);
+  await assertUniqueUserFields(db, {
+    email: cleanEmail,
+    phone: cleanPhone,
+    cleanNIN,
+    cleanPassportNumber
+  });
 
-    // Insert user into database
-    const result = await db.query(
+  return {
+    preparedRegistration: {
+      email: cleanEmail,
+      phone: cleanPhone,
+      full_name: cleanFullName,
+      cleanLawyerEmail,
+      user_type,
+      cleanNIN,
+      ninVerified,
+      identityType,
+      cleanPassportNumber,
+      cleanNationality
+    },
+    plainPassword: password,
+    verificationMeta
+  };
+};
+
+const createUserFromPreparedRegistration = async ({
+  preparedRegistration,
+  passwordHash,
+  verificationMeta,
+  tenantRegistrationPayment
+}) => {
+  await ensureTenantRegistrationPaymentSchema();
+
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    await assertUniqueUserFields(client, {
+      email: preparedRegistration.email,
+      phone: preparedRegistration.phone,
+      cleanNIN: preparedRegistration.cleanNIN,
+      cleanPassportNumber: preparedRegistration.cleanPassportNumber
+    });
+
+    const result = await client.query(
       `INSERT INTO users (
          user_type,
          email,
@@ -397,27 +513,72 @@ exports.register = async (req, res) => {
        RETURNING id, email, full_name, user_type, created_at,
                  identity_document_type, nin_verified, nationality`,
       [
-        user_type,
-        email,
-        phone,
-        password_hash,
-        full_name,
-        cleanNIN,
-        ninVerified,
-        identityType,
-        cleanPassportNumber,
-        cleanNationality
+        preparedRegistration.user_type,
+        preparedRegistration.email,
+        preparedRegistration.phone,
+        passwordHash,
+        preparedRegistration.full_name,
+        preparedRegistration.cleanNIN,
+        preparedRegistration.ninVerified,
+        preparedRegistration.identityType,
+        preparedRegistration.cleanPassportNumber,
+        preparedRegistration.cleanNationality
       ]
     );
 
     const newUser = result.rows[0];
+
+    if (tenantRegistrationPayment) {
+      const paymentConsumptionResult = await client.query(
+        `UPDATE tenant_registration_payments
+         SET registered_user_id = $1,
+             consumed_at = CURRENT_TIMESTAMP
+         WHERE id = $2
+           AND registered_user_id IS NULL
+         RETURNING id`,
+        [newUser.id, tenantRegistrationPayment.id]
+      );
+
+      if (!paymentConsumptionResult.rows.length) {
+        const error = new Error('This tenant registration payment has already been used');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      await client.query(
+        `INSERT INTO payments (
+           user_id,
+           payment_type,
+           amount,
+           currency,
+           payment_method,
+           transaction_reference,
+           payment_status,
+           gateway_response,
+           completed_at
+         )
+         VALUES ($1, 'general_platform_fee', $2, $3, $4, $5, 'completed', $6, $7)`,
+        [
+          newUser.id,
+          tenantRegistrationPayment.amount,
+          tenantRegistrationPayment.currency,
+          tenantRegistrationPayment.payment_method,
+          tenantRegistrationPayment.transaction_reference,
+          tenantRegistrationPayment.gateway_response,
+          tenantRegistrationPayment.completed_at || new Date()
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+
     let lawyerInvite = null;
 
-    if (cleanLawyerEmail) {
+    if (preparedRegistration.cleanLawyerEmail) {
       try {
         lawyerInvite = await createLawyerInvite({
           clientUserId: newUser.id,
-          lawyerEmail: cleanLawyerEmail,
+          lawyerEmail: preparedRegistration.cleanLawyerEmail,
           clientName: newUser.full_name,
           clientRole: newUser.user_type,
         });
@@ -426,46 +587,341 @@ exports.register = async (req, res) => {
       }
     }
 
-    // Generate email verification token
     const verificationToken = jwt.sign(
       { userId: newUser.id, email: newUser.email },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
-    // Send verification email
-    await sendVerificationEmail(email, verificationToken);
-    await sendWelcomeEmail(email, full_name, user_type);
+    await sendVerificationEmail(newUser.email, verificationToken);
+    await sendWelcomeEmail(
+      newUser.email,
+      newUser.full_name,
+      newUser.user_type
+    );
 
-    // Generate auth token
-    const token = generateToken(newUser.id, user_type);
+    const token = generateToken(newUser.id, newUser.user_type);
+
+    return {
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        full_name: newUser.full_name,
+        user_type: newUser.user_type,
+        created_at: newUser.created_at,
+        identity_document_type: newUser.identity_document_type,
+        nin_verified: newUser.nin_verified,
+        nationality: newUser.nationality
+      },
+      token,
+      verification: verificationMeta,
+      lawyer_invite: lawyerInvite
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+// REGISTER NEW USER
+exports.register = async (req, res) => {
+  try {
+    await ensureTenantRegistrationPaymentSchema();
+    const flags = await getFeatureFlagsMap();
+
+    // Validate input
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const {
+      preparedRegistration,
+      plainPassword,
+      verificationMeta
+    } = await validateAndPrepareRegistration(req.body);
+
+    const registrationPaymentConfig = getRegistrationPaymentConfig(
+      preparedRegistration.user_type,
+      flags
+    );
+
+    if (registrationPaymentConfig.enabled) {
+      return res.status(402).json({
+        success: false,
+        message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment is required before account creation`
+      });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(plainPassword, salt);
+
+    const data = await createUserFromPreparedRegistration({
+      preparedRegistration,
+      passwordHash,
+      verificationMeta
+    });
 
     res.status(201).json({
       success: true,
       message: 'Registration successful! Please verify your email and phone.',
-      data: {
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          full_name: newUser.full_name,
-          user_type: newUser.user_type,
-          created_at: newUser.created_at,
-          identity_document_type: newUser.identity_document_type,
-          nin_verified: newUser.nin_verified,
-          nationality: newUser.nationality
-        },
-        token,
-        verification: nimcMeta,
-        lawyer_invite: lawyerInvite
-      }
+      data
     });
 
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Registration failed',
+      message: error.message || 'Registration failed',
       error: error.message
+    });
+  }
+};
+
+exports.initializeRegistrationPayment = async (req, res) => {
+  try {
+    await ensureTenantRegistrationPaymentSchema();
+    const flags = await getFeatureFlagsMap();
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    if (!['tenant', 'landlord'].includes(req.body.user_type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'This payment flow is for tenant or landlord registration only'
+      });
+    }
+
+    if (!PAYSTACK_SECRET_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment service is not configured'
+      });
+    }
+
+    const {
+      preparedRegistration,
+      plainPassword,
+      verificationMeta
+    } = await validateAndPrepareRegistration(req.body);
+
+    const registrationPaymentConfig = getRegistrationPaymentConfig(
+      preparedRegistration.user_type,
+      flags
+    );
+
+    if (!registrationPaymentConfig.enabled) {
+      return res.status(400).json({
+        success: false,
+        message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment is currently disabled`
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(plainPassword, salt);
+    const reference = `REGPAY_${preparedRegistration.user_type.toUpperCase()}_${Date.now()}`;
+
+    await db.query(
+      `INSERT INTO tenant_registration_payments (
+         user_type,
+         email,
+         phone,
+         full_name,
+         amount,
+         transaction_reference,
+         registration_payload,
+         verification_meta
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        preparedRegistration.user_type,
+        preparedRegistration.email,
+        preparedRegistration.phone,
+        preparedRegistration.full_name,
+        registrationPaymentConfig.amount,
+        reference,
+        JSON.stringify({
+          ...preparedRegistration,
+          password_hash: passwordHash
+        }),
+        verificationMeta ? JSON.stringify(verificationMeta) : null
+      ]
+    );
+
+    const paystackResponse = await axios.post(
+      `${PAYSTACK_BASE_URL}/transaction/initialize`,
+      {
+        email: preparedRegistration.email,
+        amount: registrationPaymentConfig.amount * 100,
+        reference,
+        callback_url: `${FRONTEND_URL}/register`,
+        metadata: {
+          payment_type: 'registration_fee',
+          user_type: preparedRegistration.user_type,
+          email: preparedRegistration.email,
+          phone: preparedRegistration.phone
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment initialized`,
+      data: {
+        amount: registrationPaymentConfig.amount,
+        reference,
+        authorization_url: paystackResponse.data.data.authorization_url,
+        access_code: paystackResponse.data.data.access_code
+      }
+    });
+  } catch (error) {
+    console.error('Registration payment initialization error:', error);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to initialize registration payment'
+    });
+  }
+};
+
+exports.completeRegistrationAfterPayment = async (req, res) => {
+  try {
+    await ensureTenantRegistrationPaymentSchema();
+
+    const { reference } = req.params;
+
+    if (!reference) {
+      return res.status(400).json({
+        success: false,
+        message: 'Registration payment reference is required'
+      });
+    }
+
+    const paymentResult = await db.query(
+      `SELECT *
+       FROM tenant_registration_payments
+       WHERE transaction_reference = $1
+       LIMIT 1`,
+      [reference]
+    );
+
+    if (!paymentResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Registration payment not found'
+      });
+    }
+
+    const tenantRegistrationPayment = paymentResult.rows[0];
+
+    if (tenantRegistrationPayment.registered_user_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'This registration payment has already been used'
+      });
+    }
+
+    if (tenantRegistrationPayment.payment_status !== 'completed') {
+      if (!PAYSTACK_SECRET_KEY) {
+        return res.status(500).json({
+          success: false,
+          message: 'Payment service is not configured'
+        });
+      }
+
+      const paystackResponse = await axios.get(
+        `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`
+          }
+        }
+      );
+
+      const transaction = paystackResponse.data.data;
+
+      if (transaction.status !== 'success') {
+        return res.status(402).json({
+          success: false,
+        message: 'Registration payment is not completed yet'
+      });
+    }
+
+      const amountPaid = Number(transaction.amount || 0) / 100;
+      const requiredAmount = Number(tenantRegistrationPayment.amount || 0);
+
+      if (amountPaid < requiredAmount) {
+        return res.status(402).json({
+          success: false,
+          message: 'Registration payment amount is insufficient'
+        });
+      }
+
+      await db.query(
+        `UPDATE tenant_registration_payments
+         SET payment_status = 'completed',
+             completed_at = CURRENT_TIMESTAMP,
+             gateway_response = $1
+         WHERE transaction_reference = $2`,
+        [JSON.stringify(transaction), reference]
+      );
+
+      tenantRegistrationPayment.payment_status = 'completed';
+      tenantRegistrationPayment.completed_at = new Date();
+      tenantRegistrationPayment.gateway_response = transaction;
+    }
+
+    const storedPayload = tenantRegistrationPayment.registration_payload || {};
+    const verificationMeta = tenantRegistrationPayment.verification_meta || null;
+    const preparedRegistration = {
+      email: storedPayload.email,
+      phone: storedPayload.phone,
+      full_name: storedPayload.full_name,
+      cleanLawyerEmail: storedPayload.cleanLawyerEmail || '',
+      user_type:
+        tenantRegistrationPayment.user_type ||
+        storedPayload.user_type,
+      cleanNIN: storedPayload.cleanNIN || null,
+      ninVerified: storedPayload.ninVerified === true,
+      identityType: storedPayload.identityType || null,
+      cleanPassportNumber: storedPayload.cleanPassportNumber || null,
+      cleanNationality: storedPayload.cleanNationality || 'Nigeria'
+    };
+
+    const data = await createUserFromPreparedRegistration({
+      preparedRegistration,
+      passwordHash: storedPayload.password_hash,
+      verificationMeta,
+      tenantRegistrationPayment
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Registration completed successfully',
+      data
+    });
+  } catch (error) {
+    console.error('Registration completion error:', error);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to complete registration'
     });
   }
 };
@@ -549,6 +1005,8 @@ exports.getRegistrationFlags = async (req, res) => {
         allow_registration: flags.allow_registration !== false,
         nin_number: flags.nin_number !== false,
         passport_number: flags.passport_number !== false,
+        tenant_registration_payment: flags.tenant_registration_payment === true,
+        landlord_registration_payment: flags.landlord_registration_payment === true,
       },
     });
   } catch (error) {
@@ -559,6 +1017,12 @@ exports.getRegistrationFlags = async (req, res) => {
     });
   }
 };
+
+exports.initializeTenantRegistrationPayment =
+  exports.initializeRegistrationPayment;
+
+exports.completeTenantRegistration =
+  exports.completeRegistrationAfterPayment;
 
 exports.acceptLawyerInvite = async (req, res) => {
   try {

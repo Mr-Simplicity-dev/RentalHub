@@ -8,6 +8,7 @@ const PAYMENT_TYPE_LABELS = {
   property_unlock: 'Property Unlock',
   landlord_listing: 'Listing Payment',
   rent_payment: 'Rent Payment',
+  general_platform_fee: 'General Platform Payment',
 };
 
 const PAYMENT_STATUS_STYLES = {

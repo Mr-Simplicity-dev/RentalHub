@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../services/api";
@@ -105,61 +105,61 @@ export default function SuperAdminDashboard() {
     target_role: "",
   });
 
-  const guardedLoad = async (fn, msg) => {
-    try {
-      setLoading(true);
-      await fn();
-    } catch (e) {
-      console.error(e);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const guardedLoad = useCallback(async (fn, msg) => {
+        try {
+          setLoading(true);
+          await fn();
+        } catch (e) {
+          console.error(e);
+          toast.error(msg);
+        } finally {
+          setLoading(false);
+        }
+      }, [setLoading]);
 
-  const loadUsers = async () => {
+    const loadUsers = useCallback(async () => {
     const res = await api.get("/super/users");
     setUsers(res.data.users || []);
     setUsersPage(1);
     setSelectedUsers([]);
-  };
+  }, []);
 
-  const loadProperties = async () => {
+  const loadProperties = useCallback(async () => {
     const res = await api.get("/super/properties");
     setProperties(res.data.properties || []);
     setPropertiesPage(1);
     setSelectedProps([]);
-  };
+  }, []);
 
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     const res = await api.get("/super/logs");
     setLogs(res.data.logs || []);
     setLogsPage(1);
-  };
+  }, []);
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     const res = await api.get("/super/analytics");
     setAnalytics(res.data.data);
-  };
+  }, []);
 
-  const loadReports = async () => {
+  const loadReports = useCallback(async () => {
     const res = await api.get("/super/reports");
     setReports(res.data.reports || []);
     setReportsPage(1);
-  };
+  }, []);
 
-  const loadFraud = async () => {
+  const loadFraud = useCallback(async () => {
     const res = await api.get("/super/fraud");
     setFraud(res.data.flags || []);
     setFraudPage(1);
-  };
+  }, []);
 
-  const loadFlags = async () => {
+  const loadFlags = useCallback(async () => {
     const res = await api.get("/super/flags");
     setFlags(res.data.flags || []);
-  };
+  }, []);
 
-  const loadVerifications = async (page = verificationPage) => {
+  const loadVerifications = useCallback(async (page = verificationPage) => {
     const requestedPage = Math.max(page, 1);
 
     const res = await api.get("/super/verifications", {
@@ -182,23 +182,30 @@ export default function SuperAdminDashboard() {
     setVerifications(records);
     setVerificationPage(pagination.page || requestedPage);
     setVerificationPagination(pagination);
-  };
-
-  const loadAdminPerformance = async () => {
-    const res = await api.get("/super/admins/performance");
-    setAdminPerformance(res.data.data || []);
-  };
-
-  const applyVerificationFilters = () =>
-    guardedLoad(async () => {
-      setVerificationPage(1);
-      await Promise.all([
-        loadVerifications(1),
-        loadAdminPerformance(),
-      ]);
-    }, "Failed loading verifications");
-
-  const handleVerificationPageChange = (page) =>
+  }, [
+    verificationPage,
+    verificationSearch,
+    verificationStatus,
+    verificationUserType
+  ]);
+  const loadAdminPerformance = useCallback(async () => {
+  const res = await api.get("/super/admins/performance");
+  setAdminPerformance(res.data.data || []);
+}, []);
+  const applyVerificationFilters = useCallback(() =>
+  guardedLoad(async () => {
+    setVerificationPage(1);
+    await Promise.all([
+      loadVerifications(1),
+      loadAdminPerformance(),
+    ]);
+  }, "Failed loading verifications"),
+[
+  guardedLoad,
+  loadVerifications,
+  loadAdminPerformance
+]);
+    const handleVerificationPageChange = (page) =>
     guardedLoad(
       async () => {
         await loadVerifications(page);
@@ -206,24 +213,36 @@ export default function SuperAdminDashboard() {
       "Failed loading verifications"
     );
 
-  const loadBroadcasts = async () => {
-    const res = await api.get("/super/broadcasts");
-    setBroadcasts(res.data.broadcasts || []);
-  };
+  const loadBroadcasts = useCallback(async () => {
+  const res = await api.get("/super/broadcasts");
+  setBroadcasts(res.data.broadcasts || []);
+}, []);
 
-  const loadTab = (name) => {
-    setTab(name);
+  const loadTab = useCallback((name) => {
+  setTab(name);
 
-    if (name === "users") guardedLoad(loadUsers,"Failed loading users");
-    if (name === "properties") guardedLoad(loadProperties,"Failed loading properties");
-    if (name === "logs") guardedLoad(loadLogs,"Failed loading logs");
-    if (name === "analytics") guardedLoad(loadAnalytics,"Failed loading analytics");
-    if (name === "reports") guardedLoad(loadReports,"Failed loading reports");
-    if (name === "fraud") guardedLoad(loadFraud,"Failed loading fraud");
-    if (name === "flags") guardedLoad(loadFlags,"Failed loading flags");
-    if (name === "verifications") applyVerificationFilters();
-    if (name === "broadcast") guardedLoad(loadBroadcasts,"Failed loading broadcasts");
-  };
+  if (name === "users") guardedLoad(loadUsers, "Failed loading users");
+  if (name === "properties") guardedLoad(loadProperties, "Failed loading properties");
+  if (name === "logs") guardedLoad(loadLogs, "Failed loading logs");
+  if (name === "analytics") guardedLoad(loadAnalytics, "Failed loading analytics");
+  if (name === "reports") guardedLoad(loadReports, "Failed loading reports");
+  if (name === "fraud") guardedLoad(loadFraud, "Failed loading fraud");
+  if (name === "flags") guardedLoad(loadFlags, "Failed loading flags");
+  if (name === "verifications") applyVerificationFilters();
+  if (name === "broadcast") guardedLoad(loadBroadcasts, "Failed loading broadcasts");
+
+}, [
+  guardedLoad,
+  loadUsers,
+  loadProperties,
+  loadLogs,
+  loadAnalytics,
+  loadReports,
+  loadFraud,
+  loadFlags,
+  applyVerificationFilters,
+  loadBroadcasts
+]);
 
   const verifyIdentity = async (id) => {
     await api.patch(`/super/verifications/${id}/approve`);
@@ -344,20 +363,22 @@ export default function SuperAdminDashboard() {
     loadFlags();
   };
 
-  useEffect(() => {
+ useEffect(() => {
+  if (!user) {
+    navigate("/login");
+    return;
+  }
 
-    if (!user) navigate("/login");
+  if (user.user_type !== "super_admin") {
+    navigate("/dashboard");
+  }
+}, [user, navigate]);
 
-    if (user?.user_type !== "super_admin")
-      navigate("/dashboard");
-
-  }, [user, navigate]);
-
-  useEffect(() => {
-    if (user?.user_type === "super_admin") {
-      loadTab("users");
-    }
-  }, [user, loadTab]);
+useEffect(() => {
+  if (user?.user_type === "super_admin") {
+    loadTab("users");
+  }
+}, [user, loadTab]);
 
   const usersTotalPages = getTotalPages(users.length, PAGE_LIMITS.users);
   const pagedUsers = getPageSlice(users, usersPage, PAGE_LIMITS.users);
