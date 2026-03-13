@@ -4,6 +4,8 @@ const db = require("../config/middleware/database");
 const { authenticate, isTenant, isLandlord } = require("../config/middleware/auth");
 
 let tenantDashboardSchemaReady = false;
+let lawyerInviteDashboardSchemaReady = false;
+
 const ensureTenantDashboardSchema = async () => {
   if (tenantDashboardSchemaReady) return;
 
@@ -23,6 +25,32 @@ const ensureTenantDashboardSchema = async () => {
   tenantDashboardSchemaReady = true;
 };
 
+const ensureLawyerInviteDashboardSchema = async () => {
+  if (lawyerInviteDashboardSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS lawyer_invites (
+      id SERIAL PRIMARY KEY,
+      client_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      lawyer_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      lawyer_email VARCHAR(255) NOT NULL,
+      token_hash VARCHAR(64) NOT NULL UNIQUE,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      expires_at TIMESTAMP NOT NULL,
+      accepted_at TIMESTAMP,
+      last_sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      resent_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_lawyer_invites_client
+      ON lawyer_invites(client_user_id);
+  `);
+
+  lawyerInviteDashboardSchemaReady = true;
+};
+
 // =====================================================
 //                 TENANT DASHBOARD STATS
 // =====================================================
@@ -30,6 +58,7 @@ const ensureTenantDashboardSchema = async () => {
 router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
   try {
     await ensureTenantDashboardSchema();
+    await ensureLawyerInviteDashboardSchema();
     const userId = req.user.id;
 
     const stats = await db.query(
@@ -45,7 +74,40 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
         (SELECT COUNT(*) FROM applications WHERE tenant_id = $1) AS total_applications,
         (SELECT COUNT(*) FROM tenant_property_unlocks WHERE tenant_id = $1) AS unlocked_properties_count,
         (SELECT COUNT(*) FROM messages WHERE receiver_id = $1 AND is_read = FALSE) AS unread_messages,
-        (SELECT subscription_expires_at FROM users WHERE id = $1) AS subscription_expires_at`,
+        (SELECT subscription_expires_at FROM users WHERE id = $1) AS subscription_expires_at,
+        (
+          SELECT lawyer_email
+          FROM lawyer_invites
+          WHERE client_user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) AS lawyer_email,
+        COALESCE((
+          SELECT CASE
+            WHEN li.status = 'accepted' THEN 'accepted'
+            WHEN li.status = 'pending' AND li.expires_at < NOW() THEN 'not_accepted'
+            WHEN li.status = 'pending' THEN 'pending'
+            ELSE li.status
+          END
+          FROM lawyer_invites li
+          WHERE li.client_user_id = $1
+          ORDER BY li.created_at DESC
+          LIMIT 1
+        ), 'not_sent') AS lawyer_invite_status,
+        (
+          SELECT accepted_at
+          FROM lawyer_invites
+          WHERE client_user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) AS lawyer_invite_accepted_at,
+        (
+          SELECT expires_at
+          FROM lawyer_invites
+          WHERE client_user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) AS lawyer_invite_expires_at`,
       [userId]
     );
 
@@ -64,6 +126,7 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
 
 router.get("/landlord/stats", authenticate, isLandlord, async (req, res) => {
   try {
+    await ensureLawyerInviteDashboardSchema();
     const userId = req.user.id;
 
     const stats = await db.query(
@@ -76,7 +139,40 @@ router.get("/landlord/stats", authenticate, isLandlord, async (req, res) => {
         (SELECT COUNT(*) FROM messages WHERE receiver_id = $1 AND is_read = FALSE) AS unread_messages,
         (SELECT SUM(amount) FROM payments WHERE user_id = $1 AND payment_type = 'landlord_listing' AND payment_status = 'completed') AS total_spent,
         (SELECT COUNT(*) FROM reviews r JOIN properties p ON r.property_id = p.id WHERE p.landlord_id = $1) AS total_reviews,
-        (SELECT AVG(r.rating) FROM reviews r JOIN properties p ON r.property_id = p.id WHERE p.landlord_id = $1) AS avg_rating`,
+        (SELECT AVG(r.rating) FROM reviews r JOIN properties p ON r.property_id = p.id WHERE p.landlord_id = $1) AS avg_rating,
+        (
+          SELECT lawyer_email
+          FROM lawyer_invites
+          WHERE client_user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) AS lawyer_email,
+        COALESCE((
+          SELECT CASE
+            WHEN li.status = 'accepted' THEN 'accepted'
+            WHEN li.status = 'pending' AND li.expires_at < NOW() THEN 'not_accepted'
+            WHEN li.status = 'pending' THEN 'pending'
+            ELSE li.status
+          END
+          FROM lawyer_invites li
+          WHERE li.client_user_id = $1
+          ORDER BY li.created_at DESC
+          LIMIT 1
+        ), 'not_sent') AS lawyer_invite_status,
+        (
+          SELECT accepted_at
+          FROM lawyer_invites
+          WHERE client_user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) AS lawyer_invite_accepted_at,
+        (
+          SELECT expires_at
+          FROM lawyer_invites
+          WHERE client_user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) AS lawyer_invite_expires_at`,
       [userId]
     );
 

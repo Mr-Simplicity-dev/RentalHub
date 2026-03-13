@@ -11,14 +11,11 @@ const defaultCenter = {
   lng: 8.6753,
 };
 
-const libraries = ['places'];
-
 const MapPicker = ({ value, onChange }) => {
   const mapRef = useRef(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY,
-    libraries,
   });
 
   const onMapLoad = useCallback((map) => {

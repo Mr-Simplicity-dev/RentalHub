@@ -42,7 +42,18 @@ const LawyerInvitesManager = ({
   const resendInvite = async (inviteId) => {
     try {
       const res = await api.patch(`/auth/lawyer-invites/${inviteId}/resend`);
-      toast.success(res.data?.message || "Invite resent successfully");
+      const emailSent = res.data?.data?.email_sent !== false;
+      const errorMessage = res.data?.data?.email_error;
+      const message = errorMessage
+        ? `${res.data?.message || "Invite resend failed"}: ${errorMessage}`
+        : res.data?.message || "Invite resent successfully";
+
+      if (emailSent) {
+        toast.success(message);
+      } else {
+        toast.error(message);
+      }
+
       loadInvites(search.trim());
     } catch (error) {
       console.error("Failed to resend invite:", error);
@@ -62,7 +73,18 @@ const LawyerInvitesManager = ({
       const res = await api.patch(`/auth/lawyer-invites/${invite.id}/email`, {
         lawyer_email: nextEmail.trim(),
       });
-      toast.success(res.data?.message || "Lawyer email updated");
+      const emailSent = res.data?.data?.email_sent !== false;
+      const errorMessage = res.data?.data?.email_error;
+      const message = errorMessage
+        ? `${res.data?.message || "Lawyer email update failed"}: ${errorMessage}`
+        : res.data?.message || "Lawyer email updated";
+
+      if (emailSent) {
+        toast.success(message);
+      } else {
+        toast.error(message);
+      }
+
       loadInvites(search.trim());
     } catch (error) {
       console.error("Failed to update lawyer email:", error);

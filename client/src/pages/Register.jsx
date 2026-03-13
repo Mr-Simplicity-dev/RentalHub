@@ -124,7 +124,7 @@ const Register = () => {
   useEffect(() => {
     let active = true;
 
-    const completeTenantRegistration = async () => {
+    const completeRegistration = async () => {
       if (!registrationReference) return;
 
       setLoading(true);
@@ -156,7 +156,7 @@ const Register = () => {
         const serverError = error.response?.data;
         toast.error(
           serverError?.message ||
-          'Failed to complete tenant registration after payment'
+          'Failed to complete registration after payment'
         );
       } finally {
         if (active) {
@@ -165,7 +165,7 @@ const Register = () => {
       }
     };
 
-    completeTenantRegistration();
+    completeRegistration();
 
     return () => {
       active = false;
@@ -236,13 +236,13 @@ const Register = () => {
   setLoading(true);
 
   try {
-    // 🔹 Build cleaned payload
+    // Build cleaned payload
     const registrationData = buildRegistrationData();
 
-    // 🔹 Tenant registration requires payment
-    if (registrationData.user_type === "tenant") {
+    // Payment-required roles must complete payment before account creation
+    if (requiresRegistrationPayment) {
       const paymentResponse = await api.post(
-        "/auth/register/tenant-payment",
+        "/auth/register/payment",
         registrationData
       );
 
@@ -256,12 +256,12 @@ const Register = () => {
 
       toast.error(
         paymentResponse.data?.message ||
-        "Failed to initialize tenant registration payment"
+        "Failed to initialize registration payment"
       );
       return;
     }
 
-    // 🔹 Other users register normally
+    // Roles without registration payment create the account immediately
     const response = await register(registrationData);
 
     if (response.success) {
@@ -590,8 +590,8 @@ const Register = () => {
     }
     className="w-full btn btn-primary py-3 text-lg"
   >
-    {loading
-      ? "Creating account..."
+      {loading
+      ? (requiresRegistrationPayment ? "Processing..." : "Creating account...")
       : requiresRegistrationPayment
       ? `Proceed to N${(paymentAmountByRole?.[formData.user_type] || 0).toLocaleString()} Payment`
       : "Create Account"}

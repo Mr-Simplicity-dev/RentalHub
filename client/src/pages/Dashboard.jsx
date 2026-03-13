@@ -113,6 +113,65 @@ const Dashboard = () => {
     return `${daysLeft}d left`;
   };
 
+  const getLawyerInviteSummary = () => {
+    const status = stats?.lawyer_invite_status || 'not_sent';
+    const lawyerEmail = stats?.lawyer_email;
+    const acceptedAt = stats?.lawyer_invite_accepted_at
+      ? new Date(stats.lawyer_invite_accepted_at)
+      : null;
+    const expiresAt = stats?.lawyer_invite_expires_at
+      ? new Date(stats.lawyer_invite_expires_at)
+      : null;
+
+    if (status === 'accepted') {
+      return {
+        containerClass: 'bg-green-50 border-green-200',
+        icon: <FaCheckCircle className="text-green-600 text-2xl mb-3" />,
+        titleClass: 'text-green-800',
+        textClass: 'text-green-700',
+        title: 'Lawyer invitation accepted',
+        description: lawyerEmail
+          ? `${lawyerEmail} accepted the invitation${acceptedAt && !Number.isNaN(acceptedAt.getTime()) ? ` on ${acceptedAt.toLocaleDateString()}` : ''}.`
+          : 'Your lawyer has accepted the invitation.',
+      };
+    }
+
+    if (status === 'pending') {
+      return {
+        containerClass: 'bg-amber-50 border-amber-200',
+        icon: <FaClock className="text-amber-600 text-2xl mb-3" />,
+        titleClass: 'text-amber-800',
+        textClass: 'text-amber-700',
+        title: 'Lawyer invitation pending',
+        description: lawyerEmail
+          ? `${lawyerEmail} has not accepted the invitation yet${expiresAt && !Number.isNaN(expiresAt.getTime()) ? `. It expires on ${expiresAt.toLocaleDateString()}` : '.'}`
+          : 'The invited lawyer has not accepted the invitation yet.',
+      };
+    }
+
+    if (status === 'not_accepted') {
+      return {
+        containerClass: 'bg-red-50 border-red-200',
+        icon: <FaClock className="text-red-600 text-2xl mb-3" />,
+        titleClass: 'text-red-800',
+        textClass: 'text-red-700',
+        title: 'Lawyer invitation not accepted',
+        description: lawyerEmail
+          ? `${lawyerEmail} did not accept the invitation before it expired.`
+          : 'The lawyer invitation expired without being accepted.',
+      };
+    }
+
+    return {
+      containerClass: 'bg-gray-50 border-gray-200',
+      icon: <FaFileAlt className="text-gray-600 text-2xl mb-3" />,
+      titleClass: 'text-gray-800',
+      textClass: 'text-gray-700',
+      title: 'Lawyer invitation unavailable',
+      description: 'No lawyer invitation record is available for this account yet.',
+    };
+  };
+
   if (!user) {
     return <Loader fullScreen />;
   }
@@ -120,6 +179,8 @@ const Dashboard = () => {
   if (loading) {
     return <Loader fullScreen />;
   }
+
+  const lawyerInviteSummary = getLawyerInviteSummary();
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -189,6 +250,25 @@ const Dashboard = () => {
 
                   </div>
                 )}
+
+                <div className={`${lawyerInviteSummary.containerClass} border rounded-lg p-6 mb-6 text-center`}>
+
+                  <div className="flex flex-col items-center">
+
+                    {lawyerInviteSummary.icon}
+
+                    <h3 className={`font-semibold ${lawyerInviteSummary.titleClass}`}>
+                      {lawyerInviteSummary.title}
+                    </h3>
+
+                    <p className={`text-sm mt-2 ${lawyerInviteSummary.textClass}`}>
+                      {lawyerInviteSummary.description}
+                    </p>
+
+                  </div>
+
+                </div>
+
                         {/* Tenant Unlock Alert */}
         {user?.user_type === 'tenant' && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">

@@ -679,6 +679,47 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
+// PATCH /api/admin/users/:id/verify
+exports.verifyUser = async (req, res) => {
+  try {
+    await ensureVerificationAuditSchema();
+
+    const { id } = req.params;
+    const adminId = req.user.id;
+
+    const result = await db.query(
+      `UPDATE users
+       SET identity_verified = TRUE,
+           identity_verified_by = $2,
+           identity_verified_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1
+         AND deleted_at IS NULL
+         AND user_type IN ('tenant', 'landlord')
+       RETURNING id`,
+      [id, adminId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found or not eligible for manual verification',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'User verified successfully',
+    });
+  } catch (err) {
+    console.error('Manual verify user error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify user',
+    });
+  }
+};
+
 
 // GET /api/admin/users/:id
 exports.getUserById = async (req, res) => {

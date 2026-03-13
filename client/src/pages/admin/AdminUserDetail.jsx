@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
+import { toast } from 'react-toastify';
 
 const AdminUserDetail = () => {
   const { id } = useParams();
@@ -34,10 +35,12 @@ const AdminUserDetail = () => {
 
     setWorking(true);
     try {
-      await api.delete(`/admin/users/${id}`);
+      const res = await api.delete(`/admin/users/${id}`);
+      toast.success(res.data?.message || 'User disabled successfully');
       navigate('/admin/users');
     } catch (err) {
       console.error('Failed to disable user:', err);
+      toast.error(err.response?.data?.message || 'Failed to disable user');
     } finally {
       setWorking(false);
     }
@@ -48,10 +51,12 @@ const AdminUserDetail = () => {
 
     setWorking(true);
     try {
-      await api.post(`/admin/verifications/${id}/approve`);
-      loadUser();
+      const res = await api.patch(`/admin/users/${id}/verify`);
+      toast.success(res.data?.message || 'User verified successfully');
+      await loadUser();
     } catch (err) {
       console.error('Verification failed:', err);
+      toast.error(err.response?.data?.message || 'Verification failed');
     } finally {
       setWorking(false);
     }

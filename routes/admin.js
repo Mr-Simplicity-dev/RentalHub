@@ -25,9 +25,10 @@ router.get('/stats', requireAdminOrSuperAdmin, adminController.getStats);
  * =========================
  * USERS
  * =========================
- */
+  */
 router.get('/users', requireAdminOrSuperAdmin, adminController.getAllUsers);
 router.get('/users/:id', requireAdminOrSuperAdmin, adminController.getUserById);
+router.patch('/users/:id/verify', requireAdminOrSuperAdmin, adminController.verifyUser);
 router.delete('/users/:id', requireAdminOrSuperAdmin, adminController.deleteUser);
 
 /**

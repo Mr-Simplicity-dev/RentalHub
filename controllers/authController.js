@@ -204,6 +204,7 @@ const createLawyerInvite = async ({ clientUserId, lawyerEmail, clientName, clien
   return {
     ...inviteResult.rows[0],
     email_sent: !!emailResult?.success,
+    email_error: emailResult?.success ? null : emailResult?.error || 'Lawyer invite email failed',
   };
 };
 
@@ -1340,6 +1341,7 @@ exports.resendLawyerInvite = async (req, res) => {
         lawyer_email: invite.lawyer_email,
         expires_at: expiresAt,
         email_sent: !!emailResult?.success,
+        email_error: emailResult?.success ? null : emailResult?.error || 'Invite email delivery failed',
       }
     });
   } catch (error) {
@@ -1438,6 +1440,7 @@ exports.updateLawyerInviteEmail = async (req, res) => {
         lawyer_email: lawyerEmail,
         expires_at: expiresAt,
         email_sent: !!emailResult?.success,
+        email_error: emailResult?.success ? null : emailResult?.error || 'Invite email delivery failed',
       }
     });
   } catch (error) {
