@@ -25,7 +25,7 @@ const allowedPropertyTypes = [
 
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-const DEFAULT_FRONTEND_URL = 'http://localhost:3000';
+const DEFAULT_FRONTEND_URL = 'http://localhost:3000';'http://rentalhub.com.ng/';
 
 const resolveFrontendUrl = (req) => {
   const configuredFrontendUrl = process.env.FRONTEND_URL;

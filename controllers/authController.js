@@ -34,7 +34,7 @@ const LANDLORD_REGISTRATION_FEE_NGN = 5000;
 const FRONTEND_URL =
   process.env.FRONTEND_URL && process.env.FRONTEND_URL !== '...'
     ? process.env.FRONTEND_URL
-    : 'http://localhost:3000';
+    : 'http://localhost:3000';'http://rentalhub.com.ng';
 
 const hashInviteToken = (token) =>
   crypto.createHash('sha256').update(String(token)).digest('hex');

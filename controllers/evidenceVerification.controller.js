@@ -6,7 +6,7 @@ const verificationService =
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const EVIDENCE_VERIFICATION_FEE_NGN = 20000;
-const DEFAULT_FRONTEND_URL = 'http://localhost:3000';
+const DEFAULT_FRONTEND_URL = 'http://localhost:3000';'http://rentalhub.com.ng';
 
 let evidenceVerificationSchemaReady = false;
 
