@@ -3,11 +3,13 @@ const axios = require("axios");
 const crypto = require("crypto");
 const db = require('../config/middleware/database');
 const { validationResult } = require("express-validator");
+const { getFrontendUrl } = require('../config/utils/frontendUrl');
 
 // ====================== PAYSTACK CONFIG ======================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
 const PROPERTY_UNLOCK_PRICE_NGN = Number(process.env.PROPERTY_UNLOCK_PRICE_NGN || 1000);
+const FRONTEND_URL = getFrontendUrl();
 
 let propertyUnlockSchemaReady = false;
 
@@ -195,7 +197,7 @@ exports.initializeSubscription = async (req, res) => {
           email: user.email,
           amount: plan.price * 100,
           reference: `SUB_${paymentId}_${Date.now()}`,
-          callback_url: `${process.env.FRONTEND_URL}/payment/verify-subscription`,
+          callback_url: `${FRONTEND_URL}/payment/verify-subscription`,
           metadata: {
             payment_id: paymentId,
             user_id: userId,
@@ -455,7 +457,7 @@ exports.initializePropertyUnlock = async (req, res) => {
           email: user.email,
           amount: PROPERTY_UNLOCK_PRICE_NGN * 100,
           reference: `UNLOCK_${paymentId}_${Date.now()}`,
-          callback_url: `${process.env.FRONTEND_URL}/properties/${property_id}`,
+          callback_url: `${FRONTEND_URL}/properties/${property_id}`,
           metadata: {
             payment_id: paymentId,
             user_id: userId,
@@ -694,7 +696,7 @@ exports.initializeListingPayment = async (req, res) => {
           email: user.email,
           amount: plan.price * 100,
           reference: `LIST_${paymentId}_${Date.now()}`,
-          callback_url: `${process.env.FRONTEND_URL}/payment/verify-listing`,
+          callback_url: `${FRONTEND_URL}/payment/verify-listing`,
           metadata: {
             payment_id: paymentId,
             user_id: userId,
@@ -918,7 +920,7 @@ exports.initializeRentPayment = async (req, res) => {
           email: user.email,
           amount: amount * 100,
           reference: `RENT_${paymentId}_${Date.now()}`,
-          callback_url: `${process.env.FRONTEND_URL}/payment/verify-rent`,
+          callback_url: `${FRONTEND_URL}/payment/verify-rent`,
           metadata: {
             payment_id: paymentId,
             user_id: userId,

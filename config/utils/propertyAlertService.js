@@ -1,9 +1,11 @@
 const db = require('../middleware/database');
 const { sendEmail } = require('./mailer');
+const { getFrontendUrl } = require('./frontendUrl');
 const { sendWhatsAppText } = require('./whatsappService');
 
 let schemaReady = false;
 const ALERT_REQUEST_FEE_NGN = 5000;
+const FRONTEND_URL = getFrontendUrl();
 
 const ensureAlertSchema = async () => {
   if (schemaReady) return;
@@ -276,7 +278,7 @@ const buildMessage = (property, alert) => {
     `Title: ${property.title}`,
     `Location: ${property.area || ''}, ${property.city || ''}`,
     `Rent: NGN ${property.rent_amount}`,
-    `${process.env.FRONTEND_URL || ''}/properties/${property.id}`,
+    `${FRONTEND_URL}/properties/${property.id}`,
   ];
   return lines.filter(Boolean).join('\n');
 };
@@ -301,7 +303,7 @@ exports.notifyAlertsForProperty = async (property) => {
             <p><strong>${property.title}</strong></p>
             <p>Location: ${property.area || ''}, ${property.city || ''}</p>
             <p>Rent: NGN ${property.rent_amount}</p>
-            <p><a href="${process.env.FRONTEND_URL || ''}/properties/${property.id}">View Property</a></p>
+            <p><a href="${FRONTEND_URL}/properties/${property.id}">View Property</a></p>
           `,
         });
       } catch (error) {

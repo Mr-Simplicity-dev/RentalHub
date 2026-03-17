@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const db = require('../config/middleware/database');
 const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
+const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const {
   validateNIN,
   verifyNINWithNIMC,
@@ -31,10 +32,7 @@ const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const TENANT_REGISTRATION_FEE_NGN = 2500;
 const LANDLORD_REGISTRATION_FEE_NGN = 5000;
-const FRONTEND_URL =
-  process.env.FRONTEND_URL && process.env.FRONTEND_URL !== '...'
-    ? process.env.FRONTEND_URL
-    : 'http://localhost:3000';'http://rentalhub.com.ng';
+const FRONTEND_URL = getFrontendUrl();
 
 const hashInviteToken = (token) =>
   crypto.createHash('sha256').update(String(token)).digest('hex');

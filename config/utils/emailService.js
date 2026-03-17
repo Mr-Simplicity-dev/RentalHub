@@ -1,8 +1,7 @@
 const { sendEmail } = require('./mailer');
-const FRONTEND_URL =
-  process.env.FRONTEND_URL && process.env.FRONTEND_URL !== '...'
-    ? process.env.FRONTEND_URL
-    : 'http://localhost:3000';'http://rentalhub.com.ng';
+const { getFrontendUrl } = require('./frontendUrl');
+
+const FRONTEND_URL = getFrontendUrl();
 
 // Send verification email
 exports.sendVerificationEmail = async (email, verificationToken) => {

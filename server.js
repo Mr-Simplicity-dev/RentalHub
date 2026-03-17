@@ -33,6 +33,7 @@ const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 
 const audit = require('./config/middleware/auditMiddleware');
 const { enforceFlags } = require('./config/middleware/featureFlags');
+const { getAllowedFrontendOrigins } = require('./config/utils/frontendUrl');
 const startScheduler = require('./config/utils/scheduler');
 
 dotenv.config();
@@ -47,6 +48,7 @@ const authRateLimitWindowMs =
   Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
 const authRateLimitMax =
   Number(process.env.AUTH_RATE_LIMIT_MAX) || (isProduction ? 30 : 200);
+const allowedOrigins = new Set(getAllowedFrontendOrigins());
 
 // Trust proxy (Render, Nginx etc)
 app.set('trust proxy', 1);
@@ -58,7 +60,13 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000', 'http://rentalhub.com.ng',
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.has(origin.replace(/\/+$/, ''))) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   })
 );
@@ -219,7 +227,8 @@ const server = app.listen(PORT, () => {
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: Array.from(allowedOrigins),
+    credentials: true,
   },
 });
 

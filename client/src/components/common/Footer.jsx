@@ -77,7 +77,7 @@ const Footer = () => {
               {t('footer.contact')}
             </h3>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li>{t('footer.email')}: support@rentalhub.com.ng</li>
+              <li>{t('footer.email')}: support@renatalhub.com.ng</li>
               <li>{t('footer.phone')}: +234 706 701 2884</li>
               <li className="flex space-x-4 mt-4">
               <a
