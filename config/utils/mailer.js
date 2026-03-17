@@ -1,6 +1,7 @@
 const { Resend } = require('resend');
 
 const FROM = process.env.EMAIL_FROM || 'Rental Platform <onboarding@resend.dev>';
+const REPLY_TO = process.env.EMAIL_REPLY_TO || undefined;
 const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 12000);
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -63,6 +64,7 @@ exports.sendEmail = async ({ to, subject, html }) => {
     to,
     subject,
     html,
+    ...(REPLY_TO ? { replyTo: REPLY_TO } : {}),
   });
 
   if (!result) {
