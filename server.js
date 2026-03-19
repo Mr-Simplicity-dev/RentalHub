@@ -46,15 +46,23 @@ const locations = require("./data/nigeriaLocations");
 const slugify = require("./utils/slugify");
 const { pingGoogle } = require("./utils/pingGoogle");
 const { generateAIContent } = require("./utils/aiContentGenerator");
-const { generateTitles } = require("./utils/pageGenerator");
-const { generateKeywords } = require("./utils/keywordGenerator");
-const { saveRanking } = require("./utils/rankChecker");
+const { generateTitles } = require("./config/utils/pageGenerator");
+const { generateKeywords } = require("./config/utils/keywordGenerator");
+const { saveRanking } = require("./config/utils/rankChecker");
 const { generateBacklinks } = require("./utils/backlinkEngine");
 const adminSeoRoutes = require("./routes/adminSeoRoutes");
-const { checkRanking } = require("./utils/serpTracker");
+const { checkRanking } = require("./config/utils/serpTracker");
 
-const results = await checkRanking("houses for rent in ikeja");
-console.log(results);
+async function runInitialSeoCheck() {
+  try {
+    const results = await checkRanking("houses for rent in ikeja");
+    console.log("✅ Initial ranking check results:", results);
+  } catch (err) {
+    console.error("❌ Initial ranking check failed:", err.message);
+  }
+}
+
+runInitialSeoCheck();
 
 // ✅ Ensure DB is connected before cron runs
 mongoose.connection.on("connected", () => {
@@ -82,22 +90,11 @@ for (let i = 0; i < postsPerDay; i++) {
 
     const location = `${lga}, ${state.displayName}`;
 
-    // 🔥 MUCH MORE VARIATIONS (IMPORTANT FOR SCALE)
-    const variations = [
-      `Best Houses for Rent in ${location}`,
-      `Cheap Apartments in ${location}`,
-      `Cost of Renting in ${location}`,
-      `Affordable Homes in ${location}`,
-      `Where to Live in ${location}`,
-      `2 Bedroom Flats in ${location}`,
-      `Self Contain in ${location}`,
-      `Luxury Apartments in ${location}`,
-      `Family Houses in ${location}`,
-      `Student Housing in ${location}`
-    ];
+    const titles = generateTitles(location);
+    const keywordsList = generateKeywords(state.displayName, lga);
 
-    const title =
-      variations[Math.floor(Math.random() * variations.length)];
+    // 🔥 MUCH MORE VARIATIONS (IMPORTANT FOR SCALE)
+    const title = titles[Math.floor(Math.random() * titles.length)];
 
     const slug = slugify(title);
 
@@ -147,17 +144,17 @@ Visit: https://rentalhub.com.ng/nigeria/${slugify(
 Start your search today and find the best home in ${location}.
 `;
 
+    const fullContent = `${generateAIContent(location)}\n\n${generateBacklinks(state.displayName, lga)}\n\n${content}`;
+
     await Blog.create({
       title,
       slug,
-      content,
-      keywords: [
-        `rent in ${location}`,
-        `apartments in ${location}`,
-        `houses in ${location}`,
-        `flats in ${location}`
-      ]
+      content: fullContent,
+      keywords: keywordsList
     });
+
+    // track SEO rank for primary keyword
+    await saveRanking(keywordsList[0], `https://rentalhub.com.ng/nigeria/${slug}`);
 
     created++;
     createdPost = true;
