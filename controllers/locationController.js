@@ -28,7 +28,7 @@ exports.getLocationPage = async (req, res) => {
     const content = generateContent(location.displayName, location.lga);
 
    const blog = generateBlog(location.displayName, location.lga);
-    const canonical = `https://rentalhub.com.ng/nigeria/${location.fullSlug}`;
+    const canonical = `https://renatalhub.com.ng/nigeria/${location.fullSlug}`;
 
     // 🔗 INTERNAL LINKS
 

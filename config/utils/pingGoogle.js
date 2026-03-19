@@ -1,7 +1,7 @@
 const axios = require("axios");
 
 exports.pingGoogle = async () => {
-  const sitemapUrl = "https://rentalhub.com.ng/sitemap.xml";
+  const sitemapUrl = "https://renatalhub.com.ng/sitemap.xml";
 
   try {
     await axios.get(

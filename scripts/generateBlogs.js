@@ -6,10 +6,19 @@ const locations = require("../data/nigeriaLocations");
 const slugify = require("../utils/slugify");
 const { pingGoogle } = require("../utils/pingGoogle");
 
+const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+
 // ✅ Better Mongo connection handling
 const connectDB = async () => {
+  if (!mongoUri) {
+    console.error("❌ Missing MONGO_URI or MONGODB_URI in your environment.");
+    process.exit(1);
+  }
+
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10000
+    });
     console.log("✅ MongoDB connected");
   } catch (err) {
     console.error("❌ MongoDB connection error:", err.message);
@@ -93,8 +102,10 @@ Start your search today and find the best properties in ${location}.
   } catch (err) {
     console.error("❌ Blog generation error:", err);
   } finally {
-    await mongoose.connection.close();
-    console.log("🔌 MongoDB connection closed");
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+      console.log("🔌 MongoDB connection closed");
+    }
     process.exit(0);
   }
 })();
