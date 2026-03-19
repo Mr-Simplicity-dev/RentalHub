@@ -8,7 +8,6 @@ import ReactPaginate from 'react-paginate';
 import { useTranslation } from 'react-i18next';
 
 const PAGE_SIZE = 20;
-const ALERT_REQUEST_FEE_LABEL = 'N5,000';
 
 const Properties = () => {
   const [searchParams] = useSearchParams();
@@ -30,8 +29,15 @@ const Properties = () => {
   const [savedPropertyIds, setSavedPropertyIds] = useState([]);
   const [requestLoading, setRequestLoading] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
-  const [states, setStates] = useState([]);
+  const [locationOptions, setLocationOptions] = useState([]);
   const [alertPaymentEnabled, setAlertPaymentEnabled] = useState(false);
+  const [alertPricing, setAlertPricing] = useState({
+    amount: 5000,
+    base_amount: 5000,
+    location_required: false,
+    location_complete: false,
+    rule_scope: 'base',
+  });
   const requestSectionRef = useRef(null);
   const handledAlertRequestRef = useRef('');
   const [requestForm, setRequestForm] = useState({
@@ -40,6 +46,7 @@ const Properties = () => {
     phone: '',
     property_type: '',
     state_id: '',
+    lga_name: '',
     location: '',
     min_price: '',
     max_price: '',
@@ -121,32 +128,61 @@ const Properties = () => {
     }
   }, [t]);
 
-  const loadStates = useCallback(async () => {
+  const loadLocationOptions = useCallback(async () => {
     try {
-      const response = await propertyService.getStates();
+      const response = await propertyService.getLocationOptions();
       if (response?.success && Array.isArray(response.data)) {
-        setStates(response.data);
+        setLocationOptions(response.data);
       } else {
-        setStates([]);
+        setLocationOptions([]);
       }
     } catch {
-      setStates([]);
+      setLocationOptions([]);
     }
   }, []);
 
   const loadAlertRequestConfig = useCallback(async () => {
     try {
-      const response = await propertyService.getPropertyAlertConfig();
+      const response = await propertyService.getPropertyAlertConfig({
+        state_id: requestForm.state_id || undefined,
+        lga_name: requestForm.lga_name || undefined,
+      });
+
       setAlertPaymentEnabled(response?.data?.payment_required === true);
+      setAlertPricing({
+        amount: response?.data?.amount || 5000,
+        base_amount: response?.data?.base_amount || 5000,
+        location_required: response?.data?.location_required === true,
+        location_complete: response?.data?.location_complete === true,
+        rule_scope: response?.data?.rule_scope || 'base',
+      });
     } catch {
       setAlertPaymentEnabled(false);
+      setAlertPricing({
+        amount: 5000,
+        base_amount: 5000,
+        location_required: false,
+        location_complete: false,
+        rule_scope: 'base',
+      });
     }
-  }, []);
+  }, [requestForm.state_id, requestForm.lga_name]);
+
+  const selectedRequestState = locationOptions.find(
+    (item) => String(item.id) === String(requestForm.state_id)
+  );
+  const availableRequestLgas = selectedRequestState?.lgas || [];
+  const alertRequestFeeLabel = `N${Number(
+    alertPricing.amount || 5000
+  ).toLocaleString()}`;
 
   useEffect(() => {
-    loadStates();
+    loadLocationOptions();
+  }, [loadLocationOptions]);
+
+  useEffect(() => {
     loadAlertRequestConfig();
-  }, [loadStates, loadAlertRequestConfig]);
+  }, [loadAlertRequestConfig]);
 
   useEffect(() => {
     // Get initial filters from URL
@@ -167,6 +203,7 @@ const Properties = () => {
       ...prev,
       property_type: initialFilters.property_type || '',
       state_id: initialFilters.state_id || '',
+      lga_name: '',
       location: initialFilters.city || '',
     }));
 
@@ -212,7 +249,11 @@ const Properties = () => {
 
   const handleRequestChange = (e) => {
     const { name, value } = e.target;
-    setRequestForm((prev) => ({ ...prev, [name]: value }));
+    setRequestForm((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'state_id' ? { lga_name: '' } : {}),
+    }));
   };
 
   const clearCompletedAlertRequestParams = useCallback(() => {
@@ -284,6 +325,16 @@ const Properties = () => {
       return;
     }
 
+    if (alertPaymentEnabled && !requestForm.state_id) {
+      toast.error('Select your preferred state to calculate the request fee');
+      return;
+    }
+
+    if (alertPaymentEnabled && !requestForm.lga_name) {
+      toast.error('Select your preferred local government area to calculate the request fee');
+      return;
+    }
+
     setRequestLoading(true);
     try {
       const payload = {
@@ -292,6 +343,7 @@ const Properties = () => {
         phone: requestForm.phone || undefined,
         property_type: requestForm.property_type,
         state_id: requestForm.state_id ? Number(requestForm.state_id) : undefined,
+        lga_name: requestForm.lga_name || undefined,
         city: requestForm.location || undefined,
         min_price: requestForm.min_price || undefined,
         max_price: requestForm.max_price || undefined,
@@ -389,8 +441,13 @@ const Properties = () => {
             </p>
             <p className={`text-sm mb-4 ${alertPaymentEnabled ? 'text-primary-700' : 'text-green-700'}`}>
               {alertPaymentEnabled
-                ? `A one-time ${ALERT_REQUEST_FEE_LABEL} payment is required before the request is processed.`
+                ? `A one-time ${alertRequestFeeLabel} payment is required before the request is processed.`
                 : 'Requests are currently submitted immediately without payment.'}
+              {alertPaymentEnabled && !alertPricing.location_complete && (
+                <span className="block mt-1 text-xs text-primary-700">
+                  Select both state and local government area to confirm the exact fee.
+                </span>
+              )}
             </p>
 
             <form onSubmit={submitTenantRequest} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -438,9 +495,23 @@ const Properties = () => {
                 onChange={handleRequestChange}
               >
                 <option value="">Preferred state</option>
-                {states.map((state) => (
+                {locationOptions.map((state) => (
                   <option key={state.id} value={state.id}>
                     {state.state_name}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="lga_name"
+                className="input"
+                value={requestForm.lga_name}
+                onChange={handleRequestChange}
+                disabled={!requestForm.state_id}
+              >
+                <option value="">Preferred local government area</option>
+                {availableRequestLgas.map((lga) => (
+                  <option key={lga} value={lga}>
+                    {lga}
                   </option>
                 ))}
               </select>
@@ -484,13 +555,16 @@ const Properties = () => {
                 onChange={handleRequestChange}
               />
 
-              <button disabled={requestLoading} className="btn btn-primary md:col-span-2">
+              <button
+                disabled={requestLoading || (alertPaymentEnabled && !alertPricing.location_complete)}
+                className="btn btn-primary md:col-span-2"
+              >
                 {requestLoading
                   ? (alertRequestReference
                     ? 'Confirming payment and submitting request...'
                     : (alertPaymentEnabled ? 'Redirecting to payment...' : 'Submitting request...'))
                   : (alertPaymentEnabled
-                    ? `Pay ${ALERT_REQUEST_FEE_LABEL} to Notify Me`
+                    ? `Pay ${alertRequestFeeLabel} to Notify Me`
                     : 'Notify me when available')}
               </button>
             </form>

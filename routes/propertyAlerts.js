@@ -4,6 +4,8 @@ const axios = require('axios');
 const { body, param, validationResult } = require('express-validator');
 const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+const { resolveLocationSelection } = require('../config/utils/locationDirectory');
+const { getLocationPricingQuote } = require('../config/utils/locationPricing');
 const {
   ALERT_REQUEST_FEE_NGN,
   createTenantAlert,
@@ -34,7 +36,11 @@ const requestValidators = [
   body('email').isEmail().normalizeEmail(),
   body('phone').optional().isString(),
   body('property_type').isIn(allowedPropertyTypes),
-  body('state_id').optional().isInt(),
+  body('state_id').optional({ checkFalsy: true }).isInt(),
+  body('lga_name')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ min: 2, max: 120 }),
   body('city').optional().trim(),
   body('min_price').optional().isFloat({ min: 0 }),
   body('max_price').optional().isFloat({ min: 0 }),
@@ -50,7 +56,12 @@ router.get('/config', async (req, res) => {
       success: true,
       data: {
         payment_required: flags.property_alert_payment === true,
-        amount: ALERT_REQUEST_FEE_NGN,
+        location_required: flags.property_alert_payment === true,
+        ...(await getLocationPricingQuote({
+          appliesTo: 'property_alert_request',
+          stateId: req.query.state_id,
+          lgaName: req.query.lga_name,
+        })),
       },
     });
   } catch (error) {
@@ -81,6 +92,7 @@ router.post(
         phone: req.body.phone?.trim() || null,
         property_type: req.body.property_type,
         state_id: req.body.state_id ? Number(req.body.state_id) : null,
+        lga_name: req.body.lga_name?.trim() || null,
         city: req.body.city?.trim() || null,
         min_price: req.body.min_price || null,
         max_price: req.body.max_price || null,
@@ -90,6 +102,28 @@ router.post(
 
       const flags = await getFeatureFlagsMap();
       const paymentRequired = flags.property_alert_payment === true;
+      let pricing = {
+        amount: ALERT_REQUEST_FEE_NGN,
+        base_amount: ALERT_REQUEST_FEE_NGN,
+        rule_scope: 'base',
+      };
+
+      if (payload.state_id || payload.lga_name) {
+        const resolvedLocation = await resolveLocationSelection({
+          stateId: payload.state_id,
+          lgaName: payload.lga_name,
+          requireLga: paymentRequired,
+        });
+
+        payload.state_id = resolvedLocation.state_id;
+        payload.lga_name = resolvedLocation.lga_name;
+
+        pricing = await getLocationPricingQuote({
+          appliesTo: 'property_alert_request',
+          stateId: resolvedLocation.state_id,
+          lgaName: resolvedLocation.lga_name,
+        });
+      }
 
       if (!paymentRequired) {
         const alert = await createTenantAlert(payload);
@@ -100,6 +134,20 @@ router.post(
           message:
             'Request submitted. We will notify you by email and WhatsApp when a matching property is available.',
           data: alert,
+        });
+      }
+
+      if (!payload.state_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'State is required to calculate the request fee',
+        });
+      }
+
+      if (!payload.lga_name) {
+        return res.status(400).json({
+          success: false,
+          message: 'Local government area is required to calculate the request fee',
         });
       }
 
@@ -114,6 +162,7 @@ router.post(
 
       await createTenantAlertPayment({
         ...payload,
+        amount: pricing.amount,
         transaction_reference: reference,
       });
 
@@ -124,13 +173,14 @@ router.post(
         `${PAYSTACK_BASE_URL}/transaction/initialize`,
         {
           email: payload.email,
-          amount: ALERT_REQUEST_FEE_NGN * 100,
+          amount: pricing.amount * 100,
           reference,
           callback_url: callbackUrl,
           metadata: {
             payment_type: 'tenant_property_alert',
             property_type: payload.property_type,
             state_id: payload.state_id,
+            lga_name: payload.lga_name,
           },
         },
         {
@@ -145,9 +195,11 @@ router.post(
         success: true,
         payment_required: true,
         message:
-          'Payment of N5,000 is required before we can process your notification request.',
+          `Payment of N${pricing.amount.toLocaleString()} is required before we can process your notification request.`,
         data: {
-          amount: ALERT_REQUEST_FEE_NGN,
+          amount: pricing.amount,
+          base_amount: pricing.base_amount,
+          rule_scope: pricing.rule_scope,
           reference,
           authorization_url: paystackResponse.data.data.authorization_url,
           access_code: paystackResponse.data.data.access_code,
@@ -226,7 +278,7 @@ router.post(
 
         const amountPaid = Number(transaction.amount || 0) / 100;
 
-        if (amountPaid < ALERT_REQUEST_FEE_NGN) {
+        if (amountPaid < Number(payment.amount)) {
           return res.status(402).json({
             success: false,
             payment_required: true,

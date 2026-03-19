@@ -6,6 +6,7 @@ const {
   getSimilarProperties,
   getRecommendations,
 } = require('../config/utils/propertyUtils');
+const { getLocationOptions } = require('../config/utils/locationDirectory');
 const { authenticate, isTenant } = require('../config/middleware/auth');
 
 router.get('/popular-locations', async (req, res) => {
@@ -73,6 +74,23 @@ router.get('/recommendations', authenticate, isTenant, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch recommendations',
+    });
+  }
+});
+
+router.get('/location-options', async (req, res) => {
+  try {
+    const locations = await getLocationOptions();
+
+    res.json({
+      success: true,
+      data: locations,
+    });
+  } catch (error) {
+    console.error('Load location options error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch location options',
     });
   }
 });

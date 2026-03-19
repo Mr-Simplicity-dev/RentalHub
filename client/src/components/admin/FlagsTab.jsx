@@ -7,15 +7,15 @@ const FLAG_META = {
   },
   tenant_registration_payment: {
     label: "Tenant Registration Payment",
-    description: "Require N2,500 payment before tenant account creation.",
+    description: "Require tenant registration payment before account creation. Base fee is N2,500 and location pricing rules can override it.",
   },
   landlord_registration_payment: {
     label: "Landlord Registration Payment",
-    description: "Require N5,000 payment before landlord account creation.",
+    description: "Require landlord registration payment before account creation. Base fee is N5,000 and location pricing rules can override it.",
   },
   property_alert_payment: {
     label: "Property Alert Payment",
-    description: 'Require N5,000 payment before processing "Notify me when available" requests.',
+    description: 'Require payment before processing "Notify me when available" requests. Base fee is N5,000 and location pricing rules can override it.',
   },
   nin_number: {
     label: "NIN Requirement",

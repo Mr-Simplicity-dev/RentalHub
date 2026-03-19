@@ -19,6 +19,7 @@ const ensureAlertSchema = async () => {
       phone VARCHAR(30),
       property_type VARCHAR(50) NOT NULL,
       state_id INTEGER REFERENCES states(id) ON DELETE SET NULL,
+      lga_name VARCHAR(120),
       city VARCHAR(120),
       min_price NUMERIC(12,2),
       max_price NUMERIC(12,2),
@@ -43,6 +44,7 @@ const ensureAlertSchema = async () => {
       phone VARCHAR(30),
       property_type VARCHAR(50) NOT NULL,
       state_id INTEGER REFERENCES states(id) ON DELETE SET NULL,
+      lga_name VARCHAR(120),
       city VARCHAR(120),
       min_price NUMERIC(12,2),
       max_price NUMERIC(12,2),
@@ -65,6 +67,12 @@ const ensureAlertSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_tenant_alert_payments_status
     ON tenant_property_alert_payments(payment_status, processed_at);
+
+    ALTER TABLE tenant_property_alerts
+      ADD COLUMN IF NOT EXISTS lga_name VARCHAR(120);
+
+    ALTER TABLE tenant_property_alert_payments
+      ADD COLUMN IF NOT EXISTS lga_name VARCHAR(120);
   `);
 
   schemaReady = true;
@@ -76,6 +84,7 @@ const buildAlertPayloadFromPayment = (payment) => ({
   phone: payment.phone,
   property_type: payment.property_type,
   state_id: payment.state_id,
+  lga_name: payment.lga_name,
   city: payment.city,
   min_price: payment.min_price,
   max_price: payment.max_price,
@@ -93,6 +102,7 @@ exports.createTenantAlert = async (payload) => {
     phone = null,
     property_type,
     state_id = null,
+    lga_name = null,
     city = null,
     min_price = null,
     max_price = null,
@@ -103,9 +113,9 @@ exports.createTenantAlert = async (payload) => {
   const result = await db.query(
     `INSERT INTO tenant_property_alerts (
       user_id, full_name, email, phone, property_type,
-      state_id, city, min_price, max_price, bedrooms, bathrooms
+      state_id, lga_name, city, min_price, max_price, bedrooms, bathrooms
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
     RETURNING *`,
     [
       user_id,
@@ -114,6 +124,7 @@ exports.createTenantAlert = async (payload) => {
       phone,
       property_type,
       state_id || null,
+      lga_name || null,
       city || null,
       min_price || null,
       max_price || null,
@@ -136,22 +147,24 @@ exports.createTenantAlertPayment = async (payload) => {
     phone = null,
     property_type,
     state_id = null,
+    lga_name = null,
     city = null,
     min_price = null,
     max_price = null,
     bedrooms = null,
     bathrooms = null,
+    amount = ALERT_REQUEST_FEE_NGN,
     transaction_reference,
     payment_method = 'paystack',
   } = payload;
 
   const result = await db.query(
     `INSERT INTO tenant_property_alert_payments (
-      full_name, email, phone, property_type, state_id, city,
+      full_name, email, phone, property_type, state_id, lga_name, city,
       min_price, max_price, bedrooms, bathrooms, amount,
       payment_method, transaction_reference
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
     RETURNING *`,
     [
       full_name,
@@ -159,12 +172,13 @@ exports.createTenantAlertPayment = async (payload) => {
       phone,
       property_type,
       state_id || null,
+      lga_name || null,
       city || null,
       min_price || null,
       max_price || null,
       bedrooms || null,
       bathrooms || null,
-      ALERT_REQUEST_FEE_NGN,
+      amount,
       payment_method,
       transaction_reference,
     ]

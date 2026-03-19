@@ -14,6 +14,7 @@ import LogsTab from "../components/admin/LogsTab";
 import BroadcastTab from "../components/admin/BroadcastTab";
 import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
+import PricingRulesTab from "../components/admin/PricingRulesTab";
 import PaginationControls from "../components/admin/PaginationControls";
 import ModerationOverview from "../components/admin/ModerationOverview";
 import LiveModerationQueue from "../components/admin/LiveModerationQueue";
@@ -31,6 +32,7 @@ const tabs = [
   "reports",
   "logs",
   "broadcast",
+  "pricing",
   "flags",
   "fraud",
   "admin",
@@ -535,6 +537,10 @@ useEffect(() => {
 
       {tab === "flags" && (
         <FlagsTab flags={flags} toggleFlag={toggleFlag} />
+      )}
+
+      {tab === "pricing" && (
+        <PricingRulesTab />
       )}
 
       {tab === "lawyer_invites" && (

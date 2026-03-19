@@ -4,6 +4,14 @@ const {
   ensureFeatureFlagsTable,
   syncDefaultFeatureFlags,
 } = require('../config/middleware/featureFlags');
+const { getLocationOptions } = require('../config/utils/locationDirectory');
+const {
+  createLocationPricingRule,
+  deleteLocationPricingRule,
+  getPricingTargets,
+  listLocationPricingRules,
+  updateLocationPricingRule,
+} = require('../config/utils/locationPricing');
 
 let verificationAuditSchemaReady = false;
 
@@ -783,6 +791,104 @@ const updateFeatureFlag = async (req, res) => {
   }
 };
 
+const getPricingRules = async (req, res) => {
+  try {
+    const [rules, locations] = await Promise.all([
+      listLocationPricingRules(),
+      getLocationOptions(),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        rules,
+        targets: getPricingTargets(),
+        locations,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Failed to load pricing rules' });
+  }
+};
+
+const createPricingRule = async (req, res) => {
+  try {
+    const rule = await createLocationPricingRule({
+      appliesTo: req.body.applies_to,
+      stateId: req.body.state_id,
+      lgaName: req.body.lga_name,
+      amount: req.body.amount,
+      isActive: req.body.is_active !== false,
+    });
+
+    await logAction(req.user.id, 'CREATE_PRICING_RULE', 'pricing_rule', rule.id);
+
+    res.status(201).json({
+      success: true,
+      data: rule,
+    });
+  } catch (error) {
+    console.error(error);
+
+    if (error.code === '23505') {
+      return res.status(409).json({
+        message: 'A pricing rule already exists for that target and location',
+      });
+    }
+
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to create pricing rule',
+    });
+  }
+};
+
+const updatePricingRule = async (req, res) => {
+  try {
+    const rule = await updateLocationPricingRule(req.params.ruleId, {
+      appliesTo: req.body.applies_to,
+      stateId: req.body.state_id,
+      lgaName: req.body.lga_name,
+      amount: req.body.amount,
+      isActive: req.body.is_active !== false,
+    });
+
+    await logAction(req.user.id, 'UPDATE_PRICING_RULE', 'pricing_rule', rule.id);
+
+    res.json({
+      success: true,
+      data: rule,
+    });
+  } catch (error) {
+    console.error(error);
+
+    if (error.code === '23505') {
+      return res.status(409).json({
+        message: 'A pricing rule already exists for that target and location',
+      });
+    }
+
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to update pricing rule',
+    });
+  }
+};
+
+const removePricingRule = async (req, res) => {
+  try {
+    await deleteLocationPricingRule(req.params.ruleId);
+
+    await logAction(req.user.id, 'DELETE_PRICING_RULE', 'pricing_rule', req.params.ruleId);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to delete pricing rule',
+    });
+  }
+};
+
 // fraud
 const getFraudFlags = async (req, res) => {
   try {
@@ -833,6 +939,10 @@ module.exports = {
   bulkPropertyAction,
   getFeatureFlags,
   updateFeatureFlag,
+  getPricingRules,
+  createPricingRule,
+  updatePricingRule,
+  removePricingRule,
   getFraudFlags,
   resolveFraudFlag,
 };

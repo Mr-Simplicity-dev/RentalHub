@@ -48,6 +48,15 @@ const registerValidators = [
     .trim()
     .isLength({ min: 2, max: 80 })
     .withMessage('Nationality must be between 2 and 80 characters'),
+  body('state_id')
+    .optional({ checkFalsy: true })
+    .isInt({ min: 1 })
+    .withMessage('State must be valid'),
+  body('lga_name')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ min: 2, max: 120 })
+    .withMessage('Local government area must be between 2 and 120 characters'),
   body('user_type')
     .isIn(['landlord', 'tenant'])
     .withMessage('User type must be tenant or landlord'),

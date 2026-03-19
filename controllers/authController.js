@@ -6,6 +6,8 @@ const { validationResult } = require('express-validator');
 const db = require('../config/middleware/database');
 const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+const { resolveLocationSelection } = require('../config/utils/locationDirectory');
+const { getLocationPricingQuote } = require('../config/utils/locationPricing');
 const {
   validateNIN,
   verifyNINWithNIMC,
@@ -33,6 +35,10 @@ const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const TENANT_REGISTRATION_FEE_NGN = 2500;
 const LANDLORD_REGISTRATION_FEE_NGN = 5000;
 const FRONTEND_URL = getFrontendUrl();
+const REGISTRATION_PRICING_TARGETS = {
+  tenant: 'tenant_registration',
+  landlord: 'landlord_registration',
+};
 
 const hashInviteToken = (token) =>
   crypto.createHash('sha256').update(String(token)).digest('hex');
@@ -173,6 +179,81 @@ const getRegistrationPaymentConfig = (userType, flags) => {
   return {
     enabled: false,
     amount: 0,
+  };
+};
+
+const buildRegistrationPricingQuote = async ({
+  userType,
+  flags,
+  stateId,
+  lgaName,
+  strictLocation = false,
+}) => {
+  const paymentConfig = getRegistrationPaymentConfig(userType, flags);
+  const pricingTarget = REGISTRATION_PRICING_TARGETS[userType] || null;
+
+  if (!pricingTarget) {
+    return {
+      ...paymentConfig,
+      pricing_target: null,
+      base_amount: paymentConfig.amount,
+      amount: paymentConfig.amount,
+      rule_scope: 'base',
+      matched_rule: null,
+      location_required: false,
+      location_complete: false,
+      location: null,
+    };
+  }
+
+  let resolvedLocation = null;
+
+  if (strictLocation && paymentConfig.enabled) {
+    if (!stateId) {
+      const error = new Error('State is required to calculate the registration fee');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!String(lgaName || '').trim()) {
+      const error = new Error('Local government area is required to calculate the registration fee');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  if (stateId || lgaName) {
+    try {
+      resolvedLocation = await resolveLocationSelection({
+        stateId,
+        lgaName,
+        requireLga: strictLocation && paymentConfig.enabled,
+      });
+    } catch (error) {
+      if (strictLocation) {
+        throw error;
+      }
+    }
+  }
+
+  const quote = await getLocationPricingQuote({
+    appliesTo: pricingTarget,
+    stateId: resolvedLocation?.state_id || null,
+    lgaName: resolvedLocation?.lga_name || null,
+  });
+
+  return {
+    ...paymentConfig,
+    pricing_target: pricingTarget,
+    base_amount: quote.base_amount,
+    amount: quote.amount,
+    rule_scope: quote.rule_scope,
+    matched_rule: quote.matched_rule,
+    location_required: paymentConfig.enabled,
+    location_complete: Boolean(
+      resolvedLocation?.state_id && resolvedLocation?.lga_name
+    ),
+    location: resolvedLocation,
   };
 };
 
@@ -645,15 +726,25 @@ exports.register = async (req, res) => {
       verificationMeta
     } = await validateAndPrepareRegistration(req.body);
 
-    const registrationPaymentConfig = getRegistrationPaymentConfig(
-      preparedRegistration.user_type,
-      flags
-    );
+    const registrationPricing = await buildRegistrationPricingQuote({
+      userType: preparedRegistration.user_type,
+      flags,
+      stateId: req.body.state_id,
+      lgaName: req.body.lga_name,
+      strictLocation: false,
+    });
 
-    if (registrationPaymentConfig.enabled) {
+    if (registrationPricing.enabled) {
       return res.status(402).json({
         success: false,
-        message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment is required before account creation`
+        message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment is required before account creation`,
+        data: {
+          amount: registrationPricing.amount,
+          base_amount: registrationPricing.base_amount,
+          location_required: registrationPricing.location_required,
+          location_complete: registrationPricing.location_complete,
+          rule_scope: registrationPricing.rule_scope,
+        },
       });
     }
 
@@ -716,12 +807,15 @@ exports.initializeRegistrationPayment = async (req, res) => {
       verificationMeta
     } = await validateAndPrepareRegistration(req.body);
 
-    const registrationPaymentConfig = getRegistrationPaymentConfig(
-      preparedRegistration.user_type,
-      flags
-    );
+    const registrationPricing = await buildRegistrationPricingQuote({
+      userType: preparedRegistration.user_type,
+      flags,
+      stateId: req.body.state_id,
+      lgaName: req.body.lga_name,
+      strictLocation: true,
+    });
 
-    if (!registrationPaymentConfig.enabled) {
+    if (!registrationPricing.enabled) {
       return res.status(400).json({
         success: false,
         message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment is currently disabled`
@@ -737,11 +831,11 @@ exports.initializeRegistrationPayment = async (req, res) => {
          user_type,
          email,
          phone,
-         full_name,
-         amount,
-         transaction_reference,
-         registration_payload,
-         verification_meta
+        full_name,
+        amount,
+        transaction_reference,
+        registration_payload,
+        verification_meta
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
@@ -749,10 +843,12 @@ exports.initializeRegistrationPayment = async (req, res) => {
         preparedRegistration.email,
         preparedRegistration.phone,
         preparedRegistration.full_name,
-        registrationPaymentConfig.amount,
+        registrationPricing.amount,
         reference,
         JSON.stringify({
           ...preparedRegistration,
+          state_id: registrationPricing.location?.state_id || null,
+          lga_name: registrationPricing.location?.lga_name || null,
           password_hash: passwordHash
         }),
         verificationMeta ? JSON.stringify(verificationMeta) : null
@@ -763,14 +859,16 @@ exports.initializeRegistrationPayment = async (req, res) => {
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
         email: preparedRegistration.email,
-        amount: registrationPaymentConfig.amount * 100,
+        amount: registrationPricing.amount * 100,
         reference,
         callback_url: `${FRONTEND_URL}/register`,
         metadata: {
           payment_type: 'registration_fee',
           user_type: preparedRegistration.user_type,
           email: preparedRegistration.email,
-          phone: preparedRegistration.phone
+          phone: preparedRegistration.phone,
+          state_id: registrationPricing.location?.state_id || null,
+          lga_name: registrationPricing.location?.lga_name || null,
         }
       },
       {
@@ -785,7 +883,9 @@ exports.initializeRegistrationPayment = async (req, res) => {
       success: true,
       message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment initialized`,
       data: {
-        amount: registrationPaymentConfig.amount,
+        amount: registrationPricing.amount,
+        base_amount: registrationPricing.base_amount,
+        rule_scope: registrationPricing.rule_scope,
         reference,
         authorization_url: paystackResponse.data.data.authorization_url,
         access_code: paystackResponse.data.data.access_code
@@ -997,6 +1097,18 @@ exports.login = async (req, res) => {
 exports.getRegistrationFlags = async (req, res) => {
   try {
     const flags = await getFeatureFlagsMap();
+    const userType = String(req.query.user_type || '').trim();
+    let pricing = null;
+
+    if (['tenant', 'landlord'].includes(userType)) {
+      pricing = await buildRegistrationPricingQuote({
+        userType,
+        flags,
+        stateId: req.query.state_id,
+        lgaName: req.query.lga_name,
+        strictLocation: false,
+      });
+    }
 
     res.json({
       success: true,
@@ -1006,6 +1118,7 @@ exports.getRegistrationFlags = async (req, res) => {
         passport_number: flags.passport_number !== false,
         tenant_registration_payment: flags.tenant_registration_payment === true,
         landlord_registration_payment: flags.landlord_registration_payment === true,
+        pricing,
       },
     });
   } catch (error) {

@@ -7,6 +7,11 @@ export const propertyService = {
     return response.data;
   },
 
+  getLocationOptions: async () => {
+    const response = await api.get('/property-utils/location-options');
+    return response.data;
+  },
+
   // Browse properties
   browseProperties: async (page = 1, limit = 20) => {
     const response = await api.get('/properties/browse', {
@@ -142,8 +147,8 @@ export const propertyService = {
   },
 
   // Submit tenant request when desired property type is unavailable
-  getPropertyAlertConfig: async () => {
-    const response = await api.get('/property-alerts/config');
+  getPropertyAlertConfig: async (params = {}) => {
+    const response = await api.get('/property-alerts/config', { params });
     return response.data;
   },
 

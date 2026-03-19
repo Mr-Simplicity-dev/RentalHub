@@ -23,8 +23,11 @@ const Register = () => {
     nin: '',
     international_passport_number: '',
     nationality: '',
+    state_id: '',
+    lga_name: '',
   });
   const [loading, setLoading] = useState(false);
+  const [locationOptions, setLocationOptions] = useState([]);
   const [registrationFlags, setRegistrationFlags] = useState({
     loaded: false,
     allow_registration: true,
@@ -32,6 +35,13 @@ const Register = () => {
     passport_number: true,
     tenant_registration_payment: false,
     landlord_registration_payment: false,
+  });
+  const [registrationPricing, setRegistrationPricing] = useState({
+    amount: 2500,
+    base_amount: 2500,
+    location_required: false,
+    location_complete: false,
+    rule_scope: 'base',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -66,21 +76,30 @@ const Register = () => {
     return registrationData;
   };
 
-  const paymentAmountByRole = {
-    tenant: 2500,
-    landlord: 5000,
-  };
-
   const requiresRegistrationPayment =
     (formData.user_type === 'tenant' && registrationFlags.tenant_registration_payment) ||
     (formData.user_type === 'landlord' && registrationFlags.landlord_registration_payment);
+
+  const selectedStateOption = locationOptions.find(
+    (item) => String(item.id) === String(formData.state_id)
+  );
+  const availableLgas = selectedStateOption?.lgas || [];
+  const displayedRegistrationAmount =
+    registrationPricing.amount ||
+    (formData.user_type === 'tenant' ? 2500 : 5000);
 
   useEffect(() => {
     let mounted = true;
 
     const loadRegistrationFlags = async () => {
       try {
-        const res = await api.get('/auth/registration-flags');
+        const res = await api.get('/auth/registration-flags', {
+          params: {
+            user_type: formData.user_type,
+            state_id: formData.state_id || undefined,
+            lga_name: formData.lga_name || undefined,
+          },
+        });
         const data = res.data?.data || {};
 
         if (!mounted) return;
@@ -102,6 +121,17 @@ const Register = () => {
               ? ''
               : prev.international_passport_number,
         }));
+
+        setRegistrationPricing(
+          data.pricing || {
+            amount: formData.user_type === 'tenant' ? 2500 : 5000,
+            base_amount: formData.user_type === 'tenant' ? 2500 : 5000,
+            location_required:
+              data?.[`${formData.user_type}_registration_payment`] === true,
+            location_complete: false,
+            rule_scope: 'base',
+          }
+        );
       } catch (error) {
         console.error('Failed to load registration flags', error);
 
@@ -110,6 +140,14 @@ const Register = () => {
             ...prev,
             loaded: true,
           }));
+
+          setRegistrationPricing({
+            amount: formData.user_type === 'tenant' ? 2500 : 5000,
+            base_amount: formData.user_type === 'tenant' ? 2500 : 5000,
+            location_required: false,
+            location_complete: false,
+            rule_scope: 'base',
+          });
         }
       }
     };
@@ -118,6 +156,31 @@ const Register = () => {
 
     return () => {
       mounted = false;
+    };
+  }, [formData.user_type, formData.state_id, formData.lga_name]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadLocationOptions = async () => {
+      try {
+        const response = await api.get('/property-utils/location-options');
+
+        if (active && response.data?.success) {
+          setLocationOptions(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Failed to load location options', error);
+        if (active) {
+          setLocationOptions([]);
+        }
+      }
+    };
+
+    loadLocationOptions();
+
+    return () => {
+      active = false;
     };
   }, []);
 
@@ -173,9 +236,12 @@ const Register = () => {
   }, [registrationReference]);
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: value,
+      ...(name === 'state_id' ? { lga_name: '' } : {}),
     }));
   };
 
@@ -238,6 +304,16 @@ const Register = () => {
   try {
     // Build cleaned payload
     const registrationData = buildRegistrationData();
+
+    if (requiresRegistrationPayment && !registrationData.state_id) {
+      toast.error('Select your state to calculate the registration fee');
+      return;
+    }
+
+    if (requiresRegistrationPayment && !String(registrationData.lga_name || '').trim()) {
+      toast.error('Select your local government area to calculate the registration fee');
+      return;
+    }
 
     // Payment-required roles must complete payment before account creation
     if (requiresRegistrationPayment) {
@@ -320,8 +396,13 @@ const Register = () => {
     <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
       {formData.user_type === "tenant" ? "Tenant" : "Landlord"} account creation
       requires a one-time general platform payment of N
-      {(paymentAmountByRole?.[formData.user_type] || 0).toLocaleString()}
+      {displayedRegistrationAmount.toLocaleString()}
       before the account is created.
+      {!registrationPricing.location_complete && (
+        <div className="mt-2 text-xs text-blue-700">
+          Select your state and local government area to confirm the exact fee.
+        </div>
+      )}
     </div>
   )}
 
@@ -402,6 +483,51 @@ const Register = () => {
       </button>
     </div>
   </div>
+
+  {requiresRegistrationPayment && (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          State *
+        </label>
+        <select
+          name="state_id"
+          value={formData.state_id}
+          onChange={handleChange}
+          className="input"
+          required={requiresRegistrationPayment}
+        >
+          <option value="">Select state</option>
+          {locationOptions.map((state) => (
+            <option key={state.id} value={state.id}>
+              {state.state_name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Local Government Area *
+        </label>
+        <select
+          name="lga_name"
+          value={formData.lga_name}
+          onChange={handleChange}
+          className="input"
+          required={requiresRegistrationPayment}
+          disabled={!formData.state_id}
+        >
+          <option value="">Select local government area</option>
+          {availableLgas.map((lga) => (
+            <option key={lga} value={lga}>
+              {lga}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )}
 
   {/* FORM FIELDS */}
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -586,14 +712,15 @@ const Register = () => {
     disabled={
       loading ||
       !registrationFlags.loaded ||
-      !registrationFlags.allow_registration
+      !registrationFlags.allow_registration ||
+      (requiresRegistrationPayment && !registrationPricing.location_complete)
     }
     className="w-full btn btn-primary py-3 text-lg"
   >
       {loading
       ? (requiresRegistrationPayment ? "Processing..." : "Creating account...")
       : requiresRegistrationPayment
-      ? `Proceed to N${(paymentAmountByRole?.[formData.user_type] || 0).toLocaleString()} Payment`
+      ? `Proceed to N${displayedRegistrationAmount.toLocaleString()} Payment`
       : "Create Account"}
   </button>
 </form>

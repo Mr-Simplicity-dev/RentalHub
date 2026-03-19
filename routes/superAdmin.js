@@ -39,6 +39,11 @@ router.post('/properties/bulk', authenticate, requireSuperAdmin, superCtrl.bulkP
 router.get('/flags', authenticate, requireSuperAdmin, superCtrl.getFeatureFlags);
 router.patch('/flags/:key', authenticate, requireSuperAdmin, superCtrl.updateFeatureFlag);
 
+router.get('/pricing-rules', authenticate, requireSuperAdmin, superCtrl.getPricingRules);
+router.post('/pricing-rules', authenticate, requireSuperAdmin, superCtrl.createPricingRule);
+router.patch('/pricing-rules/:ruleId', authenticate, requireSuperAdmin, superCtrl.updatePricingRule);
+router.delete('/pricing-rules/:ruleId', authenticate, requireSuperAdmin, superCtrl.removePricingRule);
+
 router.get('/fraud', authenticate, requireSuperAdmin, superCtrl.getFraudFlags);
 router.patch('/fraud/:id/resolve', authenticate, requireSuperAdmin, superCtrl.resolveFraudFlag);
 
