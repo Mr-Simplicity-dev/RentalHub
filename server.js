@@ -35,6 +35,156 @@ const audit = require('./config/middleware/auditMiddleware');
 const { enforceFlags } = require('./config/middleware/featureFlags');
 const { getAllowedFrontendOrigins } = require('./config/utils/frontendUrl');
 const startScheduler = require('./config/utils/scheduler');
+const locationRoutes = require("./routes/locationRoutes");
+const { generateSitemap } = require("./utils/sitemapGenerator");
+const blogRoutes = require("./routes/blogRoutes");
+const cron = require("node-cron");
+const mongoose = require("mongoose");
+
+const Blog = require("./models/Blog");
+const locations = require("./data/nigeriaLocations");
+const slugify = require("./utils/slugify");
+const { pingGoogle } = require("./utils/pingGoogle");
+const { generateAIContent } = require("./utils/aiContentGenerator");
+const { generateTitles } = require("./utils/pageGenerator");
+const { generateKeywords } = require("./utils/keywordGenerator");
+const { saveRanking } = require("./utils/rankChecker");
+const { generateBacklinks } = require("./utils/backlinkEngine");
+const adminSeoRoutes = require("./routes/adminSeoRoutes");
+const { checkRanking } = require("./utils/serpTracker");
+
+const results = await checkRanking("houses for rent in ikeja");
+console.log(results);
+
+// ✅ Ensure DB is connected before cron runs
+mongoose.connection.on("connected", () => {
+  console.log("✅ MongoDB connected for cron jobs");
+
+  // 🔥 AI BLOG GENERATION (AGGRESSIVE MODE - DAILY)
+  cron.schedule("0 1 * * *", async () => {
+    try {
+      console.log("🚀 Generating AI blogs...");
+
+      const postsPerDay = 20; // 🔥 change to 10 for more aggressive growth
+      let created = 0;
+
+for (let i = 0; i < postsPerDay; i++) {
+  let attempts = 0;
+  let createdPost = false;
+
+  while (!createdPost && attempts < 5) {
+    attempts++;
+
+    const state =
+      locations[Math.floor(Math.random() * locations.length)];
+    const lga =
+      state.lgas[Math.floor(Math.random() * state.lgas.length)];
+
+    const location = `${lga}, ${state.displayName}`;
+
+    // 🔥 MUCH MORE VARIATIONS (IMPORTANT FOR SCALE)
+    const variations = [
+      `Best Houses for Rent in ${location}`,
+      `Cheap Apartments in ${location}`,
+      `Cost of Renting in ${location}`,
+      `Affordable Homes in ${location}`,
+      `Where to Live in ${location}`,
+      `2 Bedroom Flats in ${location}`,
+      `Self Contain in ${location}`,
+      `Luxury Apartments in ${location}`,
+      `Family Houses in ${location}`,
+      `Student Housing in ${location}`
+    ];
+
+    const title =
+      variations[Math.floor(Math.random() * variations.length)];
+
+    const slug = slugify(title);
+
+    const exists = await Blog.findOne({ slug });
+    if (exists) {
+      console.log("⚠️ Duplicate found, retrying...");
+      continue; // 🔥 try again instead of wasting loop
+    }
+
+    // 🔥 IMPROVED AI CONTENT (LESS REPETITION)
+    const content = `
+# ${title}
+
+Looking for houses for rent in ${location}? This detailed guide explains rental options, pricing, and tips.
+
+## Types of Properties Available
+- Self contain apartments
+- 1 bedroom flats
+- 2 bedroom apartments
+- Duplex and family homes
+
+## Cost of Renting in ${location}
+Rental prices vary depending on:
+- Property size
+- Area demand
+- Amenities available
+
+## Why Choose ${location}?
+- Affordable housing options
+- Access to transport and markets
+- Growing residential development
+
+## Tips for Renting
+- Inspect property before payment
+- Compare prices across listings
+- Verify landlord details
+
+## Explore More
+- Houses for rent in ${location}
+- Cheap apartments in ${location}
+- Flats available in ${location}
+
+Visit: https://rentalhub.com.ng/nigeria/${slugify(
+      `${state.displayName}`
+    )}
+
+Start your search today and find the best home in ${location}.
+`;
+
+    await Blog.create({
+      title,
+      slug,
+      content,
+      keywords: [
+        `rent in ${location}`,
+        `apartments in ${location}`,
+        `houses in ${location}`,
+        `flats in ${location}`
+      ]
+    });
+
+    created++;
+    createdPost = true;
+
+    console.log("✅ Created:", title);
+  }
+}
+
+      console.log(`🎯 Total blogs created today: ${created}`);
+
+    } catch (err) {
+      console.error("❌ AI blog error:", err.message);
+    }
+  });
+
+  // 🔥 DAILY SITEMAP SUBMISSION (2 AM)
+  cron.schedule("0 2 * * *", async () => {
+    try {
+      console.log("📡 Submitting sitemap to Google...");
+      await pingGoogle();
+      console.log("✅ Sitemap submitted");
+    } catch (err) {
+      console.error("❌ Sitemap submission failed:", err.message);
+    }
+  });
+
+});
 
 dotenv.config();
 
@@ -49,6 +199,10 @@ const authRateLimitWindowMs =
 const authRateLimitMax =
   Number(process.env.AUTH_RATE_LIMIT_MAX) || (isProduction ? 30 : 200);
 const allowedOrigins = new Set(getAllowedFrontendOrigins());
+
+app.use("/", locationRoutes);
+app.use("/", blogRoutes);
+app.use("/", adminSeoRoutes);
 
 // Trust proxy (Render, Nginx etc)
 app.set('trust proxy', 1);
@@ -123,6 +277,16 @@ app.get('/api/health', (req, res) => {
     status: 'OK',
     message: 'Server is running',
   });
+});
+
+app.get("/sitemap.xml", async (req, res) => {
+  try {
+    const sitemap = await generateSitemap();
+    res.header("Content-Type", "application/xml");
+    res.send(sitemap);
+  } catch (err) {
+    res.status(500).send("Error generating sitemap");
+  }
 });
 
 app.use('/api', enforceFlags);
@@ -233,3 +397,6 @@ const io = new Server(server, {
 });
 
 global.io = io;
+
+
+

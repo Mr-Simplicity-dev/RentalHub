@@ -56,6 +56,10 @@ import LawyerDashboard from './lawyer/LawyerDashboard';
 import VerifyCase from './VerifyCase';
 import DisputeDetails from "./DisputeDetails";
 import AcceptLawyerInvite from './AcceptLawyerInvite';
+import slugify from "../utils/slugify";
+
+const url = `/nigeria/${slugify(state)}/${slugify(lga)}`;
+
 
 const queryClient = new QueryClient();
 
@@ -180,6 +184,8 @@ function App() {
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
+              <Route path="/nigeria/:state" element={<LocationPage />} />
+              <Route path="/nigeria/:state/:lga" element={<LocationPage />} />
 
               {/* Protected */}
               <Route
