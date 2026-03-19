@@ -30,7 +30,7 @@ const CreateAdminTab = () => {
 
       const token = localStorage.getItem("token");
 
-      const res = await axios.post(
+      await axios.post(
         "/api/admin/create-admin",
         formData,
         {

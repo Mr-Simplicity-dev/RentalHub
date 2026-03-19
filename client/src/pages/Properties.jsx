@@ -375,7 +375,7 @@ const Properties = () => {
     } finally {
       setRequestLoading(false);
     }
-  }, [requestForm, resetRequestOptionalFields]);
+  }, [alertPaymentEnabled, requestForm, resetRequestOptionalFields]);
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">

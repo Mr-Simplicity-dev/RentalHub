@@ -18,9 +18,17 @@ nigeriaLocations.forEach((entry) => {
     lgas: Array.isArray(entry.lgas) ? entry.lgas.map((item) => String(item)) : [],
   };
 
-  addLocationLookupKey(entry.slug, normalizedEntry);
-  addLocationLookupKey(slugify(entry.displayName), normalizedEntry);
-  addLocationLookupKey(slugify(entry.state), normalizedEntry);
+  if (entry.slug) {
+    addLocationLookupKey(entry.slug, normalizedEntry);
+  }
+
+  if (entry.displayName) {
+    addLocationLookupKey(slugify(entry.displayName), normalizedEntry);
+  }
+
+  if (entry.state) {
+    addLocationLookupKey(slugify(entry.state), normalizedEntry);
+  }
 });
 
 const normalizeLgaKey = (value) => slugify(String(value || ''));
