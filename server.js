@@ -7,6 +7,8 @@ const path = require('path');
 const dotenv = require('dotenv');
 const { Server } = require("socket.io");
 
+dotenv.config();
+
 const db = require('./config/middleware/database');
 
 const authRoutes = require('./routes/auth');
@@ -54,6 +56,16 @@ const adminSeoRoutes = require("./routes/adminSeoRoutes");
 const { checkRanking } = require("./config/utils/serpTracker");
 
 async function runInitialSeoCheck() {
+  const hasSerpApiKey =
+    typeof process.env.SERP_API_KEY === "string" &&
+    process.env.SERP_API_KEY.trim() &&
+    process.env.SERP_API_KEY.trim() !== "...";
+
+  if (!hasSerpApiKey) {
+    console.log("Skipping initial ranking check: SERP_API_KEY is not configured");
+    return;
+  }
+
   try {
     const results = await checkRanking("houses for rent in ikeja");
     console.log("✅ Initial ranking check results:", results);
@@ -182,8 +194,6 @@ Start your search today and find the best home in ${location}.
   });
 
 });
-
-dotenv.config();
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -394,6 +404,5 @@ const io = new Server(server, {
 });
 
 global.io = io;
-
 
 

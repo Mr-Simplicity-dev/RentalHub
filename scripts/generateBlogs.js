@@ -8,6 +8,24 @@ const { pingGoogle } = require("../utils/pingGoogle");
 
 const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
 
+const getMongoConnectionHint = (error) => {
+  const message = String(error?.message || "").toLowerCase();
+
+  if (mongoUri && mongoUri.includes("<db_password>")) {
+    return "Your Mongo URI still contains the <db_password> placeholder. Replace it with the real Atlas database user password.";
+  }
+
+  if (message.includes("bad auth") || message.includes("authentication failed")) {
+    return "Mongo authentication failed. Confirm the Atlas database username and password, and URL-encode the password if it contains special characters like @ : / ? # & %.";
+  }
+
+  if (message.includes("enotfound") || message.includes("querysrv")) {
+    return "Mongo host lookup failed. Recheck the Atlas cluster hostname in your connection string.";
+  }
+
+  return null;
+};
+
 // ✅ Better Mongo connection handling
 const connectDB = async () => {
   if (!mongoUri) {
@@ -22,6 +40,10 @@ const connectDB = async () => {
     console.log("✅ MongoDB connected");
   } catch (err) {
     console.error("❌ MongoDB connection error:", err.message);
+    const hint = getMongoConnectionHint(err);
+    if (hint) {
+      console.error(`Hint: ${hint}`);
+    }
     process.exit(1);
   }
 };

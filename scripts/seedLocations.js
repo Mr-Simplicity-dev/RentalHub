@@ -11,12 +11,43 @@ if (!mongoUri) {
   process.exit(1);
 }
 
-mongoose.connect(mongoUri, {
-  serverSelectionTimeoutMS: 10000
-});
+const getMongoConnectionHint = (error) => {
+  const message = String(error?.message || "").toLowerCase();
+
+  if (mongoUri.includes("<db_password>")) {
+    return "Your Mongo URI still contains the <db_password> placeholder. Replace it with the real Atlas database user password.";
+  }
+
+  if (message.includes("bad auth") || message.includes("authentication failed")) {
+    return "Mongo authentication failed. Confirm the Atlas database username and password, and URL-encode the password if it contains special characters like @ : / ? # & %.";
+  }
+
+  if (message.includes("enotfound") || message.includes("querysrv")) {
+    return "Mongo host lookup failed. Recheck the Atlas cluster hostname in your connection string.";
+  }
+
+  return null;
+};
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10000
+    });
+    console.log("✅ MongoDB connected");
+  } catch (error) {
+    console.error("❌ MongoDB connection error:", error.message);
+    const hint = getMongoConnectionHint(error);
+    if (hint) {
+      console.error(`Hint: ${hint}`);
+    }
+    process.exit(1);
+  }
+};
 
 (async () => {
   try {
+    await connectDB();
     await Location.deleteMany();
 
     for (const item of locations) {
@@ -42,5 +73,10 @@ mongoose.connect(mongoUri, {
   } catch (error) {
     console.error("❌ Seeding error:", error);
     process.exit(1);
+  } finally {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+      console.log("🔌 MongoDB connection closed");
+    }
   }
 })();
