@@ -56,9 +56,7 @@ import LawyerDashboard from './lawyer/LawyerDashboard';
 import VerifyCase from './VerifyCase';
 import DisputeDetails from "./DisputeDetails";
 import AcceptLawyerInvite from './AcceptLawyerInvite';
-import slugify from "../utils/slugify";
-
-const url = `/nigeria/${slugify(state)}/${slugify(lga)}`;
+import LocationPage from './LocationPage';
 
 
 const queryClient = new QueryClient();
