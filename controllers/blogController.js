@@ -21,7 +21,7 @@ exports.getBlog = async (req, res) => {
     };
 
     // 🔗 Canonical URL
-    const canonical = `https://renatalhub.com.ng/blog/${blog.slug}`;
+    const canonical = `https://rentalhub.com.ng/blog/${blog.slug}`;
 
     res.json({
       success: true,

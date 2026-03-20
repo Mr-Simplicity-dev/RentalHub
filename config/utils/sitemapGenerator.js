@@ -11,7 +11,7 @@ exports.generateSitemap = async () => {
   locations.forEach(loc => {
     urls += `
     <url>
-      <loc>https://renatalhub.com.ng/nigeria/${loc.fullSlug}</loc>
+      <loc>https://rentalhub.com.ng/nigeria/${loc.fullSlug}</loc>
     </url>`;
   });
 
@@ -19,7 +19,7 @@ exports.generateSitemap = async () => {
   blogs.forEach(blog => {
     urls += `
     <url>
-      <loc>https://renatalhub.com.ng/blog/${blog.slug}</loc>
+      <loc>https://rentalhub.com.ng/blog/${blog.slug}</loc>
     </url>`;
   });
 

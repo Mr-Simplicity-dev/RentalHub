@@ -441,7 +441,7 @@ const Properties = () => {
             </p>
             <p className={`text-sm mb-4 ${alertPaymentEnabled ? 'text-primary-700' : 'text-green-700'}`}>
               {alertPaymentEnabled
-                ? `A one-time ${alertRequestFeeLabel} payment is required before the request is processed.`
+                ? `A one-time ${alertRequestFeeLabel} payment or more is required before the request is processed.`
                 : 'Requests are currently submitted immediately without payment.'}
               {alertPaymentEnabled && !alertPricing.location_complete && (
                 <span className="block mt-1 text-xs text-primary-700">

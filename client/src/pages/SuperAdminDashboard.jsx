@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../services/api";
@@ -66,6 +66,7 @@ export default function SuperAdminDashboard() {
 
   const { user } = useAuth();
   const navigate = useNavigate();
+  const hasInitializedDashboard = useRef(false);
 
   const [tab, setTab] = useState("users");
   const [loading, setLoading] = useState(false);
@@ -372,20 +373,25 @@ export default function SuperAdminDashboard() {
 
  useEffect(() => {
   if (!user) {
+    hasInitializedDashboard.current = false;
     navigate("/login");
     return;
   }
 
   if (user.user_type !== "super_admin") {
+    hasInitializedDashboard.current = false;
     navigate("/dashboard");
+    return;
   }
-}, [user, navigate]);
 
-useEffect(() => {
-  if (user?.user_type === "super_admin") {
-    loadTab("users");
+  if (hasInitializedDashboard.current) {
+    return;
   }
-}, [user, loadTab]);
+
+  hasInitializedDashboard.current = true;
+  setTab("users");
+  guardedLoad(loadUsers, "Failed loading users");
+}, [user, navigate, guardedLoad, loadUsers]);
 
   const usersTotalPages = getTotalPages(users.length, PAGE_LIMITS.users);
   const pagedUsers = getPageSlice(users, usersPage, PAGE_LIMITS.users);

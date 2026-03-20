@@ -397,7 +397,7 @@ const Register = () => {
       {formData.user_type === "tenant" ? "Tenant" : "Landlord"} account creation
       requires a one-time general platform payment of N
       {displayedRegistrationAmount.toLocaleString()}
-      before the account is created.
+       before the account is created for this location.
       {!registrationPricing.location_complete && (
         <div className="mt-2 text-xs text-blue-700">
           Select your state and local government area to confirm the exact fee.
