@@ -3,6 +3,7 @@ const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
 const { cloudinary } = require('../config/middleware/upload');
 const { submitURL } = require("../utils/googleIndexing");
+const { getFrontendUrl } = require('../config/utils/frontendUrl');
 let propertySchemaReady = false;
 
 const ensurePropertySchema = async () => {
@@ -841,11 +842,11 @@ exports.createProperty = async (req, res) => {
     await client.query('COMMIT');
 
     // 🔥 Submit property URL to Google (non-blocking)
-const propertyUrl = `https://rentalhub.com.ng/property/${property.id}`;
+const propertyUrl = `${getFrontendUrl()}/properties/${property.id}`;
 
 // Don't break your API if indexing fails
-submitURL(propertyUrl).catch(err =>
-  console.error("Google indexing failed:", err.message)
+submitURL(propertyUrl).catch((err) =>
+  console.error('Google indexing failed:', err.message)
 );
 
     res.status(201).json({

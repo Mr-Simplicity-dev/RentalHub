@@ -31,6 +31,13 @@ router.get(
   disputeController.getDisputes
 );
 
+router.get(
+  '/:disputeId',
+  authenticate,
+  canAccessDispute,
+  disputeController.getDisputeDetails
+);
+
 /**
  * Add message to dispute
  */
@@ -63,9 +70,22 @@ router.post(
   disputeController.uploadEvidence
 );
 
+router.get(
+  '/:disputeId/evidence',
+  authenticate,
+  canAccessDispute,
+  disputeController.listDisputeEvidence
+);
+
 /**
  * Verify evidence integrity
  */
+router.get(
+  '/evidence/:evidenceId',
+  authenticate,
+  disputeController.getEvidence
+);
+
 router.get(
   '/evidence/:evidenceId/verify',
   authenticate,

@@ -713,6 +713,12 @@ const Profile = () => {
       <div className="card">
         <h2 className="font-semibold mb-4">{t('profile.verify_title')}</h2>
 
+        {user?.identity_verification_status === 'rejected' && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            Your last verification review was rejected. Capture and upload a new live passport photo to submit again.
+          </div>
+        )}
+
         {user?.identity_verified ? (
           <div className="text-green-600 font-semibold">
             {t('profile.verified')}

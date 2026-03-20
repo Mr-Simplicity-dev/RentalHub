@@ -94,7 +94,10 @@ const ensureIdentitySchema = async () => {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS identity_document_type VARCHAR(20) DEFAULT 'nin',
     ADD COLUMN IF NOT EXISTS international_passport_number VARCHAR(50),
-    ADD COLUMN IF NOT EXISTS nationality VARCHAR(80);
+    ADD COLUMN IF NOT EXISTS nationality VARCHAR(80),
+    ADD COLUMN IF NOT EXISTS identity_verified_by INTEGER REFERENCES users(id),
+    ADD COLUMN IF NOT EXISTS identity_verified_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS identity_verification_status VARCHAR(20);
   `);
 
   identitySchemaReady = true;
@@ -258,7 +261,8 @@ router.get('/verification/status', authenticate, async (req, res) => {
     const result = await db.query(
       `SELECT email_verified, phone_verified, nin_verified,
               identity_verified, passport_photo_url, nin,
-              identity_document_type, international_passport_number
+              identity_document_type, international_passport_number,
+              identity_verification_status
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -282,6 +286,13 @@ router.get('/verification/status', authenticate, async (req, res) => {
       has_identity_number: hasIdentityNumber,
       passport: !!user.passport_photo_url,
       identity: user.identity_verified,
+      review_status:
+        user.identity_verification_status ||
+        (user.identity_verified
+          ? 'verified'
+          : user.passport_photo_url && hasIdentityNumber
+            ? 'pending'
+            : 'not_submitted'),
       overall_complete: user.email_verified && 
                         user.phone_verified && 
                         ninStepComplete && 
@@ -407,7 +418,23 @@ router.post('/upload-passport', authenticate, upload.single('passport'), async (
     const relativePath = `/uploads/passports/${req.file.filename}`;
 
     await db.query(
-      'UPDATE users SET passport_photo_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      `UPDATE users
+       SET passport_photo_url = $1,
+           identity_verified = FALSE,
+           identity_verified_by = NULL,
+           identity_verified_at = NULL,
+           identity_verification_status = CASE
+             WHEN (
+               CASE
+                 WHEN COALESCE(identity_document_type, 'nin') = 'passport'
+                 THEN international_passport_number IS NOT NULL
+                 ELSE nin IS NOT NULL
+               END
+             ) THEN 'pending'
+             ELSE NULL
+           END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
       [relativePath, userId]
     );
 
@@ -415,7 +442,7 @@ router.post('/upload-passport', authenticate, upload.single('passport'), async (
       `SELECT id, user_type, email, phone, full_name, nin,
               identity_document_type, international_passport_number, nationality, nin_verified,
               passport_photo_url, email_verified, phone_verified,
-              identity_verified, subscription_active,
+              identity_verified, identity_verification_status, subscription_active,
               subscription_expires_at, created_at
        FROM users WHERE id = $1`,
       [userId]

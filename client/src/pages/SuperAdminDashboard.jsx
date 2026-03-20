@@ -248,18 +248,49 @@ export default function SuperAdminDashboard() {
 ]);
 
   const verifyIdentity = async (id) => {
-    await api.patch(`/super/verifications/${id}/approve`);
-    toast.success("Identity verified");
-    loadVerifications(verificationPage);
-    loadUsers();
-    loadAdminPerformance();
+    try {
+      await api.patch(`/super/verifications/${id}/approve`);
+      toast.success("Identity verified");
+      await Promise.all([
+        loadVerifications(verificationPage),
+        loadUsers(),
+        loadAdminPerformance(),
+      ]);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to verify identity");
+    }
   };
 
   const rejectIdentity = async (id) => {
-    await api.patch(`/super/verifications/${id}/reject`);
-    toast.success("Identity rejected");
-    loadVerifications(verificationPage);
-    loadAdminPerformance();
+    try {
+      await api.patch(`/super/verifications/${id}/reject`);
+      toast.success("Identity rejected");
+      await Promise.all([
+        loadVerifications(verificationPage),
+        loadUsers(),
+        loadAdminPerformance(),
+      ]);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to reject identity");
+    }
+  };
+
+  const deleteRejectedVerification = async (id) => {
+    if (!window.confirm("Delete this rejected verification record?")) {
+      return;
+    }
+
+    try {
+      await api.delete(`/super/verifications/${id}`);
+      toast.success("Rejected verification deleted");
+      await Promise.all([
+        loadVerifications(verificationPage),
+        loadUsers(),
+        loadAdminPerformance(),
+      ]);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete rejected verification");
+    }
   };
 
   const banUser = async (id) => {
@@ -473,6 +504,7 @@ export default function SuperAdminDashboard() {
           onVerificationPageChange={handleVerificationPageChange}
           verifyIdentity={verifyIdentity}
           rejectIdentity={rejectIdentity}
+          deleteRejectedVerification={deleteRejectedVerification}
           adminPerformance={adminPerformance}
         />
       )}

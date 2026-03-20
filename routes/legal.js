@@ -49,5 +49,12 @@ router.patch(
   legalController.resolveDispute
 );
 
+router.get(
+  '/audit-logs',
+  authenticate,
+  allowRoles('admin', 'super_admin', 'lawyer'),
+  legalController.getLegalAuditLogs
+);
+
 
 module.exports = router;

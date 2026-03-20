@@ -23,6 +23,13 @@ const Dashboard = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const hasSubmittedVerification = !!user?.passport_photo_url;
+  const verificationReviewStatus =
+    user?.identity_verification_status ||
+    (user?.identity_verified
+      ? 'verified'
+      : hasSubmittedVerification
+        ? 'pending'
+        : 'not_submitted');
 
   const loadDashboardData = useCallback(async () => {
     if (!user) return;
@@ -197,7 +204,7 @@ const Dashboard = () => {
 
                 
                 {/* Verification Alert */}
-                {!user?.identity_verified && !hasSubmittedVerification && (
+                {!user?.identity_verified && verificationReviewStatus === 'not_submitted' && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
 
                     <div className="flex flex-col items-center">
@@ -224,7 +231,7 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {!user?.identity_verified && hasSubmittedVerification && (
+                {!user?.identity_verified && verificationReviewStatus === 'pending' && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
 
                     <div className="flex flex-col items-center">
@@ -244,6 +251,33 @@ const Dashboard = () => {
                         className="mt-3 text-sm font-semibold text-blue-800 hover:text-blue-900"
                       >
                         View Verification Status →
+                      </button>
+
+                    </div>
+
+                  </div>
+                )}
+
+                {!user?.identity_verified && verificationReviewStatus === 'rejected' && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6 text-center">
+
+                    <div className="flex flex-col items-center">
+
+                      <FaClock className="text-red-600 text-2xl mb-3" />
+
+                      <h3 className="font-semibold text-red-800">
+                        Verification Rejected
+                      </h3>
+
+                      <p className="text-sm text-red-700 mt-2">
+                        Your verification was rejected. Review your details and upload a new live passport photo.
+                      </p>
+
+                      <button
+                        onClick={() => navigate('/profile')}
+                        className="mt-3 text-sm font-semibold text-red-800 hover:text-red-900"
+                      >
+                        Fix Verification {'>'}
                       </button>
 
                     </div>

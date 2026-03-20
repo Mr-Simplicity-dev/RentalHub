@@ -1,5 +1,5 @@
 const LOCAL_FRONTEND_URL = 'http://localhost:3000';
-const DEFAULT_PRODUCTION_FRONTEND_URL = 'https://rentalhub.com.ng';
+const DEFAULT_PRODUCTION_FRONTEND_URL = 'https://renatalhub.com.ng';
 
 const normalizeUrl = (url) => String(url).trim().replace(/\/+$/, '');
 
@@ -42,10 +42,10 @@ const getAllowedFrontendOrigins = () =>
       [
         LOCAL_FRONTEND_URL,
         'http://127.0.0.1:3000',
-        'http://rentalhub.com.ng',
-        'https://rentalhub.com.ng',
-        'http://www.rentalhub.com.ng',
-        'https://www.rentalhub.com.ng',
+        'http://renatalhub.com.ng',
+        'https://renatalhub.com.ng',
+        'http://www.renatalhub.com.ng',
+        'https://www.renatalhub.com.ng',
         process.env.FRONTEND_URL,
         process.env.PRODUCTION_FRONTEND_URL,
         ...(process.env.CORS_ALLOWED_ORIGINS || '').split(','),

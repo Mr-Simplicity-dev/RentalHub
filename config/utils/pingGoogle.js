@@ -1,15 +1,23 @@
-const axios = require("axios");
+const axios = require('axios');
+const { getFrontendUrl } = require('./frontendUrl');
 
 exports.pingGoogle = async () => {
-  const sitemapUrl = "https://rentalhub.com.ng/sitemap.xml";
+  const sitemapUrl = `${getFrontendUrl()}/sitemap.xml`;
 
   try {
     await axios.get(
       `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`
     );
 
-    console.log("✅ Sitemap submitted to Google");
-  } catch (err) {
-    console.error("❌ Failed to ping Google");
+    return {
+      success: true,
+      sitemapUrl,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      sitemapUrl,
+      error: error.message,
+    };
   }
 };

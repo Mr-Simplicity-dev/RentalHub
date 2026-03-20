@@ -1,79 +1,76 @@
-const Property = require("../models/Property");
-const Location = require("../models/Location");
-const { generateSEO } = require("../utils/seoHelper");
-const { generateContent } = require("../utils/seoContent");
-const { generateBlog } = require("../utils/blogGenerator");
+const {
+  getAreaPageData,
+  getLocationPageData,
+  getNigeriaDirectoryPage,
+} = require('../config/utils/seoPageService');
+
+exports.getNigeriaDirectory = async (req, res) => {
+  try {
+    const data = await getNigeriaDirectoryPage();
+    return res.json({
+      success: true,
+      ...data,
+    });
+  } catch (error) {
+    console.error('Load Nigeria directory error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load Nigeria rental directory',
+    });
+  }
+};
 
 exports.getLocationPage = async (req, res) => {
   try {
-    const { stateSlug, lgaSlug } = req.params;
-
-    const location = await Location.findOne({
-      stateSlug,
-      ...(lgaSlug && { lgaSlug })
+    const data = await getLocationPageData({
+      stateSlug: req.params.stateSlug,
+      lgaSlug: req.params.lgaSlug || null,
     });
 
-    if (!location) {
-      return res.status(404).json({ error: "Location not found" });
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Location page not found',
+      });
     }
 
-    // 🏠 Properties
-    const query = { state: location.displayName };
-    if (lgaSlug) query.lga = location.lga;
+    return res.json({
+      success: true,
+      ...data,
+    });
+  } catch (error) {
+    console.error('Load location page error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load location page',
+    });
+  }
+};
 
-    const properties = await Property.find(query).limit(20);
-
-    // 🧠 SEO
-    const seo = generateSEO(location.displayName, location.lga);
-    const content = generateContent(location.displayName, location.lga);
-
-   const blog = generateBlog(location.displayName, location.lga);
-    const canonical = `https://rentalhub.com.ng/nigeria/${location.fullSlug}`;
-
-    // 🔗 INTERNAL LINKS
-
-    // 1. All LGAs in this state
-    const stateLGAs = await Location.find({ stateSlug });
-
-    // 2. Other LGAs (exclude current)
-    const otherLGAs = stateLGAs
-      .filter(l => l.lgaSlug !== lgaSlug)
-      .slice(0, 10); // limit for SEO cleanliness
-
-    // 3. State page link
-    const statePage = {
-      name: location.displayName,
-      url: `/nigeria/${stateSlug}`
-    };
-
-    res.json({
-      seo,
-      canonical,
-      content,
-      location: {
-        state: location.displayName,
-        lga: location.lga,
-        stateSlug,
-        lgaSlug
-      },
-      properties,
-
-      // 🔥 INTERNAL LINKS OUTPUT
-      links: {
-        statePage,
-        lgas: stateLGAs.map(l => ({
-          name: l.lga,
-          url: `/nigeria/${l.fullSlug}`
-        })),
-        nearby: otherLGAs.map(l => ({
-          name: l.lga,
-          url: `/nigeria/${l.fullSlug}`
-        }))
-      }
-
+exports.getAreaPage = async (req, res) => {
+  try {
+    const data = await getAreaPageData({
+      stateSlug: req.params.stateSlug,
+      citySlug: req.params.citySlug,
+      areaSlug: req.params.areaSlug,
     });
 
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Area page not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      ...data,
+    });
+  } catch (error) {
+    console.error('Load area page error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load area page',
+    });
   }
 };

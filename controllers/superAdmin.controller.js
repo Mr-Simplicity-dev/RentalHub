@@ -14,6 +14,18 @@ const {
 } = require('../config/utils/locationPricing');
 
 let verificationAuditSchemaReady = false;
+const USER_VERIFICATION_STATUS_EXPR = `
+  COALESCE(
+    u.identity_verification_status,
+    CASE
+      WHEN u.identity_verified = TRUE THEN 'verified'
+      WHEN u.passport_photo_url IS NOT NULL
+        AND (u.nin IS NOT NULL OR u.international_passport_number IS NOT NULL)
+      THEN 'pending'
+      ELSE 'not_submitted'
+    END
+  )
+`;
 
 const ensureVerificationAuditSchema = async () => {
   if (verificationAuditSchemaReady) return;
@@ -22,10 +34,14 @@ const ensureVerificationAuditSchema = async () => {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS identity_verified_by INTEGER REFERENCES users(id),
     ADD COLUMN IF NOT EXISTS identity_verified_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS identity_verification_status VARCHAR(20),
     ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 
     CREATE INDEX IF NOT EXISTS idx_users_identity_verified_by
       ON users(identity_verified_by);
+
+    CREATE INDEX IF NOT EXISTS idx_users_identity_verification_status
+      ON users(identity_verification_status);
   `);
 
   verificationAuditSchemaReady = true;
@@ -208,16 +224,17 @@ const getIdentityVerifications = async (req, res) => {
     const where = [
       `u.deleted_at IS NULL`,
       `u.user_type <> 'super_admin'`,
-      `u.passport_photo_url IS NOT NULL`,
-      `(u.nin IS NOT NULL OR u.international_passport_number IS NOT NULL)`,
+      `${USER_VERIFICATION_STATUS_EXPR} <> 'not_submitted'`,
     ];
     const params = [];
     let i = 1;
 
     if (status === 'pending') {
-      where.push(`u.identity_verified = FALSE`);
+      where.push(`${USER_VERIFICATION_STATUS_EXPR} = 'pending'`);
     } else if (status === 'verified') {
-      where.push(`u.identity_verified = TRUE`);
+      where.push(`${USER_VERIFICATION_STATUS_EXPR} = 'verified'`);
+    } else if (status === 'rejected') {
+      where.push(`${USER_VERIFICATION_STATUS_EXPR} = 'rejected'`);
     }
 
     if (userType && userType !== 'all') {
@@ -258,6 +275,7 @@ const getIdentityVerifications = async (req, res) => {
         u.nationality,
         u.passport_photo_url,
         u.identity_verified,
+        ${USER_VERIFICATION_STATUS_EXPR} AS identity_verification_status,
         u.identity_verified_at,
         u.identity_verified_by,
         v.full_name AS identity_verified_by_name,
@@ -265,7 +283,14 @@ const getIdentityVerifications = async (req, res) => {
       FROM users u
       LEFT JOIN users v ON v.id = u.identity_verified_by
       ${whereClause}
-      ORDER BY u.identity_verified ASC, u.created_at ASC
+      ORDER BY
+        CASE ${USER_VERIFICATION_STATUS_EXPR}
+          WHEN 'pending' THEN 0
+          WHEN 'rejected' THEN 1
+          WHEN 'verified' THEN 2
+          ELSE 3
+        END,
+        u.created_at ASC
       LIMIT $${i++} OFFSET $${i++}
     `;
     const dataResult = await db.query(dataQuery, [...params, pageSize, offset]);
@@ -296,6 +321,7 @@ const approveIdentityVerification = async (req, res) => {
     const result = await db.query(
       `UPDATE users
        SET identity_verified = TRUE,
+           identity_verification_status = 'verified',
            identity_verified_by = $2,
            identity_verified_at = NOW(),
            updated_at = NOW()
@@ -331,9 +357,9 @@ const rejectIdentityVerification = async (req, res) => {
     const result = await db.query(
       `UPDATE users
        SET identity_verified = FALSE,
+           identity_verification_status = 'rejected',
            identity_verified_by = NULL,
            identity_verified_at = NULL,
-           passport_photo_url = NULL,
            updated_at = NOW()
        WHERE id = $1
          AND deleted_at IS NULL
@@ -352,6 +378,42 @@ const rejectIdentityVerification = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to reject verification' });
+  }
+};
+
+// DELETE /api/super/verifications/:userId
+const deleteRejectedVerification = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    await ensureVerificationAuditSchema();
+
+    const result = await db.query(
+      `UPDATE users
+       SET passport_photo_url = NULL,
+           identity_verified = FALSE,
+           identity_verification_status = NULL,
+           identity_verified_by = NULL,
+           identity_verified_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+         AND deleted_at IS NULL
+         AND user_type <> 'super_admin'
+         AND identity_verification_status = 'rejected'
+       RETURNING id`,
+      [userId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: 'Rejected verification record not found' });
+    }
+
+    await logAction(req.user.id, 'DELETE_REJECTED_VERIFICATION', 'user', userId);
+
+    res.json({ success: true, message: 'Rejected verification deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to delete rejected verification' });
   }
 };
 
@@ -668,11 +730,14 @@ const bulkUserAction = async (req, res) => {
         query = `
           UPDATE users
           SET identity_verified = TRUE,
+              identity_verification_status = 'verified',
               identity_verified_by = $2,
               identity_verified_at = NOW(),
               updated_at = NOW()
           WHERE id = ANY($1)
             AND user_type <> 'super_admin'
+            AND passport_photo_url IS NOT NULL
+            AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
         `;
         params = [ids, req.user.id];
         logActionName = 'BULK_VERIFY_USERS';
@@ -922,6 +987,7 @@ module.exports = {
   getIdentityVerifications,
   approveIdentityVerification,
   rejectIdentityVerification,
+  deleteRejectedVerification,
   verifyUser,
   getAdminPerformance,
   getAllProperties,

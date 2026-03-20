@@ -1,30 +1,27 @@
-const Location = require("../models/Location");
-const Blog = require("../models/Blog");
+const { getSitemapUrls } = require('./seoPageService');
+
+const formatSitemapDate = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
 
 exports.generateSitemap = async () => {
-  const locations = await Location.find();
-  const blogs = await Blog.find();
+  const urls = await getSitemapUrls();
+  const lastmod = formatSitemapDate(new Date());
 
-  let urls = "";
-
-  // Location pages
-  locations.forEach(loc => {
-    urls += `
+  const urlEntries = urls
+    .map(
+      (url) => `
     <url>
-      <loc>https://rentalhub.com.ng/nigeria/${loc.fullSlug}</loc>
-    </url>`;
-  });
-
-  // Blog pages
-  blogs.forEach(blog => {
-    urls += `
-    <url>
-      <loc>https://rentalhub.com.ng/blog/${blog.slug}</loc>
-    </url>`;
-  });
+      <loc>${url}</loc>
+      ${lastmod ? `<lastmod>${lastmod}</lastmod>` : ''}
+    </url>`
+    )
+    .join('');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
   <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-    ${urls}
+    ${urlEntries}
   </urlset>`;
 };

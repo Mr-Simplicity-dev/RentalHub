@@ -63,25 +63,31 @@ exports.getAuthorizedProperties = async (req, res) => {
     }
 
     const result = await db.query(
-      `SELECT DISTINCT p.*
+      `SELECT DISTINCT ON (p.id)
+         p.*,
+         client.full_name AS client_name,
+         client.email AS client_email,
+         granter.full_name AS assigned_by_name,
+         granter.email AS assigned_by_email
        FROM properties p
-       WHERE EXISTS (
-         SELECT 1
-         FROM legal_authorizations la
-         WHERE la.lawyer_user_id = $1
-           AND la.status = 'active'
-           AND la.property_id = p.id
-       )
-       OR EXISTS (
-         SELECT 1
-         FROM legal_authorizations la
-         JOIN disputes d ON d.property_id = p.id
-         WHERE la.lawyer_user_id = $1
-           AND la.status = 'active'
-           AND la.property_id IS NULL
-           AND la.client_user_id IN (d.opened_by, d.against_user)
-       )
-       ORDER BY p.created_at DESC`,
+       JOIN legal_authorizations la
+         ON (
+           la.property_id = p.id
+           OR (
+             la.property_id IS NULL
+             AND EXISTS (
+               SELECT 1
+               FROM disputes d
+               WHERE d.property_id = p.id
+                 AND la.client_user_id IN (d.opened_by, d.against_user)
+             )
+           )
+         )
+       LEFT JOIN users client ON client.id = la.client_user_id
+       LEFT JOIN users granter ON granter.id = la.granted_by
+       WHERE la.lawyer_user_id = $1
+         AND la.status = 'active'
+       ORDER BY p.id, p.created_at DESC, la.id DESC`,
       [lawyerId]
     );
 
@@ -159,4 +165,54 @@ exports.resolveDispute = async (req, res) => {
 
   }
 
+};
+
+/* ---------------------------------------------------
+   Legal Audit Logs
+--------------------------------------------------- */
+
+exports.getLegalAuditLogs = async (req, res) => {
+  try {
+    const { disputeId = null, limit = 50 } = req.query;
+    const params = [];
+    const where = [];
+
+    if (disputeId) {
+      params.push(disputeId);
+      where.push(`l.target_type = 'dispute' AND l.target_id = $${params.length}`);
+    } else {
+      where.push(`(
+        l.target_type = 'dispute'
+        OR l.action ILIKE '%lawyer%'
+        OR l.action ILIKE '%legal%'
+      )`);
+    }
+
+    params.push(Math.min(Number(limit) || 50, 200));
+
+    const result = await db.query(
+      `SELECT
+         l.*,
+         u.full_name AS actor_name,
+         u.email AS actor_email,
+         u.user_type AS actor_role
+       FROM audit_logs l
+       LEFT JOIN users u ON u.id = l.actor_id
+       WHERE ${where.join(' AND ')}
+       ORDER BY l.id DESC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    return res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get legal audit logs error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch legal audit logs',
+    });
+  }
 };

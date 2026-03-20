@@ -57,6 +57,8 @@ import VerifyCase from './VerifyCase';
 import DisputeDetails from "./DisputeDetails";
 import AcceptLawyerInvite from './AcceptLawyerInvite';
 import LocationPage from './LocationPage';
+import NigeriaPage from './NigeriaPage';
+import AreaPage from './AreaPage';
 
 
 const queryClient = new QueryClient();
@@ -182,8 +184,10 @@ function App() {
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
-              <Route path="/nigeria/:state" element={<LocationPage />} />
-              <Route path="/nigeria/:state/:lga" element={<LocationPage />} />
+              <Route path="/nigeria" element={<NigeriaPage />} />
+              <Route path="/nigeria/:stateSlug" element={<LocationPage />} />
+              <Route path="/nigeria/:stateSlug/:lgaSlug" element={<LocationPage />} />
+              <Route path="/areas/:stateSlug/:citySlug/:areaSlug" element={<AreaPage />} />
 
               {/* Protected */}
               <Route

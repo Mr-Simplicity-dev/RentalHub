@@ -153,6 +153,7 @@ const LawyerInvitesManager = ({
             <thead className="bg-gray-50 text-gray-700">
               <tr>
                 <th className="p-3 text-left">Client</th>
+                <th className="p-3 text-left">Assigned By</th>
                 <th className="p-3 text-left">Role</th>
                 <th className="p-3 text-left">Lawyer Email</th>
                 <th className="p-3 text-left">Status</th>
@@ -166,7 +167,7 @@ const LawyerInvitesManager = ({
             <tbody>
               {!loading && invites.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="py-10 text-center text-gray-500">
+                  <td colSpan="9" className="py-10 text-center text-gray-500">
                     No lawyer invites found
                   </td>
                 </tr>
@@ -178,6 +179,9 @@ const LawyerInvitesManager = ({
                   className="border-t border-soft transition hover:bg-gray-50"
                 >
                   <td className="p-3 font-medium">{invite.client_name}</td>
+                  <td className="p-3 text-gray-600">
+                    {invite.assigned_by_name || invite.client_name || '-'}
+                  </td>
                   <td className="p-3 capitalize">{invite.client_role}</td>
                   <td className="p-3 text-gray-600">{invite.lawyer_email}</td>
                   <td className="p-3">

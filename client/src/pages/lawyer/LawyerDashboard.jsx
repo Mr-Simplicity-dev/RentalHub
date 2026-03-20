@@ -69,7 +69,11 @@ const LawyerDashboard = () => {
                     : 'hover:bg-gray-50'
                 }`}
               >
-                {property.title}
+                <div className="font-medium text-gray-900">{property.title}</div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Assigned by {property.assigned_by_name || property.client_name || 'Unknown'}
+                  {property.client_name ? ` for ${property.client_name}` : ''}
+                </div>
               </button>
             ))}
           </div>
@@ -140,6 +144,13 @@ const LawyerDashboard = () => {
                       className="text-sm text-primary-700 hover:underline"
                     >
                       Verify Integrity
+                    </Link>
+
+                    <Link
+                      to={`/dispute/${d.id}`}
+                      className="text-sm text-primary-700 hover:underline"
+                    >
+                      Trace Dispute
                     </Link>
                   </div>
                 </div>

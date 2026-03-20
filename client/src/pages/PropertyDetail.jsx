@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet';
 import { propertyService } from '../services/propertyService';
 import { applicationService } from '../services/applicationService';
 import { paymentService } from '../services/paymentService';
@@ -299,9 +300,51 @@ const PropertyDetail = () => {
   const landlordWhatsappLink = property?.landlord_phone
     ? `https://wa.me/${String(property.landlord_phone).replace(/[^\d]/g, '')}`
     : null;
+  const propertyLocation = [property?.area, property?.city, property?.state_name]
+    .filter(Boolean)
+    .join(', ');
+  const propertySeoTitle = propertyLocation
+    ? `${property.title} in ${propertyLocation} | ${formatCurrency(
+        property.rent_amount || property.price || 0
+      )}`
+    : property.title;
+  const propertySeoDescription = propertyLocation
+    ? `Browse verified details for ${property.title} in ${propertyLocation}. See rent, property features, photos, and landlord contact options on RenatalHub.`
+    : `Browse verified details for ${property.title} on RenatalHub.`;
+  const propertyCanonical = `${window.location.origin}/properties/${property.id}`;
+  const propertySchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Residence',
+    name: property.title,
+    description: property.description,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: property.city || property.area || property.state_name,
+      addressRegion: property.state_name,
+      addressCountry: 'NG',
+    },
+    offers: {
+      '@type': 'Offer',
+      priceCurrency: 'NGN',
+      price: Number(property.rent_amount || property.price || 0),
+      availability: property.is_available ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
+      url: propertyCanonical,
+    },
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <Helmet>
+        <title>{propertySeoTitle}</title>
+        <meta name="description" content={propertySeoDescription} />
+        <link rel="canonical" href={propertyCanonical} />
+        <meta property="og:title" content={propertySeoTitle} />
+        <meta property="og:description" content={propertySeoDescription} />
+        <meta property="og:url" content={propertyCanonical} />
+        <meta property="og:type" content="article" />
+        <script type="application/ld+json">{JSON.stringify(propertySchema)}</script>
+      </Helmet>
+
       {/* Image Gallery */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         {property.photos && property.photos.length > 0 ? (

@@ -4,6 +4,18 @@ const { notifyAlertsForProperty } = require('../config/utils/propertyAlertServic
 const bcrypt = require('bcryptjs');
 
 let verificationAuditSchemaReady = false;
+const USER_VERIFICATION_STATUS_EXPR = `
+  COALESCE(
+    identity_verification_status,
+    CASE
+      WHEN identity_verified = TRUE THEN 'verified'
+      WHEN passport_photo_url IS NOT NULL
+        AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
+      THEN 'pending'
+      ELSE 'not_submitted'
+    END
+  )
+`;
 
 const ensureVerificationAuditSchema = async () => {
   if (verificationAuditSchemaReady) return;
@@ -11,10 +23,14 @@ const ensureVerificationAuditSchema = async () => {
   await db.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS identity_verified_by INTEGER REFERENCES users(id),
-    ADD COLUMN IF NOT EXISTS identity_verified_at TIMESTAMP;
+    ADD COLUMN IF NOT EXISTS identity_verified_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS identity_verification_status VARCHAR(20);
 
     CREATE INDEX IF NOT EXISTS idx_users_identity_verified_by
       ON users(identity_verified_by);
+
+    CREATE INDEX IF NOT EXISTS idx_users_identity_verification_status
+      ON users(identity_verification_status);
   `);
 
   verificationAuditSchemaReady = true;
@@ -179,9 +195,7 @@ exports.getPendingVerifications = async (req, res) => {
       `deleted_at IS NULL`,
       `email_verified = TRUE`,
       `phone_verified = TRUE`,
-      `identity_verified = FALSE`,
-      `passport_photo_url IS NOT NULL`,
-      `(nin IS NOT NULL OR international_passport_number IS NOT NULL)`,
+      `${USER_VERIFICATION_STATUS_EXPR} = 'pending'`,
       `user_type IN ('tenant', 'landlord')`,
     ];
 
@@ -249,6 +263,7 @@ exports.approveVerification = async (req, res) => {
     const result = await db.query(
       `UPDATE users
        SET identity_verified = TRUE,
+           identity_verification_status = 'verified',
            identity_verified_by = $2,
            identity_verified_at = NOW(),
            updated_at = NOW()
@@ -284,8 +299,8 @@ exports.rejectVerification = async (req, res) => {
 
     const result = await db.query(
       `UPDATE users
-       SET passport_photo_url = NULL,
-           identity_verified = FALSE,
+       SET identity_verified = FALSE,
+           identity_verification_status = 'rejected',
            identity_verified_by = NULL,
            identity_verified_at = NULL,
            updated_at = NOW()
@@ -690,12 +705,15 @@ exports.verifyUser = async (req, res) => {
     const result = await db.query(
       `UPDATE users
        SET identity_verified = TRUE,
+           identity_verification_status = 'verified',
            identity_verified_by = $2,
            identity_verified_at = NOW(),
            updated_at = NOW()
        WHERE id = $1
          AND deleted_at IS NULL
          AND user_type IN ('tenant', 'landlord')
+         AND passport_photo_url IS NOT NULL
+         AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
        RETURNING id`,
       [id, adminId]
     );

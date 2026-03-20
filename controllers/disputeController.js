@@ -3,6 +3,8 @@ const { logAction } = require('../config/utils/auditLogger');
 const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
+const DocumentSignature = require('../models/DocumentSignature');
+const UserKey = require('../models/UserKey');
 const { buildMerkleRoot } = require('../services/merkleEvidence.service');
 const { anchorEvidence } = require('../services/evidenceAnchor.service');
 
@@ -77,6 +79,200 @@ exports.getDisputes = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch disputes'
+    });
+  }
+};
+
+// Get full dispute details with traceability
+exports.getDisputeDetails = async (req, res) => {
+  try {
+    const { disputeId } = req.params;
+
+    const disputeResult = await db.query(
+      `SELECT
+         d.*,
+         p.title AS property_title,
+         p.state,
+         p.city,
+         p.area,
+         p.full_address,
+         opener.full_name AS opened_by_name,
+         opener.email AS opened_by_email,
+         opener.user_type AS opened_by_role,
+         against_user.full_name AS against_name,
+         against_user.email AS against_email,
+         against_user.user_type AS against_role,
+         resolver.full_name AS resolved_by_name,
+         sealer.full_name AS sealed_by_name
+       FROM disputes d
+       LEFT JOIN properties p ON p.id = d.property_id
+       LEFT JOIN users opener ON opener.id = d.opened_by
+       LEFT JOIN users against_user ON against_user.id = d.against_user
+       LEFT JOIN users resolver ON resolver.id = d.resolved_by
+       LEFT JOIN users sealer ON sealer.id = d.sealed_by
+       WHERE d.id = $1
+       LIMIT 1`,
+      [disputeId]
+    );
+
+    if (!disputeResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Dispute not found',
+      });
+    }
+
+    const dispute = disputeResult.rows[0];
+
+    const [messagesResult, evidenceResult, auditResult, lawyerResult] = await Promise.all([
+      db.query(
+        `SELECT
+           m.*,
+           u.full_name AS sender_name,
+           u.email AS sender_email,
+           u.user_type AS sender_role
+         FROM dispute_messages m
+         LEFT JOIN users u ON u.id = m.sender_id
+         WHERE m.dispute_id = $1
+         ORDER BY m.created_at ASC, m.id ASC`,
+        [disputeId]
+      ),
+      db.query(
+        `SELECT
+           e.*,
+           u.full_name AS uploaded_by_name,
+           u.email AS uploaded_by_email,
+           u.user_type AS uploaded_by_role
+         FROM dispute_evidence e
+         LEFT JOIN users u ON u.id = e.uploaded_by
+         WHERE e.dispute_id = $1
+         ORDER BY e.created_at ASC, e.id ASC`,
+        [disputeId]
+      ),
+      db.query(
+        `SELECT
+           l.*,
+           u.full_name AS actor_name,
+           u.email AS actor_email,
+           u.user_type AS actor_role
+         FROM audit_logs l
+         LEFT JOIN users u ON u.id = l.actor_id
+         WHERE l.target_type = 'dispute'
+           AND l.target_id = $1
+         ORDER BY l.id ASC`,
+        [disputeId]
+      ),
+      db.query(
+        `SELECT DISTINCT
+           lawyer.id,
+           lawyer.full_name,
+           lawyer.email,
+           lawyer.user_type,
+           granter.full_name AS assigned_by_name,
+           granter.email AS assigned_by_email,
+           client.full_name AS client_name,
+           client.email AS client_email
+         FROM legal_authorizations la
+         JOIN users lawyer ON lawyer.id = la.lawyer_user_id
+         LEFT JOIN users granter ON granter.id = la.granted_by
+         LEFT JOIN users client ON client.id = la.client_user_id
+         WHERE la.status = 'active'
+           AND (
+             la.property_id = $1
+             OR (
+               la.property_id IS NULL
+               AND la.client_user_id IN ($2, $3)
+             )
+           )`,
+        [dispute.property_id, dispute.opened_by, dispute.against_user]
+      ),
+    ]);
+
+    const timeline = [
+      dispute.created_at
+        ? {
+            type: 'dispute_created',
+            happened_at: dispute.created_at,
+            actor_name: dispute.opened_by_name,
+            actor_role: dispute.opened_by_role,
+            summary: 'Dispute opened',
+            details: dispute.title || dispute.description,
+          }
+        : null,
+      ...(messagesResult.rows || []).map((item) => ({
+        type: 'message',
+        happened_at: item.created_at,
+        actor_name: item.sender_name,
+        actor_role: item.sender_role,
+        summary: 'Dispute message added',
+        details: item.message,
+      })),
+      ...(evidenceResult.rows || []).map((item) => ({
+        type: 'evidence',
+        happened_at: item.created_at,
+        actor_name: item.uploaded_by_name,
+        actor_role: item.uploaded_by_role,
+        summary: 'Evidence uploaded',
+        details: item.file_name,
+      })),
+      ...(auditResult.rows || []).map((item) => ({
+        type: 'audit',
+        happened_at: item.created_at || item.timestamp || item.logged_at,
+        actor_name: item.actor_name,
+        actor_role: item.actor_role,
+        summary: item.action,
+        details: item.metadata || null,
+      })),
+    ]
+      .filter(Boolean)
+      .sort((a, b) => new Date(a.happened_at) - new Date(b.happened_at));
+
+    return res.json({
+      success: true,
+      data: {
+        dispute,
+        messages: messagesResult.rows,
+        evidence: evidenceResult.rows,
+        audit_logs: auditResult.rows,
+        authorized_lawyers: lawyerResult.rows,
+        timeline,
+      },
+    });
+  } catch (error) {
+    console.error('Get dispute details error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dispute details',
+    });
+  }
+};
+
+exports.listDisputeEvidence = async (req, res) => {
+  try {
+    const { disputeId } = req.params;
+
+    const result = await db.query(
+      `SELECT
+         e.*,
+         u.full_name AS uploaded_by_name,
+         u.email AS uploaded_by_email,
+         u.user_type AS uploaded_by_role
+       FROM dispute_evidence e
+       LEFT JOIN users u ON u.id = e.uploaded_by
+       WHERE e.dispute_id = $1
+       ORDER BY e.created_at ASC, e.id ASC`,
+      [disputeId]
+    );
+
+    return res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('List dispute evidence error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dispute evidence',
     });
   }
 };

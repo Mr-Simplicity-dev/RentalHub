@@ -38,8 +38,16 @@ const VerificationsTab = ({
   loadVerifications,
   verifyIdentity,
   rejectIdentity,
+  deleteRejectedVerification,
   adminPerformance,
 }) => {
+  const getReviewStatus = (verification) => {
+    if (verification?.identity_verification_status) {
+      return verification.identity_verification_status;
+    }
+
+    return verification?.identity_verified ? "verified" : "pending";
+  };
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -70,6 +78,7 @@ const VerificationsTab = ({
           >
             <option value="pending">Pending</option>
             <option value="verified">Verified</option>
+            <option value="rejected">Rejected</option>
             <option value="all">All</option>
           </select>
 
@@ -130,7 +139,7 @@ const VerificationsTab = ({
 
                 <tr>
                   <td colSpan="10" className="text-center py-10 text-gray-500">
-                    No verification requests found
+                    No verification records found for the selected filters.
                   </td>
                 </tr>
 
@@ -139,6 +148,7 @@ const VerificationsTab = ({
               {verifications.map((v) => {
 
                 const docType = (v.identity_document_type || "nin").toLowerCase();
+                const reviewStatus = getReviewStatus(v);
 
                 const docNumber =
                   docType === "passport"
@@ -177,12 +187,18 @@ const VerificationsTab = ({
                       <span
                         className={`px-2 py-1 text-xs rounded-full
                           ${
-                            v.identity_verified
+                            reviewStatus === "verified"
                               ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
+                              : reviewStatus === "rejected"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-yellow-100 text-yellow-700"
                           }`}
                       >
-                        {v.identity_verified ? "Verified" : "Pending"}
+                        {reviewStatus === "verified"
+                          ? "Verified"
+                          : reviewStatus === "rejected"
+                            ? "Rejected"
+                            : "Pending"}
                       </span>
 
                     </td>
@@ -222,7 +238,7 @@ const VerificationsTab = ({
 
                       <div className="flex justify-center gap-2">
 
-                        {!v.identity_verified && (
+                        {reviewStatus === "pending" && (
 
                           <>
                             <button
@@ -240,6 +256,24 @@ const VerificationsTab = ({
                             </button>
                           </>
 
+                        )}
+
+                        {reviewStatus === "rejected" && (
+                          <>
+                            <button
+                              onClick={() => verifyIdentity(v.id)}
+                              className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700"
+                            >
+                              Approve
+                            </button>
+
+                            <button
+                              onClick={() => deleteRejectedVerification(v.id)}
+                              className="rounded-lg bg-gray-700 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-800"
+                            >
+                              Delete
+                            </button>
+                          </>
                         )}
 
                       </div>

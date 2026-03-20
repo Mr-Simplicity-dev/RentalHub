@@ -20,6 +20,7 @@ router.patch('/verify/:userId', authenticate, requireSuperAdmin, superCtrl.verif
 router.get('/verifications', authenticate, requireSuperAdmin, superCtrl.getIdentityVerifications);
 router.patch('/verifications/:userId/approve', authenticate, requireSuperAdmin, superCtrl.approveIdentityVerification);
 router.patch('/verifications/:userId/reject', authenticate, requireSuperAdmin, superCtrl.rejectIdentityVerification);
+router.delete('/verifications/:userId', authenticate, requireSuperAdmin, superCtrl.deleteRejectedVerification);
 router.get('/admins/performance', authenticate, requireSuperAdmin, superCtrl.getAdminPerformance);
 
 router.get('/logs', authenticate, requireSuperAdmin, superCtrl.getAuditLogs);
