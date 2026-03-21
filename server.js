@@ -35,7 +35,7 @@ const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 
 const audit = require('./config/middleware/auditMiddleware');
 const { enforceFlags } = require('./config/middleware/featureFlags');
-const { getAllowedFrontendOrigins } = require('./config/utils/frontendUrl');
+const { getAllowedFrontendOrigins, getFrontendUrl } = require('./config/utils/frontendUrl');
 const startScheduler = require('./config/utils/scheduler');
 const locationRoutes = require("./routes/locationRoutes");
 const { generateSitemap } = require("./utils/sitemapGenerator");
@@ -117,6 +117,7 @@ for (let i = 0; i < postsPerDay; i++) {
     }
 
     // 🔥 IMPROVED AI CONTENT (LESS REPETITION)
+    const frontendUrl = getFrontendUrl();
     const content = `
 # ${title}
 
@@ -149,7 +150,7 @@ Rental prices vary depending on:
 - Cheap apartments in ${location}
 - Flats available in ${location}
 
-Visit: https://rentalhub.com.ng/nigeria/${slugify(
+Visit: ${frontendUrl}/nigeria/${slugify(
       `${state.displayName}`
     )}
 
@@ -166,7 +167,7 @@ Start your search today and find the best home in ${location}.
     });
 
     // track SEO rank for primary keyword
-    await saveRanking(keywordsList[0], `https://rentalhub.com.ng/nigeria/${slug}`);
+    await saveRanking(keywordsList[0], `${frontendUrl}/nigeria/${slug}`);
 
     created++;
     createdPost = true;
@@ -404,5 +405,4 @@ const io = new Server(server, {
 });
 
 global.io = io;
-
 

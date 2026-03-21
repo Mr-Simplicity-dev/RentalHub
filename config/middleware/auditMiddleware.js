@@ -1,6 +1,5 @@
 const db = require('./database');
 const crypto = require('crypto');
-const db = require('./database');
 
 const audit = (action, targetType) => {
   return (req, res, next) => {

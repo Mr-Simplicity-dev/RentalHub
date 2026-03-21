@@ -121,7 +121,7 @@ const Dashboard = () => {
   };
 
   const getLawyerInviteSummary = () => {
-    const status = stats?.lawyer_invite_status || 'not_sent';
+    const rawStatus = stats?.lawyer_invite_status || 'not_sent';
     const lawyerEmail = stats?.lawyer_email;
     const acceptedAt = stats?.lawyer_invite_accepted_at
       ? new Date(stats.lawyer_invite_accepted_at)
@@ -129,6 +129,13 @@ const Dashboard = () => {
     const expiresAt = stats?.lawyer_invite_expires_at
       ? new Date(stats.lawyer_invite_expires_at)
       : null;
+
+    const hasAnyInviteRecord = !!lawyerEmail || !!stats?.lawyer_invite_accepted_at || !!stats?.lawyer_invite_expires_at;
+    const status = rawStatus === 'not_sent' && hasAnyInviteRecord
+      ? acceptedAt
+        ? 'accepted'
+        : 'pending'
+      : rawStatus;
 
     if (status === 'accepted') {
       return {

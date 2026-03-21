@@ -1,6 +1,5 @@
 const db = require('../middleware/database');
 const crypto = require('crypto');
-const db = require('../middleware/database');
 
 exports.logAction = async ({
   actorId,

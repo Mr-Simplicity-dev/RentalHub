@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import LawyerVerification from './LawyerVerification';
 
-const LawyerDashboard = () => {
+const LawyerDashboardContent = () => {
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [disputes, setDisputes] = useState([]);
@@ -162,5 +163,12 @@ const LawyerDashboard = () => {
     </div>
   );
 };
+
+// Wrap with verification gate
+const LawyerDashboard = () => (
+  <LawyerVerification>
+    <LawyerDashboardContent />
+  </LawyerVerification>
+);
 
 export default LawyerDashboard;

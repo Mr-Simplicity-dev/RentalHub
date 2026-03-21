@@ -115,6 +115,15 @@ router.post(
       .trim()
       .notEmpty()
       .withMessage('Full name is required'),
+    body('chamber_name')
+      .trim()
+      .notEmpty()
+      .withMessage('Chamber/law firm name is required'),
+    body('chamber_phone')
+      .trim()
+      .customSanitizer((value) => String(value || '').replace(/\s+/g, ''))
+      .matches(/^\+?\d{10,15}$/)
+      .withMessage('Please enter a valid chamber phone number (10-15 digits, optional +)'),
     body('phone')
       .trim()
       .customSanitizer((value) => String(value || '').replace(/\s+/g, ''))
@@ -173,6 +182,14 @@ router.post(
   authenticate,
   uploadPassport,
   authController.uploadPassport
+);
+
+// Check Lawyer Passport for Fraud (compare against tenant/landlord passports)
+router.post(
+  '/check-lawyer-passport-fraud',
+  authenticate,
+  uploadPassport,
+  authController.checkLawyerPassportForFraud
 );
 
 // Get Current User Profile

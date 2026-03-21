@@ -9,6 +9,8 @@ const LawyerInvitesManager = ({
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedLawyer, setSelectedLawyer] = useState(null);
+  const [showLawyerModal, setShowLawyerModal] = useState(false);
 
   const loadInvites = async (query = "") => {
     try {
@@ -96,6 +98,18 @@ const LawyerInvitesManager = ({
     }
   };
 
+  const showLawyerDetails = (invite) => {
+    if (invite.status === "accepted" && invite.lawyer_user_id) {
+      setSelectedLawyer(invite);
+      setShowLawyerModal(true);
+    }
+  };
+
+  const closeLawyerModal = () => {
+    setSelectedLawyer(null);
+    setShowLawyerModal(false);
+  };
+
   const getStatusBadge = (invite) => {
     const isExpired =
       invite.status !== "accepted" &&
@@ -178,7 +192,18 @@ const LawyerInvitesManager = ({
                   key={invite.id}
                   className="border-t border-soft transition hover:bg-gray-50"
                 >
-                  <td className="p-3 font-medium">{invite.client_name}</td>
+                  <td className="p-3">
+                    {invite.status === "accepted" && invite.lawyer_user_id ? (
+                      <button
+                        onClick={() => showLawyerDetails(invite)}
+                        className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {invite.client_name}
+                      </button>
+                    ) : (
+                      <span className="font-medium">{invite.client_name}</span>
+                    )}
+                  </td>
                   <td className="p-3 text-gray-600">
                     {invite.assigned_by_name || invite.client_name || '-'}
                   </td>
@@ -231,6 +256,229 @@ const LawyerInvitesManager = ({
           </table>
         </div>
       </div>
+
+      {/* Lawyer Details Modal */}
+      {showLawyerModal && selectedLawyer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+            <div className="mb-6 flex items-center justify-center relative">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white text-center">
+                Lawyer Details
+              </h3>
+              <button
+                onClick={closeLawyerModal}
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {/* Personal Information */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Personal Information
+                  </h4>
+
+                  {selectedLawyer.lawyer_passport_photo_url && (
+                    <div className="flex justify-center mb-4">
+                      <img
+                        src={selectedLawyer.lawyer_passport_photo_url}
+                        alt="Lawyer Passport Photo"
+                        className="h-32 w-32 rounded-lg object-cover border border-gray-300 dark:border-gray-600"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Full Name
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900 dark:text-white font-medium">
+                          {selectedLawyer.lawyer_name || "Not provided"}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Nationality
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                          {selectedLawyer.lawyer_nationality || "Not provided"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Email Address
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                          {selectedLawyer.lawyer_email}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Phone Number
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                          {selectedLawyer.lawyer_phone || "Not provided"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Identity Verification */}
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Identity Verification
+                  </h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Document Type
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900 dark:text-white capitalize">
+                          {selectedLawyer.lawyer_identity_document_type || "Not provided"}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Verification Status
+                        </label>
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 ${
+                            selectedLawyer.lawyer_nin_verified
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          }`}
+                        >
+                          {selectedLawyer.lawyer_nin_verified ? "Verified" : "Not Verified"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {selectedLawyer.lawyer_identity_document_type === "passport" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Passport Number
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900 dark:text-white font-mono">
+                          {selectedLawyer.lawyer_passport_number || "Not provided"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Professional Information */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Professional Information
+                  </h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Chamber/Law Firm
+                      </label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white font-medium">
+                        {selectedLawyer.lawyer_chamber_name || "Not provided"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Chamber Phone
+                      </label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                        {selectedLawyer.lawyer_chamber_phone || "Not provided"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Client Relationship */}
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Client Relationship
+                  </h4>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Client Name
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900 dark:text-white font-medium">
+                          {selectedLawyer.client_name}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Client Role
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900 dark:text-white capitalize">
+                          {selectedLawyer.client_role}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Invite Status
+                          </label>
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            Accepted
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Accepted Date
+                          </label>
+                          <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                            {selectedLawyer.accepted_at
+                              ? new Date(selectedLawyer.accepted_at).toLocaleDateString()
+                              : "Not available"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={closeLawyerModal}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

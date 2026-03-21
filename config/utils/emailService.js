@@ -203,3 +203,76 @@ exports.sendMessageNotification = async (
     console.error('Message notification email error:', error);
   }
 };
+
+// Send fraud alert to super admin
+exports.sendFraudAlertEmail = async ({
+  adminEmail,
+  adminName,
+  lawyerName,
+  lawyerEmail,
+  matchedUserName,
+  matchedUserType,
+  matchedUserEmail,
+  alertTime,
+}) => {
+  try {
+    await sendEmail({
+      to: adminEmail,
+      subject: 'URGENT: Fraud Alert - Duplicate Passport Detected',
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+          <div style="background: #fee; border: 2px solid #c33; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+            <h2 style="color: #c33; margin-top: 0;">🚨 FRAUD ALERT 🚨</h2>
+            <p style="margin: 0;"><strong>Duplicate passport detected during lawyer verification</strong></p>
+          </div>
+
+          <h3>Alert Details:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr style="background: #f9f9f9;">
+              <td style="padding: 8px; border: 1px solid #ddd;"><strong>Time:</strong></td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${alertTime}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd;"><strong>Alert Type:</strong></td>
+              <td style="padding: 8px; border: 1px solid #ddd;">Duplicate Identity - Passport Match</td>
+            </tr>
+          </table>
+
+          <h3>Lawyer Account (Attempting to Register):</h3>
+          <ul style="background: #f0f8ff; padding: 15px; border-left: 4px solid #0284c7; border-radius: 4px;">
+            <li><strong>Name:</strong> ${lawyerName}</li>
+            <li><strong>Email:</strong> ${lawyerEmail}</li>
+            <li><strong>Status:</strong> Flagged for fraud verification</li>
+          </ul>
+
+          <h3>Matched Account (Existing User):</h3>
+          <ul style="background: #f0f0f0; padding: 15px; border-left: 4px solid #999; border-radius: 4px;">
+            <li><strong>Name:</strong> ${matchedUserName}</li>
+            <li><strong>Email:</strong> ${matchedUserEmail}</li>
+            <li><strong>User Type:</strong> ${matchedUserType}</li>
+            <li><strong>Issue:</strong> Same passport photo used in multiple accounts</li>
+          </ul>
+
+          <h3>Recommended Actions:</h3>
+          <ol>
+            <li>Investigate the lawyer account: ${lawyerEmail}</li>
+            <li>Compare both passport photos in admin panel</li>
+            <li>Contact lawyer for explanation</li>
+            <li>Contact original ${matchedUserType}: ${matchedUserEmail}</li>
+            <li>Suspend lawyer account if fraud confirmed</li>
+            <li>Mark alert as resolved/false-positive when investigation complete</li>
+          </ol>
+
+          <p style="margin-top: 30px; font-size: 12px; color: #999;">
+            This is an automated fraud detection alert. Please investigate immediately.
+          </p>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Fraud alert email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+

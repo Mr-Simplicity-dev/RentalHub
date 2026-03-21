@@ -42,6 +42,10 @@ const getAllowedFrontendOrigins = () =>
       [
         LOCAL_FRONTEND_URL,
         'http://127.0.0.1:3000',
+        'http://rentalhub.com.ng',
+        'https://rentalhub.com.ng',
+        'http://www.rentalhub.com.ng',
+        'https://www.rentalhub.com.ng',
         'http://renatalhub.com.ng',
         'https://renatalhub.com.ng',
         'http://www.renatalhub.com.ng',

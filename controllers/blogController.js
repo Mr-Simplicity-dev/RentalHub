@@ -1,5 +1,6 @@
 const Blog = require("../models/Blog");
 const { submitURL } = require("../utils/googleIndexing");
+const { getFrontendUrl } = require("../config/utils/frontendUrl");
 
 exports.getBlog = async (req, res) => {
   try {
@@ -21,7 +22,7 @@ exports.getBlog = async (req, res) => {
     };
 
     // 🔗 Canonical URL
-    const canonical = `https://rentalhub.com.ng/blog/${blog.slug}`;
+    const canonical = `${getFrontendUrl()}/blog/${blog.slug}`;
 
     res.json({
       success: true,

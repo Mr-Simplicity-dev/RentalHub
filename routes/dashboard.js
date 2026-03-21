@@ -82,31 +82,43 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
           ORDER BY created_at DESC
           LIMIT 1
         ) AS lawyer_email,
-        COALESCE((
-          SELECT CASE
-            WHEN li.status = 'accepted' THEN 'accepted'
-            WHEN li.status = 'pending' AND li.expires_at < NOW() THEN 'not_accepted'
-            WHEN li.status = 'pending' THEN 'pending'
-            ELSE li.status
-          END
-          FROM lawyer_invites li
-          WHERE li.client_user_id = $1
-          ORDER BY li.created_at DESC
-          LIMIT 1
-        ), 'not_sent') AS lawyer_invite_status,
+        (CASE
+          WHEN EXISTS(
+            SELECT 1
+            FROM lawyer_invites li
+            WHERE li.client_user_id = $1
+              AND li.status = 'accepted'
+          ) THEN 'accepted'
+          WHEN EXISTS(
+            SELECT 1
+            FROM lawyer_invites li
+            WHERE li.client_user_id = $1
+              AND li.status = 'pending'
+              AND li.expires_at >= NOW()
+          ) THEN 'pending'
+          WHEN EXISTS(
+            SELECT 1
+            FROM lawyer_invites li
+            WHERE li.client_user_id = $1
+              AND li.status = 'pending'
+              AND li.expires_at < NOW()
+          ) THEN 'not_accepted'
+          WHEN EXISTS(
+            SELECT 1
+            FROM lawyer_invites li
+            WHERE li.client_user_id = $1
+          ) THEN 'not_accepted'
+          ELSE 'not_sent'
+        END) AS lawyer_invite_status,
         (
-          SELECT accepted_at
+          SELECT MAX(accepted_at)
           FROM lawyer_invites
           WHERE client_user_id = $1
-          ORDER BY created_at DESC
-          LIMIT 1
         ) AS lawyer_invite_accepted_at,
         (
-          SELECT expires_at
+          SELECT MAX(expires_at)
           FROM lawyer_invites
           WHERE client_user_id = $1
-          ORDER BY created_at DESC
-          LIMIT 1
         ) AS lawyer_invite_expires_at`,
       [userId]
     );
@@ -147,31 +159,43 @@ router.get("/landlord/stats", authenticate, isLandlord, async (req, res) => {
           ORDER BY created_at DESC
           LIMIT 1
         ) AS lawyer_email,
-        COALESCE((
-          SELECT CASE
-            WHEN li.status = 'accepted' THEN 'accepted'
-            WHEN li.status = 'pending' AND li.expires_at < NOW() THEN 'not_accepted'
-            WHEN li.status = 'pending' THEN 'pending'
-            ELSE li.status
-          END
-          FROM lawyer_invites li
-          WHERE li.client_user_id = $1
-          ORDER BY li.created_at DESC
-          LIMIT 1
-        ), 'not_sent') AS lawyer_invite_status,
+        (CASE
+          WHEN EXISTS(
+            SELECT 1
+            FROM lawyer_invites li
+            WHERE li.client_user_id = $1
+              AND li.status = 'accepted'
+          ) THEN 'accepted'
+          WHEN EXISTS(
+            SELECT 1
+            FROM lawyer_invites li
+            WHERE li.client_user_id = $1
+              AND li.status = 'pending'
+              AND li.expires_at >= NOW()
+          ) THEN 'pending'
+          WHEN EXISTS(
+            SELECT 1
+            FROM lawyer_invites li
+            WHERE li.client_user_id = $1
+              AND li.status = 'pending'
+              AND li.expires_at < NOW()
+          ) THEN 'not_accepted'
+          WHEN EXISTS(
+            SELECT 1
+            FROM lawyer_invites li
+            WHERE li.client_user_id = $1
+          ) THEN 'not_accepted'
+          ELSE 'not_sent'
+        END) AS lawyer_invite_status,
         (
-          SELECT accepted_at
+          SELECT MAX(accepted_at)
           FROM lawyer_invites
           WHERE client_user_id = $1
-          ORDER BY created_at DESC
-          LIMIT 1
         ) AS lawyer_invite_accepted_at,
         (
-          SELECT expires_at
+          SELECT MAX(expires_at)
           FROM lawyer_invites
           WHERE client_user_id = $1
-          ORDER BY created_at DESC
-          LIMIT 1
         ) AS lawyer_invite_expires_at`,
       [userId]
     );

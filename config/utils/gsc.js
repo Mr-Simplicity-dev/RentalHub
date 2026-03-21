@@ -1,4 +1,5 @@
 const { google } = require("googleapis");
+const { getFrontendUrl } = require("./frontendUrl");
 
 exports.getSearchData = async () => {
   const auth = new google.auth.GoogleAuth({
@@ -14,7 +15,7 @@ exports.getSearchData = async () => {
   });
 
   const res = await webmasters.searchanalytics.query({
-    siteUrl: "https://rentalhub.com.ng",
+    siteUrl: getFrontendUrl(),
     requestBody: {
       startDate: "2024-01-01",
       endDate: "2024-12-31",
