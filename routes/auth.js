@@ -164,6 +164,16 @@ router.patch(
   authController.updateLawyerInviteEmail
 );
 
+// Verify Lawyer OTP — called after acceptLawyerInvite, no auth token required
+router.post(
+  '/verify-otp',
+  [
+    body('phone').trim().notEmpty().withMessage('Phone is required'),
+    body('otp').trim().notEmpty().withMessage('OTP is required'),
+  ],
+  authController.verifyLawyerOtp
+);
+
 // Verify Email
 router.get('/verify-email/:token', authController.verifyEmail);
 

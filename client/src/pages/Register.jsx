@@ -575,6 +575,7 @@ return (
                     <input
                       name="full_name"
                       type="text"
+                      autoComplete="name"
                       value={formData.full_name}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, full_name: null })); }}
                       autoFocus
@@ -595,6 +596,7 @@ return (
                     <input
                       name="email"
                       type="email"
+                      autoComplete="email"
                       value={formData.email}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, email: null })); }}
                       className={`input pl-10 ${errors.email ? 'border-red-500' : ''}`}
@@ -614,6 +616,7 @@ return (
                     <input
                       name="phone"
                       type="tel"
+                      autoComplete="tel"
                       value={formData.phone}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, phone: null })); }}
                       className={`input pl-10 ${errors.phone ? 'border-red-500' : ''}`}
@@ -633,6 +636,7 @@ return (
                     <input
                       name="lawyer_email"
                       type="email"
+                      autoComplete="off"
                       value={formData.lawyer_email}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, lawyer_email: null })); }}
                       className={`input pl-10 ${errors.lawyer_email ? 'border-red-500' : ''}`}
@@ -800,6 +804,7 @@ return (
                     <input
                       name="password"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       value={formData.password}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, password: null })); }}
                       className={`input pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
@@ -841,6 +846,7 @@ return (
                     <input
                       name="confirm_password"
                       type={showConfirmPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       value={formData.confirm_password}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, confirm: null })); }}
                       className={`input pl-10 pr-10 ${

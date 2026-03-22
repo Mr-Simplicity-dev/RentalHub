@@ -38,7 +38,7 @@ const formatProviderError = (providerError) => {
 };
 
 const getSenderHint = () => {
-  if (extractEmailAddress(FROM) !== 'onboarding@resend.dev') {
+  if (extractEmailAddress(FROM) !== 'RentalHub NG <support@rentalhub.com.ng>') {
     return '';
   }
 

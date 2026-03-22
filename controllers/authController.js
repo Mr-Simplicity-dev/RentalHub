@@ -25,6 +25,8 @@ const { sendVerificationCode } = require('../config/utils/smsService');
 
 // Store OTP codes temporarily (use Redis in production)
 const otpStore = new Map();
+// Separate OTP store for lawyer invite verification (keyed by phone, no auth token available)
+const lawyerOtpStore = new Map();
 let identitySchemaReady = false;
 let lawyerInviteSchemaReady = false;
 let tenantRegistrationPaymentSchemaReady = false;
@@ -1317,23 +1319,26 @@ exports.acceptLawyerInvite = async (req, res) => {
       [invite.id, lawyerUserId]
     );
 
-    const lawyerResult = await db.query(
-      `SELECT id, email, full_name, user_type, email_verified, phone_verified, created_at, chamber_name, chamber_phone
-       FROM users
-       WHERE id = $1`,
-      [lawyerUserId]
-    );
+    // Send OTP to lawyer's phone for verification
+    const otpResult = await sendVerificationCode(cleanPhone);
 
-    const user = lawyerResult.rows[0];
-    const authToken = generateToken(user.id, user.user_type);
+    if (!otpResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Account created but failed to send OTP. Please contact support.'
+      });
+    }
+
+    // Store OTP keyed by phone (lawyer has no auth token yet)
+    lawyerOtpStore.set(cleanPhone, {
+      code: otpResult.code,
+      lawyerUserId,
+      expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
+    });
 
     return res.json({
       success: true,
-      message: 'Lawyer invite accepted successfully',
-      data: {
-        user,
-        token: authToken
-      }
+      message: 'OTP sent to your phone for verification'
     });
   } catch (error) {
     console.error('Accept lawyer invite error:', error);
@@ -1348,6 +1353,82 @@ exports.acceptLawyerInvite = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to accept lawyer invite'
+    });
+  }
+};
+
+// VERIFY LAWYER OTP — Phase 2 of invite acceptance
+// Called from AcceptLawyerInvite.jsx after OTP is entered
+// Keyed by phone number since lawyer has no auth token yet
+exports.verifyLawyerOtp = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+
+    if (!phone || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone and OTP are required'
+      });
+    }
+
+    const cleanPhone = String(phone || '').replace(/\s+/g, '');
+    const storedOTP = lawyerOtpStore.get(cleanPhone);
+
+    if (!storedOTP) {
+      return res.status(400).json({
+        success: false,
+        message: 'No OTP found for this phone. Please go back and try again.'
+      });
+    }
+
+    if (Date.now() > storedOTP.expiresAt) {
+      lawyerOtpStore.delete(cleanPhone);
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Please go back and resubmit the form to get a new OTP.'
+      });
+    }
+
+    if (parseInt(otp) !== storedOTP.code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP. Please try again.'
+      });
+    }
+
+    // OTP correct — mark phone as verified
+    await db.query(
+      'UPDATE users SET phone_verified = TRUE WHERE id = $1',
+      [storedOTP.lawyerUserId]
+    );
+
+    // Clear OTP from store
+    lawyerOtpStore.delete(cleanPhone);
+
+    // Fetch lawyer user and return auth token
+    const userResult = await db.query(
+      `SELECT id, email, full_name, user_type, email_verified, phone_verified,
+              created_at, chamber_name, chamber_phone
+       FROM users WHERE id = $1`,
+      [storedOTP.lawyerUserId]
+    );
+
+    const user = userResult.rows[0];
+    const authToken = generateToken(user.id, user.user_type);
+
+    return res.json({
+      success: true,
+      message: 'Phone verified. Lawyer account activated successfully!',
+      data: {
+        token: authToken,
+        user
+      }
+    });
+  } catch (error) {
+    console.error('Verify lawyer OTP error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'OTP verification failed'
     });
   }
 };
