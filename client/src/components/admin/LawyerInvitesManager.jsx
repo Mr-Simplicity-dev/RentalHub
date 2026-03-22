@@ -297,7 +297,7 @@ const LawyerInvitesManager = ({
                     <div className="flex justify-center mb-4">
                       <img
                         src={selectedLawyer.lawyer_passport_photo_url}
-                        alt="Lawyer Passport Photo"
+                        alt="Lawyer passport"
                         className="h-32 w-32 rounded-lg object-cover border border-gray-300 dark:border-gray-600"
                       />
                     </div>

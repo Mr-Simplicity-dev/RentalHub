@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
-import { useTranslation } from 'react-i18next';
 
 const DEFAULT_LIVENESS = {
   faceDetected: false,
@@ -55,8 +53,6 @@ const loadExternalScript = (src) => {
 };
 
 const LawyerVerification = ({ children }) => {
-  const { user } = useAuth();
-  const { t } = useTranslation();
 
   const LAWYER_VERIFICATION_KEY = 'lawyer_passport_verified';
 
@@ -70,7 +66,7 @@ const LawyerVerification = ({ children }) => {
   const [livenessError, setLivenessError] = useState('');
   const [livenessChecks, setLivenessChecks] = useState(DEFAULT_LIVENESS);
   const [faceBox, setFaceBox] = useState(null);
-  const [faceMeshReady, setFaceMeshReady] = useState(false);
+  const [_faceMeshReady, setFaceMeshReady] = useState(false);
   const [liveCaptureToken, setLiveCaptureToken] = useState('');
   const [verificationComplete, setVerificationComplete] = useState(false);
   const [fraudAlert, setFraudAlert] = useState(null);
