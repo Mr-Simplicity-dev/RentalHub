@@ -10,7 +10,7 @@ exports.sendVerificationEmail = async (email, verificationToken) => {
   try {
     await sendEmail({
       to: email,
-      subject: 'Verify Your Email - Rental Platform',
+      subject: 'Verify Your Email - Rental Hub',
       html: `
         <div style="font-family: sans-serif; line-height: 1.6;">
           <h2>Email Verification</h2>
@@ -36,7 +36,7 @@ exports.sendWelcomeEmail = async (email, fullName, userType) => {
   try {
     await sendEmail({
       to: email,
-      subject: 'Welcome to Rental Platform',
+      subject: 'Welcome to Rental Hub NG',
       html: `
         <div style="font-family: sans-serif; line-height: 1.6;">
           <h2>Welcome ${fullName}!</h2>
@@ -60,11 +60,11 @@ exports.sendLawyerInviteEmail = async ({
   try {
     await sendEmail({
       to: email,
-      subject: 'Lawyer Invitation - Rental Platform',
+      subject: 'Lawyer Invitation - Rental Hub NG',
       html: `
         <div style="font-family: sans-serif; line-height: 1.6;">
           <h2>You have been invited as a lawyer</h2>
-          <p><strong>${clientName}</strong> (${clientRole}) invited you to represent them on Rental Platform.</p>
+          <p><strong>${clientName}</strong> (${clientRole}) invited you to represent them at Rental Hub NG, A Platform that connects landlords to tenants on property renting.</p>
           <p>
             <a href="${inviteUrl}" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">
               Set Password & Activate Lawyer Access
@@ -86,7 +86,7 @@ exports.sendPasswordResetEmail = async (email, resetUrl) => {
   try {
     await sendEmail({
       to: email,
-      subject: 'Reset Your Password - Rental Platform',
+      subject: 'Reset Your Password - Rental Hub NG',
       html: `
         <div style="font-family: sans-serif; line-height: 1.6;">
           <h2>Password Reset</h2>

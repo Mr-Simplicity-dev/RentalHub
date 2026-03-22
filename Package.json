@@ -1,5 +1,5 @@
 {
-  "name": "rental-platform-backend",
+  "name": "rental-hub ng-backend",
   "version": "1.0.0",
   "description": "Nigerian Rental Property Platform API",
   "main": "server.js",

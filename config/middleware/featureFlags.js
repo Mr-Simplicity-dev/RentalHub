@@ -133,7 +133,7 @@ const enforceFlags = async (req, res, next) => {
     const flags = await getFeatureFlagsMap();
 
     if (flags.maintenance_mode && req.user?.user_type !== 'super_admin') {
-      return res.status(503).json({ message: 'System under maintenance' });
+      return res.status(503).json({ message: 'System under maintenance come back in view hours' });
     }
 
     const isDirectRegistrationRequest =

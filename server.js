@@ -23,6 +23,7 @@ const notificationRoutes = require('./routes/notifications');
 const superAdminRoutes = require('./routes/superAdmin');
 const propertyUtilsRoutes = require('./routes/propertyUtils');
 const propertyAlertsRoutes = require('./routes/propertyAlerts');
+const appLinksRoutes = require('./routes/appLinks');
 
 const disputesRoutes = require('./routes/disputes');
 const legalRoutes = require('./routes/legal');
@@ -211,6 +212,7 @@ const allowedOrigins = new Set(getAllowedFrontendOrigins());
 app.use("/", locationRoutes);
 app.use("/", blogRoutes);
 app.use("/", adminSeoRoutes);
+app.use('/.well-known', appLinksRoutes);
 
 // Trust proxy (Render, Nginx etc)
 app.set('trust proxy', 1);
@@ -276,7 +278,7 @@ app.use(audit('API Request', 'system'));
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',
-    message: 'Rental Platform API is running',
+    message: 'Rental Hub NG API is running',
   });
 });
 
@@ -405,4 +407,3 @@ const io = new Server(server, {
 });
 
 global.io = io;
-

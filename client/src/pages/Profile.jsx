@@ -412,7 +412,7 @@ const Profile = () => {
       } else if (error?.name === 'NotReadableError') {
         setCameraError('Camera is busy in another app. Close other apps using camera and retry.');
       } else {
-        setCameraError('Unable to start live capture. Allow camera permission and try again.');
+        setCameraError('Unable to Capture. Allow camera permission and try again.');
       }
     } finally {
       setCameraLoading(false);
@@ -744,7 +744,7 @@ const Profile = () => {
                     className="btn btn-secondary w-full sm:w-72"
                     type="button"
                   >
-                    {cameraLoading ? 'Opening camera...' : 'Start Live Capture'}
+                    {cameraLoading ? 'Opening camera...' : 'Capture'}
                   </button>
                 ) : (
                   <button

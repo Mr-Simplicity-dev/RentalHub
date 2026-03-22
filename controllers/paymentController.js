@@ -241,7 +241,7 @@ exports.initializeSubscription = async (req, res) => {
           payment_id: paymentId,
           bank_name: "Your Bank Name",
           account_number: "1234567890",
-          account_name: "Rental Platform Ltd",
+          account_name: "Rental Hub NG",
           amount: plan.price,
           reference: `SUB_${paymentId}_${Date.now()}`
         }
@@ -510,7 +510,7 @@ exports.initializePropertyUnlock = async (req, res) => {
           reference,
           bank_name: "Your Bank Name",
           account_number: "1234567890",
-          account_name: "Rental Platform Ltd",
+          account_name: "Rental Hub NG",
         },
       });
     }
@@ -741,7 +741,7 @@ exports.initializeListingPayment = async (req, res) => {
           payment_id: paymentId,
           bank_name: "Your Bank Name",
           account_number: "1234567890",
-          account_name: "Rental Platform Ltd",
+          account_name: "Rental Hub NG",
           amount: plan.price,
           reference: `LIST_${paymentId}_${Date.now()}`
         }
@@ -970,7 +970,7 @@ exports.initializeRentPayment = async (req, res) => {
           payment_id: paymentId,
           bank_name: "Your Bank Name",
           account_number: "1234567890",
-          account_name: "Rental Platform Ltd",
+          account_name: "Rental Hub NG",
           amount,
           reference: `RENT_${paymentId}_${Date.now()}`,
           platform_fee: platformFee,

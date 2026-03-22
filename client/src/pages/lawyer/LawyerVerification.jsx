@@ -342,7 +342,7 @@ const LawyerVerification = ({ children }) => {
       } else if (error?.name === 'NotReadableError') {
         setCameraError('Camera is busy in another app. Close other apps using camera and retry.');
       } else {
-        setCameraError('Unable to start live capture. Allow camera permission and try again.');
+        setCameraError('Unable to Capture. Allow camera permission and try again.');
       }
     } finally {
       setCameraLoading(false);
@@ -705,7 +705,7 @@ const LawyerVerification = ({ children }) => {
                 }}
                 className="btn btn-secondary w-full"
               >
-                Close Camera
+                Close
               </button>
             </div>
           </div>
@@ -717,7 +717,7 @@ const LawyerVerification = ({ children }) => {
             disabled={cameraLoading}
             className="btn btn-primary w-full"
           >
-            {cameraLoading ? 'Starting Camera...' : '📷 Start Live Capture'}
+            {cameraLoading ? 'Starting Camera...' : '📷 Capture'}
           </button>
         )}
       </div>

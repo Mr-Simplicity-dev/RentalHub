@@ -47,107 +47,122 @@ const Login = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+ return (
+  <div className="min-h-screen flex dark:bg-gray-900">
+    
+    {/* LEFT PANEL */}
+    <div className="hidden md:flex w-1/2 relative bg-gradient-to-br from-indigo-600 to-purple-600 text-white overflow-hidden">
+      
+      {/* ANIMATED BACKGROUND */}
+      <div className="absolute top-[-100px] left-[-100px] w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-[-120px] right-[-100px] w-96 h-96 bg-purple-400/20 rounded-full blur-3xl"></div>
+
+      <div className="relative w-full flex flex-col items-center justify-center text-center px-10 space-y-6">
+        
+        {/* LOGO */}
+        <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl shadow-xl border border-white/20">
+          <img src="/logo.png" alt="Rental Hub NG" className="w-12 h-12" />
+        </div>
+
+        {/* BRAND */}
+        <div className="text-lg font-semibold text-white/90">
+          Rental Hub NG
+        </div>
+
+        {/* TITLE */}
+        <h1 className="text-4xl font-bold">
+          Welcome Back
+        </h1>
+
+        {/* DESCRIPTION */}
+        <p className="text-lg text-white/80 max-w-md">
+          Sign in to manage your properties, tenants, and legal activities securely.
+        </p>
+
+        <p className="text-sm text-white/60">
+          Trusted by landlords, tenants, and legal professionals.
+        </p>
+      </div>
+    </div>
+
+    {/* RIGHT PANEL */}
+    <div className="flex w-full md:w-1/2 items-center justify-center px-6">
+      
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl space-y-6">
+
+        {/* HEADER */}
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold dark:text-white">
             {t('login.title')}
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="text-sm text-gray-500">
             {t('login.or')}{' '}
-            <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
+            <Link to="/register" className="text-indigo-600 hover:underline">
               {t('login.create')}
             </Link>
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                {t('login.email')}
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaEnvelope className="text-gray-400" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input pl-10"
-                  placeholder={t('login.email_placeholder')}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                {t('login.password')}
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaLock className="text-gray-400" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input pl-10 pr-10"
-                  placeholder={t('login.password_placeholder')}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </button>
-              </div>
-            </div>
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          
+          {/* EMAIL */}
+          <div className="relative">
+            <FaEnvelope className="absolute left-3 top-3 text-gray-400" />
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder={t('login.email_placeholder')}
+            />
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                {t('login.remember')}
-              </label>
-            </div>
-
-            <div className="text-sm">
-              <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
-                {t('login.forgot')}
-              </Link>
-            </div>
-          </div>
-
-          <div>
+          {/* PASSWORD */}
+          <div className="relative">
+            <FaLock className="absolute left-3 top-3 text-gray-400" />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder={t('login.password_placeholder')}
+            />
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full btn btn-primary py-3 text-lg"
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-3 text-gray-500"
             >
-              {loading ? t('login.signing') : t('login.submit')}
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
+
+          {/* REMEMBER + FORGOT */}
+          <div className="flex items-center justify-between text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" />
+              {t('login.remember')}
+            </label>
+
+            <Link to="/forgot-password" className="text-indigo-600 hover:underline">
+              {t('login.forgot')}
+            </Link>
+          </div>
+
+          {/* BUTTON */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition"
+          >
+            {loading ? t('login.signing') : t('login.submit')}
+          </button>
         </form>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default Login;
