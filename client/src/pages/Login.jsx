@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
@@ -11,8 +11,18 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // Load saved email if user previously checked Remember Me
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,10 +31,16 @@ const Login = () => {
     try {
       const response = await login(email, password);
       if (response.success) {
-  toast.success(t('login.success'));
+        toast.success(t('login.success'));
 
-  // const user = response.data?.user;
-  const role = response.data?.user?.user_type;
+        // Persist or clear remembered email
+        if (rememberMe) {
+          localStorage.setItem('rememberedEmail', email);
+        } else {
+          localStorage.removeItem('rememberedEmail');
+        }
+
+        const role = response.data?.user?.user_type;
 
         if (role === 'super_admin') {
           navigate('/super-admin');
@@ -113,6 +129,7 @@ const Login = () => {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
               placeholder={t('login.email_placeholder')}
             />
@@ -126,6 +143,7 @@ const Login = () => {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               className="w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
               placeholder={t('login.password_placeholder')}
             />
@@ -140,8 +158,13 @@ const Login = () => {
 
           {/* REMEMBER + FORGOT */}
           <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" />
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer"
+              />
               {t('login.remember')}
             </label>
 

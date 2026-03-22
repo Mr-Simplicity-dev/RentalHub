@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const paymentController = require('../controllers/paymentController');
+const refundController  = require('../controllers/refundController');
 const { authenticate, isTenant, isLandlord, isVerified } = require('../config/middleware/auth');
 
 // ============ TENANT SUBSCRIPTION PAYMENTS ============
@@ -16,7 +17,7 @@ router.post('/subscribe',
   isVerified,
   [
     body('plan_id').notEmpty(),
-    body('payment_method').isIn(['paystack', 'flutterwave', 'bank_transfer'])
+    body('payment_method').isIn(['paystack', 'bank_transfer'])
   ],
   paymentController.initializeSubscription
 );
@@ -78,7 +79,7 @@ router.post('/pay-listing',
   [
     body('plan_id').notEmpty(),
     body('property_id').optional().isInt(),
-    body('payment_method').isIn(['paystack', 'flutterwave', 'bank_transfer'])
+    body('payment_method').isIn(['paystack', 'bank_transfer'])
   ],
   paymentController.initializeListingPayment
 );
@@ -98,7 +99,7 @@ router.post('/pay-rent',
   [
     body('property_id').isInt(),
     body('amount').isFloat({ min: 0 }),
-    body('payment_method').isIn(['paystack', 'flutterwave', 'bank_transfer'])
+    body('payment_method').isIn(['paystack', 'bank_transfer'])
   ],
   paymentController.initializeRentPayment
 );
@@ -122,7 +123,55 @@ router.get('/:paymentId', authenticate, paymentController.getPaymentDetails);
 // Paystack webhook
 router.post('/webhook/paystack', paymentController.paystackWebhook);
 
-// Flutterwave webhook
-router.post('/webhook/flutterwave', paymentController.flutterwaveWebhook);
+
+// ============ REFUND REQUESTS ============
+
+// Tenant: submit a refund request on a completed rent payment
+router.post('/refund/request',
+  authenticate,
+  isTenant,
+  refundController.submitRefundRequest
+);
+
+// Tenant: list completed rent payments eligible for a refund
+router.get('/refund/eligible',
+  authenticate,
+  isTenant,
+  refundController.getEligibleRentPayments
+);
+
+// Tenant: view all their own refund requests
+router.get('/refund/my-requests',
+  authenticate,
+  isTenant,
+  refundController.getTenantRefundRequests
+);
+
+// Landlord: view refund requests on their properties
+router.get('/refund/landlord',
+  authenticate,
+  isLandlord,
+  refundController.getLandlordRefundRequests
+);
+
+// Landlord: approve a refund request
+router.put('/refund/:refundId/approve',
+  authenticate,
+  isLandlord,
+  refundController.approveRefundRequest
+);
+
+// Landlord: reject a refund request
+router.put('/refund/:refundId/reject',
+  authenticate,
+  isLandlord,
+  refundController.rejectRefundRequest
+);
+
+// Admin: view all refund requests across the platform
+router.get('/refund/admin/all',
+  authenticate,
+  refundController.adminGetAllRefundRequests
+);
 
 module.exports = router;

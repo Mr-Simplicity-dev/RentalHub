@@ -380,6 +380,21 @@ const Register = () => {
 
 const [step, setStep] = useState(1);
 const [errors, setErrors] = useState({});
+const [termsAccepted, setTermsAccepted] = useState(false);
+
+const getPasswordStrength = (pwd) => {
+  if (!pwd) return null;
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (pwd.length >= 12) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  if (score <= 1) return { label: 'Weak',   bar: 'w-1/4',  color: 'bg-red-500',    text: 'text-red-500'    };
+  if (score <= 2) return { label: 'Fair',   bar: 'w-2/4',  color: 'bg-orange-400', text: 'text-orange-400' };
+  if (score <= 3) return { label: 'Good',   bar: 'w-3/4',  color: 'bg-yellow-400', text: 'text-yellow-500' };
+                  return { label: 'Strong', bar: 'w-full', color: 'bg-green-500',  text: 'text-green-600'  };
+};
 
 const validateStep = () => {
   let newErrors = {};
@@ -800,6 +815,20 @@ return (
                     </button>
                   </div>
                   {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+                  {/* Password strength indicator */}
+                  {formData.password && (() => {
+                    const strength = getPasswordStrength(formData.password);
+                    return (
+                      <div className="mt-2 space-y-1">
+                        <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-300 ${strength.bar} ${strength.color}`} />
+                        </div>
+                        <p className={`text-xs font-medium ${strength.text}`}>
+                          Password strength: {strength.label}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Confirm Password */}
@@ -814,7 +843,13 @@ return (
                       type={showConfirmPassword ? 'text' : 'password'}
                       value={formData.confirm_password}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, confirm: null })); }}
-                      className={`input pl-10 pr-10 ${errors.confirm ? 'border-red-500' : ''}`}
+                      className={`input pl-10 pr-10 ${
+                        formData.confirm_password && formData.password !== formData.confirm_password
+                          ? 'border-red-500'
+                          : formData.confirm_password && formData.password === formData.confirm_password
+                          ? 'border-green-500'
+                          : errors.confirm ? 'border-red-500' : ''
+                      }`}
                       placeholder="Re-enter password"
                     />
                     <button
@@ -825,17 +860,27 @@ return (
                       {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                     </button>
                   </div>
-                  {errors.confirm && <p className="text-red-500 text-sm mt-1">{errors.confirm}</p>}
+                  {/* Live mismatch / match feedback */}
+                  {formData.confirm_password && (
+                    formData.password !== formData.confirm_password
+                      ? <p className="text-red-500 text-xs mt-1">Passwords do not match</p>
+                      : <p className="text-green-600 text-xs mt-1">Passwords match ✓</p>
+                  )}
+                  {errors.confirm && !formData.confirm_password && (
+                    <p className="text-red-500 text-sm mt-1">{errors.confirm}</p>
+                  )}
                 </div>
 
                 {/* Terms */}
                 <div className="flex items-start">
                   <input
+                    id="terms"
                     type="checkbox"
-                    required
-                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-1"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-1 cursor-pointer"
                   />
-                  <label className="ml-2 block text-sm text-gray-900">
+                  <label htmlFor="terms" className="ml-2 block text-sm text-gray-900 cursor-pointer">
                     I agree to the{' '}
                     <Link to="/terms" className="text-indigo-600 hover:text-indigo-500">Terms of Service</Link>
                     {' '}and{' '}
@@ -855,6 +900,7 @@ return (
                       !formData.password ||
                       formData.password.length < 8 ||
                       formData.password !== formData.confirm_password ||
+                      !termsAccepted ||
                       (requiresRegistrationPayment && !registrationPricing.location_complete)
                     }
                     className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"

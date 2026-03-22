@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { toast } from 'react-toastify';
 import {
   FaHome,
   FaEnvelope,
@@ -10,10 +9,6 @@ import {
   FaHeart,
   FaCheckCircle,
   FaClock,
-  FaMoneyBillWave,
-  FaUndo,
-  FaTimes,
-  FaExclamationTriangle,
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
@@ -27,14 +22,6 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // ── Refund state ──────────────────────────────────────────────────────────
-  const [showRefundModal, setShowRefundModal] = useState(false);
-  const [refundView, setRefundView] = useState('form');        // 'form' | 'history' | 'success'
-  const [eligiblePayments, setEligiblePayments] = useState([]);
-  const [myRefundRequests, setMyRefundRequests] = useState([]);
-  const [refundForm, setRefundForm] = useState({ payment_id: '', reason: '', details: '' });
-  const [refundLoading, setRefundLoading] = useState(false);
   const hasSubmittedVerification = !!user?.passport_photo_url;
   const verificationReviewStatus =
     user?.identity_verification_status ||
@@ -107,57 +94,6 @@ const Dashboard = () => {
       window.removeEventListener('focus', handleWindowFocus);
     };
   }, [user, loadDashboardData]);
-
-  // ── Refund helpers ────────────────────────────────────────────────────────
-  const openRefundModal = async () => {
-    setRefundForm({ payment_id: '', reason: '', details: '' });
-    setRefundView('form');
-    setShowRefundModal(true);
-    try {
-      const [eligibleRes, historyRes] = await Promise.all([
-        api.get('/payments/refund/eligible'),
-        api.get('/payments/refund/my-requests'),
-      ]);
-      if (eligibleRes.data?.success) setEligiblePayments(eligibleRes.data.data || []);
-      if (historyRes.data?.success) setMyRefundRequests(historyRes.data.data || []);
-    } catch (err) {
-      console.error('Failed to load refund data', err);
-    }
-  };
-
-  const handleRefundSubmit = async (e) => {
-    e.preventDefault();
-    if (!refundForm.payment_id || !refundForm.reason) return;
-    setRefundLoading(true);
-    try {
-      const res = await api.post('/payments/refund/request', {
-        payment_id: refundForm.payment_id,
-        reason: refundForm.reason,
-        details: refundForm.details,
-      });
-      if (res.data?.success) {
-        setRefundView('success');
-        loadDashboardData();
-      } else {
-        toast.error(res.data?.message || 'Failed to submit refund request');
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to submit refund request';
-      toast.error(msg);
-    } finally {
-      setRefundLoading(false);
-    }
-  };
-
-  const refundStatusBadge = (status) => {
-    const map = {
-      pending:  'bg-yellow-100 text-yellow-800',
-      approved: 'bg-blue-100 text-blue-800',
-      rejected: 'bg-red-100 text-red-800',
-      refunded: 'bg-green-100 text-green-800',
-    };
-    return map[status] || 'bg-gray-100 text-gray-700';
-  };
 
   const getTenantSubscriptionValue = () => {
     if (!stats?.subscription_expires_at) {
@@ -430,12 +366,6 @@ const Dashboard = () => {
                 value={getTenantSubscriptionValue()}
                 onClick={() => navigate('/subscribe')}
               />
-              <StatCard
-                icon={<FaMoneyBillWave className="text-orange-500" />}
-                title="Refund Requests"
-                value={stats?.refund_requests_count || 0}
-                onClick={openRefundModal}
-              />
             </>
           ) : (
             <>
@@ -466,22 +396,6 @@ const Dashboard = () => {
             </>
           )}
         </div>
-
-        {/* Landlord — 14 working days withdrawal notice */}
-        {user?.user_type === 'landlord' && (
-          <div className="bg-green-50 border border-green-200 rounded-lg px-5 py-4 mb-8 flex items-start gap-3">
-            <FaMoneyBillWave className="text-green-600 text-xl mt-0.5 shrink-0" />
-            <div>
-              <p className="font-semibold text-green-800 text-sm">Rent Payment Withdrawals</p>
-              <p className="text-green-700 text-sm mt-1">
-                Rent payments collected through the platform are held for <strong>14 working days</strong> before
-                they are released to your account. This period allows time for any tenant refund requests to be
-                reviewed and resolved. Payments with no active refund dispute after 14 working days are
-                automatically cleared for withdrawal.
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Recent Activities */}
         <div className="card">
@@ -521,12 +435,6 @@ const Dashboard = () => {
                 icon={<FaFileAlt />}
                 onClick={() => navigate('/payment-history')}
               />
-              <QuickActionCard
-                title="Request a Refund"
-                description="Request a refund on any rent payment you made to a landlord"
-                icon={<FaUndo />}
-                onClick={openRefundModal}
-              />
             </>
           ) : (
             <>
@@ -552,224 +460,6 @@ const Dashboard = () => {
           )}
         </div>
       </div>
-
-      {/* ════════════════════════════════════════════════════════════
-           REFUND REQUEST MODAL  (tenant only)
-          ════════════════════════════════════════════════════════════ */}
-      {showRefundModal && user?.user_type === 'tenant' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-
-            {/* ── Modal header ── */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
-              <div className="flex items-center gap-3">
-                <FaMoneyBillWave className="text-orange-500 text-2xl" />
-                <h2 className="text-lg font-bold text-gray-800">
-                  {refundView === 'history' ? 'My Refund Requests' : 'Request a Refund'}
-                </h2>
-              </div>
-              <div className="flex items-center gap-3">
-                {/* Toggle between form and history */}
-                {refundView !== 'success' && (
-                  <button
-                    onClick={() => setRefundView(v => v === 'history' ? 'form' : 'history')}
-                    className="text-sm text-indigo-600 hover:underline"
-                  >
-                    {refundView === 'history' ? 'New Request' : 'View History'}
-                  </button>
-                )}
-                <button onClick={() => setShowRefundModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <FaTimes className="text-xl" />
-                </button>
-              </div>
-            </div>
-
-            <div className="px-6 py-5">
-
-              {/* ── SUCCESS STATE ── */}
-              {refundView === 'success' && (
-                <div className="text-center py-6 space-y-4">
-                  <FaCheckCircle className="text-green-500 text-5xl mx-auto" />
-                  <h3 className="text-xl font-bold text-gray-800">Refund Request Submitted!</h3>
-                  <p className="text-gray-600 text-sm">
-                    Your request has been sent to the landlord for review. You will be notified once
-                    they approve or reject it. Approved refunds are processed within 3–5 business days.
-                  </p>
-                  <div className="flex gap-3 mt-4">
-                    <button
-                      onClick={() => setRefundView('history')}
-                      className="btn w-full"
-                    >
-                      View My Requests
-                    </button>
-                    <button
-                      onClick={() => setShowRefundModal(false)}
-                      className="btn btn-primary w-full"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ── HISTORY VIEW ── */}
-              {refundView === 'history' && (
-                <div className="space-y-3">
-                  {myRefundRequests.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">You have no refund requests yet.</p>
-                  ) : (
-                    myRefundRequests.map((rr) => (
-                      <div key={rr.id} className="border rounded-xl p-4 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-semibold text-gray-800 text-sm">{rr.property_title}</p>
-                            <p className="text-xs text-gray-500">{rr.property_address}</p>
-                          </div>
-                          <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize ${refundStatusBadge(rr.status)}`}>
-                            {rr.status}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Amount</span>
-                          <span className="font-bold text-gray-800">₦{Number(rr.amount).toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Reason</span>
-                          <span className="text-gray-700 capitalize">{rr.reason.replace(/_/g, ' ')}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Requested</span>
-                          <span className="text-gray-700">{new Date(rr.requested_at).toLocaleDateString()}</span>
-                        </div>
-                        {rr.landlord_note && (
-                          <div className={`mt-2 text-xs rounded-lg px-3 py-2 ${rr.status === 'rejected' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                            <strong>Landlord note:</strong> {rr.landlord_note}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {/* ── FORM VIEW ── */}
-              {refundView === 'form' && (
-                <form onSubmit={handleRefundSubmit} className="space-y-5">
-
-                  {/* No eligible payments */}
-                  {eligiblePayments.length === 0 ? (
-                    <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-4 text-sm text-yellow-800">
-                      <FaExclamationTriangle className="mt-0.5 shrink-0" />
-                      <div>
-                        <p className="font-semibold">No eligible payments found</p>
-                        <p className="mt-1">
-                          You can only request a refund for completed rent payments that have not
-                          already been refunded or have a pending request.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {/* Select payment */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Select Rent Payment *
-                        </label>
-                        <select
-                          required
-                          value={refundForm.payment_id}
-                          onChange={(e) => setRefundForm(p => ({ ...p, payment_id: e.target.value }))}
-                          className="input w-full"
-                        >
-                          <option value="">-- Choose a rent payment --</option>
-                          {eligiblePayments.map((ep) => (
-                            <option key={ep.payment_id} value={ep.payment_id}>
-                              {ep.property_title} — ₦{Number(ep.amount).toLocaleString()} &nbsp;
-                              ({new Date(ep.paid_at).toLocaleDateString()})
-                            </option>
-                          ))}
-                        </select>
-                        {refundForm.payment_id && (() => {
-                          const sel = eligiblePayments.find(p => String(p.payment_id) === String(refundForm.payment_id));
-                          return sel ? (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Paid to: <strong>{sel.landlord_name}</strong> &nbsp;|&nbsp; {sel.property_address}
-                            </p>
-                          ) : null;
-                        })()}
-                      </div>
-
-                      {/* Reason */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Reason for Refund *
-                        </label>
-                        <select
-                          required
-                          value={refundForm.reason}
-                          onChange={(e) => setRefundForm(p => ({ ...p, reason: e.target.value }))}
-                          className="input w-full"
-                        >
-                          <option value="">-- Select a reason --</option>
-                          <option value="property_not_as_described">Property was not as described</option>
-                          <option value="landlord_cancelled_agreement">Landlord cancelled the agreement</option>
-                          <option value="property_uninhabitable">Property found to be uninhabitable</option>
-                          <option value="duplicate_payment">I was charged twice</option>
-                          <option value="moved_out_early_agreement">Moved out early by mutual agreement</option>
-                          <option value="landlord_unresponsive">Landlord became unresponsive</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-
-                      {/* Details */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Additional Details <span className="text-gray-400">(optional)</span>
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={refundForm.details}
-                          onChange={(e) => setRefundForm(p => ({ ...p, details: e.target.value }))}
-                          className="input w-full resize-none"
-                          placeholder="Provide any extra information to support your request..."
-                        />
-                      </div>
-
-                      {/* Notice */}
-                      <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700">
-                        <FaExclamationTriangle className="mt-0.5 shrink-0" />
-                        <span>
-                          Your refund request will be sent to the landlord for approval.
-                          Once approved, the refund is processed back to your original payment method within 3–5 business days.
-                        </span>
-                      </div>
-
-                      <div className="flex gap-3 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setShowRefundModal(false)}
-                          className="btn w-full"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={refundLoading || !refundForm.payment_id || !refundForm.reason}
-                          className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {refundLoading ? 'Submitting...' : 'Submit Request'}
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </form>
-              )}
-
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };
@@ -860,3 +550,4 @@ const QuickActionCard = ({ title, description, icon, onClick }) => (
 );
 
 export default Dashboard;
+
