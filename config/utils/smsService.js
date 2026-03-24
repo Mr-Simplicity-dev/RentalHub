@@ -1,151 +1,142 @@
-const axios = require("axios");
+const twilio = require('twilio');
 
-// ─── Shared Sendchamp axios instance ────────────────────────────────────────
-const sendchamp = axios.create({
-  baseURL: "https://api.sendchamp.com/api/v1",
-  timeout: 15000,
-  headers: {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  },
-});
+// ─── Twilio client (lazy-initialised so missing keys fail at call time, not boot) ──
+let _client = null;
 
-// Attach Bearer token before every request
-sendchamp.interceptors.request.use((config) => {
-  config.headers.Authorization = `Bearer ${process.env.SENDCHAMP_API_KEY}`;
-  return config;
-});
+const getClient = () => {
+  if (_client) return _client;
 
-// ─── Phone normalisation ─────────────────────────────────────────────────────
+  if (!process.env.TWILIO_ACCOUNT_SID) {
+    throw new Error('TWILIO_ACCOUNT_SID is not set in environment variables');
+  }
+  if (!process.env.TWILIO_AUTH_TOKEN) {
+    throw new Error('TWILIO_AUTH_TOKEN is not set in environment variables');
+  }
+
+  _client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  return _client;
+};
+
+// ─── Phone normalisation ──────────────────────────────────────────────────────
 /**
- * Normalize Nigerian numbers to Sendchamp format: 2348012345678 (no + prefix)
+ * Normalize Nigerian numbers to E.164 format (+2348012345678)
+ * Twilio requires the + prefix.
  */
 function normalizePhone(phone) {
   if (!phone) return null;
 
-  let p = phone.toString().trim().replace(/[\s-]/g, "");
+  let p = phone.toString().trim().replace(/[\s-]/g, '');
 
-  if (p.startsWith("0")) p = "234" + p.slice(1);
-  if (p.startsWith("+")) p = p.slice(1);
+  // 070... → +23470...
+  if (p.startsWith('0')) p = '+234' + p.slice(1);
+
+  // Ensure + prefix
+  if (!p.startsWith('+')) p = '+' + p;
 
   return p;
 }
 
-// ─── SMS (primary) ───────────────────────────────────────────────────────────
+// ─── SMS (primary) ────────────────────────────────────────────────────────────
 /**
- * Send a plain SMS via Sendchamp.
+ * Send a plain SMS via Twilio.
  */
 const sendViaSMS = async (to, message) => {
-  if (!process.env.SENDCHAMP_API_KEY)
-    throw new Error("SENDCHAMP_API_KEY is not set in environment variables");
-  if (!process.env.SENDCHAMP_SENDER_ID)
-    throw new Error("SENDCHAMP_SENDER_ID is not set in environment variables");
+  if (!process.env.TWILIO_PHONE_NUMBER) {
+    throw new Error('TWILIO_PHONE_NUMBER is not set in environment variables');
+  }
 
-  const response = await sendchamp.post("/sms/send", {
-    to: [to],                              // Sendchamp expects an array
-    message,
-    sender_name: process.env.SENDCHAMP_SENDER_ID,
-    route: "non_dnd",                      // options: dnd | non_dnd | international
+  const client = getClient();
+
+  const result = await client.messages.create({
+    to,
+    from: process.env.TWILIO_PHONE_NUMBER,
+    body: message,
   });
 
   return {
     success: true,
-    channel: "sms",
+    channel: 'sms',
     to,
-    data: response.data,
+    sid: result.sid,
+    status: result.status,
   };
 };
 
-// ─── WhatsApp (fallback) ─────────────────────────────────────────────────────
+// ─── WhatsApp (fallback) ──────────────────────────────────────────────────────
 /**
- * Send an OTP via Sendchamp WhatsApp template.
+ * Send an OTP via Twilio WhatsApp.
  *
  * Requirements:
- *  - SENDCHAMP_WHATSAPP_SENDER  → your activated WhatsApp number e.g. 2347067959173
- *  - SENDCHAMP_WHATSAPP_OTP_TEMPLATE_CODE → template code from Sendchamp dashboard
+ *  - TWILIO_WHATSAPP_NUMBER → your Twilio WhatsApp-enabled number
+ *    Format: whatsapp:+14155238886  (Twilio sandbox)
+ *    or your approved WhatsApp Business number: whatsapp:+234XXXXXXXXXX
  *
- * Your WhatsApp OTP template should contain one body variable: {{1}} for the code.
- * Example template text: "Your verification code is {{1}}. Valid for 10 minutes."
+ * The message is sent as plain text (no template required for Twilio sandbox).
+ * For production WhatsApp Business, pre-approved templates may be required.
  */
-const sendViaWhatsApp = async (to, code) => {
-  if (!process.env.SENDCHAMP_API_KEY)
-    throw new Error("SENDCHAMP_API_KEY is not set in environment variables");
-  if (!process.env.SENDCHAMP_WHATSAPP_SENDER)
-    throw new Error(
-      "SENDCHAMP_WHATSAPP_SENDER is not set in environment variables"
-    );
-  if (!process.env.SENDCHAMP_WHATSAPP_OTP_TEMPLATE_CODE)
-    throw new Error(
-      "SENDCHAMP_WHATSAPP_OTP_TEMPLATE_CODE is not set in environment variables"
-    );
+const sendViaWhatsApp = async (to, message) => {
+  if (!process.env.TWILIO_WHATSAPP_NUMBER) {
+    throw new Error('TWILIO_WHATSAPP_NUMBER is not set in environment variables');
+  }
 
-  const response = await sendchamp.post("/whatsapp/template/send", {
-    recipient: to,
-    sender: process.env.SENDCHAMP_WHATSAPP_SENDER,
-    type: "template",
-    template_code: process.env.SENDCHAMP_WHATSAPP_OTP_TEMPLATE_CODE,
-    custom_data: {
-      body: {
-        "1": String(code),               // maps to {{1}} in your template
-      },
-    },
+  const client = getClient();
+
+  const result = await client.messages.create({
+    to:   `whatsapp:${to}`,
+    from: process.env.TWILIO_WHATSAPP_NUMBER,  // e.g. whatsapp:+14155238886
+    body: message,
   });
 
   return {
     success: true,
-    channel: "whatsapp",
+    channel: 'whatsapp',
     to,
-    data: response.data,
+    sid: result.sid,
+    status: result.status,
   };
 };
 
-// ─── Public: sendSMS (SMS → WhatsApp fallback) ───────────────────────────────
+// ─── Public: sendSMS (SMS → WhatsApp fallback) ────────────────────────────────
 /**
- * Send an SMS. If SMS delivery fails, automatically retries via WhatsApp.
- * The `code` param is only used for the WhatsApp template fallback.
+ * Send a message via SMS first.
+ * If SMS fails, automatically retry via WhatsApp.
  */
-exports.sendSMS = async (phoneNumber, message, code = null) => {
+exports.sendSMS = async (phoneNumber, message) => {
   const to = normalizePhone(phoneNumber);
 
   if (!to) {
-    return { success: false, error: "Invalid phone number" };
+    return { success: false, error: 'Invalid phone number' };
   }
 
-  // ── Attempt 1: SMS ──────────────────────────────────────────────────────
+  // ── Attempt 1: SMS ──────────────────────────────────────────────────────────
   try {
     const result = await sendViaSMS(to, message);
-    console.log(`[SMS] Sent to ${to} via SMS`);
+    console.log(`[SMS] Sent to ${to} via SMS (sid: ${result.sid})`);
     return result;
   } catch (smsError) {
     const smsErrMsg =
-      smsError?.response?.data?.message ||
-      smsError?.response?.data ||
-      smsError.message;
+      smsError?.message ||
+      smsError?.code ||
+      'SMS send failed';
 
     console.warn(`[SMS] SMS failed for ${to}: ${smsErrMsg}. Trying WhatsApp...`);
 
-    // ── Attempt 2: WhatsApp fallback ──────────────────────────────────────
+    // ── Attempt 2: WhatsApp fallback ────────────────────────────────────────
     try {
-      // WhatsApp template needs the raw code, not the full message string.
-      // If no code was provided we cannot use the template — surface the SMS error.
-      if (!code) {
-        throw new Error("No OTP code available for WhatsApp fallback");
-      }
-
-      const result = await sendViaWhatsApp(to, code);
-      console.log(`[SMS] Sent to ${to} via WhatsApp (fallback)`);
+      const result = await sendViaWhatsApp(to, message);
+      console.log(`[SMS] Sent to ${to} via WhatsApp fallback (sid: ${result.sid})`);
       return result;
     } catch (waError) {
       const waErrMsg =
-        waError?.response?.data?.message ||
-        waError?.response?.data ||
-        waError.message;
+        waError?.message ||
+        waError?.code ||
+        'WhatsApp send failed';
 
       console.error(`[SMS] WhatsApp fallback also failed for ${to}: ${waErrMsg}`);
 
       return {
         success: false,
-        channel: "both_failed",
+        channel: 'both_failed',
         smsError: smsErrMsg,
         whatsappError: waErrMsg,
         error: `SMS failed: ${smsErrMsg} | WhatsApp failed: ${waErrMsg}`,
@@ -160,10 +151,9 @@ exports.sendSMS = async (phoneNumber, message, code = null) => {
  */
 exports.sendVerificationCode = async (phoneNumber) => {
   const code = Math.floor(100000 + Math.random() * 900000);
-  const message = `Your verification code is: ${code}. Valid for 10 minutes.`;
+  const message = `Your Rental Hub NG verification code is: ${code}. Valid for 10 minutes. Do not share this code.`;
 
-  // Pass the raw code so the WhatsApp fallback can insert it into the template
-  const result = await exports.sendSMS(phoneNumber, message, code);
+  const result = await exports.sendSMS(phoneNumber, message);
 
   if (!result.success) {
     return { success: false, error: result.error };

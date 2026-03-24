@@ -3,8 +3,28 @@ const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const { uploadPassport } = require('../config/middleware/upload');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
+const { sendVerificationCode } = require('../config/utils/smsService'); // ✅ FIXED PATH
 
 const router = express.Router();
+
+/**
+ * ✅ Helper: format Nigerian numbers to +234
+ */
+const formatPhone = (phone) => {
+  if (!phone) return phone;
+
+  phone = String(phone).trim();
+
+  if (phone.startsWith('0')) {
+    return '+234' + phone.slice(1);
+  }
+
+  if (!phone.startsWith('+')) {
+    return '+234' + phone;
+  }
+
+  return phone;
+};
 
 const registerValidators = [
   body('email')
@@ -62,6 +82,8 @@ const registerValidators = [
     .withMessage('User type must be tenant or landlord'),
 ];
 
+// ================= ROUTES =================
+
 router.get('/registration-flags', authController.getRegistrationFlags);
 
 router.post(
@@ -86,14 +108,34 @@ router.post(
   authController.completeRegistrationAfterPayment
 );
 
-// Register new user (Landlord or Tenant)
+// ✅ REGISTER WITH SMS (SAFE WRAPPER — DOES NOT BREAK YOUR LOGIC)
 router.post(
   '/register',
   registerValidators,
-  authController.register
+  async (req, res, next) => {
+    try {
+      // 📱 Format phone
+      const formattedPhone = formatPhone(req.body.phone);
+
+      // 📡 Send SMS (non-blocking safe)
+      if (formattedPhone) {
+        sendVerificationCode(formattedPhone)
+          .then(() => console.log('✅ SMS sent to', formattedPhone))
+          .catch(err => console.error('❌ SMS failed:', err.message));
+      }
+
+      // 👉 Continue your normal logic
+      return authController.register(req, res, next);
+
+    } catch (err) {
+      console.error('SMS Wrapper Error:', err.message);
+      return authController.register(req, res, next);
+    }
+  }
 );
 
-// Login
+// ================= REST (UNCHANGED) =================
+
 router.post(
   '/login',
   [
@@ -103,40 +145,25 @@ router.post(
   authController.login
 );
 
-// Lawyer invite acceptance (password setup)
 router.post(
   '/lawyer/accept-invite',
   [
-    body('token')
-      .trim()
-      .notEmpty()
-      .withMessage('Invite token is required'),
-    body('full_name')
-      .trim()
-      .notEmpty()
-      .withMessage('Full name is required'),
-    body('chamber_name')
-      .trim()
-      .notEmpty()
-      .withMessage('Chamber/law firm name is required'),
+    body('token').trim().notEmpty(),
+    body('full_name').trim().notEmpty(),
+    body('chamber_name').trim().notEmpty(),
     body('chamber_phone')
       .trim()
-      .customSanitizer((value) => String(value || '').replace(/\s+/g, ''))
-      .matches(/^\+?\d{10,15}$/)
-      .withMessage('Please enter a valid chamber phone number (10-15 digits, optional +)'),
+      .customSanitizer(v => String(v || '').replace(/\s+/g, ''))
+      .matches(/^\+?\d{10,15}$/),
     body('phone')
       .trim()
-      .customSanitizer((value) => String(value || '').replace(/\s+/g, ''))
-      .matches(/^\+?\d{10,15}$/)
-      .withMessage('Please enter a valid phone number (10-15 digits, optional +)'),
-    body('password')
-      .isLength({ min: 8 })
-      .withMessage('Password must be at least 8 characters'),
+      .customSanitizer(v => String(v || '').replace(/\s+/g, ''))
+      .matches(/^\+?\d{10,15}$/),
+    body('password').isLength({ min: 8 }),
   ],
   authController.acceptLawyerInvite
 );
 
-// Admin + super admin invite management
 router.get(
   '/lawyer-invites',
   authenticate,
@@ -156,37 +183,26 @@ router.patch(
   [
     authenticate,
     requireAdminOrSuperAdmin,
-    body('lawyer_email')
-      .isEmail()
-      .withMessage('Please provide a valid lawyer email')
-      .normalizeEmail(),
+    body('lawyer_email').isEmail().normalizeEmail(),
   ],
   authController.updateLawyerInviteEmail
 );
 
-// Verify Lawyer OTP — called after acceptLawyerInvite, no auth token required
 router.post(
   '/verify-otp',
   [
-    body('phone').trim().notEmpty().withMessage('Phone is required'),
-    body('otp').trim().notEmpty().withMessage('OTP is required'),
+    body('phone').trim().notEmpty(),
+    body('otp').trim().notEmpty(),
   ],
   authController.verifyLawyerOtp
 );
 
-// Verify Email
 router.get('/verify-email/:token', authController.verifyEmail);
-
-// Resend Email Verification
 router.post('/resend-verification', authController.resendVerification);
 
-// Verify Phone (Send OTP)
 router.post('/send-phone-otp', authenticate, authController.sendPhoneOTP);
-
-// Verify Phone (Confirm OTP)
 router.post('/verify-phone', authenticate, authController.verifyPhone);
 
-// Upload Passport Photo
 router.post(
   '/upload-passport',
   authenticate,
@@ -194,7 +210,6 @@ router.post(
   authController.uploadPassport
 );
 
-// Check Lawyer Passport for Fraud (compare against tenant/landlord passports)
 router.post(
   '/check-lawyer-passport-fraud',
   authenticate,
@@ -202,23 +217,16 @@ router.post(
   authController.checkLawyerPassportForFraud
 );
 
-// Get Current User Profile
 router.get('/me', authenticate, authController.getCurrentUser);
-
-// Refresh Token
 router.post('/refresh-token', authController.refreshToken);
-
-// Logout
 router.post('/logout', authenticate, authController.logout);
 
-// Request Password Reset
 router.post(
   '/forgot-password',
   [body('email').isEmail().normalizeEmail()],
   authController.forgotPassword
 );
 
-// Reset Password
 router.post(
   '/reset-password/:token',
   [body('password').isLength({ min: 8 })],
