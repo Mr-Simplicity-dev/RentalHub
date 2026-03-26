@@ -1478,31 +1478,116 @@ async function handleFailedPayment(data) {
 
 
 // =====================================================
-//             FLUTTERWAVE WEBHOOK (OPTIONAL)
+//             BANK ACCOUNT VERIFICATION
 // =====================================================
 
-exports.flutterwaveWebhook = async (req, res) => {
+exports.verifyBankAccount = async (req, res) => {
   try {
-    const secretHash = process.env.FLUTTERWAVE_SECRET_HASH;
-    const signature = req.headers["verif-hash"];
-
-    if (!signature || signature !== secretHash) {
-      return res.status(401).send("Invalid signature");
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors.array() 
+      });
     }
 
-    const payload = req.body;
-    console.log("Flutterwave webhook:", payload);
+    const { bank_name, account_number } = req.body;
+    
+    if (!PAYSTACK_SECRET_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment service is not configured'
+      });
+    }
 
-    res.status(200).send("Webhook received");
+    // First, we need to get the bank code from the bank name
+    // Paystack requires bank code, not bank name
+    const banksResponse = await axios.get(
+      `${PAYSTACK_BASE_URL}/bank`,
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const banks = banksResponse.data.data;
+    const bank = banks.find(b => 
+      b.name.toLowerCase().includes(bank_name.toLowerCase()) ||
+      bank_name.toLowerCase().includes(b.name.toLowerCase())
+    );
+
+    if (!bank) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bank not found. Please select a valid bank from the list.'
+      });
+    }
+
+    // Now verify the account number with Paystack
+    const verifyResponse = await axios.get(
+      `${PAYSTACK_BASE_URL}/bank/resolve?account_number=${account_number}&bank_code=${bank.code}`,
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (verifyResponse.data.status === true) {
+      return res.json({
+        success: true,
+        message: 'Account verified successfully',
+        data: {
+          account_name: verifyResponse.data.data.account_name,
+          account_number: verifyResponse.data.data.account_number,
+          bank_code: bank.code,
+          bank_name: bank.name
+        }
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Unable to verify account. Please check the account number and try again.'
+      });
+    }
   } catch (error) {
-    console.error("Flutterwave webhook error:", error);
-    res.status(500).send("Webhook processing failed");
+    console.error('Bank account verification error:', error);
+    
+    // Handle specific Paystack errors
+    if (error.response) {
+      const paystackError = error.response.data;
+      
+      if (paystackError.message === 'Invalid bank code') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid bank selected. Please choose a valid bank from the list.'
+        });
+      }
+      
+      if (paystackError.message === 'Account number could not be resolved') {
+        return res.status(400).json({
+          success: false,
+          message: 'Account number could not be verified. Please check the account number and try again.'
+        });
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: paystackError.message || 'Failed to verify account. Please try again.'
+      });
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify account. Please try again later.'
+    });
   }
 };
 
 
-// =====================================================
-// EXPORT ALL
-// =====================================================
+
 
 module.exports = exports;

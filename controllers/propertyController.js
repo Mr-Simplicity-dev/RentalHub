@@ -1495,5 +1495,112 @@ exports.getDamageReports = async (req, res) => {
 };
 
 
+// Helper function to map bank name to Paystack bank code
+const getBankCode = (bankName) => {
+  const bankMap = {
+    'Access Bank': '044',
+    'Citibank Nigeria': '023',
+    'Ecobank Nigeria': '050',
+    'Fidelity Bank': '070',
+    'First Bank of Nigeria': '011',
+    'First City Monument Bank (FCMB)': '214',
+    'Globus Bank': '00103',
+    'Guaranty Trust Bank (GTBank)': '058',
+    'Heritage Bank': '030',
+    'Keystone Bank': '082',
+    'Kuda Bank': '50211',
+    'Moniepoint Microfinance Bank': '50515',
+    'OPay': '999992',
+    'PalmPay': '999991',
+    'Parallex Bank': '104',
+    'Polaris Bank': '076',
+    'Providus Bank': '101',
+    'Stanbic IBTC Bank': '221',
+    'Standard Chartered Bank': '068',
+    'Sterling Bank': '232',
+    'SunTrust Bank': '100',
+    'Taj Bank': '302',
+    'Titan Trust Bank': '102',
+    'Union Bank of Nigeria': '032',
+    'United Bank for Africa (UBA)': '033',
+    'Unity Bank': '215',
+    'VFD Microfinance Bank': '566',
+    'Wema Bank': '035',
+    'Zenith Bank': '057'
+  };
+  
+  return bankMap[bankName];
+};
+
+// Verify bank account for withdrawals
+exports.verifyBankAccount = async (req, res) => {
+  try {
+    const { bank_name, account_number } = req.body;
+    
+    if (!bank_name || !account_number) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bank name and account number are required'
+      });
+    }
+
+    // Validate account number format
+    if (!/^\d{10}$/.test(account_number)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account number must be 10 digits'
+      });
+    }
+
+    // Map Nigerian bank name to bank code
+    const bankCode = getBankCode(bank_name);
+    
+    if (!bankCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected bank is not supported for verification'
+      });
+    }
+
+    
+    // Call Paystack API to verify account
+    const response = await fetch('https://api.paystack.co/bank/resolve', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        account_number: account_number,
+        bank_code: bankCode
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.status && data.data) {
+      return res.json({
+        success: true,
+        data: {
+          account_name: data.data.account_name,
+          account_number: account_number,
+          bank_name: bank_name
+        }
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: data.message || 'Unable to verify account number'
+      });
+    }
+  } catch (error) {
+    console.error('Error verifying bank account:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify account. Please try again later.'
+    });
+  }
+};
+
 // Export All Handlers
 module.exports = exports;

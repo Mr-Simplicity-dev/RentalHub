@@ -83,6 +83,11 @@ const Dashboard = () => {
   const [walletView, setWalletView] = useState('withdraw'); // 'withdraw' | 'fund'
   const [fundAmount, setFundAmount] = useState('');
   const [fundLoading, setFundLoading] = useState(false);
+  
+  // ── Bank verification states ──────────────────────────────────────────────
+  const [accountNameLoading, setAccountNameLoading] = useState(false);
+  const [accountNameError, setAccountNameError] = useState('');
+  const [consentChecked, setConsentChecked] = useState(false);
 
   // ── Landlord refund management state ─────────────────────────────────────
   const [showLandlordRefundModal, setShowLandlordRefundModal] = useState(false);
@@ -165,11 +170,73 @@ const Dashboard = () => {
     };
   }, [user, loadDashboardData]);
 
+  // ── Bank account verification function ───────────────────────────────────
+  const fetchAccountName = async (bankName, accountNumber) => {
+    if (!bankName || !accountNumber || accountNumber.length !== 10) {
+      setAccountNameError('');
+      return;
+    }
+    
+    setAccountNameLoading(true);
+    setAccountNameError('');
+    
+    try {
+      const res = await api.post('/payments/verify-account', {
+        bank_name: bankName,
+        account_number: accountNumber
+      });
+      
+      if (res.data?.success && res.data.data?.account_name) {
+        setWithdrawForm(prev => ({ ...prev, account_name: res.data.data.account_name }));
+        setAccountNameError('');
+      } else {
+        setAccountNameError('Unable to fetch account name. Please enter manually.');
+      }
+    } catch (err) {
+      console.error('Error fetching account name:', err);
+      setAccountNameError(err.response?.data?.message || 'Failed to verify account. Please enter manually.');
+    } finally {
+      setAccountNameLoading(false);
+    }
+  };
+
+  // ── Account number change handler with debounce ──────────────────────────
+  const handleAccountNumberChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setWithdrawForm(prev => ({ ...prev, account_number: value }));
+    
+    // Clear previous account name when account number changes
+    if (withdrawForm.account_name) {
+      setWithdrawForm(prev => ({ ...prev, account_name: '' }));
+    }
+    
+    // Fetch account name when we have both bank and valid account number
+    if (value.length === 10 && withdrawForm.bank_name) {
+      const timeoutId = setTimeout(() => {
+        fetchAccountName(withdrawForm.bank_name, value);
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  };
+
+  // ── Bank change handler ──────────────────────────────────────────────────
+  const handleBankChange = (e) => {
+    const bankName = e.target.value;
+    setWithdrawForm(prev => ({ ...prev, bank_name: bankName, account_name: '' }));
+    
+    // If we already have a valid account number, fetch new account name
+    if (withdrawForm.account_number.length === 10 && bankName) {
+      fetchAccountName(bankName, withdrawForm.account_number);
+    }
+  };
+
   // ── Withdrawal helpers ───────────────────────────────────────────────────
   const openWithdrawModal = async () => {
     setWithdrawForm({ amount: '', bank_name: '', account_number: '', account_name: '' });
     setWalletView('withdraw');
     setFundAmount('');
+    setConsentChecked(false);
+    setAccountNameError('');
     setShowWithdrawModal(true);
     try {
       if (user.user_type === 'tenant') {
@@ -190,6 +257,10 @@ const Dashboard = () => {
     e.preventDefault();
     if (!withdrawForm.amount || !withdrawForm.bank_name || !withdrawForm.account_number || !withdrawForm.account_name) {
       toast.error('All fields are required');
+      return;
+    }
+    if (!consentChecked) {
+      toast.error('Please confirm that your account details are correct');
       return;
     }
     setWithdrawLoading(true);
@@ -471,132 +542,97 @@ const Dashboard = () => {
           </p>
         </div>
 
-                
-                {/* Verification Alert */}
-                {!user?.identity_verified && verificationReviewStatus === 'not_submitted' && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
+        {/* Verification Alert */}
+        {!user?.identity_verified && verificationReviewStatus === 'not_submitted' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
+            <div className="flex flex-col items-center">
+              <FaClock className="text-yellow-600 text-2xl mb-3" />
+              <h3 className="font-semibold text-yellow-800">
+                {t('dashboard.verify_title')}
+              </h3>
+              <p className="text-sm text-yellow-700 mt-2">
+                {t('dashboard.verify_text')}
+              </p>
+              <button
+                onClick={() => navigate('/profile')}
+                className="mt-3 text-sm font-semibold text-yellow-800 hover:text-yellow-900"
+              >
+                {t('dashboard.verify_action')} →
+              </button>
+            </div>
+          </div>
+        )}
 
-                    <div className="flex flex-col items-center">
+        {!user?.identity_verified && verificationReviewStatus === 'pending' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
+            <div className="flex flex-col items-center">
+              <FaClock className="text-blue-600 text-2xl mb-3" />
+              <h3 className="font-semibold text-blue-800">
+                Verification Submitted
+              </h3>
+              <p className="text-sm text-blue-700 mt-2">
+                Your passport was submitted. It is pending admin review.
+              </p>
+              <button
+                onClick={() => navigate('/profile')}
+                className="mt-3 text-sm font-semibold text-blue-800 hover:text-blue-900"
+              >
+                View Verification Status →
+              </button>
+            </div>
+          </div>
+        )}
 
-                      <FaClock className="text-yellow-600 text-2xl mb-3" />
+        {!user?.identity_verified && verificationReviewStatus === 'rejected' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6 text-center">
+            <div className="flex flex-col items-center">
+              <FaClock className="text-red-600 text-2xl mb-3" />
+              <h3 className="font-semibold text-red-800">
+                Verification Rejected
+              </h3>
+              <p className="text-sm text-red-700 mt-2">
+                Your verification was rejected. Review your details and upload a new live passport photo.
+              </p>
+              <button
+                onClick={() => navigate('/profile')}
+                className="mt-3 text-sm font-semibold text-red-800 hover:text-red-900"
+              >
+                Fix Verification {'>'}
+              </button>
+            </div>
+          </div>
+        )}
 
-                      <h3 className="font-semibold text-yellow-800">
-                        {t('dashboard.verify_title')}
-                      </h3>
+        <div className={`${lawyerInviteSummary.containerClass} border rounded-lg p-6 mb-6 text-center`}>
+          <div className="flex flex-col items-center">
+            {lawyerInviteSummary.icon}
+            <h3 className={`font-semibold ${lawyerInviteSummary.titleClass}`}>
+              {lawyerInviteSummary.title}
+            </h3>
+            <p className={`text-sm mt-2 ${lawyerInviteSummary.textClass}`}>
+              {lawyerInviteSummary.description}
+            </p>
+          </div>
+        </div>
 
-                      <p className="text-sm text-yellow-700 mt-2">
-                        {t('dashboard.verify_text')}
-                      </p>
-
-                      <button
-                        onClick={() => navigate('/profile')}
-                        className="mt-3 text-sm font-semibold text-yellow-800 hover:text-yellow-900"
-                      >
-                        {t('dashboard.verify_action')} →
-                      </button>
-
-                    </div>
-
-                  </div>
-                )}
-
-                {!user?.identity_verified && verificationReviewStatus === 'pending' && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
-
-                    <div className="flex flex-col items-center">
-
-                      <FaClock className="text-blue-600 text-2xl mb-3" />
-
-                      <h3 className="font-semibold text-blue-800">
-                        Verification Submitted
-                      </h3>
-
-                      <p className="text-sm text-blue-700 mt-2">
-                        Your passport was submitted. It is pending admin review.
-                      </p>
-
-                      <button
-                        onClick={() => navigate('/profile')}
-                        className="mt-3 text-sm font-semibold text-blue-800 hover:text-blue-900"
-                      >
-                        View Verification Status →
-                      </button>
-
-                    </div>
-
-                  </div>
-                )}
-
-                {!user?.identity_verified && verificationReviewStatus === 'rejected' && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6 text-center">
-
-                    <div className="flex flex-col items-center">
-
-                      <FaClock className="text-red-600 text-2xl mb-3" />
-
-                      <h3 className="font-semibold text-red-800">
-                        Verification Rejected
-                      </h3>
-
-                      <p className="text-sm text-red-700 mt-2">
-                        Your verification was rejected. Review your details and upload a new live passport photo.
-                      </p>
-
-                      <button
-                        onClick={() => navigate('/profile')}
-                        className="mt-3 text-sm font-semibold text-red-800 hover:text-red-900"
-                      >
-                        Fix Verification {'>'}
-                      </button>
-
-                    </div>
-
-                  </div>
-                )}
-
-                <div className={`${lawyerInviteSummary.containerClass} border rounded-lg p-6 mb-6 text-center`}>
-
-                  <div className="flex flex-col items-center">
-
-                    {lawyerInviteSummary.icon}
-
-                    <h3 className={`font-semibold ${lawyerInviteSummary.titleClass}`}>
-                      {lawyerInviteSummary.title}
-                    </h3>
-
-                    <p className={`text-sm mt-2 ${lawyerInviteSummary.textClass}`}>
-                      {lawyerInviteSummary.description}
-                    </p>
-
-                  </div>
-
-                </div>
-
-                        {/* Tenant Unlock Alert */}
+        {/* Tenant Unlock Alert */}
         {user?.user_type === 'tenant' && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
-
             <div className="flex flex-col items-center">
-
               <FaCheckCircle className="text-blue-600 text-2xl mb-3" />
-
               <h3 className="font-semibold text-blue-800">
                 Pay Per Property Details
               </h3>
-
               <p className="text-sm text-blue-700 mt-2 text-center">
                 Save properties first, then pay to unlock each property's full details and landlord contact.
               </p>
-
               <button
                 onClick={() => navigate('/properties')}
                 className="mt-4 btn btn-primary text-sm"
               >
                 Browse Properties
               </button>
-
             </div>
-
           </div>
         )}
 
@@ -787,14 +823,10 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ════════════════════════════════════════════════════════════
-           REFUND REQUEST MODAL  (tenant only)
-          ════════════════════════════════════════════════════════════ */}
+      {/* REFUND REQUEST MODAL (tenant only) */}
       {showRefundModal && user?.user_type === 'tenant' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-
-            {/* ── Modal header ── */}
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
               <div className="flex items-center gap-3">
                 <FaMoneyBillWave className="text-orange-500 text-2xl" />
@@ -803,7 +835,6 @@ const Dashboard = () => {
                 </h2>
               </div>
               <div className="flex items-center gap-3">
-                {/* Toggle between form and history */}
                 {refundView !== 'success' && (
                   <button
                     onClick={() => setRefundView(v => v === 'history' ? 'form' : 'history')}
@@ -817,10 +848,7 @@ const Dashboard = () => {
                 </button>
               </div>
             </div>
-
             <div className="px-6 py-5">
-
-              {/* ── SUCCESS STATE ── */}
               {refundView === 'success' && (
                 <div className="text-center py-6 space-y-4">
                   <FaCheckCircle className="text-green-500 text-5xl mx-auto" />
@@ -830,23 +858,11 @@ const Dashboard = () => {
                     they approve or reject it. Approved refunds are processed within 3–5 business days.
                   </p>
                   <div className="flex gap-3 mt-4">
-                    <button
-                      onClick={() => setRefundView('history')}
-                      className="btn w-full"
-                    >
-                      View My Requests
-                    </button>
-                    <button
-                      onClick={() => setShowRefundModal(false)}
-                      className="btn btn-primary w-full"
-                    >
-                      Close
-                    </button>
+                    <button onClick={() => setRefundView('history')} className="btn w-full">View My Requests</button>
+                    <button onClick={() => setShowRefundModal(false)} className="btn btn-primary w-full">Close</button>
                   </div>
                 </div>
               )}
-
-              {/* ── HISTORY VIEW ── */}
               {refundView === 'history' && (
                 <div className="space-y-3">
                   {myRefundRequests.length === 0 ? (
@@ -885,12 +901,8 @@ const Dashboard = () => {
                   )}
                 </div>
               )}
-
-              {/* ── FORM VIEW ── */}
               {refundView === 'form' && (
                 <form onSubmit={handleRefundSubmit} className="space-y-5">
-
-                  {/* No eligible payments */}
                   {eligiblePayments.length === 0 ? (
                     <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-4 text-sm text-yellow-800">
                       <FaExclamationTriangle className="mt-0.5 shrink-0" />
@@ -904,11 +916,8 @@ const Dashboard = () => {
                     </div>
                   ) : (
                     <>
-                      {/* Select payment */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Select Rent Payment *
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Select Rent Payment *</label>
                         <select
                           required
                           value={refundForm.payment_id}
@@ -918,26 +927,13 @@ const Dashboard = () => {
                           <option value="">-- Choose a rent payment --</option>
                           {eligiblePayments.map((ep) => (
                             <option key={ep.payment_id} value={ep.payment_id}>
-                              {ep.property_title} — ₦{Number(ep.amount).toLocaleString()} &nbsp;
-                              ({new Date(ep.paid_at).toLocaleDateString()})
+                              {ep.property_title} — ₦{Number(ep.amount).toLocaleString()} ({new Date(ep.paid_at).toLocaleDateString()})
                             </option>
                           ))}
                         </select>
-                        {refundForm.payment_id && (() => {
-                          const sel = eligiblePayments.find(p => String(p.payment_id) === String(refundForm.payment_id));
-                          return sel ? (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Paid to: <strong>{sel.landlord_name}</strong> &nbsp;|&nbsp; {sel.property_address}
-                            </p>
-                          ) : null;
-                        })()}
                       </div>
-
-                      {/* Reason */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Reason for Refund *
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Refund *</label>
                         <select
                           required
                           value={refundForm.reason}
@@ -954,8 +950,6 @@ const Dashboard = () => {
                           <option value="other">Other</option>
                         </select>
                       </div>
-
-                      {/* Details */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Additional Details <span className="text-gray-400">(optional)</span>
@@ -968,8 +962,6 @@ const Dashboard = () => {
                           placeholder="Provide any extra information to support your request..."
                         />
                       </div>
-
-                      {/* Notice */}
                       <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700">
                         <FaExclamationTriangle className="mt-0.5 shrink-0" />
                         <span>
@@ -977,15 +969,8 @@ const Dashboard = () => {
                           Once approved, the refund is processed back to your original payment method within 3–5 business days.
                         </span>
                       </div>
-
                       <div className="flex gap-3 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setShowRefundModal(false)}
-                          className="btn w-full"
-                        >
-                          Cancel
-                        </button>
+                        <button type="button" onClick={() => setShowRefundModal(false)} className="btn w-full">Cancel</button>
                         <button
                           type="submit"
                           disabled={refundLoading || !refundForm.payment_id || !refundForm.reason}
@@ -998,17 +983,12 @@ const Dashboard = () => {
                   )}
                 </form>
               )}
-
             </div>
           </div>
         </div>
       )}
 
-    
-
-      {/* ════════════════════════════════════════════════════════════
-           WITHDRAWAL MODAL  (tenant + landlord)
-          ════════════════════════════════════════════════════════════ */}
+      {/* WITHDRAWAL MODAL (tenant + landlord) */}
       {showWithdrawModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -1022,7 +1002,6 @@ const Dashboard = () => {
                   <FaTimes className="text-xl" />
                 </button>
               </div>
-              {/* Tab switcher */}
               <div className="flex border-b">
                 <button
                   type="button"
@@ -1042,14 +1021,9 @@ const Dashboard = () => {
             </div>
 
             <div className="px-6 py-5 space-y-5">
-
-              {/* ══════════════════════════════════
-                   FUND WALLET TAB
-                  ══════════════════════════════════ */}
+              {/* FUND WALLET TAB */}
               {walletView === 'fund' && (
                 <div className="space-y-5">
-
-                  {/* Balance summary */}
                   {user?.user_type === 'tenant' && walletBalance !== null && (
                     <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
                       <div>
@@ -1059,7 +1033,6 @@ const Dashboard = () => {
                       <FaWallet className="text-teal-400 text-3xl" />
                     </div>
                   )}
-
                   {user?.user_type === 'landlord' && landlordWallet && (
                     <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
                       <div>
@@ -1069,8 +1042,6 @@ const Dashboard = () => {
                       <FaWallet className="text-teal-400 text-3xl" />
                     </div>
                   )}
-
-                  {/* Quick amount buttons */}
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">Select or enter amount</p>
                     <div className="grid grid-cols-4 gap-2 mb-3">
@@ -1098,8 +1069,6 @@ const Dashboard = () => {
                       ))}
                     </div>
                   </div>
-
-                  {/* Custom amount input */}
                   <form onSubmit={handleFundWallet} className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Custom Amount (₦)</label>
@@ -1117,12 +1086,10 @@ const Dashboard = () => {
                         </p>
                       )}
                     </div>
-
                     <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-xs text-green-700">
                       <FaCheckCircle className="mt-0.5 shrink-0 text-green-500" />
                       <span>Payment is processed securely via Paystack. Your wallet will be credited immediately after a successful payment.</span>
                     </div>
-
                     <div className="flex gap-3">
                       <button type="button" onClick={() => setShowWithdrawModal(false)} className="btn w-full">Cancel</button>
                       <button
@@ -1137,13 +1104,9 @@ const Dashboard = () => {
                 </div>
               )}
 
-              {/* ══════════════════════════════════
-                   WITHDRAW FUNDS TAB
-                  ══════════════════════════════════ */}
+              {/* WITHDRAW FUNDS TAB */}
               {walletView === 'withdraw' && (
                 <div className="space-y-5">
-
-                  {/* ── TENANT: wallet balance + how it's funded ── */}
                   {user?.user_type === 'tenant' && (
                     <>
                       <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
@@ -1163,8 +1126,6 @@ const Dashboard = () => {
                       </div>
                     </>
                   )}
-
-                  {/* ── LANDLORD: wallet breakdown + how it's funded ── */}
                   {user?.user_type === 'landlord' && (
                     <>
                       {landlordWallet ? (
@@ -1194,7 +1155,7 @@ const Dashboard = () => {
                     </>
                   )}
 
-                  {/* ── Withdrawal form ── */}
+                  {/* Withdrawal form */}
                   <form onSubmit={handleWithdrawSubmit} className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₦) *</label>
@@ -1214,7 +1175,7 @@ const Dashboard = () => {
                       <select
                         required
                         value={withdrawForm.bank_name}
-                        onChange={e => setWithdrawForm(p => ({ ...p, bank_name: e.target.value }))}
+                        onChange={handleBankChange}
                         className="input w-full"
                       >
                         <option value="">-- Select your bank --</option>
@@ -1226,14 +1187,24 @@ const Dashboard = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Account Number *</label>
-                      <input
-                        required
-                        maxLength={10}
-                        value={withdrawForm.account_number}
-                        onChange={e => setWithdrawForm(p => ({ ...p, account_number: e.target.value.replace(/\D/g, '') }))}
-                        className="input w-full"
-                        placeholder="10-digit account number"
-                      />
+                      <div className="relative">
+                        <input
+                          required
+                          maxLength={10}
+                          value={withdrawForm.account_number}
+                          onChange={handleAccountNumberChange}
+                          className="input w-full"
+                          placeholder="10-digit account number"
+                        />
+                        {accountNameLoading && (
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                          </div>
+                        )}
+                      </div>
+                      {accountNameError && (
+                        <p className="text-xs text-red-600 mt-1">{accountNameError}</p>
+                      )}
                     </div>
 
                     <div>
@@ -1242,9 +1213,31 @@ const Dashboard = () => {
                         required
                         value={withdrawForm.account_name}
                         onChange={e => setWithdrawForm(p => ({ ...p, account_name: e.target.value }))}
-                        className="input w-full"
-                        placeholder="Name as it appears on your bank account"
+                        className={`input w-full ${accountNameLoading ? 'bg-gray-100' : ''}`}
+                        placeholder="Account holder name"
+                        readOnly={!accountNameError && withdrawForm.account_name && !accountNameLoading}
                       />
+                      {withdrawForm.account_name && !accountNameError && withdrawForm.account_number.length === 10 && (
+                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                          <FaCheckCircle className="text-xs" /> Account verified
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Consent Checkbox */}
+                    <div className="flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <input
+                        type="checkbox"
+                        id="withdrawConsent"
+                        checked={consentChecked}
+                        onChange={(e) => setConsentChecked(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <label htmlFor="withdrawConsent" className="text-xs text-gray-700">
+                        I confirm that the bank account details provided above are correct and belong to me. 
+                        I understand that providing incorrect information may result in failed transfers and 
+                        additional processing fees may apply.
+                      </label>
                     </div>
 
                     <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
@@ -1261,7 +1254,8 @@ const Dashboard = () => {
                           !withdrawForm.amount ||
                           !withdrawForm.bank_name ||
                           !withdrawForm.account_number ||
-                          !withdrawForm.account_name
+                          !withdrawForm.account_name ||
+                          !consentChecked
                         }
                         className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -1286,18 +1280,14 @@ const Dashboard = () => {
                       ))}
                     </div>
                   )}
-
                 </div>
-              )} {/* end walletView === 'withdraw' */}
-
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════════════
-           LANDLORD REFUND MANAGEMENT MODAL
-          ════════════════════════════════════════════════════════════ */}
+      {/* LANDLORD REFUND MANAGEMENT MODAL */}
       {showLandlordRefundModal && user?.user_type === 'landlord' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1329,7 +1319,6 @@ const Dashboard = () => {
               ) : (
                 landlordRefunds.map(rr => (
                   <div key={rr.id} className="border rounded-xl p-4 space-y-3">
-                    {/* Header */}
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-semibold text-gray-800">{rr.property_title}</p>
@@ -1339,7 +1328,6 @@ const Dashboard = () => {
                       <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize shrink-0 ${refundStatusBadge(rr.status)}`}>{rr.status}</span>
                     </div>
 
-                    {/* Details */}
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="bg-gray-50 rounded-lg px-3 py-2">
                         <p className="text-xs text-gray-500">Rent Paid</p>
@@ -1356,7 +1344,6 @@ const Dashboard = () => {
                       {rr.details && <p className="text-gray-500 mt-1 text-xs">{rr.details}</p>}
                     </div>
 
-                    {/* Approved amount if already reviewed */}
                     {rr.approved_amount && (
                       <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm">
                         <p className="text-green-700">Approved: <strong>₦{Number(rr.approved_amount).toLocaleString()}</strong>
@@ -1372,14 +1359,11 @@ const Dashboard = () => {
                       </div>
                     )}
 
-                    {/* Action panel for pending requests */}
                     {rr.status === 'pending' && (
                       <>
                         {selectedRefund === rr.id ? (
                           <div className="border-t pt-3 space-y-3">
                             <p className="text-sm font-semibold text-gray-700">How much would you like to refund?</p>
-
-                            {/* Refund type */}
                             <div className="grid grid-cols-3 gap-2">
                               {[
                                 { value: 'full', label: 'Full Refund' },
@@ -1396,15 +1380,11 @@ const Dashboard = () => {
                                 </button>
                               ))}
                             </div>
-
-                            {/* Full refund info */}
                             {approveForm.refund_type === 'full' && (
                               <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-sm text-indigo-700">
                                 Full rent amount of <strong>₦{Number(rr.amount).toLocaleString()}</strong> will be refunded to the tenant's wallet.
                               </div>
                             )}
-
-                            {/* Months selector */}
                             {approveForm.refund_type === 'partial_months' && (
                               <div className="space-y-2">
                                 <p className="text-xs text-gray-500">Select number of months to refund</p>
@@ -1436,8 +1416,6 @@ const Dashboard = () => {
                                 )}
                               </div>
                             )}
-
-                            {/* Custom amount */}
                             {approveForm.refund_type === 'partial_custom' && (
                               <div>
                                 <input
@@ -1451,8 +1429,6 @@ const Dashboard = () => {
                                 />
                               </div>
                             )}
-
-                            {/* Landlord note */}
                             <textarea
                               rows={2}
                               value={approveForm.landlord_note}
@@ -1460,7 +1436,6 @@ const Dashboard = () => {
                               className="input w-full resize-none text-sm"
                               placeholder="Optional note to tenant (e.g. reason for partial refund)..."
                             />
-
                             <div className="flex gap-2">
                               <button type="button" onClick={() => setSelectedRefund(null)} className="btn w-full text-sm">Cancel</button>
                               <button
@@ -1491,8 +1466,6 @@ const Dashboard = () => {
                             </button>
                           </div>
                         )}
-
-                        {/* Reject panel */}
                         {selectedRefund === `reject_${rr.id}` && (
                           <div className="border-t pt-3 space-y-2">
                             <p className="text-sm font-semibold text-red-700">Reason for rejection *</p>
@@ -1525,18 +1498,13 @@ const Dashboard = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
 
-
 // Stat Card Component
 const StatCard = ({ icon, title, value, onClick }) => (
-  <div
-    onClick={onClick}
-    className="card cursor-pointer"
-  >
+  <div onClick={onClick} className="card cursor-pointer">
     <div className="flex items-center justify-between">
       <div>
         <p className="text-gray-600 text-sm mb-1">{title}</p>
@@ -1606,10 +1574,7 @@ const ActivityItem = ({ activity }) => {
 
 // Quick Action Card Component
 const QuickActionCard = ({ title, description, icon, onClick }) => (
-  <div
-    onClick={onClick}
-    className="card cursor-pointer text-center"
-  >
+  <div onClick={onClick} className="card cursor-pointer text-center">
     <div className="text-4xl text-primary-600 mb-3">{icon}</div>
     <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>
     <p className="text-sm text-gray-600">{description}</p>

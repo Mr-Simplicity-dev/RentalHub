@@ -216,4 +216,16 @@ router.get('/wallet/withdrawals',
   refundController.getMyWithdrawals
 );
 
+// ============ BANK ACCOUNT VERIFICATION ============
+
+// Verify bank account for withdrawals
+router.post('/verify-account',
+  authenticate,
+  [
+    body('bank_name').notEmpty().withMessage('Bank name is required'),
+    body('account_number').isLength({ min: 10, max: 10 }).withMessage('Account number must be 10 digits')
+  ],
+  paymentController.verifyBankAccount
+);
+
 module.exports = router;
