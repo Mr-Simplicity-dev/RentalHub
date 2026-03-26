@@ -1141,153 +1141,153 @@ const Dashboard = () => {
                    WITHDRAW FUNDS TAB
                   ══════════════════════════════════ */}
               {walletView === 'withdraw' && (
-              <div className="space-y-5">
+                <div className="space-y-5">
 
-              {/* ── TENANT: wallet balance + how it's funded ── */}
-              {user?.user_type === 'tenant' && (
-                <>
-                  <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-teal-600">Available Wallet Balance</p>
-                      <p className="text-2xl font-bold text-teal-800">
-                        {walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
-                      </p>
-                    </div>
-                    <FaWallet className="text-teal-400 text-3xl" />
-                  </div>
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 space-y-1">
-                    <p className="font-semibold text-blue-800">How is my wallet funded?</p>
-                    <p>Your wallet is automatically credited when a landlord <strong>approves your refund request</strong>. The approved refund amount is added to your wallet balance.</p>
-                    <p>Once your wallet has a balance, you can withdraw it to your bank account using the form below.</p>
-                    <p className="text-blue-500 italic">To get funds in your wallet, submit a refund request from the "Request a Refund" section on your dashboard.</p>
-                  </div>
-                </>
-              )}
-
-              {/* ── LANDLORD: wallet breakdown + how it's funded ── */}
-              {user?.user_type === 'landlord' && (
-                <>
-                  {landlordWallet ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                        <p className="text-xs text-green-600">Available to Withdraw</p>
-                        <p className="text-xl font-bold text-green-800">₦{Number(landlordWallet.available_to_withdraw).toLocaleString()}</p>
+                  {/* ── TENANT: wallet balance + how it's funded ── */}
+                  {user?.user_type === 'tenant' && (
+                    <>
+                      <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-teal-600">Available Wallet Balance</p>
+                          <p className="text-2xl font-bold text-teal-800">
+                            {walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
+                          </p>
+                        </div>
+                        <FaWallet className="text-teal-400 text-3xl" />
                       </div>
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
-                        <p className="text-xs text-yellow-600">Pending (14-day hold)</p>
-                        <p className="text-xl font-bold text-yellow-800">₦{Number(landlordWallet.pending_balance).toLocaleString()}</p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 space-y-1">
+                        <p className="font-semibold text-blue-800">How is my wallet funded?</p>
+                        <p>Your wallet is automatically credited when a landlord <strong>approves your refund request</strong>. The approved refund amount is added to your wallet balance.</p>
+                        <p>Once your wallet has a balance, you can withdraw it to your bank account using the form below.</p>
+                        <p className="text-blue-500 italic">To get funds in your wallet, submit a refund request from the "Request a Refund" section on your dashboard.</p>
                       </div>
-                      <div className="col-span-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2">
-                        <p className="text-xs text-gray-500">Total Withdrawn to Date: <strong>₦{Number(landlordWallet.withdrawn_total || 0).toLocaleString()}</strong></p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-500 text-center">Loading wallet...</div>
+                    </>
                   )}
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 space-y-1">
-                    <p className="font-semibold text-blue-800">How is my wallet funded?</p>
-                    <p>Your wallet balance comes from <strong>rent payments made by tenants</strong> through the platform.</p>
-                    <p>Rent payments are held for <strong>14 working days</strong> before they are cleared and added to your available balance. This holding period allows time for any refund disputes to be resolved.</p>
-                    <p>Payments older than 14 working days with <strong>no active refund dispute</strong> are automatically cleared for withdrawal.</p>
-                    <p className="text-blue-500 italic">Pending balance = rent received within the last 14 working days or with an active refund dispute.</p>
-                  </div>
-                </>
-              )}
 
-              {/* ── Withdrawal form ── */}
-              <form onSubmit={handleWithdrawSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₦) *</label>
-                  <input
-                    type="number"
-                    required
-                    min="100"
-                    value={withdrawForm.amount}
-                    onChange={e => setWithdrawForm(p => ({ ...p, amount: e.target.value }))}
-                    className="input w-full"
-                    placeholder="Enter amount to withdraw"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name *</label>
-                  <select
-                    required
-                    value={withdrawForm.bank_name}
-                    onChange={e => setWithdrawForm(p => ({ ...p, bank_name: e.target.value }))}
-                    className="input w-full"
-                  >
-                    <option value="">-- Select your bank --</option>
-                    {NIGERIAN_BANKS.map(bank => (
-                      <option key={bank} value={bank}>{bank}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Number *</label>
-                  <input
-                    required
-                    maxLength={10}
-                    value={withdrawForm.account_number}
-                    onChange={e => setWithdrawForm(p => ({ ...p, account_number: e.target.value.replace(/\D/g, '') }))}
-                    className="input w-full"
-                    placeholder="10-digit account number"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Name *</label>
-                  <input
-                    required
-                    value={withdrawForm.account_name}
-                    onChange={e => setWithdrawForm(p => ({ ...p, account_name: e.target.value }))}
-                    className="input w-full"
-                    placeholder="Name as it appears on your bank account"
-                  />
-                </div>
-
-                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
-                  <FaExclamationTriangle className="mt-0.5 shrink-0" />
-                  <span>Withdrawals are processed within 1–3 business days. Double-check your account details — incorrect details may result in failed transfers.</span>
-                </div>
-
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setShowWithdrawModal(false)} className="btn w-full">Cancel</button>
-                  <button
-                    type="submit"
-                    disabled={
-                      withdrawLoading ||
-                      !withdrawForm.amount ||
-                      !withdrawForm.bank_name ||
-                      !withdrawForm.account_number ||
-                      !withdrawForm.account_name
-                    }
-                    className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {withdrawLoading ? 'Submitting...' : 'Request Withdrawal'}
-                  </button>
-                </div>
-              </form>
-
-              {/* Withdrawal history */}
-              {withdrawHistory.length > 0 && (
-                <div className="space-y-2 pt-2">
-                  <p className="text-sm font-semibold text-gray-700 border-t pt-3">Recent Withdrawals</p>
-                  {withdrawHistory.slice(0, 5).map(w => (
-                    <div key={w.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                      <div>
-                        <p className="font-medium text-gray-800">₦{Number(w.amount).toLocaleString()}</p>
-                        <p className="text-xs text-gray-500">{w.bank_name} · {w.account_number}</p>
-                        <p className="text-xs text-gray-400">{new Date(w.requested_at).toLocaleDateString()}</p>
+                  {/* ── LANDLORD: wallet breakdown + how it's funded ── */}
+                  {user?.user_type === 'landlord' && (
+                    <>
+                      {landlordWallet ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                            <p className="text-xs text-green-600">Available to Withdraw</p>
+                            <p className="text-xl font-bold text-green-800">₦{Number(landlordWallet.available_to_withdraw).toLocaleString()}</p>
+                          </div>
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
+                            <p className="text-xs text-yellow-600">Pending (14-day hold)</p>
+                            <p className="text-xl font-bold text-yellow-800">₦{Number(landlordWallet.pending_balance).toLocaleString()}</p>
+                          </div>
+                          <div className="col-span-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2">
+                            <p className="text-xs text-gray-500">Total Withdrawn to Date: <strong>₦{Number(landlordWallet.withdrawn_total || 0).toLocaleString()}</strong></p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-500 text-center">Loading wallet...</div>
+                      )}
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 space-y-1">
+                        <p className="font-semibold text-blue-800">How is my wallet funded?</p>
+                        <p>Your wallet balance comes from <strong>rent payments made by tenants</strong> through the platform.</p>
+                        <p>Rent payments are held for <strong>14 working days</strong> before they are cleared and added to your available balance. This holding period allows time for any refund disputes to be resolved.</p>
+                        <p>Payments older than 14 working days with <strong>no active refund dispute</strong> are automatically cleared for withdrawal.</p>
+                        <p className="text-blue-500 italic">Pending balance = rent received within the last 14 working days or with an active refund dispute.</p>
                       </div>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize ${withdrawStatusBadge(w.status)}`}>{w.status}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    </>
+                  )}
 
-              </div> {/* end withdraw tab */}
+                  {/* ── Withdrawal form ── */}
+                  <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₦) *</label>
+                      <input
+                        type="number"
+                        required
+                        min="100"
+                        value={withdrawForm.amount}
+                        onChange={e => setWithdrawForm(p => ({ ...p, amount: e.target.value }))}
+                        className="input w-full"
+                        placeholder="Enter amount to withdraw"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name *</label>
+                      <select
+                        required
+                        value={withdrawForm.bank_name}
+                        onChange={e => setWithdrawForm(p => ({ ...p, bank_name: e.target.value }))}
+                        className="input w-full"
+                      >
+                        <option value="">-- Select your bank --</option>
+                        {NIGERIAN_BANKS.map(bank => (
+                          <option key={bank} value={bank}>{bank}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Account Number *</label>
+                      <input
+                        required
+                        maxLength={10}
+                        value={withdrawForm.account_number}
+                        onChange={e => setWithdrawForm(p => ({ ...p, account_number: e.target.value.replace(/\D/g, '') }))}
+                        className="input w-full"
+                        placeholder="10-digit account number"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Account Name *</label>
+                      <input
+                        required
+                        value={withdrawForm.account_name}
+                        onChange={e => setWithdrawForm(p => ({ ...p, account_name: e.target.value }))}
+                        className="input w-full"
+                        placeholder="Name as it appears on your bank account"
+                      />
+                    </div>
+
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
+                      <FaExclamationTriangle className="mt-0.5 shrink-0" />
+                      <span>Withdrawals are processed within 1–3 business days. Double-check your account details — incorrect details may result in failed transfers.</span>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => setShowWithdrawModal(false)} className="btn w-full">Cancel</button>
+                      <button
+                        type="submit"
+                        disabled={
+                          withdrawLoading ||
+                          !withdrawForm.amount ||
+                          !withdrawForm.bank_name ||
+                          !withdrawForm.account_number ||
+                          !withdrawForm.account_name
+                        }
+                        className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {withdrawLoading ? 'Submitting...' : 'Request Withdrawal'}
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Withdrawal history */}
+                  {withdrawHistory.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <p className="text-sm font-semibold text-gray-700 border-t pt-3">Recent Withdrawals</p>
+                      {withdrawHistory.slice(0, 5).map(w => (
+                        <div key={w.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
+                          <div>
+                            <p className="font-medium text-gray-800">₦{Number(w.amount).toLocaleString()}</p>
+                            <p className="text-xs text-gray-500">{w.bank_name} · {w.account_number}</p>
+                            <p className="text-xs text-gray-400">{new Date(w.requested_at).toLocaleDateString()}</p>
+                          </div>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize ${withdrawStatusBadge(w.status)}`}>{w.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                </div>
               )} {/* end walletView === 'withdraw' */}
 
             </div>
