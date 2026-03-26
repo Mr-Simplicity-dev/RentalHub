@@ -174,4 +174,46 @@ router.get('/refund/admin/all',
   refundController.adminGetAllRefundRequests
 );
 
+// ============ WALLET FUNDING (PAYSTACK) ============
+
+// Both tenant and landlord: initialize wallet top-up via Paystack
+router.post('/wallet/fund',
+  authenticate,
+  paymentController.initializeWalletFunding
+);
+
+// Both tenant and landlord: verify wallet top-up after Paystack redirect
+router.get('/wallet/fund/verify/:reference',
+  authenticate,
+  paymentController.verifyWalletFunding
+);
+
+// ============ WALLET & WITHDRAWALS ============
+
+// Tenant: get wallet balance (approved refunds waiting to be withdrawn)
+router.get('/wallet/balance',
+  authenticate,
+  isTenant,
+  refundController.getWalletBalance
+);
+
+// Landlord: get cleared funds balance (rent after 14 working days)
+router.get('/wallet/landlord-balance',
+  authenticate,
+  isLandlord,
+  refundController.getLandlordWalletBalance
+);
+
+// Tenant + Landlord: request a withdrawal to bank account
+router.post('/wallet/withdraw',
+  authenticate,
+  refundController.requestWithdrawal
+);
+
+// Tenant + Landlord: view their withdrawal history
+router.get('/wallet/withdrawals',
+  authenticate,
+  refundController.getMyWithdrawals
+);
+
 module.exports = router;

@@ -3,28 +3,8 @@ const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const { uploadPassport } = require('../config/middleware/upload');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
-const { sendVerificationCode } = require('../config/utils/smsService'); // ✅ FIXED PATH
 
 const router = express.Router();
-
-/**
- * ✅ Helper: format Nigerian numbers to +234
- */
-const formatPhone = (phone) => {
-  if (!phone) return phone;
-
-  phone = String(phone).trim();
-
-  if (phone.startsWith('0')) {
-    return '+234' + phone.slice(1);
-  }
-
-  if (!phone.startsWith('+')) {
-    return '+234' + phone;
-  }
-
-  return phone;
-};
 
 const registerValidators = [
   body('email')
@@ -108,33 +88,13 @@ router.post(
   authController.completeRegistrationAfterPayment
 );
 
-// ✅ REGISTER WITH SMS (SAFE WRAPPER — DOES NOT BREAK YOUR LOGIC)
+// Register new user (Landlord or Tenant)
 router.post(
   '/register',
   registerValidators,
-  async (req, res, next) => {
-    try {
-      // 📱 Format phone
-      const formattedPhone = formatPhone(req.body.phone);
-
-      // 📡 Send SMS (non-blocking safe)
-      if (formattedPhone) {
-        sendVerificationCode(formattedPhone)
-          .then(() => console.log('✅ SMS sent to', formattedPhone))
-          .catch(err => console.error('❌ SMS failed:', err.message));
-      }
-
-      // 👉 Continue your normal logic
-      return authController.register(req, res, next);
-
-    } catch (err) {
-      console.error('SMS Wrapper Error:', err.message);
-      return authController.register(req, res, next);
-    }
-  }
+  authController.register
 );
 
-// ================= REST (UNCHANGED) =================
 
 router.post(
   '/login',

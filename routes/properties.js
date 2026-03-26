@@ -177,6 +177,24 @@ router.get(
   propertyController.getPropertyStats
 );
 
+// ============ DAMAGE REPORTS ============
+
+// Save damage report with photos (landlord, on property creation or edit)
+router.post(
+  '/:propertyId/damage-report',
+  authenticate,
+  isLandlord,
+  uploadPropertyPhotos,
+  propertyController.saveDamageReport
+);
+
+// Get all damage reports for a property (landlord + tenant)
+router.get(
+  '/:propertyId/damage-reports',
+  authenticate,
+  propertyController.getDamageReports
+);
+
 // Get property by ID (limited info for non-subscribers) — keep LAST
 router.get('/:propertyId', propertyController.getPropertyById);
 

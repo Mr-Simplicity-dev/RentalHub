@@ -14,10 +14,47 @@ import {
   FaUndo,
   FaTimes,
   FaExclamationTriangle,
+  FaWallet,
+  FaPiggyBank,
+  FaUniversity,
+  FaThumbsUp,
+  FaThumbsDown,
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
 import { useTranslation } from 'react-i18next';
+
+const NIGERIAN_BANKS = [
+  'Access Bank',
+  'Citibank Nigeria',
+  'Ecobank Nigeria',
+  'Fidelity Bank',
+  'First Bank of Nigeria',
+  'First City Monument Bank (FCMB)',
+  'Globus Bank',
+  'Guaranty Trust Bank (GTBank)',
+  'Heritage Bank',
+  'Keystone Bank',
+  'Kuda Bank',
+  'Moniepoint Microfinance Bank',
+  'OPay',
+  'PalmPay',
+  'Parallex Bank',
+  'Polaris Bank',
+  'Providus Bank',
+  'Stanbic IBTC Bank',
+  'Standard Chartered Bank',
+  'Sterling Bank',
+  'SunTrust Bank',
+  'Taj Bank',
+  'Titan Trust Bank',
+  'Union Bank of Nigeria',
+  'United Bank for Africa (UBA)',
+  'Unity Bank',
+  'VFD Microfinance Bank',
+  'Wema Bank',
+  'Zenith Bank',
+];
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -35,6 +72,26 @@ const Dashboard = () => {
   const [myRefundRequests, setMyRefundRequests] = useState([]);
   const [refundForm, setRefundForm] = useState({ payment_id: '', reason: '', details: '' });
   const [refundLoading, setRefundLoading] = useState(false);
+
+  // ── Withdrawal state (tenant + landlord) ──────────────────────────────────
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [landlordWallet, setLandlordWallet] = useState(null);
+  const [withdrawForm, setWithdrawForm] = useState({ amount: '', bank_name: '', account_number: '', account_name: '' });
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawHistory, setWithdrawHistory] = useState([]);
+  const [walletView, setWalletView] = useState('withdraw'); // 'withdraw' | 'fund'
+  const [fundAmount, setFundAmount] = useState('');
+  const [fundLoading, setFundLoading] = useState(false);
+
+  // ── Landlord refund management state ─────────────────────────────────────
+  const [showLandlordRefundModal, setShowLandlordRefundModal] = useState(false);
+  const [landlordRefunds, setLandlordRefunds] = useState([]);
+  const [landlordRefundFilter, setLandlordRefundFilter] = useState('pending');
+  const [selectedRefund, setSelectedRefund] = useState(null);
+  const [approveForm, setApproveForm] = useState({ refund_type: 'full', refund_months: '', approved_amount: '', landlord_note: '' });
+  const [rejectNote, setRejectNote] = useState('');
+  const [refundActionLoading, setRefundActionLoading] = useState(false);
   const hasSubmittedVerification = !!user?.passport_photo_url;
   const verificationReviewStatus =
     user?.identity_verification_status ||
@@ -107,6 +164,147 @@ const Dashboard = () => {
       window.removeEventListener('focus', handleWindowFocus);
     };
   }, [user, loadDashboardData]);
+
+  // ── Withdrawal helpers ───────────────────────────────────────────────────
+  const openWithdrawModal = async () => {
+    setWithdrawForm({ amount: '', bank_name: '', account_number: '', account_name: '' });
+    setWalletView('withdraw');
+    setFundAmount('');
+    setShowWithdrawModal(true);
+    try {
+      if (user.user_type === 'tenant') {
+        const res = await api.get('/payments/wallet/balance');
+        if (res.data?.success) setWalletBalance(res.data.data.balance);
+      } else {
+        const res = await api.get('/payments/wallet/landlord-balance');
+        if (res.data?.success) setLandlordWallet(res.data.data);
+      }
+      const histRes = await api.get('/payments/wallet/withdrawals');
+      if (histRes.data?.success) setWithdrawHistory(histRes.data.data || []);
+    } catch (err) {
+      console.error('Failed to load wallet data', err);
+    }
+  };
+
+  const handleWithdrawSubmit = async (e) => {
+    e.preventDefault();
+    if (!withdrawForm.amount || !withdrawForm.bank_name || !withdrawForm.account_number || !withdrawForm.account_name) {
+      toast.error('All fields are required');
+      return;
+    }
+    setWithdrawLoading(true);
+    try {
+      const res = await api.post('/payments/wallet/withdraw', withdrawForm);
+      if (res.data?.success) {
+        toast.success('Withdrawal request submitted successfully');
+        setShowWithdrawModal(false);
+        loadDashboardData();
+      } else {
+        toast.error(res.data?.message || 'Failed to submit withdrawal');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit withdrawal');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
+  const handleFundWallet = async (e) => {
+    e.preventDefault();
+    if (!fundAmount || Number(fundAmount) < 100) {
+      toast.error('Minimum funding amount is ₦100');
+      return;
+    }
+    setFundLoading(true);
+    try {
+      const res = await api.post('/payments/wallet/fund', { amount: fundAmount });
+      if (res.data?.success && res.data.data?.authorization_url) {
+        // Redirect to Paystack
+        window.location.href = res.data.data.authorization_url;
+      } else {
+        toast.error(res.data?.message || 'Failed to initialize payment');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to initialize payment');
+    } finally {
+      setFundLoading(false);
+    }
+  };
+
+  const withdrawStatusBadge = (status) => {
+    const map = {
+      pending:   'bg-yellow-100 text-yellow-800',
+      approved:  'bg-blue-100 text-blue-800',
+      rejected:  'bg-red-100 text-red-800',
+      processed: 'bg-green-100 text-green-800',
+    };
+    return map[status] || 'bg-gray-100 text-gray-700';
+  };
+
+  // ── Landlord refund management helpers ───────────────────────────────────
+  const openLandlordRefundModal = async (filter = 'pending') => {
+    setLandlordRefundFilter(filter);
+    setSelectedRefund(null);
+    setShowLandlordRefundModal(true);
+    try {
+      const res = await api.get(`/payments/refund/landlord?status=${filter}`);
+      if (res.data?.success) setLandlordRefunds(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to load landlord refunds', err);
+    }
+  };
+
+  const handleApproveRefund = async (refundId) => {
+    if (!approveForm.refund_type) return toast.error('Select refund type');
+    if (approveForm.refund_type === 'partial_months' && !approveForm.refund_months) {
+      return toast.error('Enter number of months to refund');
+    }
+    if (approveForm.refund_type === 'partial_custom' && !approveForm.approved_amount) {
+      return toast.error('Enter custom refund amount');
+    }
+    setRefundActionLoading(true);
+    try {
+      const res = await api.put(`/payments/refund/${refundId}/approve`, {
+        refund_type:     approveForm.refund_type,
+        refund_months:   approveForm.refund_months || undefined,
+        approved_amount: approveForm.approved_amount || undefined,
+        landlord_note:   approveForm.landlord_note,
+      });
+      if (res.data?.success) {
+        toast.success(res.data.message);
+        setSelectedRefund(null);
+        openLandlordRefundModal(landlordRefundFilter);
+        loadDashboardData();
+      } else {
+        toast.error(res.data?.message || 'Failed to approve refund');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to approve refund');
+    } finally {
+      setRefundActionLoading(false);
+    }
+  };
+
+  const handleRejectRefund = async (refundId) => {
+    if (!rejectNote.trim()) return toast.error('A rejection reason is required');
+    setRefundActionLoading(true);
+    try {
+      const res = await api.put(`/payments/refund/${refundId}/reject`, { landlord_note: rejectNote });
+      if (res.data?.success) {
+        toast.success('Refund request rejected');
+        setSelectedRefund(null);
+        setRejectNote('');
+        openLandlordRefundModal(landlordRefundFilter);
+        loadDashboardData();
+      } else {
+        toast.error(res.data?.message || 'Failed to reject refund');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reject refund');
+    } finally {
+      setRefundActionLoading(false);
+    }
+  };
 
   // ── Refund helpers ────────────────────────────────────────────────────────
   const openRefundModal = async () => {
@@ -436,6 +634,12 @@ const Dashboard = () => {
                 value={stats?.refund_requests_count || 0}
                 onClick={openRefundModal}
               />
+              <StatCard
+                icon={<FaWallet className="text-teal-500" />}
+                title="Wallet Balance"
+                value={walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
+                onClick={openWithdrawModal}
+              />
             </>
           ) : (
             <>
@@ -462,6 +666,18 @@ const Dashboard = () => {
                 title={t('dashboard.unread')}
                 value={stats?.unread_messages || 0}
                 onClick={() => navigate('/messages')}
+              />
+              <StatCard
+                icon={<FaUndo className="text-orange-500" />}
+                title="Refund Requests"
+                value={stats?.pending_refunds_count || 0}
+                onClick={() => openLandlordRefundModal('pending')}
+              />
+              <StatCard
+                icon={<FaPiggyBank className="text-teal-500" />}
+                title="Available to Withdraw"
+                value={landlordWallet ? `₦${Number(landlordWallet.available_to_withdraw).toLocaleString()}` : '—'}
+                onClick={openWithdrawModal}
               />
             </>
           )}
@@ -527,6 +743,12 @@ const Dashboard = () => {
                 icon={<FaUndo />}
                 onClick={openRefundModal}
               />
+              <QuickActionCard
+                title="Withdraw Funds"
+                description="Withdraw approved refunds from your wallet to your bank"
+                icon={<FaUniversity />}
+                onClick={openWithdrawModal}
+              />
             </>
           ) : (
             <>
@@ -547,6 +769,18 @@ const Dashboard = () => {
                 description={t('dashboard.qa_apps_landlord_desc')}
                 icon={<FaFileAlt />}
                 onClick={() => navigate('/applications')}
+              />
+              <QuickActionCard
+                title="Refund Requests"
+                description="Review and approve or reject tenant refund requests"
+                icon={<FaUndo />}
+                onClick={() => openLandlordRefundModal('pending')}
+              />
+              <QuickActionCard
+                title="Withdraw Funds"
+                description="Withdraw cleared rent payments to your bank account"
+                icon={<FaUniversity />}
+                onClick={openWithdrawModal}
               />
             </>
           )}
@@ -770,9 +1004,532 @@ const Dashboard = () => {
         </div>
       )}
 
+    
+
+      {/* ════════════════════════════════════════════════════════════
+           WITHDRAWAL MODAL  (tenant + landlord)
+          ════════════════════════════════════════════════════════════ */}
+      {showWithdrawModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="px-6 pt-6 pb-0">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <FaWallet className="text-teal-500 text-2xl" />
+                  <h2 className="text-lg font-bold text-gray-800">My Wallet</h2>
+                </div>
+                <button onClick={() => setShowWithdrawModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <FaTimes className="text-xl" />
+                </button>
+              </div>
+              {/* Tab switcher */}
+              <div className="flex border-b">
+                <button
+                  type="button"
+                  onClick={() => setWalletView('fund')}
+                  className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${walletView === 'fund' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                  💳 Fund Wallet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletView('withdraw')}
+                  className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${walletView === 'withdraw' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                  🏦 Withdraw Funds
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+
+              {/* ══════════════════════════════════
+                   FUND WALLET TAB
+                  ══════════════════════════════════ */}
+              {walletView === 'fund' && (
+                <div className="space-y-5">
+
+                  {/* Balance summary */}
+                  {user?.user_type === 'tenant' && walletBalance !== null && (
+                    <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-teal-600">Current Wallet Balance</p>
+                        <p className="text-2xl font-bold text-teal-800">₦{Number(walletBalance).toLocaleString()}</p>
+                      </div>
+                      <FaWallet className="text-teal-400 text-3xl" />
+                    </div>
+                  )}
+
+                  {user?.user_type === 'landlord' && landlordWallet && (
+                    <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-teal-600">Available Balance</p>
+                        <p className="text-2xl font-bold text-teal-800">₦{Number(landlordWallet.available_to_withdraw || 0).toLocaleString()}</p>
+                      </div>
+                      <FaWallet className="text-teal-400 text-3xl" />
+                    </div>
+                  )}
+
+                  {/* Quick amount buttons */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Select or enter amount</p>
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      {[1000, 2000, 5000, 10000].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setFundAmount(String(amt))}
+                          className={`py-2 rounded-lg text-sm font-medium border transition-colors ${Number(fundAmount) === amt ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600 hover:border-teal-300'}`}
+                        >
+                          ₦{amt.toLocaleString()}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      {[20000, 50000, 100000, 200000].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setFundAmount(String(amt))}
+                          className={`py-2 rounded-lg text-sm font-medium border transition-colors ${Number(fundAmount) === amt ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600 hover:border-teal-300'}`}
+                        >
+                          ₦{amt >= 1000 ? `${amt/1000}k` : amt.toLocaleString()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom amount input */}
+                  <form onSubmit={handleFundWallet} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Custom Amount (₦)</label>
+                      <input
+                        type="number"
+                        min="100"
+                        value={fundAmount}
+                        onChange={e => setFundAmount(e.target.value)}
+                        className="input w-full text-lg font-semibold"
+                        placeholder="Enter amount e.g. 15000"
+                      />
+                      {fundAmount && Number(fundAmount) >= 100 && (
+                        <p className="text-xs text-teal-600 mt-1">
+                          You will be charged <strong>₦{Number(fundAmount).toLocaleString()}</strong> via Paystack
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-xs text-green-700">
+                      <FaCheckCircle className="mt-0.5 shrink-0 text-green-500" />
+                      <span>Payment is processed securely via Paystack. Your wallet will be credited immediately after a successful payment.</span>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => setShowWithdrawModal(false)} className="btn w-full">Cancel</button>
+                      <button
+                        type="submit"
+                        disabled={fundLoading || !fundAmount || Number(fundAmount) < 100}
+                        className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {fundLoading ? 'Redirecting...' : `Pay ₦${fundAmount ? Number(fundAmount).toLocaleString() : '0'} via Paystack`}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* ══════════════════════════════════
+                   WITHDRAW FUNDS TAB
+                  ══════════════════════════════════ */}
+              {walletView === 'withdraw' && (
+              <div className="space-y-5">
+
+              {/* ── TENANT: wallet balance + how it's funded ── */}
+              {user?.user_type === 'tenant' && (
+                <>
+                  <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-teal-600">Available Wallet Balance</p>
+                      <p className="text-2xl font-bold text-teal-800">
+                        {walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
+                      </p>
+                    </div>
+                    <FaWallet className="text-teal-400 text-3xl" />
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 space-y-1">
+                    <p className="font-semibold text-blue-800">How is my wallet funded?</p>
+                    <p>Your wallet is automatically credited when a landlord <strong>approves your refund request</strong>. The approved refund amount is added to your wallet balance.</p>
+                    <p>Once your wallet has a balance, you can withdraw it to your bank account using the form below.</p>
+                    <p className="text-blue-500 italic">To get funds in your wallet, submit a refund request from the "Request a Refund" section on your dashboard.</p>
+                  </div>
+                </>
+              )}
+
+              {/* ── LANDLORD: wallet breakdown + how it's funded ── */}
+              {user?.user_type === 'landlord' && (
+                <>
+                  {landlordWallet ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                        <p className="text-xs text-green-600">Available to Withdraw</p>
+                        <p className="text-xl font-bold text-green-800">₦{Number(landlordWallet.available_to_withdraw).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
+                        <p className="text-xs text-yellow-600">Pending (14-day hold)</p>
+                        <p className="text-xl font-bold text-yellow-800">₦{Number(landlordWallet.pending_balance).toLocaleString()}</p>
+                      </div>
+                      <div className="col-span-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2">
+                        <p className="text-xs text-gray-500">Total Withdrawn to Date: <strong>₦{Number(landlordWallet.withdrawn_total || 0).toLocaleString()}</strong></p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-500 text-center">Loading wallet...</div>
+                  )}
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 space-y-1">
+                    <p className="font-semibold text-blue-800">How is my wallet funded?</p>
+                    <p>Your wallet balance comes from <strong>rent payments made by tenants</strong> through the platform.</p>
+                    <p>Rent payments are held for <strong>14 working days</strong> before they are cleared and added to your available balance. This holding period allows time for any refund disputes to be resolved.</p>
+                    <p>Payments older than 14 working days with <strong>no active refund dispute</strong> are automatically cleared for withdrawal.</p>
+                    <p className="text-blue-500 italic">Pending balance = rent received within the last 14 working days or with an active refund dispute.</p>
+                  </div>
+                </>
+              )}
+
+              {/* ── Withdrawal form ── */}
+              <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₦) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="100"
+                    value={withdrawForm.amount}
+                    onChange={e => setWithdrawForm(p => ({ ...p, amount: e.target.value }))}
+                    className="input w-full"
+                    placeholder="Enter amount to withdraw"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name *</label>
+                  <select
+                    required
+                    value={withdrawForm.bank_name}
+                    onChange={e => setWithdrawForm(p => ({ ...p, bank_name: e.target.value }))}
+                    className="input w-full"
+                  >
+                    <option value="">-- Select your bank --</option>
+                    {NIGERIAN_BANKS.map(bank => (
+                      <option key={bank} value={bank}>{bank}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Number *</label>
+                  <input
+                    required
+                    maxLength={10}
+                    value={withdrawForm.account_number}
+                    onChange={e => setWithdrawForm(p => ({ ...p, account_number: e.target.value.replace(/\D/g, '') }))}
+                    className="input w-full"
+                    placeholder="10-digit account number"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Name *</label>
+                  <input
+                    required
+                    value={withdrawForm.account_name}
+                    onChange={e => setWithdrawForm(p => ({ ...p, account_name: e.target.value }))}
+                    className="input w-full"
+                    placeholder="Name as it appears on your bank account"
+                  />
+                </div>
+
+                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
+                  <FaExclamationTriangle className="mt-0.5 shrink-0" />
+                  <span>Withdrawals are processed within 1–3 business days. Double-check your account details — incorrect details may result in failed transfers.</span>
+                </div>
+
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setShowWithdrawModal(false)} className="btn w-full">Cancel</button>
+                  <button
+                    type="submit"
+                    disabled={
+                      withdrawLoading ||
+                      !withdrawForm.amount ||
+                      !withdrawForm.bank_name ||
+                      !withdrawForm.account_number ||
+                      !withdrawForm.account_name
+                    }
+                    className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {withdrawLoading ? 'Submitting...' : 'Request Withdrawal'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Withdrawal history */}
+              {withdrawHistory.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <p className="text-sm font-semibold text-gray-700 border-t pt-3">Recent Withdrawals</p>
+                  {withdrawHistory.slice(0, 5).map(w => (
+                    <div key={w.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
+                      <div>
+                        <p className="font-medium text-gray-800">₦{Number(w.amount).toLocaleString()}</p>
+                        <p className="text-xs text-gray-500">{w.bank_name} · {w.account_number}</p>
+                        <p className="text-xs text-gray-400">{new Date(w.requested_at).toLocaleDateString()}</p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize ${withdrawStatusBadge(w.status)}`}>{w.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              </div> {/* end withdraw tab */}
+              )} {/* end walletView === 'withdraw' */}
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════
+           LANDLORD REFUND MANAGEMENT MODAL
+          ════════════════════════════════════════════════════════════ */}
+      {showLandlordRefundModal && user?.user_type === 'landlord' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
+              <div className="flex items-center gap-3">
+                <FaUndo className="text-orange-500 text-2xl" />
+                <h2 className="text-lg font-bold text-gray-800">Refund Requests</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <select
+                  value={landlordRefundFilter}
+                  onChange={e => { setLandlordRefundFilter(e.target.value); openLandlordRefundModal(e.target.value); }}
+                  className="input text-sm py-1"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+                <button onClick={() => { setShowLandlordRefundModal(false); setSelectedRefund(null); }} className="text-gray-400 hover:text-gray-600">
+                  <FaTimes className="text-xl" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {landlordRefunds.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">No {landlordRefundFilter} refund requests.</p>
+              ) : (
+                landlordRefunds.map(rr => (
+                  <div key={rr.id} className="border rounded-xl p-4 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-gray-800">{rr.property_title}</p>
+                        <p className="text-xs text-gray-500">{rr.property_address}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Tenant: <strong>{rr.tenant_name}</strong> · {rr.tenant_phone}</p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize shrink-0 ${refundStatusBadge(rr.status)}`}>{rr.status}</span>
+                    </div>
+
+                    {/* Details */}
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-gray-50 rounded-lg px-3 py-2">
+                        <p className="text-xs text-gray-500">Rent Paid</p>
+                        <p className="font-bold text-gray-800">₦{Number(rr.amount).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2">
+                        <p className="text-xs text-gray-500">Payment Date</p>
+                        <p className="font-medium text-gray-700">{new Date(rr.payment_date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-sm">
+                      <p className="text-gray-600"><strong>Reason:</strong> {rr.reason.replace(/_/g, ' ')}</p>
+                      {rr.details && <p className="text-gray-500 mt-1 text-xs">{rr.details}</p>}
+                    </div>
+
+                    {/* Approved amount if already reviewed */}
+                    {rr.approved_amount && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm">
+                        <p className="text-green-700">Approved: <strong>₦{Number(rr.approved_amount).toLocaleString()}</strong>
+                          {rr.refund_type === 'partial_months' && rr.refund_months && ` (${rr.refund_months} months)`}
+                          {rr.refund_type === 'full' && ' (full refund)'}
+                        </p>
+                        {rr.landlord_note && <p className="text-green-600 text-xs mt-1">{rr.landlord_note}</p>}
+                      </div>
+                    )}
+                    {rr.status === 'rejected' && rr.landlord_note && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+                        <strong>Rejection reason:</strong> {rr.landlord_note}
+                      </div>
+                    )}
+
+                    {/* Action panel for pending requests */}
+                    {rr.status === 'pending' && (
+                      <>
+                        {selectedRefund === rr.id ? (
+                          <div className="border-t pt-3 space-y-3">
+                            <p className="text-sm font-semibold text-gray-700">How much would you like to refund?</p>
+
+                            {/* Refund type */}
+                            <div className="grid grid-cols-3 gap-2">
+                              {[
+                                { value: 'full', label: 'Full Refund' },
+                                { value: 'partial_months', label: 'By Months' },
+                                { value: 'partial_custom', label: 'Custom Amount' },
+                              ].map(opt => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() => setApproveForm(p => ({ ...p, refund_type: opt.value }))}
+                                  className={`p-2 border rounded-lg text-xs font-medium transition-colors ${approveForm.refund_type === opt.value ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-indigo-300'}`}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Full refund info */}
+                            {approveForm.refund_type === 'full' && (
+                              <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-sm text-indigo-700">
+                                Full rent amount of <strong>₦{Number(rr.amount).toLocaleString()}</strong> will be refunded to the tenant's wallet.
+                              </div>
+                            )}
+
+                            {/* Months selector */}
+                            {approveForm.refund_type === 'partial_months' && (
+                              <div className="space-y-2">
+                                <p className="text-xs text-gray-500">Select number of months to refund</p>
+                                <div className="flex gap-2 flex-wrap">
+                                  {[1, 2, 3, 6, 9, 12].map(m => (
+                                    <button
+                                      key={m}
+                                      type="button"
+                                      onClick={() => setApproveForm(p => ({ ...p, refund_months: m }))}
+                                      className={`px-3 py-1.5 rounded-lg text-sm border font-medium transition-colors ${Number(approveForm.refund_months) === m ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-indigo-300'}`}
+                                    >
+                                      {m} {m === 1 ? 'month' : 'months'}
+                                    </button>
+                                  ))}
+                                </div>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={approveForm.refund_months}
+                                  onChange={e => setApproveForm(p => ({ ...p, refund_months: e.target.value }))}
+                                  className="input w-full text-sm"
+                                  placeholder="Or type exact months..."
+                                />
+                                {approveForm.refund_months && (
+                                  <p className="text-xs text-indigo-600">
+                                    Estimated refund: <strong>₦{(Number(rr.amount) / 12 * Number(approveForm.refund_months)).toLocaleString()}</strong>
+                                    <span className="text-gray-400"> (based on yearly rent ÷ 12)</span>
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Custom amount */}
+                            {approveForm.refund_type === 'partial_custom' && (
+                              <div>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={rr.amount}
+                                  value={approveForm.approved_amount}
+                                  onChange={e => setApproveForm(p => ({ ...p, approved_amount: e.target.value }))}
+                                  className="input w-full text-sm"
+                                  placeholder={`Max ₦${Number(rr.amount).toLocaleString()}`}
+                                />
+                              </div>
+                            )}
+
+                            {/* Landlord note */}
+                            <textarea
+                              rows={2}
+                              value={approveForm.landlord_note}
+                              onChange={e => setApproveForm(p => ({ ...p, landlord_note: e.target.value }))}
+                              className="input w-full resize-none text-sm"
+                              placeholder="Optional note to tenant (e.g. reason for partial refund)..."
+                            />
+
+                            <div className="flex gap-2">
+                              <button type="button" onClick={() => setSelectedRefund(null)} className="btn w-full text-sm">Cancel</button>
+                              <button
+                                type="button"
+                                onClick={() => handleApproveRefund(rr.id)}
+                                disabled={refundActionLoading}
+                                className="btn btn-primary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                              >
+                                <FaThumbsUp /> {refundActionLoading ? 'Processing...' : 'Approve Refund'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => { setSelectedRefund(rr.id); setApproveForm({ refund_type: 'full', refund_months: '', approved_amount: '', landlord_note: '' }); }}
+                              className="flex-1 flex items-center justify-center gap-2 bg-green-50 border border-green-300 text-green-700 rounded-lg py-2 text-sm font-medium hover:bg-green-100 transition"
+                            >
+                              <FaThumbsUp /> Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRefund(`reject_${rr.id}`)}
+                              className="flex-1 flex items-center justify-center gap-2 bg-red-50 border border-red-300 text-red-700 rounded-lg py-2 text-sm font-medium hover:bg-red-100 transition"
+                            >
+                              <FaThumbsDown /> Reject
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Reject panel */}
+                        {selectedRefund === `reject_${rr.id}` && (
+                          <div className="border-t pt-3 space-y-2">
+                            <p className="text-sm font-semibold text-red-700">Reason for rejection *</p>
+                            <textarea
+                              rows={2}
+                              value={rejectNote}
+                              onChange={e => setRejectNote(e.target.value)}
+                              className="input w-full resize-none text-sm border-red-300"
+                              placeholder="Explain why you are rejecting this refund request..."
+                            />
+                            <div className="flex gap-2">
+                              <button type="button" onClick={() => { setSelectedRefund(null); setRejectNote(''); }} className="btn w-full text-sm">Cancel</button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectRefund(rr.id)}
+                                disabled={refundActionLoading}
+                                className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-lg py-2 text-sm font-medium transition disabled:opacity-50"
+                              >
+                                <FaThumbsDown /> {refundActionLoading ? 'Processing...' : 'Confirm Reject'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+
 
 // Stat Card Component
 const StatCard = ({ icon, title, value, onClick }) => (

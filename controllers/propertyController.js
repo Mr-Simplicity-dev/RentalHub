@@ -1322,5 +1322,178 @@ exports.getPropertyStats = async (req, res) => {
 };
 
 
+// =====================================================
+//     DAMAGE REPORT — Save (Landlord)
+// =====================================================
+exports.saveDamageReport = async (req, res) => {
+  try {
+    const landlordId = req.user.id;
+    const { propertyId } = req.params;
+    const {
+      room_location,   // e.g. "Living Room", "Master Bedroom"
+      damage_type,     // scratch | crack | hole | dent | stain | other
+      description,
+      width_cm,
+      height_cm,
+      depth_level,     // surface | shallow | deep | structural
+      severity,        // minor | moderate | severe
+    } = req.body;
+
+    // Verify property belongs to this landlord
+    const propCheck = await db.query(
+      `SELECT id FROM properties WHERE id = $1 AND landlord_id = $2`,
+      [propertyId, landlordId]
+    );
+
+    if (!propCheck.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found or does not belong to you',
+      });
+    }
+
+    // Ensure damage_reports table exists
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS property_damage_reports (
+        id              SERIAL PRIMARY KEY,
+        property_id     INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        landlord_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        room_location   VARCHAR(100),
+        damage_type     VARCHAR(50),
+        description     TEXT,
+        width_cm        NUMERIC(8,2),
+        height_cm       NUMERIC(8,2),
+        depth_level     VARCHAR(20),
+        severity        VARCHAR(20),
+        photo_urls      JSONB DEFAULT '[]',
+        ai_analysis     JSONB,
+        reported_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT chk_depth CHECK (depth_level IN ('surface','shallow','deep','structural')),
+        CONSTRAINT chk_severity CHECK (severity IN ('minor','moderate','severe'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_damage_reports_property ON property_damage_reports(property_id);
+    `);
+
+    // Collect uploaded photo URLs (via cloudinary)
+    const photoUrls = (req.files || []).map(f => f.path || f.secure_url || f.url).filter(Boolean);
+
+    // Call Claude Vision API for AI analysis if photos were uploaded
+    let aiAnalysis = null;
+
+    if (photoUrls.length > 0 && process.env.ANTHROPIC_API_KEY) {
+      try {
+        const axios = require('axios');
+
+        // Download first photo and convert to base64
+        const photoResponse = await axios.get(photoUrls[0], { responseType: 'arraybuffer' });
+        const base64Image = Buffer.from(photoResponse.data).toString('base64');
+        const mimeType = 'image/jpeg';
+
+        const claudeResponse = await axios.post(
+          'https://api.anthropic.com/v1/messages',
+          {
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1024,
+            messages: [{
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: { type: 'base64', media_type: mimeType, data: base64Image },
+                },
+                {
+                  type: 'text',
+                  text: `You are a property damage assessment expert. Analyze this damage photo and provide a JSON response with these fields:
+                  {
+                    "damage_type": "type of damage (scratch/crack/hole/dent/stain/water_damage/mold/other)",
+                    "severity": "minor/moderate/severe",
+                    "estimated_width_cm": number or null,
+                    "estimated_height_cm": number or null,
+                    "depth_level": "surface/shallow/deep/structural",
+                    "description": "clear description of the damage in 1-2 sentences",
+                    "repair_recommendation": "brief repair suggestion",
+                    "urgency": "low/medium/high"
+                  }
+                  Return only valid JSON, no extra text.`,
+                },
+              ],
+            }],
+          },
+          {
+            headers: {
+              'x-api-key': process.env.ANTHROPIC_API_KEY,
+              'anthropic-version': '2023-06-01',
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        const rawText = claudeResponse.data?.content?.[0]?.text || '{}';
+        const cleanText = rawText.replace(/```json|```/g, '').trim();
+        aiAnalysis = JSON.parse(cleanText);
+      } catch (aiErr) {
+        console.error('AI damage analysis error:', aiErr.message);
+        aiAnalysis = { error: 'AI analysis unavailable', raw: aiErr.message };
+      }
+    }
+
+    // Save damage report
+    const result = await db.query(
+      `INSERT INTO property_damage_reports
+         (property_id, landlord_id, room_location, damage_type, description,
+          width_cm, height_cm, depth_level, severity, photo_urls, ai_analysis)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING *`,
+      [
+        propertyId,
+        landlordId,
+        room_location || null,
+        aiAnalysis?.damage_type || damage_type || null,
+        aiAnalysis?.description || description || null,
+        aiAnalysis?.estimated_width_cm || width_cm || null,
+        aiAnalysis?.estimated_height_cm || height_cm || null,
+        aiAnalysis?.depth_level || depth_level || null,
+        aiAnalysis?.severity || severity || null,
+        JSON.stringify(photoUrls),
+        aiAnalysis ? JSON.stringify(aiAnalysis) : null,
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Damage report saved successfully',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Save damage report error:', error);
+    res.status(500).json({ success: false, message: 'Failed to save damage report' });
+  }
+};
+
+
+// =====================================================
+//     DAMAGE REPORTS — Get All for a Property
+// =====================================================
+exports.getDamageReports = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+
+    const result = await db.query(
+      `SELECT dr.*, u.full_name AS landlord_name
+       FROM property_damage_reports dr
+       JOIN users u ON dr.landlord_id = u.id
+       WHERE dr.property_id = $1
+       ORDER BY dr.reported_at DESC`,
+      [propertyId]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get damage reports error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch damage reports' });
+  }
+};
+
+
 // Export All Handlers
 module.exports = exports;

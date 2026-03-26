@@ -1059,6 +1059,188 @@ exports.verifyRentPayment = async (req, res) => {
 
 
 // =====================================================
+//            WALLET FUNDING VIA PAYSTACK
+// =====================================================
+
+exports.initializeWalletFunding = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { amount } = req.body;
+
+    if (!amount || Number(amount) < 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Minimum wallet funding amount is ₦100',
+      });
+    }
+
+    if (!PAYSTACK_SECRET_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment service is not configured',
+      });
+    }
+
+    const userResult = await db.query(
+      'SELECT email, full_name, user_type FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (!userResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const user = userResult.rows[0];
+
+    // Save a pending payment record
+    const paymentResult = await db.query(
+      `INSERT INTO payments
+         (user_id, payment_type, amount, currency, payment_method, payment_status)
+       VALUES ($1, 'wallet_funding', $2, 'NGN', 'paystack', 'pending')
+       RETURNING id`,
+      [userId, Number(amount)]
+    );
+
+    const paymentId = paymentResult.rows[0].id;
+    const reference = `WALLET_${userId}_${paymentId}_${Date.now()}`;
+
+    // Update reference
+    await db.query(
+      'UPDATE payments SET transaction_reference = $1 WHERE id = $2',
+      [reference, paymentId]
+    );
+
+    // Initialize Paystack transaction
+    const paystackResponse = await axios.post(
+      `${PAYSTACK_BASE_URL}/transaction/initialize`,
+      {
+        email: user.email,
+        amount: Math.round(Number(amount) * 100), // kobo
+        reference,
+        callback_url: `${FRONTEND_URL}/payment/verify-wallet-funding`,
+        metadata: {
+          payment_id:   paymentId,
+          user_id:      userId,
+          payment_type: 'wallet_funding',
+          full_name:    user.full_name,
+          user_type:    user.user_type,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Wallet funding payment initialized',
+      data: {
+        payment_id:        paymentId,
+        amount:            Number(amount),
+        reference,
+        authorization_url: paystackResponse.data.data.authorization_url,
+        access_code:       paystackResponse.data.data.access_code,
+      },
+    });
+  } catch (error) {
+    console.error('Initialize wallet funding error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to initialize wallet funding',
+    });
+  }
+};
+
+
+exports.verifyWalletFunding = async (req, res) => {
+  try {
+    const { reference } = req.params;
+    const userId = req.user.id;
+
+    if (!reference) {
+      return res.status(400).json({ success: false, message: 'Reference is required' });
+    }
+
+    // Fetch payment record
+    const paymentResult = await db.query(
+      `SELECT * FROM payments
+       WHERE transaction_reference = $1
+         AND user_id = $2
+         AND payment_type = 'wallet_funding'`,
+      [reference, userId]
+    );
+
+    if (!paymentResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Payment record not found' });
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // Already processed
+    if (payment.payment_status === 'completed') {
+      return res.json({
+        success: true,
+        message: 'Wallet already funded for this transaction',
+        data: { amount: payment.amount, already_processed: true },
+      });
+    }
+
+    // Verify with Paystack
+    const paystackResponse = await axios.get(
+      `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
+      { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } }
+    );
+
+    const transaction = paystackResponse.data.data;
+
+    if (transaction.status !== 'success') {
+      return res.status(402).json({
+        success: false,
+        message: 'Payment not completed yet',
+        status: transaction.status,
+      });
+    }
+
+    const amountPaid = Number(transaction.amount) / 100;
+
+    // Mark payment as completed
+    await db.query(
+      `UPDATE payments
+       SET payment_status = 'completed',
+           completed_at   = CURRENT_TIMESTAMP,
+           gateway_response = $1
+       WHERE id = $2`,
+      [JSON.stringify(transaction), payment.id]
+    );
+
+    // Credit the wallet
+    await db.query(
+      `INSERT INTO wallets (user_id, balance)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id)
+       DO UPDATE SET balance = wallets.balance + $2, updated_at = CURRENT_TIMESTAMP`,
+      [userId, amountPaid]
+    );
+
+    return res.json({
+      success: true,
+      message: `₦${amountPaid.toLocaleString()} has been added to your wallet successfully!`,
+      data: { amount_funded: amountPaid, reference },
+    });
+  } catch (error) {
+    console.error('Verify wallet funding error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify wallet funding',
+    });
+  }
+};
+
+
+// =====================================================
 //               PAYMENT HISTORY
 // =====================================================
 
