@@ -55,6 +55,14 @@ const { saveRanking } = require("./config/utils/rankChecker");
 const { generateBacklinks } = require("./utils/backlinkEngine");
 const adminSeoRoutes = require("./routes/adminSeoRoutes");
 const { checkRanking } = require("./config/utils/serpTracker");
+const adminSeoRoutes = require("./routes/adminSeoRoutes");
+const { checkRanking } = require("./config/utils/serpTracker");
+const financialAdminRoutes = require("./routes/financialAdmin"); // ADD THIS LINE
+const commissionService = require('../services/commissionService');
+const adminSeoRoutes = require("./routes/adminSeoRoutes");
+const { checkRanking } = require("./config/utils/serpTracker");
+const financialAdminRoutes = require("./routes/financialAdmin"); // ADD THIS LINE
+const stateAdminRoutes = require("./routes/stateAdmin"); // ADD THIS LINE
 
 async function runInitialSeoCheck() {
   const hasSerpApiKey =
@@ -74,6 +82,101 @@ async function runInitialSeoCheck() {
     console.error("❌ Initial ranking check failed:", err.message);
   }
 }
+
+runInitialSeoCheck();
+
+// ... rest of the code ...
+
+app.use('/api/disputes', disputesRoutes);
+app.use('/api/legal', legalRoutes);
+app.use('/api/compliance', complianceRoutes);
+app.use('/api/export', exportRoutes);
+app.use('/api/financial-admin', financialAdminRoutes); // ADD THIS LINE
+
+app.use('/evidence', verificationRoutes);
+
+async function runInitialSeoCheck() {
+  const hasSerpApiKey =
+    typeof process.env.SERP_API_KEY === "string" &&
+    process.env.SERP_API_KEY.trim() &&
+    process.env.SERP_API_KEY.trim() !== "...";
+
+  if (!hasSerpApiKey) {
+    console.log("Skipping initial ranking check: SERP_API_KEY is not configured");
+    return;
+  }
+
+  try {
+    const results = await checkRanking("houses for rent in ikeja");
+    console.log("✅ Initial ranking check results:", results);
+  } catch (err) {
+    console.error("❌ Initial ranking check failed:", err.message);
+  }
+}
+
+runInitialSeoCheck();
+
+// ... rest of the code ...
+
+app.use('/api/disputes', disputesRoutes);
+app.use('/api/legal', legalRoutes);
+app.use('/api/compliance', complianceRoutes);
+app.use('/api/export', exportRoutes);
+app.use('/api/financial-admin', financialAdminRoutes); // ADD THIS LINE
+
+app.use('/evidence', verificationRoutes);
+  const hasSerpApiKey =
+    typeof process.env.SERP_API_KEY === "string" &&
+    process.env.SERP_API_KEY.trim() &&
+    process.env.SERP_API_KEY.trim() !== "...";
+
+  if (!hasSerpApiKey) {
+    console.log("Skipping initial ranking check: SERP_API_KEY is not configured");
+    return;
+  }
+
+  try {
+    const results = await checkRanking("houses for rent in ikeja");
+    console.log("✅ Initial ranking check results:", results);
+  } catch (err) {
+    console.error("❌ Initial ranking check failed:", err.message);
+  }
+// ... existing imports ...
+
+const financialAdminRoutes = require("./routes/financialAdmin"); // ADD THIS LINE
+const stateAdminRoutes = require("./routes/stateAdmin"); // ADD THIS LINE
+
+async function runInitialSeoCheck() {
+  const hasSerpApiKey =
+    typeof process.env.SERP_API_KEY === "string" &&
+    process.env.SERP_API_KEY.trim() &&
+    process.env.SERP_API_KEY.trim() !== "...";
+
+  if (!hasSerpApiKey) {
+    console.log("Skipping initial ranking check: SERP_API_KEY is not configured");
+    return;
+  }
+
+  try {
+    const results = await checkRanking("houses for rent in ikeja");
+    console.log("✅ Initial ranking check results:", results);
+  } catch (err) {
+    console.error("❌ Initial ranking check failed:", err.message);
+  }
+}
+
+runInitialSeoCheck();
+
+// ... rest of the code ...
+
+app.use('/api/disputes', disputesRoutes);
+app.use('/api/legal', legalRoutes);
+app.use('/api/compliance', complianceRoutes);
+app.use('/api/export', exportRoutes);
+app.use('/api/financial-admin', financialAdminRoutes); // ADD THIS LINE
+app.use('/api/state-admin', stateAdminRoutes); // ADD THIS LINE
+
+app.use('/evidence', verificationRoutes);
 
 runInitialSeoCheck();
 

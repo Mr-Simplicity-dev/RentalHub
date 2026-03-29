@@ -21,12 +21,14 @@ import LiveModerationQueue from "../components/admin/LiveModerationQueue";
 import AdminNotifications from "../components/admin/AdminNotifications";
 import AdminManagementTab from "../components/admin/AdminManagementTab";
 import LawyerInvitesManager from "../components/admin/LawyerInvitesManager";
+import PlatformLawyersTab from "../components/admin/PlatformLawyersTab";
 
 const tabs = [
   "overview",
   "users",
   "verifications",
   "lawyer_invites",
+  "platform_lawyers",
   "properties",
   "analytics",
   "reports",
@@ -587,6 +589,8 @@ export default function SuperAdminDashboard() {
           description="Resend pending lawyer invitations or change the invited lawyer email."
         />
       )}
+
+      {tab === "platform_lawyers" && <PlatformLawyersTab />}
 
       {tab === "fraud" && (
         <>

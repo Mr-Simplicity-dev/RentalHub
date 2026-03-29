@@ -81,6 +81,37 @@ exports.sendLawyerInviteEmail = async ({
   }
 };
 
+exports.sendPlatformLawyerInviteEmail = async ({
+  email,
+  inviteUrl,
+  expiresInHours = 72,
+  assignedByName = 'RentalHub NG',
+}) => {
+  try {
+    await sendEmail({
+      to: email,
+      subject: 'RentalHub NG Lawyer Invitation',
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6;">
+          <h2>You have been selected to serve as a RentalHub NG lawyer</h2>
+          <p><strong>${assignedByName}</strong> added you to the RentalHub NG lawyer program.</p>
+          <p>Use the button below to create your password, activate your lawyer account, and complete your profile.</p>
+          <p>
+            <a href="${inviteUrl}" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">
+              Create Password & Activate Lawyer Account
+            </a>
+          </p>
+          <p>This link expires in ${expiresInHours} hours.</p>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Platform lawyer invite email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send password reset email
 exports.sendPasswordResetEmail = async (email, resetUrl) => {
   try {
@@ -275,4 +306,3 @@ exports.sendFraudAlertEmail = async ({
     return { success: false, error: error.message };
   }
 };
-

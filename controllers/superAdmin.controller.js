@@ -12,6 +12,15 @@ const {
   listLocationPricingRules,
   updateLocationPricingRule,
 } = require('../config/utils/locationPricing');
+const {
+  PLATFORM_LAWYER_RECRUITMENT_BROADCAST_TYPE,
+  PLATFORM_LAWYER_INVITE_EXPIRY_HOURS,
+  createPlatformLawyerInvite,
+  ensurePlatformLawyerSchema,
+} = require('../config/utils/platformLawyerProgram');
+const {
+  sendPlatformLawyerInviteEmail,
+} = require('../config/utils/emailService');
 
 let verificationAuditSchemaReady = false;
 const USER_VERIFICATION_STATUS_EXPR = `
@@ -706,6 +715,633 @@ const createBroadcast = async (req, res) => {
   }
 };
 
+// ================= PLATFORM LAWYERS =================
+
+const getPlatformLawyerManagementData = async (req, res) => {
+  try {
+    await ensurePlatformLawyerSchema();
+
+    const [entriesResult, applicationsResult, broadcastsResult] = await Promise.all([
+      db.query(
+        `SELECT
+           pl.*,
+           COALESCE(NULLIF(u.full_name, ''), pl.full_name) AS display_name,
+           COALESCE(NULLIF(u.email, ''), pl.email) AS display_email,
+           COALESCE(NULLIF(u.phone, ''), pl.phone) AS display_phone,
+           COALESCE(NULLIF(u.nationality, ''), pl.nationality, 'Nigeria') AS display_nationality,
+           COALESCE(NULLIF(u.chamber_name, ''), pl.chamber_name) AS display_chamber_name,
+           COALESCE(NULLIF(u.chamber_phone, ''), pl.chamber_phone) AS display_chamber_phone,
+           COALESCE(u.identity_verified, FALSE) AS identity_verified,
+           li.id AS latest_invite_id,
+           li.status AS latest_invite_status,
+           li.expires_at AS latest_invite_expires_at,
+           li.accepted_at AS latest_invite_accepted_at,
+           li.last_sent_at AS latest_invite_last_sent_at,
+           li.resent_count AS latest_invite_resent_count
+         FROM platform_lawyers pl
+         LEFT JOIN users u ON u.id = pl.lawyer_user_id
+         LEFT JOIN LATERAL (
+           SELECT pli.id, pli.status, pli.expires_at, pli.accepted_at, pli.last_sent_at, pli.resent_count
+           FROM platform_lawyer_invites pli
+           WHERE pli.platform_lawyer_id = pl.id
+           ORDER BY pli.created_at DESC
+           LIMIT 1
+         ) li ON TRUE
+         ORDER BY pl.is_active DESC, pl.created_at DESC`
+      ),
+      db.query(
+        `SELECT
+           pla.*,
+           u.full_name,
+           u.email,
+           u.phone,
+           u.nationality,
+           u.chamber_name,
+           u.chamber_phone,
+           COALESCE(u.identity_verified, FALSE) AS identity_verified,
+           reviewer.full_name AS reviewed_by_name,
+           b.title AS broadcast_title,
+           pl.id AS platform_lawyer_id,
+           pl.is_active AS directory_active
+         FROM platform_lawyer_applications pla
+         JOIN users u ON u.id = pla.lawyer_user_id
+         LEFT JOIN users reviewer ON reviewer.id = pla.reviewed_by
+         LEFT JOIN broadcasts b ON b.id = pla.broadcast_id
+         LEFT JOIN platform_lawyers pl ON pl.application_id = pla.id
+         ORDER BY
+           CASE pla.status
+             WHEN 'pending' THEN 0
+             WHEN 'approved' THEN 1
+             ELSE 2
+           END,
+           pla.applied_at DESC`
+      ),
+      db.query(
+        `SELECT b.*, u.full_name AS sender_name
+         FROM broadcasts b
+         LEFT JOIN users u ON u.id = b.sender_id
+         WHERE b.broadcast_type = $1
+         ORDER BY b.created_at DESC
+         LIMIT 20`,
+        [PLATFORM_LAWYER_RECRUITMENT_BROADCAST_TYPE]
+      ),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        entries: entriesResult.rows,
+        applications: applicationsResult.rows,
+        recruitment_broadcasts: broadcastsResult.rows,
+        invite_expiry_hours: PLATFORM_LAWYER_INVITE_EXPIRY_HOURS,
+      },
+    });
+  } catch (error) {
+    console.error('Get platform lawyer management data error:', error);
+    res.status(500).json({ message: 'Failed to load platform lawyers' });
+  }
+};
+
+const createManualPlatformLawyer = async (req, res) => {
+  try {
+    await ensurePlatformLawyerSchema();
+
+    const fullName = String(req.body.full_name || '').trim();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const phone = String(req.body.phone || '').replace(/\s+/g, '');
+    const nationality = String(req.body.nationality || 'Nigeria').trim() || 'Nigeria';
+    const chamberName = String(req.body.chamber_name || '').trim();
+    const chamberPhone = String(req.body.chamber_phone || '').replace(/\s+/g, '');
+    const isActive = req.body.is_active !== false;
+
+    if (!fullName || !email || !phone || !chamberName || !chamberPhone) {
+      return res.status(400).json({
+        message: 'Full name, email, phone, chamber name, and chamber phone are required',
+      });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: 'Enter a valid lawyer email address' });
+    }
+
+    const duplicateEntry = await db.query(
+      `SELECT id
+       FROM platform_lawyers
+       WHERE LOWER(email) = LOWER($1)
+       LIMIT 1`,
+      [email]
+    );
+
+    if (duplicateEntry.rows.length) {
+      return res.status(409).json({
+        message: 'A platform lawyer record already exists for this email',
+      });
+    }
+
+    const existingUserResult = await db.query(
+      `SELECT id, user_type
+       FROM users
+       WHERE email = $1
+       LIMIT 1`,
+      [email]
+    );
+
+    if (
+      existingUserResult.rows.length &&
+      existingUserResult.rows[0].user_type !== 'lawyer'
+    ) {
+      return res.status(409).json({
+        message: 'This email already belongs to a non-lawyer account',
+      });
+    }
+
+    const lawyerUserId = existingUserResult.rows[0]?.id || null;
+
+    const entryResult = await db.query(
+      `INSERT INTO platform_lawyers (
+         source_type,
+         lawyer_user_id,
+         full_name,
+         email,
+         phone,
+         nationality,
+         chamber_name,
+         chamber_phone,
+         is_active,
+         created_by,
+         updated_by
+       )
+       VALUES ('manual', $1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+       RETURNING *`,
+      [
+        lawyerUserId,
+        fullName,
+        email,
+        phone,
+        nationality,
+        chamberName,
+        chamberPhone,
+        isActive,
+        req.user.id,
+      ]
+    );
+
+    const entry = entryResult.rows[0];
+    const invite = await createPlatformLawyerInvite({
+      platformLawyerId: entry.id,
+      lawyerEmail: email,
+      createdBy: req.user.id,
+    });
+
+    const emailResult = await sendPlatformLawyerInviteEmail({
+      email,
+      inviteUrl: invite.invite_url,
+      expiresInHours: invite.expires_in_hours,
+      assignedByName: req.user.full_name || 'RentalHub NG',
+    });
+
+    await logAction(req.user.id, 'CREATE_PLATFORM_LAWYER', 'platform_lawyer', entry.id);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        entry,
+        invite: {
+          ...invite,
+          email_sent: !!emailResult?.success,
+          email_error: emailResult?.success ? null : emailResult?.error || 'Invite email failed',
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Create manual platform lawyer error:', error);
+    res.status(500).json({ message: 'Failed to create platform lawyer record' });
+  }
+};
+
+const resendManualPlatformLawyerInvite = async (req, res) => {
+  try {
+    await ensurePlatformLawyerSchema();
+
+    const entryResult = await db.query(
+      `SELECT id, source_type, email
+       FROM platform_lawyers
+       WHERE id = $1
+       LIMIT 1`,
+      [req.params.lawyerId]
+    );
+
+    if (!entryResult.rows.length) {
+      return res.status(404).json({ message: 'Platform lawyer record not found' });
+    }
+
+    const entry = entryResult.rows[0];
+
+    if (entry.source_type !== 'manual') {
+      return res.status(400).json({
+        message: 'Only manually entered lawyers can receive setup invites from here',
+      });
+    }
+
+    const invite = await createPlatformLawyerInvite({
+      platformLawyerId: entry.id,
+      lawyerEmail: entry.email,
+      createdBy: req.user.id,
+    });
+
+    const emailResult = await sendPlatformLawyerInviteEmail({
+      email: entry.email,
+      inviteUrl: invite.invite_url,
+      expiresInHours: invite.expires_in_hours,
+      assignedByName: req.user.full_name || 'RentalHub NG',
+    });
+
+    await logAction(req.user.id, 'RESEND_PLATFORM_LAWYER_INVITE', 'platform_lawyer', entry.id);
+
+    res.json({
+      success: true,
+      data: {
+        invite: {
+          ...invite,
+          email_sent: !!emailResult?.success,
+          email_error: emailResult?.success ? null : emailResult?.error || 'Invite email failed',
+        },
+      },
+      message: emailResult?.success
+        ? 'Platform lawyer invite resent'
+        : 'Platform lawyer record updated, but the invite email failed to send',
+    });
+  } catch (error) {
+    console.error('Resend manual platform lawyer invite error:', error);
+    res.status(500).json({ message: 'Failed to resend platform lawyer invite' });
+  }
+};
+
+const updatePlatformLawyer = async (req, res) => {
+  try {
+    await ensurePlatformLawyerSchema();
+
+    const entryResult = await db.query(
+      `SELECT *
+       FROM platform_lawyers
+       WHERE id = $1
+       LIMIT 1`,
+      [req.params.lawyerId]
+    );
+
+    if (!entryResult.rows.length) {
+      return res.status(404).json({ message: 'Platform lawyer record not found' });
+    }
+
+    const entry = entryResult.rows[0];
+    const nextIsActive =
+      typeof req.body.is_active === 'boolean' ? req.body.is_active : entry.is_active;
+
+    if (entry.source_type !== 'manual') {
+      const result = await db.query(
+        `UPDATE platform_lawyers
+         SET is_active = $2,
+             updated_by = $3,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1
+         RETURNING *`,
+        [entry.id, nextIsActive, req.user.id]
+      );
+
+      await logAction(req.user.id, 'UPDATE_PLATFORM_LAWYER', 'platform_lawyer', entry.id);
+
+      return res.json({ success: true, data: result.rows[0] });
+    }
+
+    const fullName = String(req.body.full_name || entry.full_name || '').trim();
+    const email = String(req.body.email || entry.email || '').trim().toLowerCase();
+    const phone = String(req.body.phone || entry.phone || '').replace(/\s+/g, '');
+    const nationality = String(req.body.nationality || entry.nationality || 'Nigeria').trim() || 'Nigeria';
+    const chamberName = String(req.body.chamber_name || entry.chamber_name || '').trim();
+    const chamberPhone = String(req.body.chamber_phone || entry.chamber_phone || '').replace(/\s+/g, '');
+
+    if (!fullName || !email || !phone || !chamberName || !chamberPhone) {
+      return res.status(400).json({
+        message: 'Full name, email, phone, chamber name, and chamber phone are required',
+      });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: 'Enter a valid lawyer email address' });
+    }
+
+    const duplicateEntry = await db.query(
+      `SELECT id
+       FROM platform_lawyers
+       WHERE LOWER(email) = LOWER($1)
+         AND id <> $2
+       LIMIT 1`,
+      [email, entry.id]
+    );
+
+    if (duplicateEntry.rows.length) {
+      return res.status(409).json({
+        message: 'Another platform lawyer record already uses this email',
+      });
+    }
+
+    const existingUserResult = await db.query(
+      `SELECT id, user_type
+       FROM users
+       WHERE email = $1
+       LIMIT 1`,
+      [email]
+    );
+
+    if (
+      existingUserResult.rows.length &&
+      existingUserResult.rows[0].user_type !== 'lawyer'
+    ) {
+      return res.status(409).json({
+        message: 'This email already belongs to a non-lawyer account',
+      });
+    }
+
+    const lawyerUserId = existingUserResult.rows[0]?.id || entry.lawyer_user_id || null;
+
+    const result = await db.query(
+      `UPDATE platform_lawyers
+       SET lawyer_user_id = $2,
+           full_name = $3,
+           email = $4,
+           phone = $5,
+           nationality = $6,
+           chamber_name = $7,
+           chamber_phone = $8,
+           is_active = $9,
+           updated_by = $10,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING *`,
+      [
+        entry.id,
+        lawyerUserId,
+        fullName,
+        email,
+        phone,
+        nationality,
+        chamberName,
+        chamberPhone,
+        nextIsActive,
+        req.user.id,
+      ]
+    );
+
+    await logAction(req.user.id, 'UPDATE_PLATFORM_LAWYER', 'platform_lawyer', entry.id);
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Update platform lawyer error:', error);
+    res.status(500).json({ message: 'Failed to update platform lawyer' });
+  }
+};
+
+const deletePlatformLawyer = async (req, res) => {
+  try {
+    await ensurePlatformLawyerSchema();
+
+    const result = await db.query(
+      `DELETE FROM platform_lawyers
+       WHERE id = $1
+         AND source_type = 'manual'
+       RETURNING id`,
+      [req.params.lawyerId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        message: 'Manual platform lawyer record not found',
+      });
+    }
+
+    await logAction(req.user.id, 'DELETE_PLATFORM_LAWYER', 'platform_lawyer', req.params.lawyerId);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete platform lawyer error:', error);
+    res.status(500).json({ message: 'Failed to delete platform lawyer' });
+  }
+};
+
+const createPlatformLawyerRecruitmentBroadcast = async (req, res) => {
+  try {
+    await ensurePlatformLawyerSchema();
+
+    const title = String(req.body.title || '').trim();
+    const message = String(req.body.message || '').trim();
+
+    if (!title || !message) {
+      return res.status(400).json({
+        message: 'Title and message are required',
+      });
+    }
+
+    const result = await db.query(
+      `INSERT INTO broadcasts (sender_id, target_role, title, message, broadcast_type)
+       VALUES ($1, 'lawyer', $2, $3, $4)
+       RETURNING *`,
+      [req.user.id, title, message, PLATFORM_LAWYER_RECRUITMENT_BROADCAST_TYPE]
+    );
+
+    await logAction(req.user.id, 'CREATE_PLATFORM_LAWYER_BROADCAST', 'broadcast', result.rows[0].id);
+
+    res.status(201).json({
+      success: true,
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Create platform lawyer recruitment broadcast error:', error);
+    res.status(500).json({ message: 'Failed to send lawyer recruitment broadcast' });
+  }
+};
+
+const approvePlatformLawyerApplication = async (req, res) => {
+  try {
+    await ensurePlatformLawyerSchema();
+
+    await db.query('BEGIN');
+
+    const applicationResult = await db.query(
+      `SELECT
+         pla.*,
+         u.full_name,
+         u.email,
+         u.phone,
+         u.nationality,
+         u.chamber_name,
+         u.chamber_phone
+       FROM platform_lawyer_applications pla
+       JOIN users u ON u.id = pla.lawyer_user_id
+       WHERE pla.id = $1
+       FOR UPDATE`,
+      [req.params.applicationId]
+    );
+
+    if (!applicationResult.rows.length) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    const application = applicationResult.rows[0];
+
+    let platformLawyerResult = await db.query(
+      `SELECT *
+       FROM platform_lawyers
+       WHERE lawyer_user_id = $1
+          OR LOWER(email) = LOWER($2)
+       ORDER BY CASE source_type WHEN 'manual' THEN 0 ELSE 1 END, created_at ASC
+       LIMIT 1
+       FOR UPDATE`,
+      [application.lawyer_user_id, application.email]
+    );
+
+    let platformLawyer;
+
+    if (platformLawyerResult.rows.length) {
+      platformLawyer = (
+        await db.query(
+          `UPDATE platform_lawyers
+           SET lawyer_user_id = $2,
+               application_id = $3,
+               full_name = $4,
+               email = $5,
+               phone = $6,
+               nationality = $7,
+               chamber_name = $8,
+               chamber_phone = $9,
+               is_active = TRUE,
+               updated_by = $10,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $1
+           RETURNING *`,
+          [
+            platformLawyerResult.rows[0].id,
+            application.lawyer_user_id,
+            application.id,
+            application.full_name,
+            application.email,
+            application.phone,
+            application.nationality || 'Nigeria',
+            application.chamber_name,
+            application.chamber_phone,
+            req.user.id,
+          ]
+        )
+      ).rows[0];
+    } else {
+      platformLawyer = (
+        await db.query(
+          `INSERT INTO platform_lawyers (
+             source_type,
+             lawyer_user_id,
+             application_id,
+             full_name,
+             email,
+             phone,
+             nationality,
+             chamber_name,
+             chamber_phone,
+             is_active,
+             created_by,
+             updated_by
+           )
+           VALUES ('application', $1, $2, $3, $4, $5, $6, $7, $8, TRUE, $9, $9)
+           RETURNING *`,
+          [
+            application.lawyer_user_id,
+            application.id,
+            application.full_name,
+            application.email,
+            application.phone,
+            application.nationality || 'Nigeria',
+            application.chamber_name,
+            application.chamber_phone,
+            req.user.id,
+          ]
+        )
+      ).rows[0];
+    }
+
+    await db.query(
+      `UPDATE platform_lawyer_applications
+       SET status = 'approved',
+           review_note = $2,
+           reviewed_at = CURRENT_TIMESTAMP,
+           reviewed_by = $3,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [
+        application.id,
+        String(req.body.review_note || '').trim() || null,
+        req.user.id,
+      ]
+    );
+
+    await db.query('COMMIT');
+    await logAction(req.user.id, 'APPROVE_PLATFORM_LAWYER_APPLICATION', 'platform_lawyer_application', application.id);
+
+    res.json({
+      success: true,
+      data: {
+        application_id: application.id,
+        platform_lawyer_id: platformLawyer.id,
+      },
+    });
+  } catch (error) {
+    await db.query('ROLLBACK');
+    console.error('Approve platform lawyer application error:', error);
+    res.status(500).json({ message: 'Failed to approve lawyer application' });
+  }
+};
+
+const rejectPlatformLawyerApplication = async (req, res) => {
+  try {
+    await ensurePlatformLawyerSchema();
+
+    const applicationResult = await db.query(
+      `UPDATE platform_lawyer_applications
+       SET status = 'rejected',
+           review_note = $2,
+           reviewed_at = CURRENT_TIMESTAMP,
+           reviewed_by = $3,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING id`,
+      [
+        req.params.applicationId,
+        String(req.body.review_note || '').trim() || null,
+        req.user.id,
+      ]
+    );
+
+    if (!applicationResult.rows.length) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    await db.query(
+      `UPDATE platform_lawyers
+       SET is_active = FALSE,
+           updated_by = $2,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE application_id = $1
+         AND source_type = 'application'`,
+      [req.params.applicationId, req.user.id]
+    );
+
+    await logAction(req.user.id, 'REJECT_PLATFORM_LAWYER_APPLICATION', 'platform_lawyer_application', req.params.applicationId);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reject platform lawyer application error:', error);
+    res.status(500).json({ message: 'Failed to reject lawyer application' });
+  }
+};
+
 // Bulk actions
 const bulkUserAction = async (req, res) => {
   const { ids, action } = req.body;
@@ -1001,6 +1637,14 @@ module.exports = {
   resolveReport,
   getBroadcasts,
   createBroadcast,
+  getPlatformLawyerManagementData,
+  createManualPlatformLawyer,
+  resendManualPlatformLawyerInvite,
+  updatePlatformLawyer,
+  deletePlatformLawyer,
+  createPlatformLawyerRecruitmentBroadcast,
+  approvePlatformLawyerApplication,
+  rejectPlatformLawyerApplication,
   bulkUserAction,
   bulkPropertyAction,
   getFeatureFlags,

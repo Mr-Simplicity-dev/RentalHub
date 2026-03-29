@@ -182,23 +182,39 @@ const Home = () => {
             </form>
             <div className="mt-4">
               <Link
-                to="/properties?request=1#tenant-request"
+                to="/lawyers"
                 className="underline text-primary-100 hover:text-white text-sm"
               >
-                Can't find your preferred property type? Submit a request on the properties page.
+                Need legal support? Explore RentalHub NG lawyers and unlock full contact details after payment.
               </Link>
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+              <div className="mt-2">
                 <Link
                   to="/properties?request=1#tenant-request"
+                  className="underline text-primary-100 hover:text-white text-sm"
+                >
+                  Can't find your preferred property type? Submit a request on the properties page.
+                </Link>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+                <Link
+                  to="/lawyers"
                   className="inline-block bg-white text-primary-700 px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
                 >
-                  Submit Request 
+                  Use RentalHub NG Lawyers
                 </Link>
                 <Link
                   to="/verify-case"
                   className="inline-block border border-white px-5 py-2 rounded-lg font-semibold text-white hover:bg-primary-700 transition-colors"
                 >
                   Verify Dispute Evidence
+                </Link>
+              </div>
+              <div className="mt-3 flex justify-center">
+                <Link
+                  to="/properties?request=1#tenant-request"
+                  className="inline-block border border-white px-5 py-2 rounded-lg font-semibold text-white hover:bg-primary-700 transition-colors"
+                >
+                  Submit Request
                 </Link>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
 import { FaEnvelope, FaEye, FaEyeSlash, FaLock } from 'react-icons/fa';
@@ -14,6 +14,7 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Load saved email if user previously checked Remember Me
   useEffect(() => {
@@ -41,6 +42,13 @@ const Login = () => {
         }
 
         const role = response.data?.user?.user_type;
+        const redirectParam = searchParams.get('redirect');
+        const safeRedirect = redirectParam && redirectParam.startsWith('/') ? redirectParam : '';
+
+        if (safeRedirect) {
+          navigate(safeRedirect);
+          return;
+        }
 
         if (role === 'super_admin') {
           navigate('/super-admin');

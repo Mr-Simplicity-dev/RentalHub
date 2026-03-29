@@ -59,6 +59,9 @@ import AcceptLawyerInvite from './AcceptLawyerInvite';
 import LocationPage from './LocationPage';
 import NigeriaPage from './NigeriaPage';
 import AreaPage from './AreaPage';
+import LawyersDirectory from './LawyersDirectory';
+import FinancialAdminDashboard from './admin/FinancialAdminDashboard'; // ADD THIS LINE
+import StateAdminDashboard from './admin/StateAdminDashboard'; // ADD THIS LINE
 
 
 const queryClient = new QueryClient();
@@ -82,6 +85,32 @@ const AdminRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.user_type !== 'admin') return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
+const FinancialAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'financial_admin') return <Navigate to="/admin" />;
+
+  return children;
+};
+
+const StateAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'state_admin') return <Navigate to="/admin" />;
 
   return children;
 };
@@ -165,6 +194,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/lawyer/accept-invite" element={<AcceptLawyerInvite />} />
+              <Route path="/lawyers" element={<LawyersDirectory />} />
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
@@ -223,8 +253,10 @@ function App() {
                 <Route path="applications" element={<AdminApplications />} />
                 <Route path="compliance" element={<AdminCompliance />} />
                 <Route path="users/:id" element={<AdminUserDetail />} />
-                <Route path="properties/:id" element={<AdminPropertyDetail />} />
+                                <Route path="properties/:id" element={<AdminPropertyDetail />} />
                 <Route path="applications/:id" element={<AdminApplicationDetail />} />
+                <Route path="financial-dashboard" element={<FinancialAdminRoute><FinancialAdminDashboard /></FinancialAdminRoute>} />
+                <Route path="state-dashboard" element={<StateAdminRoute><StateAdminDashboard /></StateAdminRoute>} />
               </Route>
 
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

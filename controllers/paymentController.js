@@ -4,6 +4,12 @@ const crypto = require("crypto");
 const db = require('../config/middleware/database');
 const { validationResult } = require("express-validator");
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+const {
+  LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
+  ensureLawyerDirectoryUnlockSchema,
+  getLawyerDirectoryUnlockStatus: readLawyerDirectoryUnlockStatus,
+} = require('../config/utils/lawyerDirectoryAccess');
+const commissionService = require('../services/commissionService');
 
 // ====================== PAYSTACK CONFIG ======================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -12,6 +18,7 @@ const PROPERTY_UNLOCK_PRICE_NGN = Number(process.env.PROPERTY_UNLOCK_PRICE_NGN |
 const FRONTEND_URL = getFrontendUrl();
 
 let propertyUnlockSchemaReady = false;
+let walletLedgerSchemaReady = false;
 
 const ensurePropertyUnlockSchema = async () => {
   if (propertyUnlockSchemaReady) return;
@@ -36,6 +43,23 @@ const ensurePropertyUnlockSchema = async () => {
   `);
 
   propertyUnlockSchemaReady = true;
+};
+
+const ensureWalletLedgerSchema = async () => {
+  if (walletLedgerSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS wallets (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+      balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
+  `);
+
+  walletLedgerSchemaReady = true;
 };
 
 
@@ -257,9 +281,6 @@ exports.initializeSubscription = async (req, res) => {
   }
 };
 
-
-
-
 // Verify Subscription Payment
 exports.verifySubscription = async (req, res) => {
   try {
@@ -321,6 +342,8 @@ exports.verifySubscription = async (req, res) => {
        WHERE id = $2`,
       [expiryDate, userId]
     );
+    // Calculate commission for subscription
+    await commissionService.processPaymentCommission(payment.id);
 
     res.json({
       success: true,
@@ -594,6 +617,10 @@ exports.verifyPropertyUnlock = async (req, res) => {
       [userId, payment.property_id, payment.id, reference]
     );
 
+    // Calculate commission for property unlock
+    await commissionService.processPaymentCommission(payment.id); // ADD THIS LINE
+
+
     res.json({
       success: true,
       message: "Property unlocked successfully",
@@ -646,6 +673,275 @@ exports.getPropertyUnlockStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get property unlock status",
+    });
+  }
+};
+
+// =====================================================
+//        PLATFORM LAWYER DIRECTORY UNLOCK PAYMENT
+// =====================================================
+
+exports.initializeLawyerDirectoryUnlock = async (req, res) => {
+  let transactionStarted = false;
+
+  try {
+    await ensureLawyerDirectoryUnlockSchema();
+    await ensureWalletLedgerSchema();
+
+    const userId = req.user.id;
+    const userType = req.user.user_type;
+
+    if (!['tenant', 'landlord'].includes(userType)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only tenant and landlord accounts can unlock the lawyer directory',
+      });
+    }
+
+    const unlockStatus = await readLawyerDirectoryUnlockStatus(userId);
+
+    if (unlockStatus.unlocked) {
+      return res.json({
+        success: true,
+        message: 'Lawyer directory already unlocked for this user',
+        data: {
+          already_unlocked: true,
+          unlocked_at: unlockStatus.unlock?.unlocked_at || null,
+          reference: unlockStatus.unlock?.transaction_reference || null,
+        },
+      });
+    }
+
+    const userResult = await db.query(
+      'SELECT email, full_name FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = userResult.rows[0];
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    await db.query('BEGIN');
+    transactionStarted = true;
+
+    const walletResult = await db.query(
+      `SELECT balance
+       FROM wallets
+       WHERE user_id = $1
+       FOR UPDATE`,
+      [userId]
+    );
+
+    const walletBalance = walletResult.rows.length
+      ? Number(walletResult.rows[0].balance)
+      : 0;
+
+    if (walletBalance < LAWYER_DIRECTORY_UNLOCK_PRICE_NGN) {
+      await db.query('ROLLBACK');
+      transactionStarted = false;
+      return res.status(402).json({
+        success: false,
+        message: `Insufficient wallet balance. Fund your wallet from the dashboard before unlocking. Available: ₦${walletBalance.toLocaleString()}`,
+        data: {
+          available_balance: walletBalance,
+          amount_required: LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
+        },
+      });
+    }
+
+    const reference = `LAWYERDIR_WALLET_${userId}_${Date.now()}`;
+
+    const paymentResult = await db.query(
+      `INSERT INTO payments (
+         user_id,
+         payment_type,
+         amount,
+         currency,
+         payment_method,
+         payment_status,
+         transaction_reference,
+         completed_at,
+         gateway_response
+       )
+       VALUES ($1, 'lawyer_directory_unlock', $2, 'NGN', 'wallet', 'completed', $3, CURRENT_TIMESTAMP, $4)
+       RETURNING id`,
+      [
+        userId,
+        LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
+        reference,
+        JSON.stringify({
+          funding_source: 'wallet',
+          full_name: user.full_name,
+          email: user.email,
+        }),
+      ]
+    );
+
+    await db.query(
+      `UPDATE wallets
+       SET balance = balance - $2,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1`,
+      [userId, LAWYER_DIRECTORY_UNLOCK_PRICE_NGN]
+    );
+
+    await db.query(
+      `INSERT INTO lawyer_directory_unlocks (
+         user_id, payment_id, transaction_reference
+       )
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id)
+       DO UPDATE SET
+         payment_id = EXCLUDED.payment_id,
+         transaction_reference = EXCLUDED.transaction_reference,
+         unlocked_at = CURRENT_TIMESTAMP`,
+      [userId, paymentResult.rows[0].id, reference]
+    );
+
+    await db.query('COMMIT');
+    transactionStarted = false;
+
+    return res.json({
+      success: true,
+      message: 'Lawyer directory unlocked successfully from your wallet',
+      data: {
+        payment_id: paymentResult.rows[0].id,
+        amount: LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
+        reference,
+        unlocked_at: new Date().toISOString(),
+        available_balance: walletBalance - LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
+      },
+    });
+  } catch (error) {
+    if (transactionStarted) {
+      try {
+        await db.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Lawyer directory unlock rollback error:', rollbackError);
+      }
+    }
+    console.error('Lawyer directory unlock initialization error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to unlock lawyer directory from wallet',
+    });
+  }
+};
+
+exports.verifyLawyerDirectoryUnlock = async (req, res) => {
+  try {
+    await ensureLawyerDirectoryUnlockSchema();
+
+    const { reference } = req.params;
+    const userId = req.user.id;
+
+    const paymentResult = await db.query(
+      `SELECT *
+       FROM payments
+       WHERE transaction_reference = $1
+         AND user_id = $2
+         AND payment_type = 'lawyer_directory_unlock'`,
+      [reference, userId]
+    );
+
+    if (!paymentResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lawyer directory payment not found',
+      });
+    }
+
+    const payment = paymentResult.rows[0];
+
+    if (payment.payment_status !== 'completed') {
+      const paystackResponse = await axios.get(
+        `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
+        {
+          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+        }
+      );
+
+      const transaction = paystackResponse.data.data;
+      if (transaction.status !== 'success') {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment verification failed',
+          status: transaction.status,
+        });
+      }
+
+      await db.query(
+        `UPDATE payments
+         SET payment_status = 'completed',
+             completed_at = CURRENT_TIMESTAMP,
+             gateway_response = $1
+         WHERE id = $2`,
+        [JSON.stringify(transaction), payment.id]
+      );
+    }
+
+    await db.query(
+      `INSERT INTO lawyer_directory_unlocks (
+         user_id, payment_id, transaction_reference
+       )
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id)
+       DO UPDATE SET
+         payment_id = EXCLUDED.payment_id,
+         transaction_reference = EXCLUDED.transaction_reference,
+         unlocked_at = CURRENT_TIMESTAMP`,
+      [userId, payment.id, reference]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Lawyer directory unlocked successfully',
+      data: {
+        reference,
+        amount: LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
+      },
+    });
+  } catch (error) {
+    console.error('Lawyer directory unlock verification error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify lawyer directory payment',
+    });
+  }
+};
+
+exports.getLawyerDirectoryUnlockStatus = async (req, res) => {
+  try {
+    await ensureWalletLedgerSchema();
+    const unlockStatus = await readLawyerDirectoryUnlockStatus(req.user.id);
+    const walletResult = await db.query(
+      `SELECT balance FROM wallets WHERE user_id = $1 LIMIT 1`,
+      [req.user.id]
+    );
+    const walletBalance = walletResult.rows.length
+      ? Number(walletResult.rows[0].balance)
+      : 0;
+
+    return res.json({
+      success: true,
+      data: {
+        unlocked: unlockStatus.unlocked,
+        unlocked_at: unlockStatus.unlock?.unlocked_at || null,
+        reference: unlockStatus.unlock?.transaction_reference || null,
+        amount: LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
+        available_balance: walletBalance,
+        payment_method: 'wallet',
+      },
+    });
+  } catch (error) {
+    console.error('Lawyer directory unlock status error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get lawyer directory unlock status',
     });
   }
 };
@@ -832,7 +1128,10 @@ exports.verifyListingPayment = async (req, res) => {
       );
     }
 
-    res.json({
+ // Calculate commission for listing
+    await commissionService.processPaymentCommission(payment.id); // ADD THIS LINE
+
+      res.json({
       success: true,
       message: "Listing payment successful!",
       data: {
@@ -1037,7 +1336,10 @@ exports.verifyRentPayment = async (req, res) => {
       [JSON.stringify(transaction), payment.id]
     );
 
-    res.json({
+ // Calculate commission for rent payment
+    await commissionService.processPaymentCommission(payment.id); // ADD THIS LINE
+
+     res.json({
       success: true,
       message: "Rent payment successful!",
       data: {
@@ -1225,7 +1527,10 @@ exports.verifyWalletFunding = async (req, res) => {
       [userId, amountPaid]
     );
 
-    return res.json({
+// Calculate commission for wallet funding
+    await commissionService.processPaymentCommission(payment.id); // ADD THIS LINE
+
+      return res.json({
       success: true,
       message: `₦${amountPaid.toLocaleString()} has been added to your wallet successfully!`,
       data: { amount_funded: amountPaid, reference },
@@ -1387,7 +1692,7 @@ exports.paystackWebhook = async (req, res) => {
 async function handleSuccessfulPayment(data) {
   try {
     const reference = data.reference;
-    const metadata = data.metadata;
+    const metadata = data.metadata || {};
 
     await db.query(
       `UPDATE payments 
@@ -1398,7 +1703,12 @@ async function handleSuccessfulPayment(data) {
       [JSON.stringify(data), reference]
     );
 
-    // Process based on type
+    const storedPaymentResult = await db.query(
+      'SELECT id FROM payments WHERE transaction_reference = $1 LIMIT 1',
+      [reference]
+    );
+    const paymentId = storedPaymentResult.rows[0]?.id || null;
+
     if (metadata.payment_type === "tenant_subscription") {
       const expiry = new Date();
       expiry.setDate(expiry.getDate() + (metadata.duration_days || 30));
@@ -1428,12 +1738,6 @@ async function handleSuccessfulPayment(data) {
     if (metadata.payment_type === "property_unlock") {
       await ensurePropertyUnlockSchema();
 
-      const paymentResult = await db.query(
-        "SELECT id FROM payments WHERE transaction_reference = $1 LIMIT 1",
-        [reference]
-      );
-      const paymentId = paymentResult.rows[0]?.id || null;
-
       await db.query(
         `INSERT INTO tenant_property_unlocks (
            tenant_id, property_id, payment_id, transaction_reference
@@ -1446,6 +1750,46 @@ async function handleSuccessfulPayment(data) {
            unlocked_at = CURRENT_TIMESTAMP`,
         [metadata.user_id, metadata.property_id, paymentId, reference]
       );
+    }
+
+    if (metadata.payment_type === 'lawyer_directory_unlock') {
+      await ensureLawyerDirectoryUnlockSchema();
+
+      await db.query(
+        `INSERT INTO lawyer_directory_unlocks (
+           user_id, payment_id, transaction_reference
+         )
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id)
+         DO UPDATE SET
+           payment_id = EXCLUDED.payment_id,
+           transaction_reference = EXCLUDED.transaction_reference,
+           unlocked_at = CURRENT_TIMESTAMP`,
+        [metadata.user_id, paymentId, reference]
+      );
+    }
+    
+    if (metadata.payment_type === "wallet_funding") {
+      await db.query(
+        `INSERT INTO wallets (user_id, balance)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id)
+         DO UPDATE SET balance = wallets.balance + $2, updated_at = CURRENT_TIMESTAMP`,
+        [metadata.user_id, data.amount / 100]
+      );
+    }
+
+    if (
+      paymentId &&
+      [
+        'tenant_subscription',
+        'landlord_listing',
+        'property_unlock',
+        'rent_payment',
+        'wallet_funding',
+      ].includes(metadata.payment_type)
+    ) {
+      await commissionService.processPaymentCommission(paymentId);
     }
 
     console.log("Webhook payment processed:", reference);
@@ -1586,8 +1930,5 @@ exports.verifyBankAccount = async (req, res) => {
     });
   }
 };
-
-
-
 
 module.exports = exports;

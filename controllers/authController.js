@@ -22,6 +22,11 @@ const {
   sendFraudAlertEmail
 } = require('../config/utils/emailService');
 const { sendVerificationCode } = require('../config/utils/smsService');
+const {
+  ensurePlatformLawyerSchema,
+  hashPlatformLawyerInviteToken,
+  syncPlatformLawyerRecordFromUser,
+} = require('../config/utils/platformLawyerProgram');
 
 // Store OTP codes temporarily (use Redis in production)
 const otpStore = new Map();
@@ -161,7 +166,12 @@ const ensureTenantRegistrationPaymentSchema = async () => {
           'landlord_listing',
           'rent_payment',
           'property_unlock',
-          'general_platform_fee'
+          'general_platform_fee',
+          'registration_fee',
+          'wallet_funding',
+          'tenant_property_alert',
+          'evidence_verification',
+          'lawyer_directory_unlock'
         )
       );
   `);
@@ -1353,6 +1363,219 @@ exports.acceptLawyerInvite = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to accept lawyer invite'
+    });
+  }
+};
+
+exports.acceptPlatformLawyerInvite = async (req, res) => {
+  try {
+    await ensureIdentitySchema();
+    await ensurePlatformLawyerSchema();
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { token, full_name, phone, password, chamber_name, chamber_phone, nationality } = req.body;
+    const inviteToken = String(token || '').trim();
+    const cleanPhone = String(phone || '').replace(/\s+/g, '');
+    const cleanFullName = String(full_name || '').trim();
+    const cleanChamberName = String(chamber_name || '').trim();
+    const cleanChamberPhone = String(chamber_phone || '').replace(/\s+/g, '');
+    const tokenHash = hashPlatformLawyerInviteToken(inviteToken);
+
+    if (!cleanChamberName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chamber/law firm name is required'
+      });
+    }
+
+    if (!cleanChamberPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chamber phone number is required'
+      });
+    }
+
+    const inviteResult = await db.query(
+      `SELECT
+         pli.*,
+         pl.id AS platform_lawyer_id,
+         pl.full_name AS platform_full_name,
+         pl.email AS platform_email,
+         pl.phone AS platform_phone,
+         pl.nationality AS platform_nationality,
+         pl.chamber_name AS platform_chamber_name,
+         pl.chamber_phone AS platform_chamber_phone
+       FROM platform_lawyer_invites pli
+       JOIN platform_lawyers pl ON pl.id = pli.platform_lawyer_id
+       WHERE pli.token_hash = $1
+       LIMIT 1`,
+      [tokenHash]
+    );
+
+    if (!inviteResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invite link is invalid'
+      });
+    }
+
+    const invite = inviteResult.rows[0];
+
+    if (invite.status === 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'This invite has already been accepted'
+      });
+    }
+
+    if (new Date(invite.expires_at).getTime() < Date.now()) {
+      await db.query(
+        `UPDATE platform_lawyer_invites
+         SET status = 'expired', updated_at = NOW()
+         WHERE id = $1`,
+        [invite.id]
+      );
+
+      return res.status(410).json({
+        success: false,
+        message: 'Invite has expired. Ask the super admin to resend a fresh invite.'
+      });
+    }
+
+    const existingByPhone = await db.query(
+      `SELECT id, email FROM users WHERE phone = $1 LIMIT 1`,
+      [cleanPhone]
+    );
+
+    if (
+      existingByPhone.rows.length &&
+      String(existingByPhone.rows[0].email).toLowerCase() !== String(invite.lawyer_email).toLowerCase()
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: 'Phone number already belongs to another account'
+      });
+    }
+
+    const existingLawyerResult = await db.query(
+      `SELECT id, user_type
+       FROM users
+       WHERE email = $1
+       LIMIT 1`,
+      [invite.lawyer_email]
+    );
+
+    let lawyerUserId;
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(password, salt);
+
+    if (existingLawyerResult.rows.length) {
+      const existingUser = existingLawyerResult.rows[0];
+
+      if (existingUser.user_type !== 'lawyer') {
+        return res.status(409).json({
+          success: false,
+          message: 'Invite email already belongs to a non-lawyer account'
+        });
+      }
+
+      await db.query(
+        `UPDATE users
+         SET full_name = $1,
+             phone = $2,
+             password_hash = $3,
+             email_verified = TRUE,
+             chamber_name = $4,
+             chamber_phone = $5,
+             nationality = $6,
+             updated_at = NOW()
+         WHERE id = $7`,
+        [
+          cleanFullName,
+          cleanPhone,
+          password_hash,
+          cleanChamberName,
+          cleanChamberPhone,
+          nationality || invite.platform_nationality || 'Nigeria',
+          existingUser.id,
+        ]
+      );
+
+      lawyerUserId = existingUser.id;
+    } else {
+      const lawyerInsert = await db.query(
+        `INSERT INTO users
+         (user_type, email, phone, password_hash, full_name, identity_document_type, nationality, email_verified, chamber_name, chamber_phone)
+         VALUES ('lawyer', $1, $2, $3, $4, 'nin', $5, TRUE, $6, $7)
+         RETURNING id`,
+        [
+          invite.lawyer_email,
+          cleanPhone,
+          password_hash,
+          cleanFullName,
+          nationality || invite.platform_nationality || 'Nigeria',
+          cleanChamberName,
+          cleanChamberPhone,
+        ]
+      );
+
+      lawyerUserId = lawyerInsert.rows[0].id;
+    }
+
+    await syncPlatformLawyerRecordFromUser({
+      platformLawyerId: invite.platform_lawyer_id,
+      lawyerUserId,
+    });
+
+    await db.query(
+      `UPDATE platform_lawyer_invites
+       SET status = 'accepted',
+           accepted_at = NOW(),
+           lawyer_user_id = $2,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [invite.id, lawyerUserId]
+    );
+
+    const otpResult = await sendVerificationCode(cleanPhone);
+
+    if (!otpResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Account created but failed to send OTP. Please contact support.'
+      });
+    }
+
+    lawyerOtpStore.set(cleanPhone, {
+      code: otpResult.code,
+      lawyerUserId,
+      expiresAt: Date.now() + 10 * 60 * 1000
+    });
+
+    return res.json({
+      success: true,
+      message: 'OTP sent to your phone for verification'
+    });
+  } catch (error) {
+    console.error('Accept platform lawyer invite error:', error);
+
+    if (error.code === '23505') {
+      return res.status(409).json({
+        success: false,
+        message: 'Account details conflict with an existing user record'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to accept platform lawyer invite'
     });
   }
 };

@@ -11,6 +11,36 @@ const audit = require('../config/middleware/auditMiddleware');
 
 
 /* ---------------------------------------------------
+   Public Lawyer Directory
+--------------------------------------------------- */
+
+router.get(
+  '/directory',
+  legalController.getPublicLawyerDirectory
+);
+
+router.get(
+  '/directory/full',
+  authenticate,
+  legalController.getUnlockedLawyerDirectory
+);
+
+router.get(
+  '/platform-lawyer-program',
+  authenticate,
+  allowRoles('lawyer'),
+  legalController.getPlatformLawyerProgram
+);
+
+router.post(
+  '/platform-lawyer-program/apply',
+  authenticate,
+  allowRoles('lawyer'),
+  legalController.applyToPlatformLawyerProgram
+);
+
+
+/* ---------------------------------------------------
    Get Properties Accessible To Lawyer
 --------------------------------------------------- */
 

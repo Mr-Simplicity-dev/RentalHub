@@ -124,6 +124,25 @@ router.post(
   authController.acceptLawyerInvite
 );
 
+router.post(
+  '/lawyer/accept-platform-invite',
+  [
+    body('token').trim().notEmpty(),
+    body('full_name').trim().notEmpty(),
+    body('chamber_name').trim().notEmpty(),
+    body('chamber_phone')
+      .trim()
+      .customSanitizer(v => String(v || '').replace(/\s+/g, ''))
+      .matches(/^\+?\d{10,15}$/),
+    body('phone')
+      .trim()
+      .customSanitizer(v => String(v || '').replace(/\s+/g, ''))
+      .matches(/^\+?\d{10,15}$/),
+    body('password').isLength({ min: 8 }),
+  ],
+  authController.acceptPlatformLawyerInvite
+);
+
 router.get(
   '/lawyer-invites',
   authenticate,

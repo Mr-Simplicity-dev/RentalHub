@@ -88,6 +88,8 @@ const Dashboard = () => {
   const [accountNameLoading, setAccountNameLoading] = useState(false);
   const [accountNameError, setAccountNameError] = useState('');
   const [consentChecked, setConsentChecked] = useState(false);
+  const [banks, setBanks] = useState([]);
+  const [banksLoading, setBanksLoading] = useState(false);
 
   // ── Landlord refund management state ─────────────────────────────────────
   const [showLandlordRefundModal, setShowLandlordRefundModal] = useState(false);
@@ -199,6 +201,28 @@ const Dashboard = () => {
       setAccountNameLoading(false);
     }
   };
+
+  
+  // Fetch banks list on component mount
+  useEffect(() => {
+    const fetchBanks = async () => {
+      try {
+        setBanksLoading(true);
+        const res = await api.get('/payments/banks');
+        if (res.data?.success) {
+          setBanks(res.data.data);
+        }
+      } catch (err) {
+        console.error('Error fetching banks:', err);
+        // Fallback to hardcoded banks if API fails
+        setBanks(NIGERIAN_BANKS.map(name => ({ name, code: '', slug: '' })));
+      } finally {
+        setBanksLoading(false);
+      }
+    };
+
+    fetchBanks();
+  }, []);
 
   // ── Account number change handler with debounce ──────────────────────────
   const handleAccountNumberChange = (e) => {
@@ -781,7 +805,7 @@ const Dashboard = () => {
               />
               <QuickActionCard
                 title="Withdraw Funds"
-                description="Withdraw approved refunds from your wallet to your bank"
+                description="Fund Wallet/Withdraw approved refunds to your bank"
                 icon={<FaUniversity />}
                 onClick={openWithdrawModal}
               />
@@ -813,7 +837,7 @@ const Dashboard = () => {
                 onClick={() => openLandlordRefundModal('pending')}
               />
               <QuickActionCard
-                title="Withdraw Funds"
+                title="Fund Wallet/Withdraw Funds"
                 description="Withdraw cleared rent payments to your bank account"
                 icon={<FaUniversity />}
                 onClick={openWithdrawModal}
@@ -1082,13 +1106,13 @@ const Dashboard = () => {
                       />
                       {fundAmount && Number(fundAmount) >= 100 && (
                         <p className="text-xs text-teal-600 mt-1">
-                          You will be charged <strong>₦{Number(fundAmount).toLocaleString()}</strong> via Paystack
+                          You will be charged <strong>₦{Number(fundAmount).toLocaleString()}</strong> to fund your Wallet.
                         </p>
                       )}
                     </div>
                     <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-xs text-green-700">
                       <FaCheckCircle className="mt-0.5 shrink-0 text-green-500" />
-                      <span>Payment is processed securely via Paystack. Your wallet will be credited immediately after a successful payment.</span>
+                      <span>Payment is processed securely. Your wallet will be credited immediately after a successful payment.</span>
                     </div>
                     <div className="flex gap-3">
                       <button type="button" onClick={() => setShowWithdrawModal(false)} className="btn w-full">Cancel</button>
@@ -1097,7 +1121,7 @@ const Dashboard = () => {
                         disabled={fundLoading || !fundAmount || Number(fundAmount) < 100}
                         className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {fundLoading ? 'Redirecting...' : `Pay ₦${fundAmount ? Number(fundAmount).toLocaleString() : '0'} via Paystack`}
+                        {fundLoading ? 'Redirecting...' : `Pay ₦${fundAmount ? Number(fundAmount).toLocaleString() : '0'} to Fund Wallet`}
                       </button>
                     </div>
                   </form>
@@ -1178,10 +1202,16 @@ const Dashboard = () => {
                         onChange={handleBankChange}
                         className="input w-full"
                       >
-                        <option value="">-- Select your bank --</option>
-                        {NIGERIAN_BANKS.map(bank => (
-                          <option key={bank} value={bank}>{bank}</option>
-                        ))}
+                                                <option value="">-- Select your bank --</option>
+                        {banksLoading ? (
+                          <option disabled>Loading banks...</option>
+                        ) : (
+                          banks.map(bank => (
+                            <option key={bank.code || bank.name} value={bank.name}>
+                              {bank.name}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
 
@@ -1235,14 +1265,14 @@ const Dashboard = () => {
                       />
                       <label htmlFor="withdrawConsent" className="text-xs text-gray-700">
                         I confirm that the bank account details provided above are correct and belong to me. 
-                        I understand that providing incorrect information may result in failed transfers and 
-                        additional processing fees may apply.
+                        I understand that providing incorrect information may result in loss of funds and 
+                        Rentalhub NG will not be liable to such.
                       </label>
                     </div>
 
                     <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
                       <FaExclamationTriangle className="mt-0.5 shrink-0" />
-                      <span>Withdrawals are processed within 1–3 business days. Double-check your account details — incorrect details may result in failed transfers.</span>
+                      <span>Withdrawals are processed within 1–7 business days. Double-check your account details — incorrect details may result in loss of funds.</span>
                     </div>
 
                     <div className="flex gap-3">

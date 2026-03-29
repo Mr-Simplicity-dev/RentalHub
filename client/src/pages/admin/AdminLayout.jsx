@@ -10,7 +10,9 @@ import {
   FaEnvelope,
   FaShieldAlt,
   FaLock,
-  FaSignOutAlt
+  FaSignOutAlt,
+  FaMoneyBill,
+  FaMapMarkerAlt
 } from 'react-icons/fa';
 
 const AdminLayout = () => {
@@ -44,6 +46,9 @@ const AdminLayout = () => {
           <p className="text-xs text-gray-500 mt-1">
             {user?.full_name || 'Administrator'}
           </p>
+          <p className="text-xs text-gray-400 mt-1">
+            {user?.user_type ? user.user_type.replace('_', ' ').toUpperCase() : 'ADMIN'}
+          </p>
         </div>
 
         <nav className="flex-1 p-4 space-y-6">
@@ -76,7 +81,7 @@ const AdminLayout = () => {
                 Applications
               </NavLink>
 
-            </div>
+          </div>
           </div>
 
 
@@ -108,12 +113,11 @@ const AdminLayout = () => {
                     High
                   </span>
                 )}
-
               </NavLink>
 
             </div>
 
-          </div>
+    </div>
 
 
           {/* MONITORING */}
@@ -140,6 +144,31 @@ const AdminLayout = () => {
             </div>
 
           </div>
+
+          {/* FINANCIAL & STATE ADMIN DASHBOARDS */}
+          {(user?.user_type === 'financial_admin' || user?.user_type === 'state_admin') && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Admin Dashboards
+              </p>
+
+              <div className="space-y-2">
+                {user?.user_type === 'financial_admin' && (
+                  <NavLink to="/admin/financial-dashboard" className={navItem}>
+                    <FaMoneyBill className="mr-3" />
+                    Financial Dashboard
+                  </NavLink>
+                )}
+
+                {user?.user_type === 'state_admin' && (
+                  <NavLink to="/admin/state-dashboard" className={navItem}>
+                    <FaMapMarkerAlt className="mr-3" />
+                    State Dashboard
+                  </NavLink>
+                )}
+              </div>
+            </div>
+          )}
 
         </nav>
 
@@ -169,3 +198,4 @@ const AdminLayout = () => {
 };
 
 export default AdminLayout;
+

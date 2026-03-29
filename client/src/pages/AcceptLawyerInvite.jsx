@@ -16,6 +16,8 @@ const getPasswordStrength = (password) => {
 const AcceptLawyerInvite = () => {
   const [searchParams] = useSearchParams();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
+  const mode = useMemo(() => searchParams.get('mode') || 'client', [searchParams]);
+  const isPlatformInvite = mode === 'platform';
 
   const [step, setStep] = useState('form'); // form | otp
   const [otp, setOtp] = useState('');
@@ -58,7 +60,11 @@ const AcceptLawyerInvite = () => {
 
     setLoading(true);
     try {
-      const res = await api.post('/auth/lawyer/accept-invite', {
+      const endpoint = isPlatformInvite
+        ? '/auth/lawyer/accept-platform-invite'
+        : '/auth/lawyer/accept-invite';
+
+      const res = await api.post(endpoint, {
         token,
         full_name: formData.full_name,
         chamber_name: formData.chamber_name,
@@ -75,7 +81,12 @@ const AcceptLawyerInvite = () => {
         toast.error('Failed to send OTP');
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Error processing lawyer invite');
+      toast.error(
+        err.response?.data?.message ||
+          (isPlatformInvite
+            ? 'Error processing platform lawyer invite'
+            : 'Error processing lawyer invite')
+      );
     } finally {
       setLoading(false);
     }
@@ -203,10 +214,12 @@ const AcceptLawyerInvite = () => {
             <>
               <div className="text-center">
                 <h2 className="text-xl font-semibold dark:text-white">
-                  Activate Lawyer Access
+                  {isPlatformInvite ? 'Activate Platform Lawyer Access' : 'Activate Lawyer Access'}
                 </h2>
                 <p className="text-xs text-gray-500">
-                  Complete your lawyer profile details
+                  {isPlatformInvite
+                    ? 'Create your password and complete your RentalHub NG lawyer profile'
+                    : 'Complete your lawyer profile details'}
                 </p>
               </div>
 

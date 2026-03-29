@@ -34,6 +34,15 @@ router.patch('/reports/:reportId/resolve', authenticate, requireSuperAdmin, audi
 router.get('/broadcasts', authenticate, requireSuperAdmin, superCtrl.getBroadcasts);
 router.post('/broadcasts', authenticate, requireSuperAdmin, superCtrl.createBroadcast);
 
+router.get('/platform-lawyers', authenticate, requireSuperAdmin, superCtrl.getPlatformLawyerManagementData);
+router.post('/platform-lawyers/manual', authenticate, requireSuperAdmin, superCtrl.createManualPlatformLawyer);
+router.post('/platform-lawyers/:lawyerId/resend-invite', authenticate, requireSuperAdmin, superCtrl.resendManualPlatformLawyerInvite);
+router.patch('/platform-lawyers/:lawyerId', authenticate, requireSuperAdmin, superCtrl.updatePlatformLawyer);
+router.delete('/platform-lawyers/:lawyerId', authenticate, requireSuperAdmin, superCtrl.deletePlatformLawyer);
+router.post('/platform-lawyers/broadcast', authenticate, requireSuperAdmin, superCtrl.createPlatformLawyerRecruitmentBroadcast);
+router.patch('/platform-lawyers/applications/:applicationId/approve', authenticate, requireSuperAdmin, superCtrl.approvePlatformLawyerApplication);
+router.patch('/platform-lawyers/applications/:applicationId/reject', authenticate, requireSuperAdmin, superCtrl.rejectPlatformLawyerApplication);
+
 router.post('/users/bulk', authenticate, requireSuperAdmin, superCtrl.bulkUserAction);
 router.post('/properties/bulk', authenticate, requireSuperAdmin, superCtrl.bulkPropertyAction);
 

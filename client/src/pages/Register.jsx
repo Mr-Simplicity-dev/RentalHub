@@ -259,8 +259,13 @@ const Register = () => {
  const handleSubmit = async (e) => {
   e.preventDefault();
 
-  if (!registrationFlags.allow_registration) {
+ if (!registrationFlags.allow_registration) {
     toast.error("Registration is currently disabled");
+    return;
+  }
+
+  if (!registrationFlags.loaded) {
+    toast.error("Registration settings are still loading");
     return;
   }
 
@@ -276,6 +281,11 @@ const Register = () => {
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.lawyer_email || "")) {
     toast.error("Enter one valid lawyer email");
+    return;
+  }
+
+  if (!termsAccepted) {
+    toast.error("You must agree to the terms and privacy policy");
     return;
   }
 
@@ -313,6 +323,11 @@ const Register = () => {
 
     if (requiresRegistrationPayment && !String(registrationData.lga_name || '').trim()) {
       toast.error('Select your local government area to calculate the registration fee');
+      return;
+    }
+
+    if (requiresRegistrationPayment && !registrationPricing.location_complete) {
+      toast.error('Complete your location selection to confirm the exact registration fee');
       return;
     }
 
@@ -381,6 +396,8 @@ const Register = () => {
 const [step, setStep] = useState(1);
 const [errors, setErrors] = useState({});
 const [termsAccepted, setTermsAccepted] = useState(false);
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const passportPattern = /^[A-Za-z0-9]{6,20}$/;
 
 const getPasswordStrength = (pwd) => {
   if (!pwd) return null;
@@ -400,27 +417,53 @@ const validateStep = () => {
   let newErrors = {};
 
   if (step === 2) {
-    if (!formData.full_name) newErrors.full_name = "Full name required";
-    if (!formData.email) newErrors.email = "Email required";
-    if (!formData.phone) newErrors.phone = "Phone required";
-    if (!formData.lawyer_email) newErrors.lawyer_email = "Lawyer email required";
+    if (!String(formData.full_name || "").trim()) newErrors.full_name = "Full name required";
+    if (!String(formData.email || "").trim()) {
+      newErrors.email = "Email required";
+    } else if (!emailPattern.test(String(formData.email || "").trim())) {
+      newErrors.email = "Enter a valid email";
+    }
+    if (!String(formData.phone || "").trim()) newErrors.phone = "Phone required";
+    if (!String(formData.lawyer_email || "").trim()) {
+      newErrors.lawyer_email = "Lawyer email required";
+    } else if (!emailPattern.test(String(formData.lawyer_email || "").trim())) {
+      newErrors.lawyer_email = "Enter a valid lawyer email";
+    }
   }
 
   if (step === 3) {
-    if (!formData.is_foreigner && registrationFlags.nin_number && !formData.nin) {
-      newErrors.nin = "NIN required";
+    if (!registrationFlags.loaded) {
+      newErrors.verification = "Loading registration requirements";
+    }
+
+    if (!formData.is_foreigner && registrationFlags.nin_number) {
+      if (!String(formData.nin || "").trim()) {
+        newErrors.nin = "NIN required";
+      } else if (!/^\d{11}$/.test(formData.nin || "")) {
+        newErrors.nin = "NIN must be exactly 11 digits";
+      }
     }
 
     if (formData.is_foreigner && registrationFlags.passport_number) {
-      if (!formData.international_passport_number)
+      if (!String(formData.international_passport_number || "").trim())
         newErrors.passport = "Passport required";
-      if (!formData.nationality)
+      else if (!passportPattern.test(formData.international_passport_number || "")) {
+        newErrors.passport = "Enter a valid passport number";
+      }
+      if (!String(formData.nationality || "").trim())
         newErrors.nationality = "Nationality required";
     }
 
     if (requiresRegistrationPayment) {
       if (!formData.state_id) newErrors.state = "State required";
-      if (!formData.lga_name) newErrors.lga = "LGA required";
+      if (!String(formData.lga_name || "").trim()) newErrors.lga = "LGA required";
+      if (
+        formData.state_id &&
+        String(formData.lga_name || "").trim() &&
+        !registrationPricing.location_complete
+      ) {
+        newErrors.lga = "Complete your location selection to confirm the exact fee";
+      }
     }
   }
 
@@ -430,11 +473,64 @@ const validateStep = () => {
       newErrors.password = "Min 8 characters";
     if (formData.password !== formData.confirm_password)
       newErrors.confirm = "Passwords do not match";
+    if (!termsAccepted) newErrors.terms = "You must agree to continue";
   }
 
   setErrors(newErrors);
   return Object.keys(newErrors).length === 0;
 };
+
+const isStepTwoComplete =
+  String(formData.full_name || "").trim() &&
+  emailPattern.test(String(formData.email || "").trim()) &&
+  String(formData.phone || "").trim() &&
+  emailPattern.test(String(formData.lawyer_email || "").trim());
+
+const isStepThreeComplete = (() => {
+  if (!registrationFlags.loaded) {
+    return false;
+  }
+
+  if (!formData.is_foreigner && registrationFlags.nin_number) {
+    if (!/^\d{11}$/.test(formData.nin || "")) {
+      return false;
+    }
+  }
+
+  if (formData.is_foreigner && registrationFlags.passport_number) {
+    if (!passportPattern.test(formData.international_passport_number || "")) {
+      return false;
+    }
+
+    if (!String(formData.nationality || "").trim()) {
+      return false;
+    }
+  }
+
+  if (requiresRegistrationPayment) {
+    if (!formData.state_id || !String(formData.lga_name || "").trim()) {
+      return false;
+    }
+
+    if (!registrationPricing.location_complete) {
+      return false;
+    }
+  }
+
+  return true;
+})();
+
+const isStepFourComplete =
+  String(formData.password || "").length >= 8 &&
+  formData.password === formData.confirm_password &&
+  termsAccepted;
+
+const submitDisabled =
+  loading ||
+  !registrationFlags.loaded ||
+  !registrationFlags.allow_registration ||
+  (requiresRegistrationPayment && !registrationPricing.location_complete) ||
+  !isStepFourComplete;
 
 
 const inputClass = (field) =>
@@ -470,6 +566,29 @@ return (
           {[1,2,3,4].map(s => (
             <div key={s} className={`h-2 flex-1 rounded ${step >= s ? 'bg-indigo-600' : 'bg-gray-200'}`} />
           ))}
+        </div>
+
+        <div className="space-y-3 text-center">
+          <p className="text-sm text-gray-600">
+            Already have an account?{" "}
+            <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+              Sign in
+            </Link>
+          </p>
+
+          {requiresRegistrationPayment && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-left text-sm text-blue-800">
+              {formData.user_type === "tenant" ? "Tenant" : "Landlord"} account creation
+              requires a one-time general platform payment of N
+              {displayedRegistrationAmount.toLocaleString()} before the account is created
+              for this location.
+              {!registrationPricing.location_complete && (
+                <div className="mt-2 text-xs text-blue-700">
+                  Select your state and local government area to confirm the exact fee.
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <AnimatePresence mode="wait">
@@ -651,12 +770,7 @@ return (
                   <button
                     type="button"
                     onClick={() => validateStep() && setStep(3)}
-                    disabled={
-                      !formData.full_name ||
-                      !formData.email ||
-                      !formData.phone ||
-                      !formData.lawyer_email
-                    }
+                    disabled={!isStepTwoComplete}
                     className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Continue
@@ -669,6 +783,12 @@ return (
             {step === 3 && (
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold text-center">Verification & Location</h2>
+
+                {errors.verification && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                    {errors.verification}
+                  </div>
+                )}
 
                 {/* NIN (local applicants) */}
                 {!formData.is_foreigner && registrationFlags.nin_number && (
@@ -747,6 +867,11 @@ return (
                           <option key={l} value={l}>{l}</option>
                         ))}
                       </select>
+                      {!registrationPricing.location_complete && formData.state_id && formData.lga_name && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Confirming location pricing...
+                        </p>
+                      )}
                       {errors.lga && <p className="text-red-500 text-sm mt-1">{errors.lga}</p>}
                     </div>
                   </div>
@@ -757,16 +882,7 @@ return (
                   <button
                     type="button"
                     onClick={() => validateStep() && setStep(4)}
-                    disabled={
-                      /* Local: NIN required if flag is on */
-                      (!formData.is_foreigner && registrationFlags.nin_number && !formData.nin) ||
-                      /* Foreigner: passport + nationality required if flag is on */
-                      (formData.is_foreigner && registrationFlags.passport_number && (
-                        !formData.international_passport_number || !formData.nationality
-                      )) ||
-                      /* Payment-required: both state and LGA must be selected */
-                      (requiresRegistrationPayment && (!formData.state_id || !formData.lga_name))
-                    }
+                    disabled={!isStepThreeComplete}
                     className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Continue
@@ -883,7 +999,10 @@ return (
                     id="terms"
                     type="checkbox"
                     checked={termsAccepted}
-                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    onChange={(e) => {
+                      setTermsAccepted(e.target.checked);
+                      setErrors((prev) => ({ ...prev, terms: null }));
+                    }}
                     className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-1 cursor-pointer"
                   />
                   <label htmlFor="terms" className="ml-2 block text-sm text-gray-900 cursor-pointer">
@@ -893,22 +1012,14 @@ return (
                     <Link to="/privacy" className="text-indigo-600 hover:text-indigo-500">Privacy Policy</Link>
                   </label>
                 </div>
+                {errors.terms && <p className="text-red-500 text-sm mt-1">{errors.terms}</p>}
 
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setStep(3)} className="btn w-full">Back</button>
 
                   <button
                     type="submit"
-                    disabled={
-                      loading ||
-                      !registrationFlags.loaded ||
-                      !registrationFlags.allow_registration ||
-                      !formData.password ||
-                      formData.password.length < 8 ||
-                      formData.password !== formData.confirm_password ||
-                      !termsAccepted ||
-                      (requiresRegistrationPayment && !registrationPricing.location_complete)
-                    }
+                    disabled={submitDisabled}
                     className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading

@@ -66,6 +66,26 @@ router.get(
   paymentController.getPropertyUnlockStatus
 );
 
+// ============ PLATFORM LAWYER DIRECTORY UNLOCK ============
+
+router.post(
+  '/unlock-lawyer-directory',
+  authenticate,
+  paymentController.initializeLawyerDirectoryUnlock
+);
+
+router.get(
+  '/unlock-lawyer-directory/verify/:reference',
+  authenticate,
+  paymentController.verifyLawyerDirectoryUnlock
+);
+
+router.get(
+  '/unlock-lawyer-directory/status',
+  authenticate,
+  paymentController.getLawyerDirectoryUnlockStatus
+);
+
 // ============ LANDLORD LISTING PAYMENTS ============
 
 // Get listing plans
@@ -217,6 +237,18 @@ router.get('/wallet/withdrawals',
 );
 
 // ============ BANK ACCOUNT VERIFICATION ============
+
+// Get list of Nigerian banks (cached)
+router.get('/banks',
+  authenticate,
+  paymentController.getBanks
+);
+
+// Force refresh bank cache (admin only)
+router.post('/banks/refresh',
+  authenticate,
+  paymentController.refreshBankCache
+);
 
 // Verify bank account for withdrawals
 router.post('/verify-account',
