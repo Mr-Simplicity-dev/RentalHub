@@ -513,7 +513,7 @@ exports.getStateAdminPerformance = async (req, res) => {
     const result = await db.query(query, params);
     
     // Get commission breakdown by source
-    const sourceQuery = `
+    let sourceQuery = `
       SELECT 
         u.assigned_state,
         ac.source,
@@ -559,4 +559,11 @@ exports.getStateAdminPerformance = async (req, res) => {
       }
     });
     
-  } catch (
+  } catch (error) {
+    console.error('Get state admin performance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch state admin performance'
+    });
+  }
+};

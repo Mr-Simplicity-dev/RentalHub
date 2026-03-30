@@ -19,6 +19,11 @@ const FRONTEND_URL = getFrontendUrl();
 
 let propertyUnlockSchemaReady = false;
 let walletLedgerSchemaReady = false;
+let bankCache = {
+  data: null,
+  fetchedAt: 0,
+};
+const BANK_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const ensurePropertyUnlockSchema = async () => {
   if (propertyUnlockSchemaReady) return;
@@ -60,6 +65,35 @@ const ensureWalletLedgerSchema = async () => {
   `);
 
   walletLedgerSchemaReady = true;
+};
+
+const fetchBanksFromPaystack = async (forceRefresh = false) => {
+  if (!PAYSTACK_SECRET_KEY) {
+    throw new Error('Payment service is not configured');
+  }
+
+  const now = Date.now();
+  if (
+    !forceRefresh &&
+    Array.isArray(bankCache.data) &&
+    now - bankCache.fetchedAt < BANK_CACHE_TTL_MS
+  ) {
+    return bankCache.data;
+  }
+
+  const response = await axios.get(`${PAYSTACK_BASE_URL}/bank`, {
+    headers: {
+      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  bankCache = {
+    data: response.data?.data || [],
+    fetchedAt: now,
+  };
+
+  return bankCache.data;
 };
 
 
@@ -1825,6 +1859,49 @@ async function handleFailedPayment(data) {
 //             BANK ACCOUNT VERIFICATION
 // =====================================================
 
+exports.getBanks = async (_req, res) => {
+  try {
+    const banks = await fetchBanksFromPaystack(false);
+
+    return res.json({
+      success: true,
+      data: banks,
+      meta: {
+        cached: true,
+        count: banks.length,
+      },
+    });
+  } catch (error) {
+    console.error('Get banks error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch banks',
+    });
+  }
+};
+
+exports.refreshBankCache = async (_req, res) => {
+  try {
+    const banks = await fetchBanksFromPaystack(true);
+
+    return res.json({
+      success: true,
+      message: 'Bank list refreshed successfully',
+      data: banks,
+      meta: {
+        refreshed_at: new Date().toISOString(),
+        count: banks.length,
+      },
+    });
+  } catch (error) {
+    console.error('Refresh bank cache error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to refresh banks',
+    });
+  }
+};
+
 exports.verifyBankAccount = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -1844,19 +1921,7 @@ exports.verifyBankAccount = async (req, res) => {
       });
     }
 
-    // First, we need to get the bank code from the bank name
-    // Paystack requires bank code, not bank name
-    const banksResponse = await axios.get(
-      `${PAYSTACK_BASE_URL}/bank`,
-      {
-        headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    const banks = banksResponse.data.data;
+    const banks = await fetchBanksFromPaystack(false);
     const bank = banks.find(b => 
       b.name.toLowerCase().includes(bank_name.toLowerCase()) ||
       bank_name.toLowerCase().includes(b.name.toLowerCase())

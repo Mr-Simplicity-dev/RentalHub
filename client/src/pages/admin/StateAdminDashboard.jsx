@@ -6,10 +6,18 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
-  DollarSign, Users, Home, TrendingUp,
-  CreditCard, Wallet, BarChart2, PieChart as PieChartIcon,
-  MapPin, UserPlus, Download
-} from 'lucide-react';
+  FaDollarSign,
+  FaUsers,
+  FaHome,
+  FaChartLine,
+  FaCreditCard,
+  FaWallet,
+  FaChartBar,
+  FaChartPie,
+  FaMapMarkerAlt,
+  FaUserPlus,
+  FaDownload
+} from 'react-icons/fa';
 import api from '../../services/api';
 import AdminLayout from './AdminLayout';
 
@@ -124,7 +132,7 @@ const StateAdminDashboard = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">State Admin Dashboard</h1>
               <div className="flex items-center mt-2 text-gray-600">
-                <MapPin className="h-4 w-4 mr-2" />
+                <FaMapMarkerAlt className="h-4 w-4 mr-2" />
                 <span>{adminInfo.assigned_state}{adminInfo.assigned_city ? `, ${adminInfo.assigned_city}` : ''}</span>
                 <span className="mx-2">•</span>
                 <span>Commission Rate: {(adminInfo.admin_commission_rate * 100).toFixed(1)}%</span>
@@ -132,7 +140,7 @@ const StateAdminDashboard = () => {
             </div>
             <div className="flex items-center space-x-4">
               <div className="bg-blue-50 p-3 rounded-lg">
-                <MapPin className="h-6 w-6 text-blue-600" />
+                <FaMapMarkerAlt className="h-6 w-6 text-blue-600" />
               </div>
             </div>
           </div>
@@ -149,7 +157,7 @@ const StateAdminDashboard = () => {
                 </p>
               </div>
               <div className="bg-green-50 p-3 rounded-lg">
-                <Wallet className="h-6 w-6 text-green-600" />
+                <FaWallet className="h-6 w-6 text-green-600" />
               </div>
             </div>
             <div className="mt-4">
@@ -168,12 +176,12 @@ const StateAdminDashboard = () => {
                 </p>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg">
-                <DollarSign className="h-6 w-6 text-blue-600" />
+                <FaDollarSign className="h-6 w-6 text-blue-600" />
               </div>
             </div>
             <div className="mt-4">
               <div className="flex items-center text-sm text-green-600">
-                <TrendingUp className="h-4 w-4 mr-1" />
+                <FaChartLine className="h-4 w-4 mr-1" />
                 <span>Earned this month</span>
               </div>
             </div>
@@ -188,12 +196,12 @@ const StateAdminDashboard = () => {
                 </p>
               </div>
               <div className="bg-purple-50 p-3 rounded-lg">
-                <Users className="h-6 w-6 text-purple-600" />
+                <FaUsers className="h-6 w-6 text-purple-600" />
               </div>
             </div>
             <div className="mt-4">
               <div className="flex items-center text-sm text-gray-600">
-                <UserPlus className="h-4 w-4 mr-1" />
+                <FaUserPlus className="h-4 w-4 mr-1" />
                 <span>Users referred by you</span>
               </div>
             </div>
@@ -208,7 +216,7 @@ const StateAdminDashboard = () => {
                 </p>
               </div>
               <div className="bg-orange-50 p-3 rounded-lg">
-                <Home className="h-6 w-6 text-orange-600" />
+                <FaHome className="h-6 w-6 text-orange-600" />
               </div>
             </div>
             <div className="mt-4">
@@ -314,7 +322,7 @@ const StateAdminDashboard = () => {
                   <div className="bg-white p-4 rounded-lg border">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold">Weekly Earnings</h3>
-                      <BarChart2 className="h-5 w-5 text-gray-400" />
+                      <FaChartBar className="h-5 w-5 text-gray-400" />
                     </div>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
@@ -334,7 +342,7 @@ const StateAdminDashboard = () => {
                   <div className="bg-white p-4 rounded-lg border">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold">Commission Breakdown</h3>
-                      <PieChartIcon className="h-5 w-5 text-gray-400" />
+                      <FaChartPie className="h-5 w-5 text-gray-400" />
                     </div>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
@@ -431,7 +439,7 @@ const StateAdminDashboard = () => {
                 <h3 className="text-lg font-semibold">Commission History</h3>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
+                                        <thead>
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Date
@@ -439,7 +447,6 @@ const StateAdminDashboard = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Source
                         </th>
-                        <th className="px-6 py-3
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Amount
                         </th>
@@ -672,7 +679,7 @@ const StateAdminDashboard = () => {
                     }}
                     className="flex items-center text-sm text-blue-600 hover:text-blue-800"
                   >
-                    <Download className="h-4 w-4 mr-1" />
+                    <FaDownload className="h-4 w-4 mr-1" />
                     Export CSV
                   </button>
                 </div>

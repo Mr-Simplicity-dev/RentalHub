@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const dotenv = require('dotenv');
-const { Server } = require("socket.io");
+const { Server } = require('socket.io');
 
 dotenv.config();
 
@@ -29,6 +29,8 @@ const disputesRoutes = require('./routes/disputes');
 const legalRoutes = require('./routes/legal');
 const complianceRoutes = require('./routes/compliance');
 const exportRoutes = require('./routes/export');
+const financialAdminRoutes = require('./routes/financialAdmin');
+const stateAdminRoutes = require('./routes/stateAdmin');
 
 const verificationRoutes = require('./routes/evidenceVerification.routes');
 
@@ -36,193 +38,89 @@ const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 
 const audit = require('./config/middleware/auditMiddleware');
 const { enforceFlags } = require('./config/middleware/featureFlags');
-const { getAllowedFrontendOrigins, getFrontendUrl } = require('./config/utils/frontendUrl');
+const {
+  getAllowedFrontendOrigins,
+  getFrontendUrl,
+} = require('./config/utils/frontendUrl');
 const startScheduler = require('./config/utils/scheduler');
-const locationRoutes = require("./routes/locationRoutes");
-const { generateSitemap } = require("./utils/sitemapGenerator");
-const blogRoutes = require("./routes/blogRoutes");
-const cron = require("node-cron");
-const mongoose = require("mongoose");
+const locationRoutes = require('./routes/locationRoutes');
+const { generateSitemap } = require('./utils/sitemapGenerator');
+const blogRoutes = require('./routes/blogRoutes');
+const cron = require('node-cron');
+const mongoose = require('mongoose');
 
-const Blog = require("./models/Blog");
-const locations = require("./data/nigeriaLocations");
-const slugify = require("./utils/slugify");
-const { pingGoogle } = require("./utils/pingGoogle");
-const { generateAIContent } = require("./utils/aiContentGenerator");
-const { generateTitles } = require("./config/utils/pageGenerator");
-const { generateKeywords } = require("./config/utils/keywordGenerator");
-const { saveRanking } = require("./config/utils/rankChecker");
-const { generateBacklinks } = require("./utils/backlinkEngine");
-const adminSeoRoutes = require("./routes/adminSeoRoutes");
-const { checkRanking } = require("./config/utils/serpTracker");
-const adminSeoRoutes = require("./routes/adminSeoRoutes");
-const { checkRanking } = require("./config/utils/serpTracker");
-const financialAdminRoutes = require("./routes/financialAdmin"); // ADD THIS LINE
-const commissionService = require('../services/commissionService');
-const adminSeoRoutes = require("./routes/adminSeoRoutes");
-const { checkRanking } = require("./config/utils/serpTracker");
-const financialAdminRoutes = require("./routes/financialAdmin"); // ADD THIS LINE
-const stateAdminRoutes = require("./routes/stateAdmin"); // ADD THIS LINE
+const Blog = require('./models/Blog');
+const locations = require('./data/nigeriaLocations');
+const slugify = require('./utils/slugify');
+const { pingGoogle } = require('./utils/pingGoogle');
+const { generateAIContent } = require('./utils/aiContentGenerator');
+const { generateTitles } = require('./config/utils/pageGenerator');
+const { generateKeywords } = require('./config/utils/keywordGenerator');
+const { saveRanking } = require('./config/utils/rankChecker');
+const { generateBacklinks } = require('./utils/backlinkEngine');
+const adminSeoRoutes = require('./routes/adminSeoRoutes');
+const { checkRanking } = require('./config/utils/serpTracker');
 
 async function runInitialSeoCheck() {
   const hasSerpApiKey =
-    typeof process.env.SERP_API_KEY === "string" &&
+    typeof process.env.SERP_API_KEY === 'string' &&
     process.env.SERP_API_KEY.trim() &&
-    process.env.SERP_API_KEY.trim() !== "...";
+    process.env.SERP_API_KEY.trim() !== '...';
 
   if (!hasSerpApiKey) {
-    console.log("Skipping initial ranking check: SERP_API_KEY is not configured");
+    console.log('Skipping initial ranking check: SERP_API_KEY is not configured');
     return;
   }
 
   try {
-    const results = await checkRanking("houses for rent in ikeja");
-    console.log("✅ Initial ranking check results:", results);
+    const results = await checkRanking('houses for rent in ikeja');
+    console.log('Initial ranking check results:', results);
   } catch (err) {
-    console.error("❌ Initial ranking check failed:", err.message);
+    console.error('Initial ranking check failed:', err.message);
   }
 }
 
 runInitialSeoCheck();
 
-// ... rest of the code ...
+// Ensure DB is connected before cron runs
+mongoose.connection.on('connected', () => {
+  console.log('MongoDB connected for cron jobs');
 
-app.use('/api/disputes', disputesRoutes);
-app.use('/api/legal', legalRoutes);
-app.use('/api/compliance', complianceRoutes);
-app.use('/api/export', exportRoutes);
-app.use('/api/financial-admin', financialAdminRoutes); // ADD THIS LINE
-
-app.use('/evidence', verificationRoutes);
-
-async function runInitialSeoCheck() {
-  const hasSerpApiKey =
-    typeof process.env.SERP_API_KEY === "string" &&
-    process.env.SERP_API_KEY.trim() &&
-    process.env.SERP_API_KEY.trim() !== "...";
-
-  if (!hasSerpApiKey) {
-    console.log("Skipping initial ranking check: SERP_API_KEY is not configured");
-    return;
-  }
-
-  try {
-    const results = await checkRanking("houses for rent in ikeja");
-    console.log("✅ Initial ranking check results:", results);
-  } catch (err) {
-    console.error("❌ Initial ranking check failed:", err.message);
-  }
-}
-
-runInitialSeoCheck();
-
-// ... rest of the code ...
-
-app.use('/api/disputes', disputesRoutes);
-app.use('/api/legal', legalRoutes);
-app.use('/api/compliance', complianceRoutes);
-app.use('/api/export', exportRoutes);
-app.use('/api/financial-admin', financialAdminRoutes); // ADD THIS LINE
-
-app.use('/evidence', verificationRoutes);
-  const hasSerpApiKey =
-    typeof process.env.SERP_API_KEY === "string" &&
-    process.env.SERP_API_KEY.trim() &&
-    process.env.SERP_API_KEY.trim() !== "...";
-
-  if (!hasSerpApiKey) {
-    console.log("Skipping initial ranking check: SERP_API_KEY is not configured");
-    return;
-  }
-
-  try {
-    const results = await checkRanking("houses for rent in ikeja");
-    console.log("✅ Initial ranking check results:", results);
-  } catch (err) {
-    console.error("❌ Initial ranking check failed:", err.message);
-  }
-// ... existing imports ...
-
-const financialAdminRoutes = require("./routes/financialAdmin"); // ADD THIS LINE
-const stateAdminRoutes = require("./routes/stateAdmin"); // ADD THIS LINE
-
-async function runInitialSeoCheck() {
-  const hasSerpApiKey =
-    typeof process.env.SERP_API_KEY === "string" &&
-    process.env.SERP_API_KEY.trim() &&
-    process.env.SERP_API_KEY.trim() !== "...";
-
-  if (!hasSerpApiKey) {
-    console.log("Skipping initial ranking check: SERP_API_KEY is not configured");
-    return;
-  }
-
-  try {
-    const results = await checkRanking("houses for rent in ikeja");
-    console.log("✅ Initial ranking check results:", results);
-  } catch (err) {
-    console.error("❌ Initial ranking check failed:", err.message);
-  }
-}
-
-runInitialSeoCheck();
-
-// ... rest of the code ...
-
-app.use('/api/disputes', disputesRoutes);
-app.use('/api/legal', legalRoutes);
-app.use('/api/compliance', complianceRoutes);
-app.use('/api/export', exportRoutes);
-app.use('/api/financial-admin', financialAdminRoutes); // ADD THIS LINE
-app.use('/api/state-admin', stateAdminRoutes); // ADD THIS LINE
-
-app.use('/evidence', verificationRoutes);
-
-runInitialSeoCheck();
-
-// ✅ Ensure DB is connected before cron runs
-mongoose.connection.on("connected", () => {
-  console.log("✅ MongoDB connected for cron jobs");
-
-  // 🔥 AI BLOG GENERATION (AGGRESSIVE MODE - DAILY)
-  cron.schedule("0 1 * * *", async () => {
+  // AI blog generation
+  cron.schedule('0 1 * * *', async () => {
     try {
-      console.log("🚀 Generating AI blogs...");
+      console.log('Generating AI blogs...');
 
-      const postsPerDay = 20; // 🔥 change to 10 for more aggressive growth
+      const postsPerDay = 20;
       let created = 0;
 
-for (let i = 0; i < postsPerDay; i++) {
-  let attempts = 0;
-  let createdPost = false;
+      for (let i = 0; i < postsPerDay; i++) {
+        let attempts = 0;
+        let createdPost = false;
 
-  while (!createdPost && attempts < 5) {
-    attempts++;
+        while (!createdPost && attempts < 5) {
+          attempts++;
 
-    const state =
-      locations[Math.floor(Math.random() * locations.length)];
-    const lga =
-      state.lgas[Math.floor(Math.random() * state.lgas.length)];
+          const state =
+            locations[Math.floor(Math.random() * locations.length)];
+          const lga =
+            state.lgas[Math.floor(Math.random() * state.lgas.length)];
 
-    const location = `${lga}, ${state.displayName}`;
+          const location = `${lga}, ${state.displayName}`;
 
-    const titles = generateTitles(location);
-    const keywordsList = generateKeywords(state.displayName, lga);
+          const titles = generateTitles(location);
+          const keywordsList = generateKeywords(state.displayName, lga);
+          const title = titles[Math.floor(Math.random() * titles.length)];
+          const slug = slugify(title);
 
-    // 🔥 MUCH MORE VARIATIONS (IMPORTANT FOR SCALE)
-    const title = titles[Math.floor(Math.random() * titles.length)];
+          const exists = await Blog.findOne({ slug });
+          if (exists) {
+            console.log('Duplicate found, retrying...');
+            continue;
+          }
 
-    const slug = slugify(title);
-
-    const exists = await Blog.findOne({ slug });
-    if (exists) {
-      console.log("⚠️ Duplicate found, retrying...");
-      continue; // 🔥 try again instead of wasting loop
-    }
-
-    // 🔥 IMPROVED AI CONTENT (LESS REPETITION)
-    const frontendUrl = getFrontendUrl();
-    const content = `
+          const frontendUrl = getFrontendUrl();
+          const content = `
 # ${title}
 
 Looking for houses for rent in ${location}? This detailed guide explains rental options, pricing, and tips.
@@ -254,50 +152,48 @@ Rental prices vary depending on:
 - Cheap apartments in ${location}
 - Flats available in ${location}
 
-Visit: ${frontendUrl}/nigeria/${slugify(
-      `${state.displayName}`
-    )}
+Visit: ${frontendUrl}/nigeria/${slugify(`${state.displayName}`)}
 
 Start your search today and find the best home in ${location}.
 `;
 
-    const fullContent = `${generateAIContent(location)}\n\n${generateBacklinks(state.displayName, lga)}\n\n${content}`;
+          const fullContent = `${generateAIContent(location)}\n\n${generateBacklinks(
+            state.displayName,
+            lga
+          )}\n\n${content}`;
 
-    await Blog.create({
-      title,
-      slug,
-      content: fullContent,
-      keywords: keywordsList
-    });
+          await Blog.create({
+            title,
+            slug,
+            content: fullContent,
+            keywords: keywordsList,
+          });
 
-    // track SEO rank for primary keyword
-    await saveRanking(keywordsList[0], `${frontendUrl}/nigeria/${slug}`);
+          await saveRanking(keywordsList[0], `${frontendUrl}/nigeria/${slug}`);
 
-    created++;
-    createdPost = true;
+          created++;
+          createdPost = true;
 
-    console.log("✅ Created:", title);
-  }
-}
+          console.log('Created:', title);
+        }
+      }
 
-      console.log(`🎯 Total blogs created today: ${created}`);
-
+      console.log(`Total blogs created today: ${created}`);
     } catch (err) {
-      console.error("❌ AI blog error:", err.message);
+      console.error('AI blog error:', err.message);
     }
   });
 
-  // 🔥 DAILY SITEMAP SUBMISSION (2 AM)
-  cron.schedule("0 2 * * *", async () => {
+  // Daily sitemap submission
+  cron.schedule('0 2 * * *', async () => {
     try {
-      console.log("📡 Submitting sitemap to Google...");
+      console.log('Submitting sitemap to Google...');
       await pingGoogle();
-      console.log("✅ Sitemap submitted");
+      console.log('Sitemap submitted');
     } catch (err) {
-      console.error("❌ Sitemap submission failed:", err.message);
+      console.error('Sitemap submission failed:', err.message);
     }
   });
-
 });
 
 const app = express();
@@ -312,17 +208,13 @@ const authRateLimitMax =
   Number(process.env.AUTH_RATE_LIMIT_MAX) || (isProduction ? 30 : 200);
 const allowedOrigins = new Set(getAllowedFrontendOrigins());
 
-app.use("/", locationRoutes);
-app.use("/", blogRoutes);
-app.use("/", adminSeoRoutes);
+app.use('/', locationRoutes);
+app.use('/', blogRoutes);
+app.use('/', adminSeoRoutes);
 app.use('/.well-known', appLinksRoutes);
 
-// Trust proxy (Render, Nginx etc)
 app.set('trust proxy', 1);
 
-// -----------------------------------
-// Security Middleware
-// -----------------------------------
 app.use(helmet());
 
 app.use(
@@ -338,10 +230,8 @@ app.use(
   })
 );
 
-// Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Rate limit
 const limiter = rateLimit({
   windowMs: apiRateLimitWindowMs,
   max: apiRateLimitMax,
@@ -368,16 +258,11 @@ const authLimiter = rateLimit({
 
 app.use('/api/', limiter);
 
-// Body parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Audit middleware
 app.use(audit('API Request', 'system'));
 
-// -----------------------------------
-// ROOT & HEALTH
-// -----------------------------------
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',
@@ -392,21 +277,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get("/sitemap.xml", async (req, res) => {
+app.get('/sitemap.xml', async (req, res) => {
   try {
     const sitemap = await generateSitemap();
-    res.header("Content-Type", "application/xml");
+    res.header('Content-Type', 'application/xml');
     res.send(sitemap);
   } catch (err) {
-    res.status(500).send("Error generating sitemap");
+    res.status(500).send('Error generating sitemap');
   }
 });
 
 app.use('/api', enforceFlags);
 
-// -----------------------------------
-// EMAIL VERIFICATION
-// -----------------------------------
 app.get('/api/auth/verify-email', async (req, res) => {
   const { token } = req.query;
 
@@ -450,10 +332,6 @@ app.get('/api/auth/verify-email', async (req, res) => {
   }
 });
 
-
-// -----------------------------------
-// ROUTES
-// -----------------------------------
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -471,12 +349,11 @@ app.use('/api/disputes', disputesRoutes);
 app.use('/api/legal', legalRoutes);
 app.use('/api/compliance', complianceRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/financial-admin', financialAdminRoutes);
+app.use('/api/state-admin', stateAdminRoutes);
 
 app.use('/evidence', verificationRoutes);
 
-// -----------------------------------
-// ERROR HANDLER
-// -----------------------------------
 app.use((err, req, res, next) => {
   console.error('UNHANDLED ERROR:', err);
 
@@ -486,16 +363,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-// -----------------------------------
-// CRON JOBS
-// -----------------------------------
 startPaymentJobs();
 startPropertyJobs();
 startScheduler();
 
-// -----------------------------------
-// START SERVER
-// -----------------------------------
 const PORT = process.env.APP_PORT || 5000;
 
 const server = app.listen(PORT, () => {

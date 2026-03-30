@@ -5,9 +5,15 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
-  DollarSign, Users, CreditCard, TrendingUp,
-  AlertTriangle, Shield, BarChart2, PieChart as PieChartIcon
-} from 'lucide-react';
+  FaDollarSign,
+  FaUsers,
+  FaCreditCard,
+  FaChartLine,
+  FaExclamationTriangle,
+  FaShieldAlt,
+  FaChartBar,
+  FaChartPie
+} from 'react-icons/fa';
 import api from '../../services/api';
 import AdminLayout from './AdminLayout';
 
@@ -116,7 +122,7 @@ const FinancialAdminDashboard = () => {
             </div>
             <div className="flex items-center space-x-4">
               <div className="bg-blue-50 p-3 rounded-lg">
-                <Shield className="h-6 w-6 text-blue-600" />
+                <FaShieldAlt className="h-6 w-6 text-blue-600" />
               </div>
             </div>
           </div>
@@ -133,12 +139,12 @@ const FinancialAdminDashboard = () => {
                 </p>
               </div>
               <div className="bg-green-50 p-3 rounded-lg">
-                <DollarSign className="h-6 w-6 text-green-600" />
+                <FaDollarSign className="h-6 w-6 text-green-600" />
               </div>
             </div>
             <div className="mt-4">
               <div className="flex items-center text-sm text-green-600">
-                <TrendingUp className="h-4 w-4 mr-1" />
+                <FaChartLine className="h-4 w-4 mr-1" />
                 <span>+12.5% from last week</span>
               </div>
             </div>
@@ -153,7 +159,7 @@ const FinancialAdminDashboard = () => {
                 </p>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg">
-                <CreditCard className="h-6 w-6 text-blue-600" />
+                <FaCreditCard className="h-6 w-6 text-blue-600" />
               </div>
             </div>
             <div className="mt-4">
@@ -172,7 +178,7 @@ const FinancialAdminDashboard = () => {
                 </p>
               </div>
               <div className="bg-purple-50 p-3 rounded-lg">
-                <Users className="h-6 w-6 text-purple-600" />
+                <FaUsers className="h-6 w-6 text-purple-600" />
               </div>
             </div>
             <div className="mt-4">
@@ -191,7 +197,7 @@ const FinancialAdminDashboard = () => {
                 </p>
               </div>
               <div className="bg-red-50 p-3 rounded-lg">
-                <AlertTriangle className="h-6 w-6 text-red-600" />
+                <FaExclamationTriangle className="h-6 w-6 text-red-600" />
               </div>
             </div>
             <div className="mt-4">
@@ -231,7 +237,7 @@ const FinancialAdminDashboard = () => {
                   <div className="bg-white p-4 rounded-lg border">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold">Transaction Volume (30 Days)</h3>
-                      <BarChart2 className="h-5 w-5 text-gray-400" />
+                      <FaChartBar className="h-5 w-5 text-gray-400" />
                     </div>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
@@ -251,7 +257,7 @@ const FinancialAdminDashboard = () => {
                   <div className="bg-white p-4 rounded-lg border">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold">Top Performing States</h3>
-                      <PieChartIcon className="h-5 w-5 text-gray-400" />
+                      <FaChartPie className="h-5 w-5 text-gray-400" />
                     </div>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
