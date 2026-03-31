@@ -4,7 +4,8 @@ const { body } = require('express-validator');
 const financialAdminController = require('../controllers/financialAdminController');
 const stateAdminController = require('../controllers/stateAdminController');
 const { authenticate } = require('../config/middleware/auth');
-const { requireFinancialAdmin, requireSuperAdmin } = require('../config/middleware/roleMiddleware');
+const { requireFinancialAdmin } = require('../config/middleware/requireFinancialAdmin');
+const { requireSuperAdmin } = require('../config/middleware/requireSuperAdmin');
 
 // ====================== AUTHENTICATION ======================
 router.use(authenticate);

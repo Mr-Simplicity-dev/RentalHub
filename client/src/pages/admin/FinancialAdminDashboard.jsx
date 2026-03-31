@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
@@ -24,24 +24,24 @@ const FinancialAdminDashboard = () => {
   const [transactions, setTransactions] = useState([]);
   const [frozenFunds, setFrozenFunds] = useState([]);
   const [stateAdmins, setStateAdmins] = useState([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('week');
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    checkAccess();
-    fetchDashboardData();
-  }, [selectedPeriod]);
-
-  const checkAccess = async () => {
-    try {
-      const response = await api.get('/api/users/me');
-      if (response.data.data.user_type !== 'financial_admin') {
-        navigate('/admin/dashboard');
+    const initializeDashboard = async () => {
+      try {
+        const response = await api.get('/api/users/me');
+        if (response.data.data.user_type !== 'financial_admin') {
+          navigate('/admin/dashboard');
+          return;
+        }
+        await fetchDashboardData();
+      } catch (error) {
+        navigate('/login');
       }
-    } catch (error) {
-      navigate('/login');
-    }
-  };
+    };
+
+    initializeDashboard();
+  }, [navigate]);
 
   const fetchDashboardData = async () => {
     try {
