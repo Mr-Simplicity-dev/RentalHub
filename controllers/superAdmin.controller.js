@@ -21,6 +21,9 @@ const {
 const {
   sendPlatformLawyerInviteEmail,
 } = require('../config/utils/emailService');
+const {
+  ensureLawyerCaseNotesSchema,
+} = require('../config/utils/legalSchema');
 
 let verificationAuditSchemaReady = false;
 const USER_VERIFICATION_STATUS_EXPR = `
@@ -1614,6 +1617,249 @@ const resolveFraudFlag = async (req, res) => {
   res.json({ success: true });
 };
 
+const getRangeStart = (timeRange) => {
+  const now = Date.now();
+
+  switch (String(timeRange || '7days')) {
+    case '24h':
+      return new Date(now - 24 * 60 * 60 * 1000);
+    case '30days':
+      return new Date(now - 30 * 24 * 60 * 60 * 1000);
+    case '90days':
+      return new Date(now - 90 * 24 * 60 * 60 * 1000);
+    case 'all':
+      return null;
+    case '7days':
+    default:
+      return new Date(now - 7 * 24 * 60 * 60 * 1000);
+  }
+};
+
+const getLawyerActivities = async (req, res) => {
+  try {
+    await ensureLawyerCaseNotesSchema();
+
+    const timeRange = String(req.query.time_range || '7days');
+    const rangeStart = getRangeStart(timeRange);
+
+    const lawyersResult = await db.query(
+      `SELECT
+         id,
+         full_name,
+         email,
+         phone,
+         chamber_name,
+         identity_verified,
+         created_at
+       FROM users
+       WHERE user_type = 'lawyer'
+       ORDER BY created_at DESC`
+    );
+
+    const lawyers = lawyersResult.rows;
+    if (!lawyers.length) {
+      return res.json({
+        success: true,
+        data: {
+          lawyers: [],
+          stats: {
+            totalLawyers: 0,
+            activeLawyers: 0,
+            totalVerifications: 0,
+            totalResolutions: 0,
+            avgResponseTime: 0,
+          },
+          time_range: timeRange,
+        },
+      });
+    }
+
+    const verificationsPromise = db.query(
+      `SELECT
+         verified_by AS lawyer_user_id,
+         COUNT(*)::INT AS total_verifications
+       FROM dispute_evidence
+       WHERE verified_by IS NOT NULL
+         ${rangeStart ? 'AND verified_at >= $1' : ''}
+       GROUP BY verified_by`,
+      rangeStart ? [rangeStart] : []
+    );
+
+    const resolutionsPromise = db.query(
+      `SELECT
+         resolved_by AS lawyer_user_id,
+         COUNT(*)::INT AS total_resolutions
+       FROM disputes
+       WHERE resolved_by IS NOT NULL
+         ${rangeStart ? 'AND resolved_at >= $1' : ''}
+       GROUP BY resolved_by`,
+      rangeStart ? [rangeStart] : []
+    );
+
+    const notesPromise = db.query(
+      `SELECT
+         lawyer_user_id,
+         COUNT(*)::INT AS total_case_notes
+       FROM lawyer_case_notes
+       WHERE 1 = 1
+         ${rangeStart ? 'AND created_at >= $1' : ''}
+       GROUP BY lawyer_user_id`,
+      rangeStart ? [rangeStart] : []
+    );
+
+    const authorizationsPromise = db.query(
+      `SELECT
+         lawyer_user_id,
+         COUNT(DISTINCT property_id)::INT AS active_authorizations
+       FROM legal_authorizations
+       WHERE status = 'active'
+         AND property_id IS NOT NULL
+       GROUP BY lawyer_user_id`
+    );
+
+    const activeDisputesPromise = db.query(
+      `SELECT
+         la.lawyer_user_id,
+         COUNT(DISTINCT d.id)::INT AS active_disputes
+       FROM legal_authorizations la
+       JOIN disputes d
+         ON (
+           la.property_id = d.property_id
+           OR (
+             la.property_id IS NULL
+             AND la.client_user_id IN (d.opened_by, d.against_user)
+           )
+         )
+       WHERE la.status = 'active'
+         AND COALESCE(d.status, 'open') <> 'resolved'
+       GROUP BY la.lawyer_user_id`
+    );
+
+    const activityPromise = db.query(
+      `SELECT
+         activity.lawyer_user_id,
+         MAX(activity.happened_at) AS last_activity_at,
+         MIN(activity.happened_at) AS first_activity_at
+       FROM (
+         SELECT verified_by AS lawyer_user_id, verified_at AS happened_at
+         FROM dispute_evidence
+         WHERE verified_by IS NOT NULL
+           ${rangeStart ? 'AND verified_at >= $1' : ''}
+         UNION ALL
+         SELECT resolved_by AS lawyer_user_id, resolved_at AS happened_at
+         FROM disputes
+         WHERE resolved_by IS NOT NULL
+           ${rangeStart ? 'AND resolved_at >= $1' : ''}
+         UNION ALL
+         SELECT lawyer_user_id, created_at AS happened_at
+         FROM lawyer_case_notes
+         WHERE 1 = 1
+           ${rangeStart ? 'AND created_at >= $1' : ''}
+       ) activity
+       GROUP BY activity.lawyer_user_id`,
+      rangeStart ? [rangeStart] : []
+    );
+
+    const firstAssignedPromise = db.query(
+      `SELECT
+         lawyer_user_id,
+         MIN(created_at) AS first_assigned_at
+       FROM legal_authorizations
+       WHERE status = 'active'
+       GROUP BY lawyer_user_id`
+    );
+
+    const [
+      verificationsResult,
+      resolutionsResult,
+      notesResult,
+      authorizationsResult,
+      activeDisputesResult,
+      activityResult,
+      firstAssignedResult,
+    ] = await Promise.all([
+      verificationsPromise,
+      resolutionsPromise,
+      notesPromise,
+      authorizationsPromise,
+      activeDisputesPromise,
+      activityPromise,
+      firstAssignedPromise,
+    ]);
+
+    const toNumberMap = (rows, key, valueKey) =>
+      new Map(rows.map((row) => [Number(row[key]), Number(row[valueKey] || 0)]));
+    const toDateMap = (rows, key, valueKey) =>
+      new Map(rows.map((row) => [Number(row[key]), row[valueKey] || null]));
+
+    const verificationsMap = toNumberMap(verificationsResult.rows, 'lawyer_user_id', 'total_verifications');
+    const resolutionsMap = toNumberMap(resolutionsResult.rows, 'lawyer_user_id', 'total_resolutions');
+    const notesMap = toNumberMap(notesResult.rows, 'lawyer_user_id', 'total_case_notes');
+    const authorizationsMap = toNumberMap(authorizationsResult.rows, 'lawyer_user_id', 'active_authorizations');
+    const activeDisputesMap = toNumberMap(activeDisputesResult.rows, 'lawyer_user_id', 'active_disputes');
+    const lastActivityMap = toDateMap(activityResult.rows, 'lawyer_user_id', 'last_activity_at');
+    const firstActivityMap = toDateMap(activityResult.rows, 'lawyer_user_id', 'first_activity_at');
+    const firstAssignedMap = toDateMap(firstAssignedResult.rows, 'lawyer_user_id', 'first_assigned_at');
+
+    const lawyerRows = lawyers.map((lawyer) => {
+      const lawyerId = Number(lawyer.id);
+      const firstAssignedAt = firstAssignedMap.get(lawyerId);
+      const firstActivityAt = firstActivityMap.get(lawyerId);
+
+      let avgResponseMinutes = null;
+      if (firstAssignedAt && firstActivityAt) {
+        const assignedTime = new Date(firstAssignedAt).getTime();
+        const activityTime = new Date(firstActivityAt).getTime();
+        if (!Number.isNaN(assignedTime) && !Number.isNaN(activityTime) && activityTime >= assignedTime) {
+          avgResponseMinutes = Math.round((activityTime - assignedTime) / 60000);
+        }
+      }
+
+      return {
+        ...lawyer,
+        total_verifications: verificationsMap.get(lawyerId) || 0,
+        total_resolutions: resolutionsMap.get(lawyerId) || 0,
+        total_case_notes: notesMap.get(lawyerId) || 0,
+        active_authorizations: authorizationsMap.get(lawyerId) || 0,
+        active_disputes: activeDisputesMap.get(lawyerId) || 0,
+        last_activity_at: lastActivityMap.get(lawyerId),
+        avg_response_minutes: avgResponseMinutes,
+      };
+    });
+
+    const responseTimes = lawyerRows
+      .map((lawyer) => lawyer.avg_response_minutes)
+      .filter((value) => Number.isFinite(value) && value >= 0);
+
+    const stats = {
+      totalLawyers: lawyerRows.length,
+      activeLawyers: lawyerRows.filter(
+        (lawyer) =>
+          lawyer.total_verifications > 0 ||
+          lawyer.total_resolutions > 0 ||
+          lawyer.total_case_notes > 0
+      ).length,
+      totalVerifications: lawyerRows.reduce((sum, lawyer) => sum + lawyer.total_verifications, 0),
+      totalResolutions: lawyerRows.reduce((sum, lawyer) => sum + lawyer.total_resolutions, 0),
+      avgResponseTime: responseTimes.length
+        ? Math.round(responseTimes.reduce((sum, value) => sum + value, 0) / responseTimes.length)
+        : 0,
+    };
+
+    res.json({
+      success: true,
+      data: {
+        lawyers: lawyerRows,
+        stats,
+        time_range: timeRange,
+      },
+    });
+  } catch (error) {
+    console.error('Get lawyer activities error:', error);
+    res.status(500).json({ message: 'Failed to load lawyer activities' });
+  }
+};
+
 module.exports = {
   getAllUsers,
   banUser,
@@ -1655,4 +1901,5 @@ module.exports = {
   removePricingRule,
   getFraudFlags,
   resolveFraudFlag,
+  getLawyerActivities,
 };

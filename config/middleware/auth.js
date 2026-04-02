@@ -120,9 +120,20 @@ const requireAdminOrSuperAdmin = (req, res, next) => {
   next();
 };
 
+const isLandlordOrAgent = (req, res, next) => {
+  if (!['landlord', 'agent'].includes(req.user.user_type)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Landlords or assigned agents only.',
+    });
+  }
+  next();
+};
+
 module.exports = {
   authenticate,
   isLandlord,
+  isLandlordOrAgent,
   isTenant,
   isVerified,
   hasActiveSubscription,

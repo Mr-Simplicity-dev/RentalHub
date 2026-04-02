@@ -86,5 +86,66 @@ router.get(
   legalController.getLegalAuditLogs
 );
 
+/* ---------------------------------------------------
+   Lawyer Evidence Verification
+--------------------------------------------------- */
 
-module.exports = router;
+router.patch(
+  '/disputes/:disputeId/evidence/:evidenceId/verify',
+  authenticate,
+  allowRoles('lawyer'),
+  audit('verify_evidence', 'evidence'),
+  legalController.verifyEvidence
+);
+
+router.get(
+  '/disputes/:disputeId/evidence/verification',
+  authenticate,
+  allowRoles('lawyer'),
+  audit('view_evidence_verification', 'dispute'),
+  legalController.getEvidenceVerification
+);
+
+/* ---------------------------------------------------
+   Lawyer Case Notes
+--------------------------------------------------- */
+
+router.post(
+  '/disputes/:disputeId/notes',
+  authenticate,
+  allowRoles('lawyer'),
+  audit('create_case_note', 'dispute'),
+  legalController.createCaseNote
+);
+
+router.get(
+  '/disputes/:disputeId/notes',
+  authenticate,
+  allowRoles('lawyer'),
+  audit('view_case_notes', 'dispute'),
+  legalController.getCaseNotes
+);
+
+router.patch(
+  '/disputes/:disputeId/notes/:noteId',
+  authenticate,
+  allowRoles('lawyer'),
+  audit('update_case_note', 'dispute'),
+  legalController.updateCaseNote
+);
+
+router.delete(
+  '/disputes/:disputeId/notes/:noteId',
+  authenticate,
+  allowRoles('lawyer'),
+  audit('delete_case_note', 'dispute'),
+  legalController.deleteCaseNote
+);
+
+router.patch(
+  '/disputes/:disputeId/summary',
+  authenticate,
+  allowRoles('lawyer'),
+  audit('update_dispute_summary', 'dispute'),
+  legalController.updateDisputeSummary
+);

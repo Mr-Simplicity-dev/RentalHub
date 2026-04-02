@@ -1,5 +1,15 @@
 const db = require('../config/middleware/database');
 const { sendEmail } = require('../config/utils/mailer');
+const {
+  ensureAgentSystemSchema,
+  getActiveAgentAssignmentByLandlordId,
+  getPendingAgentInviteByLandlordId,
+  inviteAgentForLandlord,
+} = require('../config/utils/agentSystem');
+const {
+  sendAgentInviteEmail,
+  sendAgentAssignmentNoticeEmail,
+} = require('../config/utils/emailService');
 const { notifyAlertsForProperty } = require('../config/utils/propertyAlertService');
 const bcrypt = require('bcryptjs');
 
@@ -758,9 +768,126 @@ exports.getUserById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    const user = result.rows[0];
+
+    if (user.user_type === 'landlord') {
+      await ensureAgentSystemSchema();
+      const [activeAssignment, pendingInvite] = await Promise.all([
+        getActiveAgentAssignmentByLandlordId(user.id),
+        getPendingAgentInviteByLandlordId(user.id),
+      ]);
+
+      user.active_agent_assignment = activeAssignment
+        ? {
+            id: activeAssignment.id,
+            agent_user_id: activeAssignment.agent_user_id,
+            agent_name: activeAssignment.agent_name,
+            agent_email: activeAssignment.agent_email,
+            agent_phone: activeAssignment.agent_phone,
+            status: activeAssignment.status,
+            assigned_at: activeAssignment.created_at,
+          }
+        : null;
+
+      user.pending_agent_invite = pendingInvite
+        ? {
+            id: pendingInvite.id,
+            agent_full_name: pendingInvite.agent_full_name,
+            agent_email: pendingInvite.agent_email,
+            agent_phone: pendingInvite.agent_phone,
+            status: pendingInvite.status,
+            expires_at: pendingInvite.expires_at,
+          }
+        : null;
+    }
+
+    res.json({ success: true, data: user });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to load user' });
+  }
+};
+
+// POST /api/admin/users/:id/assign-agent
+exports.assignAgentToLandlord = async (req, res) => {
+  try {
+    await ensureAgentSystemSchema();
+
+    const { id } = req.params;
+    const agentFullName = String(req.body.agent_full_name || '').trim();
+    const agentEmail = String(req.body.agent_email || '').trim().toLowerCase();
+    const agentPhone = String(req.body.agent_phone || '').replace(/\s+/g, '');
+
+    if (!agentFullName || !agentEmail || !agentPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Agent full name, email, and phone are required',
+      });
+    }
+
+    const landlordResult = await db.query(
+      `SELECT id, full_name, email, phone, user_type
+       FROM users
+       WHERE id = $1
+         AND deleted_at IS NULL
+       LIMIT 1`,
+      [id]
+    );
+
+    if (!landlordResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Landlord not found',
+      });
+    }
+
+    const landlord = landlordResult.rows[0];
+
+    if (landlord.user_type !== 'landlord') {
+      return res.status(400).json({
+        success: false,
+        message: 'Agents can only be assigned to landlord accounts',
+      });
+    }
+
+    if (agentEmail === String(landlord.email || '').trim().toLowerCase()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Agent email must be different from landlord email',
+      });
+    }
+
+    if (agentPhone === String(landlord.phone || '').replace(/\s+/g, '')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Agent phone must be different from landlord phone',
+      });
+    }
+
+    const inviteResult = await inviteAgentForLandlord({
+      landlordUserId: landlord.id,
+      assignedByUserId: req.user.id,
+      landlordName: landlord.full_name,
+      agentFullName,
+      agentEmail,
+      agentPhone,
+      sendAgentInviteEmail,
+      sendAgentAssignmentNoticeEmail,
+    });
+
+    res.json({
+      success: true,
+      message:
+        inviteResult.mode === 'existing_agent_assigned'
+          ? 'Existing agent assigned successfully'
+          : 'Agent invite sent successfully',
+      data: inviteResult,
+    });
+  } catch (err) {
+    console.error('Assign agent to landlord error:', err);
+    res.status(err.statusCode || 500).json({
+      success: false,
+      message: err.message || 'Failed to assign agent to landlord',
+    });
   }
 };
 

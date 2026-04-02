@@ -35,6 +35,7 @@ router.get('/broadcasts', authenticate, requireSuperAdmin, superCtrl.getBroadcas
 router.post('/broadcasts', authenticate, requireSuperAdmin, superCtrl.createBroadcast);
 
 router.get('/platform-lawyers', authenticate, requireSuperAdmin, superCtrl.getPlatformLawyerManagementData);
+router.get('/lawyer-activities', authenticate, requireSuperAdmin, superCtrl.getLawyerActivities);
 router.post('/platform-lawyers/manual', authenticate, requireSuperAdmin, superCtrl.createManualPlatformLawyer);
 router.post('/platform-lawyers/:lawyerId/resend-invite', authenticate, requireSuperAdmin, superCtrl.resendManualPlatformLawyerInvite);
 router.patch('/platform-lawyers/:lawyerId', authenticate, requireSuperAdmin, superCtrl.updatePlatformLawyer);

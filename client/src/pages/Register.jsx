@@ -18,6 +18,10 @@ const Register = () => {
     email: '',
     lawyer_email: '',
     phone: '',
+    add_agent: false,
+    agent_full_name: '',
+    agent_email: '',
+    agent_phone: '',
     password: '',
     confirm_password: '',
     is_foreigner: false,
@@ -50,7 +54,7 @@ const Register = () => {
   const navigate = useNavigate();
 
   const buildRegistrationData = () => {
-    const { confirm_password, ...registrationData } = formData;
+    const { confirm_password, add_agent, ...registrationData } = formData;
     registrationData.identity_document_type = registrationData.is_foreigner
       ? (registrationFlags.passport_number ? 'passport' : undefined)
       : (registrationFlags.nin_number ? 'nin' : undefined);
@@ -72,6 +76,12 @@ const Register = () => {
 
     if (!registrationData.identity_document_type) {
       delete registrationData.identity_document_type;
+    }
+
+    if (registrationData.user_type !== 'landlord' || add_agent !== true) {
+      registrationData.agent_full_name = '';
+      registrationData.agent_email = '';
+      registrationData.agent_phone = '';
     }
 
     return registrationData;
@@ -279,9 +289,42 @@ const Register = () => {
     return;
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.lawyer_email || "")) {
+ if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.lawyer_email || "")) {
     toast.error("Enter one valid lawyer email");
     return;
+  }
+
+  if (formData.user_type === 'landlord' && formData.add_agent) {
+    if (!String(formData.agent_full_name || '').trim()) {
+      toast.error('Agent full name is required');
+      return;
+    }
+
+    if (!emailPattern.test(String(formData.agent_email || '').trim())) {
+      toast.error('Enter a valid agent email');
+      return;
+    }
+
+    if (!String(formData.agent_phone || '').trim()) {
+      toast.error('Agent phone number is required');
+      return;
+    }
+
+    if (
+      String(formData.agent_email || '').trim().toLowerCase() ===
+      String(formData.email || '').trim().toLowerCase()
+    ) {
+      toast.error('Agent email must be different from landlord email');
+      return;
+    }
+
+    if (
+      String(formData.agent_phone || '').replace(/\s+/g, '') ===
+      String(formData.phone || '').replace(/\s+/g, '')
+    ) {
+      toast.error('Agent phone must be different from landlord phone');
+      return;
+    }
   }
 
   if (!termsAccepted) {
@@ -429,6 +472,32 @@ const validateStep = () => {
     } else if (!emailPattern.test(String(formData.lawyer_email || "").trim())) {
       newErrors.lawyer_email = "Enter a valid lawyer email";
     }
+
+    if (formData.user_type === 'landlord' && formData.add_agent) {
+      if (!String(formData.agent_full_name || '').trim()) {
+        newErrors.agent_full_name = 'Agent full name required';
+      }
+
+      if (!String(formData.agent_email || '').trim()) {
+        newErrors.agent_email = 'Agent email required';
+      } else if (!emailPattern.test(String(formData.agent_email || '').trim())) {
+        newErrors.agent_email = 'Enter a valid agent email';
+      } else if (
+        String(formData.agent_email || '').trim().toLowerCase() ===
+        String(formData.email || '').trim().toLowerCase()
+      ) {
+        newErrors.agent_email = 'Agent email must be different from landlord email';
+      }
+
+      if (!String(formData.agent_phone || '').trim()) {
+        newErrors.agent_phone = 'Agent phone required';
+      } else if (
+        String(formData.agent_phone || '').replace(/\s+/g, '') ===
+        String(formData.phone || '').replace(/\s+/g, '')
+      ) {
+        newErrors.agent_phone = 'Agent phone must be different from landlord phone';
+      }
+    }
   }
 
   if (step === 3) {
@@ -484,7 +553,20 @@ const isStepTwoComplete =
   String(formData.full_name || "").trim() &&
   emailPattern.test(String(formData.email || "").trim()) &&
   String(formData.phone || "").trim() &&
-  emailPattern.test(String(formData.lawyer_email || "").trim());
+  emailPattern.test(String(formData.lawyer_email || "").trim()) &&
+  (
+    formData.user_type !== 'landlord' ||
+    !formData.add_agent ||
+    (
+      String(formData.agent_full_name || '').trim() &&
+      emailPattern.test(String(formData.agent_email || '').trim()) &&
+      String(formData.agent_phone || '').trim() &&
+      String(formData.agent_email || '').trim().toLowerCase() !==
+        String(formData.email || '').trim().toLowerCase() &&
+      String(formData.agent_phone || '').replace(/\s+/g, '') !==
+        String(formData.phone || '').replace(/\s+/g, '')
+    )
+  );
 
 const isStepThreeComplete = (() => {
   if (!registrationFlags.loaded) {
@@ -612,7 +694,16 @@ return (
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, user_type: 'tenant' }))}
+                      onClick={() =>
+                        setFormData(prev => ({
+                          ...prev,
+                          user_type: 'tenant',
+                          add_agent: false,
+                          agent_full_name: '',
+                          agent_email: '',
+                          agent_phone: '',
+                        }))
+                      }
                       className={`p-4 border-2 rounded-lg text-center transition-colors ${
                         formData.user_type === 'tenant'
                           ? 'border-indigo-600 bg-indigo-50'
@@ -764,6 +855,116 @@ return (
                   </div>
                   {errors.lawyer_email && <p className="text-red-500 text-sm mt-1">{errors.lawyer_email}</p>}
                 </div>
+
+                {formData.user_type === 'landlord' && (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">Add an Agent Now</h3>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Optional. An agent can help the landlord handle property listing, property updates, and other difficult day-to-day tasks later.
+                        </p>
+                      </div>
+                      <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={formData.add_agent}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setFormData((prev) => ({
+                              ...prev,
+                              add_agent: checked,
+                              ...(checked
+                                ? {}
+                                : {
+                                    agent_full_name: '',
+                                    agent_email: '',
+                                    agent_phone: '',
+                                  }),
+                            }));
+                            if (!checked) {
+                              setErrors((prev) => ({
+                                ...prev,
+                                agent_full_name: null,
+                                agent_email: null,
+                                agent_phone: null,
+                              }));
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        Add agent
+                      </label>
+                    </div>
+
+                    {formData.add_agent && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Agent Full Name *</label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <FaUser className="text-gray-400" />
+                            </div>
+                            <input
+                              name="agent_full_name"
+                              type="text"
+                              value={formData.agent_full_name}
+                              onChange={(e) => {
+                                handleChange(e);
+                                setErrors((prev) => ({ ...prev, agent_full_name: null }));
+                              }}
+                              className={`input pl-10 ${errors.agent_full_name ? 'border-red-500' : ''}`}
+                              placeholder="Agent full name"
+                            />
+                          </div>
+                          {errors.agent_full_name && <p className="text-red-500 text-sm mt-1">{errors.agent_full_name}</p>}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Agent Email *</label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <FaEnvelope className="text-gray-400" />
+                            </div>
+                            <input
+                              name="agent_email"
+                              type="email"
+                              value={formData.agent_email}
+                              onChange={(e) => {
+                                handleChange(e);
+                                setErrors((prev) => ({ ...prev, agent_email: null }));
+                              }}
+                              className={`input pl-10 ${errors.agent_email ? 'border-red-500' : ''}`}
+                              placeholder="agent@example.com"
+                            />
+                          </div>
+                          {errors.agent_email && <p className="text-red-500 text-sm mt-1">{errors.agent_email}</p>}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Agent Phone *</label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <FaPhone className="text-gray-400" />
+                            </div>
+                            <input
+                              name="agent_phone"
+                              type="tel"
+                              value={formData.agent_phone}
+                              onChange={(e) => {
+                                handleChange(e);
+                                setErrors((prev) => ({ ...prev, agent_phone: null }));
+                              }}
+                              className={`input pl-10 ${errors.agent_phone ? 'border-red-500' : ''}`}
+                              placeholder="+2348012345678"
+                            />
+                          </div>
+                          {errors.agent_phone && <p className="text-red-500 text-sm mt-1">{errors.agent_phone}</p>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setStep(1)} className="btn w-full">Back</button>

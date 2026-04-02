@@ -7,12 +7,14 @@ const DocumentSignature = require('../models/DocumentSignature');
 const UserKey = require('../models/UserKey');
 const { buildMerkleRoot } = require('../services/merkleEvidence.service');
 const { anchorEvidence } = require('../services/evidenceAnchor.service');
+const { getPropertyDisputeParticipants } = require('../config/utils/propertyDisputeParticipants');
 
 // Create dispute
 exports.createDispute = async (req, res) => {
   try {
     const { property_id, against_user, title, description, priority = 'normal' } = req.body;
     const openedBy = req.user.id;
+    const openedByRole = req.user.user_type;
 
     if (!property_id || !against_user || !title || !description) {
       return res.status(400).json({
@@ -21,12 +23,47 @@ exports.createDispute = async (req, res) => {
       });
     }
 
+    const propertyData = await getPropertyDisputeParticipants(property_id);
+
+    if (!propertyData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found'
+      });
+    }
+
+    const participants = propertyData.participants || [];
+    const participantIds = new Set(participants.map((item) => Number(item.id)));
+    const targetUserId = Number(against_user);
+    const isPrivileged = ['admin', 'super_admin'].includes(openedByRole);
+
+    if (!isPrivileged && !participantIds.has(Number(openedBy))) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not allowed to create a dispute for this property'
+      });
+    }
+
+    if (!participantIds.has(targetUserId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'The selected user is not connected to this property'
+      });
+    }
+
+    if (targetUserId === Number(openedBy)) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot create a dispute against yourself'
+      });
+    }
+
     const result = await db.query(
       `INSERT INTO disputes 
        (property_id, opened_by, against_user, title, description, priority)
        VALUES ($1,$2,$3,$4,$5,$6)
        RETURNING *`,
-      [property_id, openedBy, against_user, title, description, priority]
+      [property_id, openedBy, targetUserId, title, description, priority]
     );
 
     // Audit log

@@ -4,6 +4,8 @@ const { validationResult } = require('express-validator');
 const { cloudinary } = require('../config/middleware/upload');
 const { submitURL } = require("../utils/googleIndexing");
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+const { getPropertyDisputeParticipants } = require('../config/utils/propertyDisputeParticipants');
+const { getPropertyManagerContext } = require('../config/utils/agentSystem');
 let propertySchemaReady = false;
 
 const ensurePropertySchema = async () => {
@@ -28,6 +30,43 @@ const ensurePropertySchema = async () => {
     );
   `);
   propertySchemaReady = true;
+};
+
+const resolvePropertyManagerContext = async (
+  req,
+  res,
+  { propertyId = null, requiredPermission = 'can_manage_properties' } = {}
+) => {
+  const managerContext = await getPropertyManagerContext({
+    user: req.user,
+    propertyId,
+    requiredPermission,
+  });
+
+  if (!managerContext.authorized) {
+    const isMissingResource =
+      managerContext.message === 'Property not found or unauthorized';
+
+    res.status(isMissingResource ? 404 : 403).json({
+      success: false,
+      message: managerContext.message,
+    });
+    return null;
+  }
+
+  return managerContext;
+};
+
+const ensureLandlordOwnerIsVerified = async (landlordUserId) => {
+  const result = await db.query(
+    `SELECT identity_verified
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [landlordUserId]
+  );
+
+  return result.rows[0]?.identity_verified === true;
 };
 
 
@@ -682,6 +721,48 @@ exports.getPropertyReviews = async (req, res) => {
   }
 };
 
+// -----------------------------------------------------
+// Get users related to a property for dispute creation
+// -----------------------------------------------------
+exports.getPropertyUsers = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const requesterId = req.user?.id;
+    const requesterType = req.user?.user_type;
+
+    const propertyData = await getPropertyDisputeParticipants(propertyId);
+
+    if (!propertyData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found',
+      });
+    }
+
+    const participants = propertyData.participants || [];
+    const participantIds = new Set(participants.map((item) => Number(item.id)));
+    const isPrivileged = ['admin', 'super_admin'].includes(requesterType);
+
+    if (!isPrivileged && !participantIds.has(Number(requesterId))) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not allowed to open disputes for this property',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: participants,
+    });
+  } catch (error) {
+    console.error('Get property users error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch property users',
+    });
+  }
+};
+
 
 // =====================================================
 // =============== LANDLORD ENDPOINTS ===================
@@ -704,7 +785,20 @@ exports.createProperty = async (req, res) => {
       });
     }
 
-    const userId = req.user.id;
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
+
+    const landlordUserId = managerContext.landlordUserId;
+    const landlordVerified = await ensureLandlordOwnerIsVerified(landlordUserId);
+
+    if (!landlordVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please complete identity verification (NIN + Passport) first.',
+      });
+    }
 
     const {
       state_id,
@@ -801,10 +895,10 @@ exports.createProperty = async (req, res) => {
        VALUES (
          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
        )
-       RETURNING *`,
+      RETURNING *`,
       [
-        userId,
-        userId,
+        landlordUserId,
+        landlordUserId,
         resolvedStateName,
         resolvedStateId,
         city,
@@ -878,19 +972,11 @@ submitURL(propertyUrl).catch((err) =>
 exports.uploadPropertyPhotos = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const userId = req.user.id;
-
-    const propertyCheck = await db.query(
-      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
-      [propertyId, userId]
-    );
-
-    if (propertyCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Property not found or unauthorized'
-      });
-    }
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId,
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
 
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
@@ -941,19 +1027,11 @@ exports.uploadPropertyPhotos = async (req, res) => {
 exports.updateProperty = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const userId = req.user.id;
-
-    const propertyCheck = await db.query(
-      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
-      [propertyId, userId]
-    );
-
-    if (propertyCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Property not found or unauthorized'
-      });
-    }
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId,
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
 
     const updates = [];
     const params = [];
@@ -991,8 +1069,11 @@ exports.updateProperty = async (req, res) => {
       UPDATE properties
       SET ${updates.join(', ')}
       WHERE id = $${paramCount}
+        AND landlord_id = $${paramCount + 1}
       RETURNING *
     `;
+
+    params.push(managerContext.landlordUserId);
 
     const result = await db.query(query, params);
 
@@ -1017,19 +1098,11 @@ exports.updateProperty = async (req, res) => {
 exports.deleteProperty = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const userId = req.user.id;
-
-    const propertyCheck = await db.query(
-      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
-      [propertyId, userId]
-    );
-
-    if (propertyCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Property not found or unauthorized'
-      });
-    }
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId,
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
 
     const photosResult = await db.query(
       'SELECT photo_url FROM property_photos WHERE property_id = $1',
@@ -1068,12 +1141,17 @@ exports.deleteProperty = async (req, res) => {
 // -----------------------------------------------------
 exports.getMyProperties = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
+
+    const landlordUserId = managerContext.landlordUserId;
     const { page = 1, limit = 20, status } = req.query;
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE p.landlord_id = $1';
-    const params = [userId];
+    const params = [landlordUserId];
     let paramCount = 2;
 
     if (status === 'available') {
@@ -1129,7 +1207,11 @@ exports.getMyProperties = async (req, res) => {
 exports.toggleAvailability = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const userId = req.user.id;
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId,
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
 
     const result = await db.query(
       `UPDATE properties
@@ -1137,7 +1219,7 @@ exports.toggleAvailability = async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND landlord_id = $2
        RETURNING is_available`,
-      [propertyId, userId]
+      [propertyId, managerContext.landlordUserId]
     );
 
     if (result.rows.length === 0) {
@@ -1168,7 +1250,11 @@ exports.toggleAvailability = async (req, res) => {
 exports.unlistProperty = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId: id,
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
 
     const result = await db.query(
       `UPDATE properties
@@ -1177,7 +1263,7 @@ exports.unlistProperty = async (req, res) => {
        WHERE id = $1
          AND landlord_id = $2
        RETURNING id, is_available`,
-      [id, userId]
+        [id, managerContext.landlordUserId]
     );
 
     if (!result.rows.length) {
@@ -1213,19 +1299,11 @@ exports.unlistProperty = async (req, res) => {
 exports.deletePropertyPhoto = async (req, res) => {
   try {
     const { propertyId, photoId } = req.params;
-    const userId = req.user.id;
-
-    const propertyCheck = await db.query(
-      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
-      [propertyId, userId]
-    );
-
-    if (propertyCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Property not found or unauthorized'
-      });
-    }
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId,
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
 
     const photoResult = await db.query(
       'SELECT photo_url, is_primary FROM property_photos WHERE id = $1 AND property_id = $2',
@@ -1283,19 +1361,11 @@ exports.deletePropertyPhoto = async (req, res) => {
 exports.getPropertyStats = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const userId = req.user.id;
-
-    const propertyCheck = await db.query(
-      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
-      [propertyId, userId]
-    );
-
-    if (propertyCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Property not found or unauthorized'
-      });
-    }
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId,
+      requiredPermission: 'can_manage_properties',
+    });
+    if (!managerContext) return;
 
     const stats = await db.query(
       `SELECT 
@@ -1327,8 +1397,14 @@ exports.getPropertyStats = async (req, res) => {
 // =====================================================
 exports.saveDamageReport = async (req, res) => {
   try {
-    const landlordId = req.user.id;
     const { propertyId } = req.params;
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      propertyId,
+      requiredPermission: 'can_manage_damage_reports',
+    });
+    if (!managerContext) return;
+
+    const landlordId = managerContext.landlordUserId;
     const {
       room_location,   // e.g. "Living Room", "Master Bedroom"
       damage_type,     // scratch | crack | hole | dent | stain | other
@@ -1338,20 +1414,6 @@ exports.saveDamageReport = async (req, res) => {
       depth_level,     // surface | shallow | deep | structural
       severity,        // minor | moderate | severe
     } = req.body;
-
-    // Verify property belongs to this landlord
-    const propCheck = await db.query(
-      `SELECT id FROM properties WHERE id = $1 AND landlord_id = $2`,
-      [propertyId, landlordId]
-    );
-
-    if (!propCheck.rows.length) {
-      return res.status(404).json({
-        success: false,
-        message: 'Property not found or does not belong to you',
-      });
-    }
-
     // Ensure damage_reports table exists
     await db.query(`
       CREATE TABLE IF NOT EXISTS property_damage_reports (

@@ -60,6 +60,9 @@ const { saveRanking } = require('./config/utils/rankChecker');
 const { generateBacklinks } = require('./utils/backlinkEngine');
 const adminSeoRoutes = require('./routes/adminSeoRoutes');
 const { checkRanking } = require('./config/utils/serpTracker');
+const {
+  runEvidenceIntegrityMonitor,
+} = require('./services/evidenceIntegrityMonitor.service');
 
 async function runInitialSeoCheck() {
   const hasSerpApiKey =
@@ -81,6 +84,28 @@ async function runInitialSeoCheck() {
 }
 
 runInitialSeoCheck();
+
+const scheduleEvidenceIntegrityMonitoring = () => {
+  const cronExpression =
+    process.env.EVIDENCE_INTEGRITY_CRON?.trim() || '0 */6 * * *';
+  const scanLimit = Math.max(
+    Number(process.env.EVIDENCE_INTEGRITY_SCAN_LIMIT) || 200,
+    1
+  );
+
+  const runMonitor = async () => {
+    try {
+      const summary = await runEvidenceIntegrityMonitor({ limit: scanLimit });
+      console.log('Evidence integrity monitor completed', summary);
+    } catch (err) {
+      console.error('Evidence integrity monitor failed:', err.message);
+    }
+  };
+
+  runMonitor();
+  cron.schedule(cronExpression, runMonitor);
+  console.log(`Evidence integrity monitor scheduled (${cronExpression})`);
+};
 
 // Ensure DB is connected before cron runs
 mongoose.connection.on('connected', () => {
@@ -366,6 +391,7 @@ app.use((err, req, res, next) => {
 startPaymentJobs();
 startPropertyJobs();
 startScheduler();
+scheduleEvidenceIntegrityMonitoring();
 
 const PORT = process.env.APP_PORT || 5000;
 

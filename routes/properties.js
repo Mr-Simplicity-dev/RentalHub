@@ -4,9 +4,8 @@ const { body } = require('express-validator');
 const propertyController = require('../controllers/propertyController');
 const {
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   isTenant,
-  isVerified,
 } = require('../config/middleware/auth');
 const audit = require('../config/middleware/auditMiddleware');
 const { uploadPropertyMedia, uploadPropertyPhotos } = require('../config/middleware/upload');
@@ -71,6 +70,13 @@ router.post(
   propertyController.addReview
 );
 
+// Get property users for dispute creation
+router.get(
+  '/:propertyId/users',
+  authenticate,
+  propertyController.getPropertyUsers
+);
+
 // Get property reviews
 router.get('/:propertyId/reviews', propertyController.getPropertyReviews);
 
@@ -80,7 +86,7 @@ router.get('/:propertyId/reviews', propertyController.getPropertyReviews);
 router.get(
   '/landlord/my-properties',
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   propertyController.getMyProperties
 );
 
@@ -88,8 +94,7 @@ router.get(
 router.post(
   '/',
   authenticate,
-  isLandlord,
-  isVerified,
+  isLandlordOrAgent,
   uploadPropertyMedia,
   [
     body('state_id').optional().isInt(),
@@ -124,7 +129,7 @@ router.post(
 router.post(
   '/:propertyId/photos',
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   uploadPropertyPhotos,
   propertyController.uploadPropertyPhotos
 );
@@ -133,7 +138,7 @@ router.post(
 router.put(
   '/:propertyId',
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   propertyController.updateProperty
 );
 
@@ -141,7 +146,7 @@ router.put(
 router.delete(
   '/:propertyId',
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   propertyController.deleteProperty
 );
 
@@ -149,14 +154,14 @@ router.delete(
 router.patch(
   '/:propertyId/availability',
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   propertyController.toggleAvailability
 );
 
 router.patch(
   '/:id/unlist',
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   audit('unlist_property', 'property'),
   propertyController.unlistProperty
 );
@@ -165,7 +170,7 @@ router.patch(
 router.delete(
   '/:propertyId/photos/:photoId',
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   propertyController.deletePropertyPhoto
 );
 
@@ -173,7 +178,7 @@ router.delete(
 router.get(
   '/:propertyId/stats',
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   propertyController.getPropertyStats
 );
 
@@ -183,7 +188,7 @@ router.get(
 router.post(
   '/:propertyId/damage-report',
   authenticate,
-  isLandlord,
+  isLandlordOrAgent,
   uploadPropertyPhotos,
   propertyController.saveDamageReport
 );

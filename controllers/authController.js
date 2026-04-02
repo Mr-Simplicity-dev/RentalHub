@@ -19,7 +19,9 @@ const {
   sendWelcomeEmail,
   sendPasswordResetEmail,
   sendLawyerInviteEmail,
-  sendFraudAlertEmail
+  sendFraudAlertEmail,
+  sendAgentInviteEmail,
+  sendAgentAssignmentNoticeEmail,
 } = require('../config/utils/emailService');
 const { sendVerificationCode } = require('../config/utils/smsService');
 const {
@@ -27,6 +29,14 @@ const {
   hashPlatformLawyerInviteToken,
   syncPlatformLawyerRecordFromUser,
 } = require('../config/utils/platformLawyerProgram');
+const {
+  ensureAgentSystemSchema,
+  getActiveAgentAssignmentByAgentId,
+  getActiveAgentAssignmentByLandlordId,
+  getPendingAgentInviteByLandlordId,
+  hashAgentInviteToken,
+  inviteAgentForLandlord,
+} = require('../config/utils/agentSystem');
 
 // Store OTP codes temporarily (use Redis in production)
 const otpStore = new Map();
@@ -305,6 +315,49 @@ const createLawyerInvite = async ({ clientUserId, lawyerEmail, clientName, clien
   };
 };
 
+const normalizeOptionalAgentInvite = async ({
+  payload,
+  landlordEmail,
+  landlordPhone,
+  landlordName,
+}) => {
+  await ensureAgentSystemSchema();
+
+  const agentFullName = String(payload.agent_full_name || '').trim();
+  const agentEmail = String(payload.agent_email || '').trim().toLowerCase();
+  const agentPhone = String(payload.agent_phone || '').replace(/\s+/g, '');
+  const hasAnyAgentField = Boolean(agentFullName || agentEmail || agentPhone);
+
+  if (!hasAnyAgentField) {
+    return null;
+  }
+
+  if (!agentFullName || !agentEmail || !agentPhone) {
+    const error = new Error('Agent full name, email, and phone are required when adding an agent');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (agentEmail === landlordEmail) {
+    const error = new Error('Agent email must be different from the landlord email');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (agentPhone === landlordPhone) {
+    const error = new Error('Agent phone must be different from the landlord phone');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    agent_full_name: agentFullName,
+    agent_email: agentEmail,
+    agent_phone: agentPhone,
+    invited_by_name: landlordName,
+  };
+};
+
 // Generate JWT Token
 const generateToken = (userId, userType) => {
   return jwt.sign(
@@ -368,7 +421,10 @@ const validateAndPrepareRegistration = async (payload) => {
     identity_document_type = 'nin',
     is_foreigner = false,
     international_passport_number,
-    nationality
+    nationality,
+    agent_full_name,
+    agent_email,
+    agent_phone,
   } = payload;
 
   const cleanEmail = String(email || '').trim().toLowerCase();
@@ -377,6 +433,19 @@ const validateAndPrepareRegistration = async (payload) => {
   const cleanLawyerEmail = lawyer_email
     ? String(lawyer_email).trim().toLowerCase()
     : '';
+  const optionalAgentInvite =
+    user_type === 'landlord'
+      ? await normalizeOptionalAgentInvite({
+          payload: {
+            agent_full_name,
+            agent_email,
+            agent_phone,
+          },
+          landlordEmail: cleanEmail,
+          landlordPhone: cleanPhone,
+          landlordName: cleanFullName,
+        })
+      : null;
 
   if (cleanLawyerEmail && cleanLawyerEmail === cleanEmail) {
     const error = new Error('Lawyer email must be different from your account email');
@@ -567,7 +636,8 @@ const validateAndPrepareRegistration = async (payload) => {
       ninVerified,
       identityType,
       cleanPassportNumber,
-      cleanNationality
+      cleanNationality,
+      optionalAgentInvite,
     },
     plainPassword: password,
     verificationMeta
@@ -671,6 +741,7 @@ const createUserFromPreparedRegistration = async ({
     await client.query('COMMIT');
 
     let lawyerInvite = null;
+    let agentInvite = null;
 
     if (preparedRegistration.cleanLawyerEmail) {
       try {
@@ -682,6 +753,23 @@ const createUserFromPreparedRegistration = async ({
         });
       } catch (inviteError) {
         console.error('Lawyer invite creation error:', inviteError);
+      }
+    }
+
+    if (preparedRegistration.user_type === 'landlord' && preparedRegistration.optionalAgentInvite) {
+      try {
+        agentInvite = await inviteAgentForLandlord({
+          landlordUserId: newUser.id,
+          assignedByUserId: newUser.id,
+          landlordName: newUser.full_name,
+          agentFullName: preparedRegistration.optionalAgentInvite.agent_full_name,
+          agentEmail: preparedRegistration.optionalAgentInvite.agent_email,
+          agentPhone: preparedRegistration.optionalAgentInvite.agent_phone,
+          sendAgentInviteEmail,
+          sendAgentAssignmentNoticeEmail,
+        });
+      } catch (agentInviteError) {
+        console.error('Agent invite creation error:', agentInviteError);
       }
     }
 
@@ -713,7 +801,8 @@ const createUserFromPreparedRegistration = async ({
       },
       token,
       verification: verificationMeta,
-      lawyer_invite: lawyerInvite
+      lawyer_invite: lawyerInvite,
+      agent_invite: agentInvite,
     };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -1019,7 +1108,8 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       ninVerified: storedPayload.ninVerified === true,
       identityType: storedPayload.identityType || null,
       cleanPassportNumber: storedPayload.cleanPassportNumber || null,
-      cleanNationality: storedPayload.cleanNationality || 'Nigeria'
+      cleanNationality: storedPayload.cleanNationality || 'Nigeria',
+      optionalAgentInvite: storedPayload.optionalAgentInvite || null,
     };
 
     const data = await createUserFromPreparedRegistration({
@@ -1576,6 +1666,203 @@ exports.acceptPlatformLawyerInvite = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to accept platform lawyer invite'
+    });
+  }
+};
+
+exports.acceptAgentInvite = async (req, res) => {
+  try {
+    await ensureIdentitySchema();
+    await ensureAgentSystemSchema();
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array(),
+      });
+    }
+
+    const { token, full_name, phone, password } = req.body;
+    const inviteToken = String(token || '').trim();
+    const cleanFullName = String(full_name || '').trim();
+    const cleanPhone = String(phone || '').replace(/\s+/g, '');
+    const tokenHash = hashAgentInviteToken(inviteToken);
+
+    const inviteResult = await db.query(
+      `SELECT ai.*, landlord.full_name AS landlord_name
+       FROM agent_invites ai
+       JOIN users landlord ON landlord.id = ai.landlord_user_id
+       WHERE ai.token_hash = $1
+       LIMIT 1`,
+      [tokenHash]
+    );
+
+    if (!inviteResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invite link is invalid',
+      });
+    }
+
+    const invite = inviteResult.rows[0];
+
+    if (invite.status === 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'This invite has already been accepted',
+      });
+    }
+
+    if (new Date(invite.expires_at).getTime() < Date.now()) {
+      await db.query(
+        `UPDATE agent_invites
+         SET status = 'expired',
+             updated_at = NOW()
+         WHERE id = $1`,
+        [invite.id]
+      );
+
+      return res.status(410).json({
+        success: false,
+        message: 'Invite has expired. Ask for a fresh invite.',
+      });
+    }
+
+    const existingByPhone = await db.query(
+      `SELECT id, email
+       FROM users
+       WHERE phone = $1
+       LIMIT 1`,
+      [cleanPhone]
+    );
+
+    if (
+      existingByPhone.rows.length &&
+      String(existingByPhone.rows[0].email).toLowerCase() !==
+        String(invite.agent_email).toLowerCase()
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: 'Phone number already belongs to another account',
+      });
+    }
+
+    const existingAgentResult = await db.query(
+      `SELECT id, user_type
+       FROM users
+       WHERE email = $1
+       LIMIT 1`,
+      [invite.agent_email]
+    );
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+    let agentUserId;
+
+    if (existingAgentResult.rows.length) {
+      const existingUser = existingAgentResult.rows[0];
+
+      if (existingUser.user_type !== 'agent') {
+        return res.status(409).json({
+          success: false,
+          message: 'Invite email already belongs to a non-agent account',
+        });
+      }
+
+      await db.query(
+        `UPDATE users
+         SET full_name = $1,
+             phone = $2,
+             password_hash = $3,
+             email_verified = TRUE,
+             updated_at = NOW()
+         WHERE id = $4`,
+        [cleanFullName, cleanPhone, passwordHash, existingUser.id]
+      );
+
+      agentUserId = existingUser.id;
+    } else {
+      const insertResult = await db.query(
+        `INSERT INTO users
+         (user_type, email, phone, password_hash, full_name, identity_document_type, nationality, email_verified)
+         VALUES ('agent', $1, $2, $3, $4, 'nin', 'Nigeria', TRUE)
+         RETURNING id`,
+        [invite.agent_email, cleanPhone, passwordHash, cleanFullName]
+      );
+
+      agentUserId = insertResult.rows[0].id;
+    }
+
+    await db.query(
+      `INSERT INTO landlord_agents (
+         landlord_user_id,
+         agent_user_id,
+         assigned_by_user_id,
+         status,
+         can_manage_properties,
+         can_manage_damage_reports,
+         can_manage_disputes,
+         can_manage_legal,
+         can_manage_finances
+       )
+       VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8)
+       ON CONFLICT (landlord_user_id, agent_user_id)
+       DO UPDATE SET
+         assigned_by_user_id = EXCLUDED.assigned_by_user_id,
+         status = 'active',
+         can_manage_properties = EXCLUDED.can_manage_properties,
+         can_manage_damage_reports = EXCLUDED.can_manage_damage_reports,
+         can_manage_disputes = EXCLUDED.can_manage_disputes,
+         can_manage_legal = EXCLUDED.can_manage_legal,
+         can_manage_finances = EXCLUDED.can_manage_finances,
+         revoked_at = NULL,
+         updated_at = CURRENT_TIMESTAMP`,
+      [
+        invite.landlord_user_id,
+        agentUserId,
+        invite.assigned_by_user_id || invite.landlord_user_id,
+        invite.can_manage_properties === true,
+        invite.can_manage_damage_reports === true,
+        invite.can_manage_disputes === true,
+        invite.can_manage_legal === true,
+        invite.can_manage_finances === true,
+      ]
+    );
+
+    await db.query(
+      `UPDATE agent_invites
+       SET status = 'accepted',
+           accepted_at = NOW(),
+           agent_user_id = $2,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [invite.id, agentUserId]
+    );
+
+    const authToken = generateToken(agentUserId, 'agent');
+    const userResult = await db.query(
+      `SELECT id, user_type, email, phone, full_name, email_verified, phone_verified,
+              identity_verified, identity_verification_status, passport_photo_url, created_at
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [agentUserId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Agent account activated successfully',
+      data: {
+        token: authToken,
+        user: userResult.rows[0],
+      },
+    });
+  } catch (error) {
+    console.error('Accept agent invite error:', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to accept agent invite',
     });
   }
 };
@@ -2388,9 +2675,71 @@ exports.getCurrentUser = async (req, res) => {
       });
     }
 
+    const user = result.rows[0];
+
+    if (user.user_type === 'agent') {
+      await ensureAgentSystemSchema();
+      const assignment = await getActiveAgentAssignmentByAgentId(userId);
+
+      user.agent_assignment = assignment
+        ? {
+            id: assignment.id,
+            landlord_user_id: assignment.landlord_user_id,
+            landlord_name: assignment.landlord_name,
+            landlord_email: assignment.landlord_email,
+            landlord_phone: assignment.landlord_phone,
+            can_manage_properties: assignment.can_manage_properties === true,
+            can_manage_damage_reports:
+              assignment.can_manage_damage_reports === true,
+            can_manage_disputes: assignment.can_manage_disputes === true,
+            can_manage_legal: assignment.can_manage_legal === true,
+            can_manage_finances: assignment.can_manage_finances === true,
+            status: assignment.status,
+            assigned_at: assignment.created_at,
+          }
+        : null;
+    }
+
+    if (user.user_type === 'landlord') {
+      await ensureAgentSystemSchema();
+      const [activeAssignment, pendingInvite] = await Promise.all([
+        getActiveAgentAssignmentByLandlordId(userId),
+        getPendingAgentInviteByLandlordId(userId),
+      ]);
+
+      user.active_agent_assignment = activeAssignment
+        ? {
+            id: activeAssignment.id,
+            agent_user_id: activeAssignment.agent_user_id,
+            agent_name: activeAssignment.agent_name,
+            agent_email: activeAssignment.agent_email,
+            agent_phone: activeAssignment.agent_phone,
+            can_manage_properties: activeAssignment.can_manage_properties === true,
+            can_manage_damage_reports:
+              activeAssignment.can_manage_damage_reports === true,
+            can_manage_disputes: activeAssignment.can_manage_disputes === true,
+            can_manage_legal: activeAssignment.can_manage_legal === true,
+            can_manage_finances: activeAssignment.can_manage_finances === true,
+            status: activeAssignment.status,
+            assigned_at: activeAssignment.created_at,
+          }
+        : null;
+
+      user.pending_agent_invite = pendingInvite
+        ? {
+            id: pendingInvite.id,
+            agent_full_name: pendingInvite.agent_full_name,
+            agent_email: pendingInvite.agent_email,
+            agent_phone: pendingInvite.agent_phone,
+            expires_at: pendingInvite.expires_at,
+            status: pendingInvite.status,
+          }
+        : null;
+    }
+
     res.json({
       success: true,
-      data: result.rows[0]
+      data: user
     });
 
   } catch (error) {

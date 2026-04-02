@@ -56,6 +56,8 @@ const Login = () => {
           navigate('/admin');
         } else if (role === 'lawyer') {
           navigate('/lawyer');
+        } else if (role === 'agent') {
+          navigate('/agent/dashboard');
         } else if (role === 'landlord') {
           navigate('/dashboard');
         } else {

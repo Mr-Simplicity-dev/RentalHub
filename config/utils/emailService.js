@@ -112,6 +112,68 @@ exports.sendPlatformLawyerInviteEmail = async ({
   }
 };
 
+exports.sendAgentInviteEmail = async ({
+  email,
+  landlordName,
+  agentName,
+  inviteUrl,
+  expiresInHours = 72,
+}) => {
+  try {
+    await sendEmail({
+      to: email,
+      subject: 'RentalHub NG Agent Invitation',
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6;">
+          <h2>You have been invited to help manage a landlord account</h2>
+          <p><strong>${landlordName}</strong> invited you to serve as their agent on RentalHub NG.</p>
+          <p>${agentName ? `${agentName}, use the button below to create your password and activate your agent access.` : 'Use the button below to create your password and activate your agent access.'}</p>
+          <p>
+            <a href="${inviteUrl}" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">
+              Create Password & Activate Agent Access
+            </a>
+          </p>
+          <p>This link expires in ${expiresInHours} hours.</p>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Agent invite email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+exports.sendAgentAssignmentNoticeEmail = async ({
+  email,
+  landlordName,
+  inviterName,
+  dashboardUrl,
+}) => {
+  try {
+    await sendEmail({
+      to: email,
+      subject: 'RentalHub NG Agent Assignment Updated',
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6;">
+          <h2>Your agent assignment is active</h2>
+          <p><strong>${inviterName || landlordName}</strong> assigned you to support <strong>${landlordName}</strong> on RentalHub NG.</p>
+          <p>You can now sign in and start helping with approved landlord operations.</p>
+          <p>
+            <a href="${dashboardUrl}" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">
+              Open Agent Dashboard
+            </a>
+          </p>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Agent assignment notice email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send password reset email
 exports.sendPasswordResetEmail = async (email, resetUrl) => {
   try {

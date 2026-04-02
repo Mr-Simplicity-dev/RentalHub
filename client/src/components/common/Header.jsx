@@ -41,7 +41,7 @@ const Header = () => {
               Verify Dispute Evidence
             </Link>
 
-            {isAuthenticated && user?.user_type === 'landlord' && (
+            {isAuthenticated && ['landlord', 'agent'].includes(user?.user_type) && (
               <Link to="/my-properties" className="text-gray-700 hover:text-primary-600">
                 {t('header.my_properties')}
               </Link>
@@ -86,6 +86,8 @@ const Header = () => {
                             ? '/tenant/dashboard'
                             : user?.user_type === 'lawyer'
                               ? '/lawyer'
+                              : user?.user_type === 'agent'
+                                ? '/agent/dashboard'
                               : '/dashboard'
                         }
                         className="block px-4 py-2 text-gray-700 hover:bg-gray-100"

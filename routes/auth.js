@@ -57,6 +57,22 @@ const registerValidators = [
     .trim()
     .isLength({ min: 2, max: 120 })
     .withMessage('Local government area must be between 2 and 120 characters'),
+  body('agent_full_name')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ min: 2, max: 255 })
+    .withMessage('Agent full name must be between 2 and 255 characters'),
+  body('agent_email')
+    .optional({ checkFalsy: true })
+    .isEmail()
+    .withMessage('Agent email must be valid')
+    .normalizeEmail(),
+  body('agent_phone')
+    .optional({ checkFalsy: true })
+    .trim()
+    .customSanitizer((value) => String(value || '').replace(/\s+/g, ''))
+    .matches(/^\+?\d{10,15}$/)
+    .withMessage('Agent phone must be a valid phone number (10-15 digits, optional +)'),
   body('user_type')
     .isIn(['landlord', 'tenant'])
     .withMessage('User type must be tenant or landlord'),
@@ -141,6 +157,20 @@ router.post(
     body('password').isLength({ min: 8 }),
   ],
   authController.acceptPlatformLawyerInvite
+);
+
+router.post(
+  '/agent/accept-invite',
+  [
+    body('token').trim().notEmpty(),
+    body('full_name').trim().notEmpty(),
+    body('phone')
+      .trim()
+      .customSanitizer(v => String(v || '').replace(/\s+/g, ''))
+      .matches(/^\+?\d{10,15}$/),
+    body('password').isLength({ min: 8 }),
+  ],
+  authController.acceptAgentInvite
 );
 
 router.get(

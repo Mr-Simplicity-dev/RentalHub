@@ -9,6 +9,9 @@ const {
   fetchPublicPlatformLawyers,
   getLatestPlatformLawyerRecruitmentBroadcast,
 } = require('../config/utils/platformLawyerProgram');
+const {
+  ensureLawyerCaseNotesSchema,
+} = require('../config/utils/legalSchema');
 
 const maskEmail = (value = '') => {
   const cleanValue = String(value || '').trim();
@@ -62,6 +65,41 @@ const mapUnlockedLawyer = (row) => ({
   identity_verified: row.identity_verified === true,
   details_locked: false,
 });
+
+const ALLOWED_EVIDENCE_STATUSES = new Set([
+  'pending',
+  'verified',
+  'flagged',
+  'rejected',
+]);
+
+const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
+  const result = await db.query(
+    `SELECT
+       la.id,
+       la.property_id,
+       la.client_user_id,
+       d.id AS dispute_id,
+       d.property_id AS dispute_property_id,
+       d.status AS dispute_status
+     FROM legal_authorizations la
+     JOIN disputes d ON d.id = $2
+     WHERE la.lawyer_user_id = $1
+       AND la.status = 'active'
+       AND (
+         la.property_id = d.property_id
+         OR (
+           la.property_id IS NULL
+           AND la.client_user_id IN (d.opened_by, d.against_user)
+         )
+       )
+     ORDER BY la.id DESC
+     LIMIT 1`,
+    [lawyerId, disputeId]
+  );
+
+  return result.rows[0] || null;
+};
 
 /* ---------------------------------------------------
    Public Lawyers Directory
@@ -467,6 +505,466 @@ exports.getLegalAuditLogs = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch legal audit logs',
+    });
+  }
+};
+
+  /* ---------------------------------------------------
+   Lawyer Evidence Verification
+--------------------------------------------------- */
+
+exports.verifyEvidence = async (req, res) => {
+  try {
+    const { disputeId, evidenceId } = req.params;
+    const verificationStatus = String(req.body?.verification_status || '').trim().toLowerCase();
+    const notes = String(req.body?.notes || '').trim();
+    const lawyerId = req.user?.id;
+
+    if (!disputeId || !evidenceId || !verificationStatus) {
+      return res.status(400).json({
+        success: false,
+        message: 'disputeId, evidenceId and verification_status are required',
+      });
+    }
+
+    if (!ALLOWED_EVIDENCE_STATUSES.has(verificationStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `verification_status must be one of: ${Array.from(ALLOWED_EVIDENCE_STATUSES).join(', ')}`,
+      });
+    }
+
+    const access = await getLawyerDisputeAccess(lawyerId, disputeId);
+    if (!access) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to verify evidence for this dispute',
+      });
+    }
+
+    const result = await db.query(
+      `UPDATE dispute_evidence
+       SET verification_status = $1,
+           verified_by = $2,
+           verified_at = CURRENT_TIMESTAMP,
+           lawyer_notes = $3
+       WHERE id = $4
+         AND dispute_id = $5
+       RETURNING *`,
+      [
+        verificationStatus,
+        lawyerId,
+        notes || null,
+        evidenceId,
+        disputeId,
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Evidence not found',
+      });
+    }
+
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        lawyerId,
+        `Verified evidence as ${verificationStatus}`,
+        'evidence',
+        evidenceId,
+        JSON.stringify({
+          dispute_id: disputeId,
+          verification_status: verificationStatus,
+          notes: notes || null,
+        }),
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: `Evidence marked as ${verificationStatus}`,
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Verify evidence error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify evidence',
+    });
+  }
+};
+
+/* ---------------------------------------------------
+   Get Evidence Verification Status
+--------------------------------------------------- */
+
+exports.getEvidenceVerification = async (req, res) => {
+  try {
+    const { disputeId } = req.params;
+    const lawyerId = req.user?.id;
+
+    const access = await getLawyerDisputeAccess(lawyerId, disputeId);
+    if (!access) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to view evidence for this dispute',
+      });
+    }
+
+    const result = await db.query(
+      `SELECT
+         de.id,
+         de.file_name,
+         de.file_hash,
+         de.mime_type,
+         de.file_size,
+         COALESCE(de.uploaded_at, de.created_at) AS uploaded_at,
+         de.verification_status,
+         de.verified_at,
+         de.lawyer_notes,
+         uploaded_by.full_name AS uploaded_by_name,
+         uploaded_by.email AS uploaded_by_email,
+         u.full_name AS verified_by_name,
+         u.email AS verified_by_email
+       FROM dispute_evidence de
+       LEFT JOIN users uploaded_by ON uploaded_by.id = de.uploaded_by
+       LEFT JOIN users u ON u.id = de.verified_by
+       WHERE de.dispute_id = $1
+       ORDER BY COALESCE(de.uploaded_at, de.created_at) ASC, de.id ASC`,
+      [disputeId]
+    );
+
+    return res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get evidence verification error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch evidence verification status',
+    });
+  }
+};
+
+/* ---------------------------------------------------
+   Lawyer Case Notes
+--------------------------------------------------- */
+
+exports.createCaseNote = async (req, res) => {
+  try {
+    await ensureLawyerCaseNotesSchema();
+
+    const { disputeId } = req.params;
+    const { title, content, note_type = 'case_analysis', is_visible_to_client = false } = req.body;
+    const lawyerId = req.user?.id;
+
+    if (!disputeId || !content) {
+      return res.status(400).json({
+        success: false,
+        message: 'disputeId and content are required',
+      });
+    }
+
+    const access = await getLawyerDisputeAccess(lawyerId, disputeId);
+    if (!access) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to add notes to this dispute',
+      });
+    }
+
+    const result = await db.query(
+      `INSERT INTO lawyer_case_notes
+       (dispute_id, lawyer_user_id, title, content, note_type, is_visible_to_client)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        disputeId,
+        lawyerId,
+        title || null,
+        content,
+        note_type,
+        is_visible_to_client,
+      ]
+    );
+
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        lawyerId,
+        'Added case note',
+        'dispute',
+        disputeId,
+        JSON.stringify({
+          note_type,
+          note_id: result.rows[0].id,
+          is_visible_to_client,
+        }),
+      ]
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Case note added successfully',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Create case note error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to add case note',
+    });
+  }
+};
+
+exports.getCaseNotes = async (req, res) => {
+  try {
+    await ensureLawyerCaseNotesSchema();
+
+    const { disputeId } = req.params;
+    const lawyerId = req.user?.id;
+
+    const access = await getLawyerDisputeAccess(lawyerId, disputeId);
+    if (!access) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to view case notes for this dispute',
+      });
+    }
+
+    const result = await db.query(
+      `SELECT
+         lcn.id,
+         lcn.title,
+         lcn.content,
+         lcn.note_type,
+         lcn.is_visible_to_client,
+         lcn.lawyer_user_id,
+         lcn.created_at,
+         lcn.updated_at,
+         u.full_name AS lawyer_name,
+         u.email AS lawyer_email
+       FROM lawyer_case_notes lcn
+       JOIN users u ON u.id = lcn.lawyer_user_id
+       WHERE lcn.dispute_id = $1
+       ORDER BY lcn.updated_at DESC, lcn.id DESC`,
+      [disputeId]
+    );
+
+    return res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get case notes error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch case notes',
+    });
+  }
+};
+
+exports.updateCaseNote = async (req, res) => {
+  try {
+    await ensureLawyerCaseNotesSchema();
+
+    const { disputeId, noteId } = req.params;
+    const lawyerId = req.user?.id;
+    const { title, content, note_type, is_visible_to_client } = req.body;
+
+    const access = await getLawyerDisputeAccess(lawyerId, disputeId);
+    if (!access) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to update notes for this dispute',
+      });
+    }
+
+    const result = await db.query(
+      `UPDATE lawyer_case_notes
+       SET title = COALESCE($1, title),
+           content = COALESCE($2, content),
+           note_type = COALESCE($3, note_type),
+           is_visible_to_client = COALESCE($4, is_visible_to_client),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5
+         AND dispute_id = $6
+         AND lawyer_user_id = $7
+       RETURNING *`,
+      [
+        title ?? null,
+        content ?? null,
+        note_type ?? null,
+        typeof is_visible_to_client === 'boolean' ? is_visible_to_client : null,
+        noteId,
+        disputeId,
+        lawyerId,
+      ]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Case note not found or you cannot edit it',
+      });
+    }
+
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        lawyerId,
+        'Updated case note',
+        'dispute',
+        disputeId,
+        JSON.stringify({
+          note_id: noteId,
+        }),
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Case note updated successfully',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Update case note error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update case note',
+    });
+  }
+};
+
+exports.deleteCaseNote = async (req, res) => {
+  try {
+    await ensureLawyerCaseNotesSchema();
+
+    const { disputeId, noteId } = req.params;
+    const lawyerId = req.user?.id;
+
+    const access = await getLawyerDisputeAccess(lawyerId, disputeId);
+    if (!access) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to delete notes for this dispute',
+      });
+    }
+
+    const result = await db.query(
+      `DELETE FROM lawyer_case_notes
+       WHERE id = $1
+         AND dispute_id = $2
+         AND lawyer_user_id = $3
+       RETURNING id`,
+      [noteId, disputeId, lawyerId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Case note not found or you cannot delete it',
+      });
+    }
+
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        lawyerId,
+        'Deleted case note',
+        'dispute',
+        disputeId,
+        JSON.stringify({
+          note_id: noteId,
+        }),
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Case note deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete case note error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete case note',
+    });
+  }
+};
+
+exports.updateDisputeSummary = async (req, res) => {
+  try {
+    await ensureLawyerCaseNotesSchema();
+
+    const { disputeId } = req.params;
+    const lawyerId = req.user?.id;
+    const lawyerSummary = String(req.body?.lawyer_summary || '').trim();
+
+    if (!lawyerSummary) {
+      return res.status(400).json({
+        success: false,
+        message: 'lawyer_summary is required',
+      });
+    }
+
+    const access = await getLawyerDisputeAccess(lawyerId, disputeId);
+    if (!access) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to update this dispute summary',
+      });
+    }
+
+    const result = await db.query(
+      `UPDATE disputes
+       SET lawyer_summary = $1,
+           lawyer_summary_by = $2,
+           lawyer_summary_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING id, lawyer_summary, lawyer_summary_by, lawyer_summary_at`,
+      [lawyerSummary, lawyerId, disputeId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Dispute not found',
+      });
+    }
+
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        lawyerId,
+        'Updated dispute summary',
+        'dispute',
+        disputeId,
+        JSON.stringify({
+          lawyer_summary_length: lawyerSummary.length,
+        }),
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Dispute summary updated successfully',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Update dispute summary error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update dispute summary',
     });
   }
 };

@@ -3,8 +3,10 @@ import { propertyService } from '../services/propertyService';
 import Loader from '../components/common/Loader';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { useAuth } from '../hooks/useAuth';
 
 const MyProperties = () => {
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,10 +28,14 @@ const MyProperties = () => {
 
   if (loading) return <Loader />;
 
+  const isAgent = user?.user_type === 'agent';
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">My Properties</h1>
+        <h1 className="text-2xl font-bold">
+          {isAgent ? 'Managed Properties' : 'My Properties'}
+        </h1>
         <Link to="/add-property" className="btn btn-primary">Add Property</Link>
       </div>
 
@@ -49,7 +55,9 @@ const MyProperties = () => {
         ))}
         {items.length === 0 && (
           <div className="card text-center py-10 text-gray-500">
-            You have not listed any properties yet.
+            {isAgent
+              ? 'No properties are currently available under your assigned landlord.'
+              : 'You have not listed any properties yet.'}
           </div>
         )}
       </div>

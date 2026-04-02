@@ -28,6 +28,7 @@ router.get('/stats', requireAdminOrSuperAdmin, adminController.getStats);
   */
 router.get('/users', requireAdminOrSuperAdmin, adminController.getAllUsers);
 router.get('/users/:id', requireAdminOrSuperAdmin, adminController.getUserById);
+router.post('/users/:id/assign-agent', requireAdminOrSuperAdmin, adminController.assignAgentToLandlord);
 router.patch('/users/:id/verify', requireAdminOrSuperAdmin, adminController.verifyUser);
 router.delete('/users/:id', requireAdminOrSuperAdmin, adminController.deleteUser);
 

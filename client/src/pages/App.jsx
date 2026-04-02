@@ -53,9 +53,11 @@ import AdminPropertyDetail from './admin/AdminPropertyDetail';
 import AdminApplicationDetail from './admin/AdminApplicationDetail';
 import AdminCompliance from './admin/AdminCompliance';
 import LawyerDashboard from './lawyer/LawyerDashboard';
+import AgentDashboard from './agent/AgentDashboard';
 import VerifyCase from './VerifyCase';
 import DisputeDetails from "./DisputeDetails";
 import AcceptLawyerInvite from './AcceptLawyerInvite';
+import AcceptAgentInvite from './AcceptAgentInvite';
 import LocationPage from './LocationPage';
 import NigeriaPage from './NigeriaPage';
 import AreaPage from './AreaPage';
@@ -141,6 +143,55 @@ const LawyerRoute = ({ children }) => {
   return children;
 };
 
+const LandlordRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+
+  if (user?.user_type !== 'landlord') {
+    if (user?.user_type === 'tenant') return <Navigate to="/tenant/dashboard" />;
+    if (user?.user_type === 'agent') return <Navigate to="/agent/dashboard" />;
+    if (user?.user_type === 'lawyer') return <Navigate to="/lawyer" />;
+    if (user?.user_type === 'admin') return <Navigate to="/admin" />;
+    if (user?.user_type === 'super_admin') return <Navigate to="/super-admin" />;
+    return <Navigate to="/login" />;
+  }
+
+  return children;
+};
+
+const AgentRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'agent') return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
+const PropertyManagerRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!['landlord', 'agent'].includes(user?.user_type)) {
+    return <Navigate to="/dashboard" />;
+  }
+
+  return children;
+};
+
 function Layout({ children }) {
   const location = useLocation();
 
@@ -194,6 +245,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/lawyer/accept-invite" element={<AcceptLawyerInvite />} />
+              <Route path="/agent/accept-invite" element={<AcceptAgentInvite />} />
               <Route path="/lawyers" element={<LawyersDirectory />} />
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
@@ -211,6 +263,7 @@ function App() {
               <Route path="/terms" element={<Terms />} />
               <Route path="/super-admin" element={<SuperAdminDashboard />} />
               <Route path="/lawyer" element={<LawyerRoute><LawyerDashboard /></LawyerRoute>}/>
+              <Route path="/agent/dashboard" element={<AgentRoute><AgentDashboard /></AgentRoute>} />
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
@@ -223,9 +276,9 @@ function App() {
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute>
+                  <LandlordRoute>
                     <Dashboard />
-                  </ProtectedRoute>
+                  </LandlordRoute>
                 }
               />
               <Route
@@ -264,8 +317,8 @@ function App() {
               <Route path="/saved-properties" element={<ProtectedRoute><SavedProperties /></ProtectedRoute>} />
               <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
               <Route path="/payment-history" element={<ProtectedRoute><PaymentHistory /></ProtectedRoute>} />
-              <Route path="/my-properties" element={<ProtectedRoute><MyProperties /></ProtectedRoute>} />
-              <Route path="/add-property" element={<ProtectedRoute><AddProperty /></ProtectedRoute>} />
+              <Route path="/my-properties" element={<PropertyManagerRoute><MyProperties /></PropertyManagerRoute>} />
+              <Route path="/add-property" element={<PropertyManagerRoute><AddProperty /></PropertyManagerRoute>} />
               <Route path="/subscribe" element={<ProtectedRoute><Subscribe /></ProtectedRoute>} />
 
               {/* 404 */}

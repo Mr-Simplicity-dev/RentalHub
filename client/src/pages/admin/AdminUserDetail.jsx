@@ -11,6 +11,12 @@ const AdminUserDetail = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [assigningAgent, setAssigningAgent] = useState(false);
+  const [agentForm, setAgentForm] = useState({
+    agent_full_name: '',
+    agent_email: '',
+    agent_phone: '',
+  });
 
   const loadUser = useCallback(async () => {
     setLoading(true);
@@ -59,6 +65,34 @@ const AdminUserDetail = () => {
       toast.error(err.response?.data?.message || 'Verification failed');
     } finally {
       setWorking(false);
+    }
+  };
+
+  const assignAgent = async (e) => {
+    e.preventDefault();
+
+    if (user?.user_type !== 'landlord') return;
+
+    if (!agentForm.agent_full_name || !agentForm.agent_email || !agentForm.agent_phone) {
+      toast.error('Agent full name, email, and phone are required');
+      return;
+    }
+
+    setAssigningAgent(true);
+    try {
+      const res = await api.post(`/admin/users/${id}/assign-agent`, agentForm);
+      toast.success(res.data?.message || 'Agent assignment created successfully');
+      setAgentForm({
+        agent_full_name: '',
+        agent_email: '',
+        agent_phone: '',
+      });
+      await loadUser();
+    } catch (err) {
+      console.error('Failed to assign agent:', err);
+      toast.error(err.response?.data?.message || 'Failed to assign agent');
+    } finally {
+      setAssigningAgent(false);
     }
   };
 
@@ -118,6 +152,83 @@ const AdminUserDetail = () => {
           <Status label="Phone Verified" status={user.phone_verified} />
           <Status label="Identity Verified" status={user.identity_verified} />
         </div>
+
+        {user.user_type === 'landlord' && (
+          <div className="mt-8 border-t pt-6 space-y-5">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800">Agent Assignment</h3>
+              <p className="text-sm text-gray-500">
+                Use this if the landlord skipped agent setup during registration. Assigned agents can help with property listings, updates, and other delegated operational tasks.
+              </p>
+            </div>
+
+            {user.active_agent_assignment ? (
+              <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+                <p className="text-sm font-semibold text-green-800">Active Agent</p>
+                <p className="mt-2 text-sm text-green-900">{user.active_agent_assignment.agent_name}</p>
+                <p className="text-sm text-green-700">{user.active_agent_assignment.agent_email}</p>
+                <p className="text-sm text-green-700">{user.active_agent_assignment.agent_phone || 'No phone provided'}</p>
+              </div>
+            ) : user.pending_agent_invite ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-amber-800">Pending Agent Invite</p>
+                <p className="mt-2 text-sm text-amber-900">{user.pending_agent_invite.agent_full_name || 'Pending agent'}</p>
+                <p className="text-sm text-amber-700">{user.pending_agent_invite.agent_email}</p>
+                <p className="text-xs text-amber-700 mt-2">
+                  Expires: {user.pending_agent_invite.expires_at ? new Date(user.pending_agent_invite.expires_at).toLocaleString() : 'N/A'}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                No agent is currently assigned to this landlord.
+              </div>
+            )}
+
+            {!user.active_agent_assignment && (
+              <form onSubmit={assignAgent} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Agent Full Name</label>
+                  <input
+                    type="text"
+                    value={agentForm.agent_full_name}
+                    onChange={(e) => setAgentForm((prev) => ({ ...prev, agent_full_name: e.target.value }))}
+                    className="input w-full"
+                    placeholder="Agent full name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Agent Email</label>
+                  <input
+                    type="email"
+                    value={agentForm.agent_email}
+                    onChange={(e) => setAgentForm((prev) => ({ ...prev, agent_email: e.target.value }))}
+                    className="input w-full"
+                    placeholder="agent@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Agent Phone</label>
+                  <input
+                    type="tel"
+                    value={agentForm.agent_phone}
+                    onChange={(e) => setAgentForm((prev) => ({ ...prev, agent_phone: e.target.value }))}
+                    className="input w-full"
+                    placeholder="+2348012345678"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <button
+                    type="submit"
+                    disabled={assigningAgent}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {assigningAgent ? 'Assigning Agent...' : 'Assign Agent'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

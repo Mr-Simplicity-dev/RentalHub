@@ -88,6 +88,8 @@ const Dashboard = () => {
   const [accountNameLoading, setAccountNameLoading] = useState(false);
   const [accountNameError, setAccountNameError] = useState('');
   const [consentChecked, setConsentChecked] = useState(false);
+  const [banks, setBanks] = useState([]);
+  const [banksLoading, setBanksLoading] = useState(false);
 
   // ── Landlord refund management state ─────────────────────────────────────
   const [showLandlordRefundModal, setShowLandlordRefundModal] = useState(false);
@@ -199,6 +201,28 @@ const Dashboard = () => {
       setAccountNameLoading(false);
     }
   };
+
+  
+  // Fetch banks list on component mount
+  useEffect(() => {
+    const fetchBanks = async () => {
+      try {
+        setBanksLoading(true);
+        const res = await api.get('/payments/banks');
+        if (res.data?.success) {
+          setBanks(res.data.data);
+        }
+      } catch (err) {
+        console.error('Error fetching banks:', err);
+        // Fallback to hardcoded banks if API fails
+        setBanks(NIGERIAN_BANKS.map(name => ({ name, code: '', slug: '' })));
+      } finally {
+        setBanksLoading(false);
+      }
+    };
+
+    fetchBanks();
+  }, []);
 
   // ── Account number change handler with debounce ──────────────────────────
   const handleAccountNumberChange = (e) => {
@@ -1178,10 +1202,16 @@ const Dashboard = () => {
                         onChange={handleBankChange}
                         className="input w-full"
                       >
-                        <option value="">-- Select your bank --</option>
-                        {NIGERIAN_BANKS.map(bank => (
-                          <option key={bank} value={bank}>{bank}</option>
-                        ))}
+                                                <option value="">-- Select your bank --</option>
+                        {banksLoading ? (
+                          <option disabled>Loading banks...</option>
+                        ) : (
+                          banks.map(bank => (
+                            <option key={bank.code || bank.name} value={bank.name}>
+                              {bank.name}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
 
@@ -1235,14 +1265,14 @@ const Dashboard = () => {
                       />
                       <label htmlFor="withdrawConsent" className="text-xs text-gray-700">
                         I confirm that the bank account details provided above are correct and belong to me. 
-                        I understand that providing incorrect information may result in failed transfers and 
-                        additional processing fees may apply.
+                        I understand that providing incorrect information may result in loss of funds and 
+                        Rentalhub NG will not be liable to such.
                       </label>
                     </div>
 
                     <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
                       <FaExclamationTriangle className="mt-0.5 shrink-0" />
-                      <span>Withdrawals are processed within 1–3 business days. Double-check your account details — incorrect details may result in failed transfers.</span>
+                      <span>Withdrawals are processed within 1–7 business days. Double-check your account details — incorrect details may result in loss of funds.</span>
                     </div>
 
                     <div className="flex gap-3">

@@ -22,6 +22,7 @@ import AdminNotifications from "../components/admin/AdminNotifications";
 import AdminManagementTab from "../components/admin/AdminManagementTab";
 import LawyerInvitesManager from "../components/admin/LawyerInvitesManager";
 import PlatformLawyersTab from "../components/admin/PlatformLawyersTab";
+import LawyerActivityMonitor from "../components/admin/LawyerActivityMonitor";
 
 const tabs = [
   "overview",
@@ -29,6 +30,7 @@ const tabs = [
   "verifications",
   "lawyer_invites",
   "platform_lawyers",
+  "lawyer_activity",
   "properties",
   "analytics",
   "reports",
@@ -591,6 +593,8 @@ export default function SuperAdminDashboard() {
       )}
 
       {tab === "platform_lawyers" && <PlatformLawyersTab />}
+
+      {tab === "lawyer_activity" && <LawyerActivityMonitor />}
 
       {tab === "fraud" && (
         <>

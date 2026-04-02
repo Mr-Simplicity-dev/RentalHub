@@ -13,6 +13,8 @@ export default function DisputeDetails() {
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [lawyerProfile, setLawyerProfile] = useState(null);
+const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +48,17 @@ export default function DisputeDetails() {
   if (!payload?.dispute) return <div className="p-6">Dispute not found.</div>;
 
   const { dispute, messages = [], evidence = [], audit_logs = [], authorized_lawyers = [], timeline = [] } = payload;
+
+  const loadLawyerProfile = async () => {
+  try {
+    const res = await api.get('/auth/me');
+    setLawyerProfile(res.data.data);
+  } catch (err) {
+    console.error('Failed to load lawyer profile');
+  } finally {
+    setProfileLoading(false);
+  }
+};
 
   return (
     <div className="bg-gray-50 min-h-screen">
