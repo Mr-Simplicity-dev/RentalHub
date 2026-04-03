@@ -80,6 +80,20 @@ export const propertyService = {
     return response.data;
   },
 
+  analyzeDamagePhoto: async (formData) => {
+    const response = await api.post('/properties/damage-analysis', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
+  saveDamageReport: async (propertyId, formData) => {
+    const response = await api.post(`/properties/${propertyId}/damage-report`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
   // Get my properties (landlord)
   getMyProperties: async (params) => {
     const response = await api.get('/properties/landlord/my-properties', { params });

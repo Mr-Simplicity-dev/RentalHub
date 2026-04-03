@@ -44,10 +44,10 @@ const resolvePropertyManagerContext = async (
   });
 
   if (!managerContext.authorized) {
-    const isMissingResource =
-      managerContext.message === 'Property not found or unauthorized';
+    const statusCode =
+      managerContext.message === 'Property not found or unauthorized' ? 404 : 403;
 
-    res.status(isMissingResource ? 404 : 403).json({
+    res.status(statusCode).json({
       success: false,
       message: managerContext.message,
     });
@@ -67,6 +67,81 @@ const ensureLandlordOwnerIsVerified = async (landlordUserId) => {
   );
 
   return result.rows[0]?.identity_verified === true;
+};
+
+const buildDamageAiPrompt = () => `You are a property damage assessment expert. Analyze this damage photo and provide a JSON response with these fields:
+{
+  "damage_type": "type of damage (scratch/crack/hole/dent/stain/water_damage/mold/other)",
+  "severity": "minor/moderate/severe",
+  "estimated_width_cm": number or null,
+  "estimated_height_cm": number or null,
+  "depth_level": "surface/shallow/deep/structural",
+  "description": "clear description of the damage in 1-2 sentences",
+  "repair_recommendation": "brief repair suggestion",
+  "urgency": "low/medium/high"
+}
+Return only valid JSON, no extra text.`;
+
+const analyzeDamagePhotoUrls = async (photoUrls = []) => {
+  if (!photoUrls.length) return null;
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return {
+      error: 'AI analysis unavailable',
+      raw: 'ANTHROPIC_API_KEY is not configured',
+    };
+  }
+
+  try {
+    const axios = require('axios');
+    const photoResponse = await axios.get(photoUrls[0], {
+      responseType: 'arraybuffer',
+    });
+    const base64Image = Buffer.from(photoResponse.data).toString('base64');
+
+    const claudeResponse = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: 'image/jpeg',
+                  data: base64Image,
+                },
+              },
+              {
+                type: 'text',
+                text: buildDamageAiPrompt(),
+              },
+            ],
+          },
+        ],
+      },
+      {
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const rawText = claudeResponse.data?.content?.[0]?.text || '{}';
+    const cleanText = rawText.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleanText);
+  } catch (error) {
+    console.error('AI damage analysis error:', error.message);
+    return {
+      error: 'AI analysis unavailable',
+      raw: error.message,
+    };
+  }
 };
 
 
@@ -972,11 +1047,19 @@ submitURL(propertyUrl).catch((err) =>
 exports.uploadPropertyPhotos = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const managerContext = await resolvePropertyManagerContext(req, res, {
-      propertyId,
-      requiredPermission: 'can_manage_properties',
-    });
-    if (!managerContext) return;
+    const userId = req.user.id;
+
+    const propertyCheck = await db.query(
+      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
+      [propertyId, userId]
+    );
+
+    if (propertyCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found or unauthorized'
+      });
+    }
 
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
@@ -1027,11 +1110,19 @@ exports.uploadPropertyPhotos = async (req, res) => {
 exports.updateProperty = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const managerContext = await resolvePropertyManagerContext(req, res, {
-      propertyId,
-      requiredPermission: 'can_manage_properties',
-    });
-    if (!managerContext) return;
+    const userId = req.user.id;
+
+    const propertyCheck = await db.query(
+      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
+      [propertyId, userId]
+    );
+
+    if (propertyCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found or unauthorized'
+      });
+    }
 
     const updates = [];
     const params = [];
@@ -1069,11 +1160,8 @@ exports.updateProperty = async (req, res) => {
       UPDATE properties
       SET ${updates.join(', ')}
       WHERE id = $${paramCount}
-        AND landlord_id = $${paramCount + 1}
       RETURNING *
     `;
-
-    params.push(managerContext.landlordUserId);
 
     const result = await db.query(query, params);
 
@@ -1098,11 +1186,19 @@ exports.updateProperty = async (req, res) => {
 exports.deleteProperty = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const managerContext = await resolvePropertyManagerContext(req, res, {
-      propertyId,
-      requiredPermission: 'can_manage_properties',
-    });
-    if (!managerContext) return;
+    const userId = req.user.id;
+
+    const propertyCheck = await db.query(
+      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
+      [propertyId, userId]
+    );
+
+    if (propertyCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found or unauthorized'
+      });
+    }
 
     const photosResult = await db.query(
       'SELECT photo_url FROM property_photos WHERE property_id = $1',
@@ -1207,11 +1303,7 @@ exports.getMyProperties = async (req, res) => {
 exports.toggleAvailability = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const managerContext = await resolvePropertyManagerContext(req, res, {
-      propertyId,
-      requiredPermission: 'can_manage_properties',
-    });
-    if (!managerContext) return;
+    const userId = req.user.id;
 
     const result = await db.query(
       `UPDATE properties
@@ -1219,7 +1311,7 @@ exports.toggleAvailability = async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND landlord_id = $2
        RETURNING is_available`,
-      [propertyId, managerContext.landlordUserId]
+      [propertyId, userId]
     );
 
     if (result.rows.length === 0) {
@@ -1250,11 +1342,7 @@ exports.toggleAvailability = async (req, res) => {
 exports.unlistProperty = async (req, res) => {
   try {
     const { id } = req.params;
-    const managerContext = await resolvePropertyManagerContext(req, res, {
-      propertyId: id,
-      requiredPermission: 'can_manage_properties',
-    });
-    if (!managerContext) return;
+    const userId = req.user.id;
 
     const result = await db.query(
       `UPDATE properties
@@ -1263,7 +1351,7 @@ exports.unlistProperty = async (req, res) => {
        WHERE id = $1
          AND landlord_id = $2
        RETURNING id, is_available`,
-        [id, managerContext.landlordUserId]
+      [id, userId]
     );
 
     if (!result.rows.length) {
@@ -1299,11 +1387,19 @@ exports.unlistProperty = async (req, res) => {
 exports.deletePropertyPhoto = async (req, res) => {
   try {
     const { propertyId, photoId } = req.params;
-    const managerContext = await resolvePropertyManagerContext(req, res, {
-      propertyId,
-      requiredPermission: 'can_manage_properties',
-    });
-    if (!managerContext) return;
+    const userId = req.user.id;
+
+    const propertyCheck = await db.query(
+      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
+      [propertyId, userId]
+    );
+
+    if (propertyCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found or unauthorized'
+      });
+    }
 
     const photoResult = await db.query(
       'SELECT photo_url, is_primary FROM property_photos WHERE id = $1 AND property_id = $2',
@@ -1361,11 +1457,19 @@ exports.deletePropertyPhoto = async (req, res) => {
 exports.getPropertyStats = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const managerContext = await resolvePropertyManagerContext(req, res, {
-      propertyId,
-      requiredPermission: 'can_manage_properties',
-    });
-    if (!managerContext) return;
+    const userId = req.user.id;
+
+    const propertyCheck = await db.query(
+      'SELECT id FROM properties WHERE id = $1 AND landlord_id = $2',
+      [propertyId, userId]
+    );
+
+    if (propertyCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property not found or unauthorized'
+      });
+    }
 
     const stats = await db.query(
       `SELECT 
@@ -1395,6 +1499,42 @@ exports.getPropertyStats = async (req, res) => {
 // =====================================================
 //     DAMAGE REPORT — Save (Landlord)
 // =====================================================
+exports.analyzeDamagePhoto = async (req, res) => {
+  try {
+    const managerContext = await resolvePropertyManagerContext(req, res, {
+      requiredPermission: 'can_manage_damage_reports',
+    });
+    if (!managerContext) return;
+
+    const photoUrls = (req.files || [])
+      .map((file) => file.path || file.secure_url || file.url)
+      .filter(Boolean);
+
+    if (!photoUrls.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please capture or upload at least one photo',
+      });
+    }
+
+    const aiAnalysis = await analyzeDamagePhotoUrls(photoUrls);
+
+    return res.json({
+      success: true,
+      data: {
+        ai_analysis: aiAnalysis,
+        photo_urls: photoUrls,
+      },
+    });
+  } catch (error) {
+    console.error('Analyze damage photo error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to analyze damage photo',
+    });
+  }
+};
+
 exports.saveDamageReport = async (req, res) => {
   try {
     const { propertyId } = req.params;
@@ -1413,7 +1553,9 @@ exports.saveDamageReport = async (req, res) => {
       height_cm,
       depth_level,     // surface | shallow | deep | structural
       severity,        // minor | moderate | severe
+      ai_analysis,
     } = req.body;
+
     // Ensure damage_reports table exists
     await db.query(`
       CREATE TABLE IF NOT EXISTS property_damage_reports (
@@ -1442,61 +1584,17 @@ exports.saveDamageReport = async (req, res) => {
     // Call Claude Vision API for AI analysis if photos were uploaded
     let aiAnalysis = null;
 
-    if (photoUrls.length > 0 && process.env.ANTHROPIC_API_KEY) {
+    if (ai_analysis) {
       try {
-        const axios = require('axios');
-
-        // Download first photo and convert to base64
-        const photoResponse = await axios.get(photoUrls[0], { responseType: 'arraybuffer' });
-        const base64Image = Buffer.from(photoResponse.data).toString('base64');
-        const mimeType = 'image/jpeg';
-
-        const claudeResponse = await axios.post(
-          'https://api.anthropic.com/v1/messages',
-          {
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 1024,
-            messages: [{
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: { type: 'base64', media_type: mimeType, data: base64Image },
-                },
-                {
-                  type: 'text',
-                  text: `You are a property damage assessment expert. Analyze this damage photo and provide a JSON response with these fields:
-                  {
-                    "damage_type": "type of damage (scratch/crack/hole/dent/stain/water_damage/mold/other)",
-                    "severity": "minor/moderate/severe",
-                    "estimated_width_cm": number or null,
-                    "estimated_height_cm": number or null,
-                    "depth_level": "surface/shallow/deep/structural",
-                    "description": "clear description of the damage in 1-2 sentences",
-                    "repair_recommendation": "brief repair suggestion",
-                    "urgency": "low/medium/high"
-                  }
-                  Return only valid JSON, no extra text.`,
-                },
-              ],
-            }],
-          },
-          {
-            headers: {
-              'x-api-key': process.env.ANTHROPIC_API_KEY,
-              'anthropic-version': '2023-06-01',
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        const rawText = claudeResponse.data?.content?.[0]?.text || '{}';
-        const cleanText = rawText.replace(/```json|```/g, '').trim();
-        aiAnalysis = JSON.parse(cleanText);
-      } catch (aiErr) {
-        console.error('AI damage analysis error:', aiErr.message);
-        aiAnalysis = { error: 'AI analysis unavailable', raw: aiErr.message };
+        aiAnalysis =
+          typeof ai_analysis === 'string' ? JSON.parse(ai_analysis) : ai_analysis;
+      } catch (error) {
+        console.error('Failed to parse submitted AI analysis:', error.message);
       }
+    }
+
+    if (!aiAnalysis) {
+      aiAnalysis = await analyzeDamagePhotoUrls(photoUrls);
     }
 
     // Save damage report

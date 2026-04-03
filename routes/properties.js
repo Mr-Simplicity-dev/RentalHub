@@ -82,6 +82,14 @@ router.get('/:propertyId/reviews', propertyController.getPropertyReviews);
 
 // ============ LANDLORD ROUTES ============
 
+router.post(
+  '/damage-analysis',
+  authenticate,
+  isLandlordOrAgent,
+  uploadPropertyPhotos,
+  propertyController.analyzeDamagePhoto
+);
+
 // Get landlord's properties
 router.get(
   '/landlord/my-properties',
