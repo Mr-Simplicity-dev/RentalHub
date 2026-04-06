@@ -121,6 +121,9 @@ const AgentDashboard = () => {
                 <Link to="/agent/earnings" className="btn w-full">
                   <FaCoins className="mr-2" />
                   View Earnings
+                                <Link to="/agent/withdrawals" className="btn w-full">
+                                  Request Withdrawal
+                                </Link>
                 </Link>
               </div>
             </div>

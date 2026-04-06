@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { FaDollarSign, FaCheckCircle, FaClock, FaHistory } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
@@ -193,12 +194,18 @@ const AgentEarningsPage = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900">Commission History</h2>
-          <button
-            onClick={loadEarningsData}
-            className="btn btn-sm btn-outline"
-          >
-            Refresh
-          </button>
+          <div className="flex gap-2">
+            <Link to="/agent/withdrawals" className="btn btn-sm btn-primary">
+              + Request Withdrawal
+            </Link>
+            <button
+              onClick={loadEarningsData}
+              className="btn btn-sm btn-outline"
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
         </div>
         <CommissionHistory commissions={commissions} loading={commissionLoading} />
       </div>

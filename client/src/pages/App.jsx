@@ -66,6 +66,8 @@ import FinancialAdminDashboard from './admin/FinancialAdminDashboard'; // ADD TH
 import StateAdminDashboard from './admin/StateAdminDashboard'; // ADD THIS LINE
 import AgentEarningsPage from './agent/AgentEarningsPage';
 
+import AdminAgentManagement from './admin/AdminAgentManagement';
+import AgentWithdrawalPage from './agent/AgentWithdrawalPage';
 
 const queryClient = new QueryClient();
 
@@ -266,6 +268,7 @@ function App() {
               <Route path="/lawyer" element={<LawyerRoute><LawyerDashboard /></LawyerRoute>}/>
               <Route path="/agent/dashboard" element={<AgentRoute><AgentDashboard /></AgentRoute>} />
               <Route path="/agent/earnings" element={<AgentRoute><AgentEarningsPage /></AgentRoute>} />
+                            <Route path="/agent/withdrawals" element={<AgentRoute><AgentWithdrawalPage /></AgentRoute>} />
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
@@ -307,6 +310,7 @@ function App() {
                 <Route path="properties" element={<AdminProperties />} />
                 <Route path="applications" element={<AdminApplications />} />
                 <Route path="compliance" element={<AdminCompliance />} />
+                                <Route path="agents" element={<AdminAgentManagement />} />
                 <Route path="users/:id" element={<AdminUserDetail />} />
                                 <Route path="properties/:id" element={<AdminPropertyDetail />} />
                 <Route path="applications/:id" element={<AdminApplicationDetail />} />

@@ -34,7 +34,10 @@ const stateAdminRoutes = require('./routes/stateAdmin');
 
 const verificationRoutes = require('./routes/evidenceVerification.routes');
 const agentCommissionRoutes = require('./routes/agentCommissions');
+const adminAgentRoutes = require('./routes/adminAgents');
+const agentWithdrawalRoutes = require('./routes/agentWithdrawals');
 
+const damageReportRoutes = require('./routes/damageReports');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 
 const audit = require('./config/middleware/auditMiddleware');
@@ -380,6 +383,9 @@ app.use('/api/state-admin', stateAdminRoutes);
 
 app.use('/evidence', verificationRoutes);
 app.use('/api/commissions', agentCommissionRoutes);
+app.use('/api/admin/agents', adminAgentRoutes);
+app.use('/api/withdrawals', agentWithdrawalRoutes);
+app.use('/api', damageReportRoutes);
 
 app.use((err, req, res, next) => {
   console.error('UNHANDLED ERROR:', err);

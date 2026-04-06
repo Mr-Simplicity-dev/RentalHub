@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import Loader from '../components/common/Loader';
 import Modal from '../components/common/Modal';
 import DisputeCreationModal from '../components/DisputeCreationModal';
+import { DamageReportPreview } from '../components/damage';
 import {
   FaBed,
   FaBath,
@@ -499,6 +500,13 @@ const PropertyDetail = () => {
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3">Full Address</h2>
                 <p className="text-gray-700">{property.full_address}</p>
+              </div>
+            )}
+
+            {/* Property Condition Report - show latest damage report to tenants */}
+            {hasFullAccess && property.damage_reports && property.damage_reports.length > 0 && (
+              <div className="mb-6">
+                <DamageReportPreview damageReports={property.damage_reports} />
               </div>
             )}
           </div>
