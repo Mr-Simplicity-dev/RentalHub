@@ -33,6 +33,7 @@ const financialAdminRoutes = require('./routes/financialAdmin');
 const stateAdminRoutes = require('./routes/stateAdmin');
 
 const verificationRoutes = require('./routes/evidenceVerification.routes');
+const agentCommissionRoutes = require('./routes/agentCommissions');
 
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 
@@ -378,6 +379,7 @@ app.use('/api/financial-admin', financialAdminRoutes);
 app.use('/api/state-admin', stateAdminRoutes);
 
 app.use('/evidence', verificationRoutes);
+app.use('/api/commissions', agentCommissionRoutes);
 
 app.use((err, req, res, next) => {
   console.error('UNHANDLED ERROR:', err);

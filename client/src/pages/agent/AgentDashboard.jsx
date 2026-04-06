@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaClipboardList, FaHome, FaShieldAlt, FaUserTie } from 'react-icons/fa';
+import { FaClipboardList, FaHome, FaShieldAlt, FaUserTie, FaCoins } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
@@ -117,6 +117,10 @@ const AgentDashboard = () => {
                 </Link>
                 <Link to="/add-property" className="btn w-full">
                   Add New Property
+                </Link>
+                <Link to="/agent/earnings" className="btn w-full">
+                  <FaCoins className="mr-2" />
+                  View Earnings
                 </Link>
               </div>
             </div>

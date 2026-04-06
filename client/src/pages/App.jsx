@@ -64,6 +64,7 @@ import AreaPage from './AreaPage';
 import LawyersDirectory from './LawyersDirectory';
 import FinancialAdminDashboard from './admin/FinancialAdminDashboard'; // ADD THIS LINE
 import StateAdminDashboard from './admin/StateAdminDashboard'; // ADD THIS LINE
+import AgentEarningsPage from './agent/AgentEarningsPage';
 
 
 const queryClient = new QueryClient();
@@ -264,6 +265,7 @@ function App() {
               <Route path="/super-admin" element={<SuperAdminDashboard />} />
               <Route path="/lawyer" element={<LawyerRoute><LawyerDashboard /></LawyerRoute>}/>
               <Route path="/agent/dashboard" element={<AgentRoute><AgentDashboard /></AgentRoute>} />
+              <Route path="/agent/earnings" element={<AgentRoute><AgentEarningsPage /></AgentRoute>} />
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
