@@ -36,6 +36,7 @@ const PropertyDetail = () => {
   const [applicationData, setApplicationData] = useState({
     message: '',
     move_in_date: '',
+    proposed_rent: '',
   });
   const [submittingApplication, setSubmittingApplication] = useState(false);
   const [hasFullAccess, setHasFullAccess] = useState(false);
@@ -272,6 +273,7 @@ const PropertyDetail = () => {
     try {
       const response = await applicationService.submitApplication({
         property_id: parseInt(id),
+        proposed_rent: applicationData.proposed_rent || undefined,
         ...applicationData,
       });
 
@@ -642,6 +644,25 @@ const PropertyDetail = () => {
               className="input"
               placeholder="Introduce yourself and explain why you're interested in this property..."
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Proposed Rent (Optional)
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={applicationData.proposed_rent}
+              onChange={(e) =>
+                setApplicationData({ ...applicationData, proposed_rent: e.target.value })
+              }
+              className="input"
+              placeholder={`Leave blank to accept listed rent of ${formatCurrency(property.rent_amount)}`}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Enter a different amount only if you want to negotiate rent with the landlord.
+            </p>
           </div>
 
           <div>

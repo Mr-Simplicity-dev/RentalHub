@@ -14,7 +14,8 @@ router.post('/',
   [
     body('property_id').isInt(),
     body('message').optional().trim(),
-    body('move_in_date').optional().isDate()
+    body('move_in_date').optional().isDate(),
+    body('proposed_rent').optional({ checkFalsy: true }).isFloat({ gt: 0 })
   ],
   applicationController.submitApplication
 );
@@ -39,6 +40,26 @@ router.patch('/:applicationId/withdraw',
   applicationController.withdrawApplication
 );
 
+router.patch('/:applicationId/offer',
+  authenticate,
+  isTenant,
+  [
+    body('proposed_rent').isFloat({ gt: 0 }),
+    body('note').optional().trim()
+  ],
+  applicationController.tenantUpdateOffer
+);
+
+router.patch('/:applicationId/respond-counter',
+  authenticate,
+  isTenant,
+  [
+    body('action').isIn(['accept', 'reject']),
+    body('note').optional().trim()
+  ],
+  applicationController.tenantRespondToCounter
+);
+
 // ============ LANDLORD ROUTES ============
 
 // Get applications for landlord's properties
@@ -60,6 +81,23 @@ router.patch('/:applicationId/approve',
   authenticate,
   isLandlord,
   applicationController.approveApplication
+);
+
+router.patch('/:applicationId/accept-offer',
+  authenticate,
+  isLandlord,
+  [body('note').optional().trim()],
+  applicationController.landlordAcceptOffer
+);
+
+router.patch('/:applicationId/counter-offer',
+  authenticate,
+  isLandlord,
+  [
+    body('counter_offer_rent').isFloat({ gt: 0 }),
+    body('note').optional().trim()
+  ],
+  applicationController.landlordCounterOffer
 );
 
 // Reject application
