@@ -7,6 +7,27 @@ const {
 
 let applicationNegotiationSchemaReady = false;
 
+// Phone number masking for security - prevent sharing during negotiation
+const maskPhoneNumbers = (data) => {
+  if (!data) return data;
+  const masked = { ...data };
+  if (masked.landlord_phone) masked.landlord_phone = '***-***-****';
+  if (masked.tenant_phone) masked.tenant_phone = '***-***-****';
+  if (masked.phone) masked.phone = '***-***-****';
+  return masked;
+};
+
+// Remove sensitive contact info from negotiation context
+const sanitizeForNegotiation = (application) => {
+  if (!application) return application;
+  const sanitized = { ...application };
+  delete sanitized.landlord_phone;
+  delete sanitized.tenant_phone;
+  delete sanitized.phone;
+  // Keep only name and email for contact, not phone
+  return sanitized;
+};
+
 const NEGOTIATION_STATUSES = {
   NONE: 'none',
   TENANT_OFFERED: 'tenant_offered',
@@ -315,7 +336,7 @@ exports.getMyApplications = async (req, res) => {
 
     return res.json({
       success: true,
-      data: result.rows,
+      data: result.rows.map(sanitizeForNegotiation),
       pagination: {
         page: parseInt(page, 10),
         limit: parseInt(limit, 10),
@@ -349,7 +370,7 @@ exports.getApplicationById = async (req, res) => {
 
     return res.json({
       success: true,
-      data: await attachHistory(row),
+      data: sanitizeForNegotiation(await attachHistory(row)),
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch application' });
@@ -445,7 +466,7 @@ exports.getReceivedApplications = async (req, res) => {
 
     return res.json({
       success: true,
-      data: result.rows,
+      data: result.rows.map(sanitizeForNegotiation),
       pagination: {
         page: parseInt(page, 10),
         limit: parseInt(limit, 10),
@@ -554,7 +575,7 @@ exports.landlordAcceptOffer = async (req, res) => {
     return res.json({
       success: true,
       message: 'Tenant offer accepted. You can now approve the application.',
-      data: await attachHistory(result.rows[0]),
+      data: sanitizeForNegotiation(await attachHistory(result.rows[0])),
     });
   } catch (error) {
     console.error('Landlord accept offer error:', error);
@@ -605,7 +626,7 @@ exports.landlordCounterOffer = async (req, res) => {
     return res.json({
       success: true,
       message: 'Counter-offer sent to tenant',
-      data: await attachHistory(result.rows[0]),
+      data: sanitizeForNegotiation(await attachHistory(result.rows[0])),
     });
   } catch (error) {
     console.error('Landlord counter offer error:', error);
@@ -657,7 +678,7 @@ exports.tenantUpdateOffer = async (req, res) => {
     return res.json({
       success: true,
       message: 'Offer sent to landlord',
-      data: await attachHistory(result.rows[0]),
+      data: sanitizeForNegotiation(await attachHistory(result.rows[0])),
     });
   } catch (error) {
     console.error('Tenant update offer error:', error);
@@ -717,7 +738,7 @@ exports.tenantRespondToCounter = async (req, res) => {
     return res.json({
       success: true,
       message: action === 'accept' ? 'Counter-offer accepted' : 'Counter-offer rejected',
-      data: await attachHistory(result.rows[0]),
+      data: sanitizeForNegotiation(await attachHistory(result.rows[0])),
     });
   } catch (error) {
     console.error('Tenant respond to counter error:', error);
@@ -753,13 +774,23 @@ exports.approveApplication = async (req, res) => {
       || (application.negotiation_status === NEGOTIATION_STATUSES.TENANT_OFFERED ? application.proposed_rent : null)
       || application.rent_amount;
 
-    const result = await db.query(
+    // Determine if this approval involves a negotiated rent
+    const isNegotiatedApproval = application.negotiation_status === NEGOTIATION_STATUSES.TENANT_OFFERED && application.proposed_rent;
+    const rentChangeNote = isNegotiatedApproval 
+      ? `Property rent updated from ${application.rent_amount} to ${finalRent} (agreed after tenant negotiation)` 
+      : null;
+
+    const appResult = await db.query(
       `UPDATE applications
        SET status = 'approved',
            agreed_rent = COALESCE(agreed_rent, $2),
            negotiation_status = CASE
              WHEN negotiation_status = $3 THEN $4
              ELSE negotiation_status
+           END,
+           internal_notes = CASE
+             WHEN $5 IS NOT NULL THEN $5
+             ELSE internal_notes
            END,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
@@ -769,17 +800,34 @@ exports.approveApplication = async (req, res) => {
         finalRent,
         NEGOTIATION_STATUSES.TENANT_OFFERED,
         NEGOTIATION_STATUSES.AGREED,
+        rentChangeNote,
       ]
     );
 
-    if (application.negotiation_status === NEGOTIATION_STATUSES.TENANT_OFFERED && application.proposed_rent) {
+    const approvedApp = appResult.rows[0];
+
+    // If negotiated rent differs from property rent, update the property rent
+    if (isNegotiatedApproval && finalRent !== application.rent_amount) {
+      await db.query(
+        `UPDATE properties
+         SET rent_amount = $1,
+             is_negotiated_rent = TRUE,
+             last_negotiation_date = CURRENT_TIMESTAMP,
+             last_negotiated_by = $2,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [finalRent, userId, application.property_id]
+      );
+    }
+
+    if (isNegotiatedApproval) {
       await createNegotiationEvent({
         applicationId,
         actorUserId: userId,
         actorRole: 'landlord',
         actionType: ACTION_TYPES.LANDLORD_ACCEPT,
         offerAmount: application.proposed_rent,
-        note: 'Offer accepted during application approval',
+        note: 'Offer accepted during application approval. Property rent updated.',
       });
     }
 
@@ -792,8 +840,8 @@ exports.approveApplication = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Application approved successfully',
-      data: result.rows[0],
+      message: 'Application approved successfully' + (isNegotiatedApproval ? ' - Property rent has been updated.' : ''),
+      data: sanitizeForNegotiation(approvedApp),
     });
   } catch (error) {
     console.error('Approve application error:', error);

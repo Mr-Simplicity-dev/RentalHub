@@ -1,8 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const { body } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 const applicationController = require('../controllers/applicationController');
 const { authenticate, isTenant, isLandlord, isVerified } = require('../config/middleware/auth');
+
+// Security: Block phone number sharing during negotiation
+const phoneNumberRegex = /(\+?[\d-\s()]{7,})|(\d{3}[-.]?\d{3}[-.]?\d{4})|(\d{10})/i;
+const noPhoneNumbersValidator = body('note', 'Phone numbers cannot be shared during negotiation')
+  .if(body('note').exists({ checkFalsy: false }))
+  .custom(value => {
+    if (value && typeof value === 'string' && phoneNumberRegex.test(value)) {
+      throw new Error('Phone numbers cannot be shared during negotiation. Please use only in-app messaging.');
+    }
+    return true;
+  });
+
+const handleValidationErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, message: errors.array()[0].msg });
+  }
+  next();
+};
 
 // ============ TENANT ROUTES ============
 
@@ -17,6 +36,7 @@ router.post('/',
     body('move_in_date').optional().isDate(),
     body('proposed_rent').optional({ checkFalsy: true }).isFloat({ gt: 0 })
   ],
+  handleValidationErrors,
   applicationController.submitApplication
 );
 
@@ -45,8 +65,9 @@ router.patch('/:applicationId/offer',
   isTenant,
   [
     body('proposed_rent').isFloat({ gt: 0 }),
-    body('note').optional().trim()
+    noPhoneNumbersValidator
   ],
+  handleValidationErrors,
   applicationController.tenantUpdateOffer
 );
 
@@ -55,8 +76,9 @@ router.patch('/:applicationId/respond-counter',
   isTenant,
   [
     body('action').isIn(['accept', 'reject']),
-    body('note').optional().trim()
+    noPhoneNumbersValidator
   ],
+  handleValidationErrors,
   applicationController.tenantRespondToCounter
 );
 
@@ -86,7 +108,8 @@ router.patch('/:applicationId/approve',
 router.patch('/:applicationId/accept-offer',
   authenticate,
   isLandlord,
-  [body('note').optional().trim()],
+  [noPhoneNumbersValidator],
+  handleValidationErrors,
   applicationController.landlordAcceptOffer
 );
 
@@ -95,8 +118,9 @@ router.patch('/:applicationId/counter-offer',
   isLandlord,
   [
     body('counter_offer_rent').isFloat({ gt: 0 }),
-    body('note').optional().trim()
+    noPhoneNumbersValidator
   ],
+  handleValidationErrors,
   applicationController.landlordCounterOffer
 );
 
