@@ -1,14 +1,55 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import LawyerVerification from './LawyerVerification';
 
+const EVIDENCE_STATUSES = ['pending', 'verified', 'flagged', 'rejected'];
+
+const formatDateTime = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+};
+
+const getStatusBadge = (status) => {
+  if (status === 'resolved') {
+    return 'bg-emerald-100 text-emerald-700';
+  }
+
+  if (status === 'in_progress' || status === 'active') {
+    return 'bg-blue-100 text-blue-700';
+  }
+
+  return 'bg-amber-100 text-amber-700';
+};
+
+const getEvidenceStatusBadge = (status) => {
+  if (status === 'verified') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'flagged') return 'bg-orange-100 text-orange-700';
+  if (status === 'rejected') return 'bg-red-100 text-red-700';
+  return 'bg-gray-100 text-gray-700';
+};
+
 const LawyerDashboardContent = () => {
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [disputes, setDisputes] = useState([]);
+  const [selectedDispute, setSelectedDispute] = useState(null);
+  const [disputeDetails, setDisputeDetails] = useState(null);
+  const [evidenceVerification, setEvidenceVerification] = useState([]);
+  const [caseNotes, setCaseNotes] = useState([]);
+  const [evidenceNoteDrafts, setEvidenceNoteDrafts] = useState({});
+  const [summaryDraft, setSummaryDraft] = useState('');
+  const [newNoteTitle, setNewNoteTitle] = useState('');
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [newNoteVisible, setNewNoteVisible] = useState(false);
+  const [lawyerProfile, setLawyerProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [verificationBusyId, setVerificationBusyId] = useState(null);
+  const [summarySaving, setSummarySaving] = useState(false);
+  const [noteSaving, setNoteSaving] = useState(false);
   const [programLoading, setProgramLoading] = useState(true);
   const [applyLoading, setApplyLoading] = useState(false);
   const [programData, setProgramData] = useState({
@@ -16,23 +57,89 @@ const LawyerDashboardContent = () => {
     application: null,
   });
 
+  const loadLawyerProfile = async () => {
+    try {
+      const res = await api.get('/users/profile');
+      setLawyerProfile(res.data?.data || null);
+    } catch {
+      setLawyerProfile(null);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   const loadAuthorizedProperties = async () => {
     try {
       const res = await api.get('/legal/properties');
-      setProperties(res.data.data || []);
-    } catch (err) {
-      console.error('Failed to load properties');
+      const rows = res.data?.data || [];
+      setProperties(rows);
+      if (rows.length && !selectedProperty) {
+        setSelectedProperty(rows[0]);
+      }
+    } catch {
+      toast.error('Failed to load authorized properties');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadDisputes = async (propertyId) => {
+  const loadDisputes = async (propertyId, preferredDisputeId = null) => {
     try {
       const res = await api.get(`/legal/property/${propertyId}/disputes`);
-      setDisputes(res.data.data || []);
-    } catch (err) {
-      console.error('Failed to load disputes');
+      const rows = res.data?.data || [];
+      setDisputes(rows);
+
+      if (!rows.length) {
+        setSelectedDispute(null);
+        setDisputeDetails(null);
+        setEvidenceVerification([]);
+        setCaseNotes([]);
+        setSummaryDraft('');
+        return;
+      }
+
+      const nextDispute = preferredDisputeId
+        ? rows.find((item) => String(item.id) === String(preferredDisputeId)) || rows[0]
+        : rows[0];
+
+      setSelectedDispute(nextDispute);
+      await loadDisputeWorkspace(nextDispute.id);
+    } catch {
+      toast.error('Failed to load disputes for this property');
+    }
+  };
+
+  const loadDisputeWorkspace = async (disputeId) => {
+    try {
+      setWorkspaceLoading(true);
+      const [disputeRes, verificationRes, notesRes] = await Promise.all([
+        api.get(`/disputes/${disputeId}`),
+        api.get(`/legal/disputes/${disputeId}/evidence/verification`),
+        api.get(`/legal/disputes/${disputeId}/notes`),
+      ]);
+
+      const payload = disputeRes.data?.data || null;
+      const verificationRows = verificationRes.data?.data || [];
+      const noteRows = notesRes.data?.data || [];
+
+      setDisputeDetails(payload);
+      setEvidenceVerification(verificationRows);
+      setCaseNotes(noteRows);
+      setSummaryDraft(payload?.dispute?.lawyer_summary || '');
+
+      setEvidenceNoteDrafts((current) => {
+        const next = { ...current };
+        verificationRows.forEach((row) => {
+          if (typeof next[row.id] === 'undefined') {
+            next[row.id] = row.lawyer_notes || '';
+          }
+        });
+        return next;
+      });
+    } catch {
+      toast.error('Failed to load dispute workspace');
+    } finally {
+      setWorkspaceLoading(false);
     }
   };
 
@@ -43,8 +150,8 @@ const LawyerDashboardContent = () => {
         broadcast: res.data?.data?.broadcast || null,
         application: res.data?.data?.application || null,
       });
-    } catch (err) {
-      console.error('Failed to load platform lawyer program');
+    } catch {
+      setProgramData({ broadcast: null, application: null });
     } finally {
       setProgramLoading(false);
     }
@@ -52,9 +159,15 @@ const LawyerDashboardContent = () => {
 
   useEffect(() => {
     loadAuthorizedProperties();
+    loadLawyerProfile();
     loadPlatformLawyerProgram();
-     loadLawyerProfile();
   }, []);
+
+  useEffect(() => {
+    if (selectedProperty?.id) {
+      loadDisputes(selectedProperty.id, selectedDispute?.id);
+    }
+  }, [selectedProperty?.id]);
 
   const applyToProgram = async () => {
     setApplyLoading(true);
@@ -69,172 +182,94 @@ const LawyerDashboardContent = () => {
     }
   };
 
-  if (loading || profileLoading) {
-  return <div className="p-6">Loading lawyer dashboard...</div>;
-}
+  const handleEvidenceVerification = async (evidenceId, status) => {
+    if (!selectedDispute?.id) return;
 
-if (loading || profileLoading) {
-  return <div className="p-6">Loading lawyer dashboard...</div>;
-}
+    try {
+      setVerificationBusyId(evidenceId);
+      const notes = evidenceNoteDrafts[evidenceId] || '';
+      const res = await api.patch(
+        `/legal/disputes/${selectedDispute.id}/evidence/${evidenceId}/verify`,
+        {
+          verification_status: status,
+          notes,
+        }
+      );
+      toast.success(res.data?.message || 'Evidence updated');
+      await loadDisputeWorkspace(selectedDispute.id);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to verify evidence');
+    } finally {
+      setVerificationBusyId(null);
+    }
+  };
 
-return (
-  <div className="p-6 space-y-6">
+  const handleSaveSummary = async () => {
+    if (!selectedDispute?.id || !summaryDraft.trim()) {
+      toast.error('Enter a dispute summary first');
+      return;
+    }
 
-    {/* 🔥 HEADER */}
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-2xl font-bold">Lawyer Dashboard</h1>
-      <Link
-        to="/verify-case"
-        className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-      >
-        Verify Case Evidence
-      </Link>
-    </div>
+    try {
+      setSummarySaving(true);
+      const res = await api.patch(`/legal/disputes/${selectedDispute.id}/summary`, {
+        lawyer_summary: summaryDraft,
+      });
+      toast.success(res.data?.message || 'Summary saved');
+      await loadDisputeWorkspace(selectedDispute.id);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save summary');
+    } finally {
+      setSummarySaving(false);
+    }
+  };
 
-    {/* ✅ LAWYER PROFILE CARD (INSERTED HERE) */}
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-            <span className="text-2xl font-bold text-blue-600">
-              {lawyerProfile?.full_name?.charAt(0) || 'L'}
-            </span>
-          </div>
+  const handleCreateCaseNote = async () => {
+    if (!selectedDispute?.id || !newNoteContent.trim()) {
+      toast.error('Case note content is required');
+      return;
+    }
 
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">
-              {lawyerProfile?.full_name || 'Lawyer Name'}
-            </h2>
+    try {
+      setNoteSaving(true);
+      const res = await api.post(`/legal/disputes/${selectedDispute.id}/notes`, {
+        title: newNoteTitle.trim() || null,
+        content: newNoteContent.trim(),
+        is_visible_to_client: newNoteVisible,
+      });
+      toast.success(res.data?.message || 'Case note added');
+      setNewNoteTitle('');
+      setNewNoteContent('');
+      setNewNoteVisible(false);
+      await loadDisputeWorkspace(selectedDispute.id);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to add case note');
+    } finally {
+      setNoteSaving(false);
+    }
+  };
 
-            <div className="flex flex-wrap gap-3 mt-2">
-              
-              <span className="inline-flex items-center gap-1 text-sm text-gray-600">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                </svg>
-                {lawyerProfile?.email || 'lawyer@example.com'}
-              </span>
+  const handleDeleteCaseNote = async (noteId) => {
+    if (!selectedDispute?.id) return;
 
-              <span className="inline-flex items-center gap-1 text-sm text-gray-600">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm3 14a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                </svg>
-                {lawyerProfile?.phone || '+234...'}
-              </span>
+    try {
+      const res = await api.delete(`/legal/disputes/${selectedDispute.id}/notes/${noteId}`);
+      toast.success(res.data?.message || 'Case note deleted');
+      await loadDisputeWorkspace(selectedDispute.id);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete case note');
+    }
+  };
 
-              <span className="inline-flex items-center gap-1 text-sm text-gray-600">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z" clipRule="evenodd" />
-                </svg>
-                {lawyerProfile?.nationality || 'Nigeria'}
-              </span>
-            </div>
+  const summaryInfo = useMemo(() => {
+    if (!disputeDetails?.dispute) return null;
 
-            {lawyerProfile?.chamber_name && (
-              <p className="mt-2 text-sm text-gray-700">
-                <span className="font-semibold">Chamber:</span> {lawyerProfile.chamber_name}
-                {lawyerProfile?.chamber_phone && ` • ${lawyerProfile.chamber_phone}`}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <Link
-            to="/verify-case"
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-          >
-            Verify Case Evidence
-          </Link>
-
-          <button className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            Edit Profile
-          </button>
-        </div>
-      </div>
-    </div>
-
-    {/* ✅ EXISTING PROGRAM CARD (UNCHANGED) */}
-    <div className="card p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-semibold text-gray-900">
-            RentalHub NG Lawyer Program
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Apply when the super admin opens recruitment for lawyers who will be displayed on the public RentalHub NG lawyers page.
-          </p>
-        </div>
-
-        {programData.application?.status === 'approved' ? (
-          <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-            Approved
-          </span>
-        ) : programData.application?.status === 'pending' ? (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-            Pending Review
-          </span>
-        ) : programData.application?.status === 'rejected' ? (
-          <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-            Rejected
-          </span>
-        ) : null}
-      </div>
-
-      {programLoading ? (
-        <p className="mt-4 text-sm text-gray-500">
-          Loading lawyer program details...
-        </p>
-      ) : (
-        <div className="mt-4 space-y-4">
-          {programData.broadcast ? (
-            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
-              <p className="font-semibold">{programData.broadcast.title}</p>
-              <p className="mt-2 whitespace-pre-line">{programData.broadcast.message}</p>
-              <p className="mt-3 text-xs text-blue-700">
-                Sent {new Date(programData.broadcast.created_at).toLocaleString()}
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-              No active platform-lawyer recruitment broadcast is available right now.
-            </div>
-          )}
-
-          {programData.application && (
-            <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
-              <p className="font-semibold text-gray-900">
-                Application status: {programData.application.status}
-              </p>
-              <p className="mt-1 text-gray-500">
-                Applied on {new Date(programData.application.applied_at).toLocaleString()}
-              </p>
-              {programData.application.review_note && (
-                <p className="mt-2 text-sm text-gray-700">
-                  Review note: {programData.application.review_note}
-                </p>
-              )}
-            </div>
-          )}
-
-          <button
-            onClick={applyToProgram}
-            disabled={applyLoading}
-            className="rounded-lg bg-primary-600 px-4 py-2 text-white"
-          >
-            Apply To Serve
-          </button>
-        </div>
-      )}
-    </div>
-
-    {/* 🔽 KEEP THE REST OF YOUR CODE (properties + disputes) EXACTLY AS IS */}
-  </div>
-);
-
-const LawyerDashboardContent = () => {
+    const dispute = disputeDetails.dispute;
+    return {
+      byName: dispute.lawyer_summary_by_name || 'Unknown',
+      at: dispute.lawyer_summary_at,
+    };
+  }, [disputeDetails]);
 
   if (loading || profileLoading) {
     return <div className="p-6">Loading lawyer dashboard...</div>;
@@ -242,10 +277,8 @@ const LawyerDashboardContent = () => {
 
   return (
     <div className="p-6 space-y-6">
-
-      {/* 🔥 HEADER */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Lawyer Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Lawyer Dashboard</h1>
         <Link
           to="/verify-case"
           className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
@@ -254,460 +287,369 @@ const LawyerDashboardContent = () => {
         </Link>
       </div>
 
-      {/* ✅ LAWYER PROFILE CARD */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl font-bold text-blue-600">
-                {lawyerProfile?.full_name?.charAt(0) || 'L'}
-              </span>
-            </div>
-
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                {lawyerProfile?.full_name || 'Lawyer Name'}
-              </h2>
-
-              <div className="flex flex-wrap gap-3 mt-2">
-
-                <span className="inline-flex items-center gap-1 text-sm text-gray-600">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                  </svg>
-                  {lawyerProfile?.email || 'lawyer@example.com'}
-                </span>
-
-                <span className="inline-flex items-center gap-1 text-sm text-gray-600">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm3 14a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                  </svg>
-                  {lawyerProfile?.phone || '+234...'}
-                </span>
-
-                <span className="inline-flex items-center gap-1 text-sm text-gray-600">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z" clipRule="evenodd" />
-                  </svg>
-                  {lawyerProfile?.nationality || 'Nigeria'}
-                </span>
-              </div>
-
-              {lawyerProfile?.chamber_name && (
-                <p className="mt-2 text-sm text-gray-700">
-                  <span className="font-semibold">Chamber:</span> {lawyerProfile.chamber_name}
-                  {lawyerProfile?.chamber_phone && ` • ${lawyerProfile.chamber_phone}`}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Link
-              to="/verify-case"
-              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-            >
-              Verify Case Evidence
-            </Link>
-
-            <button className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Edit Profile
-            </button>
+      <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-blue-700">Lawyer Profile</p>
+            <h2 className="mt-1 text-xl font-bold text-gray-900">
+              {lawyerProfile?.full_name || 'Lawyer'}
+            </h2>
+            <p className="mt-1 text-sm text-gray-700">{lawyerProfile?.email || '-'}</p>
+            <p className="text-sm text-gray-700">
+              {lawyerProfile?.phone || '-'} • {lawyerProfile?.nationality || 'Nigeria'}
+            </p>
+            <p className="mt-1 text-sm text-gray-700">
+              {lawyerProfile?.chamber_name || 'No chamber provided'}
+              {lawyerProfile?.chamber_phone ? ` • ${lawyerProfile.chamber_phone}` : ''}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* ✅ PROGRAM CARD */}
       <div className="card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-semibold text-gray-900">
-              RentalHub NG Lawyer Program
-            </h2>
+            <h2 className="font-semibold text-gray-900">RentalHub NG Lawyer Program</h2>
             <p className="mt-1 text-sm text-gray-500">
-              Apply when the super admin opens recruitment for lawyers who will be displayed on the public RentalHub NG lawyers page.
+              Apply when the super admin opens recruitment for lawyers listed on the public directory.
             </p>
           </div>
-
-          {programData.application?.status === 'approved' ? (
-            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-              Approved
-            </span>
-          ) : programData.application?.status === 'pending' ? (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-              Pending Review
-            </span>
-          ) : programData.application?.status === 'rejected' ? (
-            <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-              Rejected
+          {programData.application?.status ? (
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 capitalize">
+              {programData.application.status}
             </span>
           ) : null}
         </div>
 
         {programLoading ? (
-          <p className="mt-4 text-sm text-gray-500">
-            Loading lawyer program details...
-          </p>
+          <p className="mt-4 text-sm text-gray-500">Loading lawyer program details...</p>
         ) : (
           <div className="mt-4 space-y-4">
-
             {programData.broadcast ? (
               <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
                 <p className="font-semibold">{programData.broadcast.title}</p>
                 <p className="mt-2 whitespace-pre-line">{programData.broadcast.message}</p>
                 <p className="mt-3 text-xs text-blue-700">
-                  Sent {new Date(programData.broadcast.created_at).toLocaleString()}
+                  Sent {formatDateTime(programData.broadcast.created_at)}
                 </p>
               </div>
             ) : (
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
                 No active platform-lawyer recruitment broadcast is available right now.
-              </div>
-            )}
-
-            {programData.application && (
-              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
-                <p className="font-semibold text-gray-900">
-                  Application status: {programData.application.status}
-                </p>
-                <p className="mt-1 text-gray-500">
-                  Applied on {new Date(programData.application.applied_at).toLocaleString()}
-                </p>
-                {programData.application.review_note && (
-                  <p className="mt-2 text-sm text-gray-700">
-                    Review note: {programData.application.review_note}
-                  </p>
-                )}
               </div>
             )}
 
             <button
+              type="button"
               onClick={applyToProgram}
-              disabled={applyLoading}
-              className="rounded-lg bg-primary-600 px-4 py-2 text-white"
+              disabled={
+                applyLoading ||
+                !programData.broadcast ||
+                programData.application?.status === 'pending' ||
+                programData.application?.status === 'approved'
+              }
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Apply To Serve
+              {programData.application?.status === 'approved'
+                ? 'Already Approved'
+                : programData.application?.status === 'pending'
+                  ? 'Application Pending'
+                  : applyLoading
+                    ? 'Submitting...'
+                    : 'Apply To Serve On RentalHub NG'}
             </button>
           </div>
         )}
       </div>
 
-      {/* ✅ KEEP YOUR EXISTING LOGIC BELOW (UNCHANGED) */}
+      <div className="grid gap-6 lg:grid-cols-[320px,1fr]">
+        <section className="card p-4">
+          <h2 className="text-base font-semibold text-gray-900">Authorized Properties</h2>
+          <p className="mt-1 text-xs text-gray-500">Select a property to open your legal workspace.</p>
 
-      {/* Authorized Properties */}
-      <div className="card p-4">
-        <h2 className="font-semibold mb-3">Authorized Properties</h2>
-
-        {properties.length === 0 ? (
-          <p className="text-gray-500">No authorized properties.</p>
-        ) : (
-          <div className="space-y-2">
-            {properties.map((property) => (
-              <button
-                key={property.id}
-                onClick={() => {
-                  setSelectedProperty(property);
-                  loadDisputes(property.id);
-                }}
-                className={`w-full text-left border p-3 rounded ${
-                  selectedProperty?.id === property.id
-                    ? 'bg-blue-50 border-blue-400'
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <div className="font-medium text-gray-900">{property.title}</div>
-                <div className="mt-1 text-xs text-gray-500">
-                  Assigned by {property.assigned_by_name || property.client_name || 'Unknown'}
-                  {property.client_name ? ` for ${property.client_name}` : ''}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Disputes */}
-      {selectedProperty && (
-        <div className="card p-4">
-          <h2 className="font-semibold mb-3">
-            Disputes for {selectedProperty.title}
-          </h2>
-
-          {disputes.length === 0 ? (
-            <p className="text-gray-500">No disputes found.</p>
+          {properties.length === 0 ? (
+            <p className="mt-4 text-sm text-gray-500">No authorized properties.</p>
           ) : (
-            <div className="space-y-3">
-              {disputes.map((d) => (
-                <div key={d.id} className="border rounded p-3 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="font-medium">Dispute #{d.id}</span>
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      d.status === 'resolved'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {d.status}
-                    </span>
-                  </div>
-
-                  <p className="text-sm">{d.description}</p>
-
-                  <div className="text-xs text-gray-500">
-                    Escalated: {d.escalated ? 'Yes' : 'No'}
-                  </div>
-
-                  <div className="flex gap-3 mt-2">
-                    <a href={`/api/export/dispute/${d.id}`} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
-                      Download PDF
-                    </a>
-
-                    <button
-                      className="text-sm text-blue-600 hover:underline"
-                      onClick={() => window.open(`/api/disputes/${d.id}/evidence`, '_blank')}
-                    >
-                      View Evidence
-                    </button>
-
-                    <Link to={`/verify-case?dispute=${d.id}`} className="text-sm text-primary-700 hover:underline">
-                      Verify Integrity
-                    </Link>
-
-                    <Link to={`/dispute/${d.id}`} className="text-sm text-primary-700 hover:underline">
-                      Trace Dispute
-                    </Link>
-                  </div>
-                </div>
+            <div className="mt-4 space-y-2">
+              {properties.map((property) => (
+                <button
+                  key={property.id}
+                  type="button"
+                  onClick={() => setSelectedProperty(property)}
+                  className={`w-full rounded-xl border p-3 text-left transition ${
+                    selectedProperty?.id === property.id
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <p className="font-semibold text-gray-900">{property.title}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Client: {property.client_name || 'Unknown'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Assigned by {property.assigned_by_name || 'Unknown'}
+                  </p>
+                </button>
               ))}
             </div>
           )}
-        </div>
-      )}
-    </div>
-  );
-};
+        </section>
 
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Lawyer Dashboard</h1>
-        <Link
-          to="/verify-case"
-          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          Verify Case Evidence
-        </Link>
-      </div>
-
-      <div className="card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-gray-900">
-              RentalHub NG Lawyer Program
+        <section className="space-y-6">
+          <div className="card p-4">
+            <h2 className="text-base font-semibold text-gray-900">
+              Disputes {selectedProperty ? `for ${selectedProperty.title}` : ''}
             </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Apply when the super admin opens recruitment for lawyers who will be displayed on the public RentalHub NG lawyers page.
-            </p>
-          </div>
 
-          {programData.application?.status === 'approved' ? (
-            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-              Approved
-            </span>
-          ) : programData.application?.status === 'pending' ? (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-              Pending Review
-            </span>
-          ) : programData.application?.status === 'rejected' ? (
-            <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-              Rejected
-            </span>
-          ) : null}
-        </div>
-
-        {programLoading ? (
-          <p className="mt-4 text-sm text-gray-500">
-            Loading lawyer program details...
-          </p>
-        ) : (
-          <div className="mt-4 space-y-4">
-            {programData.broadcast ? (
-              <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
-                <p className="font-semibold">{programData.broadcast.title}</p>
-                <p className="mt-2 whitespace-pre-line">{programData.broadcast.message}</p>
-                <p className="mt-3 text-xs text-blue-700">
-                  Sent {new Date(programData.broadcast.created_at).toLocaleString()}
-                </p>
-              </div>
+            {!selectedProperty ? (
+              <p className="mt-4 text-sm text-gray-500">Select a property first.</p>
+            ) : disputes.length === 0 ? (
+              <p className="mt-4 text-sm text-gray-500">No disputes found for this property.</p>
             ) : (
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-                No active platform-lawyer recruitment broadcast is available right now.
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {disputes.map((dispute) => (
+                  <button
+                    key={dispute.id}
+                    type="button"
+                    onClick={async () => {
+                      setSelectedDispute(dispute);
+                      await loadDisputeWorkspace(dispute.id);
+                    }}
+                    className={`rounded-xl border p-3 text-left transition ${
+                      selectedDispute?.id === dispute.id
+                        ? 'border-blue-400 bg-blue-50'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-gray-900">Dispute #{dispute.id}</p>
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${getStatusBadge(dispute.status)}`}>
+                        {dispute.status}
+                      </span>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm text-gray-700">{dispute.description}</p>
+                    <p className="mt-2 text-xs text-gray-500">
+                      Opened by {dispute.opened_by_name || 'Unknown'} vs {dispute.against_name || 'Unknown'}
+                    </p>
+                  </button>
+                ))}
               </div>
             )}
+          </div>
 
-            {programData.application ? (
-              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
-                <p className="font-semibold text-gray-900">
-                  Application status: {programData.application.status}
-                </p>
-                <p className="mt-1 text-gray-500">
-                  Applied on {new Date(programData.application.applied_at).toLocaleString()}
-                </p>
-                {programData.application.review_note ? (
-                  <p className="mt-2 text-sm text-gray-700">
-                    Review note: {programData.application.review_note}
-                  </p>
-                ) : null}
-                {programData.application.status === 'approved' ? (
-                  <p className="mt-2 text-sm text-green-700">
-                    You are approved and can be managed from the super admin public lawyer directory.
-                  </p>
-                ) : null}
+          {selectedDispute ? (
+            <div className="card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-gray-900">Dispute Workspace #{selectedDispute.id}</h2>
+                <div className="flex gap-3 text-sm">
+                  <Link className="text-blue-600 hover:underline" to={`/dispute/${selectedDispute.id}`}>
+                    Open full trace
+                  </Link>
+                  <Link className="text-blue-600 hover:underline" to={`/verify-case?dispute=${selectedDispute.id}`}>
+                    Verify integrity
+                  </Link>
+                </div>
               </div>
-            ) : null}
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={applyToProgram}
-                disabled={
-                  applyLoading ||
-                  !programData.broadcast ||
-                  programData.application?.status === 'pending' ||
-                  programData.application?.status === 'approved'
-                }
-                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {programData.application?.status === 'approved'
-                  ? 'Already Approved'
-                  : programData.application?.status === 'pending'
-                    ? 'Application Pending'
-                    : applyLoading
-                      ? 'Submitting...'
-                      : 'Apply To Serve On RentalHub NG'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+              {workspaceLoading ? (
+                <p className="mt-4 text-sm text-gray-500">Loading dispute workspace...</p>
+              ) : (
+                <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-slate-200 p-4">
+                      <h3 className="text-base font-semibold text-slate-900">Evidence Verification</h3>
+                      <p className="mt-1 text-sm text-slate-500">Review each evidence file and set a verification status.</p>
 
-      {/* Authorized Properties */}
-      <div className="card p-4">
-        <h2 className="font-semibold mb-3">Authorized Properties</h2>
+                      <div className="mt-4 space-y-3">
+                        {evidenceVerification.length === 0 ? (
+                          <p className="text-sm text-gray-500">No evidence uploaded yet.</p>
+                        ) : (
+                          evidenceVerification.map((item) => (
+                            <div key={item.id} className="rounded-2xl border border-slate-200 p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                  <p className="font-semibold text-slate-900">{item.file_name || `Evidence #${item.id}`}</p>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    Uploaded by {item.uploaded_by_name || 'Unknown'} on {formatDateTime(item.uploaded_at)}
+                                  </p>
+                                </div>
+                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${getEvidenceStatusBadge(item.verification_status || 'pending')}`}>
+                                  {item.verification_status || 'pending'}
+                                </span>
+                              </div>
 
-        {properties.length === 0 ? (
-          <p className="text-gray-500">No authorized properties.</p>
-        ) : (
-          <div className="space-y-2">
-            {properties.map((property) => (
-              <button
-                key={property.id}
-                onClick={() => {
-                  setSelectedProperty(property);
-                  loadDisputes(property.id);
-                }}
-                className={`w-full text-left border p-3 rounded ${
-                  selectedProperty?.id === property.id
-                    ? 'bg-blue-50 border-blue-400'
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <div className="font-medium text-gray-900">{property.title}</div>
-                <div className="mt-1 text-xs text-gray-500">
-                  Assigned by {property.assigned_by_name || property.client_name || 'Unknown'}
-                  {property.client_name ? ` for ${property.client_name}` : ''}
+                              <textarea
+                                value={evidenceNoteDrafts[item.id] ?? item.lawyer_notes ?? ''}
+                                onChange={(event) =>
+                                  setEvidenceNoteDrafts((current) => ({
+                                    ...current,
+                                    [item.id]: event.target.value,
+                                  }))
+                                }
+                                rows={3}
+                                className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                                placeholder="Add lawyer notes for this evidence"
+                              />
+
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {EVIDENCE_STATUSES.map((status) => (
+                                  <button
+                                    key={status}
+                                    type="button"
+                                    onClick={() => handleEvidenceVerification(item.id, status)}
+                                    disabled={verificationBusyId === item.id}
+                                    className={`rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
+                                      item.verification_status === status
+                                        ? 'bg-slate-900 text-white'
+                                        : 'bg-slate-100 text-slate-700'
+                                    }`}
+                                  >
+                                    {verificationBusyId === item.id && item.verification_status !== status
+                                      ? 'Saving...'
+                                      : status}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 p-4">
+                      <h3 className="text-base font-semibold text-slate-900">Case Notes</h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Add internal notes or mark notes visible to clients.
+                      </p>
+
+                      <div className="mt-4 rounded-xl border border-slate-200 p-3">
+                        <input
+                          type="text"
+                          value={newNoteTitle}
+                          onChange={(event) => setNewNoteTitle(event.target.value)}
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                          placeholder="Optional note title"
+                        />
+                        <textarea
+                          value={newNoteContent}
+                          onChange={(event) => setNewNoteContent(event.target.value)}
+                          rows={4}
+                          className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                          placeholder="Write your legal assessment, actions, or next steps"
+                        />
+                        <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={newNoteVisible}
+                            onChange={(event) => setNewNoteVisible(event.target.checked)}
+                          />
+                          Visible to client
+                        </label>
+                        <div>
+                          <button
+                            type="button"
+                            onClick={handleCreateCaseNote}
+                            disabled={noteSaving}
+                            className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                          >
+                            {noteSaving ? 'Saving...' : 'Add Case Note'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        {caseNotes.length === 0 ? (
+                          <p className="text-sm text-gray-500">No case notes yet.</p>
+                        ) : (
+                          caseNotes.map((note) => (
+                            <div key={note.id} className="rounded-xl border border-slate-200 p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="font-semibold text-slate-900">{note.title || 'Untitled note'}</p>
+                                <div className="flex items-center gap-2">
+                                  {note.is_visible_to_client ? (
+                                    <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
+                                      Visible to client
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
+                                      Internal
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCaseNote(note.id)}
+                                    className="rounded-lg bg-red-50 px-2 py-1 text-xs font-semibold text-red-700"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="mt-2 text-sm text-slate-700 whitespace-pre-line">{note.content}</p>
+                              <p className="mt-2 text-xs text-slate-500">
+                                {note.lawyer_name || 'Lawyer'} • Updated {formatDateTime(note.updated_at || note.created_at)}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-slate-200 p-4">
+                      <h3 className="text-base font-semibold text-slate-900">Lawyer Summary</h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Keep a concise dispute summary for fast case review.
+                      </p>
+                      <textarea
+                        value={summaryDraft}
+                        onChange={(event) => setSummaryDraft(event.target.value)}
+                        rows={10}
+                        className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                        placeholder="Write the current legal posture, evidence quality, and next legal action"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveSummary}
+                        disabled={summarySaving}
+                        className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        {summarySaving ? 'Saving...' : 'Save Summary'}
+                      </button>
+                      {summaryInfo?.at ? (
+                        <p className="mt-2 text-xs text-slate-500">
+                          Last updated by {summaryInfo.byName} on {formatDateTime(summaryInfo.at)}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 p-4">
+                      <h3 className="text-base font-semibold text-slate-900">Dispute Timeline Snapshot</h3>
+                      <div className="mt-3 space-y-2 text-sm text-slate-700">
+                        {(disputeDetails?.timeline || []).slice(-8).map((entry, index) => (
+                          <div key={`${entry.type}-${entry.happened_at}-${index}`} className="rounded-lg bg-slate-50 p-2">
+                            <p className="font-semibold text-slate-900">{entry.summary}</p>
+                            <p className="text-xs text-slate-500">
+                              {formatDateTime(entry.happened_at)} • {entry.actor_name || 'System'}
+                            </p>
+                          </div>
+                        ))}
+                        {!(disputeDetails?.timeline || []).length ? (
+                          <p className="text-sm text-gray-500">No timeline events yet.</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Disputes */}
-      {selectedProperty && (
-        <div className="card p-4">
-          <h2 className="font-semibold mb-3">
-            Disputes for {selectedProperty.title}
-          </h2>
-
-          {disputes.length === 0 ? (
-            <p className="text-gray-500">No disputes found.</p>
-          ) : (
-            <div className="space-y-3">
-              {disputes.map((d) => (
-                <div
-                  key={d.id}
-                  className="border rounded p-3 space-y-2"
-                >
-                  <div className="flex justify-between">
-                    <span className="font-medium">
-                      Dispute #{d.id}
-                    </span>
-                    <span
-                      className={`text-xs px-2 py-1 rounded ${
-                        d.status === 'resolved'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
-                    >
-                      {d.status}
-                    </span>
-                  </div>
-
-                  <p className="text-sm">{d.description}</p>
-
-                  <div className="text-xs text-gray-500">
-                    Escalated: {d.escalated ? 'Yes' : 'No'}
-                  </div>
-
-                  <div className="flex gap-3 mt-2">
-                    <a
-                      href={`/api/export/dispute/${d.id}`}
-                      className="text-sm text-blue-600 hover:underline"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Download PDF
-                    </a>
-
-                    <button
-                      className="text-sm text-blue-600 hover:underline"
-                      onClick={() =>
-                        window.open(
-                          `/api/disputes/${d.id}/evidence`,
-                          '_blank'
-                        )
-                      }
-                    >
-                      View Evidence
-                    </button>
-
-                    <Link
-                      to={`/verify-case?dispute=${d.id}`}
-                      className="text-sm text-primary-700 hover:underline"
-                    >
-                      Verify Integrity
-                    </Link>
-
-                    <Link
-                      to={`/dispute/${d.id}`}
-                      className="text-sm text-primary-700 hover:underline"
-                    >
-                      Trace Dispute
-                    </Link>
-                  </div>
-                </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
-      )}
+          ) : null}
+        </section>
+      </div>
     </div>
   );
 };
 
-// Wrap with verification gate
 const LawyerDashboard = () => (
   <LawyerVerification>
     <LawyerDashboardContent />

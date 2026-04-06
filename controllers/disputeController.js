@@ -7,6 +7,7 @@ const DocumentSignature = require('../models/DocumentSignature');
 const UserKey = require('../models/UserKey');
 const { buildMerkleRoot } = require('../services/merkleEvidence.service');
 const { anchorEvidence } = require('../services/evidenceAnchor.service');
+const { ensureLawyerCaseNotesSchema } = require('../config/utils/legalSchema');
 const { getPropertyDisputeParticipants } = require('../config/utils/propertyDisputeParticipants');
 
 // Create dispute
@@ -123,6 +124,8 @@ exports.getDisputes = async (req, res) => {
 // Get full dispute details with traceability
 exports.getDisputeDetails = async (req, res) => {
   try {
+    await ensureLawyerCaseNotesSchema();
+
     const { disputeId } = req.params;
 
     const disputeResult = await db.query(
@@ -140,13 +143,15 @@ exports.getDisputeDetails = async (req, res) => {
          against_user.email AS against_email,
          against_user.user_type AS against_role,
          resolver.full_name AS resolved_by_name,
-         sealer.full_name AS sealed_by_name
+         sealer.full_name AS sealed_by_name,
+         summary_author.full_name AS lawyer_summary_by_name
        FROM disputes d
        LEFT JOIN properties p ON p.id = d.property_id
        LEFT JOIN users opener ON opener.id = d.opened_by
        LEFT JOIN users against_user ON against_user.id = d.against_user
        LEFT JOIN users resolver ON resolver.id = d.resolved_by
        LEFT JOIN users sealer ON sealer.id = d.sealed_by
+       LEFT JOIN users summary_author ON summary_author.id = d.lawyer_summary_by
        WHERE d.id = $1
        LIMIT 1`,
       [disputeId]
@@ -161,7 +166,9 @@ exports.getDisputeDetails = async (req, res) => {
 
     const dispute = disputeResult.rows[0];
 
-    const [messagesResult, evidenceResult, auditResult, lawyerResult] = await Promise.all([
+    const canViewAllCaseNotes = ['lawyer', 'admin', 'super_admin'].includes(req.user?.user_type);
+
+    const [messagesResult, evidenceResult, auditResult, lawyerResult, caseNotesResult] = await Promise.all([
       db.query(
         `SELECT
            m.*,
@@ -179,9 +186,15 @@ exports.getDisputeDetails = async (req, res) => {
            e.*,
            u.full_name AS uploaded_by_name,
            u.email AS uploaded_by_email,
-           u.user_type AS uploaded_by_role
+           u.user_type AS uploaded_by_role,
+           COALESCE(e.verification_status, 'pending') AS verification_status,
+           e.verified_at,
+           e.lawyer_notes,
+           verifier.full_name AS verified_by_name,
+           verifier.email AS verified_by_email
          FROM dispute_evidence e
          LEFT JOIN users u ON u.id = e.uploaded_by
+         LEFT JOIN users verifier ON verifier.id = e.verified_by
          WHERE e.dispute_id = $1
          ORDER BY e.created_at ASC, e.id ASC`,
         [disputeId]
@@ -226,6 +239,24 @@ exports.getDisputeDetails = async (req, res) => {
     ]);
 
     const timeline = [
+      db.query(
+        `SELECT
+           lcn.id,
+           lcn.title,
+           lcn.content,
+           lcn.note_type,
+           lcn.is_visible_to_client,
+           lcn.created_at,
+           lcn.updated_at,
+           lawyer.full_name AS lawyer_name,
+           lawyer.email AS lawyer_email
+         FROM lawyer_case_notes lcn
+         LEFT JOIN users lawyer ON lawyer.id = lcn.lawyer_user_id
+         WHERE lcn.dispute_id = $1
+           AND ($2::boolean = TRUE OR lcn.is_visible_to_client = TRUE)
+         ORDER BY lcn.updated_at DESC, lcn.id DESC`,
+        [disputeId, canViewAllCaseNotes]
+      ),
       dispute.created_at
         ? {
             type: 'dispute_created',
@@ -246,11 +277,29 @@ exports.getDisputeDetails = async (req, res) => {
       })),
       ...(evidenceResult.rows || []).map((item) => ({
         type: 'evidence',
-        happened_at: item.created_at,
+        happened_at: item.created_at || item.uploaded_at,
         actor_name: item.uploaded_by_name,
         actor_role: item.uploaded_by_role,
         summary: 'Evidence uploaded',
         details: item.file_name,
+      })),
+      ...(evidenceResult.rows || [])
+        .filter((item) => item.verified_at)
+        .map((item) => ({
+          type: 'evidence_verification',
+          happened_at: item.verified_at,
+          actor_name: item.verified_by_name,
+          actor_role: 'lawyer',
+          summary: `Evidence marked as ${item.verification_status || 'pending'}`,
+          details: item.lawyer_notes || item.file_name,
+        })),
+      ...(caseNotesResult.rows || []).map((item) => ({
+        type: 'case_note',
+        happened_at: item.updated_at || item.created_at,
+        actor_name: item.lawyer_name,
+        actor_role: 'lawyer',
+        summary: item.title || 'Lawyer case note',
+        details: item.content,
       })),
       ...(auditResult.rows || []).map((item) => ({
         type: 'audit',
@@ -270,6 +319,7 @@ exports.getDisputeDetails = async (req, res) => {
         dispute,
         messages: messagesResult.rows,
         evidence: evidenceResult.rows,
+        case_notes: caseNotesResult.rows,
         audit_logs: auditResult.rows,
         authorized_lawyers: lawyerResult.rows,
         timeline,
@@ -293,9 +343,15 @@ exports.listDisputeEvidence = async (req, res) => {
          e.*,
          u.full_name AS uploaded_by_name,
          u.email AS uploaded_by_email,
-         u.user_type AS uploaded_by_role
+         u.user_type AS uploaded_by_role,
+         COALESCE(e.verification_status, 'pending') AS verification_status,
+         e.verified_at,
+         e.lawyer_notes,
+         verifier.full_name AS verified_by_name,
+         verifier.email AS verified_by_email
        FROM dispute_evidence e
        LEFT JOIN users u ON u.id = e.uploaded_by
+       LEFT JOIN users verifier ON verifier.id = e.verified_by
        WHERE e.dispute_id = $1
        ORDER BY e.created_at ASC, e.id ASC`,
       [disputeId]

@@ -8,13 +8,18 @@ const formatDateTime = (value) => {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 };
 
+const getEvidenceStatusBadge = (status) => {
+  if (status === 'verified') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'flagged') return 'bg-orange-100 text-orange-700';
+  if (status === 'rejected') return 'bg-red-100 text-red-700';
+  return 'bg-gray-100 text-gray-700';
+};
+
 export default function DisputeDetails() {
   const { disputeId } = useParams();
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [lawyerProfile, setLawyerProfile] = useState(null);
-const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,21 +52,18 @@ const [profileLoading, setProfileLoading] = useState(true);
   if (error) return <div className="p-6 text-red-600">{error}</div>;
   if (!payload?.dispute) return <div className="p-6">Dispute not found.</div>;
 
-  const { dispute, messages = [], evidence = [], audit_logs = [], authorized_lawyers = [], timeline = [] } = payload;
-
-  const loadLawyerProfile = async () => {
-  try {
-    const res = await api.get('/auth/me');
-    setLawyerProfile(res.data.data);
-  } catch (err) {
-    console.error('Failed to load lawyer profile');
-  } finally {
-    setProfileLoading(false);
-  }
-};
+  const {
+    dispute,
+    messages = [],
+    evidence = [],
+    case_notes = [],
+    audit_logs = [],
+    authorized_lawyers = [],
+    timeline = [],
+  } = payload;
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
         <div className="rounded-3xl bg-white p-8 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -72,9 +74,7 @@ const [profileLoading, setProfileLoading] = useState(true);
               <h1 className="mt-3 text-3xl font-bold text-gray-900">
                 {dispute.title || `Dispute #${dispute.id}`}
               </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-600">
-                {dispute.description}
-              </p>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-600">{dispute.description}</p>
             </div>
 
             <div className="rounded-2xl border border-gray-200 p-4 text-sm text-gray-600">
@@ -82,12 +82,10 @@ const [profileLoading, setProfileLoading] = useState(true);
                 <span className="font-semibold text-gray-900">Status:</span> {dispute.status}
               </div>
               <div className="mt-2">
-                <span className="font-semibold text-gray-900">Opened:</span>{' '}
-                {formatDateTime(dispute.created_at)}
+                <span className="font-semibold text-gray-900">Opened:</span> {formatDateTime(dispute.created_at)}
               </div>
               <div className="mt-2">
-                <span className="font-semibold text-gray-900">Sealed:</span>{' '}
-                {dispute.is_legally_sealed ? 'Yes' : 'No'}
+                <span className="font-semibold text-gray-900">Sealed:</span> {dispute.is_legally_sealed ? 'Yes' : 'No'}
               </div>
             </div>
           </div>
@@ -138,9 +136,7 @@ const [profileLoading, setProfileLoading] = useState(true);
                     </div>
                     {item.details && (
                       <p className="mt-3 text-sm leading-7 text-gray-700">
-                        {typeof item.details === 'string'
-                          ? item.details
-                          : JSON.stringify(item.details)}
+                        {typeof item.details === 'string' ? item.details : JSON.stringify(item.details)}
                       </p>
                     )}
                   </div>
@@ -170,9 +166,43 @@ const [profileLoading, setProfileLoading] = useState(true);
             </div>
 
             <div className="rounded-3xl bg-white p-8 shadow-sm">
+              <h2 className="text-2xl font-semibold text-gray-900">Lawyer Work Progress</h2>
+              {dispute.lawyer_summary ? (
+                <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm font-semibold text-blue-900">Lawyer Summary</p>
+                  <p className="mt-2 whitespace-pre-line text-sm leading-7 text-blue-900">{dispute.lawyer_summary}</p>
+                  <p className="mt-2 text-xs text-blue-700">
+                    Updated by {dispute.lawyer_summary_by_name || 'lawyer'} on {formatDateTime(dispute.lawyer_summary_at)}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-gray-500">No lawyer summary yet.</p>
+              )}
+
+              <div className="mt-5">
+                <h3 className="text-base font-semibold text-gray-900">Client-visible lawyer notes</h3>
+                {case_notes.length === 0 ? (
+                  <p className="mt-2 text-sm text-gray-500">No client-visible notes yet.</p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {case_notes.map((note) => (
+                      <div key={note.id} className="rounded-xl border border-gray-200 p-3">
+                        <p className="font-semibold text-gray-900">{note.title || 'Lawyer note'}</p>
+                        <p className="mt-2 whitespace-pre-line text-sm text-gray-700">{note.content}</p>
+                        <p className="mt-2 text-xs text-gray-500">
+                          {note.lawyer_name || 'Lawyer'} • {formatDateTime(note.updated_at || note.created_at)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white p-8 shadow-sm">
               <h2 className="text-2xl font-semibold text-gray-900">Evidence verification</h2>
               <p className="mt-3 text-sm leading-7 text-gray-600">
-                Use the QR code or the direct verification screen to validate the integrity of this dispute record.
+                Use the QR code or direct verification screen to validate dispute integrity.
               </p>
               <div className="mt-5">
                 <DisputeQRCode disputeId={dispute.id} />
@@ -225,11 +255,9 @@ const [profileLoading, setProfileLoading] = useState(true);
                       {entry.actor_name || 'System'}
                       {entry.actor_role ? ` • ${entry.actor_role}` : ''}
                     </p>
-                    {entry.route && (
-                      <p className="mt-2 text-xs text-gray-500">
-                        {entry.method || 'ACTION'} {entry.route}
-                      </p>
-                    )}
+                    {entry.route ? (
+                      <p className="mt-2 text-xs text-gray-500">{entry.method || 'ACTION'} {entry.route}</p>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -245,13 +273,24 @@ const [profileLoading, setProfileLoading] = useState(true);
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {evidence.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-gray-200 p-4">
-                  <p className="font-semibold text-gray-900">{item.file_name}</p>
-                  <p className="mt-1 text-sm text-gray-600">
-                    Uploaded by {item.uploaded_by_name || 'Unknown'}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {formatDateTime(item.created_at)}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-gray-900">{item.file_name}</p>
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${getEvidenceStatusBadge(item.verification_status)}`}>
+                      {item.verification_status || 'pending'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-600">Uploaded by {item.uploaded_by_name || 'Unknown'}</p>
+                  <p className="mt-1 text-xs text-gray-500">{formatDateTime(item.created_at || item.uploaded_at)}</p>
+                  {item.verified_at ? (
+                    <p className="mt-2 text-xs text-gray-600">
+                      Verified by {item.verified_by_name || 'Lawyer'} on {formatDateTime(item.verified_at)}
+                    </p>
+                  ) : null}
+                  {item.lawyer_notes ? (
+                    <p className="mt-2 rounded-lg bg-gray-50 p-2 text-xs leading-6 text-gray-700">
+                      {item.lawyer_notes}
+                    </p>
+                  ) : null}
                   <div className="mt-4 flex gap-3 text-sm">
                     <a
                       href={`/api/disputes/evidence/${item.id}`}
