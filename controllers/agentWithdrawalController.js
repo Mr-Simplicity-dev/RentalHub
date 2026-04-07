@@ -1,5 +1,4 @@
 const AgentWithdrawalService = require('../services/agentWithdrawalService');
-const logger = require('../config/logging');
 
 class AgentWithdrawalController {
   /**
@@ -24,10 +23,6 @@ class AgentWithdrawalController {
       }
 
       // Agents can only request their own withdrawals
-      if (req.user.user_type === 'agent' && req.user.id !== resp.user.id) {
-        // The user making request is an agent - extract agent ID from params or assume it's req.user.id
-      }
-
       const agentId = req.user.user_type === 'agent' ? req.user.id : req.params.agentId;
       if (!agentId) {
         return res.status(400).json({
@@ -53,7 +48,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      logger.error(`Error creating withdrawal request: ${error.message}`);
+      console.error(`Error creating withdrawal request: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to create withdrawal request',
@@ -89,7 +84,7 @@ class AgentWithdrawalController {
         data: requests,
       });
     } catch (error) {
-      logger.error(`Error fetching withdrawal requests: ${error.message}`);
+      console.error(`Error fetching withdrawal requests: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch withdrawal requests',
@@ -122,7 +117,7 @@ class AgentWithdrawalController {
         data: summary,
       });
     } catch (error) {
-      logger.error(`Error fetching withdrawal summary: ${error.message}`);
+      console.error(`Error fetching withdrawal summary: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch withdrawal summary',
@@ -157,7 +152,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      logger.error(`Error approving withdrawal: ${error.message}`);
+      console.error(`Error approving withdrawal: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to approve withdrawal',
@@ -199,7 +194,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      logger.error(`Error rejecting withdrawal: ${error.message}`);
+      console.error(`Error rejecting withdrawal: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to reject withdrawal',
@@ -229,7 +224,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      logger.error(`Error marking withdrawal as processing: ${error.message}`);
+      console.error(`Error marking withdrawal as processing: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to mark withdrawal as processing',
@@ -264,7 +259,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      logger.error(`Error marking withdrawal as completed: ${error.message}`);
+      console.error(`Error marking withdrawal as completed: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to mark withdrawal as completed',

@@ -1,5 +1,4 @@
-const db = require('../config/database');
-const logger = require('../config/logging');
+const db = require('../config/middleware/database');
 
 class DamageReportVisibilityService {
   /**
@@ -23,7 +22,7 @@ class DamageReportVisibilityService {
 
       return null;
     } catch (error) {
-      logger.error(`Error fetching latest published report: ${error.message}`);
+      console.error(`Error fetching latest published report: ${error.message}`);
       throw error;
     }
   }
@@ -57,7 +56,7 @@ class DamageReportVisibilityService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      logger.error(`Error fetching property reports: ${error.message}`);
+      console.error(`Error fetching property reports: ${error.message}`);
       throw error;
     }
   }
@@ -85,7 +84,7 @@ class DamageReportVisibilityService {
 
       throw new Error('Report not found');
     } catch (error) {
-      logger.error(`Error publishing report: ${error.message}`);
+      console.error(`Error publishing report: ${error.message}`);
       throw error;
     }
   }
@@ -111,7 +110,7 @@ class DamageReportVisibilityService {
 
       throw new Error('Report not found');
     } catch (error) {
-      logger.error(`Error unpublishing report: ${error.message}`);
+      console.error(`Error unpublishing report: ${error.message}`);
       throw error;
     }
   }
@@ -217,7 +216,7 @@ class DamageReportVisibilityService {
 
       throw new Error('Report not found');
     } catch (error) {
-      logger.error(`Error updating report: ${error.message}`);
+      console.error(`Error updating report: ${error.message}`);
       throw error;
     }
   }
@@ -238,7 +237,7 @@ class DamageReportVisibilityService {
 
       throw new Error('Report not found');
     } catch (error) {
-      logger.error(`Error deleting report: ${error.message}`);
+      console.error(`Error deleting report: ${error.message}`);
       throw error;
     }
   }
@@ -261,7 +260,7 @@ class DamageReportVisibilityService {
 
       return result.rows[0] || {};
     } catch (error) {
-      logger.error(`Error fetching report summary: ${error.message}`);
+      console.error(`Error fetching report summary: ${error.message}`);
       throw error;
     }
   }

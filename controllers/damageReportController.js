@@ -1,5 +1,39 @@
 const DamageReportVisibilityService = require('../services/damageReportVisibilityService');
-const logger = require('../config/logging');
+const db = require('../config/middleware/database');
+
+const canManageDamageReport = async (reportId, user) => {
+  if (!user) return false;
+  if (user.user_type === 'admin' || user.user_type === 'super_admin') return true;
+
+  const reportResult = await db.query(
+    `SELECT landlord_id
+     FROM property_damage_reports
+     WHERE id = $1
+     LIMIT 1`,
+    [reportId]
+  );
+
+  if (reportResult.rows.length === 0) return false;
+
+  const landlordId = reportResult.rows[0].landlord_id;
+  if (landlordId === user.id) return true;
+
+  if (user.user_type === 'agent') {
+    const assignment = await db.query(
+      `SELECT 1
+       FROM landlord_agents
+       WHERE landlord_user_id = $1
+         AND agent_user_id = $2
+         AND status = 'active'
+         AND can_manage_damage_reports = TRUE
+       LIMIT 1`,
+      [landlordId, user.id]
+    );
+    return assignment.rows.length > 0;
+  }
+
+  return false;
+};
 
 class DamageReportController {
   /**
@@ -24,7 +58,7 @@ class DamageReportController {
         data: report,
       });
     } catch (error) {
-      logger.error(`Error fetching latest published report: ${error.message}`);
+      console.error(`Error fetching latest published report: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch damage report',
@@ -43,12 +77,36 @@ class DamageReportController {
       // Verify authorization: owner or admin
       if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
         // Verify property ownership
-        const propertyResult = await global.db.query(
+        const propertyResult = await db.query(
           `SELECT landlord_id FROM properties WHERE id = $1`,
           [propertyId]
         );
 
-        if (propertyResult.rows.length === 0 || propertyResult.rows[0].landlord_id !== req.user.id) {
+        if (propertyResult.rows.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Property not found',
+          });
+        }
+
+        const landlordId = propertyResult.rows[0].landlord_id;
+        let authorized = landlordId === req.user.id;
+
+        if (!authorized && req.user.user_type === 'agent') {
+          const assignment = await db.query(
+            `SELECT 1
+             FROM landlord_agents
+             WHERE landlord_user_id = $1
+               AND agent_user_id = $2
+               AND status = 'active'
+               AND can_manage_damage_reports = TRUE
+             LIMIT 1`,
+            [landlordId, req.user.id]
+          );
+          authorized = assignment.rows.length > 0;
+        }
+
+        if (!authorized) {
           return res.status(403).json({
             success: false,
             message: 'Unauthorized to access these reports',
@@ -67,7 +125,7 @@ class DamageReportController {
         data: reports,
       });
     } catch (error) {
-      logger.error(`Error fetching property reports: ${error.message}`);
+      console.error(`Error fetching property reports: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch reports',
@@ -82,7 +140,8 @@ class DamageReportController {
     try {
       const { reportId } = req.params;
 
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
+      const allowed = await canManageDamageReport(reportId, req.user);
+      if (!allowed) {
         return res.status(403).json({
           success: false,
           message: 'Unauthorized to publish reports',
@@ -97,7 +156,7 @@ class DamageReportController {
         data: report,
       });
     } catch (error) {
-      logger.error(`Error publishing report: ${error.message}`);
+      console.error(`Error publishing report: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to publish report',
@@ -112,7 +171,8 @@ class DamageReportController {
     try {
       const { reportId } = req.params;
 
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
+      const allowed = await canManageDamageReport(reportId, req.user);
+      if (!allowed) {
         return res.status(403).json({
           success: false,
           message: 'Unauthorized to unpublish reports',
@@ -127,7 +187,7 @@ class DamageReportController {
         data: report,
       });
     } catch (error) {
-      logger.error(`Error unpublishing report: ${error.message}`);
+      console.error(`Error unpublishing report: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to unpublish report',
@@ -143,7 +203,8 @@ class DamageReportController {
       const { reportId } = req.params;
       const updates = req.body;
 
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
+      const allowed = await canManageDamageReport(reportId, req.user);
+      if (!allowed) {
         return res.status(403).json({
           success: false,
           message: 'Unauthorized to update reports',
@@ -158,7 +219,7 @@ class DamageReportController {
         data: report,
       });
     } catch (error) {
-      logger.error(`Error updating report: ${error.message}`);
+      console.error(`Error updating report: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to update report',
@@ -173,7 +234,8 @@ class DamageReportController {
     try {
       const { reportId } = req.params;
 
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
+      const allowed = await canManageDamageReport(reportId, req.user);
+      if (!allowed) {
         return res.status(403).json({
           success: false,
           message: 'Unauthorized to delete reports',
@@ -187,7 +249,7 @@ class DamageReportController {
         message: 'Report deleted successfully',
       });
     } catch (error) {
-      logger.error(`Error deleting report: ${error.message}`);
+      console.error(`Error deleting report: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to delete report',
@@ -209,7 +271,7 @@ class DamageReportController {
         data: summary,
       });
     } catch (error) {
-      logger.error(`Error fetching report summary: ${error.message}`);
+      console.error(`Error fetching report summary: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch summary',

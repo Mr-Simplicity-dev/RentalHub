@@ -150,6 +150,34 @@ const AgentDashboard = () => {
               You can help with the harder operational work, but account ownership and sensitive financial control remain with the landlord.
             </p>
           </div>
+
+          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">Task Areas</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Use these dedicated paths for your assignment workflow.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+              <Link to="/my-properties" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
+                Assigned/Managed Properties
+              </Link>
+              <Link to="/add-property" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
+                Damage-Report Tasks
+              </Link>
+              <Link to="/messages" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
+                Dispute and Evidence Tasks
+              </Link>
+              <Link to="/lawyer" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
+                Legal and Lawyer Operations
+              </Link>
+              <Link to="/agent/earnings" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
+                Commission Ledger and Earnings
+              </Link>
+              <Link to="/agent/withdrawals" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
+                Withdrawal Request Flow
+              </Link>
+            </div>
+          </div>
         </>
       )}
     </div>

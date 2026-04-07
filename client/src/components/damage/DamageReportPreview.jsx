@@ -12,9 +12,19 @@ const DamageReportPreview = ({ damageReports }) => {
       return null;
     }
     // Sort by date descending and get the first published one
-    return damageReports
-      .filter((r) => !r.is_draft && r.is_published)
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null;
+    return (
+      damageReports
+        .filter((r) => {
+          if (r.status) return r.status === 'published';
+          if (typeof r.is_visible_to_tenant === 'boolean') return r.is_visible_to_tenant;
+          return !r.is_draft && r.is_published;
+        })
+        .sort((a, b) => {
+          const aDate = new Date(a.published_at || a.created_at || a.reported_at || 0);
+          const bDate = new Date(b.published_at || b.created_at || b.reported_at || 0);
+          return bDate - aDate;
+        })[0] || null
+    );
   }, [damageReports]);
 
   if (!latestReport) {
@@ -61,7 +71,7 @@ const DamageReportPreview = ({ damageReports }) => {
     }
   };
 
-  const reportDate = new Date(latestReport.created_at).toLocaleDateString('en-US', {
+  const reportDate = new Date(latestReport.published_at || latestReport.created_at || latestReport.reported_at).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -159,10 +169,10 @@ const DamageReportPreview = ({ damageReports }) => {
         )}
 
         {/* Photo if available */}
-        {latestReport.photo_url && (
+        {(latestReport.photo_url || (Array.isArray(latestReport.photo_urls) && latestReport.photo_urls[0])) && (
           <div className="overflow-hidden rounded-lg border border-gray-200">
             <img
-              src={latestReport.photo_url}
+              src={latestReport.photo_url || latestReport.photo_urls[0]}
               alt={`Damage at ${latestReport.room_location}`}
               className="h-auto w-full object-cover"
             />

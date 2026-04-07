@@ -1,5 +1,4 @@
-const db = require('../config/database');
-const logger = require('../config/logging');
+const db = require('../config/middleware/database');
 
 class AgentCommissionService {
   /**
@@ -44,7 +43,7 @@ class AgentCommissionService {
         return result.rows[0];
       }
     } catch (error) {
-      logger.error(`Error recording commission: ${error.message}`);
+      console.error(`Error recording commission: ${error.message}`);
       throw error;
     }
   }
@@ -80,7 +79,7 @@ class AgentCommissionService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      logger.error(`Error fetching agent earnings: ${error.message}`);
+      console.error(`Error fetching agent earnings: ${error.message}`);
       throw error;
     }
   }
@@ -125,7 +124,7 @@ class AgentCommissionService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      logger.error(`Error fetching commission history: ${error.message}`);
+      console.error(`Error fetching commission history: ${error.message}`);
       throw error;
     }
   }
@@ -157,7 +156,7 @@ class AgentCommissionService {
         return commission;
       }
     } catch (error) {
-      logger.error(`Error verifying commission: ${error.message}`);
+      console.error(`Error verifying commission: ${error.message}`);
       throw error;
     }
   }
@@ -220,7 +219,7 @@ class AgentCommissionService {
         return result.rows[0];
       }
     } catch (error) {
-      logger.error(`Error reversing commission: ${error.message}`);
+      console.error(`Error reversing commission: ${error.message}`);
       throw error;
     }
   }
@@ -234,22 +233,25 @@ class AgentCommissionService {
       await db.query(
         `UPDATE agent_commission_rates
          SET is_active = FALSE, effective_to = CURRENT_TIMESTAMP
-         WHERE agent_user_id = $1 AND landlord_user_id = $2 AND commission_type = $3 AND is_active = TRUE`,
+         WHERE agent_user_id = $1
+           AND COALESCE(landlord_user_id, tenant_user_id) = $2
+           AND commission_type = $3
+           AND is_active = TRUE`,
         [agentUserId, landlordUserId, commissionType]
       );
 
       // Create new rate
       const result = await db.query(
         `INSERT INTO agent_commission_rates 
-         (agent_user_id, tenant_user_id, commission_type, commission_rate, created_by_user_id)
-         VALUES ($1, $2, $3, $4, $5)
+         (agent_user_id, tenant_user_id, landlord_user_id, commission_type, commission_rate, created_by_user_id)
+         VALUES ($1, $2, $2, $3, $4, $5)
          RETURNING *`,
         [agentUserId, landlordUserId, commissionType, rate, createdByUserId]
       );
 
       return result.rows[0];
     } catch (error) {
-      logger.error(`Error setting commission rate: ${error.message}`);
+      console.error(`Error setting commission rate: ${error.message}`);
       throw error;
     }
   }
@@ -268,7 +270,7 @@ class AgentCommissionService {
       const params = [agentUserId];
 
       if (landlordUserId) {
-        query += ` AND tenant_user_id = $2`;
+        query += ` AND COALESCE(landlord_user_id, tenant_user_id) = $2`;
         params.push(landlordUserId);
       }
 
@@ -277,7 +279,7 @@ class AgentCommissionService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      logger.error(`Error fetching commission rates: ${error.message}`);
+      console.error(`Error fetching commission rates: ${error.message}`);
       throw error;
     }
   }
@@ -286,7 +288,7 @@ class AgentCommissionService {
    * Process payout for agents
    */
   static async processPayout(agentIds, payoutDate, paymentMethod, processedByUserId) {
-    const client = await db.getClient();
+    const client = await db.connect();
 
     try {
       await client.query('BEGIN');
@@ -350,7 +352,7 @@ class AgentCommissionService {
       return updateBatchResult.rows[0];
     } catch (error) {
       await client.query('ROLLBACK');
-      logger.error(`Error processing payout: ${error.message}`);
+      console.error(`Error processing payout: ${error.message}`);
       throw error;
     } finally {
       client.release();
@@ -390,7 +392,7 @@ class AgentCommissionService {
         );
       }
     } catch (error) {
-      logger.error(`Error updating earnings summary: ${error.message}`);
+      console.error(`Error updating earnings summary: ${error.message}`);
       throw error;
     }
   }
@@ -407,7 +409,7 @@ class AgentCommissionService {
         [agentUserId, actionType, affectedCommissionId, JSON.stringify(oldValues), JSON.stringify(newValues), performedByUserId]
       );
     } catch (error) {
-      logger.error(`Error logging audit trail: ${error.message}`);
+      console.error(`Error logging audit trail: ${error.message}`);
       // Don't throw - audit logging shouldn't fail the main operation
     }
   }

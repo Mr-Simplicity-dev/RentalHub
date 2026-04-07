@@ -1,5 +1,4 @@
-const db = require('../config/database');
-const logger = require('../config/logging');
+const db = require('../config/middleware/database');
 
 class AdminAgentService {
   /**
@@ -46,7 +45,7 @@ class AdminAgentService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      logger.error(`Error fetching assignments: ${error.message}`);
+      console.error(`Error fetching assignments: ${error.message}`);
       throw error;
     }
   }
@@ -97,7 +96,7 @@ class AdminAgentService {
 
       return result.rows[0];
     } catch (error) {
-      logger.error(`Error assigning agent: ${error.message}`);
+      console.error(`Error assigning agent: ${error.message}`);
       throw error;
     }
   }
@@ -167,7 +166,7 @@ class AdminAgentService {
 
       throw new Error('Assignment not found');
     } catch (error) {
-      logger.error(`Error updating permissions: ${error.message}`);
+      console.error(`Error updating permissions: ${error.message}`);
       throw error;
     }
   }
@@ -191,7 +190,7 @@ class AdminAgentService {
 
       throw new Error('Assignment not found');
     } catch (error) {
-      logger.error(`Error revoking assignment: ${error.message}`);
+      console.error(`Error revoking assignment: ${error.message}`);
       throw error;
     }
   }
@@ -220,7 +219,7 @@ class AdminAgentService {
 
       throw new Error('Assignment not found');
     } catch (error) {
-      logger.error(`Error fetching assignment details: ${error.message}`);
+      console.error(`Error fetching assignment details: ${error.message}`);
       throw error;
     }
   }
@@ -244,7 +243,7 @@ class AdminAgentService {
 
       throw new Error('Assignment not found');
     } catch (error) {
-      logger.error(`Error deactivating assignment: ${error.message}`);
+      console.error(`Error deactivating assignment: ${error.message}`);
       throw error;
     }
   }
@@ -268,7 +267,7 @@ class AdminAgentService {
 
       throw new Error('Assignment not found');
     } catch (error) {
-      logger.error(`Error reactivating assignment: ${error.message}`);
+      console.error(`Error reactivating assignment: ${error.message}`);
       throw error;
     }
   }

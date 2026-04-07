@@ -1,5 +1,4 @@
 const AdminAgentService = require('../services/adminAgentService');
-const logger = require('../config/logging');
 
 class AdminAgentController {
   /**
@@ -29,7 +28,7 @@ class AdminAgentController {
         data: assignments,
       });
     } catch (error) {
-      logger.error(`Error fetching assignments: ${error.message}`);
+      console.error(`Error fetching assignments: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch assignments',
@@ -71,7 +70,7 @@ class AdminAgentController {
         data: assignment,
       });
     } catch (error) {
-      logger.error(`Error assigning agent: ${error.message}`);
+      console.error(`Error assigning agent: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to assign agent',
@@ -109,7 +108,7 @@ class AdminAgentController {
         data: assignment,
       });
     } catch (error) {
-      logger.error(`Error updating permissions: ${error.message}`);
+      console.error(`Error updating permissions: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to update permissions',
@@ -139,7 +138,7 @@ class AdminAgentController {
         data: assignment,
       });
     } catch (error) {
-      logger.error(`Error revoking assignment: ${error.message}`);
+      console.error(`Error revoking assignment: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to revoke assignment',
@@ -168,7 +167,7 @@ class AdminAgentController {
         data: assignment,
       });
     } catch (error) {
-      logger.error(`Error fetching assignment details: ${error.message}`);
+      console.error(`Error fetching assignment details: ${error.message}`);
       res.status(404).json({
         success: false,
         message: error.message || 'Assignment not found',
@@ -198,7 +197,7 @@ class AdminAgentController {
         data: assignment,
       });
     } catch (error) {
-      logger.error(`Error deactivating assignment: ${error.message}`);
+      console.error(`Error deactivating assignment: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to deactivate assignment',
@@ -228,7 +227,7 @@ class AdminAgentController {
         data: assignment,
       });
     } catch (error) {
-      logger.error(`Error reactivating assignment: ${error.message}`);
+      console.error(`Error reactivating assignment: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to reactivate assignment',

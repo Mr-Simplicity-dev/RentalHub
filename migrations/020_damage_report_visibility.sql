@@ -1,6 +1,22 @@
 -- Add damage report visibility and status fields
 -- Allows landlords/admins to control which reports are shown to tenants
 
+CREATE TABLE IF NOT EXISTS property_damage_reports (
+  id              SERIAL PRIMARY KEY,
+  property_id     INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  landlord_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  room_location   VARCHAR(100),
+  damage_type     VARCHAR(50),
+  description     TEXT,
+  width_cm        NUMERIC(8,2),
+  height_cm       NUMERIC(8,2),
+  depth_level     VARCHAR(20),
+  severity        VARCHAR(20),
+  photo_urls      JSONB DEFAULT '[]',
+  ai_analysis     JSONB,
+  reported_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 ALTER TABLE property_damage_reports
 ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft',
 -- Status: 'draft' (internal only), 'published' (visible to tenants)

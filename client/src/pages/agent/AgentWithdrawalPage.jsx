@@ -30,13 +30,13 @@ const AgentWithdrawalPage = () => {
       setLoading(true);
       
       // Load withdrawal requests
-      const requestsResponse = await api.get(`/api/withdrawals/agents/${agentId}/withdrawal-requests?landlordId=${landlordId}`);
+      const requestsResponse = await api.get(`/withdrawals/agents/${agentId}/withdrawal-requests?landlordId=${landlordId}`);
       if (requestsResponse.data?.success) {
         setWithdrawalRequests(requestsResponse.data.data);
       }
 
       // Load summary
-      const summaryResponse = await api.get(`/api/withdrawals/agents/${agentId}/withdrawal-summary?landlordId=${landlordId}`);
+      const summaryResponse = await api.get(`/withdrawals/agents/${agentId}/withdrawal-summary?landlordId=${landlordId}`);
       if (summaryResponse.data?.success) {
         setSummary(summaryResponse.data.data);
       }
@@ -63,7 +63,7 @@ const AgentWithdrawalPage = () => {
 
     try {
       setSubmitting(true);
-      const response = await api.post(`/api/withdrawals/agents/${agentId}/withdrawal-requests`, {
+      const response = await api.post(`/withdrawals/agents/${agentId}/withdrawal-requests`, {
         landlordId: parseInt(landlordId),
         amount: parseFloat(formData.amount),
         withdrawalMethod: formData.withdrawalMethod,

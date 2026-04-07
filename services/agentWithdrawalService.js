@@ -1,5 +1,4 @@
-const db = require('../config/database');
-const logger = require('../config/logging');
+const db = require('../config/middleware/database');
 
 class AgentWithdrawalService {
   /**
@@ -53,7 +52,7 @@ class AgentWithdrawalService {
         return withdrawal;
       }
     } catch (error) {
-      logger.error(`Error creating withdrawal request: ${error.message}`);
+      console.error(`Error creating withdrawal request: ${error.message}`);
       throw error;
     }
   }
@@ -93,7 +92,7 @@ class AgentWithdrawalService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      logger.error(`Error fetching withdrawal requests: ${error.message}`);
+      console.error(`Error fetching withdrawal requests: ${error.message}`);
       throw error;
     }
   }
@@ -125,7 +124,7 @@ class AgentWithdrawalService {
         return withdrawal;
       }
     } catch (error) {
-      logger.error(`Error approving withdrawal: ${error.message}`);
+      console.error(`Error approving withdrawal: ${error.message}`);
       throw error;
     }
   }
@@ -157,7 +156,7 @@ class AgentWithdrawalService {
         return withdrawal;
       }
     } catch (error) {
-      logger.error(`Error rejecting withdrawal: ${error.message}`);
+      console.error(`Error rejecting withdrawal: ${error.message}`);
       throw error;
     }
   }
@@ -187,7 +186,7 @@ class AgentWithdrawalService {
         return result.rows[0];
       }
     } catch (error) {
-      logger.error(`Error marking withdrawal as processing: ${error.message}`);
+      console.error(`Error marking withdrawal as processing: ${error.message}`);
       throw error;
     }
   }
@@ -218,7 +217,7 @@ class AgentWithdrawalService {
         return result.rows[0];
       }
     } catch (error) {
-      logger.error(`Error marking withdrawal as completed: ${error.message}`);
+      console.error(`Error marking withdrawal as completed: ${error.message}`);
       throw error;
     }
   }
@@ -243,7 +242,7 @@ class AgentWithdrawalService {
 
       return result.rows[0] || {};
     } catch (error) {
-      logger.error(`Error fetching withdrawal summary: ${error.message}`);
+      console.error(`Error fetching withdrawal summary: ${error.message}`);
       throw error;
     }
   }
@@ -260,7 +259,7 @@ class AgentWithdrawalService {
         [withdrawalId, actionType, oldStatus, newStatus, performedByUserId, notes]
       );
     } catch (error) {
-      logger.error(`Error logging withdrawal audit: ${error.message}`);
+      console.error(`Error logging withdrawal audit: ${error.message}`);
       // Don't throw - audit shouldn't fail the main operation
     }
   }

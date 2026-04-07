@@ -30,7 +30,7 @@ const AdminAgentManagement = () => {
     try {
       setLoading(true);
       const query = new URLSearchParams(filters);
-      const response = await api.get(`/api/admin/agents/assignments?${query}`);
+      const response = await api.get(`/admin/agents/assignments?${query}`);
       
       if (response.data?.success) {
         setAssignments(response.data.data);
@@ -52,7 +52,7 @@ const AdminAgentManagement = () => {
     }
 
     try {
-      const response = await api.post('/api/admin/agents/assignments', {
+      const response = await api.post('/admin/agents/assignments', {
         landlordId: parseInt(formData.landlordId),
         agentId: parseInt(formData.agentId),
         permissions: formData.permissions,
@@ -83,7 +83,7 @@ const AdminAgentManagement = () => {
     if (!window.confirm('Are you sure you want to revoke this assignment?')) return;
 
     try {
-      const response = await api.post(`/api/admin/agents/assignments/${assignmentId}/revoke`, {});
+      const response = await api.post(`/admin/agents/assignments/${assignmentId}/revoke`, {});
       
       if (response.data?.success) {
         toast.success('Assignment revoked successfully');
@@ -96,7 +96,7 @@ const AdminAgentManagement = () => {
 
   const handleDeactivate = async (assignmentId) => {
     try {
-      const response = await api.post(`/api/admin/agents/assignments/${assignmentId}/deactivate`, {});
+      const response = await api.post(`/admin/agents/assignments/${assignmentId}/deactivate`, {});
       
       if (response.data?.success) {
         toast.success('Assignment deactivated');
@@ -109,7 +109,7 @@ const AdminAgentManagement = () => {
 
   const handleReactivate = async (assignmentId) => {
     try {
-      const response = await api.post(`/api/admin/agents/assignments/${assignmentId}/reactivate`, {});
+      const response = await api.post(`/admin/agents/assignments/${assignmentId}/reactivate`, {});
       
       if (response.data?.success) {
         toast.success('Assignment reactivated');

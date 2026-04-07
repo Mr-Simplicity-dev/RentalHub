@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS agent_withdrawal_requests (
   -- 'pending', 'approved', 'processing', 'completed', 'rejected', 'cancelled'
   withdrawal_method VARCHAR(50),
   -- 'bank_transfer', 'wallet', 'cheque', 'other'
-  bank_account_id INTEGER REFERENCES bank_accounts(id) ON DELETE SET NULL,
+  bank_account_id INTEGER,
   -- Flexible: could store account details or reference
   request_reason TEXT,
   reason_for_rejection TEXT,
