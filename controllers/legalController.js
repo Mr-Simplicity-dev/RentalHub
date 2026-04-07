@@ -12,6 +12,7 @@ const {
 const {
   ensureLawyerCaseNotesSchema,
 } = require('../config/utils/legalSchema');
+const { statesMatch } = require('../config/utils/stateScope');
 
 const maskEmail = (value = '') => {
   const cleanValue = String(value || '').trim();
@@ -81,9 +82,13 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
        la.client_user_id,
        d.id AS dispute_id,
        d.property_id AS dispute_property_id,
-       d.status AS dispute_status
+       d.status AS dispute_status,
+       u.assigned_state AS lawyer_assigned_state,
+       p.state AS property_state
      FROM legal_authorizations la
      JOIN disputes d ON d.id = $2
+     JOIN users u ON u.id = la.lawyer_user_id
+     JOIN properties p ON p.id = d.property_id
      WHERE la.lawyer_user_id = $1
        AND la.status = 'active'
        AND (
@@ -97,8 +102,13 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
      LIMIT 1`,
     [lawyerId, disputeId]
   );
+  const row = result.rows[0] || null;
+  if (!row) return null;
+  if (!row.lawyer_assigned_state || !statesMatch(row.lawyer_assigned_state, row.property_state)) {
+    return null;
+  }
 
-  return result.rows[0] || null;
+  return row;
 };
 
 /* ---------------------------------------------------
@@ -301,11 +311,109 @@ exports.grantLawyerAccess = async (req, res) => {
   try {
 
     const { property_id, lawyer_id, client_user_id } = req.body;
+    const requesterId = Number(req.user?.id);
 
     if (!property_id || !lawyer_id || !client_user_id) {
       return res.status(400).json({
         success: false,
         message: "property_id, lawyer_id and client_user_id are required"
+      });
+    }
+
+    // Tenant/Landlord can only grant legal access on their own behalf
+    if (Number(client_user_id) !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only grant legal access for your own account',
+      });
+    }
+
+    // Ensure requester has control over the property in question
+    const propertyAccessCheck = await db.query(
+      `SELECT id
+       FROM properties
+       WHERE id = $1
+         AND owner_id = $2
+       UNION
+       SELECT id
+       FROM rental_applications
+       WHERE property_id = $1
+         AND tenant_id = $2
+         AND status = 'approved'
+       LIMIT 1`,
+      [property_id, requesterId]
+    );
+
+    if (propertyAccessCheck.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to grant legal access for this property',
+      });
+    }
+
+    // Verify the target user is actually a lawyer
+    const lawyerCheck = await db.query(
+      `SELECT id, assigned_state
+       FROM users
+       WHERE id = $1 AND user_type = 'lawyer'
+       LIMIT 1`,
+      [lawyer_id]
+    );
+    if (lawyerCheck.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "The specified user is not a registered lawyer"
+      });
+    }
+
+    const propertyStateResult = await db.query(
+      `SELECT state
+       FROM properties
+       WHERE id = $1
+       LIMIT 1`,
+      [property_id]
+    );
+
+    const propertyState = propertyStateResult.rows[0]?.state || null;
+    const lawyerAssignedState = lawyerCheck.rows[0]?.assigned_state || null;
+
+    if (!lawyerAssignedState || !statesMatch(lawyerAssignedState, propertyState)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Lawyer state lock violation: selected lawyer is outside this property state',
+      });
+    }
+
+    // Verify the client is actually connected to this property (owner or tenant)
+    const clientCheck = await db.query(
+      `SELECT 1 FROM properties WHERE id = $1 AND owner_id = $2
+       UNION
+       SELECT 1 FROM rental_applications
+       WHERE property_id = $1 AND tenant_id = $2 AND status = 'approved'
+       LIMIT 1`,
+      [property_id, requesterId]
+    );
+    if (clientCheck.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "The client is not connected to this property"
+      });
+    }
+
+    // Prevent duplicate active authorizations
+    const dupCheck = await db.query(
+      `SELECT id FROM legal_authorizations
+       WHERE property_id = $1
+         AND lawyer_user_id = $2
+         AND client_user_id = $3
+         AND status = 'active'
+       LIMIT 1`,
+      [property_id, lawyer_id, client_user_id]
+    );
+    if (dupCheck.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "This lawyer already has active access to this property for this client"
       });
     }
 
@@ -315,6 +423,18 @@ exports.grantLawyerAccess = async (req, res) => {
        VALUES ($1,$2,$3,$4)
        RETURNING *`,
       [property_id, client_user_id, lawyer_id, req.user?.id]
+    );
+
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        req.user?.id,
+        'Granted lawyer access to property',
+        'property',
+        property_id,
+        JSON.stringify({ lawyer_id, client_user_id })
+      ]
     );
 
     return res.status(201).json({
@@ -360,7 +480,8 @@ exports.getAuthorizedProperties = async (req, res) => {
          client.full_name AS client_name,
          client.email AS client_email,
          granter.full_name AS assigned_by_name,
-         granter.email AS assigned_by_email
+         granter.email AS assigned_by_email,
+         lawyer.assigned_state AS lawyer_assigned_state
        FROM properties p
        JOIN legal_authorizations la
          ON (
@@ -377,8 +498,11 @@ exports.getAuthorizedProperties = async (req, res) => {
          )
        LEFT JOIN users client ON client.id = la.client_user_id
        LEFT JOIN users granter ON granter.id = la.granted_by
+       LEFT JOIN users lawyer ON lawyer.id = la.lawyer_user_id
        WHERE la.lawyer_user_id = $1
          AND la.status = 'active'
+         AND lawyer.assigned_state IS NOT NULL
+         AND LOWER(lawyer.assigned_state) = LOWER(p.state)
        ORDER BY p.id, p.created_at DESC, la.id DESC`,
       [lawyerId]
     );
@@ -410,11 +534,21 @@ exports.resolveDispute = async (req, res) => {
 
     const { disputeId } = req.params;
     const { resolution_note } = req.body;
+    const lawyerId = req.user?.id;
 
     if (!disputeId) {
       return res.status(400).json({
         success: false,
         message: "Dispute ID is required"
+      });
+    }
+
+    // Verify this lawyer has been granted access to this specific dispute
+    const access = await getLawyerDisputeAccess(lawyerId, disputeId);
+    if (!access) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to resolve this dispute"
       });
     }
 
@@ -425,20 +559,33 @@ exports.resolveDispute = async (req, res) => {
            resolved_by = $2,
            resolved_at = NOW()
        WHERE id = $3
+         AND is_legally_sealed = FALSE
        RETURNING *`,
       [
         resolution_note || null,
-        req.user?.id,
+        lawyerId,
         disputeId
       ]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
+      return res.status(403).json({
         success: false,
-        message: "Dispute not found"
+        message: "Dispute not found or it is legally sealed and cannot be modified"
       });
     }
+
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        lawyerId,
+        'Lawyer resolved dispute',
+        'dispute',
+        disputeId,
+        JSON.stringify({ resolution_note: resolution_note || null })
+      ]
+    );
 
     return res.json({
       success: true,
@@ -539,6 +686,18 @@ exports.verifyEvidence = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'You are not authorized to verify evidence for this dispute',
+      });
+    }
+
+    // Block mutations once a dispute is legally sealed — the merkle root is final
+    const sealCheck = await db.query(
+      `SELECT is_legally_sealed FROM disputes WHERE id = $1`,
+      [disputeId]
+    );
+    if (sealCheck.rows[0]?.is_legally_sealed) {
+      return res.status(403).json({
+        success: false,
+        message: 'This dispute is legally sealed. Evidence verification status cannot be changed.',
       });
     }
 

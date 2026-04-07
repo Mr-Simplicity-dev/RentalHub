@@ -8,6 +8,8 @@ const { authenticate } = require('../config/middleware/auth');
 const { allowRoles } = require('../config/middleware/roleMiddleware');
 const { canLawyerAccessProperty } = require('../config/middleware/legalAccessMiddleware');
 const audit = require('../config/middleware/auditMiddleware');
+const validateRequest = require('../config/middleware/validateRequest');
+const { grantLawyerAccessValidators } = require('../config/validators/securityValidators');
 
 
 /* ---------------------------------------------------
@@ -77,6 +79,20 @@ router.patch(
   allowRoles('lawyer'),
   audit('resolve_dispute', 'dispute'),
   legalController.resolveDispute
+);
+
+/* ---------------------------------------------------
+   Grant Lawyer Access (Tenant / Landlord)
+--------------------------------------------------- */
+
+router.post(
+  '/grant-access',
+  authenticate,
+  allowRoles('tenant', 'landlord'),
+  grantLawyerAccessValidators,
+  validateRequest,
+  audit('grant_lawyer_access', 'property'),
+  legalController.grantLawyerAccess
 );
 
 router.get(
@@ -149,3 +165,5 @@ router.patch(
   audit('update_dispute_summary', 'dispute'),
   legalController.updateDisputeSummary
 );
+
+module.exports = router;

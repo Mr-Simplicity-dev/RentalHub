@@ -1,11 +1,16 @@
 const express = require('express');
 const AgentCommissionController = require('../controllers/agentCommissionController');
-const auth = require('../config/middleware/auth');
+const { authenticate } = require('../config/middleware/auth');
+const validateRequest = require('../config/middleware/validateRequest');
+const {
+	commissionRatesSetValidators,
+	commissionRatesGetValidators,
+} = require('../config/validators/securityValidators');
 
 const router = express.Router();
 
 // Middleware to ensure user is authenticated
-router.use(auth);
+router.use(authenticate);
 
 // Get agent earnings summary
 router.get('/agents/:agentId/earnings', AgentCommissionController.getEarnings);
@@ -23,10 +28,20 @@ router.put('/commissions/:commissionId/verify', AgentCommissionController.verify
 router.post('/commissions/:commissionId/reverse', AgentCommissionController.reverseCommission);
 
 // Set commission rates
-router.post('/agents/:agentId/commission-rates', AgentCommissionController.setCommissionRate);
+router.post(
+	'/agents/:agentId/commission-rates',
+	commissionRatesSetValidators,
+	validateRequest,
+	AgentCommissionController.setCommissionRate
+);
 
 // Get commission rates
-router.get('/agents/:agentId/commission-rates', AgentCommissionController.getCommissionRates);
+router.get(
+	'/agents/:agentId/commission-rates',
+	commissionRatesGetValidators,
+	validateRequest,
+	AgentCommissionController.getCommissionRates
+);
 
 // Process payout (admin only)
 router.post('/payouts', AgentCommissionController.processPayout);

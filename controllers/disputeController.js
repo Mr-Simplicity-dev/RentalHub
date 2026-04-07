@@ -9,6 +9,7 @@ const { buildMerkleRoot } = require('../services/merkleEvidence.service');
 const { anchorEvidence } = require('../services/evidenceAnchor.service');
 const { ensureLawyerCaseNotesSchema } = require('../config/utils/legalSchema');
 const { getPropertyDisputeParticipants } = require('../config/utils/propertyDisputeParticipants');
+const { statesMatch } = require('../config/utils/stateScope');
 
 // Create dispute
 exports.createDispute = async (req, res) => {
@@ -442,11 +443,12 @@ exports.resolveDispute = async (req, res) => {
             const result = await db.query(
             `UPDATE disputes
             SET status = 'resolved',
-                resolved_at = CURRENT_TIMESTAMP
+                resolved_at = CURRENT_TIMESTAMP,
+                resolved_by = $2
             WHERE id = $1
             AND is_legally_sealed = FALSE
             RETURNING *`,
-            [disputeId]
+            [disputeId, req.user.id]
             );
 
             if (result.rows.length === 0) {
@@ -559,17 +561,54 @@ exports.uploadEvidence = async (req, res) => {
 
 exports.getEvidence = async (req, res) => {
   const { evidenceId } = req.params;
+  const userId = req.user?.id;
+  const userType = req.user?.user_type;
 
   const result = await db.query(
-    `SELECT * FROM dispute_evidence WHERE id = $1`,
+    `SELECT de.*, d.opened_by, d.against_user, d.property_id
+     FROM dispute_evidence de
+     JOIN disputes d ON d.id = de.dispute_id
+     WHERE de.id = $1`,
     [evidenceId]
   );
 
   if (result.rows.length === 0) {
-    return res.status(404).json({ success: false });
+    return res.status(404).json({ success: false, message: 'Evidence not found' });
   }
 
   const evidence = result.rows[0];
+  const isPrivileged = ['admin', 'super_admin'].includes(userType);
+  const isParticipant = [evidence.opened_by, evidence.against_user].includes(Number(userId));
+
+  if (!isPrivileged && !isParticipant) {
+    // Check if lawyer has an active authorization covering this dispute's property
+    if (userType === 'lawyer') {
+      const lawyerCheck = await db.query(
+        `SELECT la.id, u.assigned_state AS lawyer_assigned_state, p.state AS property_state
+         FROM legal_authorizations la
+         JOIN users u ON u.id = la.lawyer_user_id
+         JOIN properties p ON p.id = $2
+         WHERE la.lawyer_user_id = $1
+           AND la.status = 'active'
+           AND (
+             la.property_id = $2
+             OR (la.property_id IS NULL AND la.client_user_id IN ($3, $4))
+           )
+         LIMIT 1`,
+        [userId, evidence.property_id, evidence.opened_by, evidence.against_user]
+      );
+      const lawyerRow = lawyerCheck.rows[0];
+      if (
+        lawyerCheck.rows.length === 0 ||
+        !lawyerRow.lawyer_assigned_state ||
+        !statesMatch(lawyerRow.lawyer_assigned_state, lawyerRow.property_state)
+      ) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    } else {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+  }
 
   res.sendFile(require('path').resolve(evidence.file_path));
 };
@@ -578,9 +617,14 @@ exports.getEvidence = async (req, res) => {
 exports.verifyEvidenceIntegrity = async (req, res) => {
   try {
     const { evidenceId } = req.params;
+    const userId = req.user?.id;
+    const userType = req.user?.user_type;
 
     const result = await db.query(
-      `SELECT * FROM dispute_evidence WHERE id = $1`,
+      `SELECT de.*, d.opened_by, d.against_user, d.property_id
+       FROM dispute_evidence de
+       JOIN disputes d ON d.id = de.dispute_id
+       WHERE de.id = $1`,
       [evidenceId]
     );
 
@@ -589,6 +633,37 @@ exports.verifyEvidenceIntegrity = async (req, res) => {
     }
 
     const evidence = result.rows[0];
+    const isPrivileged = ['admin', 'super_admin'].includes(userType);
+    const isParticipant = [evidence.opened_by, evidence.against_user].includes(Number(userId));
+
+    if (!isPrivileged && !isParticipant) {
+      if (userType === 'lawyer') {
+        const lawyerCheck = await db.query(
+          `SELECT la.id, u.assigned_state AS lawyer_assigned_state, p.state AS property_state
+           FROM legal_authorizations la
+           JOIN users u ON u.id = la.lawyer_user_id
+           JOIN properties p ON p.id = $2
+           WHERE la.lawyer_user_id = $1
+             AND la.status = 'active'
+             AND (
+               la.property_id = $2
+               OR (la.property_id IS NULL AND la.client_user_id IN ($3, $4))
+             )
+           LIMIT 1`,
+          [userId, evidence.property_id, evidence.opened_by, evidence.against_user]
+        );
+        const lawyerRow = lawyerCheck.rows[0];
+        if (
+          lawyerCheck.rows.length === 0 ||
+          !lawyerRow.lawyer_assigned_state ||
+          !statesMatch(lawyerRow.lawyer_assigned_state, lawyerRow.property_state)
+        ) {
+          return res.status(403).json({ success: false, message: 'Access denied' });
+        }
+      } else {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
 
     const fileBuffer = fs.readFileSync(evidence.file_path);
     const currentHash = crypto

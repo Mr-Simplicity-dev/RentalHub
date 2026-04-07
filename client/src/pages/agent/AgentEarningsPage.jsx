@@ -206,10 +206,8 @@ const AgentEarningsPage = () => {
             </button>
           </div>
         </div>
-        </div>
         <CommissionHistory commissions={commissions} loading={commissionLoading} />
       </div>
-
       {/* Help Section */}
       <div className="rounded-2xl border bg-blue-50 p-6 text-blue-900">
         <h3 className="font-semibold">Understanding Your Earnings</h3>
