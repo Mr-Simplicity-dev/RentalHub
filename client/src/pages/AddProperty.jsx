@@ -235,7 +235,7 @@ const AddProperty = () => {
 
           <div className="rounded-lg bg-amber-50 p-4">
             <p className="text-sm text-amber-800">
-              <strong>Tip:</strong> You can add damage reports after publishing the property. Click "Continue" now to verify and publish your listing.
+              <strong>Tip:</strong> You can add Property Maintenance Assessments after publishing the property. Click "Continue" now to verify and publish your listing.
             </p>
           </div>
 
@@ -254,7 +254,7 @@ const AddProperty = () => {
         <div className="card space-y-6">
           <div className="space-y-3 text-center">
             <h2 className="text-xl font-semibold">🎉 Property Published!</h2>
-            <p className="text-sm text-gray-500">Your property is now live. You can add damage reports now if needed.</p>
+            <p className="text-sm text-gray-500">Your property is now live. You can add Property Maintenance Assessments now if needed.</p>
           </div>
 
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center">

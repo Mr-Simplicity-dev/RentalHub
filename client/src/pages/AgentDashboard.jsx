@@ -74,7 +74,7 @@ const AgentDashboard = () => {
           type: 'damage_report',
           amount: 2000,
           landlord_name: 'Jane Smith',
-          description: 'Commission: Damage report submission',
+          description: 'Commission: Property Maintenance Assessment submission',
           date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
           status: 'completed',
         },
@@ -278,7 +278,7 @@ const AgentDashboard = () => {
                 <p className="text-3xl font-bold text-green-600">{propertyStats.active}</p>
               </div>
               <div className="card">
-                <p className="text-sm text-gray-600">Damage Reports</p>
+                <p className="text-sm text-gray-600">Property Maintenance Assessments</p>
                 <p className="text-3xl font-bold text-orange-600">{propertyStats.with_damage_reports}</p>
               </div>
             </div>
@@ -457,7 +457,7 @@ const AgentDashboard = () => {
                 <h3 className="font-semibold text-lg mb-2">❓ Frequently Asked Questions</h3>
                 <p className="text-gray-600">How do I add a new property?</p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Go to "Add Property" and fill in the property details. You can add damage reports after publishing.
+                  Go to "Add Property" and fill in the property details. You can add Property Maintenance Assessments after publishing.
                 </p>
               </div>
 
@@ -465,7 +465,7 @@ const AgentDashboard = () => {
                 <h3 className="font-semibold text-lg mb-2">💰 Commission Structure</h3>
                 <p className="text-gray-600">How do I earn commissions?</p>
                 <p className="text-sm text-gray-500 mt-1">
-                  You earn commissions on property listings, damage reports, dispute resolutions, and other platform activities.
+                  You earn commissions on property listings, Property Maintenance Assessments, dispute resolutions, and other platform activities.
                   Your landlord may also set a custom commission rate.
                 </p>
               </div>

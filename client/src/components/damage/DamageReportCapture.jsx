@@ -40,11 +40,12 @@ const ROOMS = [
 ];
 
 /**
- * DamageReportCapture - Reusable component for landlords and agents to report property damage
+ * DamageReportCapture - Reusable component for landlords and agents to submit Property Maintenance Assessments
  * Guides users through: capture → AI analysis → review → confirm → save
  */
 const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'landlord' }) => {
   const [stage, setStage] = useState('workflow'); // workflow | camera | preview | review | confirm
+  const [, setCameraActive] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState('');
 
@@ -53,6 +54,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
   const [analyzingDamage, setAnalyzingDamage] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const [aiResult, setAiResult] = useState(null);
+  const [, setForceEditMode] = useState(false);
 
   const [damageForm, setDamageForm] = useState({
     room_location: '',
@@ -255,23 +257,23 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
       const res = await propertyService.saveDamageReport(propertyId, fd);
 
       if (res.success) {
-        toast.success('✅ Damage report saved successfully');
+        toast.success('✅ Property Maintenance Assessment saved successfully');
         cleanup();
         onSaved?.();
         onClose?.();
       } else {
-        toast.error(res.message || 'Failed to save damage report');
+        toast.error(res.message || 'Failed to save Property Maintenance Assessment');
       }
     } catch (error) {
       console.error('Save error:', error);
-      toast.error(error?.response?.data?.message || 'Failed to save damage report');
+      toast.error(error?.response?.data?.message || 'Failed to save Property Maintenance Assessment');
     } finally {
       setSaving(false);
     }
   }, [capturedPhoto, damageForm, aiResult, propertyId, cleanup, onSaved, onClose]);
 
   return (
-    <Modal isOpen={true} onClose={onClose} title="📸 Damage Report">
+    <Modal isOpen={true} onClose={onClose} title="📸 Property Maintenance Assessment">
       <div className="space-y-4">
         {/* WORKFLOW GUIDE */}
         {stage === 'workflow' && (

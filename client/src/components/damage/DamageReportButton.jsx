@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import DamageReportCapture from '../damage/DamageReportCapture';
 
 /**
- * DamageReportButton - Simple trigger button for damage report modal
+ * DamageReportButton - Simple trigger button for Property Maintenance Assessment modal
  * Used in AddProperty, AgentDashboard, PropertyDetail, etc.
  */
 const DamageReportButton = ({ propertyId, onReportSaved, variant = 'primary' }) => {
@@ -24,7 +24,7 @@ const DamageReportButton = ({ propertyId, onReportSaved, variant = 'primary' }) 
         onClick={() => setShowCapture(true)}
         className={`btn btn-${variant} gap-2`}
       >
-        📸 Report Damage
+        📸 Property Maintenance Assessment
       </button>
 
       {showCapture && (

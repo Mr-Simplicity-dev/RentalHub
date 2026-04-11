@@ -225,7 +225,7 @@ const AgentDashboard = () => {
 
             <div className="mt-5 flex flex-wrap gap-3">
               <PermissionBadge enabled={assignment.can_manage_properties} label="Manage properties" />
-              <PermissionBadge enabled={assignment.can_manage_damage_reports} label="Manage damage reports" />
+              <PermissionBadge enabled={assignment.can_manage_damage_reports} label="Manage Property Maintenance Assessments" />
               <PermissionBadge enabled={assignment.can_manage_disputes} label="Manage disputes" />
               <PermissionBadge enabled={assignment.can_manage_legal} label="Manage legal tasks" />
               <PermissionBadge enabled={assignment.can_manage_finances} label="Manage finances" />
@@ -247,7 +247,7 @@ const AgentDashboard = () => {
                 Assigned/Managed Properties
               </Link>
               <Link to="/add-property" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
-                Damage-Report Tasks
+                Property Maintenance Assessment Tasks
               </Link>
               <Link to="/messages" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
                 Dispute and Evidence Tasks
