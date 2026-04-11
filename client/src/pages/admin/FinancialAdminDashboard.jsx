@@ -15,6 +15,10 @@ import {
   FaChartPie
 } from 'react-icons/fa';
 import api from '../../services/api';
+import { toast } from 'react-toastify';
+import Button from '../../components/common/Button';
+import InputDialog from '../../components/common/InputDialog';
+import useRetryableAction from '../../hooks/useRetryableAction';
 import AdminLayout from './AdminLayout';
 
 const FinancialAdminDashboard = () => {
@@ -25,6 +29,35 @@ const FinancialAdminDashboard = () => {
   const [frozenFunds, setFrozenFunds] = useState([]);
   const [stateAdmins, setStateAdmins] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showFreezeDialog, setShowFreezeDialog] = useState(false);
+  const [freezeInputs, setFreezeInputs] = useState({
+    user_id: '',
+    amount: '',
+    reason: '',
+  });
+
+  const freezeFundsAction = useRetryableAction(
+    async (inputs) => {
+      await api.post('/api/financial-admin/funds/freeze', {
+        user_id: Number(inputs.user_id),
+        amount: parseFloat(inputs.amount),
+        reason: String(inputs.reason || '').trim(),
+      });
+    },
+    {
+      maxRetries: 2,
+      context: 'financial_admin',
+      onSuccess: async () => {
+        toast.success('Funds frozen successfully');
+        setShowFreezeDialog(false);
+        setFreezeInputs({ user_id: '', amount: '', reason: '' });
+        await fetchDashboardData();
+      },
+      onError: (error) => {
+        toast.error(error?.message || 'Failed to freeze funds');
+      },
+    }
+  );
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -65,23 +98,42 @@ const FinancialAdminDashboard = () => {
     }
   };
 
-  const handleFreezeFunds = async (userId, amount, reason) => {
-    if (!reason || !amount) {
-      alert('Please provide reason and amount');
+  const openFreezeDialog = () => {
+    setFreezeInputs({ user_id: '', amount: '', reason: '' });
+    setShowFreezeDialog(true);
+  };
+
+  const handleFreezeFunds = async (inputs) => {
+    const userId = Number(inputs.user_id);
+    const amount = Number(inputs.amount);
+    const reason = String(inputs.reason || '').trim();
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      toast.error('Please enter a valid user ID');
       return;
     }
 
-    try {
-      await api.post('/api/financial-admin/funds/freeze', {
-        user_id: userId,
-        amount: parseFloat(amount),
-        reason
-      });
-      alert('Funds frozen successfully');
-      fetchDashboardData();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to freeze funds');
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
     }
+
+    if (!reason) {
+      toast.error('Please provide a reason');
+      return;
+    }
+
+    setFreezeInputs({
+      user_id: String(userId),
+      amount: String(amount),
+      reason,
+    });
+
+    await freezeFundsAction.execute({
+      user_id: userId,
+      amount,
+      reason,
+    });
   };
 
   const formatCurrency = (amount) => {
@@ -548,19 +600,9 @@ const FinancialAdminDashboard = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold">Frozen Funds</h3>
-                  <button
-                    onClick={() => {
-                      const userId = prompt('Enter User ID:');
-                      const amount = prompt('Enter Amount to Freeze:');
-                      const reason = prompt('Enter Reason:');
-                      if (userId && amount && reason) {
-                        handleFreezeFunds(userId, amount, reason);
-                      }
-                    }}
-                    className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
-                  >
+                  <Button onClick={openFreezeDialog} variant="danger" size="small">
                     Freeze Funds
-                  </button>
+                  </Button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
@@ -687,6 +729,58 @@ const FinancialAdminDashboard = () => {
             )}
           </div>
         </div>
+
+        <InputDialog
+          isOpen={showFreezeDialog}
+          onConfirm={handleFreezeFunds}
+          onCancel={() => setShowFreezeDialog(false)}
+          title="Freeze User Funds"
+          message="Enter the user ID, amount, and reason for this freeze action."
+          type="danger"
+          confirmText="Freeze Funds"
+          cancelText="Cancel"
+          isLoading={freezeFundsAction.isLoading}
+          initialValues={freezeInputs}
+          inputs={[
+            {
+              name: 'user_id',
+              label: 'User ID',
+              type: 'number',
+              placeholder: 'Enter user ID',
+              required: true,
+              validate: (value) => {
+                const num = Number(value);
+                return Number.isInteger(num) && num > 0
+                  ? true
+                  : 'Please enter a valid user ID';
+              },
+            },
+            {
+              name: 'amount',
+              label: 'Amount (NGN)',
+              type: 'number',
+              placeholder: 'Enter amount to freeze',
+              required: true,
+              validate: (value) => {
+                const num = Number(value);
+                return Number.isFinite(num) && num > 0
+                  ? true
+                  : 'Please enter a valid amount';
+              },
+            },
+            {
+              name: 'reason',
+              label: 'Reason',
+              type: 'textarea',
+              placeholder: 'Enter reason for freezing these funds',
+              rows: 3,
+              required: true,
+              validate: (value) => String(value || '').trim().length > 0
+                ? true
+                : 'Reason is required',
+            },
+          ]}
+        />
       </div>
     </AdminLayout>
   );
