@@ -317,6 +317,14 @@ const PropertyDetail = () => {
     ? `Browse verified details for ${property.title} in ${propertyLocation}. See rent, property features, photos, and landlord contact options on RenatalHub.`
     : `Browse verified details for ${property.title} on RenatalHub.`;
   const propertyCanonical = `${window.location.origin}/properties/${property.id}`;
+  const propertyShareImageRaw =
+    property.photos?.[0] ||
+    property.primary_photo ||
+    '/placeholder-property.jpg';
+  const propertyShareImage =
+    propertyShareImageRaw && /^https?:\/\//i.test(propertyShareImageRaw)
+      ? propertyShareImageRaw
+      : `${window.location.origin}${propertyShareImageRaw}`;
   const propertySchema = {
     '@context': 'https://schema.org',
     '@type': 'Residence',
@@ -347,6 +355,11 @@ const PropertyDetail = () => {
         <meta property="og:description" content={propertySeoDescription} />
         <meta property="og:url" content={propertyCanonical} />
         <meta property="og:type" content="article" />
+        <meta property="og:image" content={propertyShareImage} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={propertySeoTitle} />
+        <meta name="twitter:description" content={propertySeoDescription} />
+        <meta name="twitter:image" content={propertyShareImage} />
         <script type="application/ld+json">{JSON.stringify(propertySchema)}</script>
       </Helmet>
 

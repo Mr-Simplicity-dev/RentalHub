@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import api from '../../services/api';
 import {
   FaUsers,
   FaHome,
@@ -18,16 +19,12 @@ const AdminDashboard = () => {
     pendingVerifications: '-',
   });
 
+  const [scope, setScope] = useState({ assignedState: null, assignedCity: null });
+
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const res = await fetch('/api/admin/stats', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-
-        const data = await res.json();
+        const { data } = await api.get('/admin/stats');
 
         if (data.success) {
           setStats({
@@ -36,6 +33,9 @@ const AdminDashboard = () => {
             applications: data.data.applications,
             pendingVerifications: data.data.pendingVerifications,
           });
+          if (data.data.scope) {
+            setScope(data.data.scope);
+          }
         }
       } catch (err) {
         console.error('Failed to load admin stats', err);
@@ -56,6 +56,19 @@ const AdminDashboard = () => {
             Welcome, {user?.full_name || 'Administrator'}
           </p>
         </div>
+
+        {user?.user_type === 'admin' && (scope.assignedState || scope.assignedCity) && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm font-semibold text-blue-900">Your Jurisdiction</p>
+            <p className="mt-1 text-sm text-blue-800">
+              {scope.assignedState}
+              {scope.assignedCity ? ` — ${scope.assignedCity} Local Government` : ''}
+            </p>
+            <p className="mt-1 text-xs text-blue-600">
+              You can only view and manage tenants, landlords and properties within this local government.
+            </p>
+          </div>
+        )}
 
         <div className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <StatCard

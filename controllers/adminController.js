@@ -14,6 +14,8 @@ const { notifyAlertsForProperty } = require('../config/utils/propertyAlertServic
 const bcrypt = require('bcryptjs');
 
 let verificationAuditSchemaReady = false;
+let lawyerScopeSchemaReady = false;
+const VERIFICATION_TARGET_USER_TYPES = "('tenant', 'landlord', 'agent', 'lawyer')";
 const USER_VERIFICATION_STATUS_EXPR = `
   COALESCE(
     identity_verification_status,
@@ -46,24 +48,241 @@ const ensureVerificationAuditSchema = async () => {
   verificationAuditSchemaReady = true;
 };
 
+const ensureLawyerScopeSchema = async () => {
+  if (lawyerScopeSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS lawyer_client_scope VARCHAR(20);
+
+    CREATE INDEX IF NOT EXISTS idx_users_lawyer_client_scope
+      ON users(lawyer_client_scope);
+  `);
+
+  lawyerScopeSchemaReady = true;
+};
+
+const buildDeletedEmail = (userId) => `deleted+u${userId}.${Date.now()}@deleted.local`;
+
+const buildDeletedUniqueValue = (prefix, userId) => `${prefix}${userId}${Date.now().toString().slice(-8)}`;
+
+const releaseDeletedUserIdentityConflicts = async ({ email, phone, nin }) => {
+  const filters = [];
+  const params = [];
+
+  if (String(email || '').trim()) {
+    params.push(String(email).trim().toLowerCase());
+    filters.push(`LOWER(email) = $${params.length}`);
+  }
+
+  if (String(phone || '').trim()) {
+    params.push(String(phone).trim());
+    filters.push(`phone = $${params.length}`);
+  }
+
+  if (String(nin || '').trim()) {
+    params.push(String(nin).trim());
+    filters.push(`nin = $${params.length}`);
+  }
+
+  if (!filters.length) return;
+
+  const result = await db.query(
+    `SELECT id, email, phone, nin
+     FROM users
+     WHERE deleted_at IS NOT NULL
+       AND (${filters.join(' OR ')})`,
+    params
+  );
+
+  for (const row of result.rows) {
+    const nextEmail = row.email && String(email || '').trim() && String(row.email).trim().toLowerCase() === String(email).trim().toLowerCase()
+      ? buildDeletedEmail(row.id)
+      : row.email;
+    const nextPhone = row.phone && String(phone || '').trim() && String(row.phone).trim() === String(phone).trim()
+      ? buildDeletedUniqueValue('DELP', row.id)
+      : row.phone;
+    const nextNin = row.nin && String(nin || '').trim() && String(row.nin).trim() === String(nin).trim()
+      ? buildDeletedUniqueValue('DELN', row.id)
+      : row.nin;
+
+    await db.query(
+      `UPDATE users
+       SET email = $2,
+           phone = $3,
+           nin = $4,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [row.id, nextEmail, nextPhone, nextNin]
+    );
+  }
+};
+
+const STATE_ADMIN_ROLES = new Set(['state_admin', 'state_financial_admin']);
+
+const getRequesterStateScope = async (user) => {
+  const requesterRole = user?.user_type || user?.userType;
+  if (!STATE_ADMIN_ROLES.has(requesterRole)) {
+    return null;
+  }
+
+  const result = await db.query(
+    `SELECT assigned_state
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [user.id]
+  );
+
+  const assignedState = String(result.rows?.[0]?.assigned_state || '').trim();
+  return assignedState || null;
+};
+
+// Returns { assignedState, assignedCity } for all scoped roles.
+// - admin role: scoped by both assigned_state (state) AND assigned_city (LGA)
+// - state_admin / state_financial_admin: scoped by assigned_state only
+// - all other roles: no scope restriction (both null)
+const getRequesterScope = async (user) => {
+  const role = user?.user_type || user?.userType;
+
+  if (role === 'admin') {
+    const result = await db.query(
+      `SELECT assigned_state, assigned_city
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [user.id]
+    );
+    const row = result.rows[0] || {};
+    return {
+      assignedState: String(row.assigned_state || '').trim() || null,
+      assignedCity: String(row.assigned_city || '').trim() || null,
+    };
+  }
+
+  // Reuse existing function for state-scoped roles
+  const assignedState = await getRequesterStateScope(user);
+  return { assignedState, assignedCity: null };
+};
+
 // GET /api/admin/stats
 exports.getStats = async (req, res) => {
   try {
-    const totalUsers = await db.query(
-      `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL`
-    );
-    const totalProperties = await db.query(
-      `SELECT COUNT(*) FROM properties`
-    );
-    const applications = await db.query(
-      `SELECT COUNT(*) FROM applications`
-    );
-    const pendingVerifications = await db.query(
-      `SELECT COUNT(*) FROM users
-       WHERE deleted_at IS NULL
-         AND identity_verified = FALSE
-         AND user_type IN ('tenant', 'landlord')`
-    );
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
+
+    let totalUsers;
+    let totalProperties;
+    let applications;
+    let pendingVerifications;
+
+    if (assignedState) {
+      const scopeParams = [assignedState];
+      if (assignedCity) scopeParams.push(assignedCity);
+
+      // State filter: $1; LGA filter (admin only): $2
+      const stateSql = `LOWER(TRIM(sp.state)) = LOWER(TRIM($1))`;
+      const lgaSql = assignedCity
+        ? ` AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($2))`
+        : '';
+      const propLgaSql = assignedCity
+        ? ` AND LOWER(TRIM(COALESCE(lga_name, ''))) = LOWER(TRIM($2))`
+        : '';
+      const joinedLgaSql = assignedCity
+        ? ` AND LOWER(TRIM(COALESCE(p.lga_name, ''))) = LOWER(TRIM($2))`
+        : '';
+
+      totalUsers = await db.query(
+        `SELECT COUNT(*)
+         FROM users u
+         WHERE u.deleted_at IS NULL
+           AND u.user_type IN ${VERIFICATION_TARGET_USER_TYPES}
+           AND (
+             EXISTS (
+               SELECT 1
+               FROM properties sp
+               WHERE (sp.user_id = u.id OR sp.landlord_id = u.id)
+                 AND ${stateSql}${lgaSql}
+             )
+             OR EXISTS (
+               SELECT 1
+               FROM applications sa
+               JOIN properties sp ON sp.id = sa.property_id
+               WHERE sa.tenant_id = u.id
+                 AND ${stateSql}${lgaSql}
+             )
+           )`,
+        scopeParams
+      );
+
+      totalProperties = await db.query(
+        `SELECT COUNT(*)
+         FROM properties
+         WHERE LOWER(TRIM(state)) = LOWER(TRIM($1))${propLgaSql}`,
+        scopeParams
+      );
+
+      applications = await db.query(
+        `SELECT COUNT(*)
+         FROM applications a
+         JOIN properties p ON p.id = a.property_id
+         WHERE LOWER(TRIM(p.state)) = LOWER(TRIM($1))${joinedLgaSql}`,
+        scopeParams
+      );
+
+      pendingVerifications = await db.query(
+        `SELECT COUNT(*)
+         FROM users u
+         WHERE u.deleted_at IS NULL
+           AND u.user_type IN ${VERIFICATION_TARGET_USER_TYPES}
+           AND ${USER_VERIFICATION_STATUS_EXPR} = 'pending'
+           AND (
+             EXISTS (
+               SELECT 1
+               FROM properties sp
+               WHERE (sp.user_id = u.id OR sp.landlord_id = u.id)
+                 AND ${stateSql}${lgaSql}
+             )
+             OR EXISTS (
+               SELECT 1
+               FROM applications sa
+               JOIN properties sp ON sp.id = sa.property_id
+               WHERE sa.tenant_id = u.id
+                 AND ${stateSql}${lgaSql}
+             )
+           )`,
+        scopeParams
+      );
+    } else {
+      totalUsers = await db.query(
+        `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL`
+      );
+      totalProperties = await db.query(
+        `SELECT COUNT(*) FROM properties`
+      );
+      applications = await db.query(
+        `SELECT COUNT(*) FROM applications`
+      );
+      pendingVerifications = await db.query(
+        `SELECT COUNT(*) FROM users
+         WHERE deleted_at IS NULL
+           AND identity_verified = FALSE
+           AND user_type IN ${VERIFICATION_TARGET_USER_TYPES}`
+      );
+    }
 
     res.json({
       success: true,
@@ -72,6 +291,10 @@ exports.getStats = async (req, res) => {
         totalProperties: Number(totalProperties.rows[0].count),
         applications: Number(applications.rows[0].count),
         pendingVerifications: Number(pendingVerifications.rows[0].count),
+        scope: {
+          assignedState: assignedState || null,
+          assignedCity: assignedCity || null,
+        },
       }
     });
   } catch (err) {
@@ -98,6 +321,21 @@ exports.getAllUsers = async (req, res) => {
     const currentPage = Math.max(Number(page) || 1, 1);
     const pageSize = Math.min(Number(limit) || 20, 100);
     const offset = (currentPage - 1) * pageSize;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
 
     const where = [];
     const params = [];
@@ -129,6 +367,36 @@ exports.getAllUsers = async (req, res) => {
     if (state) {
       where.push(`ls.state ILIKE $${i++}`);
       params.push(`%${state}%`);
+    }
+
+    if (assignedState) {
+      where.push(`(
+        LOWER(TRIM(ls.state)) = LOWER(TRIM($${i}))
+        OR EXISTS (
+          SELECT 1
+          FROM applications sa
+          JOIN properties sp ON sp.id = sa.property_id
+          WHERE sa.tenant_id = u.id
+            AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${i}))
+        )
+      )`);
+      params.push(assignedState);
+      i++;
+    }
+
+    if (assignedCity) {
+      where.push(`(
+        LOWER(TRIM(COALESCE(ls.lga_name, ''))) = LOWER(TRIM($${i}))
+        OR EXISTS (
+          SELECT 1
+          FROM applications sa
+          JOIN properties sp ON sp.id = sa.property_id
+          WHERE sa.tenant_id = u.id
+            AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${i}))
+        )
+      )`);
+      params.push(assignedCity);
+      i++;
     }
 
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -200,13 +468,28 @@ exports.getPendingVerifications = async (req, res) => {
     const currentPage = Math.max(Number(page) || 1, 1);
     const pageSize = Math.min(Number(limit) || 20, 100);
     const offset = (currentPage - 1) * pageSize;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
 
     const where = [
       `deleted_at IS NULL`,
       `email_verified = TRUE`,
       `phone_verified = TRUE`,
       `${USER_VERIFICATION_STATUS_EXPR} = 'pending'`,
-      `user_type IN ('tenant', 'landlord')`,
+      `user_type IN ${VERIFICATION_TARGET_USER_TYPES}`,
     ];
 
     const params = [];
@@ -220,6 +503,46 @@ exports.getPendingVerifications = async (req, res) => {
         international_passport_number ILIKE $${i}
       )`);
       params.push(`%${search}%`);
+      i++;
+    }
+
+    if (assignedState) {
+      where.push(`(
+        EXISTS (
+          SELECT 1
+          FROM properties sp
+          WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+            AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${i}))
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM applications sa
+          JOIN properties sp ON sp.id = sa.property_id
+          WHERE sa.tenant_id = users.id
+            AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${i}))
+        )
+      )`);
+      params.push(assignedState);
+      i++;
+    }
+
+    if (assignedCity) {
+      where.push(`(
+        EXISTS (
+          SELECT 1
+          FROM properties sp
+          WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+            AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${i}))
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM applications sa
+          JOIN properties sp ON sp.id = sa.property_id
+          WHERE sa.tenant_id = users.id
+            AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${i}))
+        )
+      )`);
+      params.push(assignedCity);
       i++;
     }
 
@@ -269,6 +592,66 @@ exports.approveVerification = async (req, res) => {
 
     const userId = req.params.id;
     const adminId = req.user.id;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
+
+    const queryParams = [userId, adminId];
+    let stateScopeClause = '';
+
+    if (assignedState) {
+      const stateIdx = queryParams.length + 1;
+      queryParams.push(assignedState);
+      stateScopeClause += `
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM properties sp
+             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications sa
+             JOIN properties sp ON sp.id = sa.property_id
+             WHERE sa.tenant_id = users.id
+               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+           )
+         )`;
+    }
+
+    if (assignedCity) {
+      const cityIdx = queryParams.length + 1;
+      queryParams.push(assignedCity);
+      stateScopeClause += `
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM properties sp
+             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+               AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications sa
+             JOIN properties sp ON sp.id = sa.property_id
+             WHERE sa.tenant_id = users.id
+               AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+           )
+         )`;
+    }
 
     const result = await db.query(
       `UPDATE users
@@ -279,11 +662,12 @@ exports.approveVerification = async (req, res) => {
            updated_at = NOW()
        WHERE id = $1
          AND deleted_at IS NULL
-         AND user_type IN ('tenant', 'landlord')
+         AND user_type IN ${VERIFICATION_TARGET_USER_TYPES}
          AND passport_photo_url IS NOT NULL
          AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
+         ${stateScopeClause}
        RETURNING id`,
-      [userId, adminId]
+      queryParams
     );
 
     if (!result.rows.length) {
@@ -306,6 +690,66 @@ exports.rejectVerification = async (req, res) => {
     await ensureVerificationAuditSchema();
 
     const userId = req.params.id;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
+
+    const queryParams = [userId];
+    let stateScopeClause = '';
+
+    if (assignedState) {
+      const stateIdx = queryParams.length + 1;
+      queryParams.push(assignedState);
+      stateScopeClause += `
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM properties sp
+             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications sa
+             JOIN properties sp ON sp.id = sa.property_id
+             WHERE sa.tenant_id = users.id
+               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+           )
+         )`;
+    }
+
+    if (assignedCity) {
+      const cityIdx = queryParams.length + 1;
+      queryParams.push(assignedCity);
+      stateScopeClause += `
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM properties sp
+             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+               AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications sa
+             JOIN properties sp ON sp.id = sa.property_id
+             WHERE sa.tenant_id = users.id
+               AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+           )
+         )`;
+    }
 
     const result = await db.query(
       `UPDATE users
@@ -316,9 +760,10 @@ exports.rejectVerification = async (req, res) => {
            updated_at = NOW()
        WHERE id = $1
          AND deleted_at IS NULL
-         AND user_type IN ('tenant', 'landlord')
+         AND user_type IN ${VERIFICATION_TARGET_USER_TYPES}
+         ${stateScopeClause}
        RETURNING id`,
-      [userId]
+      queryParams
     );
 
     if (!result.rows.length) {
@@ -347,6 +792,21 @@ exports.getAllProperties = async (req, res) => {
     const currentPage = Math.max(Number(page) || 1, 1);
     const pageSize = Math.min(Number(limit) || 20, 100);
     const offset = (currentPage - 1) * pageSize;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
 
     const where = [];
     const params = [];
@@ -360,6 +820,16 @@ exports.getAllProperties = async (req, res) => {
       )`);
       params.push(`%${search}%`);
       i++;
+    }
+
+    if (assignedState) {
+      where.push(`LOWER(TRIM(p.state)) = LOWER(TRIM($${i++}))`);
+      params.push(assignedState);
+    }
+
+    if (assignedCity) {
+      where.push(`LOWER(TRIM(COALESCE(p.lga_name, ''))) = LOWER(TRIM($${i++}))`);
+      params.push(assignedCity);
     }
 
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -416,17 +886,51 @@ exports.getAllProperties = async (req, res) => {
 // GET /api/admin/properties/pending
 exports.getPendingProperties = async (req, res) => {
   try {
-    const result = await db.query(`
-      SELECT 
-        p.*, 
-        u.full_name AS landlord_name,
-        u.email AS landlord_email
-      FROM properties p
-      LEFT JOIN users u ON p.landlord_id = u.id
-      WHERE p.is_verified = FALSE
-        AND p.deleted_at IS NULL
-      ORDER BY p.created_at DESC
-    `);
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
+
+    const params = [];
+    let i = 1;
+    const extraClauses = [];
+
+    if (assignedState) {
+      extraClauses.push(`AND LOWER(TRIM(p.state)) = LOWER(TRIM($${i++}))`);
+      params.push(assignedState);
+    }
+
+    if (assignedCity) {
+      extraClauses.push(`AND LOWER(TRIM(COALESCE(p.lga_name, ''))) = LOWER(TRIM($${i++}))`);
+      params.push(assignedCity);
+    }
+
+    const stateClause = extraClauses.join(' ');
+
+    const result = await db.query(
+      `SELECT 
+         p.*, 
+         u.full_name AS landlord_name,
+         u.email AS landlord_email
+       FROM properties p
+       LEFT JOIN users u ON p.landlord_id = u.id
+       WHERE p.is_verified = FALSE
+         AND p.deleted_at IS NULL
+         ${stateClause}
+       ORDER BY p.created_at DESC`,
+      params
+    );
 
     res.json({
       success: true,
@@ -446,6 +950,36 @@ exports.approveProperty = async (req, res) => {
   try {
     const { id } = req.params;
     const adminId = req.user.id;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
+
+    const queryParams = [id, adminId];
+    const extraClauses = [];
+
+    if (assignedState) {
+      extraClauses.push(`AND LOWER(TRIM(state)) = LOWER(TRIM($${queryParams.length + 1}))`);
+      queryParams.push(assignedState);
+    }
+
+    if (assignedCity) {
+      extraClauses.push(`AND LOWER(TRIM(COALESCE(lga_name, ''))) = LOWER(TRIM($${queryParams.length + 1}))`);
+      queryParams.push(assignedCity);
+    }
+
+    const stateClause = extraClauses.join(' ');
 
           const result = await db.query(
         `
@@ -456,9 +990,10 @@ exports.approveProperty = async (req, res) => {
             verified_at = NOW()
         WHERE id = $1
           AND deleted_at IS NULL
+          ${stateClause}
         RETURNING id, title, landlord_id, property_type, state_id, city, area, rent_amount, bedrooms, bathrooms
         `,
-        [id, adminId]
+        queryParams
       );
 
     if (!result.rows.length) {
@@ -517,6 +1052,36 @@ exports.approveProperty = async (req, res) => {
 exports.rejectProperty = async (req, res) => {
   try {
     const { id } = req.params;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
+
+    const queryParams = [id, assignedState ? 'Rejected by state admin review' : 'Rejected by admin review'];
+    const extraClauses = [];
+
+    if (assignedState) {
+      extraClauses.push(`AND LOWER(TRIM(state)) = LOWER(TRIM($${queryParams.length + 1}))`);
+      queryParams.push(assignedState);
+    }
+
+    if (assignedCity) {
+      extraClauses.push(`AND LOWER(TRIM(COALESCE(lga_name, ''))) = LOWER(TRIM($${queryParams.length + 1}))`);
+      queryParams.push(assignedCity);
+    }
+
+    const stateClause = extraClauses.join(' ');
 
         const result = await db.query(
       `
@@ -526,9 +1091,10 @@ exports.rejectProperty = async (req, res) => {
     rejection_reason = $2
       WHERE id = $1
         AND deleted_at IS NULL
+        ${stateClause}
       RETURNING id, title, landlord_id
       `,
-      [id]
+      queryParams
     );
 
 
@@ -586,6 +1152,21 @@ exports.getAllApplications = async (req, res) => {
     const currentPage = Math.max(Number(page) || 1, 1);
     const pageSize = Math.min(Number(limit) || 20, 100);
     const offset = (currentPage - 1) * pageSize;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
 
     const where = [];
     const params = [];
@@ -599,6 +1180,16 @@ exports.getAllApplications = async (req, res) => {
       )`);
       params.push(`%${search}%`);
       i++;
+    }
+
+    if (assignedState) {
+      where.push(`LOWER(TRIM(p.state)) = LOWER(TRIM($${i++}))`);
+      params.push(assignedState);
+    }
+
+    if (assignedCity) {
+      where.push(`LOWER(TRIM(COALESCE(p.lga_name, ''))) = LOWER(TRIM($${i++}))`);
+      params.push(assignedCity);
     }
 
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -721,7 +1312,7 @@ exports.verifyUser = async (req, res) => {
            updated_at = NOW()
        WHERE id = $1
          AND deleted_at IS NULL
-         AND user_type IN ('tenant', 'landlord')
+         AND user_type IN ${VERIFICATION_TARGET_USER_TYPES}
          AND passport_photo_url IS NOT NULL
          AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
        RETURNING id`,
@@ -753,6 +1344,61 @@ exports.verifyUser = async (req, res) => {
 exports.getUserById = async (req, res) => {
   try {
     const { id } = req.params;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({ success: false, message: 'State admin account is missing assigned_state' });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({ success: false, message: 'Admin account is missing assigned state or local government' });
+    }
+
+    const queryParams = [id];
+    let stateClause = '';
+
+    if (assignedState) {
+      const stateIdx = queryParams.length + 1;
+      queryParams.push(assignedState);
+      stateClause += `
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM properties sp
+             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications sa
+             JOIN properties sp ON sp.id = sa.property_id
+             WHERE sa.tenant_id = users.id
+               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+           )
+         )`;
+    }
+
+    if (assignedCity) {
+      const cityIdx = queryParams.length + 1;
+      queryParams.push(assignedCity);
+      stateClause += `
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM properties sp
+             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+               AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications sa
+             JOIN properties sp ON sp.id = sa.property_id
+             WHERE sa.tenant_id = users.id
+               AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+           )
+         )`;
+    }
+
     const result = await db.query(
       `SELECT id, full_name, email, phone, user_type,
               email_verified, phone_verified, identity_verified,
@@ -760,8 +1406,9 @@ exports.getUserById = async (req, res) => {
        FROM users
        WHERE id = $1
          AND deleted_at IS NULL
-         AND user_type IN ('tenant', 'landlord')`,
-      [id]
+         AND user_type IN ('tenant', 'landlord')
+         ${stateClause}`,
+      queryParams
     );
 
     if (!result.rows.length) {
@@ -800,6 +1447,7 @@ exports.getUserById = async (req, res) => {
           }
         : null;
     }
+
 
     res.json({ success: true, data: user });
   } catch (err) {
@@ -895,13 +1543,38 @@ exports.assignAgentToLandlord = async (req, res) => {
 exports.getPropertyById = async (req, res) => {
   try {
     const { id } = req.params;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({ success: false, message: 'State admin account is missing assigned_state' });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({ success: false, message: 'Admin account is missing assigned state or local government' });
+    }
+
+    const queryParams = [id];
+    const extraClauses = [];
+
+    if (assignedState) {
+      extraClauses.push(`AND LOWER(TRIM(p.state)) = LOWER(TRIM($${queryParams.length + 1}))`);
+      queryParams.push(assignedState);
+    }
+
+    if (assignedCity) {
+      extraClauses.push(`AND LOWER(TRIM(COALESCE(p.lga_name, ''))) = LOWER(TRIM($${queryParams.length + 1}))`);
+      queryParams.push(assignedCity);
+    }
+
+    const stateClause = extraClauses.join(' ');
 
     const result = await db.query(
       `SELECT p.*, u.full_name AS landlord_name, u.email AS landlord_email
        FROM properties p
        LEFT JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
-      [id]
+       WHERE p.id = $1
+         ${stateClause}`,
+      queryParams
     );
 
     if (!result.rows.length) {
@@ -918,6 +1591,36 @@ exports.getPropertyById = async (req, res) => {
 exports.getApplicationById = async (req, res) => {
   try {
     const { id } = req.params;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
+
+    const queryParams = [id];
+    const extraClauses = [];
+
+    if (assignedState) {
+      extraClauses.push(`AND LOWER(TRIM(p.state)) = LOWER(TRIM($${queryParams.length + 1}))`);
+      queryParams.push(assignedState);
+    }
+
+    if (assignedCity) {
+      extraClauses.push(`AND LOWER(TRIM(COALESCE(p.lga_name, ''))) = LOWER(TRIM($${queryParams.length + 1}))`);
+      queryParams.push(assignedCity);
+    }
+
+    const stateClause = extraClauses.join(' ');
 
     const result = await db.query(
       `SELECT 
@@ -929,8 +1632,9 @@ exports.getApplicationById = async (req, res) => {
        JOIN users t ON a.tenant_id = t.id
        JOIN properties p ON a.property_id = p.id
        LEFT JOIN users l ON p.user_id = l.id
-       WHERE a.id = $1`,
-      [id]
+       WHERE a.id = $1
+         ${stateClause}`,
+      queryParams
     );
 
     if (!result.rows.length) {
@@ -947,13 +1651,54 @@ exports.getApplicationById = async (req, res) => {
 exports.approveApplication = async (req, res) => {
   try {
     const { id } = req.params;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
+
+    const queryParams = [id];
+    let stateCheck = '';
+
+    if (assignedState) {
+      const stateIdx = queryParams.length + 1;
+      queryParams.push(assignedState);
+      stateCheck += `AND EXISTS (
+           SELECT 1
+           FROM properties p
+           WHERE p.id = applications.property_id
+             AND LOWER(TRIM(p.state)) = LOWER(TRIM($${stateIdx}))
+         )`;
+    }
+
+    if (assignedCity) {
+      const cityIdx = queryParams.length + 1;
+      queryParams.push(assignedCity);
+      stateCheck += ` AND EXISTS (
+           SELECT 1
+           FROM properties p
+           WHERE p.id = applications.property_id
+             AND LOWER(TRIM(COALESCE(p.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+         )`;
+    }
 
     const result = await db.query(
       `UPDATE applications
        SET status = 'approved', updated_at = NOW()
        WHERE id = $1
+         ${stateCheck}
        RETURNING id, status`,
-      [id]
+      queryParams
     );
 
     if (!result.rows.length) {
@@ -981,13 +1726,54 @@ exports.approveApplication = async (req, res) => {
 exports.rejectApplication = async (req, res) => {
   try {
     const { id } = req.params;
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({
+        success: false,
+        message: 'State admin account is missing assigned_state',
+      });
+    }
+
+    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin account is missing assigned state or local government',
+      });
+    }
+
+    const queryParams = [id];
+    let stateCheck = '';
+
+    if (assignedState) {
+      const stateIdx = queryParams.length + 1;
+      queryParams.push(assignedState);
+      stateCheck += `AND EXISTS (
+           SELECT 1
+           FROM properties p
+           WHERE p.id = applications.property_id
+             AND LOWER(TRIM(p.state)) = LOWER(TRIM($${stateIdx}))
+         )`;
+    }
+
+    if (assignedCity) {
+      const cityIdx = queryParams.length + 1;
+      queryParams.push(assignedCity);
+      stateCheck += ` AND EXISTS (
+           SELECT 1
+           FROM properties p
+           WHERE p.id = applications.property_id
+             AND LOWER(TRIM(COALESCE(p.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+         )`;
+    }
 
     const result = await db.query(
       `UPDATE applications
        SET status = 'rejected', updated_at = NOW()
        WHERE id = $1
+         ${stateCheck}
        RETURNING id, status`,
-      [id]
+      queryParams
     );
 
     if (!result.rows.length) {
@@ -1059,7 +1845,101 @@ exports.verifyLedgerIntegrity = async (req, res) => {
 
 exports.createAdmin = async (req, res) => {
   try {
-    const { email, phone, full_name, nin, password, user_type } = req.body;
+    await ensureLawyerScopeSchema();
+
+    const {
+      email,
+      phone,
+      full_name,
+      nin,
+      password,
+      user_type,
+      assigned_state,
+      assigned_city,
+      lawyer_client_scope,
+    } = req.body;
+
+    const allowedCreateRoles = [
+      'admin',
+      'state_admin',
+      'state_financial_admin',
+      'state_support_admin',
+      'super_financial_admin',
+      'super_support_admin',
+      'lawyer',
+      'state_lawyer',
+      'super_lawyer',
+    ];
+
+    const states = [
+      'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta',
+      'Ebonyi','Edo','Ekiti','Enugu','FCT','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi',
+      'Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto',
+      'Taraba','Yobe','Zamfara'
+    ];
+
+    const stateBoundRoles = new Set([
+      'admin',
+      'state_admin',
+      'state_financial_admin',
+      'state_support_admin',
+      'state_lawyer',
+      'lawyer',
+    ]);
+    const lawyerRoles = new Set([
+      'lawyer',
+      'state_lawyer',
+      'super_lawyer',
+    ]);
+
+    if (!allowedCreateRoles.includes(user_type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role selected',
+      });
+    }
+
+    const normalizedState = String(assigned_state || '').trim();
+    const normalizedCity = String(assigned_city || '').trim();
+    if (stateBoundRoles.has(user_type)) {
+      if (!normalizedState) {
+        return res.status(400).json({
+          success: false,
+          message: 'Assigned state is required for this role',
+        });
+      }
+
+      if (!states.includes(normalizedState)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid assigned state selected',
+        });
+      }
+    }
+
+    if (user_type === 'admin' && !normalizedCity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Assigned local government is required for admin role',
+      });
+    }
+
+    let normalizedLawyerScope = null;
+    if (lawyerRoles.has(user_type)) {
+      normalizedLawyerScope = String(lawyer_client_scope || '').trim().toLowerCase();
+      if (!['tenant', 'landlord'].includes(normalizedLawyerScope)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Lawyer must be assigned to tenant or landlord client type',
+        });
+      }
+    }
+
+    await releaseDeletedUserIdentityConflicts({
+      email,
+      phone,
+      nin,
+    });
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
@@ -1067,21 +1947,37 @@ exports.createAdmin = async (req, res) => {
     const result = await db.query(
       `INSERT INTO users (
         user_type, email, phone, password_hash,
-        full_name, nin,
+        full_name, nin, assigned_state, assigned_city, lawyer_client_scope,
         email_verified, phone_verified, identity_verified
       )
-      VALUES ($1,$2,$3,$4,$5,$6,TRUE,TRUE,TRUE)
-      RETURNING id, email, user_type`,
-      [user_type, email, phone, passwordHash, full_name, nin]
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,TRUE,TRUE)
+      RETURNING id, email, user_type, assigned_state, assigned_city, lawyer_client_scope`,
+      [
+        user_type,
+        email,
+        phone,
+        passwordHash,
+        full_name,
+        nin,
+        normalizedState || null,
+        user_type === 'admin' ? normalizedCity : null,
+        normalizedLawyerScope,
+      ]
     );
 
     res.json({
-      message: 'Admin created successfully',
+      message: 'Account created successfully',
       admin: result.rows[0]
     });
 
   } catch (err) {
     console.error(err);
+
+    if (err.code === '23505') {
+      const detail = String(err.detail || 'A user with one of those details already exists.');
+      return res.status(409).json({ message: detail });
+    }
+
     res.status(500).json({ message: 'Server error' });
   }
 };

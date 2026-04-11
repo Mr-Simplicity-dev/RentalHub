@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
+import { setAuthSession } from '../services/authStorage';
 
 const AcceptAgentInvite = () => {
   const [searchParams] = useSearchParams();
@@ -71,8 +72,7 @@ const AcceptAgentInvite = () => {
 
       if (res.data?.success && res.data?.data?.token) {
         const { token: authToken, user } = res.data.data;
-        localStorage.setItem('token', authToken);
-        localStorage.setItem('user', JSON.stringify(user));
+        setAuthSession(authToken, user);
         api.defaults.headers.common.Authorization = `Bearer ${authToken}`;
         toast.success('Agent access activated successfully');
         window.location.href = '/agent/dashboard';

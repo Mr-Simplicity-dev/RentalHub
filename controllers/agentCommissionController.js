@@ -1,5 +1,7 @@
 const AgentCommissionService = require('../services/agentCommissionService');
 
+const ADMIN_PAYOUT_ROLES = ['admin', 'super_admin', 'financial_admin', 'super_financial_admin'];
+
 class AgentCommissionController {
   /**
    * Get agent's earnings summary
@@ -262,6 +264,18 @@ class AgentCommissionController {
     try {
       const { agentId } = req.params;
       const { landlordId } = req.query;
+      const requesterId = Number(req.user?.id);
+      const requesterRole = req.user?.user_type;
+      const isAdminLike = ADMIN_PAYOUT_ROLES.includes(requesterRole);
+      const isAgentSelf = requesterRole === 'agent' && requesterId === Number(agentId);
+      const isLandlordSelf = requesterRole === 'landlord' && Number(landlordId) === requesterId;
+
+      if (!isAdminLike && !isAgentSelf && !isLandlordSelf) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to view commission rates',
+        });
+      }
 
       const rates = await AgentCommissionService.getCommissionRates(
         parseInt(agentId),
@@ -288,7 +302,7 @@ class AgentCommissionController {
     try {
       const { agentIds, payoutDate, paymentMethod } = req.body;
 
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin' && req.user.user_type !== 'financial_admin') {
+      if (!ADMIN_PAYOUT_ROLES.includes(req.user.user_type)) {
         return res.status(403).json({
           success: false,
           message: 'Unauthorized to process payouts',

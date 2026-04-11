@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaUser, FaCheck, FaTimes,FaEllipsisV } from 'react-icons/fa';
+import { FaUser } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
@@ -8,7 +8,6 @@ const AdminAgentManagement = () => {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [filters, setFilters] = useState({ status: 'active' });
   const [formData, setFormData] = useState({
     landlordId: '',
@@ -24,6 +23,7 @@ const AdminAgentManagement = () => {
 
   useEffect(() => {
     loadAssignments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const loadAssignments = async () => {

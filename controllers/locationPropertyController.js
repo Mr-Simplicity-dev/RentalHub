@@ -477,7 +477,7 @@ exports.getStateAdminPerformance = async (req, res) => {
       LEFT JOIN admin_commissions ac ON u.id = ac.admin_id
       LEFT JOIN users u2 ON u2.referred_by = u.id
       LEFT JOIN admin_withdrawals aw ON u.id = aw.admin_id
-      WHERE u.user_type = 'state_admin'
+      WHERE u.user_type IN ('state_admin', 'state_financial_admin')
     `;
     
     const params = [];
@@ -522,7 +522,7 @@ exports.getStateAdminPerformance = async (req, res) => {
         AVG(ac.commission_rate) as avg_rate
       FROM admin_commissions ac
       JOIN users u ON ac.admin_id = u.id
-      WHERE u.user_type = 'state_admin'
+      WHERE u.user_type IN ('state_admin', 'state_financial_admin')
         AND ac.status = 'pending'
     `;
     

@@ -52,8 +52,22 @@ const Login = () => {
 
         if (role === 'super_admin') {
           navigate('/super-admin');
+        } else if (role === 'super_support_admin') {
+          navigate('/admin/super-support-dashboard');
+        } else if (role === 'state_support_admin') {
+          navigate('/admin/state-support-dashboard');
+        } else if (role === 'super_financial_admin') {
+          navigate('/admin/super-financial-dashboard');
+        } else if (role === 'financial_admin') {
+          navigate('/admin/financial-dashboard');
+        } else if (role === 'state_admin' || role === 'state_financial_admin') {
+          navigate('/admin');
         } else if (role === 'admin') {
           navigate('/admin');
+        } else if (role === 'super_lawyer') {
+          navigate('/lawyer/super');
+        } else if (role === 'state_lawyer') {
+          navigate('/lawyer/state');
         } else if (role === 'lawyer') {
           navigate('/lawyer');
         } else if (role === 'agent') {

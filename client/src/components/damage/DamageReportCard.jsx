@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { FaTag, FaRuler, FaExclamationTriangle } from 'react-icons/fa';
+import { FaRuler, FaExclamationTriangle } from 'react-icons/fa';
 import api from '../../services/api';
 import Loader from '../common/Loader';
 
 const DamageReportCard = ({ propertyId }) => {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadReport();
@@ -20,10 +19,8 @@ const DamageReportCard = ({ propertyId }) => {
       if (response.data?.success && response.data?.data) {
         setReport(response.data.data);
       }
-      setError(null);
     } catch (err) {
       console.error('Failed to load damage report:', err);
-      setError(null); // Silent fail - no report is ok
     } finally {
       setLoading(false);
     }
@@ -176,7 +173,7 @@ const DamageReportCard = ({ propertyId }) => {
               <div key={idx} className="rounded-lg overflow-hidden bg-gray-200">
                 <img
                   src={photo}
-                  alt={`Damage photo ${idx + 1}`}
+                  alt={`Photo ${idx + 1}`}
                   className="h-32 w-full object-cover hover:opacity-80 transition-opacity"
                   onError={(e) => (e.target.src = '/images/broken-image.png')}
                 />

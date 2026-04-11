@@ -13,7 +13,7 @@ exports.filterPropertiesByAdminLocation = async (adminId, queryParams = {}) => {
     const adminResult = await db.query(
       `SELECT assigned_state, assigned_city 
        FROM users 
-       WHERE id = $1 AND user_type = 'state_admin'`,
+       WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin')`,
       [adminId]
     );
     
@@ -181,7 +181,7 @@ exports.filterTransactionsByAdminLocation = async (adminId, queryParams = {}) =>
     const adminResult = await db.query(
       `SELECT assigned_state, assigned_city 
        FROM users 
-       WHERE id = $1 AND user_type = 'state_admin'`,
+       WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin')`,
       [adminId]
     );
     
@@ -423,7 +423,7 @@ exports.getLocationStatistics = async (adminId) => {
     const adminResult = await db.query(
       `SELECT assigned_state, assigned_city 
        FROM users 
-       WHERE id = $1 AND user_type = 'state_admin'`,
+       WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin')`,
       [adminId]
     );
     

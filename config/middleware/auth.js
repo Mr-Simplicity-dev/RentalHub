@@ -1,9 +1,26 @@
 const jwt = require('jsonwebtoken');
 const db = require('./database');
 
+let userSuspensionSchemaReady = false;
+
+const ensureUserSuspensionSchema = async () => {
+  if (userSuspensionSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS account_suspended_reason TEXT,
+    ADD COLUMN IF NOT EXISTS account_suspended_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS account_suspended_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  `);
+
+  userSuspensionSchemaReady = true;
+};
+
 // Verify JWT Token
 const authenticate = async (req, res, next) => {
   try {
+    await ensureUserSuspensionSchema();
+
     const authHeader = req.headers.authorization;
 
     const token = authHeader?.split(' ')[1];
@@ -27,7 +44,10 @@ const authenticate = async (req, res, next) => {
     }
 
     const result = await db.query(
-      'SELECT id, email, user_type, identity_verified, subscription_active FROM users WHERE id = $1',
+      `SELECT id, email, user_type, identity_verified, subscription_active, deleted_at, is_active,
+              account_suspended_reason
+       FROM users
+       WHERE id = $1`,
       [userId]
     );
 
@@ -38,7 +58,26 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    req.user = result.rows[0];
+    const currentUser = result.rows[0];
+
+    if (currentUser.deleted_at) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account deleted. Please contact support.',
+      });
+    }
+
+    if (currentUser.is_active === false) {
+      const reason = String(currentUser.account_suspended_reason || '').trim();
+      return res.status(403).json({
+        success: false,
+        message: reason
+          ? `Account suspended: ${reason}`
+          : 'Account suspended. Please contact support.',
+      });
+    }
+
+    req.user = currentUser;
     next();
   } catch (error) {
     console.error('Auth error:', error);

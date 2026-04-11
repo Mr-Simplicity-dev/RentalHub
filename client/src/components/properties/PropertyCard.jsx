@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaBed, FaBath, FaMapMarkerAlt, FaHeart, FaRegHeart, FaStar } from 'react-icons/fa';
 import { formatCurrency } from '../../utils/helpers';
+import PropertyShareButton from './PropertyShareButton';
 
 const PropertyCard = ({
   property,
@@ -29,16 +30,26 @@ const PropertyCard = ({
           </span>
         )}
         {showSaveButton && (
-          <button
-            onClick={() => onSave && onSave(property.id)}
-            className="absolute top-2 right-2 bg-white p-2 rounded-full shadow-md hover:bg-gray-100 transition-colors"
-          >
-            {isSaved ? (
-              <FaHeart className="text-red-500" />
-            ) : (
-              <FaRegHeart className="text-gray-600" />
-            )}
-          </button>
+          <div className="absolute top-2 right-2 flex items-center gap-2">
+            <PropertyShareButton property={property} detailLink={detailLink} />
+            <button
+              type="button"
+              onClick={() => onSave && onSave(property.id)}
+              className="bg-white p-2 rounded-full shadow-md hover:bg-gray-100 transition-colors"
+              aria-label={isSaved ? 'Remove property from saved list' : 'Save property'}
+            >
+              {isSaved ? (
+                <FaHeart className="text-red-500" />
+              ) : (
+                <FaRegHeart className="text-gray-600" />
+              )}
+            </button>
+          </div>
+        )}
+        {!showSaveButton && (
+          <div className="absolute top-2 right-2">
+            <PropertyShareButton property={property} detailLink={detailLink} />
+          </div>
         )}
       </div>
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { setAuthSession } from '../services/authStorage';
 
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
@@ -26,8 +27,7 @@ const VerifyEmail = () => {
           const { token: authToken, user } = res.data;
 
           // 🔐 Auto-login
-          localStorage.setItem('token', authToken);
-          localStorage.setItem('user', JSON.stringify(user));
+          setAuthSession(authToken, user);
           api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
 
           setStatus('success');

@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const db = require('../middleware/database');
 const { getFrontendUrl } = require('./frontendUrl');
+const { statesMatch } = require('./stateScope');
 
 const FRONTEND_URL = getFrontendUrl();
 const AGENT_INVITE_EXPIRY_HOURS = 72;
@@ -56,8 +57,10 @@ const ensureAgentSystemSchema = async () => {
           'lawyer',
           'admin',
           'state_admin',
+          'state_financial_admin',
           'super_admin',
           'financial_admin',
+          'super_financial_admin',
           'agent'
         )
       );
@@ -243,9 +246,25 @@ const getPropertyManagerContext = async ({
     };
   }
 
+  const agentStateResult = await db.query(
+    `SELECT assigned_state
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [user.id]
+  );
+
+  const agentAssignedState = agentStateResult.rows[0]?.assigned_state || null;
+  if (!agentAssignedState) {
+    return {
+      authorized: false,
+      message: 'Agent assigned_state is not configured. Request state migration or contact admin.',
+    };
+  }
+
   if (propertyId) {
     const propertyCheck = await db.query(
-      `SELECT id, landlord_id, title
+      `SELECT id, landlord_id, title, state
        FROM properties
        WHERE id = $1
          AND landlord_id = $2
@@ -257,12 +276,20 @@ const getPropertyManagerContext = async ({
       return { authorized: false, message: 'Property not found or unauthorized' };
     }
 
+    if (!statesMatch(agentAssignedState, propertyCheck.rows[0].state)) {
+      return {
+        authorized: false,
+        message: 'Agent state lock violation: this property is outside your assigned state',
+      };
+    }
+
     return {
       authorized: true,
       landlordUserId: assignment.landlord_user_id,
       actingUserId: user.id,
       isAgent: true,
       assignment,
+      assigned_state: agentAssignedState,
       property: propertyCheck.rows[0],
     };
   }
@@ -273,6 +300,7 @@ const getPropertyManagerContext = async ({
     actingUserId: user.id,
     isAgent: true,
     assignment,
+    assigned_state: agentAssignedState,
   };
 };
 
@@ -315,7 +343,7 @@ const inviteAgentForLandlord = async ({
   }
 
   const existingUserResult = await db.query(
-    `SELECT id, user_type, full_name, email
+    `SELECT id, user_type, full_name, email, assigned_state
      FROM users
      WHERE email = $1
      LIMIT 1`,
@@ -329,6 +357,32 @@ const inviteAgentForLandlord = async ({
       const error = new Error('Agent email already belongs to a non-agent account');
       error.statusCode = 409;
       throw error;
+    }
+
+    if (!existingUser.assigned_state) {
+      const error = new Error('Agent assigned_state is not configured');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const landlordStatesResult = await db.query(
+      `SELECT DISTINCT state
+       FROM properties
+       WHERE landlord_id = $1
+         AND state IS NOT NULL`,
+      [landlordUserId]
+    );
+
+    const landlordStates = landlordStatesResult.rows.map((row) => row.state).filter(Boolean);
+    if (landlordStates.length) {
+      const hasMatch = landlordStates.some((state) => statesMatch(state, existingUser.assigned_state));
+      if (!hasMatch) {
+        const error = new Error(
+          `State lock violation: agent is assigned to ${existingUser.assigned_state} but landlord properties are in ${landlordStates.join(', ')}`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
     }
 
     const assignmentResult = await db.query(

@@ -1,4 +1,39 @@
 const db = require('../config/middleware/database');
+const { statesMatch } = require('../config/utils/stateScope');
+
+const validateAgentStateCompatibility = async (landlordUserId, agentUserId) => {
+  const agentResult = await db.query(
+    `SELECT assigned_state
+     FROM users
+     WHERE id = $1
+       AND user_type = 'agent'
+     LIMIT 1`,
+    [agentUserId]
+  );
+
+  const agentAssignedState = agentResult.rows[0]?.assigned_state || null;
+  if (!agentAssignedState) {
+    throw new Error('Agent assigned_state is not configured');
+  }
+
+  const landlordStatesResult = await db.query(
+    `SELECT DISTINCT state
+     FROM properties
+     WHERE landlord_id = $1
+       AND state IS NOT NULL`,
+    [landlordUserId]
+  );
+
+  const landlordStates = landlordStatesResult.rows.map((row) => row.state).filter(Boolean);
+  if (!landlordStates.length) {
+    return;
+  }
+
+  const hasMatch = landlordStates.some((state) => statesMatch(state, agentAssignedState));
+  if (!hasMatch) {
+    throw new Error(`State lock violation: agent is assigned to ${agentAssignedState} but landlord properties are in ${landlordStates.join(', ')}`);
+  }
+};
 
 class AdminAgentService {
   /**
@@ -63,6 +98,8 @@ class AdminAgentService {
     } = permissions;
 
     try {
+      await validateAgentStateCompatibility(landlordUserId, agentUserId);
+
       // Check if assignment already exists
       const existingResult = await db.query(
         `SELECT id FROM landlord_agents 

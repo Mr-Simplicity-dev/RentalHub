@@ -4,8 +4,9 @@ exports.canAccessDispute = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { disputeId } = req.params;
+    const lawyerRoles = ['lawyer', 'state_lawyer', 'super_lawyer'];
 
-    if (req.user.user_type === 'lawyer') {
+    if (lawyerRoles.includes(req.user.user_type)) {
       const lawyerAccess = await db.query(
         `SELECT d.id
          FROM disputes d

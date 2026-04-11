@@ -1,6 +1,7 @@
 // ====================== IMPORTS ======================
 const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
+const { isSuperFinancialAdmin } = require('../config/utils/roleScopes');
 
 // ====================== SUPER FINANCIAL ADMIN DASHBOARD ======================
 
@@ -173,10 +174,10 @@ exports.freezeUserFunds = async (req, res) => {
       [financialAdminId]
     );
     
-    if (adminCheck.rows[0].user_type !== 'financial_admin') {
+    if (!isSuperFinancialAdmin(adminCheck.rows[0].user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Only financial admins can freeze funds'
+        message: 'Only super financial admins can freeze funds'
       });
     }
     

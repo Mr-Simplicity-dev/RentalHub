@@ -3,7 +3,7 @@ exports.requireAdmin = (req, res, next) => {
     req.user?.userType ||   // from JWT payload
     req.user?.user_type;    // from DB-attached user
 
-  if (type !== 'admin') {
+  if (!['admin', 'state_admin', 'state_financial_admin'].includes(type)) {
     return res.status(403).json({
       success: false,
       message: 'Admin access required',

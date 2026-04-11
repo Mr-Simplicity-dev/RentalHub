@@ -11,6 +11,8 @@ const audit = require('../config/middleware/auditMiddleware');
 const validateRequest = require('../config/middleware/validateRequest');
 const { grantLawyerAccessValidators } = require('../config/validators/securityValidators');
 
+const LAWYER_ROLES = ['lawyer', 'state_lawyer', 'super_lawyer'];
+
 
 /* ---------------------------------------------------
    Public Lawyer Directory
@@ -30,14 +32,14 @@ router.get(
 router.get(
   '/platform-lawyer-program',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   legalController.getPlatformLawyerProgram
 );
 
 router.post(
   '/platform-lawyer-program/apply',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   legalController.applyToPlatformLawyerProgram
 );
 
@@ -49,7 +51,7 @@ router.post(
 router.get(
   '/properties',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   audit('view_authorized_properties', 'property'),
   legalController.getAuthorizedProperties
 );
@@ -62,7 +64,7 @@ router.get(
 router.get(
   '/property/:propertyId/disputes',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   canLawyerAccessProperty,
   audit('view_property_disputes', 'property'),
   disputeController.getDisputes
@@ -76,7 +78,7 @@ router.get(
 router.patch(
   '/disputes/:disputeId/resolve',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   audit('resolve_dispute', 'dispute'),
   legalController.resolveDispute
 );
@@ -98,7 +100,7 @@ router.post(
 router.get(
   '/audit-logs',
   authenticate,
-  allowRoles('admin', 'super_admin', 'lawyer'),
+  allowRoles('admin', 'super_admin', ...LAWYER_ROLES),
   legalController.getLegalAuditLogs
 );
 
@@ -109,7 +111,7 @@ router.get(
 router.patch(
   '/disputes/:disputeId/evidence/:evidenceId/verify',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   audit('verify_evidence', 'evidence'),
   legalController.verifyEvidence
 );
@@ -117,7 +119,7 @@ router.patch(
 router.get(
   '/disputes/:disputeId/evidence/verification',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   audit('view_evidence_verification', 'dispute'),
   legalController.getEvidenceVerification
 );
@@ -129,7 +131,7 @@ router.get(
 router.post(
   '/disputes/:disputeId/notes',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   audit('create_case_note', 'dispute'),
   legalController.createCaseNote
 );
@@ -137,7 +139,7 @@ router.post(
 router.get(
   '/disputes/:disputeId/notes',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   audit('view_case_notes', 'dispute'),
   legalController.getCaseNotes
 );
@@ -145,7 +147,7 @@ router.get(
 router.patch(
   '/disputes/:disputeId/notes/:noteId',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   audit('update_case_note', 'dispute'),
   legalController.updateCaseNote
 );
@@ -153,7 +155,7 @@ router.patch(
 router.delete(
   '/disputes/:disputeId/notes/:noteId',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   audit('delete_case_note', 'dispute'),
   legalController.deleteCaseNote
 );
@@ -161,7 +163,7 @@ router.delete(
 router.patch(
   '/disputes/:disputeId/summary',
   authenticate,
-  allowRoles('lawyer'),
+  allowRoles(...LAWYER_ROLES),
   audit('update_dispute_summary', 'dispute'),
   legalController.updateDisputeSummary
 );

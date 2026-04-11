@@ -91,6 +91,8 @@ const VerificationsTab = ({
             <option value="admin">Admins</option>
             <option value="landlord">Landlords</option>
             <option value="tenant">Tenants</option>
+            <option value="agent">Agents</option>
+            <option value="lawyer">Lawyers</option>
           </select>
 
           <button

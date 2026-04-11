@@ -45,7 +45,6 @@ const ROOMS = [
  */
 const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'landlord' }) => {
   const [stage, setStage] = useState('workflow'); // workflow | camera | preview | review | confirm
-  const [cameraActive, setCameraActive] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState('');
 
@@ -66,7 +65,6 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
     description: '',
   });
 
-  const [forceEditMode, setForceEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const videoRef = useRef(null);
@@ -199,7 +197,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
     } finally {
       setAnalyzingDamage(false);
     }
-  }, []);
+  }, [autoFillDamageForm]);
 
   const autoFillDamageForm = useCallback((analysis) => {
     if (!analysis) return;

@@ -107,6 +107,7 @@ router.post(
   [
     body('state_id').optional().isInt(),
     body('state').optional().trim().notEmpty(),
+    body('lga_name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
     body().custom((_, { req }) => {
       if (req.body.state_id || req.body.state) return true;
       throw new Error('state_id or state is required');

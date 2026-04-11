@@ -236,6 +236,22 @@ router.get('/wallet/withdrawals',
   refundController.getMyWithdrawals
 );
 
+// Admin approvals for wallet withdrawals
+router.get('/wallet/withdrawals/pending',
+  authenticate,
+  refundController.getPendingWalletWithdrawals
+);
+
+router.post('/wallet/withdrawals/:withdrawalId/approve',
+  authenticate,
+  refundController.approveWalletWithdrawal
+);
+
+router.post('/wallet/withdrawals/:withdrawalId/reject',
+  authenticate,
+  refundController.rejectWalletWithdrawal
+);
+
 // ============ BANK ACCOUNT VERIFICATION ============
 
 // Get list of Nigerian banks (cached)

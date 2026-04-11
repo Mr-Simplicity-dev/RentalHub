@@ -10,6 +10,14 @@
 
 const db = require('../config/middleware/database');
 const axios = require('axios');
+const {
+  createTransferRecipient,
+  initiateTransfer,
+  resolveBankCodeFromName,
+  isValidPaystackSignature,
+} = require('../services/paystackTransfer.service');
+
+const WALLET_WITHDRAWAL_ADMIN_ROLES = ['admin', 'super_admin', 'financial_admin', 'super_financial_admin'];
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL   = 'https://api.paystack.co';
@@ -83,6 +91,16 @@ const ensureRefundSchema = async () => {
       CONSTRAINT chk_withdrawal_status
         CHECK (status IN ('pending','approved','rejected','processed'))
     );
+
+    ALTER TABLE withdrawal_requests
+      ADD COLUMN IF NOT EXISTS bank_code VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS paystack_recipient_code VARCHAR(120),
+      ADD COLUMN IF NOT EXISTS paystack_transfer_code VARCHAR(120),
+      ADD COLUMN IF NOT EXISTS paystack_transfer_reference VARCHAR(120),
+      ADD COLUMN IF NOT EXISTS paystack_transfer_status VARCHAR(40),
+      ADD COLUMN IF NOT EXISTS paystack_last_response JSONB,
+      ADD COLUMN IF NOT EXISTS payout_attempted_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS payout_failed_reason TEXT;
 
     CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
     CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_user ON withdrawal_requests(user_id);
@@ -595,7 +613,7 @@ exports.requestWithdrawal = async (req, res) => {
     await ensureRefundSchema();
 
     const userId = req.user.id;
-    const { amount, bank_name, account_number, account_name } = req.body;
+    const { amount, bank_name, bank_code, account_number, account_name } = req.body;
 
     if (!amount || !bank_name || !account_number || !account_name) {
       return res.status(400).json({
@@ -660,10 +678,10 @@ exports.requestWithdrawal = async (req, res) => {
     // Create withdrawal request
     const result = await db.query(
       `INSERT INTO withdrawal_requests
-         (user_id, amount, bank_name, account_number, account_name)
-       VALUES ($1, $2, $3, $4, $5)
+         (user_id, amount, bank_name, bank_code, account_number, account_name)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [userId, withdrawAmount, bank_name, account_number, account_name]
+      [userId, withdrawAmount, bank_name, bank_code || null, account_number, account_name]
     );
 
     res.status(201).json({
@@ -695,6 +713,249 @@ exports.getMyWithdrawals = async (req, res) => {
   } catch (error) {
     console.error('Get withdrawals error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch withdrawal requests' });
+  }
+};
+
+// =====================================================
+//     ADMIN / SUPER ADMIN / FINANCIAL ADMIN
+//     Get pending wallet withdrawal requests
+// =====================================================
+exports.getPendingWalletWithdrawals = async (req, res) => {
+  try {
+    await ensureRefundSchema();
+
+    if (!WALLET_WITHDRAWAL_ADMIN_ROLES.includes(req.user.user_type)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const result = await db.query(
+      `SELECT wr.*, u.full_name, u.email, u.user_type
+       FROM withdrawal_requests wr
+       JOIN users u ON u.id = wr.user_id
+       WHERE wr.status = 'pending'
+       ORDER BY wr.requested_at ASC`
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get pending wallet withdrawals error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch pending wallet withdrawals' });
+  }
+};
+
+// =====================================================
+//     ADMIN / SUPER ADMIN / FINANCIAL ADMIN
+//     Approve + auto-payout wallet withdrawal
+// =====================================================
+exports.approveWalletWithdrawal = async (req, res) => {
+  try {
+    await ensureRefundSchema();
+
+    if (!WALLET_WITHDRAWAL_ADMIN_ROLES.includes(req.user.user_type)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const { withdrawalId } = req.params;
+
+    const requestResult = await db.query(
+      `SELECT * FROM withdrawal_requests WHERE id = $1 LIMIT 1`,
+      [withdrawalId]
+    );
+
+    if (!requestResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
+    }
+
+    const withdrawal = requestResult.rows[0];
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({ success: false, message: `Withdrawal is already ${withdrawal.status}` });
+    }
+
+    const bankCode = withdrawal.bank_code || await resolveBankCodeFromName(withdrawal.bank_name);
+
+    let recipientCode = withdrawal.paystack_recipient_code;
+    if (!recipientCode) {
+      const recipient = await createTransferRecipient({
+        name: withdrawal.account_name,
+        accountNumber: withdrawal.account_number,
+        bankCode,
+      });
+      recipientCode = recipient.recipient_code;
+    }
+
+    const reference = `WLW_${withdrawal.id}_${Date.now()}`;
+    const transfer = await initiateTransfer({
+      amount: withdrawal.amount,
+      recipientCode,
+      reason: `Wallet withdrawal #${withdrawal.id}`,
+      reference,
+    });
+
+    const result = await db.query(
+      `UPDATE withdrawal_requests
+       SET status = 'approved',
+           bank_code = $1,
+           paystack_recipient_code = $2,
+           paystack_transfer_code = $3,
+           paystack_transfer_reference = $4,
+           paystack_transfer_status = $5,
+           paystack_last_response = $6,
+           payout_attempted_at = CURRENT_TIMESTAMP,
+           admin_note = $7,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $8
+       RETURNING *`,
+      [
+        bankCode,
+        recipientCode,
+        transfer?.transfer_code || null,
+        transfer?.reference || reference,
+        transfer?.status || 'pending',
+        JSON.stringify(transfer || {}),
+        req.body?.admin_note || 'Auto payout initiated',
+        withdrawalId,
+      ]
+    );
+
+    res.json({ success: true, message: 'Withdrawal approved and payout initiated', data: result.rows[0] });
+  } catch (error) {
+    console.error('Approve wallet withdrawal error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to approve wallet withdrawal' });
+  }
+};
+
+// =====================================================
+//     ADMIN / SUPER ADMIN / FINANCIAL ADMIN
+//     Reject wallet withdrawal and refund user balance
+// =====================================================
+exports.rejectWalletWithdrawal = async (req, res) => {
+  try {
+    await ensureRefundSchema();
+
+    if (!WALLET_WITHDRAWAL_ADMIN_ROLES.includes(req.user.user_type)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const { withdrawalId } = req.params;
+    const reason = req.body?.admin_note || 'Rejected by admin';
+
+    const requestResult = await db.query(
+      `SELECT * FROM withdrawal_requests WHERE id = $1 LIMIT 1`,
+      [withdrawalId]
+    );
+
+    if (!requestResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
+    }
+
+    const withdrawal = requestResult.rows[0];
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({ success: false, message: `Cannot reject withdrawal in ${withdrawal.status} state` });
+    }
+
+    await db.query(
+      `UPDATE wallets
+       SET balance = balance + $1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2`,
+      [withdrawal.amount, withdrawal.user_id]
+    );
+
+    const result = await db.query(
+      `UPDATE withdrawal_requests
+       SET status = 'rejected',
+           admin_note = $1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING *`,
+      [reason, withdrawalId]
+    );
+
+    res.json({ success: true, message: 'Withdrawal rejected and funds refunded', data: result.rows[0] });
+  } catch (error) {
+    console.error('Reject wallet withdrawal error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reject wallet withdrawal' });
+  }
+};
+
+// =====================================================
+//     Paystack webhook for wallet withdrawals
+// =====================================================
+exports.walletWithdrawalWebhook = async (req, res) => {
+  try {
+    const signature = req.headers['x-paystack-signature'];
+    const rawBody = req.rawBody || JSON.stringify(req.body || {});
+
+    if (!isValidPaystackSignature(rawBody, signature)) {
+      return res.status(401).json({ success: false, message: 'Invalid signature' });
+    }
+
+    const event = req.body?.event;
+    const payload = req.body?.data || {};
+
+    if (!event || !event.startsWith('transfer.')) {
+      return res.json({ success: true, message: 'Ignored event' });
+    }
+
+    const reference = payload.reference;
+    if (!reference || !reference.startsWith('WLW_')) {
+      return res.json({ success: true, message: 'Event not for wallet withdrawals' });
+    }
+
+    const findResult = await db.query(
+      `SELECT * FROM withdrawal_requests WHERE paystack_transfer_reference = $1 LIMIT 1`,
+      [reference]
+    );
+
+    if (!findResult.rows.length) {
+      return res.json({ success: true, message: 'Withdrawal not found for reference' });
+    }
+
+    const withdrawal = findResult.rows[0];
+
+    if (event === 'transfer.success') {
+      await db.query(
+        `UPDATE withdrawal_requests
+         SET status = 'processed',
+             processed_at = CURRENT_TIMESTAMP,
+             paystack_transfer_status = 'success',
+             paystack_last_response = $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [JSON.stringify(payload), withdrawal.id]
+      );
+    } else if (event === 'transfer.failed' || event === 'transfer.reversed') {
+      if (withdrawal.status !== 'pending' && withdrawal.status !== 'rejected') {
+        await db.query(
+          `UPDATE wallets
+           SET balance = balance + $1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE user_id = $2`,
+          [withdrawal.amount, withdrawal.user_id]
+        );
+      }
+
+      await db.query(
+        `UPDATE withdrawal_requests
+         SET status = 'pending',
+             paystack_transfer_status = $1,
+             paystack_last_response = $2,
+             payout_failed_reason = $3,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4`,
+        [
+          event === 'transfer.failed' ? 'failed' : 'reversed',
+          JSON.stringify(payload),
+          payload?.failure_reason || payload?.reason || 'Transfer failed',
+          withdrawal.id,
+        ]
+      );
+    }
+
+    return res.json({ success: true, message: 'Webhook processed' });
+  } catch (error) {
+    console.error('Wallet withdrawal webhook error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to process webhook' });
   }
 };
 

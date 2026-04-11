@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const dotenv = require('dotenv');
+const http = require('http');
 const { Server } = require('socket.io');
 
 dotenv.config();
@@ -36,9 +37,18 @@ const verificationRoutes = require('./routes/evidenceVerification.routes');
 const agentCommissionRoutes = require('./routes/agentCommissions');
 const adminAgentRoutes = require('./routes/adminAgents');
 const agentWithdrawalRoutes = require('./routes/agentWithdrawals');
+const stateMigrationRoutes = require('./routes/stateMigrations');
 
 const damageReportRoutes = require('./routes/damageReports');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
+const csrfProtection = require('./config/middleware/csrfProtection');
+const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
+const {
+  authSensitiveLimiter,
+  paymentOpsLimiter,
+  verificationOpsLimiter,
+  financeOpsLimiter,
+} = require('./config/middleware/securityRateLimiters');
 
 const audit = require('./config/middleware/auditMiddleware');
 const { enforceFlags } = require('./config/middleware/featureFlags');
@@ -67,6 +77,7 @@ const { checkRanking } = require('./config/utils/serpTracker');
 const {
   runEvidenceIntegrityMonitor,
 } = require('./services/evidenceIntegrityMonitor.service');
+const { runPayoutRetryCycle } = require('./services/payoutRetry.service');
 
 async function runInitialSeoCheck() {
   const hasSerpApiKey =
@@ -86,8 +97,6 @@ async function runInitialSeoCheck() {
     console.error('Initial ranking check failed:', err.message);
   }
 }
-
-runInitialSeoCheck();
 
 const scheduleEvidenceIntegrityMonitoring = () => {
   const cronExpression =
@@ -109,6 +118,23 @@ const scheduleEvidenceIntegrityMonitoring = () => {
   runMonitor();
   cron.schedule(cronExpression, runMonitor);
   console.log(`Evidence integrity monitor scheduled (${cronExpression})`);
+};
+
+const schedulePayoutRetries = () => {
+  const cronExpression = process.env.PAYOUT_RETRY_CRON?.trim() || '*/10 * * * *';
+
+  const runRetries = async () => {
+    try {
+      const summary = await runPayoutRetryCycle();
+      console.log('Payout retry cycle completed', summary);
+    } catch (err) {
+      console.error('Payout retry cycle failed:', err.message);
+    }
+  };
+
+  runRetries();
+  cron.schedule(cronExpression, runRetries);
+  console.log(`Payout retry scheduler started (${cronExpression})`);
 };
 
 // Ensure DB is connected before cron runs
@@ -287,8 +313,16 @@ const authLimiter = rateLimit({
 
 app.use('/api/', limiter);
 
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf.toString('utf8');
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
+app.use(securityAlertMiddleware);
+app.use(csrfProtection);
 
 app.use(audit('API Request', 'system'));
 
@@ -361,9 +395,9 @@ app.get('/api/auth/verify-email', async (req, res) => {
   }
 });
 
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authLimiter, authSensitiveLimiter, authRoutes);
 app.use('/api/properties', propertyRoutes);
-app.use('/api/payments', paymentRoutes);
+app.use('/api/payments', paymentOpsLimiter, paymentRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/users', userRoutes);
@@ -381,10 +415,11 @@ app.use('/api/export', exportRoutes);
 app.use('/api/financial-admin', financialAdminRoutes);
 app.use('/api/state-admin', stateAdminRoutes);
 
-app.use('/evidence', verificationRoutes);
-app.use('/api/commissions', agentCommissionRoutes);
+app.use('/evidence', verificationOpsLimiter, verificationRoutes);
+app.use('/api/commissions', financeOpsLimiter, agentCommissionRoutes);
 app.use('/api/admin/agents', adminAgentRoutes);
-app.use('/api/withdrawals', agentWithdrawalRoutes);
+app.use('/api/withdrawals', financeOpsLimiter, agentWithdrawalRoutes);
+app.use('/api/state-migrations', stateMigrationRoutes);
 app.use('/api', damageReportRoutes);
 
 app.use((err, req, res, next) => {
@@ -396,15 +431,59 @@ app.use((err, req, res, next) => {
   });
 });
 
-startPaymentJobs();
-startPropertyJobs();
-startScheduler();
-scheduleEvidenceIntegrityMonitoring();
-
 const PORT = process.env.APP_PORT || 5000;
+let backgroundServicesStarted = false;
 
-const server = app.listen(PORT, () => {
+const ensureStartupSchema = async () => {
+  try {
+    await db.query(`
+      ALTER TABLE users
+        ALTER COLUMN user_type TYPE VARCHAR(50);
+    `);
+  } catch (err) {
+    // Ignore if already the right type
+    if (!err.message?.includes('already')) {
+      console.error('ensureStartupSchema warning:', err.message);
+    }
+  }
+};
+
+
+const startBackgroundServices = () => {
+  if (backgroundServicesStarted) {
+    return;
+  }
+
+  backgroundServicesStarted = true;
+  runInitialSeoCheck();
+  startPaymentJobs();
+  startPropertyJobs();
+  startScheduler();
+  scheduleEvidenceIntegrityMonitoring();
+  schedulePayoutRetries();
+};
+
+const handleServerStartupError = (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `Port ${PORT} is already in use. Another instance of this server may already be running. Stop the existing process or set APP_PORT to a free port before restarting.`
+    );
+  } else {
+    console.error('Server startup failed:', err);
+  }
+
+  process.exit(1);
+};
+
+const server = http.createServer(app);
+
+server.once('error', handleServerStartupError);
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  ensureStartupSchema().then(() => startBackgroundServices()).catch((err) => {
+    console.error('Startup schema migration failed:', err.message);
+    startBackgroundServices();
+  });
 });
 
 const io = new Server(server, {

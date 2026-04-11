@@ -18,14 +18,28 @@ const PermissionBadge = ({ enabled, label }) => (
 const AgentDashboard = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [migrationRequests, setMigrationRequests] = useState([]);
+  const [migrationLoading, setMigrationLoading] = useState(false);
+  const [migrationForm, setMigrationForm] = useState({ to_state: '', reason: '' });
+
+  const STATES = [
+    'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta',
+    'Ebonyi','Edo','Ekiti','Enugu','FCT','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi',
+    'Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto',
+    'Taraba','Yobe','Zamfara'
+  ];
 
   useEffect(() => {
     const loadProfile = async () => {
       setLoading(true);
       try {
-        const res = await api.get('/auth/me');
+        const [res, migrationRes] = await Promise.all([
+          api.get('/auth/me'),
+          api.get('/state-migrations/my').catch(() => ({ data: { data: [] } })),
+        ]);
         if (res.data?.success) {
           setProfile(res.data.data);
+          setMigrationRequests(migrationRes.data?.data || []);
         } else {
           toast.error('Failed to load agent dashboard');
         }
@@ -39,6 +53,30 @@ const AgentDashboard = () => {
 
     loadProfile();
   }, []);
+
+  const submitMigrationRequest = async () => {
+    if (!migrationForm.to_state || !migrationForm.reason.trim()) {
+      toast.error('Please select target state and provide reason');
+      return;
+    }
+
+    try {
+      setMigrationLoading(true);
+      const res = await api.post('/state-migrations/request', {
+        to_state: migrationForm.to_state,
+        reason: migrationForm.reason,
+      });
+
+      toast.success(res.data?.message || 'Migration request submitted');
+      setMigrationForm({ to_state: '', reason: '' });
+      const myRes = await api.get('/state-migrations/my');
+      setMigrationRequests(myRes.data?.data || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to submit migration request');
+    } finally {
+      setMigrationLoading(false);
+    }
+  };
 
   if (loading) return <Loader />;
 
@@ -72,6 +110,53 @@ const AgentDashboard = () => {
         </div>
       ) : (
         <>
+          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">State Migration Request</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Your current assigned state: <span className="font-semibold text-gray-800">{profile?.assigned_state || 'Not configured'}</span>
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              Agents are state-locked and can only operate in their assigned state.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <select
+                value={migrationForm.to_state}
+                onChange={(e) => setMigrationForm((prev) => ({ ...prev, to_state: e.target.value }))}
+                className="input"
+              >
+                <option value="">Select target state</option>
+                {STATES.map((state) => (
+                  <option key={state} value={state}>{state}</option>
+                ))}
+              </select>
+              <input
+                value={migrationForm.reason}
+                onChange={(e) => setMigrationForm((prev) => ({ ...prev, reason: e.target.value }))}
+                className="input md:col-span-2"
+                placeholder="Reason for migration request"
+              />
+            </div>
+
+            <div className="mt-3">
+              <button type="button" className="btn btn-primary" onClick={submitMigrationRequest} disabled={migrationLoading}>
+                {migrationLoading ? 'Submitting...' : 'Apply for State Migration'}
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {migrationRequests.slice(0, 3).map((request) => (
+                <div key={request.id} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+                  <p className="font-medium text-gray-800">
+                    {request.from_state} → {request.to_state}
+                    <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs capitalize">{request.status}</span>
+                  </p>
+                  <p className="text-xs text-gray-600">{request.reason}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="rounded-2xl border bg-white p-6 shadow-sm lg:col-span-2">
               <div className="flex items-center gap-3">
@@ -121,9 +206,9 @@ const AgentDashboard = () => {
                 <Link to="/agent/earnings" className="btn w-full">
                   <FaCoins className="mr-2" />
                   View Earnings
-                                <Link to="/agent/withdrawals" className="btn w-full">
-                                  Request Withdrawal
-                                </Link>
+                </Link>
+                <Link to="/agent/withdrawals" className="btn w-full">
+                  Request Withdrawal
                 </Link>
               </div>
             </div>

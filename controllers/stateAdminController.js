@@ -2,6 +2,10 @@
 const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
+const {
+  isStateFinancialAdmin,
+  isSuperAdminOrSuperFinancialAdmin,
+} = require('../config/utils/roleScopes');
 
 // ====================== STATE ADMIN MANAGEMENT ======================
 
@@ -36,10 +40,10 @@ exports.createStateAdmin = async (req, res) => {
       [superAdminId]
     );
     
-    if (adminCheck.rows[0].user_type !== 'super_admin') {
+    if (!isSuperAdminOrSuperFinancialAdmin(adminCheck.rows[0].user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Only super admins can create state admins'
+        message: 'Only super admin or super financial admin can create state financial admins'
       });
     }
     
@@ -73,7 +77,7 @@ exports.createStateAdmin = async (req, res) => {
         admin_commission_rate,
         referred_by,
         is_active
-      ) VALUES ($1, $2, $3, $4, 'state_admin', $5, $6, $7, $8, true)
+      ) VALUES ($1, $2, $3, $4, 'state_financial_admin', $5, $6, $7, $8, true)
       RETURNING id, full_name, email, phone, assigned_state, assigned_city, admin_commission_rate`,
       [
         full_name,
@@ -133,7 +137,7 @@ exports.getAllStateAdmins = async (req, res) => {
       LEFT JOIN admin_commissions ac ON u.id = ac.admin_id
       LEFT JOIN users u2 ON u2.referred_by = u.id
       LEFT JOIN admin_withdrawals aw ON u.id = aw.admin_id
-      WHERE u.user_type = 'state_admin'
+      WHERE u.user_type IN ('state_admin', 'state_financial_admin')
     `;
     
     const params = [];
@@ -169,7 +173,7 @@ exports.getAllStateAdmins = async (req, res) => {
         SUM(admin_wallet_balance) as total_wallet_balance,
         AVG(admin_commission_rate) as avg_commission_rate
       FROM users
-      WHERE user_type = 'state_admin'
+      WHERE user_type IN ('state_admin', 'state_financial_admin')
         AND is_active = true
       GROUP BY assigned_state
       ORDER BY assigned_state
@@ -214,10 +218,10 @@ exports.manageAdminFunds = async (req, res) => {
       [superAdminId]
     );
     
-    if (adminCheck.rows[0].user_type !== 'super_admin') {
+    if (!isSuperAdminOrSuperFinancialAdmin(adminCheck.rows[0].user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Only super admins can manage admin funds'
+        message: 'Only super admin or super financial admin can manage admin funds'
       });
     }
     
@@ -225,7 +229,7 @@ exports.manageAdminFunds = async (req, res) => {
     const stateAdminCheck = await db.query(
       `SELECT id, full_name, email, admin_funds_frozen 
        FROM users 
-       WHERE id = $1 AND user_type = 'state_admin'`,
+       WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin')`,
       [admin_id]
     );
     
@@ -338,10 +342,10 @@ exports.updateCommissionRate = async (req, res) => {
       [superAdminId]
     );
     
-    if (adminCheck.rows[0].user_type !== 'super_admin') {
+    if (!isSuperAdminOrSuperFinancialAdmin(adminCheck.rows[0].user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Only super admins can update commission rates'
+        message: 'Only super admin or super financial admin can update commission rates'
       });
     }
     
@@ -358,7 +362,7 @@ exports.updateCommissionRate = async (req, res) => {
       `UPDATE users 
        SET admin_commission_rate = $1,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2 AND user_type = 'state_admin'
+      WHERE id = $2 AND user_type IN ('state_admin', 'state_financial_admin')
        RETURNING id, full_name, email, admin_commission_rate`,
       [commission_rate, admin_id]
     );
@@ -412,14 +416,21 @@ exports.getStateAdminDashboard = async (req, res) => {
         admin_commission_rate, admin_wallet_balance,
         admin_funds_frozen, is_active
        FROM users 
-       WHERE id = $1 AND user_type = 'state_admin'`,
+       WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin')`,
       [adminId]
     );
     
     if (adminCheck.rows.length === 0) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. State admin only.'
+        message: 'Access denied. State financial admin only.'
+      });
+    }
+
+    if (!isStateFinancialAdmin(req.user.user_type)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. State financial admin only.'
       });
     }
     
@@ -539,6 +550,71 @@ exports.getStateAdminDashboard = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch state admin dashboard'
+    });
+  }
+};
+
+/**
+ * Create super financial admin (super admin only)
+ */
+exports.createSuperFinancialAdmin = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array(),
+      });
+    }
+
+    if (req.user?.user_type !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only super admins can create super financial admins',
+      });
+    }
+
+    const { full_name, email, phone, password } = req.body;
+
+    const existingUser = await db.query(
+      'SELECT id FROM users WHERE email = $1 LIMIT 1',
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered',
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const result = await db.query(
+      `INSERT INTO users (
+         full_name,
+         email,
+         phone,
+         password_hash,
+         user_type,
+         referred_by,
+         is_active
+       ) VALUES ($1, $2, $3, $4, 'super_financial_admin', $5, true)
+       RETURNING id, full_name, email, phone, user_type`,
+      [full_name, email, phone, passwordHash, req.user.id]
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Super financial admin created successfully',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Create super financial admin error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create super financial admin',
     });
   }
 };

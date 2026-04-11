@@ -1,5 +1,12 @@
 import api from './api';
 import { jwtDecode } from 'jwt-decode';
+import {
+  clearAuthSession,
+  getAuthToken,
+  getAuthUser,
+  setAuthSession,
+  setAuthUser,
+} from './authStorage';
 
 export const authService = {
   // Register
@@ -7,8 +14,7 @@ export const authService = {
     const response = await api.post('/auth/register', userData);
     if (response.data.success) {
       const { token, user } = response.data.data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      setAuthSession(token, user);
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
     return response.data;
@@ -19,8 +25,7 @@ export const authService = {
     const response = await api.post('/auth/login', { email, password });
     if (response.data.success) {
       const { token, user } = response.data.data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      setAuthSession(token, user);
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
     return response.data;
@@ -28,8 +33,7 @@ export const authService = {
 
   // Logout (NO redirect here)
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAuthSession();
     delete api.defaults.headers.common['Authorization'];
   },
 
@@ -37,7 +41,7 @@ export const authService = {
   getCurrentUser: async () => {
     const response = await api.get('/auth/me');
     if (response.data.success) {
-      localStorage.setItem('user', JSON.stringify(response.data.data));
+      setAuthUser(response.data.data);
     }
     return response.data;
   },
@@ -72,7 +76,7 @@ export const authService = {
 
   // Check if authenticated
   isAuthenticated: () => {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) return false;
 
     try {
@@ -85,8 +89,7 @@ export const authService = {
 
   // Get user from storage
   getUserFromStorage: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    return getAuthUser();
   },
 
   // Forgot password

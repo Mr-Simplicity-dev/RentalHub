@@ -4,8 +4,17 @@ const { body } = require('express-validator');
 const financialAdminController = require('../controllers/financialAdminController');
 const stateAdminController = require('../controllers/stateAdminController');
 const { authenticate } = require('../config/middleware/auth');
-const { requireFinancialAdmin } = require('../config/middleware/requireFinancialAdmin');
+const {
+  requireFinancialAdmin,
+  requireSuperAdminOrSuperFinancialAdmin,
+} = require('../config/middleware/requireFinancialAdmin');
 const { requireSuperAdmin } = require('../config/middleware/requireSuperAdmin');
+const { isStateFinancialAdmin } = require('../config/utils/roleScopes');
+const {
+  createTransferRecipient,
+  initiateTransfer,
+  resolveBankCodeFromName,
+} = require('../services/paystackTransfer.service');
 
 // ====================== AUTHENTICATION ======================
 router.use(authenticate);
@@ -72,7 +81,7 @@ router.get('/funds/frozen',
  * Create state admin (super admin only)
  */
 router.post('/state-admins/create',
-  requireSuperAdmin,
+  requireSuperAdminOrSuperFinancialAdmin,
   [
     body('full_name').notEmpty().withMessage('Full name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -86,10 +95,24 @@ router.post('/state-admins/create',
 );
 
 /**
+ * Create super financial admin (super admin only)
+ */
+router.post('/super-financial-admins/create',
+  requireSuperAdmin,
+  [
+    body('full_name').notEmpty().withMessage('Full name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('phone').notEmpty().withMessage('Phone number is required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  ],
+  stateAdminController.createSuperFinancialAdmin
+);
+
+/**
  * Get all state admins
  */
 router.get('/state-admins',
-  requireSuperAdmin,
+  requireSuperAdminOrSuperFinancialAdmin,
   stateAdminController.getAllStateAdmins
 );
 
@@ -97,7 +120,7 @@ router.get('/state-admins',
  * Freeze/Unfreeze state admin funds (super admin only)
  */
 router.post('/state-admins/funds/manage',
-  requireSuperAdmin,
+  requireSuperAdminOrSuperFinancialAdmin,
   [
     body('admin_id').isInt().withMessage('Admin ID is required'),
     body('action').isIn(['freeze', 'unfreeze']).withMessage('Action must be "freeze" or "unfreeze"'),
@@ -110,7 +133,7 @@ router.post('/state-admins/funds/manage',
  * Update state admin commission rate (super admin only)
  */
 router.put('/state-admins/commission-rate',
-  requireSuperAdmin,
+  requireSuperAdminOrSuperFinancialAdmin,
   [
     body('admin_id').isInt().withMessage('Admin ID is required'),
     body('commission_rate').isFloat({ min: 0.01, max: 0.20 }).withMessage('Commission rate must be between 1% and 20%')
@@ -125,11 +148,11 @@ router.put('/state-admins/commission-rate',
  */
 router.get('/dashboard/state-admin',
   (req, res, next) => {
-    // Check if user is state admin
-    if (req.user.user_type !== 'state_admin') {
+    // Check if user is state financial admin
+    if (!isStateFinancialAdmin(req.user.user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. State admin only.'
+        message: 'Access denied. State financial admin only.'
       });
     }
     next();
@@ -144,10 +167,10 @@ router.get('/dashboard/state-admin',
  */
 router.post('/withdraw/request',
   (req, res, next) => {
-    if (req.user.user_type !== 'state_admin') {
+    if (!isStateFinancialAdmin(req.user.user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. State admin only.'
+        message: 'Access denied. State financial admin only.'
       });
     }
     next();
@@ -191,10 +214,10 @@ router.post('/withdraw/request',
  */
 router.get('/commissions/summary',
   (req, res, next) => {
-    if (req.user.user_type !== 'state_admin') {
+    if (!isStateFinancialAdmin(req.user.user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. State admin only.'
+        message: 'Access denied. State financial admin only.'
       });
     }
     next();
@@ -223,10 +246,10 @@ router.get('/commissions/summary',
  */
 router.get('/withdrawals/history',
   (req, res, next) => {
-    if (req.user.user_type !== 'state_admin') {
+    if (!isStateFinancialAdmin(req.user.user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. State admin only.'
+        message: 'Access denied. State financial admin only.'
       });
     }
     next();
@@ -261,7 +284,7 @@ router.get('/withdrawals/history',
  * Get pending withdrawal requests
  */
 router.get('/withdrawals/pending',
-  requireSuperAdmin,
+  requireSuperAdminOrSuperFinancialAdmin,
   async (req, res) => {
     try {
       const db = require('../config/middleware/database');
@@ -296,7 +319,7 @@ router.get('/withdrawals/pending',
  * Approve withdrawal request
  */
 router.post('/withdrawals/:withdrawalId/approve',
-  requireSuperAdmin,
+  requireSuperAdminOrSuperFinancialAdmin,
   [
     body('admin_note').optional()
   ],
@@ -305,18 +328,75 @@ router.post('/withdrawals/:withdrawalId/approve',
       const db = require('../config/middleware/database');
       const { withdrawalId } = req.params;
       const { admin_note } = req.body;
+
+      const existing = await db.query(
+        `SELECT * FROM admin_withdrawals WHERE id = $1 LIMIT 1`,
+        [withdrawalId]
+      );
+
+      if (existing.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Withdrawal request not found'
+        });
+      }
+
+      const withdrawal = existing.rows[0];
+      if (withdrawal.status !== 'pending') {
+        return res.status(400).json({
+          success: false,
+          message: `Withdrawal request is already ${withdrawal.status}`
+        });
+      }
+
+      const bankCode = withdrawal.bank_code || await resolveBankCodeFromName(withdrawal.bank_name);
+
+      let recipientCode = withdrawal.paystack_recipient_code;
+      if (!recipientCode) {
+        const recipient = await createTransferRecipient({
+          name: withdrawal.account_name,
+          accountNumber: withdrawal.account_number,
+          bankCode,
+        });
+        recipientCode = recipient.recipient_code;
+      }
+
+      const reference = `SAW_${withdrawal.id}_${Date.now()}`;
+      const transfer = await initiateTransfer({
+        amount: withdrawal.amount,
+        recipientCode,
+        reason: `State admin withdrawal #${withdrawal.id}`,
+        reference,
+      });
       
       // Update withdrawal status
       const result = await db.query(
         `UPDATE admin_withdrawals 
          SET status = 'approved',
-             processed_by = $1,
+             bank_code = $1,
+             paystack_recipient_code = $2,
+             paystack_transfer_code = $3,
+             paystack_transfer_reference = $4,
+             paystack_transfer_status = $5,
+             paystack_last_response = $6,
+             payout_attempted_at = CURRENT_TIMESTAMP,
+           processed_by = $8,
              processed_at = CURRENT_TIMESTAMP,
-             admin_note = $2,
+             admin_note = $7,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3 AND status = 'pending'
+         WHERE id = $9 AND status = 'pending'
          RETURNING *`,
-        [req.user.id, admin_note, withdrawalId]
+        [
+          bankCode,
+          recipientCode,
+          transfer?.transfer_code || null,
+          transfer?.reference || reference,
+          transfer?.status || 'pending',
+          JSON.stringify(transfer || {}),
+          admin_note || 'Auto payout initiated',
+          req.user.id,
+          withdrawalId,
+        ]
       );
       
       if (result.rows.length === 0) {
@@ -341,7 +421,7 @@ router.post('/withdrawals/:withdrawalId/approve',
       
       res.json({
         success: true,
-        message: 'Withdrawal approved successfully',
+        message: 'Withdrawal approved and payout initiated successfully',
         data: result.rows[0]
       });
     } catch (error) {
@@ -358,7 +438,7 @@ router.post('/withdrawals/:withdrawalId/approve',
  * Reject withdrawal request
  */
 router.post('/withdrawals/:withdrawalId/reject',
-  requireSuperAdmin,
+  requireSuperAdminOrSuperFinancialAdmin,
   [
     body('admin_note').notEmpty().withMessage('Rejection reason is required')
   ],

@@ -6,6 +6,8 @@ const { submitURL } = require("../utils/googleIndexing");
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { getPropertyDisputeParticipants } = require('../config/utils/propertyDisputeParticipants');
 const { getPropertyManagerContext } = require('../config/utils/agentSystem');
+const { resolveLocationSelection } = require('../config/utils/locationDirectory');
+const { statesMatch } = require('../config/utils/stateScope');
 let propertySchemaReady = false;
 
 const ensurePropertySchema = async () => {
@@ -13,7 +15,8 @@ const ensurePropertySchema = async () => {
   await db.query(`
     ALTER TABLE properties
     ADD COLUMN IF NOT EXISTS full_address TEXT,
-    ADD COLUMN IF NOT EXISTS video_url VARCHAR(500);
+    ADD COLUMN IF NOT EXISTS video_url VARCHAR(500),
+    ADD COLUMN IF NOT EXISTS lga_name VARCHAR(120);
 
     ALTER TABLE property_photos
     ADD COLUMN IF NOT EXISTS upload_order INTEGER DEFAULT 0;
@@ -272,11 +275,13 @@ exports.getFeaturedProperties = async (req, res) => {
 // -----------------------------------------------------
 exports.searchProperties = async (req, res) => {
   try {
+    await ensurePropertySchema();
     const {
       search,
       featured,
       state_id,
       state,
+      lga_name,
       city,
       property_type,
       min_price,
@@ -318,6 +323,22 @@ exports.searchProperties = async (req, res) => {
     if (state) {
       whereConditions.push(`LOWER(s.state_name) LIKE LOWER($${paramCount})`);
       params.push(`%${state}%`);
+      paramCount++;
+    }
+
+    if (state_id && String(lga_name || '').trim()) {
+      const resolvedLocation = await resolveLocationSelection({
+        stateId: state_id,
+        lgaName: lga_name,
+        requireLga: true,
+      });
+
+      whereConditions.push(`(
+        LOWER(COALESCE(p.lga_name, '')) = LOWER($${paramCount}) OR
+        LOWER(COALESCE(p.city, '')) = LOWER($${paramCount}) OR
+        LOWER(COALESCE(p.area, '')) = LOWER($${paramCount})
+      )`);
+      params.push(resolvedLocation.lga_name);
       paramCount++;
     }
 
@@ -393,7 +414,7 @@ exports.searchProperties = async (req, res) => {
     const query = `
       SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
-        p.rent_amount, p.payment_frequency, p.city, p.area,
+        p.rent_amount, p.payment_frequency, p.city, p.area, p.lga_name,
         p.amenities, p.featured, p.created_at,
         s.state_name, s.state_code,
         (SELECT photo_url FROM property_photos 
@@ -432,9 +453,9 @@ exports.searchProperties = async (req, res) => {
     });
   } catch (error) {
     console.error('Search properties error:', error);
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Failed to search properties'
+      message: error.message || 'Failed to search properties'
     });
   }
 };
@@ -878,6 +899,7 @@ exports.createProperty = async (req, res) => {
     const {
       state_id,
       state,
+      lga_name,
       city,
       area,
       full_address,
@@ -952,6 +974,30 @@ exports.createProperty = async (req, res) => {
       });
     }
 
+    let resolvedLgaName = null;
+
+    if (String(lga_name || '').trim()) {
+      const resolvedLocation = await resolveLocationSelection({
+        stateId: resolvedStateId,
+        lgaName: lga_name,
+        requireLga: true,
+      });
+
+      resolvedStateId = resolvedLocation.state_id;
+      resolvedStateName = resolvedLocation.state_name;
+      resolvedLgaName = resolvedLocation.lga_name;
+    }
+
+    if (managerContext.isAgent) {
+      const assignedState = managerContext.assigned_state;
+      if (!assignedState || !statesMatch(assignedState, resolvedStateName)) {
+        return res.status(403).json({
+          success: false,
+          message: `Agent state lock: you can only create properties in ${assignedState || 'your assigned state'}`,
+        });
+      }
+    }
+
     const finalAddress =
       full_address && String(full_address).trim()
         ? String(full_address).trim()
@@ -962,13 +1008,13 @@ exports.createProperty = async (req, res) => {
 
     const result = await client.query(
       `INSERT INTO properties (
-         landlord_id, user_id, state, state_id, city, area, full_address,
+         landlord_id, user_id, state, state_id, lga_name, city, area, full_address,
          property_type, bedrooms, bathrooms,
          price, rent_amount, payment_frequency,
          title, description, amenities, is_available, is_verified, status, video_url
        )
        VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
        )
       RETURNING *`,
       [
@@ -976,6 +1022,7 @@ exports.createProperty = async (req, res) => {
         landlordUserId,
         resolvedStateName,
         resolvedStateId,
+        resolvedLgaName,
         city,
         area,
         finalAddress,
@@ -1129,7 +1176,7 @@ exports.updateProperty = async (req, res) => {
     let paramCount = 1;
 
     const allowedFields = [
-      'state_id', 'city', 'area', 'full_address', 'property_type',
+      'state_id', 'lga_name', 'city', 'area', 'full_address', 'property_type',
       'bedrooms', 'bathrooms', 'rent_amount', 'payment_frequency',
       'caution_deposit', 'title', 'description', 'amenities'
     ];

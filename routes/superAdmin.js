@@ -22,6 +22,8 @@ router.patch('/verifications/:userId/approve', authenticate, requireSuperAdmin, 
 router.patch('/verifications/:userId/reject', authenticate, requireSuperAdmin, superCtrl.rejectIdentityVerification);
 router.delete('/verifications/:userId', authenticate, requireSuperAdmin, superCtrl.deleteRejectedVerification);
 router.get('/admins/performance', authenticate, requireSuperAdmin, superCtrl.getAdminPerformance);
+router.get('/admins/:adminId/state-users', authenticate, requireSuperAdmin, superCtrl.getAdminStateUsers);
+router.patch('/admins/:id/jurisdiction', authenticate, requireSuperAdmin, superCtrl.updateAdminJurisdiction);
 
 router.get('/logs', authenticate, requireSuperAdmin, superCtrl.getAuditLogs);
 

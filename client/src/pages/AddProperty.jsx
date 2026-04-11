@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
@@ -7,18 +7,7 @@ import { DamageReportButton } from '../components/damage';
 import { propertyService } from '../services/propertyService';
 import { useAuth } from '../hooks/useAuth';
 
-const STATES = [
-  'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa',
-  'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo',
-  'Ekiti', 'Enugu', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano',
-  'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa',
-  'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers',
-  'Sokoto', 'Taraba', 'Yobe', 'Zamfara', 'FCT'
-];
-
 const PROPERTY_TYPES = ['apartment', 'house', 'bungalow', 'duplex', 'studio', 'flat', 'room'];
-const SEVERITY_STYLES = { minor: 'bg-emerald-100 text-emerald-700', moderate: 'bg-amber-100 text-amber-700', severe: 'bg-red-100 text-red-700' };
-const URGENCY_STYLES = { low: 'bg-sky-100 text-sky-700', medium: 'bg-orange-100 text-orange-700', high: 'bg-red-100 text-red-700' };
 
 const AddProperty = () => {
   const navigate = useNavigate();
@@ -30,23 +19,107 @@ const AddProperty = () => {
   const [loading, setLoading] = useState(false);
   const [createdPropertyId, setCreatedPropertyId] = useState(null);
   const [form, setForm] = useState({
-    title: '', description: '', state: '', city: '', area: '', property_type: '',
+    title: '', description: '', state: '', state_id: '', lga_name: '', city: '', area: '', property_type: '',
     rent_amount: '', payment_frequency: 'yearly', bedrooms: '', bathrooms: '',
     amenities: '', is_available: true, latitude: '', longitude: '',
   });
+  const [locationOptions, setLocationOptions] = useState([]);
   const [images, setImages] = useState([]);
   const [video, setVideo] = useState(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
+  const locationPrefillAppliedRef = useRef(false);
+
+  const selectedStateOption = useMemo(
+    () => locationOptions.find((item) => String(item.id) === String(form.state_id)),
+    [locationOptions, form.state_id]
+  );
+  const availableLgas = selectedStateOption?.lgas || [];
 
   useEffect(() => {
-    capturedPreviewRef.current = capturedPhotoPreview;
-  useEffect(() => () => {
-    // Component cleanup
+    let active = true;
+
+    const loadLocationOptions = async () => {
+      try {
+        const response = await propertyService.getLocationOptions();
+
+        if (!active) return;
+
+        if (response?.success && Array.isArray(response.data)) {
+          setLocationOptions(response.data);
+          return;
+        }
+
+        setLocationOptions([]);
+      } catch (error) {
+        if (active) {
+          setLocationOptions([]);
+          toast.error('Failed to load property location options');
+        }
+      }
+    };
+
+    loadLocationOptions();
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (locationPrefillAppliedRef.current || !locationOptions.length) {
+      return;
+    }
+
+    const preferredStateId = String(user?.preferred_state_id || '');
+    if (!preferredStateId) {
+      return;
+    }
+
+    const preferredState = locationOptions.find(
+      (item) => String(item.id) === preferredStateId
+    );
+
+    if (!preferredState) {
+      return;
+    }
+
+    const preferredLga =
+      preferredState.lgas.find(
+        (item) =>
+          String(item).toLowerCase() ===
+          String(user?.preferred_lga_name || '').toLowerCase()
+      ) || '';
+
+    setForm((prev) => ({
+      ...prev,
+      state_id: preferredStateId,
+      state: preferredState.state_name,
+      lga_name: preferredLga,
+    }));
+    locationPrefillAppliedRef.current = true;
+  }, [locationOptions, user?.preferred_lga_name, user?.preferred_state_id]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+
+    if (name === 'state_id') {
+      const nextState = locationOptions.find(
+        (item) => String(item.id) === String(value)
+      );
+
+      setForm((prev) => ({
+        ...prev,
+        state_id: value,
+        state: nextState?.state_name || '',
+        lga_name: '',
+      }));
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   };
 
   const handleCodeChange = (index, value) => {
@@ -60,7 +133,9 @@ const AddProperty = () => {
 
   const proceedToVerification = (e) => {
     e.preventDefault();
-    if (!form.title || !form.state || !form.city || !form.property_type || !form.rent_amount) return toast.error(t('add_property.required'));
+    if (!form.title || !form.state_id || !form.lga_name || !form.city || !form.area || !form.property_type || !form.rent_amount) {
+      return toast.error(t('add_property.required'));
+    }
     if (!form.latitude || !form.longitude) return toast.error('Please pick the property location on the map.');
     setStep(2);
   };
@@ -97,11 +172,33 @@ const AddProperty = () => {
         <form onSubmit={proceedToVerification} className="card space-y-4">
           <input name="title" value={form.title} onChange={handleChange} className="input" placeholder={t('add_property.form.title')} />
           <textarea name="description" value={form.description} onChange={handleChange} className="input" rows="4" placeholder={t('add_property.form.description')} />
+          {(user?.preferred_state_id || user?.preferred_lga_name) && (
+            <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+              Your registration location is prefilled below so tenant discovery and landlord posting stay aligned. You can still change it for this property.
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
-            <select name="state" value={form.state} onChange={handleChange} className="input"><option value="">{t('add_property.form.state')}</option>{STATES.map((stateName) => <option key={stateName} value={stateName}>{stateName}</option>)}</select>
-            <input name="city" value={form.city} onChange={handleChange} className="input" placeholder={t('add_property.form.city')} />
+            <select name="state_id" value={form.state_id} onChange={handleChange} className="input">
+              <option value="">{t('add_property.form.state')}</option>
+              {locationOptions.map((stateOption) => (
+                <option key={stateOption.id} value={stateOption.id}>
+                  {stateOption.state_name}
+                </option>
+              ))}
+            </select>
+            <select name="lga_name" value={form.lga_name} onChange={handleChange} className="input" disabled={!form.state_id}>
+              <option value="">Select local government area</option>
+              {availableLgas.map((lga) => (
+                <option key={lga} value={lga}>
+                  {lga}
+                </option>
+              ))}
+            </select>
           </div>
-          <input name="area" value={form.area} onChange={handleChange} className="input" placeholder={t('add_property.form.area')} />
+          <div className="grid grid-cols-2 gap-4">
+            <input name="city" value={form.city} onChange={handleChange} className="input" placeholder={t('add_property.form.city')} />
+            <input name="area" value={form.area} onChange={handleChange} className="input" placeholder={t('add_property.form.area')} />
+          </div>
           <select name="property_type" value={form.property_type} onChange={handleChange} className="input"><option value="">{t('add_property.form.type')}</option>{PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select>
           <div className="grid grid-cols-2 gap-4">
             <input type="number" name="rent_amount" value={form.rent_amount} onChange={handleChange} className="input" placeholder={t('add_property.form.rent')} />
@@ -146,7 +243,7 @@ const AddProperty = () => {
             <button type="button" onClick={() => setStep(1)} className="btn w-full">
               ← Back
             </button>
-            <button type="button" onClick={() => setStep(2)} className="btn btn-primary w-full">
+            <button type="button" onClick={() => setStep(3)} className="btn btn-primary w-full">
               Continue to Verification
             </button>
           </div>
@@ -176,7 +273,7 @@ const AddProperty = () => {
             </button>
             <button
               type="button"
-              onClick={() => navigate(`/property/${createdPropertyId}`)}
+              onClick={() => navigate(`/properties/${createdPropertyId}`)}
               className="btn btn-primary w-full"
             >
               View Property

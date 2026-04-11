@@ -150,6 +150,46 @@ const Dashboard = () => {
       return;
     }
 
+    if (user.user_type === 'super_financial_admin') {
+      navigate('/admin/super-financial-dashboard', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'financial_admin') {
+      navigate('/admin/financial-dashboard', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'super_support_admin') {
+      navigate('/admin/super-support-dashboard', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'state_support_admin') {
+      navigate('/admin/state-support-dashboard', { replace: true });
+      return;
+    }
+
+    if (['state_admin', 'state_financial_admin'].includes(user.user_type)) {
+      navigate('/admin', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'super_lawyer') {
+      navigate('/lawyer/super', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'state_lawyer') {
+      navigate('/lawyer/state', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'lawyer') {
+      navigate('/lawyer', { replace: true });
+      return;
+    }
+
     loadDashboardData();
   }, [user, navigate, loadDashboardData]);
 
@@ -578,7 +618,7 @@ const Dashboard = () => {
                 {t('dashboard.verify_text')}
               </p>
               <button
-                onClick={() => navigate('/profile')}
+                onClick={() => navigate('/verification-status')}
                 className="mt-3 text-sm font-semibold text-yellow-800 hover:text-yellow-900"
               >
                 {t('dashboard.verify_action')} →
@@ -598,7 +638,7 @@ const Dashboard = () => {
                 Your passport was submitted. It is pending admin review.
               </p>
               <button
-                onClick={() => navigate('/profile')}
+                onClick={() => navigate('/verification-status')}
                 className="mt-3 text-sm font-semibold text-blue-800 hover:text-blue-900"
               >
                 View Verification Status →
@@ -618,7 +658,7 @@ const Dashboard = () => {
                 Your verification was rejected. Review your details and upload a new live passport photo.
               </p>
               <button
-                onClick={() => navigate('/profile')}
+                onClick={() => navigate('/verification-status')}
                 className="mt-3 text-sm font-semibold text-red-800 hover:text-red-900"
               >
                 Fix Verification {'>'}

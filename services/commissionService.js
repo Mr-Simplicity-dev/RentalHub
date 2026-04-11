@@ -90,7 +90,7 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
         admin_commission_rate,
         admin_funds_frozen
        FROM users 
-       WHERE id = $1 AND user_type = 'state_admin'`,
+       WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin')`,
       [referredBy]
     );
     
@@ -369,7 +369,7 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails) => {
         full_name,
         email
        FROM users 
-       WHERE id = $1 AND user_type = 'state_admin'`,
+       WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin')`,
       [adminId]
     );
     

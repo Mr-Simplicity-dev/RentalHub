@@ -76,6 +76,7 @@ const Properties = () => {
         const hasStateFilter = Boolean(filterParams.state || filterParams.state_id);
         const hasNarrowSearch = Boolean(
           filterParams.search ||
+          filterParams.lga_name ||
           filterParams.city ||
           filterParams.property_type ||
           filterParams.min_price ||
@@ -109,7 +110,9 @@ const Properties = () => {
             setProperties(fallbackResponse.data || []);
             setPagination(fallbackResponse.pagination);
             setResultNote(
-              filterParams.state
+              filterParams.lga_name
+                ? `No exact matches found in ${filterParams.lga_name}. Showing related properties in the selected state.`
+                : filterParams.state
                 ? `No exact matches found. Showing related properties in ${filterParams.state}.`
                 : 'No exact matches found. Showing related properties in the selected state.'
             );
@@ -203,7 +206,7 @@ const Properties = () => {
       ...prev,
       property_type: initialFilters.property_type || '',
       state_id: initialFilters.state_id || '',
-      lga_name: '',
+      lga_name: initialFilters.lga_name || '',
       location: initialFilters.city || '',
     }));
 

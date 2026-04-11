@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { FaUser, FaEnvelope, FaPhone, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import api from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { setAuthSession } from '../services/authStorage';
 
 const Register = () => {
   const [searchParams] = useSearchParams();
@@ -48,6 +49,9 @@ const Register = () => {
     location_complete: false,
     rule_scope: 'base',
   });
+  const [locationPreviewProperties, setLocationPreviewProperties] = useState([]);
+  const [locationPreviewLoading, setLocationPreviewLoading] = useState(false);
+  const [locationPreviewNote, setLocationPreviewNote] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { register } = useAuth();
@@ -98,6 +102,13 @@ const Register = () => {
   const displayedRegistrationAmount =
     registrationPricing.amount ||
     (formData.user_type === 'tenant' ? 2500 : 5000);
+  const registrationLocationBrowseUrl = formData.state_id
+    ? `/properties?state_id=${encodeURIComponent(formData.state_id)}${
+        formData.lga_name
+          ? `&lga_name=${encodeURIComponent(formData.lga_name)}`
+          : ''
+      }`
+    : '/properties';
 
   useEffect(() => {
     let mounted = true;
@@ -198,6 +209,79 @@ const Register = () => {
   useEffect(() => {
     let active = true;
 
+    if (formData.user_type !== 'tenant' || !formData.state_id) {
+      setLocationPreviewProperties([]);
+      setLocationPreviewNote('');
+      setLocationPreviewLoading(false);
+
+      return () => {
+        active = false;
+      };
+    }
+
+    const loadLocationPreview = async () => {
+      setLocationPreviewLoading(true);
+      setLocationPreviewNote('');
+
+      try {
+        const exactParams = {
+          state_id: formData.state_id,
+          limit: 4,
+        };
+
+        if (formData.lga_name) {
+          exactParams.lga_name = formData.lga_name;
+        }
+
+        const exactResponse = await api.get('/properties/search', {
+          params: exactParams,
+        });
+
+        let nextProperties = exactResponse.data?.data || [];
+        let nextNote = '';
+
+        if (!nextProperties.length && formData.lga_name) {
+          const fallbackResponse = await api.get('/properties/search', {
+            params: {
+              state_id: formData.state_id,
+              limit: 4,
+            },
+          });
+
+          nextProperties = fallbackResponse.data?.data || [];
+
+          if (nextProperties.length) {
+            nextNote = `No live listings are matched to ${formData.lga_name} yet. Showing available properties in ${selectedStateOption?.state_name || 'the selected state'} instead.`;
+          }
+        }
+
+        if (!active) return;
+
+        setLocationPreviewProperties(nextProperties);
+        setLocationPreviewNote(nextNote);
+      } catch (error) {
+        if (!active) return;
+
+        console.error('Failed to load registration location preview', error);
+        setLocationPreviewProperties([]);
+        setLocationPreviewNote('Unable to load available properties for this location right now.');
+      } finally {
+        if (active) {
+          setLocationPreviewLoading(false);
+        }
+      }
+    };
+
+    loadLocationPreview();
+
+    return () => {
+      active = false;
+    };
+  }, [formData.user_type, formData.state_id, formData.lga_name, selectedStateOption?.state_name]);
+
+  useEffect(() => {
+    let active = true;
+
     const completeRegistration = async () => {
       if (!registrationReference) return;
 
@@ -213,8 +297,7 @@ const Register = () => {
         if (response.data?.success) {
           const { token, user } = response.data.data;
 
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(user));
+          setAuthSession(token, user);
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
           toast.success('Registration successful. Verify email and phone next.');
@@ -1035,11 +1118,21 @@ return (
                   </>
                 )}
 
-                {/* State & LGA (payment-required) */}
-                {requiresRegistrationPayment && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Registration Location</h3>
+                    <p className="mt-1 text-xs text-gray-600">
+                      {formData.user_type === 'tenant'
+                        ? 'Choose your preferred registration location so the system can show you available properties in that area.'
+                        : 'Choose your registration location now. It will prefill your property posting flow after signup, and you can still change it later per listing.'}
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        State{requiresRegistrationPayment ? ' *' : ''}
+                      </label>
                       <select
                         name="state_id"
                         value={formData.state_id}
@@ -1055,7 +1148,9 @@ return (
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Local Government Area *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Local Government Area{requiresRegistrationPayment ? ' *' : ''}
+                      </label>
                       <select
                         name="lga_name"
                         value={formData.lga_name}
@@ -1068,7 +1163,7 @@ return (
                           <option key={l} value={l}>{l}</option>
                         ))}
                       </select>
-                      {!registrationPricing.location_complete && formData.state_id && formData.lga_name && (
+                      {requiresRegistrationPayment && !registrationPricing.location_complete && formData.state_id && formData.lga_name && (
                         <p className="text-xs text-blue-600 mt-1">
                           Confirming location pricing...
                         </p>
@@ -1076,7 +1171,66 @@ return (
                       {errors.lga && <p className="text-red-500 text-sm mt-1">{errors.lga}</p>}
                     </div>
                   </div>
-                )}
+
+                  {requiresRegistrationPayment && formData.state_id && formData.lga_name && registrationPricing.location_complete && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                      Exact registration fee for this location: ₦{displayedRegistrationAmount.toLocaleString()}.
+                    </div>
+                  )}
+
+                  {formData.user_type === 'tenant' && formData.state_id && (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-sm font-semibold text-emerald-900">
+                            Available Properties Near This Location
+                          </h4>
+                          <p className="mt-1 text-xs text-emerald-800">
+                            {formData.lga_name
+                              ? `Showing live inventory for ${formData.lga_name}, ${selectedStateOption?.state_name || ''}.`
+                              : `Showing live inventory in ${selectedStateOption?.state_name || 'your selected state'}.`}
+                          </p>
+                        </div>
+                        <Link
+                          to={registrationLocationBrowseUrl}
+                          className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
+                        >
+                          Browse all
+                        </Link>
+                      </div>
+
+                      {locationPreviewLoading ? (
+                        <p className="mt-3 text-sm text-emerald-800">Loading available properties...</p>
+                      ) : locationPreviewProperties.length > 0 ? (
+                        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {locationPreviewProperties.map((property) => (
+                            <Link
+                              key={property.id}
+                              to={`/properties/${property.id}`}
+                              className="rounded-lg border border-emerald-200 bg-white p-3 transition hover:border-emerald-300"
+                            >
+                              <p className="font-medium text-gray-900">{property.title}</p>
+                              <p className="mt-1 text-xs text-gray-600">
+                                {[property.area, property.city, property.state_name].filter(Boolean).join(', ')}
+                              </p>
+                              <p className="mt-2 text-sm font-semibold text-emerald-700">
+                                ₦{Number(property.rent_amount || 0).toLocaleString()} / {property.payment_frequency || 'yearly'}
+                              </p>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-sm text-emerald-800">
+                          No live properties are attached to this location yet.
+                        </p>
+                      )}
+
+                      {locationPreviewNote && (
+                        <p className="mt-3 text-xs text-amber-700">{locationPreviewNote}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setStep(2)} className="btn w-full">Back</button>

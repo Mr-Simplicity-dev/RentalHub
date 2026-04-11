@@ -264,6 +264,45 @@ class DamageReportController {
     try {
       const { propertyId } = req.params;
 
+      // Verify authorization: owner/admin/super-admin/authorized agent
+      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
+        const propertyResult = await db.query(
+          `SELECT landlord_id FROM properties WHERE id = $1`,
+          [propertyId]
+        );
+
+        if (propertyResult.rows.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Property not found',
+          });
+        }
+
+        const landlordId = propertyResult.rows[0].landlord_id;
+        let authorized = landlordId === req.user.id;
+
+        if (!authorized && req.user.user_type === 'agent') {
+          const assignment = await db.query(
+            `SELECT 1
+             FROM landlord_agents
+             WHERE landlord_user_id = $1
+               AND agent_user_id = $2
+               AND status = 'active'
+               AND can_manage_damage_reports = TRUE
+             LIMIT 1`,
+            [landlordId, req.user.id]
+          );
+          authorized = assignment.rows.length > 0;
+        }
+
+        if (!authorized) {
+          return res.status(403).json({
+            success: false,
+            message: 'Unauthorized to access this summary',
+          });
+        }
+      }
+
       const summary = await DamageReportVisibilityService.getReportSummary(propertyId);
 
       res.json({

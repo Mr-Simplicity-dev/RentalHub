@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaBank, FaCheck, FaClock, FaTimes } from 'react-icons/fa';
+import { FaUniversity, FaCheck, FaClock, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
@@ -21,6 +21,7 @@ const AgentWithdrawalPage = () => {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [landlordId]);
 
   const loadData = async () => {
@@ -120,7 +121,7 @@ const AgentWithdrawalPage = () => {
             </p>
           </div>
           <div className="rounded-xl bg-white/10 p-4">
-            <FaBank className="text-3xl" />
+            <FaUniversity className="text-3xl" />
           </div>
         </div>
       </div>

@@ -353,9 +353,9 @@ exports.grantLawyerAccess = async (req, res) => {
 
     // Verify the target user is actually a lawyer
     const lawyerCheck = await db.query(
-      `SELECT id, assigned_state
+      `SELECT id, assigned_state, lawyer_client_scope
        FROM users
-       WHERE id = $1 AND user_type = 'lawyer'
+       WHERE id = $1 AND user_type IN ('lawyer', 'state_lawyer', 'super_lawyer')
        LIMIT 1`,
       [lawyer_id]
     );
@@ -376,11 +376,35 @@ exports.grantLawyerAccess = async (req, res) => {
 
     const propertyState = propertyStateResult.rows[0]?.state || null;
     const lawyerAssignedState = lawyerCheck.rows[0]?.assigned_state || null;
+    const lawyerClientScope = String(lawyerCheck.rows[0]?.lawyer_client_scope || '').trim().toLowerCase();
 
     if (!lawyerAssignedState || !statesMatch(lawyerAssignedState, propertyState)) {
       return res.status(403).json({
         success: false,
         message: 'Lawyer state lock violation: selected lawyer is outside this property state',
+      });
+    }
+
+    const clientTypeResult = await db.query(
+      `SELECT user_type
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [requesterId]
+    );
+    const clientUserType = String(clientTypeResult.rows[0]?.user_type || '').trim().toLowerCase();
+
+    if (!['tenant', 'landlord'].includes(clientUserType)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only tenant or landlord clients can grant legal access',
+      });
+    }
+
+    if (lawyerClientScope && lawyerClientScope !== clientUserType) {
+      return res.status(403).json({
+        success: false,
+        message: `Selected lawyer is restricted to ${lawyerClientScope} clients`,
       });
     }
 

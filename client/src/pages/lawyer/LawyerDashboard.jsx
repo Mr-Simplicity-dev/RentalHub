@@ -30,7 +30,22 @@ const getEvidenceStatusBadge = (status) => {
   return 'bg-gray-100 text-gray-700';
 };
 
-const LawyerDashboardContent = () => {
+const LawyerDashboardContent = ({
+  dashboardTitle = 'Lawyer Dashboard',
+  profileLabel = 'Lawyer Profile',
+  nameFallback = 'Lawyer',
+  dashboardSubtitle = 'Manage disputes, verify evidence, and maintain legal case notes.',
+  rolePillLabel = 'Lawyer',
+  showSuperLawyerPanel = false,
+  showStateLawyerPanel = false,
+}) => {
+  const STATES = [
+    'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta',
+    'Ebonyi','Edo','Ekiti','Enugu','FCT','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi',
+    'Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto',
+    'Taraba','Yobe','Zamfara'
+  ];
+
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [disputes, setDisputes] = useState([]);
@@ -56,15 +71,45 @@ const LawyerDashboardContent = () => {
     broadcast: null,
     application: null,
   });
+  const [migrationRequests, setMigrationRequests] = useState([]);
+  const [migrationForm, setMigrationForm] = useState({ to_state: '', reason: '' });
+  const [migrationLoading, setMigrationLoading] = useState(false);
 
   const loadLawyerProfile = async () => {
     try {
-      const res = await api.get('/users/profile');
+      const [res, migrationRes] = await Promise.all([
+        api.get('/auth/me'),
+        api.get('/state-migrations/my').catch(() => ({ data: { data: [] } })),
+      ]);
       setLawyerProfile(res.data?.data || null);
+      setMigrationRequests(migrationRes.data?.data || []);
     } catch {
       setLawyerProfile(null);
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  const submitMigrationRequest = async () => {
+    if (!migrationForm.to_state || !migrationForm.reason.trim()) {
+      toast.error('Please select target state and provide reason');
+      return;
+    }
+
+    try {
+      setMigrationLoading(true);
+      const res = await api.post('/state-migrations/request', {
+        to_state: migrationForm.to_state,
+        reason: migrationForm.reason,
+      });
+      toast.success(res.data?.message || 'Migration request submitted');
+      setMigrationForm({ to_state: '', reason: '' });
+      const myRes = await api.get('/state-migrations/my');
+      setMigrationRequests(myRes.data?.data || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to submit migration request');
+    } finally {
+      setMigrationLoading(false);
     }
   };
 
@@ -161,12 +206,14 @@ const LawyerDashboardContent = () => {
     loadAuthorizedProperties();
     loadLawyerProfile();
     loadPlatformLawyerProgram();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (selectedProperty?.id) {
       loadDisputes(selectedProperty.id, selectedDispute?.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProperty?.id]);
 
   const applyToProgram = async () => {
@@ -278,21 +325,53 @@ const LawyerDashboardContent = () => {
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">Lawyer Dashboard</h1>
-        <Link
-          to="/verify-case"
-          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          Verify Case Evidence
-        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{dashboardTitle}</h1>
+          <p className="mt-1 text-sm text-gray-600">{dashboardSubtitle}</p>
+          <span className="mt-2 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            {rolePillLabel}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/verify-case"
+            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+          >
+            Verify Case Evidence
+          </Link>
+          <Link
+            to="/lawyers"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            View Public Directory
+          </Link>
+        </div>
       </div>
+
+      {showSuperLawyerPanel && (
+        <div className="card p-4 border border-purple-200 bg-purple-50">
+          <h2 className="font-semibold text-purple-900">Super Lawyer Controls</h2>
+          <p className="mt-1 text-sm text-purple-800">
+            This workspace is configured for super lawyer operations with expanded legal review responsibility.
+          </p>
+        </div>
+      )}
+
+      {showStateLawyerPanel && (
+        <div className="card p-4 border border-emerald-200 bg-emerald-50">
+          <h2 className="font-semibold text-emerald-900">State Lawyer Controls</h2>
+          <p className="mt-1 text-sm text-emerald-800">
+            This workspace is focused on state-level legal operations. Ensure assigned state is correct for your case queue.
+          </p>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-wide text-blue-700">Lawyer Profile</p>
+            <p className="text-xs uppercase tracking-wide text-blue-700">{profileLabel}</p>
             <h2 className="mt-1 text-xl font-bold text-gray-900">
-              {lawyerProfile?.full_name || 'Lawyer'}
+              {lawyerProfile?.full_name || nameFallback}
             </h2>
             <p className="mt-1 text-sm text-gray-700">{lawyerProfile?.email || '-'}</p>
             <p className="text-sm text-gray-700">
@@ -302,7 +381,59 @@ const LawyerDashboardContent = () => {
               {lawyerProfile?.chamber_name || 'No chamber provided'}
               {lawyerProfile?.chamber_phone ? ` • ${lawyerProfile.chamber_phone}` : ''}
             </p>
+            <p className="mt-2 text-sm text-blue-800">
+              Assigned state: <span className="font-semibold">{lawyerProfile?.assigned_state || 'Not configured'}</span>
+            </p>
           </div>
+        </div>
+      </div>
+
+      <div className="card p-4">
+        <h2 className="font-semibold text-gray-900">State Migration Request</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Lawyers are state-locked and can only work on properties inside their assigned state.
+        </p>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <select
+            value={migrationForm.to_state}
+            onChange={(e) => setMigrationForm((prev) => ({ ...prev, to_state: e.target.value }))}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">Select target state</option>
+            {STATES.map((state) => (
+              <option key={state} value={state}>{state}</option>
+            ))}
+          </select>
+          <input
+            value={migrationForm.reason}
+            onChange={(e) => setMigrationForm((prev) => ({ ...prev, reason: e.target.value }))}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+            placeholder="Reason for migration request"
+          />
+        </div>
+
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={submitMigrationRequest}
+            disabled={migrationLoading}
+            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {migrationLoading ? 'Submitting...' : 'Apply for State Migration'}
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {migrationRequests.slice(0, 3).map((request) => (
+            <div key={request.id} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+              <p className="font-medium text-gray-800">
+                {request.from_state} → {request.to_state}
+                <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs capitalize">{request.status}</span>
+              </p>
+              <p className="text-xs text-gray-600">{request.reason}</p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -650,10 +781,36 @@ const LawyerDashboardContent = () => {
   );
 };
 
-const LawyerDashboard = () => (
+export const LawyerDashboardView = ({
+  dashboardTitle,
+  profileLabel,
+  nameFallback,
+  dashboardSubtitle,
+  rolePillLabel,
+  showSuperLawyerPanel,
+  showStateLawyerPanel,
+}) => (
   <LawyerVerification>
-    <LawyerDashboardContent />
+    <LawyerDashboardContent
+      dashboardTitle={dashboardTitle}
+      profileLabel={profileLabel}
+      nameFallback={nameFallback}
+      dashboardSubtitle={dashboardSubtitle}
+      rolePillLabel={rolePillLabel}
+      showSuperLawyerPanel={showSuperLawyerPanel}
+      showStateLawyerPanel={showStateLawyerPanel}
+    />
   </LawyerVerification>
+);
+
+const LawyerDashboard = () => (
+  <LawyerDashboardView
+    dashboardTitle="Lawyer Dashboard"
+    profileLabel="Lawyer Profile"
+    nameFallback="Lawyer"
+    dashboardSubtitle="Manage disputes, verify evidence, and keep legal notes synchronized with your assigned state."
+    rolePillLabel="Lawyer"
+  />
 );
 
 export default LawyerDashboard;

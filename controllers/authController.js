@@ -45,6 +45,8 @@ const lawyerOtpStore = new Map();
 let identitySchemaReady = false;
 let lawyerInviteSchemaReady = false;
 let tenantRegistrationPaymentSchemaReady = false;
+let registrationLocationSchemaReady = false;
+let userSuspensionSchemaReady = false;
 
 const LAWYER_INVITE_EXPIRY_HOURS = 72;
 const LAWYER_INVITE_EXPIRY_MS = LAWYER_INVITE_EXPIRY_HOURS * 60 * 60 * 1000;
@@ -61,8 +63,22 @@ const REGISTRATION_PRICING_TARGETS = {
 const hashInviteToken = (token) =>
   crypto.createHash('sha256').update(String(token)).digest('hex');
 
+const ensureRegistrationLocationSchema = async () => {
+  if (registrationLocationSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS preferred_state_id INTEGER REFERENCES states(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS preferred_lga_name VARCHAR(120);
+  `);
+
+  registrationLocationSchemaReady = true;
+};
+
 const ensureIdentitySchema = async () => {
   if (identitySchemaReady) return;
+
+  await ensureRegistrationLocationSchema();
 
   await db.query(`
     ALTER TABLE users
@@ -84,6 +100,19 @@ const ensureIdentitySchema = async () => {
   `);
 
   identitySchemaReady = true;
+};
+
+const ensureUserSuspensionSchema = async () => {
+  if (userSuspensionSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS account_suspended_reason TEXT,
+    ADD COLUMN IF NOT EXISTS account_suspended_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS account_suspended_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  `);
+
+  userSuspensionSchemaReady = true;
 };
 
 const ensureLawyerInviteSchema = async () => {
@@ -120,6 +149,8 @@ const ensureLawyerInviteSchema = async () => {
 
 const ensureTenantRegistrationPaymentSchema = async () => {
   if (tenantRegistrationPaymentSchemaReady) return;
+
+  await ensureRegistrationLocationSchema();
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS tenant_registration_payments (
@@ -284,6 +315,16 @@ const buildRegistrationPricingQuote = async ({
     location: resolvedLocation,
   };
 };
+
+const withPreparedRegistrationLocation = (
+  preparedRegistration,
+  resolvedLocation = null
+) => ({
+  ...preparedRegistration,
+  preferredStateId: resolvedLocation?.state_id || null,
+  preferredStateName: resolvedLocation?.state_name || null,
+  preferredLgaName: resolvedLocation?.lga_name || null,
+});
 
 const createLawyerInvite = async ({ clientUserId, lawyerEmail, clientName, clientRole }) => {
   await ensureLawyerInviteSchema();
@@ -675,11 +716,14 @@ const createUserFromPreparedRegistration = async ({
          nin_verified,
          identity_document_type,
          international_passport_number,
-         nationality
+         nationality,
+         preferred_state_id,
+         preferred_lga_name
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING id, email, full_name, user_type, created_at,
-                 identity_document_type, nin_verified, nationality`,
+                 identity_document_type, nin_verified, nationality,
+                 preferred_state_id, preferred_lga_name`,
       [
         preparedRegistration.user_type,
         preparedRegistration.email,
@@ -690,7 +734,9 @@ const createUserFromPreparedRegistration = async ({
         preparedRegistration.ninVerified,
         preparedRegistration.identityType,
         preparedRegistration.cleanPassportNumber,
-        preparedRegistration.cleanNationality
+        preparedRegistration.cleanNationality,
+        preparedRegistration.preferredStateId,
+        preparedRegistration.preferredLgaName
       ]
     );
 
@@ -797,7 +843,10 @@ const createUserFromPreparedRegistration = async ({
         created_at: newUser.created_at,
         identity_document_type: newUser.identity_document_type,
         nin_verified: newUser.nin_verified,
-        nationality: newUser.nationality
+        nationality: newUser.nationality,
+        preferred_state_id: newUser.preferred_state_id,
+        preferred_state_name: preparedRegistration.preferredStateName || null,
+        preferred_lga_name: newUser.preferred_lga_name
       },
       token,
       verification: verificationMeta,
@@ -840,6 +889,10 @@ exports.register = async (req, res) => {
       lgaName: req.body.lga_name,
       strictLocation: false,
     });
+    const preparedRegistrationWithLocation = withPreparedRegistrationLocation(
+      preparedRegistration,
+      registrationPricing.location
+    );
 
     if (registrationPricing.enabled) {
       return res.status(402).json({
@@ -860,7 +913,7 @@ exports.register = async (req, res) => {
     const passwordHash = await bcrypt.hash(plainPassword, salt);
 
     const data = await createUserFromPreparedRegistration({
-      preparedRegistration,
+      preparedRegistration: preparedRegistrationWithLocation,
       passwordHash,
       verificationMeta
     });
@@ -921,6 +974,10 @@ exports.initializeRegistrationPayment = async (req, res) => {
       lgaName: req.body.lga_name,
       strictLocation: true,
     });
+    const preparedRegistrationWithLocation = withPreparedRegistrationLocation(
+      preparedRegistration,
+      registrationPricing.location
+    );
 
     if (!registrationPricing.enabled) {
       return res.status(400).json({
@@ -946,14 +1003,14 @@ exports.initializeRegistrationPayment = async (req, res) => {
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
-        preparedRegistration.user_type,
-        preparedRegistration.email,
-        preparedRegistration.phone,
-        preparedRegistration.full_name,
+        preparedRegistrationWithLocation.user_type,
+        preparedRegistrationWithLocation.email,
+        preparedRegistrationWithLocation.phone,
+        preparedRegistrationWithLocation.full_name,
         registrationPricing.amount,
         reference,
         JSON.stringify({
-          ...preparedRegistration,
+          ...preparedRegistrationWithLocation,
           state_id: registrationPricing.location?.state_id || null,
           lga_name: registrationPricing.location?.lga_name || null,
           password_hash: passwordHash
@@ -1110,6 +1167,15 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       cleanPassportNumber: storedPayload.cleanPassportNumber || null,
       cleanNationality: storedPayload.cleanNationality || 'Nigeria',
       optionalAgentInvite: storedPayload.optionalAgentInvite || null,
+      preferredStateId:
+        storedPayload.preferredStateId ||
+        storedPayload.state_id ||
+        null,
+      preferredStateName: storedPayload.preferredStateName || null,
+      preferredLgaName:
+        storedPayload.preferredLgaName ||
+        storedPayload.lga_name ||
+        null,
     };
 
     const data = await createUserFromPreparedRegistration({
@@ -1137,6 +1203,7 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     await ensureIdentitySchema();
+    await ensureUserSuspensionSchema();
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -1150,13 +1217,19 @@ exports.login = async (req, res) => {
 
     // Find user
     const result = await db.query(
-      `SELECT id, email, password_hash, full_name, user_type, 
-              email_verified, phone_verified, identity_verified,
-              identity_verification_status, passport_photo_url,
-              subscription_active, subscription_expires_at,
-              identity_document_type, international_passport_number,
-              nationality, nin_verified
-       FROM users WHERE email = $1`,
+      `SELECT u.id, u.email, u.password_hash, u.full_name, u.user_type,
+              u.email_verified, u.phone_verified, u.identity_verified,
+              u.identity_verification_status, u.passport_photo_url,
+              u.subscription_active, u.subscription_expires_at,
+              u.identity_document_type, u.international_passport_number,
+              u.nationality, u.nin_verified,
+              u.preferred_state_id, s.state_name AS preferred_state_name,
+              u.preferred_lga_name,
+              u.deleted_at,
+              u.is_active, u.account_suspended_reason
+       FROM users u
+       LEFT JOIN states s ON s.id = u.preferred_state_id
+       WHERE u.email = $1`,
       [email]
     );
 
@@ -1175,6 +1248,23 @@ exports.login = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
+      });
+    }
+
+    if (user.deleted_at) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account deleted. Please contact support.',
+      });
+    }
+
+    if (user.is_active === false) {
+      const reason = String(user.account_suspended_reason || '').trim();
+      return res.status(403).json({
+        success: false,
+        message: reason
+          ? `Account suspended: ${reason}`
+          : 'Account suspended. Please contact support.',
       });
     }
 
@@ -2659,12 +2749,17 @@ exports.getCurrentUser = async (req, res) => {
     const userId = req.user.id;
 
     const result = await db.query(
-      `SELECT id, user_type, email, phone, full_name, nin,
-              identity_document_type, international_passport_number, nationality, nin_verified,
-              passport_photo_url, email_verified, phone_verified,
-              identity_verified, identity_verification_status, subscription_active,
-              subscription_expires_at, created_at
-       FROM users WHERE id = $1`,
+      `SELECT u.id, u.user_type, u.email, u.phone, u.full_name, u.nin,
+              u.identity_document_type, u.international_passport_number, u.nationality, u.nin_verified,
+              u.assigned_state, u.assigned_city,
+              u.preferred_state_id, s.state_name AS preferred_state_name,
+              u.preferred_lga_name,
+              u.passport_photo_url, u.email_verified, u.phone_verified,
+              u.identity_verified, u.identity_verification_status, u.subscription_active,
+              u.subscription_expires_at, u.created_at
+       FROM users u
+       LEFT JOIN states s ON s.id = u.preferred_state_id
+       WHERE u.id = $1`,
       [userId]
     );
 

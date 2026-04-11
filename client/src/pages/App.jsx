@@ -53,6 +53,8 @@ import AdminPropertyDetail from './admin/AdminPropertyDetail';
 import AdminApplicationDetail from './admin/AdminApplicationDetail';
 import AdminCompliance from './admin/AdminCompliance';
 import LawyerDashboard from './lawyer/LawyerDashboard';
+import StateLawyerDashboard from './lawyer/StateLawyerDashboard';
+import SuperLawyerDashboard from './lawyer/SuperLawyerDashboard';
 import AgentDashboard from './agent/AgentDashboard';
 import VerifyCase from './VerifyCase';
 import DisputeDetails from "./DisputeDetails";
@@ -63,13 +65,31 @@ import NigeriaPage from './NigeriaPage';
 import AreaPage from './AreaPage';
 import LawyersDirectory from './LawyersDirectory';
 import FinancialAdminDashboard from './admin/FinancialAdminDashboard'; // ADD THIS LINE
-import StateAdminDashboard from './admin/StateAdminDashboard'; // ADD THIS LINE
+import SuperFinancialAdminDashboard from './admin/SuperFinancialAdminDashboard';
+import StateAdminDashboard from './admin/StateAdminDashboard';
+import StateSupportAdminDashboard from './admin/StateSupportAdminDashboard';
+import SuperSupportAdminDashboard from './admin/SuperSupportAdminDashboard';
 import AgentEarningsPage from './agent/AgentEarningsPage';
 
 import AdminAgentManagement from './admin/AdminAgentManagement';
 import AgentWithdrawalPage from './agent/AgentWithdrawalPage';
+import VerificationStatus from './VerificationStatus';
 
 const queryClient = new QueryClient();
+
+const FINANCIAL_ADMIN_ROLES = ['financial_admin'];
+const SUPER_FINANCIAL_ADMIN_ROLES = ['super_financial_admin'];
+const STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin'];
+const STATE_SUPPORT_ADMIN_ROLES = ['state_support_admin'];
+const SUPER_SUPPORT_ADMIN_ROLES = ['super_support_admin'];
+const ADMIN_SHELL_ROLES = [
+  'admin',
+  ...FINANCIAL_ADMIN_ROLES,
+  ...SUPER_FINANCIAL_ADMIN_ROLES,
+  ...STATE_ADMIN_ROLES,
+  ...STATE_SUPPORT_ADMIN_ROLES,
+  ...SUPER_SUPPORT_ADMIN_ROLES,
+];
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -81,19 +101,6 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
-const AdminRoute = ({ children }) => {
-  const { isAuthenticated, loading, user } = useAuth();
-
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'admin') return <Navigate to="/dashboard" />;
-
-  return children;
-};
-
 const FinancialAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -102,7 +109,20 @@ const FinancialAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'financial_admin') return <Navigate to="/admin" />;
+  if (!FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+
+  return children;
+};
+
+const SuperFinancialAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -115,7 +135,33 @@ const StateAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'state_admin') return <Navigate to="/admin" />;
+  if (!STATE_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+
+  return children;
+};
+
+const StateSupportAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+
+  return children;
+};
+
+const SuperSupportAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -133,19 +179,6 @@ const TenantRoute = ({ children }) => {
   return children;
 };
 
-const LawyerRoute = ({ children }) => {
-  const { isAuthenticated, loading, user } = useAuth();
-
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'lawyer') return <Navigate to="/dashboard" />;
-
-  return children;
-};
-
 const LandlordRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -159,7 +192,14 @@ const LandlordRoute = ({ children }) => {
     if (user?.user_type === 'tenant') return <Navigate to="/tenant/dashboard" />;
     if (user?.user_type === 'agent') return <Navigate to="/agent/dashboard" />;
     if (user?.user_type === 'lawyer') return <Navigate to="/lawyer" />;
+    if (user?.user_type === 'state_lawyer') return <Navigate to="/lawyer/state" />;
+    if (user?.user_type === 'super_lawyer') return <Navigate to="/lawyer/super" />;
     if (user?.user_type === 'admin') return <Navigate to="/admin" />;
+    if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/financial-dashboard" />;
+    if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-financial-dashboard" />;
+    if (STATE_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+    if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/state-support-dashboard" />;
+    if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-support-dashboard" />;
     if (user?.user_type === 'super_admin') return <Navigate to="/super-admin" />;
     return <Navigate to="/login" />;
   }
@@ -180,6 +220,58 @@ const AgentRoute = ({ children }) => {
   return children;
 };
 
+const BaseLawyerRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'lawyer') return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
+const StateLawyerRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'state_lawyer') return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
+const SuperLawyerRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'super_lawyer') return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
+const AdminShellRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!ADMIN_SHELL_ROLES.includes(user?.user_type)) return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
 const PropertyManagerRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -193,6 +285,66 @@ const PropertyManagerRoute = ({ children }) => {
   }
 
   return children;
+};
+
+const AdminHomeRoute = () => {
+  const { user } = useAuth();
+
+  if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/super-financial-dashboard" replace />;
+  }
+
+  if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/financial-dashboard" replace />;
+  }
+
+  if (STATE_ADMIN_ROLES.includes(user?.user_type)) {
+    return (
+      <StateAdminRoute>
+        <StateAdminDashboard />
+      </StateAdminRoute>
+    );
+  }
+
+  if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/state-support-dashboard" replace />;
+  }
+
+  if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/super-support-dashboard" replace />;
+  }
+
+  return <AdminDashboard />;
+};
+
+const AdminWithdrawalsRoute = () => {
+  const { user } = useAuth();
+
+  if (STATE_ADMIN_ROLES.includes(user?.user_type)) {
+    return (
+      <StateAdminRoute>
+        <StateAdminDashboard initialTab="withdrawals" />
+      </StateAdminRoute>
+    );
+  }
+
+  if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/financial-dashboard" replace />;
+  }
+
+  if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/super-financial-dashboard" replace />;
+  }
+
+  if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/state-support-dashboard" replace />;
+  }
+
+  if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/super-support-dashboard" replace />;
+  }
+
+  return <Navigate to="/admin" replace />;
 };
 
 function Layout({ children }) {
@@ -265,7 +417,9 @@ function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/super-admin" element={<SuperAdminDashboard />} />
-              <Route path="/lawyer" element={<LawyerRoute><LawyerDashboard /></LawyerRoute>}/>
+              <Route path="/lawyer" element={<BaseLawyerRoute><LawyerDashboard /></BaseLawyerRoute>}/>
+              <Route path="/lawyer/state" element={<StateLawyerRoute><StateLawyerDashboard /></StateLawyerRoute>} />
+              <Route path="/lawyer/super" element={<SuperLawyerRoute><SuperLawyerDashboard /></SuperLawyerRoute>} />
               <Route path="/agent/dashboard" element={<AgentRoute><AgentDashboard /></AgentRoute>} />
               <Route path="/agent/earnings" element={<AgentRoute><AgentEarningsPage /></AgentRoute>} />
                             <Route path="/agent/withdrawals" element={<AgentRoute><AgentWithdrawalPage /></AgentRoute>} />
@@ -298,12 +452,12 @@ function App() {
               <Route
                 path="/admin/*"
                 element={
-                  <AdminRoute>
+                  <AdminShellRoute>
                     <AdminLayout />
-                  </AdminRoute>
+                  </AdminShellRoute>
                 }
               >
-                <Route index element={<AdminDashboard />} />
+                <Route index element={<AdminHomeRoute />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="verifications" element={<AdminVerifications />} />
                 <Route path="lawyer-invites" element={<AdminLawyerInvites />} />
@@ -314,11 +468,16 @@ function App() {
                 <Route path="users/:id" element={<AdminUserDetail />} />
                                 <Route path="properties/:id" element={<AdminPropertyDetail />} />
                 <Route path="applications/:id" element={<AdminApplicationDetail />} />
+                <Route path="super-financial-dashboard" element={<SuperFinancialAdminRoute><SuperFinancialAdminDashboard /></SuperFinancialAdminRoute>} />
                 <Route path="financial-dashboard" element={<FinancialAdminRoute><FinancialAdminDashboard /></FinancialAdminRoute>} />
-                <Route path="state-dashboard" element={<StateAdminRoute><StateAdminDashboard /></StateAdminRoute>} />
+                <Route path="state-dashboard" element={<StateAdminRoute><AdminDashboard /></StateAdminRoute>} />
+                <Route path="withdrawals" element={<AdminWithdrawalsRoute />} />
+                <Route path="state-support-dashboard" element={<StateSupportAdminRoute><StateSupportAdminDashboard /></StateSupportAdminRoute>} />
+                <Route path="super-support-dashboard" element={<SuperSupportAdminRoute><SuperSupportAdminDashboard /></SuperSupportAdminRoute>} />
               </Route>
 
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/verification-status" element={<ProtectedRoute><VerificationStatus /></ProtectedRoute>} />
               <Route path="/applications" element={<ProtectedRoute><Applications /></ProtectedRoute>} />
               <Route path="/saved-properties" element={<ProtectedRoute><SavedProperties /></ProtectedRoute>} />
               <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />

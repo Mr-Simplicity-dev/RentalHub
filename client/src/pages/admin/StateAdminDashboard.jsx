@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LineChart, Line, PieChart, Pie, Cell,
@@ -15,20 +15,25 @@ import {
   FaChartPie,
   FaMapMarkerAlt,
   FaUserPlus,
-  FaDownload
+  FaDownload,
+  FaSyncAlt,
+  FaShieldAlt
 } from 'react-icons/fa';
 import api from '../../services/api';
 import AdminLayout from './AdminLayout';
 
-const StateAdminDashboard = () => {
+const StateAdminDashboard = ({ initialTab = 'overview' }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [managedUsers, setManagedUsers] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [oversightStateFilter, setOversightStateFilter] = useState('all');
+  const [oversightLgaFilter, setOversightLgaFilter] = useState('all');
+  const [oversightCoverageFilter, setOversightCoverageFilter] = useState('all');
   const [bankDetails, setBankDetails] = useState({
     bank_name: '',
     account_number: '',
@@ -38,14 +43,14 @@ const StateAdminDashboard = () => {
   useEffect(() => {
     const initializeDashboard = async () => {
       try {
-        const response = await api.get('/api/users/me');
-        if (response.data.data.user_type !== 'state_admin') {
-          navigate('/admin/dashboard');
+        const response = await api.get('/auth/me');
+        if (!['state_admin', 'state_financial_admin'].includes(response.data.data.user_type)) {
+          navigate('/admin', { replace: true });
           return;
         }
         await fetchDashboardData();
       } catch (error) {
-        navigate('/login');
+        navigate('/login', { replace: true });
       }
     };
 
@@ -57,10 +62,10 @@ const StateAdminDashboard = () => {
       setLoading(true);
       
       const [dashboardRes, transactionsRes, usersRes, withdrawalsRes] = await Promise.all([
-        api.get('/api/state-admin/dashboard'),
-        api.get('/api/state-admin/transactions?limit=10'),
-        api.get('/api/state-admin/managed-users?limit=10'),
-        api.get('/api/state-admin/withdrawals')
+        api.get('/state-admin/dashboard'),
+        api.get('/state-admin/transactions?limit=10'),
+        api.get('/state-admin/managed-users?limit=10'),
+        api.get('/state-admin/withdrawals')
       ]);
 
       setDashboardData(dashboardRes.data.data);
@@ -81,7 +86,7 @@ const StateAdminDashboard = () => {
     }
 
     try {
-      await api.post('/api/state-admin/withdraw', {
+      await api.post('/state-admin/withdraw', {
         amount: parseFloat(withdrawAmount),
         ...bankDetails
       });
@@ -110,6 +115,92 @@ const StateAdminDashboard = () => {
     });
   };
 
+  const adminInfo = dashboardData?.admin_info || {};
+  const summary = dashboardData?.summary || {};
+
+  const localGovernmentOversight = useMemo(() => {
+    const grouped = new Map();
+
+    managedUsers.forEach((user) => {
+      const stateLabel = String(
+        user.assigned_state || user.preferred_state || adminInfo.assigned_state || 'Unknown State'
+      ).trim();
+      const lgaLabel = String(
+        user.preferred_lga_name || user.lga_name || user.assigned_city || user.city || 'Unspecified LGA'
+      ).trim();
+
+      const key = `${stateLabel.toLowerCase()}::${lgaLabel.toLowerCase()}`;
+      const existing = grouped.get(key) || {
+        state: stateLabel,
+        lga: lgaLabel,
+        local_admin_count: 0,
+        active_admin_count: 0,
+        total_users_count: 0,
+        latest_activity_at: null
+      };
+
+      const userRole = String(user.user_type || '').toLowerCase();
+      const isLocalAdmin = userRole === 'admin';
+      const isActive = user.is_active !== false;
+
+      existing.total_users_count += 1;
+      if (isLocalAdmin) {
+        existing.local_admin_count += 1;
+        if (isActive) {
+          existing.active_admin_count += 1;
+        }
+      }
+
+      if (user.created_at) {
+        const currentLatest = existing.latest_activity_at ? new Date(existing.latest_activity_at) : null;
+        const candidate = new Date(user.created_at);
+        if (!currentLatest || candidate > currentLatest) {
+          existing.latest_activity_at = user.created_at;
+        }
+      }
+
+      grouped.set(key, existing);
+    });
+
+    const rows = Array.from(grouped.values()).sort((a, b) => {
+      const byState = a.state.localeCompare(b.state);
+      if (byState !== 0) return byState;
+      return a.lga.localeCompare(b.lga);
+    });
+
+    const availableStates = ['all', ...Array.from(new Set(rows.map((row) => row.state)))];
+    const availableLgas = ['all', ...Array.from(new Set(rows.map((row) => row.lga)))];
+
+    const filteredRows = rows.filter((row) => {
+      const stateOk = oversightStateFilter === 'all' || row.state === oversightStateFilter;
+      const lgaOk = oversightLgaFilter === 'all' || row.lga === oversightLgaFilter;
+      const coverageOk =
+        oversightCoverageFilter === 'all' ||
+        (oversightCoverageFilter === 'with_admin' && row.local_admin_count > 0) ||
+        (oversightCoverageFilter === 'without_admin' && row.local_admin_count === 0);
+      return stateOk && lgaOk && coverageOk;
+    });
+
+    return {
+      rows,
+      filteredRows,
+      availableStates,
+      availableLgas,
+      summary: {
+        totalLgaUnits: rows.length,
+        totalCoveredLgaUnits: rows.filter((row) => row.local_admin_count > 0).length,
+        totalLocalAdmins: rows.reduce((sum, row) => sum + row.local_admin_count, 0),
+        totalActiveLocalAdmins: rows.reduce((sum, row) => sum + row.active_admin_count, 0)
+      }
+    };
+  }, [
+    managedUsers,
+    adminInfo.assigned_state,
+    oversightStateFilter,
+    oversightLgaFilter,
+    oversightCoverageFilter
+  ]);
+
   if (loading) {
     return (
       <AdminLayout>
@@ -119,9 +210,6 @@ const StateAdminDashboard = () => {
       </AdminLayout>
     );
   }
-
-  const adminInfo = dashboardData?.admin_info || {};
-  const summary = dashboardData?.summary || {};
 
   return (
     <AdminLayout>
@@ -137,6 +225,9 @@ const StateAdminDashboard = () => {
                 <span className="mx-2">•</span>
                 <span>Commission Rate: {(adminInfo.admin_commission_rate * 100).toFixed(1)}%</span>
               </div>
+              <p className="mt-2 text-sm text-blue-700">
+                Super Admin can create admin details centrally, while this dashboard monitors local government admin coverage in your state.
+              </p>
             </div>
             <div className="flex items-center space-x-4">
               <div className="bg-blue-50 p-3 rounded-lg">
@@ -310,6 +401,16 @@ const StateAdminDashboard = () => {
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
               ))}
+              <button
+                onClick={() => setActiveTab('oversight')}
+                className={`py-4 px-6 text-sm font-medium border-b-2 ${
+                  activeTab === 'oversight'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Local Govt Oversight
+              </button>
             </nav>
           </div>
 
@@ -740,6 +841,132 @@ const StateAdminDashboard = () => {
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'oversight' && (
+              <div className="space-y-6">
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-900">Local Government Dashboard Oversight</h3>
+                      <p className="mt-1 text-sm text-blue-800">
+                        Use this view to monitor local-government admin coverage and operational activity under your state scope.
+                      </p>
+                    </div>
+                    <button
+                      onClick={fetchDashboardData}
+                      className="inline-flex items-center rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                    >
+                      <FaSyncAlt className="mr-2 h-4 w-4" />
+                      Refresh Oversight
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="rounded-lg border bg-white p-4">
+                    <p className="text-sm text-gray-600">Total LGA Units Seen</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">{localGovernmentOversight.summary.totalLgaUnits}</p>
+                  </div>
+                  <div className="rounded-lg border bg-white p-4">
+                    <p className="text-sm text-gray-600">Covered LGA Units</p>
+                    <p className="mt-2 text-2xl font-bold text-green-700">{localGovernmentOversight.summary.totalCoveredLgaUnits}</p>
+                  </div>
+                  <div className="rounded-lg border bg-white p-4">
+                    <p className="text-sm text-gray-600">Local Govt Admins</p>
+                    <p className="mt-2 text-2xl font-bold text-blue-700">{localGovernmentOversight.summary.totalLocalAdmins}</p>
+                  </div>
+                  <div className="rounded-lg border bg-white p-4">
+                    <p className="text-sm text-gray-600">Active Local Admins</p>
+                    <p className="mt-2 text-2xl font-bold text-purple-700">{localGovernmentOversight.summary.totalActiveLocalAdmins}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <select
+                    value={oversightStateFilter}
+                    onChange={(e) => setOversightStateFilter(e.target.value)}
+                    className="border rounded px-3 py-2 text-sm"
+                  >
+                    {localGovernmentOversight.availableStates.map((state) => (
+                      <option key={state} value={state}>
+                        {state === 'all' ? 'All States (Provision)' : state}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={oversightLgaFilter}
+                    onChange={(e) => setOversightLgaFilter(e.target.value)}
+                    className="border rounded px-3 py-2 text-sm"
+                  >
+                    {localGovernmentOversight.availableLgas.map((lga) => (
+                      <option key={lga} value={lga}>
+                        {lga === 'all' ? 'All Local Governments' : lga}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={oversightCoverageFilter}
+                    onChange={(e) => setOversightCoverageFilter(e.target.value)}
+                    className="border rounded px-3 py-2 text-sm"
+                  >
+                    <option value="all">All Coverage Status</option>
+                    <option value="with_admin">With Local Admin</option>
+                    <option value="without_admin">Without Local Admin</option>
+                  </select>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="min-w-full divide-y divide-gray-200 bg-white">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Local Government</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Local Admins</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active Admins</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Linked Users</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Latest Activity</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {localGovernmentOversight.filteredRows.map((row) => (
+                        <tr key={`${row.state}-${row.lga}`}>
+                          <td className="px-6 py-4 text-sm text-gray-900">{row.state}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{row.lga}</td>
+                          <td className="px-6 py-4 text-sm font-medium text-blue-700">{row.local_admin_count}</td>
+                          <td className="px-6 py-4 text-sm font-medium text-green-700">{row.active_admin_count}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{row.total_users_count}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {row.latest_activity_at ? formatDate(row.latest_activity_at) : 'No activity yet'}
+                          </td>
+                          <td className="px-6 py-4">
+                            {row.local_admin_count > 0 ? (
+                              <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                                <FaShieldAlt className="mr-1 h-3 w-3" />
+                                Covered
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                                Pending Assignment
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {localGovernmentOversight.filteredRows.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
+                            No local-government oversight records match your current filters.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

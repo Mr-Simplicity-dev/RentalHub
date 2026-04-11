@@ -1,11 +1,11 @@
 const express = require('express');
 const AdminAgentController = require('../controllers/adminAgentController');
-const auth = require('../config/middleware/auth');
+const { authenticate } = require('../config/middleware/auth');
 
 const router = express.Router();
 
 // All routes require authentication
-router.use(auth);
+router.use(authenticate);
 
 /**
  * Admin Agent Assignment Management Routes

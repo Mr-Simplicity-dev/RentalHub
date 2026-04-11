@@ -1,11 +1,13 @@
 const db = require('./database');
+const { statesMatch } = require('../utils/stateScope');
 
 exports.canLawyerAccessProperty = async (req, res, next) => {
   try {
     const lawyerId = req.user.id;
     const { propertyId } = req.params;
+    const allowedLawyerRoles = ['lawyer', 'state_lawyer', 'super_lawyer'];
 
-    if (req.user.user_type !== 'lawyer') {
+    if (!allowedLawyerRoles.includes(req.user.user_type)) {
       return res.status(403).json({
         success: false,
         message: 'Only lawyers can access this endpoint'
@@ -13,8 +15,11 @@ exports.canLawyerAccessProperty = async (req, res, next) => {
     }
 
     const result = await db.query(
-      `SELECT 1
+      `SELECT p.state AS property_state,
+              u.assigned_state AS lawyer_assigned_state
        FROM legal_authorizations la
+       JOIN users u ON u.id = la.lawyer_user_id
+       JOIN properties p ON p.id = $1
        WHERE la.lawyer_user_id = $2
          AND la.status = 'active'
          AND (
@@ -37,6 +42,14 @@ exports.canLawyerAccessProperty = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: 'No legal authorization found'
+      });
+    }
+
+    const row = result.rows[0];
+    if (!row.lawyer_assigned_state || !statesMatch(row.lawyer_assigned_state, row.property_state)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Lawyer state lock violation: property is outside your assigned state',
       });
     }
 

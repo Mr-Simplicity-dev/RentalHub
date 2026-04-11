@@ -1,4 +1,7 @@
 const AgentWithdrawalService = require('../services/agentWithdrawalService');
+const { isValidPaystackSignature } = require('../services/paystackTransfer.service');
+
+const ADMIN_WITHDRAWAL_ROLES = ['admin', 'super_admin', 'financial_admin', 'super_financial_admin'];
 
 class AgentWithdrawalController {
   /**
@@ -6,7 +9,26 @@ class AgentWithdrawalController {
    */
   static async createWithdrawalRequest(req, res) {
     try {
-      const { landlordId, amount, withdrawalMethod, bankAccountId, requestReason } = req.body;
+      const {
+        landlordId,
+        amount,
+        withdrawalMethod,
+        bankAccountId,
+        bankName,
+        bankCode,
+        accountNumber,
+        accountName,
+        requestReason,
+      } = req.body;
+      const userType = req.user?.user_type;
+      const isAdminLike = ADMIN_WITHDRAWAL_ROLES.includes(userType);
+
+      if (userType !== 'agent' && !isAdminLike) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to create withdrawal requests',
+        });
+      }
 
       if (!landlordId || !amount) {
         return res.status(400).json({
@@ -23,7 +45,7 @@ class AgentWithdrawalController {
       }
 
       // Agents can only request their own withdrawals
-      const agentId = req.user.user_type === 'agent' ? req.user.id : req.params.agentId;
+      const agentId = userType === 'agent' ? req.user.id : req.params.agentId;
       if (!agentId) {
         return res.status(400).json({
           success: false,
@@ -38,6 +60,10 @@ class AgentWithdrawalController {
         {
           withdrawalMethod: withdrawalMethod || 'bank_transfer',
           bankAccountId: bankAccountId ? parseInt(bankAccountId) : null,
+          bankName: bankName || null,
+          bankCode: bankCode || null,
+          accountNumber: accountNumber || null,
+          accountName: accountName || null,
           requestReason,
         }
       );
@@ -62,13 +88,22 @@ class AgentWithdrawalController {
   static async getWithdrawalRequests(req, res) {
     try {
       const { status, limit = 50, offset = 0 } = req.query;
+      const userType = req.user?.user_type;
+      const isAdminLike = ADMIN_WITHDRAWAL_ROLES.includes(userType);
 
       let agentId = req.params.agentId;
       let landlordId = req.query.landlordId;
 
       // Agents can only view their own requests
-      if (req.user.user_type === 'agent') {
+      if (userType === 'agent') {
         agentId = req.user.id;
+      } else if (userType === 'landlord') {
+        landlordId = req.user.id;
+      } else if (!isAdminLike) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to view withdrawal requests',
+        });
       }
 
       const requests = await AgentWithdrawalService.getWithdrawalRequests({
@@ -97,8 +132,21 @@ class AgentWithdrawalController {
    */
   static async getWithdrawalSummary(req, res) {
     try {
-      const { agentId } = req.params;
-      const { landlordId } = req.query;
+      const userType = req.user?.user_type;
+      const isAdminLike = ADMIN_WITHDRAWAL_ROLES.includes(userType);
+      let { agentId } = req.params;
+      let { landlordId } = req.query;
+
+      if (userType === 'agent') {
+        agentId = req.user.id;
+      } else if (userType === 'landlord') {
+        landlordId = req.user.id;
+      } else if (!isAdminLike) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to view withdrawal summary',
+        });
+      }
 
       if (!agentId || !landlordId) {
         return res.status(400).json({
@@ -130,7 +178,7 @@ class AgentWithdrawalController {
    */
   static async approveWithdrawal(req, res) {
     try {
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin' && req.user.user_type !== 'financial_admin') {
+      if (!ADMIN_WITHDRAWAL_ROLES.includes(req.user.user_type)) {
         return res.status(403).json({
           success: false,
           message: 'Unauthorized to approve withdrawals',
@@ -165,7 +213,7 @@ class AgentWithdrawalController {
    */
   static async rejectWithdrawal(req, res) {
     try {
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin' && req.user.user_type !== 'financial_admin') {
+      if (!ADMIN_WITHDRAWAL_ROLES.includes(req.user.user_type)) {
         return res.status(403).json({
           success: false,
           message: 'Unauthorized to reject withdrawals',
@@ -207,7 +255,7 @@ class AgentWithdrawalController {
    */
   static async markAsProcessing(req, res) {
     try {
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin' && req.user.user_type !== 'financial_admin') {
+      if (!ADMIN_WITHDRAWAL_ROLES.includes(req.user.user_type)) {
         return res.status(403).json({
           success: false,
           message: 'Unauthorized to process withdrawals',
@@ -237,7 +285,7 @@ class AgentWithdrawalController {
    */
   static async markAsCompleted(req, res) {
     try {
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin' && req.user.user_type !== 'financial_admin') {
+      if (!ADMIN_WITHDRAWAL_ROLES.includes(req.user.user_type)) {
         return res.status(403).json({
           success: false,
           message: 'Unauthorized to complete withdrawals',
@@ -263,6 +311,57 @@ class AgentWithdrawalController {
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to mark withdrawal as completed',
+      });
+    }
+  }
+
+  static async paystackTransferWebhook(req, res) {
+    try {
+      const signature = req.headers['x-paystack-signature'];
+      const rawBody = req.rawBody || JSON.stringify(req.body || {});
+
+      if (!isValidPaystackSignature(rawBody, signature)) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid Paystack signature',
+        });
+      }
+
+      const event = req.body?.event;
+      const data = req.body?.data || {};
+
+      if (!event || !event.startsWith('transfer.')) {
+        return res.json({ success: true, message: 'Ignored non-transfer event' });
+      }
+
+      const reference = data.reference;
+      if (!reference) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing transfer reference',
+        });
+      }
+
+      let transferStatus = 'pending';
+      if (event === 'transfer.success') {
+        transferStatus = 'success';
+      } else if (event === 'transfer.failed') {
+        transferStatus = 'failed';
+      } else if (event === 'transfer.reversed') {
+        transferStatus = 'reversed';
+      }
+
+      await AgentWithdrawalService.reconcilePaystackTransfer(reference, transferStatus, data);
+
+      return res.json({
+        success: true,
+        message: 'Webhook processed',
+      });
+    } catch (error) {
+      console.error(`Paystack transfer webhook error: ${error.message}`);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process webhook',
       });
     }
   }

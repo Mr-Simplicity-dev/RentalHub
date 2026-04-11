@@ -10,6 +10,7 @@ const {
   getLawyerDirectoryUnlockStatus: readLawyerDirectoryUnlockStatus,
 } = require('../config/utils/lawyerDirectoryAccess');
 const commissionService = require('../services/commissionService');
+const AgentWithdrawalService = require('../services/agentWithdrawalService');
 
 // ====================== PAYSTACK CONFIG ======================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -1686,9 +1687,10 @@ exports.getPaymentDetails = async (req, res) => {
 
 exports.paystackWebhook = async (req, res) => {
   try {
+    const rawBody = req.rawBody || JSON.stringify(req.body);
     const hash = crypto
       .createHmac("sha512", PAYSTACK_SECRET_KEY)
-      .update(JSON.stringify(req.body))
+      .update(rawBody)
       .digest("hex");
 
     if (hash !== req.headers["x-paystack-signature"]) {
@@ -1707,7 +1709,9 @@ exports.paystackWebhook = async (req, res) => {
         break;
 
       case "transfer.success":
-        console.log("Transfer successful:", event.data);
+      case "transfer.failed":
+      case "transfer.reversed":
+        await handleTransferWebhook(event.event, event.data);
         break;
 
       default:
@@ -1829,6 +1833,123 @@ async function handleSuccessfulPayment(data) {
     console.log("Webhook payment processed:", reference);
   } catch (error) {
     console.error("Webhook success handler error:", error);
+  }
+}
+
+async function handleTransferWebhook(eventName, data) {
+  try {
+    const reference = data?.reference;
+    if (!reference) return;
+
+    if (reference.startsWith('AGW_')) {
+      let status = 'pending';
+      if (eventName === 'transfer.success') status = 'success';
+      else if (eventName === 'transfer.failed') status = 'failed';
+      else if (eventName === 'transfer.reversed') status = 'reversed';
+
+      await AgentWithdrawalService.reconcilePaystackTransfer(reference, status, data);
+      return;
+    }
+
+    if (reference.startsWith('WLW_')) {
+      const result = await db.query(
+        `SELECT * FROM withdrawal_requests WHERE paystack_transfer_reference = $1 LIMIT 1`,
+        [reference]
+      );
+
+      if (!result.rows.length) return;
+      const withdrawal = result.rows[0];
+
+      if (eventName === 'transfer.success') {
+        await db.query(
+          `UPDATE withdrawal_requests
+           SET status = 'processed',
+               processed_at = CURRENT_TIMESTAMP,
+               paystack_transfer_status = 'success',
+               paystack_last_response = $1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [JSON.stringify(data), withdrawal.id]
+        );
+      } else if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
+        if (withdrawal.status !== 'pending' && withdrawal.status !== 'rejected') {
+          await db.query(
+            `UPDATE wallets
+             SET balance = balance + $1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE user_id = $2`,
+            [withdrawal.amount, withdrawal.user_id]
+          );
+        }
+
+        await db.query(
+          `UPDATE withdrawal_requests
+           SET status = 'pending',
+               paystack_transfer_status = $1,
+               paystack_last_response = $2,
+               payout_failed_reason = $3,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4`,
+          [
+            eventName === 'transfer.failed' ? 'failed' : 'reversed',
+            JSON.stringify(data),
+            data?.failure_reason || data?.reason || 'Transfer failed',
+            withdrawal.id,
+          ]
+        );
+      }
+      return;
+    }
+
+    if (reference.startsWith('SAW_')) {
+      const result = await db.query(
+        `SELECT * FROM admin_withdrawals WHERE paystack_transfer_reference = $1 LIMIT 1`,
+        [reference]
+      );
+
+      if (!result.rows.length) return;
+      const withdrawal = result.rows[0];
+
+      if (eventName === 'transfer.success') {
+        await db.query(
+          `UPDATE admin_withdrawals
+           SET status = 'processed',
+               processed_at = CURRENT_TIMESTAMP,
+               paystack_transfer_status = 'success',
+               paystack_last_response = $1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [JSON.stringify(data), withdrawal.id]
+        );
+      } else if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
+        if (withdrawal.status !== 'pending' && withdrawal.status !== 'rejected') {
+          await db.query(
+            `UPDATE users
+             SET admin_wallet_balance = admin_wallet_balance + $1
+             WHERE id = $2`,
+            [withdrawal.amount, withdrawal.admin_id]
+          );
+        }
+
+        await db.query(
+          `UPDATE admin_withdrawals
+           SET status = 'pending',
+               paystack_transfer_status = $1,
+               paystack_last_response = $2,
+               payout_failed_reason = $3,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4`,
+          [
+            eventName === 'transfer.failed' ? 'failed' : 'reversed',
+            JSON.stringify(data),
+            data?.failure_reason || data?.reason || 'Transfer failed',
+            withdrawal.id,
+          ]
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Transfer webhook handler error:', error);
   }
 }
 

@@ -26,6 +26,7 @@ const {
 } = require('../config/utils/legalSchema');
 
 let verificationAuditSchemaReady = false;
+let userSuspensionSchemaReady = false;
 const USER_VERIFICATION_STATUS_EXPR = `
   COALESCE(
     u.identity_verification_status,
@@ -58,6 +59,23 @@ const ensureVerificationAuditSchema = async () => {
 
   verificationAuditSchemaReady = true;
 };
+
+const ensureUserSuspensionSchema = async () => {
+  if (userSuspensionSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS account_suspended_reason TEXT,
+    ADD COLUMN IF NOT EXISTS account_suspended_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS account_suspended_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  `);
+
+  userSuspensionSchemaReady = true;
+};
+
+const buildDeletedEmail = (userId) => `deleted+u${userId}.${Date.now()}@deleted.local`;
+
+const buildDeletedUniqueValue = (prefix, userId) => `${prefix}${userId}${Date.now().toString().slice(-8)}`;
 
 // ---- Audit Helper ----
 const logAction = async (actorId, action, targetType = null, targetId = null) => {
@@ -111,11 +129,19 @@ const banUser = async (req, res) => {
   const { id } = req.params;
 
   try {
+    await ensureUserSuspensionSchema();
+
+    const reason = String(req.body?.reason || '').trim();
+
     await db.query(
       `UPDATE users
-       SET is_active = FALSE, updated_at = NOW()
+       SET is_active = FALSE,
+           account_suspended_reason = $2,
+           account_suspended_at = NOW(),
+           account_suspended_by = $3,
+           updated_at = NOW()
        WHERE id = $1 AND user_type <> 'super_admin'`,
-      [id]
+      [id, reason || null, req.user.id]
     );
     await logAction(req.user.id, 'BAN_USER', 'user', id);
 
@@ -132,10 +158,15 @@ const unbanUser = async (req, res) => {
 
   try {
     await ensureVerificationAuditSchema();
+    await ensureUserSuspensionSchema();
 
     const result = await db.query(
       `UPDATE users
-       SET is_active = TRUE, updated_at = NOW()
+       SET is_active = TRUE,
+           account_suspended_reason = NULL,
+           account_suspended_at = NULL,
+           account_suspended_by = NULL,
+           updated_at = NOW()
        WHERE id = $1
          AND user_type <> 'super_admin'
          AND deleted_at IS NULL
@@ -162,17 +193,70 @@ const deleteUser = async (req, res) => {
 
   try {
     await ensureVerificationAuditSchema();
+    await ensureUserSuspensionSchema();
+
+    const existingResult = await db.query(
+      `SELECT id, user_type, email, phone, nin
+       FROM users
+       WHERE id = $1
+         AND user_type <> 'super_admin'
+         AND deleted_at IS NULL
+       LIMIT 1`,
+      [id]
+    );
+
+    if (!existingResult.rows.length) {
+      return res.status(404).json({ message: 'User not found or cannot be deleted' });
+    }
+
+    const existingUser = existingResult.rows[0];
+
+    try {
+      const hardDeleteResult = await db.query(
+        `DELETE FROM users
+         WHERE id = $1
+           AND user_type <> 'super_admin'
+         RETURNING id`,
+        [id]
+      );
+
+      if (!hardDeleteResult.rows.length) {
+        return res.status(404).json({ message: 'User not found or cannot be deleted' });
+      }
+
+      await logAction(req.user.id, 'DELETE_USER', 'user', id);
+
+      return res.json({
+        success: true,
+        message: 'User deleted permanently',
+      });
+    } catch (deleteError) {
+      if (deleteError.code !== '23503') {
+        throw deleteError;
+      }
+    }
 
     const result = await db.query(
       `UPDATE users
        SET deleted_at = NOW(),
            is_active = FALSE,
+           email = $2,
+           phone = $3,
+           nin = $4,
+           account_suspended_reason = NULL,
+           account_suspended_at = NULL,
+           account_suspended_by = NULL,
            updated_at = NOW()
        WHERE id = $1
          AND user_type <> 'super_admin'
          AND deleted_at IS NULL
        RETURNING id`,
-      [id]
+      [
+        id,
+        existingUser.email ? buildDeletedEmail(existingUser.id) : null,
+        existingUser.phone ? buildDeletedUniqueValue('DELP', existingUser.id) : null,
+        existingUser.nin ? buildDeletedUniqueValue('DELN', existingUser.id) : null,
+      ]
     );
 
     if (!result.rows.length) {
@@ -443,7 +527,11 @@ const getAdminPerformance = async (req, res) => {
          a.id,
          a.full_name,
          a.email,
+         a.user_type,
+         a.assigned_state,
+         a.assigned_city,
          a.is_active,
+         a.account_suspended_reason,
          a.created_at,
          COUNT(v.id)::INT AS credentials_verified_count,
          MAX(v.identity_verified_at) AS last_verification_at
@@ -451,9 +539,15 @@ const getAdminPerformance = async (req, res) => {
        LEFT JOIN users v
          ON v.identity_verified_by = a.id
          AND v.identity_verified = TRUE
-       WHERE a.user_type = 'admin'
+       WHERE (
+         a.user_type IN ('super_admin', 'admin', 'state_admin', 'financial_admin', 'lawyer',
+                         'state_financial_admin', 'state_support_admin', 'super_financial_admin', 'super_support_admin',
+                         'state_lawyer', 'super_lawyer')
+         OR a.user_type LIKE 'state_%'
+         OR a.user_type LIKE 'super_%'
+       )
          AND a.deleted_at IS NULL
-       GROUP BY a.id, a.full_name, a.email, a.is_active, a.created_at
+       GROUP BY a.id, a.full_name, a.email, a.user_type, a.assigned_state, a.assigned_city, a.is_active, a.account_suspended_reason, a.created_at
        ORDER BY credentials_verified_count DESC, a.created_at DESC`
     );
 
@@ -461,6 +555,167 @@ const getAdminPerformance = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to load admin performance' });
+  }
+};
+
+// GET /api/super/admins/:adminId/state-users
+const getAdminStateUsers = async (req, res) => {
+  const { adminId } = req.params;
+
+  try {
+    const adminResult = await db.query(
+      `SELECT id, full_name, email, user_type, assigned_state
+       FROM users
+       WHERE id = $1
+         AND deleted_at IS NULL
+         AND user_type LIKE 'state_%'
+       LIMIT 1`,
+      [adminId]
+    );
+
+    if (!adminResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'State admin not found' });
+    }
+
+    const admin = adminResult.rows[0];
+    const assignedState = String(admin.assigned_state || '').trim();
+
+    if (!assignedState) {
+      return res.status(400).json({ success: false, message: 'Selected state admin has no assigned state' });
+    }
+
+    const usersResult = await db.query(
+      `SELECT DISTINCT
+         u.id,
+         u.full_name,
+         u.email,
+         u.phone,
+         u.user_type,
+         u.created_at
+       FROM users u
+       WHERE u.deleted_at IS NULL
+         AND u.user_type IN ('tenant', 'landlord')
+         AND (
+           (
+             u.user_type = 'landlord'
+             AND EXISTS (
+               SELECT 1
+               FROM properties p
+               WHERE (p.user_id = u.id OR p.landlord_id = u.id)
+                 AND LOWER(TRIM(p.state)) = LOWER(TRIM($1))
+             )
+           )
+           OR
+           (
+             u.user_type = 'tenant'
+             AND EXISTS (
+               SELECT 1
+               FROM applications a
+               JOIN properties p ON p.id = a.property_id
+               WHERE a.tenant_id = u.id
+                 AND LOWER(TRIM(p.state)) = LOWER(TRIM($1))
+             )
+           )
+         )
+       ORDER BY u.user_type ASC, u.full_name ASC`,
+      [assignedState]
+    );
+
+    const users = usersResult.rows;
+    const summary = {
+      total: users.length,
+      tenants: users.filter((u) => u.user_type === 'tenant').length,
+      landlords: users.filter((u) => u.user_type === 'landlord').length,
+    };
+
+    res.json({
+      success: true,
+      data: {
+        admin,
+        assigned_state: assignedState,
+        summary,
+        users,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to load state users' });
+  }
+};
+
+const updateAdminJurisdiction = async (req, res) => {
+  try {
+    const adminId = req.params.id;
+    const normalizedState = String(req.body?.assigned_state || '').trim();
+    const normalizedCity = String(req.body?.assigned_city || '').trim();
+
+    const targetResult = await db.query(
+      `SELECT id, user_type
+       FROM users
+       WHERE id = $1
+         AND deleted_at IS NULL
+       LIMIT 1`,
+      [adminId]
+    );
+
+    if (!targetResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    const targetRole = String(targetResult.rows[0].user_type || '');
+
+    if (targetRole === 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Super admin jurisdiction cannot be edited' });
+    }
+
+    const stateBoundRoles = new Set([
+      'admin',
+      'state_admin',
+      'state_financial_admin',
+      'state_support_admin',
+      'state_lawyer',
+      'lawyer',
+    ]);
+
+    if (stateBoundRoles.has(targetRole) && !normalizedState) {
+      return res.status(400).json({
+        success: false,
+        message: 'Assigned state is required for this admin role',
+      });
+    }
+
+    if (targetRole === 'admin' && !normalizedCity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Assigned local government is required for admin role',
+      });
+    }
+
+    const updateResult = await db.query(
+      `UPDATE users
+       SET assigned_state = $2,
+           assigned_city = $3,
+           updated_at = NOW()
+       WHERE id = $1
+         AND deleted_at IS NULL
+       RETURNING id, full_name, email, user_type, assigned_state, assigned_city`,
+      [
+        adminId,
+        normalizedState || null,
+        targetRole === 'admin' ? normalizedCity : null,
+      ]
+    );
+
+    await logAction(req.user.id, 'UPDATE_ADMIN_JURISDICTION', 'user', adminId);
+
+    res.json({
+      success: true,
+      message: 'Admin jurisdiction updated successfully',
+      data: updateResult.rows[0],
+    });
+  } catch (err) {
+    console.error('Update admin jurisdiction error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update admin jurisdiction' });
   }
 };
 
@@ -1872,6 +2127,8 @@ module.exports = {
   deleteRejectedVerification,
   verifyUser,
   getAdminPerformance,
+  getAdminStateUsers,
+  updateAdminJurisdiction,
   getAllProperties,
   unlistProperty,
   featureProperty,

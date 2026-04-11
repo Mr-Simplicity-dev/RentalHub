@@ -1,24 +1,45 @@
 const express = require('express');
 const AgentWithdrawalController = require('../controllers/agentWithdrawalController');
-const auth = require('../config/middleware/auth');
+const { authenticate } = require('../config/middleware/auth');
+const validateRequest = require('../config/middleware/validateRequest');
+const {
+	withdrawalCreateValidators,
+	withdrawalQueryValidators,
+	withdrawalSummaryValidators,
+} = require('../config/validators/securityValidators');
 
 const router = express.Router();
 
 // All routes require authentication
-router.use(auth);
+router.use(authenticate);
 
 /**
  * Agent Withdrawal Request Routes
  */
 
 // Create withdrawal request
-router.post('/agents/:agentId/withdrawal-requests', AgentWithdrawalController.createWithdrawalRequest);
+router.post(
+	'/agents/:agentId/withdrawal-requests',
+	withdrawalCreateValidators,
+	validateRequest,
+	AgentWithdrawalController.createWithdrawalRequest
+);
 
 // Get withdrawal requests
-router.get('/agents/:agentId/withdrawal-requests', AgentWithdrawalController.getWithdrawalRequests);
+router.get(
+	'/agents/:agentId/withdrawal-requests',
+	withdrawalQueryValidators,
+	validateRequest,
+	AgentWithdrawalController.getWithdrawalRequests
+);
 
 // Get withdrawal summary
-router.get('/agents/:agentId/withdrawal-summary', AgentWithdrawalController.getWithdrawalSummary);
+router.get(
+	'/agents/:agentId/withdrawal-summary',
+	withdrawalSummaryValidators,
+	validateRequest,
+	AgentWithdrawalController.getWithdrawalSummary
+);
 
 // Approve withdrawal (admin only)
 router.post('/withdrawals/:withdrawalId/approve', AgentWithdrawalController.approveWithdrawal);
