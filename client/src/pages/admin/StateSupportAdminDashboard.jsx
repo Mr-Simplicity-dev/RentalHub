@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FaArrowDown, FaArrowUp, FaCheckCircle, FaSyncAlt, FaTimesCircle } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import InputDialog from '../../components/common/InputDialog';
+import useRetryableAction from '../../hooks/useRetryableAction';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 
@@ -16,6 +18,33 @@ const StateSupportAdminDashboard = () => {
   const [stage, setStage] = useState('all');
   const [queue, setQueue] = useState([]);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [reviewDialogValues, setReviewDialogValues] = useState({ review_note: '' });
+  const [pendingReview, setPendingReview] = useState(null);
+
+  const reviewAction = useRetryableAction(
+    async ({ requestId, direction, decision, review_note }) => {
+      await api.patch(`/state-migrations/${requestId}/support-review`, {
+        direction,
+        decision,
+        review_note: review_note || undefined,
+      });
+    },
+    {
+      maxRetries: 2,
+      context: 'state_admin',
+      onSuccess: async (_result, args) => {
+        toast.success(`Request ${args?.[0]?.decision} (${args?.[0]?.direction})`);
+        setShowReviewDialog(false);
+        setPendingReview(null);
+        setReviewDialogValues({ review_note: '' });
+        await loadQueue();
+      },
+      onError: (error) => {
+        toast.error(error?.message || 'Failed to review request');
+      },
+    }
+  );
 
   const loadQueue = async () => {
     setLoading(true);
@@ -50,23 +79,23 @@ const StateSupportAdminDashboard = () => {
     };
   }, [queue]);
 
-  const reviewRequest = async (requestId, direction, decision) => {
-    const note = window.prompt(
-      `${decision === 'approved' ? 'Approve' : 'Reject'} ${direction} migration review note (optional):`,
-      ''
-    );
+  const reviewRequest = (requestId, direction, decision) => {
+    setPendingReview({ requestId, direction, decision });
+    setReviewDialogValues({ review_note: '' });
+    setShowReviewDialog(true);
+  };
 
+  const submitReview = async (values) => {
+    if (!pendingReview) return;
+    setActionLoadingId(pendingReview.requestId);
+    setReviewDialogValues(values);
     try {
-      setActionLoadingId(requestId);
-      await api.patch(`/state-migrations/${requestId}/support-review`, {
-        direction,
-        decision,
-        review_note: note || undefined,
+      await reviewAction.execute({
+        requestId: pendingReview.requestId,
+        direction: pendingReview.direction,
+        decision: pendingReview.decision,
+        review_note: String(values?.review_note || '').trim(),
       });
-      toast.success(`Request ${decision} (${direction})`);
-      await loadQueue();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to review request');
     } finally {
       setActionLoadingId(null);
     }
@@ -205,6 +234,31 @@ const StateSupportAdminDashboard = () => {
           </div>
         )}
       </section>
+
+      <InputDialog
+        isOpen={showReviewDialog}
+        onConfirm={submitReview}
+        onCancel={() => {
+          setShowReviewDialog(false);
+          setPendingReview(null);
+        }}
+        title={pendingReview?.decision === 'approved' ? 'Approve Migration Review' : 'Reject Migration Review'}
+        message={`Add an optional note for ${pendingReview?.direction || 'this'} review action.`}
+        type={pendingReview?.decision === 'approved' ? 'info' : 'warning'}
+        confirmText={pendingReview?.decision === 'approved' ? 'Approve' : 'Reject'}
+        cancelText="Cancel"
+        isLoading={reviewAction.isLoading}
+        initialValues={reviewDialogValues}
+        inputs={[
+          {
+            name: 'review_note',
+            label: 'Review Note (Optional)',
+            type: 'textarea',
+            placeholder: 'Enter optional context for this review decision',
+            rows: 3,
+          },
+        ]}
+      />
     </div>
   );
 };

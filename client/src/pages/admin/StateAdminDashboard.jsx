@@ -19,7 +19,10 @@ import {
   FaSyncAlt,
   FaShieldAlt
 } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 import api from '../../services/api';
+import Button from '../../components/common/Button';
+import useRetryableAction from '../../hooks/useRetryableAction';
 import AdminLayout from './AdminLayout';
 
 const StateAdminDashboard = ({ initialTab = 'overview' }) => {
@@ -39,6 +42,25 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
     account_number: '',
     account_name: ''
   });
+
+  const withdrawalAction = useRetryableAction(
+    async (payload) => {
+      await api.post('/state-admin/withdraw', payload);
+    },
+    {
+      maxRetries: 2,
+      context: 'state_admin',
+      onSuccess: async () => {
+        toast.success('Withdrawal request submitted successfully');
+        setWithdrawAmount('');
+        setBankDetails({ bank_name: '', account_number: '', account_name: '' });
+        await fetchDashboardData();
+      },
+      onError: (error) => {
+        toast.error(error?.message || 'Failed to submit withdrawal request');
+      },
+    }
+  );
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -81,22 +103,20 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
 
   const handleWithdrawal = async () => {
     if (!withdrawAmount || !bankDetails.bank_name || !bankDetails.account_number || !bankDetails.account_name) {
-      alert('Please fill all withdrawal details');
+      toast.error('Please fill all withdrawal details');
       return;
     }
 
-    try {
-      await api.post('/state-admin/withdraw', {
-        amount: parseFloat(withdrawAmount),
-        ...bankDetails
-      });
-      alert('Withdrawal request submitted successfully');
-      setWithdrawAmount('');
-      setBankDetails({ bank_name: '', account_number: '', account_name: '' });
-      fetchDashboardData();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to submit withdrawal request');
+    const amount = Number(withdrawAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Please enter a valid withdrawal amount');
+      return;
     }
+
+    await withdrawalAction.execute({
+      amount,
+      ...bankDetails,
+    });
   };
 
   const formatCurrency = (amount) => {
@@ -371,12 +391,15 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               />
             </div>
             <div className="flex items-end">
-              <button
+              <Button
                 onClick={handleWithdrawal}
-                className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                className="w-full"
+                loading={withdrawalAction.isLoading}
+                error={withdrawalAction.error}
+                errorContext="state_admin"
               >
                 Request Withdrawal
-              </button>
+              </Button>
             </div>
           </div>
           <p className="text-sm text-gray-500 mt-2">
