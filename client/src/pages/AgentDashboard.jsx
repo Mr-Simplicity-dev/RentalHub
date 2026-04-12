@@ -6,6 +6,7 @@ import { DamageReportButton } from '../components/damage';
 import Loader from '../components/common/Loader';
 import { toast } from 'react-toastify';
 import { formatCurrency } from '../utils/helpers';
+import api from '../services/api';
 
 const AgentDashboard = () => {
   const { user } = useAuth();
@@ -31,13 +32,14 @@ const AgentDashboard = () => {
   const loadAgentData = async () => {
     setLoading(true);
     try {
-      // In a real implementation, these would be separate API calls
-      // For now, we'll simulate the data structure
-      
-      // Load assigned landlords
+      // Load agent profile to get agent ID
+      const profileRes = await api.get('/auth/me');
+      if (!profileRes.data?.success) throw new Error('Could not load profile');
+      const agentId = profileRes.data.data.id;
+
+      // Load assigned landlords via managed properties
       const landlordsRes = await propertyService.getMyProperties();
       if (landlordsRes.success) {
-        // Extract unique landlords from properties with last_agent_assignment info
         const uniqueLandlords = {};
         landlordsRes.data.forEach((prop) => {
           if (prop.landlord_id && !uniqueLandlords[prop.landlord_id]) {
@@ -53,40 +55,26 @@ const AgentDashboard = () => {
           if (prop.landlord_id) uniqueLandlords[prop.landlord_id].properties_managed++;
         });
         setLandlords(Object.values(uniqueLandlords));
-
-        // Load managed properties
         setProperties(landlordsRes.data);
       }
 
-      // Load commission history (simulated - in real implementation needs backend API)
-      setCommissionHistory([
-        {
-          id: 1,
-          type: 'property_listing',
-          amount: 5000,
-          landlord_name: 'John Doe',
-          description: 'Commission: Property listing #123',
-          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'completed',
-        },
-        {
-          id: 2,
-          type: 'damage_report',
-          amount: 2000,
-          landlord_name: 'Jane Smith',
-          description: 'Commission: Property Maintenance Assessment submission',
-          date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'completed',
-        },
-      ]);
+      // Load real commission history
+      const historyRes = await api.get(`/commissions/agents/${agentId}/history?limit=20`);
+      if (historyRes.data?.success) {
+        setCommissionHistory(historyRes.data.data || []);
+      }
 
-      // Load earnings summary (simulated)
-      setEarnings({
-        total_earned: 125000,
-        pending_balance: 45000,
-        withdrawn_total: 80000,
-        available_for_withdrawal: 45000,
-      });
+      // Load real earnings summary
+      const earningsRes = await api.get(`/commissions/agents/${agentId}/earnings`);
+      if (earningsRes.data?.success) {
+        const e = earningsRes.data.data[0] || {};
+        setEarnings({
+          total_earned: e.total_earned || 0,
+          pending_balance: e.pending_amount || 0,
+          withdrawn_total: e.total_paid || 0,
+          available_for_withdrawal: e.available_for_withdrawal || 0,
+        });
+      }
     } catch (error) {
       console.error('Failed to load agent data:', error);
       toast.error('Failed to load dashboard data');
@@ -108,12 +96,29 @@ const AgentDashboard = () => {
 
     setProcessingWithdrawal(true);
     try {
-      // In a real implementation, call API to create withdrawal request
+      const profileRes = await api.get('/auth/me');
+      if (!profileRes.data?.success) throw new Error('Could not load profile');
+      const agentId = profileRes.data.data.id;
+
+      const assignment = profileRes.data.data.agent_assignment;
+      if (!assignment?.landlord_id) {
+        toast.error('No landlord assignment found. Cannot submit withdrawal.');
+        return;
+      }
+
+      await api.post(`/withdrawals/agents/${agentId}/withdrawal-requests`, {
+        landlordId: assignment.landlord_id,
+        amount: parseFloat(withdrawalAmount),
+        withdrawalMethod: 'bank_transfer',
+        requestReason: withdrawalReason || undefined,
+      });
+
       toast.success(`Withdrawal request of ${formatCurrency(withdrawalAmount)} submitted`);
       setWithdrawalAmount('');
       setWithdrawalReason('');
+      loadAgentData();
     } catch (error) {
-      toast.error('Failed to process withdrawal request');
+      toast.error(error.response?.data?.message || 'Failed to process withdrawal request');
     } finally {
       setProcessingWithdrawal(false);
     }
@@ -184,13 +189,13 @@ const AgentDashboard = () => {
                   {commissionHistory.map((item) => (
                     <div key={item.id} className="flex justify-between items-center border-b pb-3">
                       <div>
-                        <p className="font-medium">{item.description}</p>
-                        <p className="text-sm text-gray-500">{item.landlord_name}</p>
+                        <p className="font-medium">{item.description || item.transaction_type}</p>
+                        <p className="text-sm text-gray-500 capitalize">{item.transaction_type}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-emerald-600">{formatCurrency(item.amount)}</p>
                         <p className="text-xs text-gray-500">
-                          {new Date(item.date).toLocaleDateString()}
+                          {new Date(item.created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -220,11 +225,11 @@ const AgentDashboard = () => {
                 <p className="text-sm text-blue-700">Manage existing properties</p>
               </Link>
               <Link
-                to="/disputes"
+                to="/messages"
                 className="card bg-gradient-to-br from-green-50 to-emerald-50 hover:shadow-lg transition"
               >
                 <div className="text-3xl mb-2">⚖️</div>
-                <h3 className="font-semibold text-green-900">Disputes</h3>
+                <h3 className="font-semibold text-green-900">Disputes & Messages</h3>
                 <p className="text-sm text-green-700">View disputes & evidence</p>
               </Link>
             </div>
@@ -250,10 +255,10 @@ const AgentDashboard = () => {
                         {landlord.properties_managed} propert{landlord.properties_managed === 1 ? 'y' : 'ies'}
                       </span>
                       <Link
-                        to={`/landlord/${landlord.id}`}
+                        to="/my-properties"
                         className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                       >
-                        View →
+                        View properties →
                       </Link>
                     </div>
                   </div>
@@ -429,13 +434,13 @@ const AgentDashboard = () => {
                       className="flex justify-between items-center border-b pb-3 last:border-b-0"
                     >
                       <div>
-                        <p className="font-medium">{item.description}</p>
-                        <p className="text-sm text-gray-500">{item.landlord_name}</p>
+                        <p className="font-medium">{item.description || item.transaction_type}</p>
+                        <p className="text-sm text-gray-500 capitalize">{item.transaction_type}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-emerald-600">{formatCurrency(item.amount)}</p>
                         <p className="text-xs text-gray-500">
-                          {new Date(item.date).toLocaleDateString()}
+                          {new Date(item.created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>

@@ -248,6 +248,36 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               <p className="mt-2 text-sm text-blue-700">
                 Super Admin can create admin details centrally, while this dashboard monitors local government admin coverage in your state.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('transactions')}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  View Transactions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('users')}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Manage Users
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('withdrawals')}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Withdrawal History
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('oversight')}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Local Govt Oversight
+                </button>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
               <div className="bg-blue-50 p-3 rounded-lg">

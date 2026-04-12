@@ -1,8 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { formatCurrency } from './utils/helpers';
 
-test('renders learn react link', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+test('formatCurrency returns naira-formatted value', () => {
+  expect(formatCurrency(10000)).toContain('10,000');
 });

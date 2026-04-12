@@ -252,8 +252,8 @@ const AgentDashboard = () => {
               <Link to="/messages" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
                 Dispute and Evidence Tasks
               </Link>
-              <Link to="/lawyer" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
-                Legal and Lawyer Operations
+              <Link to="/messages" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
+                Legal and Dispute Messages
               </Link>
               <Link to="/agent/earnings" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-100">
                 Commission Ledger and Earnings

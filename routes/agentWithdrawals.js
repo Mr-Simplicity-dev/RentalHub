@@ -1,6 +1,7 @@
 const express = require('express');
 const AgentWithdrawalController = require('../controllers/agentWithdrawalController');
 const { authenticate } = require('../config/middleware/auth');
+const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const validateRequest = require('../config/middleware/validateRequest');
 const {
 	withdrawalCreateValidators,
@@ -42,15 +43,15 @@ router.get(
 );
 
 // Approve withdrawal (admin only)
-router.post('/withdrawals/:withdrawalId/approve', AgentWithdrawalController.approveWithdrawal);
+router.post('/withdrawals/:withdrawalId/approve', requireAdminOrSuperAdmin, AgentWithdrawalController.approveWithdrawal);
 
 // Reject withdrawal (admin only)
-router.post('/withdrawals/:withdrawalId/reject', AgentWithdrawalController.rejectWithdrawal);
+router.post('/withdrawals/:withdrawalId/reject', requireAdminOrSuperAdmin, AgentWithdrawalController.rejectWithdrawal);
 
 // Mark as processing (admin only)
-router.post('/withdrawals/:withdrawalId/mark-processing', AgentWithdrawalController.markAsProcessing);
+router.post('/withdrawals/:withdrawalId/mark-processing', requireAdminOrSuperAdmin, AgentWithdrawalController.markAsProcessing);
 
 // Mark as completed (admin only)
-router.post('/withdrawals/:withdrawalId/mark-completed', AgentWithdrawalController.markAsCompleted);
+router.post('/withdrawals/:withdrawalId/mark-completed', requireAdminOrSuperAdmin, AgentWithdrawalController.markAsCompleted);
 
 module.exports = router;

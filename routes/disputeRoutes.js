@@ -1,3 +1,8 @@
+const express = require('express');
+const router = express.Router();
+const { authenticate } = require('../config/middleware/auth');
+const { allowRoles } = require('../config/middleware/roleMiddleware');
+const disputeController = require('../controllers/disputeController');
 const courtBundleController = require('../controllers/courtBundleController');
 
 router.post(
@@ -15,3 +20,5 @@ router.get(
   allowRoles('admin','lawyer','super_admin'),
   courtBundleController.downloadCourtBundle
 );
+
+module.exports = router;

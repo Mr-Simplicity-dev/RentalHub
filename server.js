@@ -27,6 +27,7 @@ const propertyAlertsRoutes = require('./routes/propertyAlerts');
 const appLinksRoutes = require('./routes/appLinks');
 
 const disputesRoutes = require('./routes/disputes');
+const disputeRoutes = require('./routes/disputeRoutes');
 const legalRoutes = require('./routes/legal');
 const complianceRoutes = require('./routes/compliance');
 const exportRoutes = require('./routes/export');
@@ -409,6 +410,7 @@ app.use('/api/property-utils', propertyUtilsRoutes);
 app.use('/api/property-alerts', propertyAlertsRoutes);
 
 app.use('/api/disputes', disputesRoutes);
+app.use('/api/disputes', disputeRoutes);
 app.use('/api/legal', legalRoutes);
 app.use('/api/compliance', complianceRoutes);
 app.use('/api/export', exportRoutes);

@@ -171,6 +171,29 @@ const FinancialAdminDashboard = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Financial Admin Dashboard</h1>
               <p className="text-gray-600">Monitor all financial transactions and manage funds</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('transactions')}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  View Transactions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('frozen-funds')}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  View Frozen Funds
+                </button>
+                <button
+                  type="button"
+                  onClick={openFreezeDialog}
+                  className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                >
+                  Freeze Funds
+                </button>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
               <div className="bg-blue-50 p-3 rounded-lg">
