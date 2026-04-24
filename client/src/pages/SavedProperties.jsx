@@ -3,10 +3,12 @@ import { propertyService } from '../services/propertyService';
 import PropertyList from '../components/properties/PropertyList';
 import Loader from '../components/common/Loader';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const SavedProperties = () => {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadSaved();
@@ -32,6 +34,15 @@ const SavedProperties = () => {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Saved Properties</h1>
 
+      <div className="flex justify-center mb-6">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="btn btn-outline"
+        >
+          Back to Dashboard
+        </button>
+      </div>
+
       <PropertyList
         properties={properties}
         loading={false}
@@ -47,7 +58,9 @@ const SavedProperties = () => {
         </div>
       )}
     </div>
+    
   );
 };
 
 export default SavedProperties;
+

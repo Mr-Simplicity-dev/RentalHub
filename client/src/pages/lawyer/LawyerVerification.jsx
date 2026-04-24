@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
+import { isImpersonatingSession } from '../../services/authStorage';
 
 const DEFAULT_LIVENESS = {
   faceDetected: false,
@@ -53,6 +54,8 @@ const loadExternalScript = (src) => {
 };
 
 const LawyerVerification = ({ children }) => {
+
+  const bypassVerification = isImpersonatingSession();
 
   const LAWYER_VERIFICATION_KEY = 'lawyer_passport_verified';
 
@@ -535,6 +538,11 @@ const LawyerVerification = ({ children }) => {
       setUploading(false);
     }
   };
+
+  // Allow trusted super-admin impersonation sessions to view the dashboard without local passport gating.
+  if (bypassVerification) {
+    return children;
+  }
 
   // If verification is complete, render children (dashboard)
   if (verificationComplete && !fraudAlert?.isFraudulent) {

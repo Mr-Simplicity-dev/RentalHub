@@ -60,4 +60,24 @@ export const messageService = {
     const response = await api.get('/messages/escalations');
     return response.data;
   },
+
+  // Mark escalation as handled
+  markEscalationHandled: async (messageId) => {
+    const response = await api.patch(`/messages/escalations/${messageId}/handled`);
+    return response.data;
+  },
+
+  // Convert escalation into tracked approval ticket
+  convertEscalationToTicket: async (messageId) => {
+    const response = await api.post(`/messages/escalations/${messageId}/ticket`);
+    return response.data;
+  },
+
+  // Update tracked escalation ticket status
+  updateEscalationTicketStatus: async (messageId, ticketStatus) => {
+    const response = await api.patch(`/messages/escalations/${messageId}/ticket-status`, {
+      ticket_status: ticketStatus,
+    });
+    return response.data;
+  },
 };

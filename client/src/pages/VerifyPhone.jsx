@@ -139,8 +139,15 @@ const VerifyPhone = () => {
           </>
         )}
       </div>
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="btn btn-outline mt-4"
+      >
+        Back to Dashboard
+      </button>
     </div>
   );
 };
 
 export default VerifyPhone;
+

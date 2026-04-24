@@ -22,6 +22,9 @@ const adminRoutes = require('./routes/admin');
 const dashboardRoutes = require('./routes/dashboard');
 const notificationRoutes = require('./routes/notifications');
 const superAdminRoutes = require('./routes/superAdmin');
+const transportationRoutes = require('./routes/transportation');
+const transportationAdminRoutes = require('./routes/transportationAdmin');
+const fumigationCleaningRoutes = require('./routes/fumigationCleaning');
 const propertyUtilsRoutes = require('./routes/propertyUtils');
 const propertyAlertsRoutes = require('./routes/propertyAlerts');
 const appLinksRoutes = require('./routes/appLinks');
@@ -41,7 +44,9 @@ const agentWithdrawalRoutes = require('./routes/agentWithdrawals');
 const stateMigrationRoutes = require('./routes/stateMigrations');
 
 const damageReportRoutes = require('./routes/damageReports');
+const rentSavingsRoutes = require('./routes/rentSavings');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
+const { startRentSavingsJobs } = require('./jobs/rentSavingsJobs');
 const csrfProtection = require('./config/middleware/csrfProtection');
 const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
 const {
@@ -406,6 +411,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/super', superAdminRoutes);
+app.use('/api/transportation', transportationRoutes);
+app.use('/api/transportation-admin', transportationAdminRoutes);
+app.use('/api/fumigation-cleaning', fumigationCleaningRoutes);
 app.use('/api/property-utils', propertyUtilsRoutes);
 app.use('/api/property-alerts', propertyAlertsRoutes);
 
@@ -423,6 +431,7 @@ app.use('/api/admin/agents', adminAgentRoutes);
 app.use('/api/withdrawals', financeOpsLimiter, agentWithdrawalRoutes);
 app.use('/api/state-migrations', stateMigrationRoutes);
 app.use('/api', damageReportRoutes);
+app.use('/api/rent-savings', rentSavingsRoutes);
 
 app.use((err, req, res, next) => {
   console.error('UNHANDLED ERROR:', err);
@@ -460,6 +469,7 @@ const startBackgroundServices = () => {
   runInitialSeoCheck();
   startPaymentJobs();
   startPropertyJobs();
+  startRentSavingsJobs();
   startScheduler();
   scheduleEvidenceIntegrityMonitoring();
   schedulePayoutRetries();

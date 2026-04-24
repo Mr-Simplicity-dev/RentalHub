@@ -1,4 +1,7 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import PaginationControls from "./PaginationControls";
+
+const BROADCASTS_PAGE_SIZE = 8;
 
 const BroadcastTab = ({
   broadcastForm,
@@ -6,6 +9,27 @@ const BroadcastTab = ({
   sendBroadcast,
   broadcasts
 }) => {
+  const [broadcastPage, setBroadcastPage] = useState(1);
+
+  const totalBroadcastPages = useMemo(
+    () => Math.max(Math.ceil((broadcasts?.length || 0) / BROADCASTS_PAGE_SIZE), 1),
+    [broadcasts]
+  );
+
+  const pagedBroadcasts = useMemo(() => {
+    const start = (broadcastPage - 1) * BROADCASTS_PAGE_SIZE;
+    return (broadcasts || []).slice(start, start + BROADCASTS_PAGE_SIZE);
+  }, [broadcasts, broadcastPage]);
+
+  useEffect(() => {
+    setBroadcastPage(1);
+  }, [broadcasts?.length]);
+
+  useEffect(() => {
+    if (broadcastPage > totalBroadcastPages) {
+      setBroadcastPage(totalBroadcastPages);
+    }
+  }, [broadcastPage, totalBroadcastPages]);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -74,7 +98,7 @@ const BroadcastTab = ({
 
         <ul className="space-y-3 text-sm">
 
-          {broadcasts.map((b) => (
+          {pagedBroadcasts.map((b) => (
 
             <li key={b.id} className="border-b border-soft pb-2 transition hover:bg-gray-50">
 
@@ -102,6 +126,13 @@ const BroadcastTab = ({
           ))}
 
         </ul>
+
+        <PaginationControls
+          currentPage={broadcastPage}
+          totalPages={totalBroadcastPages}
+          onPageChange={setBroadcastPage}
+          summary={`Showing ${(broadcasts?.length || 0) === 0 ? 0 : (broadcastPage - 1) * BROADCASTS_PAGE_SIZE + 1}-${Math.min(broadcastPage * BROADCASTS_PAGE_SIZE, broadcasts?.length || 0)} of ${broadcasts?.length || 0}`}
+        />
 
       </div>
 

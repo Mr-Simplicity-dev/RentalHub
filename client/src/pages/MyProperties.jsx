@@ -39,6 +39,15 @@ const MyProperties = () => {
         <Link to="/add-property" className="btn btn-primary">Add Property</Link>
       </div>
 
+      <div className="flex justify-center mb-6">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="btn btn-outline"
+        >
+          Back to Dashboard
+        </button>
+      </div>
+
       <div className="space-y-4">
         {items.map(p => (
           <div key={p.id} className="card flex justify-between items-center">

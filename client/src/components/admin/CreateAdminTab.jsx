@@ -99,7 +99,7 @@ const CreateAdminTab = () => {
       setLoading(true);
       setMessage("");
 
-      await api.post(
+      const response = await api.post(
         "/admin/create-admin",
         {
           ...formData,
@@ -115,7 +115,12 @@ const CreateAdminTab = () => {
         }
       );
 
-      setMessage("✅ Admin created successfully");
+      const createdRoleLabel = String(formData.user_type || '')
+        .split('_')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+
+      setMessage(`✅ ${response.data?.message || `${createdRoleLabel} created successfully`}`);
 
       setFormData({
         email: "",

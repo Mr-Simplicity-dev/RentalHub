@@ -71,4 +71,25 @@ router.get('/escalations',
   messageController.getEscalations
 );
 
+// Mark escalation handled
+router.patch('/escalations/:messageId/handled',
+  authenticate,
+  messageController.markEscalationHandled
+);
+
+// Convert escalation to tracked ticket
+router.post('/escalations/:messageId/ticket',
+  authenticate,
+  messageController.convertEscalationToTicket
+);
+
+// Update escalation ticket status
+router.patch('/escalations/:messageId/ticket-status',
+  authenticate,
+  [
+    body('ticket_status').isString().trim().notEmpty(),
+  ],
+  messageController.updateEscalationTicketStatus
+);
+
 module.exports = router;

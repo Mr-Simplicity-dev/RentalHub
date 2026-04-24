@@ -1,7 +1,7 @@
 const {
   isSuperFinancialAdmin,
   isSuperAdminOrSuperFinancialAdmin,
-} = require('../utils/roleScopes');
+} = require('../utils/roleScopes.js work on it');
 
 module.exports.requireFinancialAdmin = (req, res, next) => {
   if (!req.user) {

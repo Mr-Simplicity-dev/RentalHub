@@ -9,7 +9,10 @@ const {
   requireSuperAdminOrSuperFinancialAdmin,
 } = require('../config/middleware/requireFinancialAdmin');
 const { requireSuperAdmin } = require('../config/middleware/requireSuperAdmin');
-const { isStateFinancialAdmin } = require('../config/utils/roleScopes');
+const {
+  isStateFinancialAdmin,
+  isSuperAdminOrSuperFinancialAdmin: isSuperOrFinancialRole,
+} = require('../config/utils/roleScopes.js work on it');
 const {
   createTransferRecipient,
   initiateTransfer,
@@ -162,15 +165,18 @@ router.get('/dashboard/state-admin',
 
 // ====================== COMMISSION WITHDRAWAL ROUTES ======================
 
+const canRequestAdminWithdrawal = (userType) =>
+  isStateFinancialAdmin(userType) || isSuperOrFinancialRole(userType);
+
 /**
- * Request commission withdrawal (state admin only)
+ * Request personal commission withdrawal (eligible admin roles)
  */
 router.post('/withdraw/request',
   (req, res, next) => {
-    if (!isStateFinancialAdmin(req.user.user_type)) {
+    if (!canRequestAdminWithdrawal(req.user.user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. State financial admin only.'
+        message: 'Access denied. Eligible admin role required.'
       });
     }
     next();
@@ -210,14 +216,14 @@ router.post('/withdraw/request',
 );
 
 /**
- * Get commission summary (state admin only)
+ * Get commission summary (eligible admin roles)
  */
 router.get('/commissions/summary',
   (req, res, next) => {
-    if (!isStateFinancialAdmin(req.user.user_type)) {
+    if (!canRequestAdminWithdrawal(req.user.user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. State financial admin only.'
+        message: 'Access denied. Eligible admin role required.'
       });
     }
     next();
@@ -242,14 +248,64 @@ router.get('/commissions/summary',
 );
 
 /**
- * Get withdrawal history (state admin only)
+ * Get withdrawable balance snapshot (eligible admin roles)
+ */
+router.get('/commissions/withdrawable',
+  (req, res, next) => {
+    if (!canRequestAdminWithdrawal(req.user.user_type)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Eligible admin role required.'
+      });
+    }
+    next();
+  },
+  async (req, res) => {
+    try {
+      const db = require('../config/middleware/database');
+
+      const [walletResult, earningsResult] = await Promise.all([
+        db.query(
+          `SELECT COALESCE(admin_wallet_balance, 0) AS withdrawable_amount
+           FROM users
+           WHERE id = $1
+           LIMIT 1`,
+          [req.user.id]
+        ),
+        db.query(
+          `SELECT COALESCE(SUM(amount), 0) AS total_earned
+           FROM admin_commissions
+           WHERE admin_id = $1`,
+          [req.user.id]
+        )
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          withdrawable_amount: Number(walletResult.rows?.[0]?.withdrawable_amount || 0),
+          total_earned: Number(earningsResult.rows?.[0]?.total_earned || 0),
+        }
+      });
+    } catch (error) {
+      console.error('Get withdrawable balance snapshot error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch withdrawable balance'
+      });
+    }
+  }
+);
+
+/**
+ * Get withdrawal history (eligible admin roles)
  */
 router.get('/withdrawals/history',
   (req, res, next) => {
-    if (!isStateFinancialAdmin(req.user.user_type)) {
+    if (!canRequestAdminWithdrawal(req.user.user_type)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. State financial admin only.'
+        message: 'Access denied. Eligible admin role required.'
       });
     }
     next();

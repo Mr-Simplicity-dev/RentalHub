@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import PaginationControls from './PaginationControls';
+
+const ENTRIES_PAGE_SIZE = 8;
+const APPLICATIONS_PAGE_SIZE = 8;
+const BROADCASTS_PAGE_SIZE = 8;
 
 const initialManualForm = {
   full_name: '',
@@ -34,6 +39,9 @@ const PlatformLawyersTab = () => {
   const [broadcasts, setBroadcasts] = useState([]);
   const [manualForm, setManualForm] = useState(initialManualForm);
   const [broadcastForm, setBroadcastForm] = useState(initialBroadcastForm);
+  const [entriesPage, setEntriesPage] = useState(1);
+  const [applicationsPage, setApplicationsPage] = useState(1);
+  const [broadcastsPage, setBroadcastsPage] = useState(1);
 
   const loadData = async () => {
     try {
@@ -42,6 +50,9 @@ const PlatformLawyersTab = () => {
       setEntries(res.data?.data?.entries || []);
       setApplications(res.data?.data?.applications || []);
       setBroadcasts(res.data?.data?.recruitment_broadcasts || []);
+      setEntriesPage(1);
+      setApplicationsPage(1);
+      setBroadcastsPage(1);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to load platform lawyers');
     } finally {
@@ -176,6 +187,18 @@ const PlatformLawyersTab = () => {
     }
   };
 
+  const entriesTotalPages = Math.max(Math.ceil((entries.length || 0) / ENTRIES_PAGE_SIZE), 1);
+  const entriesStart = (entriesPage - 1) * ENTRIES_PAGE_SIZE;
+  const pagedEntries = entries.slice(entriesStart, entriesStart + ENTRIES_PAGE_SIZE);
+
+  const applicationsTotalPages = Math.max(Math.ceil((applications.length || 0) / APPLICATIONS_PAGE_SIZE), 1);
+  const applicationsStart = (applicationsPage - 1) * APPLICATIONS_PAGE_SIZE;
+  const pagedApplications = applications.slice(applicationsStart, applicationsStart + APPLICATIONS_PAGE_SIZE);
+
+  const broadcastsTotalPages = Math.max(Math.ceil((broadcasts.length || 0) / BROADCASTS_PAGE_SIZE), 1);
+  const broadcastsStart = (broadcastsPage - 1) * BROADCASTS_PAGE_SIZE;
+  const pagedBroadcasts = broadcasts.slice(broadcastsStart, broadcastsStart + BROADCASTS_PAGE_SIZE);
+
   return (
     <div className="space-y-6 animate-fadeIn text-left">
       <div className="grid gap-6 lg:grid-cols-2">
@@ -304,7 +327,7 @@ const PlatformLawyersTab = () => {
           <p className="text-sm text-gray-500">No platform lawyers have been configured yet.</p>
         ) : (
           <div className="space-y-3">
-            {entries.map((entry) => (
+            {pagedEntries.map((entry) => (
               <div
                 key={entry.id}
                 className="rounded-xl border border-gray-200 p-4"
@@ -375,6 +398,13 @@ const PlatformLawyersTab = () => {
             ))}
           </div>
         )}
+
+        <PaginationControls
+          currentPage={entriesPage}
+          totalPages={entriesTotalPages}
+          onPageChange={setEntriesPage}
+          summary={`Showing ${entries.length === 0 ? 0 : entriesStart + 1}-${Math.min(entriesPage * ENTRIES_PAGE_SIZE, entries.length)} of ${entries.length}`}
+        />
       </div>
 
       <div className="rounded-xl2 border border-soft bg-white p-6 shadow-card">
@@ -385,7 +415,7 @@ const PlatformLawyersTab = () => {
           <p className="text-sm text-gray-500">No lawyer applications yet.</p>
         ) : (
           <div className="space-y-3">
-            {applications.map((application) => (
+            {pagedApplications.map((application) => (
               <div
                 key={application.id}
                 className="rounded-xl border border-gray-200 p-4"
@@ -445,6 +475,13 @@ const PlatformLawyersTab = () => {
             ))}
           </div>
         )}
+
+        <PaginationControls
+          currentPage={applicationsPage}
+          totalPages={applicationsTotalPages}
+          onPageChange={setApplicationsPage}
+          summary={`Showing ${applications.length === 0 ? 0 : applicationsStart + 1}-${Math.min(applicationsPage * APPLICATIONS_PAGE_SIZE, applications.length)} of ${applications.length}`}
+        />
       </div>
 
       <div className="rounded-xl2 border border-soft bg-white p-6 shadow-card">
@@ -455,7 +492,7 @@ const PlatformLawyersTab = () => {
           <p className="text-sm text-gray-500">No recruitment broadcasts sent yet.</p>
         ) : (
           <ul className="space-y-3 text-sm">
-            {broadcasts.map((broadcast) => (
+            {pagedBroadcasts.map((broadcast) => (
               <li key={broadcast.id} className="border-b border-soft pb-3 last:border-b-0">
                 <p className="font-semibold text-gray-900">{broadcast.title}</p>
                 <p className="mt-1 whitespace-pre-line text-gray-600">
@@ -468,6 +505,13 @@ const PlatformLawyersTab = () => {
             ))}
           </ul>
         )}
+
+        <PaginationControls
+          currentPage={broadcastsPage}
+          totalPages={broadcastsTotalPages}
+          onPageChange={setBroadcastsPage}
+          summary={`Showing ${broadcasts.length === 0 ? 0 : broadcastsStart + 1}-${Math.min(broadcastsPage * BROADCASTS_PAGE_SIZE, broadcasts.length)} of ${broadcasts.length}`}
+        />
       </div>
     </div>
   );

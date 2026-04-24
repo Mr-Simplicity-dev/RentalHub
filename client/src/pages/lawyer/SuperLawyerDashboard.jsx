@@ -6,6 +6,9 @@ const SuperLawyerDashboard = () => (
     dashboardTitle="Super Lawyer Dashboard"
     profileLabel="Super Lawyer Profile"
     nameFallback="Super Lawyer"
+    dashboardSubtitle="Lead cross-state legal review, evidence verification, and escalated dispute oversight from the super lawyer command layer."
+    rolePillLabel="Super Lawyer"
+    showSuperLawyerPanel
   />
 );
 

@@ -2,8 +2,234 @@ const express = require('express');
 const { authenticate, requireSuperAdmin } = require('../config/middleware/auth');
 const superCtrl = require('../controllers/superAdmin.controller');
 const audit = require('../config/middleware/auditMiddleware');
+const db = require('../config/middleware/database');
+const bcrypt = require('bcryptjs');
+const commissionService = require('../services/commissionService');
 
 const router = express.Router();
+
+// ================== PENDING ADMIN APPROVALS ==================
+
+// Allow super_admin OR a delegated super_financial_admin to hit these routes
+const canManagePendingAdmins = async (req, res, next) => {
+  const userType = req.user?.user_type;
+  if (userType === 'super_admin') return next();
+
+  if (userType === 'super_financial_admin') {
+    const perm = await db.query(
+      `SELECT can_approve_admins FROM sfa_delegation_permissions WHERE super_financial_admin_id = $1`,
+      [req.user.id]
+    );
+    if (perm.rows[0]?.can_approve_admins) return next();
+  }
+
+  return res.status(403).json({ success: false, message: 'Access denied.' });
+};
+
+// GET /super/pending-admins
+router.get('/pending-admins', authenticate, async (req, res, next) => {
+  try {
+    await canManagePendingAdmins(req, res, async () => {
+      // Super Financial Admin cannot see other super_financial_admin pending accounts
+      const isSFA = req.user.user_type === 'super_financial_admin';
+      const rows = await db.query(
+        `SELECT id, full_name, email, phone, user_type,
+                assigned_state, assigned_city, lawyer_client_scope,
+                created_at, approval_status
+         FROM users
+         WHERE approval_status = 'pending'
+           AND deleted_at IS NULL
+           ${isSFA ? `AND user_type <> 'super_financial_admin'` : ''}
+         ORDER BY created_at DESC`
+      );
+      res.json({ success: true, data: rows.rows });
+    });
+  } catch (err) {
+    console.error('Get pending admins error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PATCH /super/pending-admins/:id/approve
+router.patch('/pending-admins/:id/approve', authenticate, async (req, res) => {
+  try {
+    await new Promise((resolve, reject) => canManagePendingAdmins(req, res, resolve));
+
+    const { id } = req.params;
+    const isSFA = req.user.user_type === 'super_financial_admin';
+
+    // SFA cannot approve another super_financial_admin
+    const target = await db.query(
+      `SELECT user_type, approval_status FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [id]
+    );
+    if (!target.rows.length) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+    if (target.rows[0].approval_status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Account is not pending approval' });
+    }
+    if (isSFA && target.rows[0].user_type === 'super_financial_admin') {
+      return res.status(403).json({ success: false, message: 'Only the Super Admin can approve Super Financial Admin accounts' });
+    }
+
+    await db.query(
+      `UPDATE users SET approval_status = 'approved' WHERE id = $1`,
+      [id]
+    );
+
+    res.json({ success: true, message: 'Admin account approved successfully' });
+  } catch (err) {
+    console.error('Approve pending admin error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PATCH /super/pending-admins/:id/reject
+router.patch('/pending-admins/:id/reject', authenticate, async (req, res) => {
+  try {
+    await new Promise((resolve, reject) => canManagePendingAdmins(req, res, resolve));
+
+    const { id } = req.params;
+    const isSFA = req.user.user_type === 'super_financial_admin';
+
+    const target = await db.query(
+      `SELECT user_type, approval_status FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [id]
+    );
+    if (!target.rows.length) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+    if (target.rows[0].approval_status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Account is not pending approval' });
+    }
+    if (isSFA && target.rows[0].user_type === 'super_financial_admin') {
+      return res.status(403).json({ success: false, message: 'Only the Super Admin can reject Super Financial Admin accounts' });
+    }
+
+    // Soft-delete the rejected account
+    await db.query(
+      `UPDATE users SET deleted_at = NOW(), approval_status = 'rejected' WHERE id = $1`,
+      [id]
+    );
+
+    res.json({ success: true, message: 'Admin account rejected and removed' });
+  } catch (err) {
+    console.error('Reject pending admin error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ================== SFA DELEGATION PERMISSIONS ==================
+
+// GET /super/sfa-permissions  (super_admin only)
+router.get('/sfa-permissions', authenticate, requireSuperAdmin, async (req, res) => {
+  try {
+    const sfas = await db.query(
+      `SELECT u.id, u.full_name, u.email,
+              COALESCE(p.can_approve_admins, FALSE)  AS can_approve_admins,
+              COALESCE(p.can_direct_withdraw, FALSE) AS can_direct_withdraw,
+              p.granted_at
+       FROM users u
+       LEFT JOIN sfa_delegation_permissions p ON p.super_financial_admin_id = u.id
+       WHERE u.user_type = 'super_financial_admin'
+         AND u.deleted_at IS NULL
+         AND COALESCE(u.approval_status, 'approved') = 'approved'
+       ORDER BY u.full_name`
+    );
+    res.json({ success: true, data: sfas.rows });
+  } catch (err) {
+    console.error('Get SFA permissions error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PATCH /super/sfa-permissions/:sfaId  (super_admin only)
+router.patch('/sfa-permissions/:sfaId', authenticate, requireSuperAdmin, async (req, res) => {
+  try {
+    const { sfaId } = req.params;
+    const { can_approve_admins, can_direct_withdraw } = req.body;
+
+    // Verify target is a super_financial_admin
+    const target = await db.query(
+      `SELECT id FROM users WHERE id = $1 AND user_type = 'super_financial_admin' AND deleted_at IS NULL`,
+      [sfaId]
+    );
+    if (!target.rows.length) {
+      return res.status(404).json({ success: false, message: 'Super Financial Admin not found' });
+    }
+
+    await db.query(
+      `INSERT INTO sfa_delegation_permissions
+         (super_financial_admin_id, can_approve_admins, can_direct_withdraw, granted_by, granted_at, updated_at)
+       VALUES ($1, $2, $3, $4, NOW(), NOW())
+       ON CONFLICT (super_financial_admin_id) DO UPDATE
+         SET can_approve_admins  = EXCLUDED.can_approve_admins,
+             can_direct_withdraw = EXCLUDED.can_direct_withdraw,
+             granted_by          = EXCLUDED.granted_by,
+             granted_at          = NOW(),
+             updated_at          = NOW()`,
+      [sfaId, !!can_approve_admins, !!can_direct_withdraw, req.user.id]
+    );
+
+    res.json({ success: true, message: 'Permissions updated successfully' });
+  } catch (err) {
+    console.error('Update SFA permissions error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ================== SUPER ADMIN DIRECT WITHDRAWAL ==================
+
+// POST /super/withdraw/direct  (super_admin only — instant Paystack payout)
+router.post('/withdraw/direct', authenticate, requireSuperAdmin, async (req, res) => {
+  try {
+    const { amount, bank_name, bank_code, account_number, account_name, password } = req.body;
+
+    // Validate inputs
+    if (!amount || !bank_name || !account_number || !account_name || !password) {
+      return res.status(400).json({ success: false, message: 'All fields are required' });
+    }
+    const parsedAmount = parseFloat(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 1000) {
+      return res.status(400).json({ success: false, message: 'Minimum withdrawal amount is ₦1,000' });
+    }
+    if (!/^\d{10}$/.test(String(account_number))) {
+      return res.status(400).json({ success: false, message: 'Account number must be 10 digits' });
+    }
+
+    // Verify identity password
+    const userRow = await db.query(
+      `SELECT password_hash FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+    const passwordMatch = await bcrypt.compare(String(password), userRow.rows[0].password_hash);
+    if (!passwordMatch) {
+      return res.status(403).json({ success: false, message: 'Incorrect password' });
+    }
+
+    // Process via commission service (direct payout — no queue)
+    const result = await commissionService.processAdminWithdrawal(
+      req.user.id,
+      parsedAmount,
+      {
+        bank_name: String(bank_name).trim(),
+        bank_code: String(bank_code || '').trim(),
+        account_number: String(account_number).trim(),
+        account_name: String(account_name).trim(),
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Withdrawal processed successfully',
+      data: result,
+    });
+  } catch (err) {
+    console.error('Super admin direct withdrawal error:', err);
+    res.status(400).json({ success: false, message: err.message || 'Withdrawal failed' });
+  }
+});
 
 router.get('/users', authenticate, requireSuperAdmin, superCtrl.getAllUsers);
 router.patch('/users/:id/ban', authenticate, requireSuperAdmin, superCtrl.banUser);
@@ -22,6 +248,7 @@ router.patch('/verifications/:userId/approve', authenticate, requireSuperAdmin, 
 router.patch('/verifications/:userId/reject', authenticate, requireSuperAdmin, superCtrl.rejectIdentityVerification);
 router.delete('/verifications/:userId', authenticate, requireSuperAdmin, superCtrl.deleteRejectedVerification);
 router.get('/admins/performance', authenticate, requireSuperAdmin, superCtrl.getAdminPerformance);
+router.post('/admins/:id/impersonate', authenticate, requireSuperAdmin, superCtrl.impersonateAdmin);
 router.get('/admins/:adminId/state-users', authenticate, requireSuperAdmin, superCtrl.getAdminStateUsers);
 router.patch('/admins/:id/jurisdiction', authenticate, requireSuperAdmin, superCtrl.updateAdminJurisdiction);
 

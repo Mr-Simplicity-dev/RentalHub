@@ -19,6 +19,15 @@ import Properties from './Properties';
 import PropertyDetail from './PropertyDetail';
 import Dashboard from './Dashboard';
 import NotFound from './NotFound';
+import TransportationBooking from './TransportationBooking';
+import TransportationPayment from './TransportationPayment';
+import TransportationBookings from './TransportationBookings';
+import TransportationBookingDetails from './TransportationBookingDetails';
+import FumigationCleaningBooking from './FumigationCleaningBooking';
+import FumigationCleaningPayment from './FumigationCleaningPayment';
+import FumigationCleaningCatalog from '../components/fumigation/FumigationCleaningCatalog';
+import FumigationCleaningBookings from './FumigationCleaningBookings';
+import FumigationCleaningBookingDetails from './FumigationCleaningBookingDetails';
 
 import AdminDashboard from './admin/AdminDashboard';
 import AdminLayout from './admin/AdminLayout';
@@ -52,7 +61,11 @@ import AdminUserDetail from './admin/AdminUserDetail';
 import AdminPropertyDetail from './admin/AdminPropertyDetail';
 import AdminApplicationDetail from './admin/AdminApplicationDetail';
 import AdminCompliance from './admin/AdminCompliance';
+import TransportationAdminDashboard from './admin/TransportationAdminDashboard';
+import TransporationAdminStateDashboard from './admin/TransporationAdminStateDashboard';
+import TransportationSuperAdminDashboard from './admin/TransportationSuperAdminDashboard';
 import LawyerDashboard from './lawyer/LawyerDashboard';
+import LawyerLayout from './lawyer/LawyerLayout';
 import StateLawyerDashboard from './lawyer/StateLawyerDashboard';
 import SuperLawyerDashboard from './lawyer/SuperLawyerDashboard';
 import AgentDashboard from './agent/AgentDashboard';
@@ -82,6 +95,8 @@ const SUPER_FINANCIAL_ADMIN_ROLES = ['super_financial_admin'];
 const STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin'];
 const STATE_SUPPORT_ADMIN_ROLES = ['state_support_admin'];
 const SUPER_SUPPORT_ADMIN_ROLES = ['super_support_admin'];
+const SUPER_ADMIN_ROLES = ['super_admin'];
+const TRANSPORTATION_STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_support_admin'];
 const ADMIN_SHELL_ROLES = [
   'admin',
   ...FINANCIAL_ADMIN_ROLES,
@@ -162,6 +177,19 @@ const SuperSupportAdminRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (!SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+
+  return children;
+};
+
+const SuperAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!SUPER_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/dashboard" />;
 
   return children;
 };
@@ -268,6 +296,34 @@ const AdminShellRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (!ADMIN_SHELL_ROLES.includes(user?.user_type)) return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
+const TransportationCoreAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'admin') return <Navigate to="/admin" replace />;
+
+  return children;
+};
+
+const TransportationStateAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!TRANSPORTATION_STATE_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin" replace />;
+  }
 
   return children;
 };
@@ -404,6 +460,11 @@ function App() {
               <Route path="/lawyers" element={<LawyersDirectory />} />
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
+              <Route path="/transportation/book" element={<TransportationBooking />} />
+              <Route path="/transportation/payment/:bookingId" element={<TransportationPayment />} />
+              <Route path="/transportation/bookings" element={<TransportationBookings />} />
+              <Route path="/transportation/bookings/:bookingId" element={<TransportationBookingDetails />} />
+              <Route path="/fumigation-cleaning/catalog" element={<FumigationCleaningCatalog />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/verify-email/:token" element={<VerifyEmailToken />} />
               <Route path="/auth/verify-email/:token" element={<VerifyEmailToken />} />
@@ -416,10 +477,49 @@ function App() {
               <Route path="/landlord-guide" element={<LandlordGuide />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
-              <Route path="/super-admin" element={<SuperAdminDashboard />} />
-              <Route path="/lawyer" element={<BaseLawyerRoute><LawyerDashboard /></BaseLawyerRoute>}/>
-              <Route path="/lawyer/state" element={<StateLawyerRoute><StateLawyerDashboard /></StateLawyerRoute>} />
-              <Route path="/lawyer/super" element={<SuperLawyerRoute><SuperLawyerDashboard /></SuperLawyerRoute>} />
+              <Route
+                path="/super-admin/*"
+                element={
+                  <SuperAdminRoute>
+                    <AdminLayout />
+                  </SuperAdminRoute>
+                }
+              >
+                <Route index element={<SuperAdminDashboard />} />
+                <Route path="transportation" element={<TransportationSuperAdminDashboard />} />
+              </Route>
+              <Route path="/fumigation-cleaning/booking" element={<FumigationCleaningBooking />} />
+<Route path="/fumigation-cleaning/payment/:bookingId" element={<FumigationCleaningPayment />} />
+              <Route
+                path="/lawyer"
+                element={
+                  <BaseLawyerRoute>
+                    <LawyerLayout />
+                  </BaseLawyerRoute>
+                }
+              >
+                <Route index element={<LawyerDashboard />} />
+              </Route>
+              <Route
+                path="/lawyer/state"
+                element={
+                  <StateLawyerRoute>
+                    <LawyerLayout />
+                  </StateLawyerRoute>
+                }
+              >
+                <Route index element={<StateLawyerDashboard />} />
+              </Route>
+              <Route
+                path="/lawyer/super"
+                element={
+                  <SuperLawyerRoute>
+                    <LawyerLayout />
+                  </SuperLawyerRoute>
+                }
+              >
+                <Route index element={<SuperLawyerDashboard />} />
+              </Route>
               <Route path="/agent/dashboard" element={<AgentRoute><AgentDashboard /></AgentRoute>} />
               <Route path="/agent/earnings" element={<AgentRoute><AgentEarningsPage /></AgentRoute>} />
                             <Route path="/agent/withdrawals" element={<AgentRoute><AgentWithdrawalPage /></AgentRoute>} />
@@ -448,8 +548,9 @@ function App() {
                   </TenantRoute>
                 }
               />
-
-              <Route
+                <Route path="/fumigation-cleaning/bookings" element={<TenantRoute><FumigationCleaningBookings /></TenantRoute>} />
+<Route path="/fumigation-cleaning/bookings/:bookingId" element={<TenantRoute><FumigationCleaningBookingDetails /></TenantRoute>} />
+   <Route
                 path="/admin/*"
                 element={
                   <AdminShellRoute>
@@ -464,6 +565,21 @@ function App() {
                 <Route path="properties" element={<AdminProperties />} />
                 <Route path="applications" element={<AdminApplications />} />
                 <Route path="compliance" element={<AdminCompliance />} />
+                <Route
+                  path="transportation"
+                  element={
+                    <TransportationCoreAdminRoute>
+                      <TransportationAdminDashboard />
+                    </TransportationCoreAdminRoute>
+                  }
+                />
+                <Route path="transportation/state"
+                  element={
+                    <TransportationStateAdminRoute>
+                      <TransporationAdminStateDashboard />
+                    </TransportationStateAdminRoute>
+                  }
+                />
                                 <Route path="agents" element={<AdminAgentManagement />} />
                 <Route path="users/:id" element={<AdminUserDetail />} />
                                 <Route path="properties/:id" element={<AdminPropertyDetail />} />

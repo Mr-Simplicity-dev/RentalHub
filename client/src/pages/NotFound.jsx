@@ -1,8 +1,10 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaHome } from 'react-icons/fa';
 
 const NotFound = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
@@ -15,6 +17,12 @@ const NotFound = () => {
           <FaHome className="inline mr-2" />
           Go Home
         </Link>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="btn btn-outline mt-4"
+        >
+          Back to Dashboard
+        </button>
       </div>
     </div>
   );

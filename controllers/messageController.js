@@ -3,6 +3,7 @@ const { validationResult } = require('express-validator');
 const { sendMessageNotification } = require('../config/utils/emailService');
 
 let messageSchemaReady = false;
+const ESCALATION_TICKET_STATUSES = ['approval_pending', 'under_review', 'approved', 'rejected'];
 
 const ensureMessageSchema = async () => {
   if (messageSchemaReady) return;
@@ -17,9 +18,40 @@ const ensureMessageSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_messages_message_type
       ON messages(message_type);
+
+    CREATE TABLE IF NOT EXISTS escalation_tickets (
+      id SERIAL PRIMARY KEY,
+      escalation_message_id INTEGER NOT NULL UNIQUE REFERENCES messages(id) ON DELETE CASCADE,
+      ticket_status VARCHAR(32),
+      updated_by INTEGER REFERENCES users(id),
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      handled_by INTEGER REFERENCES users(id),
+      handled_at TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_escalation_tickets_message
+      ON escalation_tickets(escalation_message_id);
   `);
 
   messageSchemaReady = true;
+};
+
+const getEscalationForActor = async (messageId, actorId, actorRole) => {
+  const role = String(actorRole || '').toLowerCase();
+  if (!['admin', 'super_admin'].includes(role)) {
+    return null;
+  }
+
+  const query = role === 'admin'
+    ? `SELECT id, sender_id, receiver_id, message_type
+       FROM messages
+       WHERE id = $1 AND message_type = 'escalation' AND sender_id = $2`
+    : `SELECT id, sender_id, receiver_id, message_type
+       FROM messages
+       WHERE id = $1 AND message_type = 'escalation' AND receiver_id = $2`;
+
+  const result = await db.query(query, [messageId, actorId]);
+  return result.rows[0] || null;
 };
 
 const canSendMessage = (senderRole, receiverRole, messageType) => {
@@ -138,6 +170,14 @@ exports.sendMessage = async (req, res) => {
     );
 
     const message = result.rows[0];
+
+    if (messageType === 'escalation') {
+      await db.query(
+        `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
+         VALUES ($1, $2, $3, $4)`,
+        [senderId, 'ADMIN_ESCALATION_REQUESTED', 'user', receiver_id]
+      );
+    }
 
     // Send email notification
     await sendMessageNotification(
@@ -595,10 +635,18 @@ exports.getEscalations = async (req, res) => {
       query = `
         SELECT m.id, m.subject, m.message_text, m.is_read, m.created_at,
                s.id AS sender_id, s.full_name AS sender_name, s.user_type AS sender_role,
-               r.id AS receiver_id, r.full_name AS receiver_name, r.user_type AS receiver_role
+               r.id AS receiver_id, r.full_name AS receiver_name, r.user_type AS receiver_role,
+               et.ticket_status, et.updated_at AS ticket_updated_at, et.updated_by AS ticket_updated_by,
+               et.handled_at, et.handled_by,
+               tu.full_name AS ticket_updated_by_name,
+               hu.full_name AS handled_by_name,
+               (et.handled_at IS NOT NULL OR m.is_read = TRUE) AS is_handled
         FROM messages m
         JOIN users s ON s.id = m.sender_id
         JOIN users r ON r.id = m.receiver_id
+        LEFT JOIN escalation_tickets et ON et.escalation_message_id = m.id
+        LEFT JOIN users tu ON tu.id = et.updated_by
+        LEFT JOIN users hu ON hu.id = et.handled_by
         WHERE m.message_type = 'escalation'
           AND m.sender_id = $1
         ORDER BY m.created_at DESC
@@ -609,10 +657,18 @@ exports.getEscalations = async (req, res) => {
       query = `
         SELECT m.id, m.subject, m.message_text, m.is_read, m.created_at,
                s.id AS sender_id, s.full_name AS sender_name, s.user_type AS sender_role,
-               r.id AS receiver_id, r.full_name AS receiver_name, r.user_type AS receiver_role
+               r.id AS receiver_id, r.full_name AS receiver_name, r.user_type AS receiver_role,
+               et.ticket_status, et.updated_at AS ticket_updated_at, et.updated_by AS ticket_updated_by,
+               et.handled_at, et.handled_by,
+               tu.full_name AS ticket_updated_by_name,
+               hu.full_name AS handled_by_name,
+               (et.handled_at IS NOT NULL OR m.is_read = TRUE) AS is_handled
         FROM messages m
         JOIN users s ON s.id = m.sender_id
         JOIN users r ON r.id = m.receiver_id
+        LEFT JOIN escalation_tickets et ON et.escalation_message_id = m.id
+        LEFT JOIN users tu ON tu.id = et.updated_by
+        LEFT JOIN users hu ON hu.id = et.handled_by
         WHERE m.message_type = 'escalation'
           AND m.receiver_id = $1
         ORDER BY m.created_at DESC
@@ -632,6 +688,163 @@ exports.getEscalations = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch escalations',
+    });
+  }
+};
+
+exports.markEscalationHandled = async (req, res) => {
+  try {
+    await ensureMessageSchema();
+
+    const actorId = req.user.id;
+    const actorRole = req.user.user_type;
+    const messageId = Number(req.params.messageId);
+
+    if (!Number.isFinite(messageId) || messageId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid escalation id',
+      });
+    }
+
+    const escalation = await getEscalationForActor(messageId, actorId, actorRole);
+    if (!escalation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escalation not found or unauthorized',
+      });
+    }
+
+    await db.query(
+      `INSERT INTO escalation_tickets (escalation_message_id, handled_at, handled_by, updated_at, updated_by)
+       VALUES ($1, NOW(), $2, NOW(), $2)
+       ON CONFLICT (escalation_message_id)
+       DO UPDATE SET handled_at = NOW(), handled_by = EXCLUDED.handled_by, updated_at = NOW(), updated_by = EXCLUDED.updated_by`,
+      [messageId, actorId]
+    );
+
+    await db.query(
+      `UPDATE messages
+       SET is_read = TRUE
+       WHERE id = $1`,
+      [messageId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Escalation marked as handled',
+    });
+  } catch (error) {
+    console.error('Mark escalation handled error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to mark escalation as handled',
+    });
+  }
+};
+
+exports.convertEscalationToTicket = async (req, res) => {
+  try {
+    await ensureMessageSchema();
+
+    const actorId = req.user.id;
+    const actorRole = req.user.user_type;
+    const messageId = Number(req.params.messageId);
+
+    if (!Number.isFinite(messageId) || messageId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid escalation id',
+      });
+    }
+
+    const escalation = await getEscalationForActor(messageId, actorId, actorRole);
+    if (!escalation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escalation not found or unauthorized',
+      });
+    }
+
+    const upsert = await db.query(
+      `INSERT INTO escalation_tickets (escalation_message_id, ticket_status, updated_by, updated_at)
+       VALUES ($1, 'approval_pending', $2, NOW())
+       ON CONFLICT (escalation_message_id)
+       DO UPDATE SET
+         ticket_status = COALESCE(escalation_tickets.ticket_status, 'approval_pending'),
+         updated_by = EXCLUDED.updated_by,
+         updated_at = NOW()
+       RETURNING escalation_message_id, ticket_status, updated_at`,
+      [messageId, actorId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Escalation converted to tracked approval ticket',
+      data: upsert.rows[0],
+    });
+  } catch (error) {
+    console.error('Convert escalation ticket error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to convert escalation to ticket',
+    });
+  }
+};
+
+exports.updateEscalationTicketStatus = async (req, res) => {
+  try {
+    await ensureMessageSchema();
+
+    const actorId = req.user.id;
+    const actorRole = req.user.user_type;
+    const messageId = Number(req.params.messageId);
+    const ticketStatus = String(req.body?.ticket_status || '').trim();
+
+    if (!Number.isFinite(messageId) || messageId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid escalation id',
+      });
+    }
+
+    if (!ESCALATION_TICKET_STATUSES.includes(ticketStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `ticket_status must be one of: ${ESCALATION_TICKET_STATUSES.join(', ')}`,
+      });
+    }
+
+    const escalation = await getEscalationForActor(messageId, actorId, actorRole);
+    if (!escalation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escalation not found or unauthorized',
+      });
+    }
+
+    const upsert = await db.query(
+      `INSERT INTO escalation_tickets (escalation_message_id, ticket_status, updated_by, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (escalation_message_id)
+       DO UPDATE SET
+         ticket_status = EXCLUDED.ticket_status,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = NOW()
+       RETURNING escalation_message_id, ticket_status, updated_at`,
+      [messageId, ticketStatus, actorId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Escalation ticket status updated',
+      data: upsert.rows[0],
+    });
+  } catch (error) {
+    console.error('Update escalation ticket status error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update escalation ticket status',
     });
   }
 };

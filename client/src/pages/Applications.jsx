@@ -134,6 +134,15 @@ const Applications = () => {
         {user?.user_type === 'tenant' ? t('applications.my_title') : t('applications.landlord_title')}
       </h1>
 
+      <div className="flex justify-center mb-6">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="btn btn-outline"
+        >
+          Back to Dashboard
+        </button>
+      </div>
+
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="card text-center">
           <p className="mb-1 text-sm text-gray-600">{t('dashboard.total_apps')}</p>

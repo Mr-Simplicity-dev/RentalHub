@@ -19,10 +19,16 @@ import {
   FaUniversity,
   FaThumbsUp,
   FaThumbsDown,
+  FaTruck,
+  FaSprayCan,
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
 import { useTranslation } from 'react-i18next';
+import ApprovalTimeline from '../components/common/ApprovalTimeline';
+import WalletFundModal from '../components/dashboard/WalletFundModal';
+import WalletWithdrawModal from '../components/dashboard/WalletWithdrawModal';
+import RentSavingsModal from '../components/dashboard/RentSavingsModal';
 
 const NIGERIAN_BANKS = [
   'Access Bank',
@@ -65,6 +71,12 @@ const Dashboard = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Transportation state
+  const [transportStats, setTransportStats] = useState(null);
+  const [upcomingTransportBookings, setUpcomingTransportBookings] = useState([]);
+  const [showTransportModal, setShowTransportModal] = useState(false);
+  const [transportLoading, setTransportLoading] = useState(false);
+
   // ── Refund state ──────────────────────────────────────────────────────────
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundView, setRefundView] = useState('form');        // 'form' | 'history' | 'success'
@@ -75,13 +87,12 @@ const Dashboard = () => {
 
   // ── Withdrawal state (tenant + landlord) ──────────────────────────────────
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showFundModal, setShowFundModal] = useState(false);
   const [walletBalance, setWalletBalance] = useState(null);
   const [landlordWallet, setLandlordWallet] = useState(null);
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', bank_name: '', account_number: '', account_name: '' });
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [withdrawHistory, setWithdrawHistory] = useState([]);
-  const [walletView, setWalletView] = useState('withdraw'); // 'withdraw' | 'fund'
-  const [fundAmount, setFundAmount] = useState('');
   const [fundLoading, setFundLoading] = useState(false);
   
   // ── Bank verification states ──────────────────────────────────────────────
@@ -90,6 +101,12 @@ const Dashboard = () => {
   const [consentChecked, setConsentChecked] = useState(false);
   const [banks, setBanks] = useState([]);
   const [banksLoading, setBanksLoading] = useState(false);
+
+   // Rent Savings state (tenant only)
+  const [showRentSavingsModal, setShowRentSavingsModal] = useState(false);
+  const [tenantProperties, setTenantProperties] = useState([]);
+  const [rentSavingsStats, setRentSavingsStats] = useState(null);
+
 
   // ── Landlord refund management state ─────────────────────────────────────
   const [showLandlordRefundModal, setShowLandlordRefundModal] = useState(false);
@@ -142,6 +159,81 @@ const Dashboard = () => {
     }
   }, [user]);
 
+    // Load transportation data for tenant
+  const loadTransportationData = useCallback(async () => {
+    if (user?.user_type !== 'tenant') return;
+    
+    setTransportLoading(true);
+    try {
+      const [statsRes, upcomingRes] = await Promise.all([
+        api.get('/transportation/stats'),
+        api.get('/transportation/upcoming?limit=3')
+      ]);
+      
+      if (statsRes.data?.success) {
+        setTransportStats(statsRes.data.data);
+      }
+      
+      if (upcomingRes.data?.success) {
+        setUpcomingTransportBookings(upcomingRes.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading transportation data:', error);
+      // Don't show error toast for transportation data - it's optional
+    } finally {
+      setTransportLoading(false);
+    }
+  }, [user]);
+
+// Load rent savings data for tenants
+const loadRentSavingsData = useCallback(async () => {
+  if (user?.user_type !== 'tenant') return;
+  
+  try {
+    const [summaryRes, propertiesRes] = await Promise.all([
+      api.get('/rent-savings/summary'),
+      api.get('/properties/tenant'),
+    ]);
+    
+    if (summaryRes.data?.success) {
+      setRentSavingsStats(summaryRes.data.data);
+    }
+    
+    if (propertiesRes.data?.success) {
+      setTenantProperties(propertiesRes.data.data || []);
+    } else if (Array.isArray(propertiesRes.data)) {
+      setTenantProperties(propertiesRes.data);
+    }
+  } catch (error) {
+    console.error('Error loading rent savings data:', error);
+    // Don't show error toast - it's optional
+  }
+}, [user]);
+
+// Update the existing loadDashboard function to also load transportation data
+const loadDashboard = useCallback(async () => {
+  setLoading(true);
+  try {
+    const [statsRes, activitiesRes] = await Promise.all([
+      user?.user_type === 'tenant' ? api.get('/dashboard/tenant/stats') : api.get('/dashboard/landlord/stats'),
+      user?.user_type === 'tenant' ? api.get('/dashboard/tenant/recent-activities') : api.get('/dashboard/landlord/recent-activities'),
+    ]);
+
+    setStats(statsRes.data?.data || {});
+    setRecentActivities(activitiesRes.data?.data || []);
+    
+    // Load transportation data for tenants
+    if (user?.user_type === 'tenant') {
+      await loadTransportationData();
+      await loadRentSavingsData();
+    }
+  } catch (error) {
+    toast.error(error?.response?.data?.message || error?.message || 'Could not load dashboard');
+  } finally {
+    setLoading(false);
+  }
+}, [user, loadTransportationData, loadRentSavingsData]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -190,18 +282,18 @@ const Dashboard = () => {
       return;
     }
 
-    loadDashboardData();
-  }, [user, navigate, loadDashboardData]);
+    loadDashboard();
+  }, [user, navigate, loadDashboard]);
 
   useEffect(() => {
     if (!user) return undefined;
 
     const intervalId = setInterval(() => {
-      loadDashboardData();
+      loadDashboard();
     }, 30000);
 
     const handleWindowFocus = () => {
-      loadDashboardData();
+      loadDashboard();
     };
 
     window.addEventListener('focus', handleWindowFocus);
@@ -210,7 +302,7 @@ const Dashboard = () => {
       clearInterval(intervalId);
       window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [user, loadDashboardData]);
+  }, [user, loadDashboard]);
 
   // ── Bank account verification function ───────────────────────────────────
   const fetchAccountName = async (bankName, accountNumber) => {
@@ -297,8 +389,6 @@ const Dashboard = () => {
   // ── Withdrawal helpers ───────────────────────────────────────────────────
   const openWithdrawModal = async () => {
     setWithdrawForm({ amount: '', bank_name: '', account_number: '', account_name: '' });
-    setWalletView('withdraw');
-    setFundAmount('');
     setConsentChecked(false);
     setAccountNameError('');
     setShowWithdrawModal(true);
@@ -312,6 +402,21 @@ const Dashboard = () => {
       }
       const histRes = await api.get('/payments/wallet/withdrawals');
       if (histRes.data?.success) setWithdrawHistory(histRes.data.data || []);
+    } catch (err) {
+      console.error('Failed to load wallet data', err);
+    }
+  };
+
+  const openFundModal = async () => {
+    setShowFundModal(true);
+    try {
+      if (user.user_type === 'tenant') {
+        const res = await api.get('/payments/wallet/balance');
+        if (res.data?.success) setWalletBalance(res.data.data.balance);
+      } else {
+        const res = await api.get('/payments/wallet/landlord-balance');
+        if (res.data?.success) setLandlordWallet(res.data.data);
+      }
     } catch (err) {
       console.error('Failed to load wallet data', err);
     }
@@ -344,15 +449,14 @@ const Dashboard = () => {
     }
   };
 
-  const handleFundWallet = async (e) => {
-    e.preventDefault();
-    if (!fundAmount || Number(fundAmount) < 100) {
+  const handleFundWallet = async (amountInput) => {
+    if (!amountInput || Number(amountInput) < 100) {
       toast.error('Minimum funding amount is ₦100');
       return;
     }
     setFundLoading(true);
     try {
-      const res = await api.post('/payments/wallet/fund', { amount: fundAmount });
+      const res = await api.post('/payments/wallet/fund', { amount: amountInput });
       if (res.data?.success && res.data.data?.authorization_url) {
         // Redirect to Paystack
         window.location.href = res.data.data.authorization_url;
@@ -728,6 +832,13 @@ const Dashboard = () => {
                 value={getTenantSubscriptionValue()}
                 onClick={() => navigate('/subscribe')}
               />
+               {/* Transportation Booking Card */}
+              <StatCard
+                title="Transport Bookings"
+                value={transportStats?.total_bookings || 0}
+                icon={<FaTruck className="text-sky-500" />}
+                onClick={() => setShowTransportModal(true)}
+              />
               <StatCard
                 icon={<FaMoneyBillWave className="text-orange-500" />}
                 title="Refund Requests"
@@ -739,6 +850,16 @@ const Dashboard = () => {
                 title="Wallet Balance"
                 value={walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
                 onClick={openWithdrawModal}
+              />
+              {/* Rent Savings Card */}
+              <StatCard
+                icon={<FaPiggyBank className="text-purple-500" />}
+                title="Rent Savings"
+                value={rentSavingsStats?.total_plans > 0 ? `${rentSavingsStats.active_plans || 0} Active` : 'Start Saving'}
+                onClick={() => {
+                  setShowRentSavingsModal(true);
+                  if (tenantProperties.length === 0) loadRentSavingsData();
+                }}
               />
             </>
           ) : (
@@ -838,6 +959,12 @@ const Dashboard = () => {
                 onClick={() => navigate('/payment-history')}
               />
               <QuickActionCard
+                title="Fumigation & Cleaning"
+                description="Browse certified fumigation and cleaning services for your property"
+                icon={<FaSprayCan />}
+                onClick={() => navigate('/fumigation-cleaning/catalog')}
+              />
+              <QuickActionCard
                 title="Request a Refund"
                 description="Request a refund on any rent payment you made to a landlord"
                 icon={<FaUndo />}
@@ -848,6 +975,21 @@ const Dashboard = () => {
                 description="Fund Wallet/Withdraw approved refunds to your bank"
                 icon={<FaUniversity />}
                 onClick={openWithdrawModal}
+              />
+              <QuickActionCard
+                title="Fund Wallet"
+                description="Add money to your wallet via Paystack"
+                icon={<FaWallet />}
+                onClick={openFundModal}
+              />
+              <QuickActionCard
+                title="Rent Savings"
+                description="Save towards your rent automatically with monthly contributions"
+                icon={<FaPiggyBank />}
+                onClick={() => {
+                  setShowRentSavingsModal(true);
+                  if (tenantProperties.length === 0) loadRentSavingsData();
+                }}
               />
             </>
           ) : (
@@ -877,10 +1019,16 @@ const Dashboard = () => {
                 onClick={() => openLandlordRefundModal('pending')}
               />
               <QuickActionCard
-                title="Fund Wallet/Withdraw Funds"
+                title="Withdraw Funds"
                 description="Withdraw cleared rent payments to your bank account"
                 icon={<FaUniversity />}
                 onClick={openWithdrawModal}
+              />
+              <QuickActionCard
+                title="Fund Wallet"
+                description="Top up your wallet balance"
+                icon={<FaWallet />}
+                onClick={openFundModal}
               />
             </>
           )}
@@ -955,6 +1103,21 @@ const Dashboard = () => {
                           <span className="text-gray-600">Requested</span>
                           <span className="text-gray-700">{new Date(rr.requested_at).toLocaleDateString()}</span>
                         </div>
+                        <ApprovalTimeline
+                          steps={[
+                            { key: 'requested', label: 'Requested' },
+                            { key: 'landlord_review', label: 'Landlord Review' },
+                            { key: 'processed', label: 'Processed' },
+                          ]}
+                          currentStepKey={
+                            rr.status === 'pending'
+                              ? 'landlord_review'
+                              : rr.status === 'approved' || rr.status === 'refunded'
+                                ? 'processed'
+                                : 'landlord_review'
+                          }
+                          finalStatus={rr.status}
+                        />
                         {rr.landlord_note && (
                           <div className={`mt-2 text-xs rounded-lg px-3 py-2 ${rr.status === 'rejected' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
                             <strong>Landlord note:</strong> {rr.landlord_note}
@@ -1052,310 +1215,156 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* WITHDRAWAL MODAL (tenant + landlord) */}
-      {showWithdrawModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="px-6 pt-6 pb-0">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <FaWallet className="text-teal-500 text-2xl" />
-                  <h2 className="text-lg font-bold text-gray-800">My Wallet</h2>
-                </div>
-                <button onClick={() => setShowWithdrawModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <FaTimes className="text-xl" />
+      {/* Transportation Booking Modal */}
+      {showTransportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Transportation Services</h3>
+                <button
+                  onClick={() => setShowTransportModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  &times;
                 </button>
               </div>
-              <div className="flex border-b">
-                <button
-                  type="button"
-                  onClick={() => setWalletView('fund')}
-                  className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${walletView === 'fund' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                  💳 Fund Wallet
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWalletView('withdraw')}
-                  className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${walletView === 'withdraw' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                  🏦 Withdraw Funds
-                </button>
-              </div>
-            </div>
-
-            <div className="px-6 py-5 space-y-5">
-              {/* FUND WALLET TAB */}
-              {walletView === 'fund' && (
-                <div className="space-y-5">
-                  {user?.user_type === 'tenant' && walletBalance !== null && (
-                    <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-teal-600">Current Wallet Balance</p>
-                        <p className="text-2xl font-bold text-teal-800">₦{Number(walletBalance).toLocaleString()}</p>
-                      </div>
-                      <FaWallet className="text-teal-400 text-3xl" />
-                    </div>
-                  )}
-                  {user?.user_type === 'landlord' && landlordWallet && (
-                    <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-teal-600">Available Balance</p>
-                        <p className="text-2xl font-bold text-teal-800">₦{Number(landlordWallet.available_to_withdraw || 0).toLocaleString()}</p>
-                      </div>
-                      <FaWallet className="text-teal-400 text-3xl" />
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Select or enter amount</p>
-                    <div className="grid grid-cols-4 gap-2 mb-3">
-                      {[1000, 2000, 5000, 10000].map(amt => (
-                        <button
-                          key={amt}
-                          type="button"
-                          onClick={() => setFundAmount(String(amt))}
-                          className={`py-2 rounded-lg text-sm font-medium border transition-colors ${Number(fundAmount) === amt ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600 hover:border-teal-300'}`}
-                        >
-                          ₦{amt.toLocaleString()}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 mb-3">
-                      {[20000, 50000, 100000, 200000].map(amt => (
-                        <button
-                          key={amt}
-                          type="button"
-                          onClick={() => setFundAmount(String(amt))}
-                          className={`py-2 rounded-lg text-sm font-medium border transition-colors ${Number(fundAmount) === amt ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600 hover:border-teal-300'}`}
-                        >
-                          ₦{amt >= 1000 ? `${amt/1000}k` : amt.toLocaleString()}
-                        </button>
-                      ))}
-                    </div>
+              
+              <div className="mb-6">
+                <p className="text-gray-600 mb-4">
+                  Book transportation to move your items after paying tenancy. Available services include vans, trucks, and full moving services.
+                </p>
+                
+                {transportLoading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                   </div>
-                  <form onSubmit={handleFundWallet} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Custom Amount (₦)</label>
-                      <input
-                        type="number"
-                        min="100"
-                        value={fundAmount}
-                        onChange={e => setFundAmount(e.target.value)}
-                        className="input w-full text-lg font-semibold"
-                        placeholder="Enter amount e.g. 15000"
-                      />
-                      {fundAmount && Number(fundAmount) >= 100 && (
-                        <p className="text-xs text-teal-600 mt-1">
-                          You will be charged <strong>₦{Number(fundAmount).toLocaleString()}</strong> to fund your Wallet.
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-xs text-green-700">
-                      <FaCheckCircle className="mt-0.5 shrink-0 text-green-500" />
-                      <span>Payment is processed securely. Your wallet will be credited immediately after a successful payment.</span>
-                    </div>
-                    <div className="flex gap-3">
-                      <button type="button" onClick={() => setShowWithdrawModal(false)} className="btn w-full">Cancel</button>
-                      <button
-                        type="submit"
-                        disabled={fundLoading || !fundAmount || Number(fundAmount) < 100}
-                        className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {fundLoading ? 'Redirecting...' : `Pay ₦${fundAmount ? Number(fundAmount).toLocaleString() : '0'} to Fund Wallet`}
-                      </button>
-                    </div>
-                  </form>
+                ) : (
+                  <>
+                    {transportStats && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <h4 className="font-semibold text-blue-800 mb-2">Your Transportation Stats</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="text-sm">
+                            <span className="text-gray-600">Total Bookings:</span>
+                            <span className="font-semibold ml-2">{transportStats.total_bookings || 0}</span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-gray-600">Completed:</span>
+                            <span className="font-semibold ml-2">{transportStats.completed_bookings || 0}</span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-gray-600">Total Spent:</span>
+                            <span className="font-semibold ml-2">₦{(transportStats.total_spent || 0).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {upcomingTransportBookings.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-gray-800 mb-2">Upcoming Bookings</h4>
+                        <div className="space-y-2">
+                          {upcomingTransportBookings.slice(0, 2).map((booking) => (
+                            <div key={booking.id} className="bg-gray-50 border border-gray-200 rounded p-3">
+                              <div className="flex justify-between">
+                                <span className="font-medium">{booking.service_name}</span>
+                                <span className="text-blue-600 font-semibold">₦{booking.total_price?.toLocaleString()}</span>
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                {new Date(booking.booking_date).toLocaleDateString()} at {booking.booking_time}
+                              </div>
+                              <div className="text-xs mt-1">
+                                <span className={`px-2 py-1 rounded ${
+                                  booking.booking_status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                                  booking.booking_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {booking.booking_status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                <div className="flex flex-col space-y-3">
+                  <button
+                    onClick={() => {
+                      setShowTransportModal(false);
+                      navigate('/transportation/book');
+                    }}
+                    className="btn btn-primary w-full py-3"
+                  >
+                    <FaTruck className="inline mr-2" />
+                    Book Transportation Now
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setShowTransportModal(false);
+                      navigate('/transportation/bookings');
+                    }}
+                    className="btn btn-outline w-full py-3"
+                  >
+                    View All Bookings
+                  </button>
+                  
+                  <button
+                    onClick={() => setShowTransportModal(false)}
+                    className="btn btn-gray w-full py-3"
+                  >
+                    Close
+                  </button>
                 </div>
-              )}
-
-              {/* WITHDRAW FUNDS TAB */}
-              {walletView === 'withdraw' && (
-                <div className="space-y-5">
-                  {user?.user_type === 'tenant' && (
-                    <>
-                      <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-teal-600">Available Wallet Balance</p>
-                          <p className="text-2xl font-bold text-teal-800">
-                            {walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
-                          </p>
-                        </div>
-                        <FaWallet className="text-teal-400 text-3xl" />
-                      </div>
-                      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 space-y-1">
-                        <p className="font-semibold text-blue-800">How is my wallet funded?</p>
-                        <p>Your wallet is automatically credited when a landlord <strong>approves your refund request</strong>. The approved refund amount is added to your wallet balance.</p>
-                        <p>Once your wallet has a balance, you can withdraw it to your bank account using the form below.</p>
-                        <p className="text-blue-500 italic">To get funds in your wallet, submit a refund request from the "Request a Refund" section on your dashboard.</p>
-                      </div>
-                    </>
-                  )}
-                  {user?.user_type === 'landlord' && (
-                    <>
-                      {landlordWallet ? (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                            <p className="text-xs text-green-600">Available to Withdraw</p>
-                            <p className="text-xl font-bold text-green-800">₦{Number(landlordWallet.available_to_withdraw).toLocaleString()}</p>
-                          </div>
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
-                            <p className="text-xs text-yellow-600">Pending (14-day hold)</p>
-                            <p className="text-xl font-bold text-yellow-800">₦{Number(landlordWallet.pending_balance).toLocaleString()}</p>
-                          </div>
-                          <div className="col-span-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2">
-                            <p className="text-xs text-gray-500">Total Withdrawn to Date: <strong>₦{Number(landlordWallet.withdrawn_total || 0).toLocaleString()}</strong></p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-500 text-center">Loading wallet...</div>
-                      )}
-                      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 space-y-1">
-                        <p className="font-semibold text-blue-800">How is my wallet funded?</p>
-                        <p>Your wallet balance comes from <strong>rent payments made by tenants</strong> through the platform.</p>
-                        <p>Rent payments are held for <strong>14 working days</strong> before they are cleared and added to your available balance. This holding period allows time for any refund disputes to be resolved.</p>
-                        <p>Payments older than 14 working days with <strong>no active refund dispute</strong> are automatically cleared for withdrawal.</p>
-                        <p className="text-blue-500 italic">Pending balance = rent received within the last 14 working days or with an active refund dispute.</p>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Withdrawal form */}
-                  <form onSubmit={handleWithdrawSubmit} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₦) *</label>
-                      <input
-                        type="number"
-                        required
-                        min="100"
-                        value={withdrawForm.amount}
-                        onChange={e => setWithdrawForm(p => ({ ...p, amount: e.target.value }))}
-                        className="input w-full"
-                        placeholder="Enter amount to withdraw"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name *</label>
-                      <select
-                        required
-                        value={withdrawForm.bank_name}
-                        onChange={handleBankChange}
-                        className="input w-full"
-                      >
-                                                <option value="">-- Select your bank --</option>
-                        {banksLoading ? (
-                          <option disabled>Loading banks...</option>
-                        ) : (
-                          banks.map(bank => (
-                            <option key={bank.code || bank.name} value={bank.name}>
-                              {bank.name}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Account Number *</label>
-                      <div className="relative">
-                        <input
-                          required
-                          maxLength={10}
-                          value={withdrawForm.account_number}
-                          onChange={handleAccountNumberChange}
-                          className="input w-full"
-                          placeholder="10-digit account number"
-                        />
-                        {accountNameLoading && (
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
-                          </div>
-                        )}
-                      </div>
-                      {accountNameError && (
-                        <p className="text-xs text-red-600 mt-1">{accountNameError}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Account Name *</label>
-                      <input
-                        required
-                        value={withdrawForm.account_name}
-                        onChange={e => setWithdrawForm(p => ({ ...p, account_name: e.target.value }))}
-                        className={`input w-full ${accountNameLoading ? 'bg-gray-100' : ''}`}
-                        placeholder="Account holder name"
-                        readOnly={!accountNameError && withdrawForm.account_name && !accountNameLoading}
-                      />
-                      {withdrawForm.account_name && !accountNameError && withdrawForm.account_number.length === 10 && (
-                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                          <FaCheckCircle className="text-xs" /> Account verified
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Consent Checkbox */}
-                    <div className="flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                      <input
-                        type="checkbox"
-                        id="withdrawConsent"
-                        checked={consentChecked}
-                        onChange={(e) => setConsentChecked(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
-                      <label htmlFor="withdrawConsent" className="text-xs text-gray-700">
-                        I confirm that the bank account details provided above are correct and belong to me. 
-                        I understand that providing incorrect information may result in loss of funds and 
-                        Rentalhub NG will not be liable to such.
-                      </label>
-                    </div>
-
-                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
-                      <FaExclamationTriangle className="mt-0.5 shrink-0" />
-                      <span>Withdrawals are processed within 1–7 business days. Double-check your account details — incorrect details may result in loss of funds.</span>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button type="button" onClick={() => setShowWithdrawModal(false)} className="btn w-full">Cancel</button>
-                      <button
-                        type="submit"
-                        disabled={
-                          withdrawLoading ||
-                          !withdrawForm.amount ||
-                          !withdrawForm.bank_name ||
-                          !withdrawForm.account_number ||
-                          !withdrawForm.account_name ||
-                          !consentChecked
-                        }
-                        className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {withdrawLoading ? 'Submitting...' : 'Request Withdrawal'}
-                      </button>
-                    </div>
-                  </form>
-
-                  {/* Withdrawal history */}
-                  {withdrawHistory.length > 0 && (
-                    <div className="space-y-2 pt-2">
-                      <p className="text-sm font-semibold text-gray-700 border-t pt-3">Recent Withdrawals</p>
-                      {withdrawHistory.slice(0, 5).map(w => (
-                        <div key={w.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                          <div>
-                            <p className="font-medium text-gray-800">₦{Number(w.amount).toLocaleString()}</p>
-                            <p className="text-xs text-gray-500">{w.bank_name} · {w.account_number}</p>
-                            <p className="text-xs text-gray-400">{new Date(w.requested_at).toLocaleDateString()}</p>
-                          </div>
-                          <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize ${withdrawStatusBadge(w.status)}`}>{w.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <WalletFundModal
+        isOpen={showFundModal}
+        onClose={() => setShowFundModal(false)}
+        onSubmit={handleFundWallet}
+        isLoading={fundLoading}
+        userType={user?.user_type}
+        walletBalance={walletBalance}
+        landlordWallet={landlordWallet}
+        onSwitchToWithdraw={() => {
+          setShowFundModal(false);
+          openWithdrawModal();
+        }}
+      />
+
+      <WalletWithdrawModal
+        isOpen={showWithdrawModal}
+        onClose={() => setShowWithdrawModal(false)}
+        onSubmit={handleWithdrawSubmit}
+        isLoading={withdrawLoading}
+        userType={user?.user_type}
+        walletBalance={walletBalance}
+        landlordWallet={landlordWallet}
+        withdrawForm={withdrawForm}
+        setWithdrawForm={setWithdrawForm}
+        handleBankChange={handleBankChange}
+        handleAccountNumberChange={handleAccountNumberChange}
+        banks={banks}
+        banksLoading={banksLoading}
+        accountNameLoading={accountNameLoading}
+        accountNameError={accountNameError}
+        consentChecked={consentChecked}
+        setConsentChecked={setConsentChecked}
+        withdrawHistory={withdrawHistory}
+        withdrawStatusBadge={withdrawStatusBadge}
+        onSwitchToFund={() => {
+          setShowWithdrawModal(false);
+          openFundModal();
+        }}
+      />
 
       {/* LANDLORD REFUND MANAGEMENT MODAL */}
       {showLandlordRefundModal && user?.user_type === 'landlord' && (
@@ -1567,6 +1576,16 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Rent Savings Modal */}
+      {showRentSavingsModal && user?.user_type === 'tenant' && (
+        <RentSavingsModal
+          isOpen={showRentSavingsModal}
+          onClose={() => setShowRentSavingsModal(false)}
+          user={user}
+          properties={tenantProperties}
+        />
       )}
     </div>
   );

@@ -367,14 +367,15 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails) => {
         admin_wallet_balance,
         admin_funds_frozen,
         full_name,
-        email
+        email,
+        user_type
        FROM users 
-       WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin')`,
+       WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin', 'financial_admin', 'super_financial_admin', 'super_admin')`,
       [adminId]
     );
     
     if (adminResult.rows.length === 0) {
-      throw new Error('State admin not found');
+      throw new Error('Eligible admin not found');
     }
     
     const admin = adminResult.rows[0];

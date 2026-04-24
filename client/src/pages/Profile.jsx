@@ -632,6 +632,15 @@ const Profile = () => {
         </div>
       </div>
 
+      <div className="flex justify-center mb-6">
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="btn btn-outline"
+      >
+        Back to Dashboard
+      </button>
+    </div>
+
       <div className="card mb-6">
         <h2 className="font-semibold mb-4">{t('profile.account_title')}</h2>
         <div className="space-y-3 text-sm">

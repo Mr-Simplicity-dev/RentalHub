@@ -1,5 +1,18 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import api from "../../services/api";
+import PaginationControls from "./PaginationControls";
+import { useAuth } from "../../hooks/useAuth";
+import {
+  getAuthToken,
+  getAuthUser,
+  setAuthSession,
+  setImpersonationOriginalSession,
+  isImpersonatingSession,
+} from "../../services/authStorage";
+
+const ADMINS_PAGE_SIZE = 10;
 
 const getRoleBadgeClass = (role) => {
   switch (role) {
@@ -26,17 +39,21 @@ const getRoleBadgeClass = (role) => {
 const formatRoleLabel = (role) => String(role || 'admin').replace(/_/g, ' ');
 
 const AdminListTab = () => {
+  const navigate = useNavigate();
+  const { updateUser } = useAuth();
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedAdminId, setExpandedAdminId] = useState(null);
   const [stateUsersByAdmin, setStateUsersByAdmin] = useState({});
   const [stateUsersLoadingByAdmin, setStateUsersLoadingByAdmin] = useState({});
+  const [adminsPage, setAdminsPage] = useState(1);
 
   const fetchAdmins = async () => {
     try {
       setLoading(true);
       const res = await api.get("/super/admins/performance");
       setAdmins(res.data.data || []);
+      setAdminsPage(1);
     } catch (err) {
       console.error("Failed to load admins:", err);
       setAdmins([]);
@@ -67,17 +84,32 @@ const AdminListTab = () => {
     fetchAdmins();
   };
 
-  const deleteAdmin = async (admin) => {
+  
+
+    const deleteAdmin = async (admin) => {
     const ok = window.confirm(
       `Delete ${admin.full_name}? This will deactivate the account and block login.`
     );
     if (!ok) return;
 
     try {
-      await api.delete(`/super/users/${admin.id}`);
+      // Try the admin-specific endpoint first
+      await api.delete(`/super/admins/${admin.id}`);
+      toast.success(`Admin ${admin.full_name} deleted successfully`);
       fetchAdmins();
     } catch (err) {
-      window.alert(err.response?.data?.message || 'Failed to delete admin');
+      console.error('Delete admin error:', err);
+      // If admin-specific endpoint fails, try the general user endpoint
+      try {
+        await api.delete(`/super/users/${admin.id}`);
+        toast.success(`Admin ${admin.full_name} deleted successfully`);
+        fetchAdmins();
+      } catch (secondErr) {
+        const errorMessage = secondErr.response?.data?.message || 
+                            err.response?.data?.message || 
+                            'Failed to delete admin. Please check permissions and try again.';
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -155,6 +187,43 @@ const AdminListTab = () => {
     }
   };
 
+  const openAdminDashboard = async (admin) => {
+    try {
+      const currentToken = getAuthToken();
+      const currentUser = getAuthUser();
+
+      if (!isImpersonatingSession() && currentToken && currentUser) {
+        setImpersonationOriginalSession(currentToken, currentUser);
+      }
+
+      const response = await api.post(`/super/admins/${admin.id}/impersonate`);
+      const token = response?.data?.data?.token;
+      const user = response?.data?.data?.user;
+      const redirectPath = response?.data?.data?.redirect_path || '/dashboard';
+
+      if (!token || !user) {
+        toast.error('Unable to start admin impersonation session.');
+        return;
+      }
+
+      setAuthSession(token, user);
+      updateUser(user);
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      toast.success(`Now viewing dashboard as ${user.full_name || user.email || 'selected admin'}`);
+      navigate(redirectPath);
+    } catch (error) {
+      const message = error?.response?.data?.message || 'Failed to open selected admin dashboard';
+      toast.error(message);
+    }
+  };
+
+  const totalAdminsPages = Math.max(
+    Math.ceil((admins.length || 0) / ADMINS_PAGE_SIZE),
+    1
+  );
+  const adminsStart = (adminsPage - 1) * ADMINS_PAGE_SIZE;
+  const pagedAdmins = admins.slice(adminsStart, adminsStart + ADMINS_PAGE_SIZE);
+
   return (
     <div className="space-y-4">
       <div className="text-center">
@@ -191,11 +260,20 @@ const AdminListTab = () => {
               </tr>
             )}
 
-            {admins.map((admin) => (
+            {pagedAdmins.map((admin) => (
               <React.Fragment key={admin.id}>
                 <tr className="border-t border-soft transition hover:bg-gray-50">
                   <td className="p-3 font-medium">{admin.full_name}</td>
-                  <td className="p-3 text-gray-600">{admin.email}</td>
+                  <td className="p-3 text-gray-600">
+                    <button
+                      type="button"
+                      onClick={() => openAdminDashboard(admin)}
+                      className="text-blue-700 underline decoration-dotted underline-offset-2 hover:text-blue-900"
+                      title={`Open ${admin.full_name || 'admin'} dashboard`}
+                    >
+                      {admin.email}
+                    </button>
+                  </td>
                   <td className="p-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold capitalize ${getRoleBadgeClass(admin.user_type)}`}
@@ -339,6 +417,13 @@ const AdminListTab = () => {
           </tbody>
         </table>
       </div>
+
+      <PaginationControls
+        currentPage={adminsPage}
+        totalPages={totalAdminsPages}
+        onPageChange={setAdminsPage}
+        summary={`Showing ${admins.length === 0 ? 0 : adminsStart + 1}-${Math.min(adminsPage * ADMINS_PAGE_SIZE, admins.length)} of ${admins.length}`}
+      />
     </div>
   );
 };

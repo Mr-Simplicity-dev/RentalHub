@@ -1,4 +1,5 @@
 const db = require('../config/middleware/database');
+const jwt = require('jsonwebtoken');
 const {
   DEFAULT_FEATURE_FLAGS,
   ensureFeatureFlagsTable,
@@ -86,6 +87,33 @@ const logAction = async (actorId, action, targetType = null, targetId = null) =>
   );
 };
 
+const getDashboardPathForRole = (userType) => {
+  switch (String(userType || '').toLowerCase()) {
+    case 'super_admin':
+      return '/super-admin?tab=overview';
+    case 'super_financial_admin':
+      return '/admin/super-financial-dashboard?panel=overview';
+    case 'financial_admin':
+      return '/admin/financial-dashboard';
+    case 'state_admin':
+    case 'state_financial_admin':
+    case 'admin':
+      return '/admin';
+    case 'super_support_admin':
+      return '/admin/super-support-dashboard?tab=overview';
+    case 'state_support_admin':
+      return '/admin/state-support-dashboard';
+    case 'super_lawyer':
+      return '/lawyer/super';
+    case 'state_lawyer':
+      return '/lawyer/state';
+    case 'lawyer':
+      return '/lawyer';
+    default:
+      return '/dashboard';
+  }
+};
+
 // ================= USERS =================
 
 // GET /api/super/users
@@ -121,6 +149,100 @@ const getAllUsers = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to load users' });
+  }
+};
+
+const impersonateAdmin = async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
+    if (!Number.isInteger(targetId) || targetId <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid admin id' });
+    }
+
+    const { rows } = await db.query(
+      `SELECT id, email, full_name, user_type, assigned_state, assigned_city,
+              email_verified, phone_verified, identity_verified,
+              identity_verification_status, subscription_active, subscription_expires_at,
+              is_active, deleted_at, COALESCE(approval_status, 'approved') AS approval_status
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [targetId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    const target = rows[0];
+    const allowedRoles = new Set([
+      'admin',
+      'state_admin',
+      'state_financial_admin',
+      'financial_admin',
+      'super_financial_admin',
+      'state_support_admin',
+      'super_support_admin',
+      'lawyer',
+      'state_lawyer',
+      'super_lawyer',
+      'super_admin',
+    ]);
+
+    if (!allowedRoles.has(String(target.user_type || '').toLowerCase())) {
+      return res.status(403).json({ success: false, message: 'Impersonation is not allowed for this role' });
+    }
+
+    if (target.deleted_at) {
+      return res.status(403).json({ success: false, message: 'Cannot impersonate a deleted account' });
+    }
+
+    if (target.is_active === false) {
+      return res.status(403).json({ success: false, message: 'Cannot impersonate a suspended account' });
+    }
+
+    if (target.approval_status === 'pending') {
+      return res.status(403).json({ success: false, message: 'Cannot impersonate an account pending approval' });
+    }
+
+    const impersonationToken = jwt.sign(
+      {
+        userId: target.id,
+        userType: target.user_type,
+        impersonation: true,
+        impersonatedBy: req.user.id,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+
+    await logAction(req.user.id, `IMPERSONATE_ADMIN_${String(target.user_type || '').toUpperCase()}`, 'user', target.id);
+
+    return res.json({
+      success: true,
+      message: `Now impersonating ${target.full_name}`,
+      data: {
+        token: impersonationToken,
+        user: {
+          id: target.id,
+          email: target.email,
+          full_name: target.full_name,
+          user_type: target.user_type,
+          assigned_state: target.assigned_state,
+          assigned_city: target.assigned_city,
+          email_verified: target.email_verified,
+          phone_verified: target.phone_verified,
+          identity_verified: target.identity_verified,
+          identity_verification_status: target.identity_verification_status,
+          subscription_active: target.subscription_active,
+          subscription_expires_at: target.subscription_expires_at,
+        },
+        redirect_path: getDashboardPathForRole(target.user_type),
+      },
+    });
+  } catch (error) {
+    console.error('Impersonation error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to impersonate admin' });
   }
 };
 
@@ -2117,6 +2239,7 @@ const getLawyerActivities = async (req, res) => {
 
 module.exports = {
   getAllUsers,
+  impersonateAdmin,
   banUser,
   unbanUser,
   deleteUser,

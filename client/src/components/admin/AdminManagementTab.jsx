@@ -1,14 +1,37 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { useAuth } from "../../hooks/useAuth";
+import { approvalService } from "../../services/approvalService";
 
 import CreateAdminTab from "./CreateAdminTab";
 import AdminListTab from "./AdminListTab";
+import PendingAdminApprovalsTab from "./PendingAdminApprovalsTab";
+import SFAPermissionsTab from "./SFAPermissionsTab";
 
-const AdminManagementTab = () => {
-  const [activeTab, setActiveTab] = useState("create");
+const AdminManagementTab = ({ initialTab = "create" }) => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.user_type === "super_admin";
+
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const loadPendingCount = useCallback(async () => {
+    try {
+      const rows = await approvalService.fetchPendingAdminApprovals();
+      setPendingCount(rows.length);
+    } catch {
+      setPendingCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPendingCount();
+  }, [loadPendingCount]);
 
   const tabs = [
     { id: "create", label: "Create Admin" },
     { id: "list", label: "Manage Admins" },
+    { id: "pending", label: "Pending Approvals", count: pendingCount },
+    ...(isSuperAdmin ? [{ id: "sfa_permissions", label: "SFA Delegation" }] : []),
   ];
 
   const renderTab = () => {
@@ -17,6 +40,10 @@ const AdminManagementTab = () => {
         return <CreateAdminTab />;
       case "list":
         return <AdminListTab />;
+      case "pending":
+        return <PendingAdminApprovalsTab />;
+      case "sfa_permissions":
+        return isSuperAdmin ? <SFAPermissionsTab /> : null;
       default:
         return null;
     }
@@ -50,7 +77,14 @@ const AdminManagementTab = () => {
               }
             `}
           >
-            {tab.label}
+            <span className="inline-flex items-center gap-2">
+              {tab.label}
+              {typeof tab.count === "number" && tab.count > 0 && (
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
+                  {tab.count}
+                </span>
+              )}
+            </span>
           </button>
         ))}
 

@@ -67,6 +67,15 @@ const PaymentHistory = () => {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6 text-center">Payment History</h1>
 
+    <div className="flex justify-center mb-6">
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="btn btn-outline"
+      >
+        Back to Dashboard
+      </button>
+    </div>
+
       {payments.length === 0 ? (
         <div className="card text-center py-10 text-gray-500">
           No payment history yet.

@@ -12,14 +12,15 @@ import {
   FaExclamationTriangle,
   FaShieldAlt,
   FaChartBar,
-  FaChartPie
+  FaChartPie,
+  FaDownload
 } from 'react-icons/fa';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
 import Button from '../../components/common/Button';
 import InputDialog from '../../components/common/InputDialog';
+import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
 import useRetryableAction from '../../hooks/useRetryableAction';
-import AdminLayout from './AdminLayout';
 
 const FinancialAdminDashboard = () => {
   const navigate = useNavigate();
@@ -28,12 +29,20 @@ const FinancialAdminDashboard = () => {
   const [transactions, setTransactions] = useState([]);
   const [frozenFunds, setFrozenFunds] = useState([]);
   const [stateAdmins, setStateAdmins] = useState([]);
+  const [withdrawals, setWithdrawals] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [showFreezeDialog, setShowFreezeDialog] = useState(false);
   const [freezeInputs, setFreezeInputs] = useState({
     user_id: '',
     amount: '',
     reason: '',
+  });
+  const [showPersonalWithdrawDialog, setShowPersonalWithdrawDialog] = useState(false);
+  const [personalWithdrawInputs, setPersonalWithdrawInputs] = useState({
+    amount: '',
+    bank_name: '',
+    account_number: '',
+    account_name: '',
   });
 
   const freezeFundsAction = useRetryableAction(
@@ -59,6 +68,31 @@ const FinancialAdminDashboard = () => {
     }
   );
 
+  const personalWithdrawAction = useRetryableAction(
+    async (inputs) => {
+      await api.post('/api/financial-admin/withdraw/request', {
+        amount: parseFloat(inputs.amount),
+        bank_name: String(inputs.bank_name || '').trim(),
+        bank_code: String(inputs.bank_code || '').trim(),
+        account_number: String(inputs.account_number || '').trim(),
+        account_name: String(inputs.account_name || '').trim(),
+      });
+    },
+    {
+      maxRetries: 2,
+      context: 'financial_admin',
+      onSuccess: async () => {
+        toast.success('Personal commission withdrawal request submitted');
+        setShowPersonalWithdrawDialog(false);
+        setPersonalWithdrawInputs({ amount: '', bank_name: '', account_number: '', account_name: '' });
+        await fetchDashboardData();
+      },
+      onError: (error) => {
+        toast.error(error?.message || 'Failed to submit withdrawal request');
+      },
+    }
+  );
+
   useEffect(() => {
     const initializeDashboard = async () => {
       try {
@@ -80,17 +114,19 @@ const FinancialAdminDashboard = () => {
     try {
       setLoading(true);
       
-      const [statsRes, transactionsRes, frozenRes, adminsRes] = await Promise.all([
+      const [statsRes, transactionsRes, frozenRes, adminsRes, withdrawalsRes] = await Promise.all([
         api.get(`/api/financial-admin/stats/realtime`),
         api.get(`/api/financial-admin/transactions?limit=10&page=1`),
         api.get('/api/financial-admin/funds/frozen'),
-        api.get('/api/financial-admin/performance/state-admins')
+        api.get('/api/financial-admin/performance/state-admins'),
+        api.get('/api/financial-admin/withdrawals/history')
       ]);
 
       setStats(statsRes.data.data);
       setTransactions(transactionsRes.data.data);
       setFrozenFunds(frozenRes.data.data);
       setStateAdmins(adminsRes.data.data);
+      setWithdrawals(withdrawalsRes.data.data || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -154,17 +190,14 @@ const FinancialAdminDashboard = () => {
 
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex items-center justify-center h-96">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </AdminLayout>
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
     );
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
@@ -188,11 +221,39 @@ const FinancialAdminDashboard = () => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setActiveTab('withdrawals')}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  View Withdrawal History
+                </button>
+                <button
+                  type="button"
                   onClick={openFreezeDialog}
                   className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                 >
                   Freeze Funds
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPersonalWithdrawDialog(true)}
+                  className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                >
+                  Request Personal Withdrawal
+                </button>
+              </div>
+              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-emerald-800">
+                    Withdrawal Access: Enabled. You can request your personal commission withdrawal from this dashboard.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('withdrawals')}
+                    className="rounded-md border border-emerald-300 bg-white px-3 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                  >
+                    Open Withdrawal History
+                  </button>
+                </div>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -287,7 +348,7 @@ const FinancialAdminDashboard = () => {
         <div className="bg-white rounded-lg shadow">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
-              {['overview', 'transactions', 'state-admins', 'frozen-funds', 'audit-trail'].map((tab) => (
+              {['overview', 'transactions', 'state-admins', 'frozen-funds', 'withdrawals', 'audit-trail'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -691,6 +752,93 @@ const FinancialAdminDashboard = () => {
               </div>
             )}
 
+            {activeTab === 'withdrawals' && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Withdrawal History</h3>
+                  <button
+                    onClick={() => {
+                      const csvContent = "data:text/csv;charset=utf-8," 
+                        + "Date,Amount,Bank,Account Number,Status\n"
+                        + withdrawals.map(w => 
+                            `${formatDate(w.requested_at)},${w.amount},${w.bank_name},${w.account_number},${w.status}`
+                          ).join("\n");
+                      const encodedUri = encodeURI(csvContent);
+                      const link = document.createElement("a");
+                      link.setAttribute("href", encodedUri);
+                      link.setAttribute("download", "withdrawals.csv");
+                      document.body.appendChild(link);
+                      link.click();
+                    }}
+                    className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    <FaDownload className="h-4 w-4 mr-1" />
+                    Export CSV
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Amount
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Bank
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Account Number
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Processed
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {withdrawals.map((withdrawal) => (
+                        <tr key={withdrawal.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(withdrawal.requested_at)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {formatCurrency(withdrawal.amount)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {withdrawal.bank_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {withdrawal.account_number}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              withdrawal.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : withdrawal.status === 'completed'
+                                ? 'bg-green-100 text-green-800'
+                                : withdrawal.status === 'failed'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {withdrawal.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {withdrawal.processed_at ? formatDate(withdrawal.processed_at) : 'Pending'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'audit-trail' && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -804,8 +952,18 @@ const FinancialAdminDashboard = () => {
             },
           ]}
         />
-      </div>
-    </AdminLayout>
+
+        <AdminWithdrawalModal
+          isOpen={showPersonalWithdrawDialog}
+          onClose={() => setShowPersonalWithdrawDialog(false)}
+          onSubmit={async (formData) => {
+            setPersonalWithdrawInputs(formData);
+            await personalWithdrawAction.execute(formData);
+          }}
+          isLoading={personalWithdrawAction.isLoading}
+          confirmLabel="Submit Withdrawal Request"
+        />
+    </div>
   );
 };
 

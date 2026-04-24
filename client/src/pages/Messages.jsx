@@ -16,6 +16,13 @@ const formatDateTime = (value) => {
   return new Date(value).toLocaleString();
 };
 
+const ESCALATION_TICKET_OPTIONS = [
+  { value: 'approval_pending', label: 'Approval Pending' },
+  { value: 'under_review', label: 'Under Review' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+];
+
 const Messages = () => {
   const { user } = useAuth();
 
@@ -30,6 +37,7 @@ const Messages = () => {
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [loadingEscalations, setLoadingEscalations] = useState(false);
   const [sending, setSending] = useState(false);
+  const [updatingEscalationId, setUpdatingEscalationId] = useState('');
 
   const [recipientRoleFilter, setRecipientRoleFilter] = useState('');
   const [compose, setCompose] = useState({
@@ -198,6 +206,93 @@ const Messages = () => {
     }
   };
 
+  const handleOpenEscalationThread = async (item) => {
+    if (!item?.sender_id) {
+      toast.error('Unable to open full message thread');
+      return;
+    }
+
+    const matchingConversation = conversations.find(
+      (c) => Number(c.other_user_id) === Number(item.sender_id)
+    );
+
+    if (matchingConversation) {
+      await handleSelectConversation(matchingConversation);
+      return;
+    }
+
+    const fallbackConversation = {
+      other_user_id: Number(item.sender_id),
+      other_user_name: item.sender_name || 'User',
+      other_user_type: item.sender_role || 'admin',
+    };
+    await handleSelectConversation(fallbackConversation);
+  };
+
+  const handleMarkEscalationHandled = async (item) => {
+    try {
+      setUpdatingEscalationId(`handled-${item.id}`);
+      await messageService.markEscalationHandled(item.id);
+      setEscalations((prev) => prev.map((row) => (
+        Number(row.id) === Number(item.id)
+          ? { ...row, is_read: true, is_handled: true, handled_at: new Date().toISOString() }
+          : row
+      )));
+      toast.success('Escalation marked as handled');
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to mark escalation as handled');
+    } finally {
+      setUpdatingEscalationId(null);
+    }
+  };
+
+  const handleConvertEscalationToTicket = (item) => {
+    if (item.ticket_status) {
+      toast.info('Escalation is already tracked as an approval ticket');
+      return;
+    }
+
+    const persist = async () => {
+      try {
+        setUpdatingEscalationId(`ticket-${item.id}`);
+        const res = await messageService.convertEscalationToTicket(item.id);
+        const nextStatus = res?.data?.ticket_status || 'approval_pending';
+        setEscalations((prev) => prev.map((row) => (
+          Number(row.id) === Number(item.id)
+            ? { ...row, ticket_status: nextStatus }
+            : row
+        )));
+        toast.success('Escalation converted to tracked approval ticket status');
+      } catch (error) {
+        toast.error(error?.response?.data?.message || 'Failed to convert escalation to ticket');
+      } finally {
+        setUpdatingEscalationId('');
+      }
+    };
+
+    persist();
+  };
+
+  const handleEscalationTicketStatusChange = (item, status) => {
+    const persist = async () => {
+      try {
+        setUpdatingEscalationId(`ticket-${item.id}`);
+        await messageService.updateEscalationTicketStatus(item.id, status);
+        setEscalations((prev) => prev.map((row) => (
+          Number(row.id) === Number(item.id)
+            ? { ...row, ticket_status: status }
+            : row
+        )));
+      } catch (error) {
+        toast.error(error?.response?.data?.message || 'Failed to update ticket status');
+      } finally {
+        setUpdatingEscalationId('');
+      }
+    };
+
+    persist();
+  };
+
   /* ---------------- UI ---------------- */
 
   return (
@@ -216,6 +311,15 @@ const Messages = () => {
               Refresh
             </button>
           </div>
+
+          <div className="flex justify-center mb-6">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="btn btn-outline"
+        >
+          Back to Dashboard
+        </button>
+      </div>
 
           {loadingConversations ? (
             <p className="text-sm text-gray-500">Loading conversations...</p>
@@ -410,6 +514,62 @@ const Messages = () => {
                       <p className="text-gray-700 mt-1 whitespace-pre-wrap">{item.message_text}</p>
                       <div className="text-xs text-gray-500 mt-2">
                         From {item.sender_name} ({roleLabel(item.sender_role)}) to {item.receiver_name} ({roleLabel(item.receiver_role)}) on {formatDateTime(item.created_at)}
+                      </div>
+                      {(item.ticket_updated_at || item.handled_at) && (
+                        <div className="text-[11px] text-gray-500 mt-1">
+                          {item.ticket_updated_at && (
+                            <>
+                              Ticket updated by {item.ticket_updated_by_name || 'Unknown'} on {formatDateTime(item.ticket_updated_at)}
+                            </>
+                          )}
+                          {item.ticket_updated_at && item.handled_at ? ' · ' : ''}
+                          {item.handled_at && (
+                            <>
+                              Handled by {item.handled_by_name || 'Unknown'} on {formatDateTime(item.handled_at)}
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEscalationThread(item)}
+                          className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                        >
+                          Open Full Message Thread
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMarkEscalationHandled(item)}
+                          disabled={Boolean(item.is_handled || item.handled_at || item.is_read) || updatingEscalationId === `handled-${item.id}`}
+                          className="rounded-md border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {item.is_handled || item.handled_at || item.is_read ? 'Handled' : updatingEscalationId === `handled-${item.id}` ? 'Saving...' : 'Mark Escalation as Handled'}
+                        </button>
+                        {!item.ticket_status ? (
+                          <button
+                            type="button"
+                            onClick={() => handleConvertEscalationToTicket(item)}
+                            disabled={updatingEscalationId === `ticket-${item.id}`}
+                            className="rounded-md border border-indigo-300 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {updatingEscalationId === `ticket-${item.id}` ? 'Saving...' : 'Convert to Tracked Approval Ticket'}
+                          </button>
+                        ) : (
+                          <label className="flex items-center gap-2 text-xs text-gray-700">
+                            Ticket Status
+                            <select
+                              value={item.ticket_status}
+                              onChange={(event) => handleEscalationTicketStatusChange(item, event.target.value)}
+                              disabled={updatingEscalationId === `ticket-${item.id}`}
+                              className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700"
+                            >
+                              {ESCALATION_TICKET_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                       </div>
                     </li>
                   ))}

@@ -400,16 +400,16 @@ exports.getAllUsers = async (req, res) => {
     }
 
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const fromClause = `
-      FROM users u
-      LEFT JOIN LATERAL (
-        SELECT p.state
-        FROM properties p
-        WHERE p.landlord_id = u.id
-        ORDER BY p.created_at DESC
-        LIMIT 1
-      ) ls ON TRUE
-    `;
+        const fromClause = `
+        FROM users u
+        LEFT JOIN LATERAL (
+          SELECT p.state, p.lga_name
+          FROM properties p
+          WHERE p.landlord_id = u.id
+          ORDER BY p.created_at DESC
+          LIMIT 1
+        ) ls ON TRUE
+      `;
 
     // Total count
     const countQuery = `
@@ -1944,14 +1944,31 @@ exports.createAdmin = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
+    // Roles that require super-admin approval before the account is active
+    const requiresApprovalRoles = new Set([
+      'admin',
+      'state_admin',
+      'financial_admin',
+      'super_financial_admin',
+      'state_financial_admin',
+      'state_support_admin',
+      'super_support_admin',
+      'super_lawyer',
+      'state_lawyer',
+      'lawyer',
+      'agent',
+    ]);
+
+    const pendingApproval = requiresApprovalRoles.has(user_type);
+
     const result = await db.query(
       `INSERT INTO users (
         user_type, email, phone, password_hash,
         full_name, nin, assigned_state, assigned_city, lawyer_client_scope,
-        email_verified, phone_verified, identity_verified
+        email_verified, phone_verified, identity_verified, approval_status
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,TRUE,TRUE)
-      RETURNING id, email, user_type, assigned_state, assigned_city, lawyer_client_scope`,
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,TRUE,TRUE,$10)
+      RETURNING id, email, user_type, assigned_state, assigned_city, lawyer_client_scope, approval_status`,
       [
         user_type,
         email,
@@ -1962,12 +1979,23 @@ exports.createAdmin = async (req, res) => {
         normalizedState || null,
         user_type === 'admin' ? normalizedCity : null,
         normalizedLawyerScope,
+        pendingApproval ? 'pending' : 'approved',
       ]
     );
 
+    const createdRoleLabel = String(user_type || '')
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+
+    const statusNote = pendingApproval
+      ? ' — awaiting Super Admin approval'
+      : '';
+
     res.json({
-      message: 'Account created successfully',
-      admin: result.rows[0]
+      message: `${createdRoleLabel} created successfully${statusNote}`,
+      admin: result.rows[0],
+      pending_approval: pendingApproval,
     });
 
   } catch (err) {

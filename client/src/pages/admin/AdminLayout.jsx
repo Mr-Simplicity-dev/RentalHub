@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import api from '../../services/api';
+import RoleBadge from '../../components/common/RoleBadge';
 import {
   FaTachometerAlt,
   FaUsers,
@@ -14,7 +16,8 @@ import {
   FaMoneyBill,
   FaMapMarkerAlt,
   FaLifeRing,
-  FaGlobe
+  FaGlobe,
+  FaTruck
 } from 'react-icons/fa';
 
 const AdminLayout = () => {
@@ -28,8 +31,134 @@ const AdminLayout = () => {
   const ledgerIntegrity = user?.ledgerIntegrity ?? true;
   const isSuperSupportAdmin = role === 'super_support_admin';
   const isStateAdmin = role === 'state_admin';
+  const isCoreAdmin = role === 'admin';
+  const isSuperAdmin = role === 'super_admin';
+  const isFinancialAdmin = role === 'financial_admin';
+  const isSuperFinancialAdmin = role === 'super_financial_admin';
+  const isStateFinancialAdmin = role === 'state_financial_admin';
+  const isStateSupportAdmin = role === 'state_support_admin';
   const isStateScopedAdmin = ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_lawyer'].includes(role);
   const assignedStateLabel = user?.assigned_state || 'Not Assigned';
+  const [liveBadges, setLiveBadges] = useState({
+    pendingVerifications: 0,
+    pendingAdminApprovals: 0,
+    pendingSupportQueue: 0,
+    pendingWithdrawals: 0,
+  });
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+
+    let isCancelled = false;
+
+    const loadBadges = async () => {
+      const next = {
+        pendingVerifications: 0,
+        pendingAdminApprovals: 0,
+        pendingSupportQueue: 0,
+        pendingWithdrawals: 0,
+      };
+
+      if (isCoreAdmin) {
+        try {
+          const statsRes = await api.get('/admin/stats');
+          next.pendingVerifications = Number(statsRes.data?.data?.pendingVerifications || 0);
+        } catch {
+          // Ignore badge load failures.
+        }
+      }
+
+      if (isSuperAdmin) {
+        try {
+          const pendingAdminsRes = await api.get('/super/pending-admins');
+          next.pendingAdminApprovals = Array.isArray(pendingAdminsRes.data?.data)
+            ? pendingAdminsRes.data.data.length
+            : 0;
+        } catch {
+          // Ignore badge load failures.
+        }
+      }
+
+      if (isStateSupportAdmin) {
+        try {
+          const queueRes = await api.get('/state-migrations/support/queue?stage=incoming&status=pending');
+          next.pendingSupportQueue = Array.isArray(queueRes.data?.data)
+            ? queueRes.data.data.length
+            : 0;
+        } catch {
+          // Ignore badge load failures.
+        }
+      }
+
+      if (isStateAdmin || isStateFinancialAdmin) {
+        try {
+          const withdrawalsRes = await api.get('/state-admin/withdrawals');
+          const rows = withdrawalsRes.data?.data?.withdrawals || [];
+          next.pendingWithdrawals = rows.filter((row) => String(row.status || '').toLowerCase() === 'pending').length;
+        } catch {
+          // Ignore badge load failures.
+        }
+      }
+
+      if (!isCancelled) {
+        setLiveBadges(next);
+      }
+    };
+
+    loadBadges();
+    const intervalId = setInterval(loadBadges, 30000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [
+    isCoreAdmin,
+    isSuperAdmin,
+    isStateSupportAdmin,
+    isStateAdmin,
+    isStateFinancialAdmin,
+    user?.id,
+  ]);
+
+  const badgePill = (count, tone = 'red') => {
+    if (!count || count < 1) return null;
+    const toneClass = tone === 'amber'
+      ? 'bg-amber-500 text-white'
+      : tone === 'blue'
+      ? 'bg-blue-500 text-white'
+      : 'bg-red-500 text-white';
+
+    return (
+      <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${toneClass}`}>
+        {count > 99 ? '99+' : count}
+      </span>
+    );
+  };
+
+  const roleTheme = isStateAdmin || isStateFinancialAdmin
+    ? {
+        sidebarBg: 'from-state-700 to-state-600',
+        activeNav: 'bg-state-600 text-white',
+        hoverNav: 'text-gray-700 hover:bg-state-50',
+        mainBg: 'bg-gradient-to-br from-state-50 via-white to-state-100/40',
+        panelTitle: 'State Admin Console',
+      }
+    : isStateSupportAdmin
+    ? {
+        sidebarBg: 'from-amber-700 to-amber-600',
+        activeNav: 'bg-amber-600 text-white',
+        hoverNav: 'text-gray-700 hover:bg-amber-50',
+        mainBg: 'bg-gradient-to-br from-amber-50 via-white to-amber-100/40',
+        panelTitle: 'State Support Console',
+      }
+    : {
+        sidebarBg: 'from-admin-700 to-admin-600',
+        activeNav: 'bg-admin-600 text-white',
+        hoverNav: 'text-gray-700 hover:bg-admin-50',
+        mainBg: 'bg-gradient-to-br from-admin-50 via-white to-admin-100/40',
+        panelTitle: 'Admin Portal',
+      };
 
   const handleLogout = () => {
     logout();
@@ -39,32 +168,45 @@ const AdminLayout = () => {
   const navItem = ({ isActive }) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
       isActive
-        ? 'bg-primary-600 text-white'
-        : 'text-gray-700 hover:bg-gray-100'
+        ? roleTheme.activeNav
+        : roleTheme.hoverNav
     }`;
 
   const supportTab = new URLSearchParams(location.search).get('tab') || 'overview';
+  const superAdminTab = new URLSearchParams(location.search).get('tab') || 'overview';
   const supportNavItem = (tab) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
       location.pathname === '/admin/super-support-dashboard' && supportTab === tab
-        ? 'bg-primary-600 text-white'
-        : 'text-gray-700 hover:bg-gray-100'
+        ? roleTheme.activeNav
+        : roleTheme.hoverNav
+    }`;
+
+  const superAdminNavItem = (tab) =>
+    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+      location.pathname === '/super-admin' && superAdminTab === tab
+        ? roleTheme.activeNav
+        : roleTheme.hoverNav
+    }`;
+  const superFinancialPanel = new URLSearchParams(location.search).get('panel') || 'overview';
+  const superFinancialNavItem = (panel) =>
+    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+      location.pathname === '/admin/super-financial-dashboard' && superFinancialPanel === panel
+        ? roleTheme.activeNav
+        : roleTheme.hoverNav
     }`;
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
+    <div className={`min-h-screen flex ${roleTheme.mainBg}`}>
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white shadow-lg flex flex-col">
+      <aside className="w-64 bg-white/95 shadow-lg flex flex-col backdrop-blur">
 
         <div className="px-6 py-5 border-b">
-          <h2 className="text-xl font-bold text-primary-600">Admin Panel</h2>
+          <h2 className="text-xl font-bold text-gray-900">{roleTheme.panelTitle}</h2>
           <p className="text-xs text-gray-500 mt-1">
             {user?.full_name || 'Administrator'}
           </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {role ? role.replace(/_/g, ' ').toUpperCase() : 'ADMIN'}
-          </p>
+          <RoleBadge role={role} className="mt-2" />
           {isStateScopedAdmin && (
             <div className="mt-2 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
               Scope: {assignedStateLabel}
@@ -116,6 +258,98 @@ const AdminLayout = () => {
               </div>
             </div>
           )}
+
+          {/* SUPER ADMIN */}
+          {isSuperAdmin && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Super Admin
+              </p>
+
+              <div className="space-y-2">
+                <NavLink to="/super-admin?tab=overview" className={() => superAdminNavItem('overview')}>
+                  <FaTachometerAlt className="mr-3" />
+                  Overview
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=users" className={() => superAdminNavItem('users')}>
+                  <FaUsers className="mr-3" />
+                  Users
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=verifications" className={() => superAdminNavItem('verifications')}>
+                  <FaCheckCircle className="mr-3" />
+                  Verifications
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=lawyer_invites" className={() => superAdminNavItem('lawyer_invites')}>
+                  <FaEnvelope className="mr-3" />
+                  Lawyer Invites
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=platform_lawyers" className={() => superAdminNavItem('platform_lawyers')}>
+                  <FaUsers className="mr-3" />
+                  Platform Lawyers
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=lawyer_activity" className={() => superAdminNavItem('lawyer_activity')}>
+                  <FaFileAlt className="mr-3" />
+                  Lawyer Activity
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=properties" className={() => superAdminNavItem('properties')}>
+                  <FaHome className="mr-3" />
+                  Properties
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=analytics" className={() => superAdminNavItem('analytics')}>
+                  <FaShieldAlt className="mr-3" />
+                  Analytics
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=reports" className={() => superAdminNavItem('reports')}>
+                  <FaFileAlt className="mr-3" />
+                  Reports
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=logs" className={() => superAdminNavItem('logs')}>
+                  <FaLock className="mr-3" />
+                  Logs
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=broadcast" className={() => superAdminNavItem('broadcast')}>
+                  <FaEnvelope className="mr-3" />
+                  Broadcast
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=pricing" className={() => superAdminNavItem('pricing')}>
+                  <FaMoneyBill className="mr-3" />
+                  Pricing
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=flags" className={() => superAdminNavItem('flags')}>
+                  <FaShieldAlt className="mr-3" />
+                  Flags
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=fraud" className={() => superAdminNavItem('fraud')}>
+                  <FaShieldAlt className="mr-3" />
+                  Fraud
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=admin" className={() => superAdminNavItem('admin')}>
+                  <FaUsers className="mr-3" />
+                  Admin
+                  {badgePill(liveBadges.pendingAdminApprovals, 'amber')}
+                </NavLink>
+
+                <NavLink to="/super-admin/transportation" className={navItem}>
+                  <FaTruck className="mr-3" />
+                  Transportation
+                </NavLink>
+              </div>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 p-4 space-y-6">
@@ -152,12 +386,17 @@ const AdminLayout = () => {
                   <FaMoneyBill className="mr-3" />
                   Commission Withdrawals
                 </NavLink>
+
+                <NavLink to="/admin/transportation/state" className={navItem}>
+                  <FaTruck className="mr-3" />
+                  Transportation Monitor
+                </NavLink>
               </div>
             </div>
           )}
 
           {/* CORE */}
-          {!isSuperSupportAdmin && !isStateAdmin && (
+          {isCoreAdmin && (
           <div>
             <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
               Core
@@ -185,13 +424,18 @@ const AdminLayout = () => {
                 Applications
               </NavLink>
 
+              <NavLink to="/admin/transportation" className={navItem}>
+                <FaTruck className="mr-3" />
+                Transportation
+              </NavLink>
+
           </div>
           </div>
           )}
 
 
           {/* LEGAL */}
-          {!isSuperSupportAdmin && !isStateAdmin && (
+          {isCoreAdmin && (
           <div>
 
             <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
@@ -203,6 +447,7 @@ const AdminLayout = () => {
               <NavLink to="/admin/verifications" className={navItem}>
                 <FaCheckCircle className="mr-3" />
                 Identity Verification
+                {badgePill(liveBadges.pendingVerifications, 'amber')}
               </NavLink>
 
               <NavLink to="/admin/lawyer-invites" className={navItem}>
@@ -228,7 +473,7 @@ const AdminLayout = () => {
 
 
           {/* MONITORING */}
-          {!isSuperSupportAdmin && !isStateAdmin && (
+          {isCoreAdmin && (
           <div>
 
             <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
@@ -254,51 +499,97 @@ const AdminLayout = () => {
           </div>
           )}
 
-          {/* FINANCIAL & STATE ADMIN DASHBOARDS */}
-          {(
-            role === 'financial_admin' ||
-            role === 'super_financial_admin' ||
-            role === 'state_financial_admin' ||
-            role === 'state_support_admin'
-          ) && (
+          {/* FINANCIAL ADMIN NAV */}
+          {isFinancialAdmin && (
             <div>
               <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
-                Admin Dashboards
+                Financial Admin
               </p>
 
               <div className="space-y-2">
-                {role === 'financial_admin' && (
-                  <NavLink to="/admin/financial-dashboard" className={navItem}>
-                    <FaMoneyBill className="mr-3" />
-                    Financial Dashboard
-                  </NavLink>
-                )}
+                <NavLink to="/admin/financial-dashboard" className={navItem}>
+                  <FaMoneyBill className="mr-3" />
+                  Financial Dashboard
+                </NavLink>
 
-                {role === 'super_financial_admin' && (
-                  <NavLink to="/admin/super-financial-dashboard" className={navItem}>
-                    <FaMoneyBill className="mr-3" />
-                    Super Financial Dashboard
-                  </NavLink>
-                )}
+                <NavLink to="/admin/withdrawals" className={navItem}>
+                  <FaMoneyBill className="mr-3" />
+                  Withdrawals Queue
+                </NavLink>
+              </div>
+            </div>
+          )}
 
-                {role === 'state_financial_admin' && (
+          {/* SUPER FINANCIAL ADMIN NAV */}
+          {isSuperFinancialAdmin && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Super Financial
+              </p>
+
+              <div className="space-y-2">
+                <NavLink to="/admin/super-financial-dashboard?panel=overview" className={() => superFinancialNavItem('overview')}>
+                  <FaMoneyBill className="mr-3" />
+                  Overview
+                </NavLink>
+
+                <NavLink to="/admin/super-financial-dashboard?panel=transactions" className={() => superFinancialNavItem('transactions')}>
+                  <FaFileAlt className="mr-3" />
+                  Transactions
+                </NavLink>
+
+                <NavLink to="/admin/super-financial-dashboard?panel=state-performance" className={() => superFinancialNavItem('state-performance')}>
+                  <FaUsers className="mr-3" />
+                  State Performance
+                </NavLink>
+
+                <NavLink to="/admin/super-financial-dashboard?panel=withdrawals" className={() => superFinancialNavItem('withdrawals')}>
+                  <FaMoneyBill className="mr-3" />
+                  Personal Withdrawals
+                </NavLink>
+
+                <NavLink to="/admin/super-financial-dashboard?panel=frozen-funds" className={() => superFinancialNavItem('frozen-funds')}>
+                  <FaLock className="mr-3" />
+                  Frozen Funds
+                </NavLink>
+              </div>
+            </div>
+          )}
+
+          {/* STATE FINANCIAL & SUPPORT NAV */}
+          {(isStateFinancialAdmin || isStateSupportAdmin) && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">State Operations</p>
+
+              <div className="space-y-2">
+                {isStateFinancialAdmin && (
                   <NavLink to="/admin" className={navItem}>
                     <FaMapMarkerAlt className="mr-3" />
                     State Dashboard
                   </NavLink>
                 )}
 
-                {role === 'state_financial_admin' && (
+                {isStateFinancialAdmin && (
                   <NavLink to="/admin/withdrawals" className={navItem}>
                     <FaMoneyBill className="mr-3" />
                     Commission Withdrawals
+                    {badgePill(liveBadges.pendingWithdrawals, 'blue')}
+                    {badgePill(liveBadges.pendingWithdrawals, 'blue')}
                   </NavLink>
                 )}
 
-                {role === 'state_support_admin' && (
+                {isStateSupportAdmin && (
                   <NavLink to="/admin/state-support-dashboard" className={navItem}>
                     <FaLifeRing className="mr-3" />
                     State Support Dashboard
+                    {badgePill(liveBadges.pendingSupportQueue)}
+                  </NavLink>
+                )}
+
+                {(isStateFinancialAdmin || isStateSupportAdmin) && (
+                  <NavLink to="/admin/transportation/state" className={navItem}>
+                    <FaTruck className="mr-3" />
+                    Transportation Monitor
                   </NavLink>
                 )}
 

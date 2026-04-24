@@ -139,6 +139,26 @@ const AgentDashboard = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Agent Dashboard</h1>
           <p className="text-gray-600">Welcome back, {user?.full_name}!</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              to="/my-properties"
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Manage Properties
+            </Link>
+            <Link
+              to="/agent/earnings"
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Open Earnings Center
+            </Link>
+            <Link
+              to="/agent/withdrawals"
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Withdrawal Center
+            </Link>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -479,8 +499,28 @@ const AgentDashboard = () => {
                 <h3 className="font-semibold text-lg mb-2">📞 Contact Support</h3>
                 <p className="text-gray-600">Need help?</p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Email: support@rentalhub.com | Phone: +234-XXX-XXXX
+                  Email: support@rentalhub.com | Phone: +234-706-701-2884
                 </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    to="/messages"
+                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Open Messages
+                  </Link>
+                  <Link
+                    to="/agent/earnings"
+                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    View Earnings
+                  </Link>
+                  <Link
+                    to="/agent/withdrawals"
+                    className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                  >
+                    Request Withdrawal
+                  </Link>
+                </div>
               </div>
             </div>
           </div>

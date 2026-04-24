@@ -380,6 +380,52 @@ router.delete('/account', authenticate, async (req, res) => {
   }
 });
 
+// Verify current user's password for sensitive actions
+router.post('/verify-password', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { password } = req.body || {};
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required',
+      });
+    }
+
+    const result = await db.query(
+      'SELECT password_hash FROM users WHERE id = $1 LIMIT 1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const isValid = await bcrypt.compare(password, result.rows[0].password_hash);
+    if (!isValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Password verified',
+    });
+  } catch (error) {
+    console.error('Password verification error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify password',
+    });
+  }
+});
+
 // Upload passport photo
 router.post('/upload-passport', authenticate, upload.single('passport'), async (req, res) => {
   try {

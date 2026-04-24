@@ -1,5 +1,7 @@
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
+const IMPERSONATION_ORIGINAL_TOKEN_KEY = 'impersonation_original_token';
+const IMPERSONATION_ORIGINAL_USER_KEY = 'impersonation_original_user';
 
 const getSessionStorage = () => {
   if (typeof window === 'undefined') return null;
@@ -100,4 +102,39 @@ export const setAuthUser = (user) => {
   if (local) {
     local.removeItem(USER_KEY);
   }
+};
+
+export const setImpersonationOriginalSession = (token, user) => {
+  const session = getSessionStorage();
+  if (!session || !token || !user) return;
+
+  session.setItem(IMPERSONATION_ORIGINAL_TOKEN_KEY, String(token));
+  session.setItem(IMPERSONATION_ORIGINAL_USER_KEY, JSON.stringify(user));
+};
+
+export const getImpersonationOriginalSession = () => {
+  const session = getSessionStorage();
+  if (!session) return null;
+
+  const token = session.getItem(IMPERSONATION_ORIGINAL_TOKEN_KEY);
+  const rawUser = session.getItem(IMPERSONATION_ORIGINAL_USER_KEY);
+  if (!token || !rawUser) return null;
+
+  try {
+    return { token, user: JSON.parse(rawUser) };
+  } catch {
+    return null;
+  }
+};
+
+export const clearImpersonationOriginalSession = () => {
+  const session = getSessionStorage();
+  if (!session) return;
+
+  session.removeItem(IMPERSONATION_ORIGINAL_TOKEN_KEY);
+  session.removeItem(IMPERSONATION_ORIGINAL_USER_KEY);
+};
+
+export const isImpersonatingSession = () => {
+  return Boolean(getImpersonationOriginalSession());
 };

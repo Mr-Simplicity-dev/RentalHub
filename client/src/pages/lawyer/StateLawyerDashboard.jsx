@@ -6,6 +6,9 @@ const StateLawyerDashboard = () => (
     dashboardTitle="State Lawyer Dashboard"
     profileLabel="State Lawyer Profile"
     nameFallback="State Lawyer"
+    dashboardSubtitle="Manage state-level disputes, verify evidence within your jurisdiction, and keep case notes aligned with your assigned state workflow."
+    rolePillLabel="State Lawyer"
+    showStateLawyerPanel
   />
 );
 

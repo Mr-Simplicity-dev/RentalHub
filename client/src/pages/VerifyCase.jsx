@@ -235,6 +235,15 @@ export default function VerifyCase() {
                       </p>
                     </div>
 
+                    <div className="flex justify-center mt-6">
+                    <button
+                      onClick={() => navigate('/dashboard')}
+                      className="btn btn-outline"
+                    >
+                      Back to Dashboard
+                    </button>
+                  </div>
+
                     <span
                       className={`px-2 py-1 text-xs rounded-full ${
                         file.valid

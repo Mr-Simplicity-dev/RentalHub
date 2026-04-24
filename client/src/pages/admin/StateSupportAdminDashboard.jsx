@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FaArrowDown, FaArrowUp, FaCheckCircle, FaSyncAlt, FaTimesCircle } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import InputDialog from '../../components/common/InputDialog';
+import ApprovalTimeline from '../../components/common/ApprovalTimeline';
 import useRetryableAction from '../../hooks/useRetryableAction';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
@@ -10,6 +11,18 @@ const badgeClass = (status) => {
   if (status === 'approved') return 'bg-green-100 text-green-700';
   if (status === 'rejected') return 'bg-red-100 text-red-700';
   return 'bg-amber-100 text-amber-700';
+};
+
+const queueSteps = [
+  { key: 'submitted', label: 'Submitted' },
+  { key: 'outgoing', label: 'Outgoing Review' },
+  { key: 'incoming', label: 'Incoming Review' },
+];
+
+const resolveCurrentStep = (row) => {
+  if (row?.status && row.status !== 'pending') return 'incoming';
+  if (row?.outgoing_status && row.outgoing_status !== 'pending') return 'incoming';
+  return 'outgoing';
 };
 
 const StateSupportAdminDashboard = () => {
@@ -102,7 +115,7 @@ const StateSupportAdminDashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen space-y-6 bg-gradient-to-br from-state-50 via-white to-state-100/40 p-1">
       <section className="rounded-xl bg-white p-6 shadow">
         <div className="flex items-center justify-between">
           <div>
@@ -110,6 +123,43 @@ const StateSupportAdminDashboard = () => {
             <p className="mt-1 text-sm text-gray-600">
               Outgoing and incoming migration decisions for {user?.assigned_state || 'your assigned state'}.
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setStage('all')}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                All Queue
+              </button>
+              <button
+                type="button"
+                onClick={() => setStage('incoming')}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Incoming Reviews
+              </button>
+              <button
+                type="button"
+                onClick={loadQueue}
+                className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                Refresh Queue
+              </button>
+            </div>
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium text-amber-800">
+                  Withdrawal Access: Review Only. This role handles migration/support decisions and withdrawal tickets, not personal commission withdrawal requests.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setStage('incoming')}
+                  className="rounded-md border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                >
+                  Open Incoming Reviews
+                </button>
+              </div>
+            </div>
           </div>
           <button
             type="button"
@@ -120,6 +170,28 @@ const StateSupportAdminDashboard = () => {
           </button>
         </div>
       </section>
+
+      {(stats.incomingPending > 0 || stats.outgoingPending > 0) && (
+        <section className="rounded-xl border-l-4 border-red-500 bg-red-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-red-800">
+                {stats.incomingPending + stats.outgoingPending} migration request action{stats.incomingPending + stats.outgoingPending === 1 ? '' : 's'} pending
+              </p>
+              <p className="mt-1 text-xs text-red-700">
+                Review pending outgoing and incoming stages to avoid escalation delays.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStage('incoming')}
+              className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+            >
+              Review Pending
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <article className="rounded-xl bg-white p-5 shadow">
@@ -185,6 +257,12 @@ const StateSupportAdminDashboard = () => {
                     <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badgeClass(row.incoming_status)}`}>Incoming: {row.incoming_status}</span>
                   </div>
                 </div>
+
+                <ApprovalTimeline
+                  steps={queueSteps}
+                  currentStepKey={resolveCurrentStep(row)}
+                  finalStatus={row.status}
+                />
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   {row.can_review_outgoing && (

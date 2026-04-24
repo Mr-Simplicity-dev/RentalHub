@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import PaginationControls from './PaginationControls';
+
+const LAWYER_ACTIVITY_PAGE_SIZE = 10;
 
 const TIME_RANGE_OPTIONS = [
   { value: '24h', label: '24 Hours' },
@@ -71,6 +74,7 @@ const LawyerActivityMonitor = () => {
     totalResolutions: 0,
     avgResponseTime: 0,
   });
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let ignore = false;
@@ -84,6 +88,7 @@ const LawyerActivityMonitor = () => {
 
         if (!ignore && res.data.success) {
           setLawyers(res.data.data?.lawyers || []);
+          setPage(1);
           setStats(
             res.data.data?.stats || {
               totalLawyers: 0,
@@ -112,6 +117,13 @@ const LawyerActivityMonitor = () => {
       ignore = true;
     };
   }, [timeRange]);
+
+  const totalPages = Math.max(
+    Math.ceil((lawyers.length || 0) / LAWYER_ACTIVITY_PAGE_SIZE),
+    1
+  );
+  const start = (page - 1) * LAWYER_ACTIVITY_PAGE_SIZE;
+  const pagedLawyers = lawyers.slice(start, start + LAWYER_ACTIVITY_PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -205,7 +217,7 @@ const LawyerActivityMonitor = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {lawyers.map((lawyer) => {
+                {pagedLawyers.map((lawyer) => {
                   const activity = getActivityLevel(lawyer);
 
                   return (
@@ -260,6 +272,13 @@ const LawyerActivityMonitor = () => {
                 })}
               </tbody>
             </table>
+
+            <PaginationControls
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              summary={`Showing ${lawyers.length === 0 ? 0 : start + 1}-${Math.min(page * LAWYER_ACTIVITY_PAGE_SIZE, lawyers.length)} of ${lawyers.length}`}
+            />
           </div>
         )}
       </div>

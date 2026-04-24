@@ -109,6 +109,12 @@ const VerifyEmail = () => {
               >
                 Create New Account
               </button>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="btn btn-outline mt-4"
+              >
+                Back to Dashboard
+              </button>
             </div>
           </>
         )}
@@ -118,3 +124,4 @@ const VerifyEmail = () => {
 };
 
 export default VerifyEmail;
+

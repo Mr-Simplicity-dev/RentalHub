@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import api from "../../services/api";
+import PaginationControls from "./PaginationControls";
+
+const INVITES_PAGE_SIZE = 12;
 
 const LawyerInvitesManager = ({
   title = "Lawyer Invites",
@@ -9,6 +12,7 @@ const LawyerInvitesManager = ({
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [invitePage, setInvitePage] = useState(1);
   const [selectedLawyer, setSelectedLawyer] = useState(null);
   const [showLawyerModal, setShowLawyerModal] = useState(false);
 
@@ -22,6 +26,7 @@ const LawyerInvitesManager = ({
       });
 
       setInvites(res.data?.data || []);
+      setInvitePage(1);
     } catch (error) {
       console.error("Failed to load lawyer invites:", error);
       toast.error(
@@ -138,6 +143,13 @@ const LawyerInvitesManager = ({
     return "Pending";
   };
 
+  const totalInvitePages = Math.max(
+    Math.ceil((invites.length || 0) / INVITES_PAGE_SIZE),
+    1
+  );
+  const inviteStart = (invitePage - 1) * INVITES_PAGE_SIZE;
+  const pagedInvites = invites.slice(inviteStart, inviteStart + INVITES_PAGE_SIZE);
+
   return (
     <div className="space-y-4 animate-fadeIn">
       <div className="rounded-xl2 border border-soft bg-white p-6 shadow-card">
@@ -187,7 +199,7 @@ const LawyerInvitesManager = ({
                 </tr>
               )}
 
-              {invites.map((invite) => (
+              {pagedInvites.map((invite) => (
                 <tr
                   key={invite.id}
                   className="border-t border-soft transition hover:bg-gray-50"
@@ -255,6 +267,13 @@ const LawyerInvitesManager = ({
             </tbody>
           </table>
         </div>
+
+        <PaginationControls
+          currentPage={invitePage}
+          totalPages={totalInvitePages}
+          onPageChange={setInvitePage}
+          summary={`Showing ${invites.length === 0 ? 0 : inviteStart + 1}-${Math.min(invitePage * INVITES_PAGE_SIZE, invites.length)} of ${invites.length}`}
+        />
       </div>
 
       {/* Lawyer Details Modal */}

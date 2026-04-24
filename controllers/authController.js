@@ -1226,7 +1226,8 @@ exports.login = async (req, res) => {
               u.preferred_state_id, s.state_name AS preferred_state_name,
               u.preferred_lga_name,
               u.deleted_at,
-              u.is_active, u.account_suspended_reason
+              u.is_active, u.account_suspended_reason,
+              COALESCE(u.approval_status, 'approved') AS approval_status
        FROM users u
        LEFT JOIN states s ON s.id = u.preferred_state_id
        WHERE u.email = $1`,
@@ -1265,6 +1266,13 @@ exports.login = async (req, res) => {
         message: reason
           ? `Account suspended: ${reason}`
           : 'Account suspended. Please contact support.',
+      });
+    }
+
+    if (user.approval_status === 'pending') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is pending Super Admin approval. You will be notified once your account is activated.',
       });
     }
 
