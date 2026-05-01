@@ -25,6 +25,7 @@ import {
   FaUndo
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const FumigationCleaningBookingDetails = () => {
   const { bookingId } = useParams();
@@ -263,20 +264,16 @@ const FumigationCleaningBookingDetails = () => {
       <div className="max-w-6xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => navigate('/fumigation-cleaning/bookings')}
-            className="btn btn-gray mb-4"
-          >
-            <FaArrowLeft className="mr-2" />
-            Back to Bookings
-          </button>
-          
-      <button
-      onClick={() => navigate('/dashboard')}
-      className="btn btn-gray mb-4 ml-2 flex items-center"
-    >
-      Back to Dashboard
-    </button>
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+            <button
+              onClick={() => navigate('/fumigation-cleaning/bookings')}
+              className="btn btn-gray inline-flex items-center justify-center"
+            >
+              <FaArrowLeft className="mr-2" />
+              Back to Bookings
+            </button>
+            <BackToDashboard />
+          </div>
 
           <div className="flex flex-col md:flex-row md:items-center justify-between">
             <div>

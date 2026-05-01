@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import { toast } from 'react-toastify';
@@ -9,18 +9,15 @@ import {
   FaMapMarkerAlt,
   FaMoneyBillWave,
   FaCheckCircle,
-  FaClock,
-  FaTimesCircle,
   FaUser,
   FaPhone,
-  FaCar,
-  FaBox,
   FaRoute,
   FaReceipt,
   FaPrint,
   FaArrowLeft
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const TransportationBookingDetails = () => {
   const { bookingId } = useParams();
@@ -179,19 +176,16 @@ const TransportationBookingDetails = () => {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <button
-                onClick={() => navigate('/transportation/bookings')}
-                className="btn btn-outline mb-4 flex items-center"
-              >
-                <FaArrowLeft className="mr-2" />
-                Back to Bookings
-              </button>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="btn btn-gray mb-4 ml-2"
-              >
-                Back to Dashboard
-              </button>
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+                <button
+                  onClick={() => navigate('/transportation/bookings')}
+                  className="btn btn-outline inline-flex items-center justify-center"
+                >
+                  <FaArrowLeft className="mr-2" />
+                  Back to Bookings
+                </button>
+                <BackToDashboard />
+              </div>
               <h1 className="text-3xl font-bold text-gray-900">Booking Details</h1>
               <p className="text-gray-600">
                 Booking ID: <span className="font-mono">TR-{booking.id.toString().padStart(6, '0')}</span>

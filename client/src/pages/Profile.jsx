@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const DEFAULT_LIVENESS = {
   faceDetected: false,
@@ -626,20 +627,12 @@ const Profile = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <div className="mb-6 flex justify-center">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="rounded-xl border border-teal-200 bg-teal-50 px-6 py-2">
           <h1 className="text-2xl font-bold text-teal-700">My Profile</h1>
         </div>
+        <BackToDashboard />
       </div>
-
-      <div className="flex justify-center mb-6">
-      <button
-        onClick={() => navigate('/dashboard')}
-        className="btn btn-outline"
-      >
-        Back to Dashboard
-      </button>
-    </div>
 
       <div className="card mb-6">
         <h2 className="font-semibold mb-4">{t('profile.account_title')}</h2>

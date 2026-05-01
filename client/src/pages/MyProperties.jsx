@@ -4,6 +4,7 @@ import Loader from '../components/common/Loader';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const MyProperties = () => {
   const { user } = useAuth();
@@ -32,20 +33,14 @@ const MyProperties = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h1 className="text-2xl font-bold">
           {isAgent ? 'Managed Properties' : 'My Properties'}
         </h1>
-        <Link to="/add-property" className="btn btn-primary">Add Property</Link>
-      </div>
-
-      <div className="flex justify-center mb-6">
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-outline"
-        >
-          Back to Dashboard
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <BackToDashboard />
+          <Link to="/add-property" className="btn btn-primary">Add Property</Link>
+        </div>
       </div>
 
       <div className="space-y-4">

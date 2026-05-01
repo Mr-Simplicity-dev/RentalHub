@@ -7,6 +7,7 @@ import Modal from '../components/common/Modal';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/helpers';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const statusStyles = {
   approved: 'bg-green-100 text-green-700',
@@ -130,17 +131,11 @@ const Applications = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="mb-3 text-center text-2xl font-bold">
-        {user?.user_type === 'tenant' ? t('applications.my_title') : t('applications.landlord_title')}
-      </h1>
-
-      <div className="flex justify-center mb-6">
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-outline"
-        >
-          Back to Dashboard
-        </button>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold">
+          {user?.user_type === 'tenant' ? t('applications.my_title') : t('applications.landlord_title')}
+        </h1>
+        <BackToDashboard />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">

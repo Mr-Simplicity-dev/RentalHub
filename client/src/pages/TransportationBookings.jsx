@@ -16,6 +16,7 @@ import {
   FaPlus
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const TransportationBookings = () => {
   const { user } = useAuth();
@@ -179,12 +180,7 @@ const TransportationBookings = () => {
                 New Booking
               </Link>
               
-              <Link
-                to="/dashboard"
-                className="btn btn-outline"
-              >
-                Back to Dashboard
-              </Link>
+              <BackToDashboard />
             </div>
           </div>
         </div>

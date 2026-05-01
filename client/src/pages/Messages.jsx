@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { messageService } from '../services/messageService';
 import { toast } from 'react-toastify';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const roleLabel = (role) => {
   if (role === 'super_admin') return 'Super Admin';
@@ -297,7 +298,10 @@ const Messages = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Internal Messages</h1>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold">Internal Messages</h1>
+        <BackToDashboard />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card lg:col-span-1">
@@ -311,15 +315,6 @@ const Messages = () => {
               Refresh
             </button>
           </div>
-
-          <div className="flex justify-center mb-6">
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-outline"
-        >
-          Back to Dashboard
-        </button>
-      </div>
 
           {loadingConversations ? (
             <p className="text-sm text-gray-500">Loading conversations...</p>

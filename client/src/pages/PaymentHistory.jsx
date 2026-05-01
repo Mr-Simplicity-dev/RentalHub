@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Loader from '../components/common/Loader';
 import { paymentService } from '../services/paymentService';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const PAYMENT_TYPE_LABELS = {
   tenant_subscription: 'Subscription',
@@ -65,16 +66,10 @@ const PaymentHistory = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6 text-center">Payment History</h1>
-
-    <div className="flex justify-center mb-6">
-      <button
-        onClick={() => navigate('/dashboard')}
-        className="btn btn-outline"
-      >
-        Back to Dashboard
-      </button>
-    </div>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold">Payment History</h1>
+        <BackToDashboard />
+      </div>
 
       {payments.length === 0 ? (
         <div className="card text-center py-10 text-gray-500">

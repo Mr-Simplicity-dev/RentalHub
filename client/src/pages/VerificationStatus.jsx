@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaCheckCircle, FaClock, FaExclamationTriangle, FaUserCircle } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const VerificationStatus = () => {
   const navigate = useNavigate();
@@ -85,14 +86,6 @@ const VerificationStatus = () => {
     };
   }, [verificationStatus]);
 
-  const goToDashboard = () => {
-    if (user?.user_type === 'tenant') {
-      navigate('/tenant/dashboard');
-      return;
-    }
-    navigate('/dashboard');
-  };
-
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadLatestStatus();
@@ -144,13 +137,7 @@ const VerificationStatus = () => {
               </button>
             )}
 
-            <button
-              onClick={goToDashboard}
-              className="btn btn-secondary"
-              type="button"
-            >
-              Back to Dashboard
-            </button>
+            <BackToDashboard />
           </div>
         </div>
       </div>

@@ -621,6 +621,26 @@ const loadDashboard = useCallback(async () => {
     return `${daysLeft}d left`;
   };
 
+  const getRentSavingsValue = () => {
+    if (!rentSavingsStats) {
+      return '0 plans';
+    }
+
+    const activePlans = Number(rentSavingsStats.active_plans || 0);
+    const totalSaved = Number(rentSavingsStats.total_saved_across_plans || 0);
+
+    if (totalSaved > 0) {
+      return `NGN ${totalSaved.toLocaleString()}`;
+    }
+
+    return `${activePlans} ${activePlans === 1 ? 'plan' : 'plans'}`;
+  };
+
+  const closeRentSavingsModal = () => {
+    setShowRentSavingsModal(false);
+    loadRentSavingsData();
+  };
+
   const getLawyerInviteSummary = () => {
     const rawStatus = stats?.lawyer_invite_status || 'not_sent';
     const lawyerEmail = stats?.lawyer_email;
@@ -840,6 +860,12 @@ const loadDashboard = useCallback(async () => {
                 onClick={() => setShowTransportModal(true)}
               />
               <StatCard
+                icon={<FaPiggyBank className="text-emerald-500" />}
+                title="Rent Savings"
+                value={getRentSavingsValue()}
+                onClick={() => setShowRentSavingsModal(true)}
+              />
+              <StatCard
                 icon={<FaMoneyBillWave className="text-orange-500" />}
                 title="Refund Requests"
                 value={stats?.refund_requests_count || 0}
@@ -850,16 +876,6 @@ const loadDashboard = useCallback(async () => {
                 title="Wallet Balance"
                 value={walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
                 onClick={openWithdrawModal}
-              />
-              {/* Rent Savings Card */}
-              <StatCard
-                icon={<FaPiggyBank className="text-purple-500" />}
-                title="Rent Savings"
-                value={rentSavingsStats?.total_plans > 0 ? `${rentSavingsStats.active_plans || 0} Active` : 'Start Saving'}
-                onClick={() => {
-                  setShowRentSavingsModal(true);
-                  if (tenantProperties.length === 0) loadRentSavingsData();
-                }}
               />
             </>
           ) : (
@@ -984,12 +1000,9 @@ const loadDashboard = useCallback(async () => {
               />
               <QuickActionCard
                 title="Rent Savings"
-                description="Save towards your rent automatically with monthly contributions"
+                description="Save toward rent, contribute monthly, and manage withdrawals"
                 icon={<FaPiggyBank />}
-                onClick={() => {
-                  setShowRentSavingsModal(true);
-                  if (tenantProperties.length === 0) loadRentSavingsData();
-                }}
+                onClick={() => setShowRentSavingsModal(true)}
               />
             </>
           ) : (
@@ -1366,6 +1379,13 @@ const loadDashboard = useCallback(async () => {
         }}
       />
 
+      <RentSavingsModal
+        isOpen={showRentSavingsModal}
+        onClose={closeRentSavingsModal}
+        user={user}
+        properties={tenantProperties}
+      />
+
       {/* LANDLORD REFUND MANAGEMENT MODAL */}
       {showLandlordRefundModal && user?.user_type === 'landlord' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
@@ -1576,16 +1596,6 @@ const loadDashboard = useCallback(async () => {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Rent Savings Modal */}
-      {showRentSavingsModal && user?.user_type === 'tenant' && (
-        <RentSavingsModal
-          isOpen={showRentSavingsModal}
-          onClose={() => setShowRentSavingsModal(false)}
-          user={user}
-          properties={tenantProperties}
-        />
       )}
     </div>
   );

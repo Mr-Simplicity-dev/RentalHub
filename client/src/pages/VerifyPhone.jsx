@@ -143,7 +143,7 @@ const VerifyPhone = () => {
         onClick={() => navigate('/dashboard')}
         className="btn btn-outline mt-4"
       >
-        Back to Dashboard
+        Back 
       </button>
     </div>
   );

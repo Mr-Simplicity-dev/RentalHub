@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const Subscribe = () => {
   const { user } = useAuth();
@@ -8,20 +9,28 @@ const Subscribe = () => {
 
   if (user?.subscription_active) {
     return (
-      <div className="container mx-auto px-4 py-12 text-center">
-        <h1 className="text-2xl font-bold mb-4">You are already subscribed</h1>
-        <button onClick={() => navigate('/properties')} className="btn btn-primary">
-          Browse Properties
-        </button>
+      <div className="container mx-auto px-4 py-12">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-2xl font-bold">You are already subscribed</h1>
+            <BackToDashboard />
+          </div>
+          <button onClick={() => navigate('/properties')} className="btn btn-primary">
+            Browse Properties
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-3xl">
-      <h1 className="text-3xl font-bold mb-6 text-center">
-        Unlock Full Property Access
-      </h1>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-bold">
+          Unlock Full Property Access
+        </h1>
+        <BackToDashboard />
+      </div>
 
       <div className="card text-center">
         <h2 className="text-xl font-semibold mb-2">Premium Tenant Plan</h2>

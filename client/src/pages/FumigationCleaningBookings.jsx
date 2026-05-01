@@ -25,6 +25,7 @@ import {
   FaUndo
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const FumigationCleaningBookings = () => {
   const { user } = useAuth();
@@ -264,12 +265,7 @@ const FumigationCleaningBookings = () => {
                 New Booking
               </Link>
               
-              <Link
-                to="/dashboard"
-                className="btn btn-outline"
-              >
-                Back to Dashboard
-              </Link>
+              <BackToDashboard />
             </div>
           </div>
         </div>

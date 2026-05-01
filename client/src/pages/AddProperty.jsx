@@ -6,6 +6,7 @@ import MapPicker from '../components/MapPicker';
 import { DamageReportButton } from '../components/damage';
 import { propertyService } from '../services/propertyService';
 import { useAuth } from '../hooks/useAuth';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const PROPERTY_TYPES = ['apartment', 'house', 'bungalow', 'duplex', 'studio', 'flat', 'room'];
 
@@ -166,7 +167,10 @@ const AddProperty = () => {
 
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold">{t('add_property.title')}</h1>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold">{t('add_property.title')}</h1>
+        <BackToDashboard />
+      </div>
 
       {step === 1 && (
         <form onSubmit={proceedToVerification} className="card space-y-4">

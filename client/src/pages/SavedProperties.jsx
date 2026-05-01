@@ -3,12 +3,11 @@ import { propertyService } from '../services/propertyService';
 import PropertyList from '../components/properties/PropertyList';
 import Loader from '../components/common/Loader';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
+import BackToDashboard from '../components/common/BackToDashboard';
 
 const SavedProperties = () => {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadSaved();
@@ -32,15 +31,9 @@ const SavedProperties = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Saved Properties</h1>
-
-      <div className="flex justify-center mb-6">
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-outline"
-        >
-          Back to Dashboard
-        </button>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold">Saved Properties</h1>
+        <BackToDashboard />
       </div>
 
       <PropertyList

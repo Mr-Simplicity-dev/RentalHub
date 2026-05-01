@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
+import BackToDashboard from "../components/common/BackToDashboard";
 
 const VERIFICATION_FEE_LABEL = "N20,000";
 
@@ -111,15 +112,19 @@ export default function VerifyCase() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-3xl bg-white border border-soft rounded-xl2 shadow-card p-8 space-y-6 animate-fadeIn">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold">
-            Digital Evidence Verification
-          </h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="text-center sm:text-left">
+            <h1 className="text-2xl font-semibold">
+              Digital Evidence Verification
+            </h1>
 
-          <p className="text-gray-500 text-sm mt-1">
-            Pay {VERIFICATION_FEE_LABEL} to verify the integrity of dispute
-            evidence
-          </p>
+            <p className="text-gray-500 text-sm mt-1">
+              Pay {VERIFICATION_FEE_LABEL} to verify the integrity of dispute
+              evidence
+            </p>
+          </div>
+
+          <BackToDashboard />
         </div>
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
@@ -234,15 +239,6 @@ export default function VerifyCase() {
                         File integrity verification
                       </p>
                     </div>
-
-                    <div className="flex justify-center mt-6">
-                    <button
-                      onClick={() => navigate('/dashboard')}
-                      className="btn btn-outline"
-                    >
-                      Back to Dashboard
-                    </button>
-                  </div>
 
                     <span
                       className={`px-2 py-1 text-xs rounded-full ${
