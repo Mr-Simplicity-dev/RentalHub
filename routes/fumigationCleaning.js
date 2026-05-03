@@ -3,7 +3,32 @@ const router = express.Router();
 const { body } = require('express-validator');
 const fumigationCleaningController = require('../controllers/fumigationCleaningController');
 const { authenticate, isTenant, isVerified } = require('../config/middleware/auth');
-const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
+
+const FUMIGATION_ADMIN_ROLES = new Set([
+  'admin',
+  'super_admin',
+  'state_admin',
+  'state_financial_admin',
+  'fumigation_admin',
+]);
+
+const requireFumigationAdminAccess = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Unauthorized',
+    });
+  }
+
+  if (!FUMIGATION_ADMIN_ROLES.has(req.user.user_type)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Fumigation admin access only',
+    });
+  }
+
+  return next();
+};
 
 // ============ SERVICE CATALOG ENDPOINTS ============
 
@@ -168,21 +193,28 @@ router.get('/services/:serviceId/reviews',
 // Get all bookings (admin)
 router.get('/admin/bookings',
   authenticate,
-  requireAdminOrSuperAdmin,
+  requireFumigationAdminAccess,
   fumigationCleaningController.getAllBookings
 );
 
 // Get admin statistics
 router.get('/admin/stats',
   authenticate,
-  requireAdminOrSuperAdmin,
+  requireFumigationAdminAccess,
   fumigationCleaningController.getAdminStats
+);
+
+// Get active service providers (admin)
+router.get('/admin/providers',
+  authenticate,
+  requireFumigationAdminAccess,
+  fumigationCleaningController.getProviders
 );
 
 // Update booking status (admin)
 router.put('/admin/bookings/:bookingId/status',
   authenticate,
-  requireAdminOrSuperAdmin,
+  requireFumigationAdminAccess,
   [
     body('status').isIn(['pending', 'confirmed', 'scheduled', 'in_progress', 'completed', 'cancelled', 'rescheduled']).withMessage('Invalid status'),
     body('update_data').optional().isObject()
@@ -193,7 +225,7 @@ router.put('/admin/bookings/:bookingId/status',
 // Assign provider to booking (admin)
 router.post('/admin/bookings/:bookingId/assign-provider',
   authenticate,
-  requireAdminOrSuperAdmin,
+  requireFumigationAdminAccess,
   [
     body('provider_id').isInt().withMessage('Provider ID is required')
   ],
@@ -203,7 +235,7 @@ router.post('/admin/bookings/:bookingId/assign-provider',
 // Get available providers for booking (admin)
 router.get('/admin/bookings/:bookingId/available-providers',
   authenticate,
-  requireAdminOrSuperAdmin,
+  requireFumigationAdminAccess,
   fumigationCleaningController.getAvailableProvidersForBooking
 );
 
@@ -212,7 +244,7 @@ router.get('/admin/bookings/:bookingId/available-providers',
 // Submit safety compliance record
 router.post('/admin/compliance/:bookingId',
   authenticate,
-  requireAdminOrSuperAdmin,
+  requireFumigationAdminAccess,
   [
     body('provider_id').isInt().withMessage('Provider ID is required'),
     body('safety_briefing_completed').optional().isBoolean(),

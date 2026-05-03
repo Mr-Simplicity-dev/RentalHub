@@ -64,6 +64,10 @@ const Login = () => {
           navigate('/admin');
         } else if (role === 'admin') {
           navigate('/admin');
+        } else if (role === 'fumigation_admin') {
+          navigate('/admin/fumigation-cleaning');
+        } else if (role === 'transportation_admin') {
+          navigate('/admin/transportation');
         } else if (role === 'super_lawyer') {
           navigate('/lawyer/super');
         } else if (role === 'state_lawyer') {

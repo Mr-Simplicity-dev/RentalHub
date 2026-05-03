@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { FaBell, FaUser, FaSignOutAlt, FaEnvelope } from 'react-icons/fa';
+import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDown } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
@@ -10,12 +10,14 @@ import {
   clearImpersonationOriginalSession,
   setAuthSession,
 } from '../../services/authStorage';
-import RoleBadge from './RoleBadge';
 
 const Header = () => {
   const { user, isAuthenticated, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuRef = useRef(null);
   const [badgeCounts, setBadgeCounts] = useState({
     unreadMessages: 0,
     pendingVerifications: 0,
@@ -36,12 +38,33 @@ const Header = () => {
     if (role === 'state_admin' || role === 'state_financial_admin') return '/admin';
     if (role === 'super_financial_admin') return '/admin/super-financial-dashboard';
     if (role === 'financial_admin') return '/admin/financial-dashboard';
+    if (role === 'fumigation_admin') return '/admin/fumigation-cleaning';
+    if (role === 'transportation_admin') return '/admin/transportation';
     if (role === 'lawyer') return '/lawyer';
     if (role === 'state_lawyer') return '/lawyer/state';
     if (role === 'super_lawyer') return '/lawyer/super';
     if (role === 'agent') return '/agent/dashboard';
     return '/dashboard';
   }, [role]);
+
+ // Track scroll for glass effect
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return undefined;
@@ -147,17 +170,24 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white shadow-md sticky top-0 z-50">
+    <header
+      className={`sticky top-0 z-50 transition-all duration-500 ${
+        scrolled
+          ? 'bg-white/90 backdrop-blur-xl shadow-sm border-b border-gray-100/50'
+          : 'bg-white shadow-sm'
+      }`}
+    >
       {isImpersonating && (
-        <div className="bg-amber-100 border-b border-amber-300 px-4 py-2">
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 animate-fadeIn">
           <div className="container mx-auto flex flex-wrap items-center justify-between gap-2 text-sm">
-            <p className="text-amber-900 font-medium">
-              Impersonation Mode: You are viewing the platform as {user?.full_name || 'selected admin'}.
+            <p className="text-amber-800 font-medium flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse-soft"></span>
+              Impersonation Mode: Viewing as {user?.full_name || 'selected admin'}
             </p>
             <button
               type="button"
               onClick={stopImpersonation}
-              className="rounded bg-amber-700 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-800"
+              className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-all duration-200 hover:shadow-md"
             >
               Return to Super Admin
             </button>
@@ -165,128 +195,135 @@ const Header = () => {
         </div>
       )}
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-3">
-                <img
-                  src="/logo192.png"
-                  alt="RentalHub NG"
-                  className="h-12 md:h-14 lg:h-16 object-contain"
-                />
-                <span className="text-xl md:text-2xl font-bold text-gray-900">
-                  RentalHub NG
-                </span>
-              </Link>
+          <Link to="/" className="flex items-center space-x-3 group">
+            <img
+              src="/logo192.png"
+              alt="RentalHub NG"
+              className="h-10 md:h-12 lg:h-14 object-contain transition-transform duration-300 group-hover:scale-105"
+            />
+            <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
+              RentalHub NG
+            </span>
+          </Link>
 
-
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link to="/properties" className="text-gray-700 hover:text-primary-600">
-              {t('header.browse')}
-            </Link>
-            <Link to="/verify-case" className="text-gray-700 hover:text-primary-600">
-              Verify Dispute Evidence
-            </Link>
-
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-1">
+            <NavLink to="/properties" label={t('header.browse')} />
+            <NavLink to="/verify-case" label="Verify Evidence" />
             {isAuthenticated && ['landlord', 'agent'].includes(user?.user_type) && (
-              <Link to="/my-properties" className="text-gray-700 hover:text-primary-600">
-                {t('header.my_properties')}
-              </Link>
+              <NavLink to="/my-properties" label={t('header.my_properties')} />
             )}
-
             {isAuthenticated && user?.user_type === 'tenant' && (
-              <Link to="/saved-properties" className="text-gray-700 hover:text-primary-600">
-                {t('header.saved')}
-              </Link>
+              <NavLink to="/saved-properties" label={t('header.saved')} />
             )}
           </nav>
 
           {/* Right side */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 md:space-x-4">
             {isAuthenticated ? (
               <>
-                {/* Messages */}
-                <Link to="/messages" className="relative text-gray-700 hover:text-primary-600">
-                  <FaEnvelope className="text-xl" />
+                <Link to="/messages" className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
+                  <FaEnvelope className="text-lg" />
                   {badgeCounts.unreadMessages > 0 && (
-                    <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white animate-scaleIn">
                       {badgeCounts.unreadMessages > 99 ? '99+' : badgeCounts.unreadMessages}
                     </span>
                   )}
                 </Link>
 
-                {/* Notifications */}
-                <Link to="/notifications" className="relative text-gray-700 hover:text-primary-600">
-                  <FaBell className="text-xl" />
+                <Link to="/notifications" className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
+                  <FaBell className="text-lg" />
                   {headerAttentionCount > 0 && (
-                    <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
+                    <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white animate-pulse-soft" />
                   )}
                 </Link>
 
                 {/* User Menu */}
-                <div className="relative">
+                <div className="relative" ref={menuRef}>
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center space-x-2 text-gray-700 hover:text-primary-600"
+                    className="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
                   >
-                    <FaUser className="text-xl" />
-                    <span className="hidden md:block">{user?.full_name}</span>
-                    <RoleBadge role={role} compact className="hidden md:inline-flex" />
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-sm font-semibold shadow-sm">
+                      {user?.full_name?.charAt(0)?.toUpperCase() || <FaUser />}
+                    </div>
+                    <span className="hidden lg:block text-sm font-medium">{user?.full_name}</span>
+                    <FaChevronDown className={`hidden lg:block text-xs transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} />
                   </button>
 
                   {showUserMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2">
-                      <Link
-                        to={roleDashboardPath}
-                        className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
-                        onClick={() => setShowUserMenu(false)}
-                      >
-                        <span className="flex items-center justify-between">
-                          <span>{t('header.dashboard')}</span>
-                          {headerAttentionCount > 0 && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                              {headerAttentionCount}
-                            </span>
-                          )}
-                        </span>
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-elevated-lg border border-gray-100 py-2 animate-scaleIn origin-top-right">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{user?.full_name}</p>
+                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                      </div>
+
+                      <Link to={roleDashboardPath} className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
+                        <span>{t('header.dashboard')}</span>
+                        {headerAttentionCount > 0 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{headerAttentionCount}</span>
+                        )}
                       </Link>
 
-                      <Link
-                        to="/profile"
-                        className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
-                        onClick={() => setShowUserMenu(false)}
-                      >
+                      <Link to="/profile" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
                         {t('header.profile')}
                       </Link>
 
-                      <Link
-                        to="/applications"
-                        className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
-                        onClick={() => setShowUserMenu(false)}
-                      >
+                      <Link to="/applications" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
                         {t('header.applications')}
                       </Link>
 
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 flex items-center space-x-2"
-                      >
-                        <FaSignOutAlt />
-                        <span>{t('header.logout')}</span>
-                      </button>
+                      <div className="border-t border-gray-100 mt-1 pt-1">
+                        <button onClick={handleLogout} className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-150 gap-2">
+                          <FaSignOutAlt className="text-xs" />
+                          <span>{t('header.logout')}</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               </>
             ) : (
-              <div className="flex items-center space-x-4">
-                <Link to="/login" className="text-gray-700 hover:text-primary-600">
+              <div className="flex items-center space-x-3">
+                <Link to="/login" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-xl transition-all duration-200">
                   {t('header.login')}
                 </Link>
-                <Link to="/register" className="btn btn-primary">
+                <Link to="/register" className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5">
                   {t('header.register')}
                 </Link>
               </div>
+            )}
+
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
+              aria-label="Toggle mobile menu"
+            >
+              {mobileMenuOpen ? <FaTimes className="text-lg" /> : <FaBars className="text-lg" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        <div
+          className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+            mobileMenuOpen ? 'max-h-96 opacity-100 pb-4' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="flex flex-col space-y-1 border-t border-gray-100 pt-3">
+            <MobileNavLink to="/properties" label={t('header.browse')} />
+            <MobileNavLink to="/verify-case" label="Verify Evidence" />
+            {isAuthenticated && ['landlord', 'agent'].includes(user?.user_type) && (
+              <MobileNavLink to="/my-properties" label={t('header.my_properties')} />
+            )}
+            {isAuthenticated && user?.user_type === 'tenant' && (
+              <MobileNavLink to="/saved-properties" label={t('header.saved')} />
+            )}
+            {isAuthenticated && (
+              <MobileNavLink to={roleDashboardPath} label={t('header.dashboard')} />
             )}
           </div>
         </div>
@@ -294,5 +331,17 @@ const Header = () => {
     </header>
   );
 };
+
+const NavLink = ({ to, label }) => (
+  <Link to={to} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
+    {label}
+  </Link>
+);
+
+const MobileNavLink = ({ to, label }) => (
+  <Link to={to} className="px-4 py-3 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
+    {label}
+  </Link>
+);
 
 export default Header;

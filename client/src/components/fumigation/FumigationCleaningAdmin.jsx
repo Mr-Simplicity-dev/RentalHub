@@ -52,7 +52,7 @@ const FumigationCleaningAdmin = () => {
   // Load admin data
   useEffect(() => {
     const loadAdminData = async () => {
-      if (!user || !['admin', 'super_admin'].includes(user.user_type)) {
+      if (!user || !['admin', 'super_admin', 'fumigation_admin'].includes(user.user_type)) {
         toast.error('Access denied');
         navigate('/dashboard');
         return;
@@ -487,7 +487,8 @@ const FumigationCleaningAdmin = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
-                                  </tr>
+                  </th>
+                </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredBookings.length > 0 ? (

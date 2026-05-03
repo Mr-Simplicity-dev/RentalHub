@@ -17,7 +17,8 @@ import {
   FaMapMarkerAlt,
   FaLifeRing,
   FaGlobe,
-  FaTruck
+  FaTruck,
+  FaSprayCan
 } from 'react-icons/fa';
 
 const AdminLayout = () => {
@@ -37,6 +38,8 @@ const AdminLayout = () => {
   const isSuperFinancialAdmin = role === 'super_financial_admin';
   const isStateFinancialAdmin = role === 'state_financial_admin';
   const isStateSupportAdmin = role === 'state_support_admin';
+  const isFumigationAdmin = role === 'fumigation_admin';
+  const isTransportationAdmin = role === 'transportation_admin';
   const isStateScopedAdmin = ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_lawyer'].includes(role);
   const assignedStateLabel = user?.assigned_state || 'Not Assigned';
   const [liveBadges, setLiveBadges] = useState({
@@ -151,6 +154,22 @@ const AdminLayout = () => {
         hoverNav: 'text-gray-700 hover:bg-amber-50',
         mainBg: 'bg-gradient-to-br from-amber-50 via-white to-amber-100/40',
         panelTitle: 'State Support Console',
+      }
+    : isFumigationAdmin
+    ? {
+        sidebarBg: 'from-rose-700 to-rose-600',
+        activeNav: 'bg-rose-600 text-white',
+        hoverNav: 'text-gray-700 hover:bg-rose-50',
+        mainBg: 'bg-gradient-to-br from-rose-50 via-white to-rose-100/40',
+        panelTitle: 'Fumigation Admin',
+      }
+    : isTransportationAdmin
+    ? {
+        sidebarBg: 'from-sky-700 to-sky-600',
+        activeNav: 'bg-sky-600 text-white',
+        hoverNav: 'text-gray-700 hover:bg-sky-50',
+        mainBg: 'bg-gradient-to-br from-sky-50 via-white to-sky-100/40',
+        panelTitle: 'Transportation Admin',
       }
     : {
         sidebarBg: 'from-admin-700 to-admin-600',
@@ -347,6 +366,11 @@ const AdminLayout = () => {
                   <FaTruck className="mr-3" />
                   Transportation
                 </NavLink>
+
+                <NavLink to="/super-admin/fumigation-cleaning" className={navItem}>
+                  <FaSprayCan className="mr-3" />
+                  Fumigation
+                </NavLink>
               </div>
             </div>
           )}
@@ -429,8 +453,38 @@ const AdminLayout = () => {
                 Transportation
               </NavLink>
 
+              <NavLink to="/admin/fumigation-cleaning" className={navItem}>
+                <FaSprayCan className="mr-3" />
+                Fumigation
+              </NavLink>
+
           </div>
           </div>
+          )}
+
+          {/* SERVICE ADMINS */}
+          {(isFumigationAdmin || isTransportationAdmin) && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Service Admin
+              </p>
+
+              <div className="space-y-2">
+                {isFumigationAdmin && (
+                  <NavLink to="/admin/fumigation-cleaning" className={navItem}>
+                    <FaSprayCan className="mr-3" />
+                    Fumigation
+                  </NavLink>
+                )}
+
+                {isTransportationAdmin && (
+                  <NavLink to="/admin/transportation" className={navItem}>
+                    <FaTruck className="mr-3" />
+                    Transportation
+                  </NavLink>
+                )}
+              </div>
+            </div>
           )}
 
 

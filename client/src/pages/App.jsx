@@ -26,6 +26,7 @@ import TransportationBookingDetails from './TransportationBookingDetails';
 import FumigationCleaningBooking from './FumigationCleaningBooking';
 import FumigationCleaningPayment from './FumigationCleaningPayment';
 import FumigationCleaningCatalog from '../components/fumigation/FumigationCleaningCatalog';
+import FumigationCleaningAdmin from '../components/fumigation/FumigationCleaningAdmin';
 import FumigationCleaningBookings from './FumigationCleaningBookings';
 import FumigationCleaningBookingDetails from './FumigationCleaningBookingDetails';
 
@@ -96,6 +97,8 @@ const STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin'];
 const STATE_SUPPORT_ADMIN_ROLES = ['state_support_admin'];
 const SUPER_SUPPORT_ADMIN_ROLES = ['super_support_admin'];
 const SUPER_ADMIN_ROLES = ['super_admin'];
+const FUMIGATION_ADMIN_ROLES = ['fumigation_admin'];
+const TRANSPORTATION_ADMIN_ROLES = ['transportation_admin'];
 const TRANSPORTATION_STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_support_admin'];
 const ADMIN_SHELL_ROLES = [
   'admin',
@@ -104,6 +107,8 @@ const ADMIN_SHELL_ROLES = [
   ...STATE_ADMIN_ROLES,
   ...STATE_SUPPORT_ADMIN_ROLES,
   ...SUPER_SUPPORT_ADMIN_ROLES,
+  ...FUMIGATION_ADMIN_ROLES,
+  ...TRANSPORTATION_ADMIN_ROLES,
 ];
 
 const ProtectedRoute = ({ children }) => {
@@ -228,6 +233,8 @@ const LandlordRoute = ({ children }) => {
     if (STATE_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
     if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/state-support-dashboard" />;
     if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-support-dashboard" />;
+    if (FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/fumigation-cleaning" />;
+    if (TRANSPORTATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/transportation" />;
     if (user?.user_type === 'super_admin') return <Navigate to="/super-admin" />;
     return <Navigate to="/login" />;
   }
@@ -308,7 +315,20 @@ const TransportationCoreAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user?.user_type !== 'admin') return <Navigate to="/admin" replace />;
+  if (!['admin', 'transportation_admin'].includes(user?.user_type)) return <Navigate to="/admin" replace />;
+
+  return children;
+};
+
+const FumigationAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!['admin', 'super_admin', 'fumigation_admin'].includes(user?.user_type)) return <Navigate to="/admin" replace />;
 
   return children;
 };
@@ -368,6 +388,14 @@ const AdminHomeRoute = () => {
 
   if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
     return <Navigate to="/admin/super-support-dashboard" replace />;
+  }
+
+  if (FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/fumigation-cleaning" replace />;
+  }
+
+  if (TRANSPORTATION_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/transportation" replace />;
   }
 
   return <AdminDashboard />;
@@ -487,6 +515,7 @@ function App() {
               >
                 <Route index element={<SuperAdminDashboard />} />
                 <Route path="transportation" element={<TransportationSuperAdminDashboard />} />
+                <Route path="fumigation-cleaning" element={<FumigationCleaningAdmin />} />
               </Route>
               <Route path="/fumigation-cleaning/booking" element={<FumigationCleaningBooking />} />
 <Route path="/fumigation-cleaning/payment/:bookingId" element={<FumigationCleaningPayment />} />
@@ -571,6 +600,14 @@ function App() {
                     <TransportationCoreAdminRoute>
                       <TransportationAdminDashboard />
                     </TransportationCoreAdminRoute>
+                  }
+                />
+                <Route
+                  path="fumigation-cleaning"
+                  element={
+                    <FumigationAdminRoute>
+                      <FumigationCleaningAdmin />
+                    </FumigationAdminRoute>
                   }
                 />
                 <Route path="transportation/state"

@@ -15,6 +15,7 @@ const bcrypt = require('bcryptjs');
 
 let verificationAuditSchemaReady = false;
 let lawyerScopeSchemaReady = false;
+let adminRoleSchemaReady = false;
 const VERIFICATION_TARGET_USER_TYPES = "('tenant', 'landlord', 'agent', 'lawyer')";
 const USER_VERIFICATION_STATUS_EXPR = `
   COALESCE(
@@ -60,6 +61,58 @@ const ensureLawyerScopeSchema = async () => {
   `);
 
   lawyerScopeSchemaReady = true;
+};
+
+const ensureAdminRoleSchema = async () => {
+  if (adminRoleSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+      ALTER COLUMN user_type TYPE VARCHAR(50);
+
+    DO $$
+    DECLARE
+      existing_check_name TEXT;
+    BEGIN
+      SELECT c.conname
+      INTO existing_check_name
+      FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+      WHERE t.relname = 'users'
+        AND c.contype = 'c'
+        AND pg_get_constraintdef(c.oid) ILIKE '%user_type%';
+
+      IF existing_check_name IS NOT NULL THEN
+        EXECUTE format('ALTER TABLE users DROP CONSTRAINT %I', existing_check_name);
+      END IF;
+    END $$;
+
+    ALTER TABLE users
+      ADD CONSTRAINT users_user_type_check
+      CHECK (
+        user_type IN (
+          'tenant',
+          'landlord',
+          'lawyer',
+          'state_lawyer',
+          'super_lawyer',
+          'admin',
+          'state_admin',
+          'state_financial_admin',
+          'state_support_admin',
+          'super_admin',
+          'financial_admin',
+          'super_financial_admin',
+          'super_support_admin',
+          'agent',
+          'lga_admin',
+          'fumigation_admin',
+          'transportation_admin'
+        )
+      );
+  `);
+
+  adminRoleSchemaReady = true;
 };
 
 const buildDeletedEmail = (userId) => `deleted+u${userId}.${Date.now()}@deleted.local`;
@@ -1845,6 +1898,7 @@ exports.verifyLedgerIntegrity = async (req, res) => {
 
 exports.createAdmin = async (req, res) => {
   try {
+    await ensureAdminRoleSchema();
     await ensureLawyerScopeSchema();
 
     const {
@@ -1869,6 +1923,8 @@ exports.createAdmin = async (req, res) => {
       'lawyer',
       'state_lawyer',
       'super_lawyer',
+      'fumigation_admin',
+      'transportation_admin',
     ];
 
     const states = [
@@ -1957,6 +2013,8 @@ exports.createAdmin = async (req, res) => {
       'state_lawyer',
       'lawyer',
       'agent',
+      'fumigation_admin',
+      'transportation_admin',
     ]);
 
     const pendingApproval = requiresApprovalRoles.has(user_type);

@@ -103,6 +103,10 @@ const getDashboardPathForRole = (userType) => {
       return '/admin/super-support-dashboard?tab=overview';
     case 'state_support_admin':
       return '/admin/state-support-dashboard';
+    case 'fumigation_admin':
+      return '/admin/fumigation-cleaning';
+    case 'transportation_admin':
+      return '/admin/transportation';
     case 'super_lawyer':
       return '/lawyer/super';
     case 'state_lawyer':
@@ -183,6 +187,8 @@ const impersonateAdmin = async (req, res) => {
       'super_financial_admin',
       'state_support_admin',
       'super_support_admin',
+      'fumigation_admin',
+      'transportation_admin',
       'lawyer',
       'state_lawyer',
       'super_lawyer',
@@ -664,7 +670,7 @@ const getAdminPerformance = async (req, res) => {
        WHERE (
          a.user_type IN ('super_admin', 'admin', 'state_admin', 'financial_admin', 'lawyer',
                          'state_financial_admin', 'state_support_admin', 'super_financial_admin', 'super_support_admin',
-                         'state_lawyer', 'super_lawyer')
+                         'state_lawyer', 'super_lawyer', 'fumigation_admin', 'transportation_admin')
          OR a.user_type LIKE 'state_%'
          OR a.user_type LIKE 'super_%'
        )

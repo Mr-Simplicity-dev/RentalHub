@@ -1,154 +1,167 @@
-const twilio = require('twilio');
+const axios = require('axios');
 
-// ─── Twilio client (lazy-initialised so missing keys fail at call time, not boot) ──
-let _client = null;
+const DEFAULT_TERMII_BASE_URL = 'https://api.ng.termii.com';
+const DEFAULT_COUNTRY_CODE = '234';
+const TERMII_CHANNELS = new Set(['generic', 'dnd', 'whatsapp']);
 
-const getClient = () => {
-  if (_client) return _client;
+const cleanEnv = (value) => String(value || '').trim();
 
-  if (!process.env.TWILIO_ACCOUNT_SID) {
-    throw new Error('TWILIO_ACCOUNT_SID is not set in environment variables');
+function normalizeTermiiChannel(channel) {
+  const normalized = cleanEnv(channel || 'generic').toLowerCase();
+
+  if (!TERMII_CHANNELS.has(normalized)) {
+    throw new Error(`Invalid TERMII_CHANNEL "${channel}". Use generic, dnd, or whatsapp.`);
   }
-  if (!process.env.TWILIO_AUTH_TOKEN) {
-    throw new Error('TWILIO_AUTH_TOKEN is not set in environment variables');
+
+  return normalized;
+}
+
+function getTermiiConfig() {
+  const apiKey = cleanEnv(process.env.TERMII_API_KEY);
+  const senderId = cleanEnv(process.env.TERMII_SENDER_ID || process.env.TERMII_FROM);
+
+  if (!apiKey) {
+    throw new Error('TERMII_API_KEY is not set in environment variables');
   }
 
-  _client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  return _client;
-};
+  if (!senderId) {
+    throw new Error('TERMII_SENDER_ID is not set in environment variables');
+  }
 
-// ─── Phone normalisation ──────────────────────────────────────────────────────
+  return {
+    apiKey,
+    senderId,
+    baseUrl: cleanEnv(process.env.TERMII_BASE_URL || DEFAULT_TERMII_BASE_URL).replace(/\/+$/, ''),
+    channel: normalizeTermiiChannel(process.env.TERMII_CHANNEL || 'generic'),
+    timeout: Number(process.env.TERMII_TIMEOUT_MS || 15000),
+  };
+}
+
 /**
- * Normalize Nigerian numbers to E.164 format (+2348012345678)
- * Twilio requires the + prefix.
+ * Termii expects international phone numbers without a leading "+".
+ * Nigerian local numbers like 08012345678 are converted to 2348012345678.
  */
 function normalizePhone(phone) {
   if (!phone) return null;
 
-  let p = phone.toString().trim().replace(/[\s-]/g, '');
+  let digits = String(phone).trim();
 
-  // 070... → +23470...
-  if (p.startsWith('0')) p = '+234' + p.slice(1);
+  if (!digits) return null;
 
-  // Ensure + prefix
-  if (!p.startsWith('+')) p = '+' + p;
+  digits = digits.replace(/[^\d+]/g, '');
 
-  return p;
+  if (digits.startsWith('+')) {
+    digits = digits.slice(1);
+  }
+
+  digits = digits.replace(/\D/g, '');
+
+  if (digits.startsWith('00')) {
+    digits = digits.slice(2);
+  }
+
+  const countryCode = cleanEnv(process.env.SMS_DEFAULT_COUNTRY_CODE || DEFAULT_COUNTRY_CODE).replace(/\D/g, '');
+
+  if (countryCode && digits.startsWith('0')) {
+    digits = `${countryCode}${digits.slice(1)}`;
+  } else if (countryCode === '234' && /^[789]\d{9}$/.test(digits)) {
+    digits = `234${digits}`;
+  }
+
+  return /^\d{8,15}$/.test(digits) ? digits : null;
 }
 
-// ─── SMS (primary) ────────────────────────────────────────────────────────────
-/**
- * Send a plain SMS via Twilio.
- */
-const sendViaSMS = async (to, message) => {
-  if (!process.env.TWILIO_PHONE_NUMBER) {
-    throw new Error('TWILIO_PHONE_NUMBER is not set in environment variables');
+function getTermiiErrorMessage(error) {
+  const responseData = error?.response?.data;
+
+  if (typeof responseData === 'string' && responseData.trim()) {
+    return responseData.trim();
   }
 
-  const client = getClient();
+  if (responseData?.message) {
+    return responseData.message;
+  }
 
-  const result = await client.messages.create({
-    to,
-    from: process.env.TWILIO_PHONE_NUMBER,
-    body: message,
-  });
+  if (responseData?.error) {
+    return responseData.error;
+  }
+
+  if (error?.code === 'ECONNABORTED') {
+    return 'Termii request timed out';
+  }
+
+  return error?.message || 'Termii SMS send failed';
+}
+
+async function sendViaTermii(to, message) {
+  const config = getTermiiConfig();
+  const text = String(message || '').trim();
+
+  if (!text) {
+    throw new Error('SMS message is required');
+  }
+
+  const response = await axios.post(
+    `${config.baseUrl}/api/sms/send`,
+    {
+      api_key: config.apiKey,
+      to,
+      from: config.senderId,
+      sms: text,
+      type: 'plain',
+      channel: config.channel,
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      timeout: config.timeout,
+    }
+  );
+
+  const data = response.data || {};
+  const responseCode = cleanEnv(data.code).toLowerCase();
+
+  if (responseCode && responseCode !== 'ok') {
+    throw new Error(data.message || `Termii returned "${data.code}"`);
+  }
 
   return {
     success: true,
+    provider: 'termii',
     channel: 'sms',
+    route: config.channel,
     to,
-    sid: result.sid,
-    status: result.status,
+    messageId: data.message_id || null,
+    status: data.message || data.code || 'sent',
   };
-};
+}
 
-// ─── WhatsApp (fallback) ──────────────────────────────────────────────────────
-/**
- * Send an OTP via Twilio WhatsApp.
- *
- * Requirements:
- *  - TWILIO_WHATSAPP_NUMBER → your Twilio WhatsApp-enabled number
- *    Format: whatsapp:+14155238886  (Twilio sandbox)
- *    or your approved WhatsApp Business number: whatsapp:+234XXXXXXXXXX
- *
- * The message is sent as plain text (no template required for Twilio sandbox).
- * For production WhatsApp Business, pre-approved templates may be required.
- */
-const sendViaWhatsApp = async (to, message) => {
-  if (!process.env.TWILIO_WHATSAPP_NUMBER) {
-    throw new Error('TWILIO_WHATSAPP_NUMBER is not set in environment variables');
-  }
-
-  const client = getClient();
-
-  const result = await client.messages.create({
-    to:   `whatsapp:${to}`,
-    from: process.env.TWILIO_WHATSAPP_NUMBER,  // e.g. whatsapp:+14155238886
-    body: message,
-  });
-
-  return {
-    success: true,
-    channel: 'whatsapp',
-    to,
-    sid: result.sid,
-    status: result.status,
-  };
-};
-
-// ─── Public: sendSMS (SMS → WhatsApp fallback) ────────────────────────────────
-/**
- * Send a message via SMS first.
- * If SMS fails, automatically retry via WhatsApp.
- */
 exports.sendSMS = async (phoneNumber, message) => {
   const to = normalizePhone(phoneNumber);
 
   if (!to) {
-    return { success: false, error: 'Invalid phone number' };
+    return { success: false, provider: 'termii', error: 'Invalid phone number' };
   }
 
-  // ── Attempt 1: SMS ──────────────────────────────────────────────────────────
   try {
-    const result = await sendViaSMS(to, message);
-    console.log(`[SMS] Sent to ${to} via SMS (sid: ${result.sid})`);
+    const result = await sendViaTermii(to, message);
+    const idSuffix = result.messageId ? ` (message id: ${result.messageId})` : '';
+    console.log(`[SMS] Sent to ${to} via Termii ${result.route}${idSuffix}`);
     return result;
-  } catch (smsError) {
-    const smsErrMsg =
-      smsError?.message ||
-      smsError?.code ||
-      'SMS send failed';
+  } catch (error) {
+    const errorMessage = getTermiiErrorMessage(error);
+    console.error(`[SMS] Termii send failed for ${to}: ${errorMessage}`);
 
-    console.warn(`[SMS] SMS failed for ${to}: ${smsErrMsg}. Trying WhatsApp...`);
-
-    // ── Attempt 2: WhatsApp fallback ────────────────────────────────────────
-    try {
-      const result = await sendViaWhatsApp(to, message);
-      console.log(`[SMS] Sent to ${to} via WhatsApp fallback (sid: ${result.sid})`);
-      return result;
-    } catch (waError) {
-      const waErrMsg =
-        waError?.message ||
-        waError?.code ||
-        'WhatsApp send failed';
-
-      console.error(`[SMS] WhatsApp fallback also failed for ${to}: ${waErrMsg}`);
-
-      return {
-        success: false,
-        channel: 'both_failed',
-        smsError: smsErrMsg,
-        whatsappError: waErrMsg,
-        error: `SMS failed: ${smsErrMsg} | WhatsApp failed: ${waErrMsg}`,
-      };
-    }
+    return {
+      success: false,
+      provider: 'termii',
+      channel: 'sms',
+      error: errorMessage,
+    };
   }
 };
 
-// ─── Public: sendVerificationCode ────────────────────────────────────────────
-/**
- * Generate a 6-digit OTP and send it via SMS (with WhatsApp fallback).
- */
 exports.sendVerificationCode = async (phoneNumber) => {
   const code = Math.floor(100000 + Math.random() * 900000);
   const message = `Your Rental Hub NG verification code is: ${code}. Valid for 10 minutes. Do not share this code.`;
@@ -163,6 +176,7 @@ exports.sendVerificationCode = async (phoneNumber) => {
     success: true,
     code,
     channel: result.channel,
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+    provider: result.provider,
+    expiresAt: Date.now() + 10 * 60 * 1000,
   };
 };

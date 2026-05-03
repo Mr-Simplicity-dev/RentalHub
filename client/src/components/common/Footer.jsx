@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaFacebook, FaTwitter, FaInstagram, FaLinkedin } from 'react-icons/fa';
+import { FaFacebook, FaTwitter, FaInstagram, FaLinkedin, FaArrowRight } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 const Footer = () => {
@@ -8,129 +8,76 @@ const Footer = () => {
 
   return (
     <footer className="bg-gray-900 text-white">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="container mx-auto px-4 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           {/* About */}
-          <div>
-            <h3 className="text-lg font-bold mb-4">RentalHub NG</h3>
-            <p className="text-sm text-gray-400">
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-primary-200 bg-clip-text text-transparent">
+              RentalHub NG
+            </h3>
+            <p className="text-sm text-gray-400 leading-relaxed">
               {t('footer.about')}
             </p>
+            <div className="flex space-x-3 pt-2">
+              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-primary-600 hover:text-white transition-all duration-300 hover:scale-110">
+                <FaFacebook />
+              </a>
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-primary-600 hover:text-white transition-all duration-300 hover:scale-110">
+                <FaTwitter />
+              </a>
+              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-primary-600 hover:text-white transition-all duration-300 hover:scale-110">
+                <FaInstagram />
+              </a>
+              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-primary-600 hover:text-white transition-all duration-300 hover:scale-110">
+                <FaLinkedin />
+              </a>
+            </div>
           </div>
 
           {/* Quick Links */}
-          <div>
-            <h3 className="text-lg font-bold mb-4">
-              {t('footer.quick_links')}
-            </h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link to="/properties" className="text-gray-400 hover:text-white">
-                  {t('footer.browse')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/about" className="text-gray-400 hover:text-white">
-                  {t('footer.about_us')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/how-it-works" className="text-gray-400 hover:text-white">
-                  {t('footer.how')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/faq" className="text-gray-400 hover:text-white">
-                  {t('footer.faq')}
-                </Link>
-              </li>
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold">{t('footer.quick_links')}</h3>
+            <ul className="space-y-3">
+              <li><FooterLink to="/properties" label={t('footer.browse')} /></li>
+              <li><FooterLink to="/about" label={t('footer.about_us')} /></li>
+              <li><FooterLink to="/how-it-works" label={t('footer.how')} /></li>
+              <li><FooterLink to="/faq" label={t('footer.faq')} /></li>
             </ul>
           </div>
 
           {/* For Landlords */}
-          <div>
-            <h3 className="text-lg font-bold mb-4">
-              {t('footer.landlords')}
-            </h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link to="/list-property" className="text-gray-400 hover:text-white">
-                  {t('footer.list')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/pricing" className="text-gray-400 hover:text-white">
-                  {t('footer.pricing')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/landlord-guide" className="text-gray-400 hover:text-white">
-                  {t('footer.guide')}
-                </Link>
-              </li>
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold">{t('footer.landlords')}</h3>
+            <ul className="space-y-3">
+              <li><FooterLink to="/list-property" label={t('footer.list')} /></li>
+              <li><FooterLink to="/pricing" label={t('footer.pricing')} /></li>
+              <li><FooterLink to="/landlord-guide" label={t('footer.guide')} /></li>
             </ul>
           </div>
 
           {/* Contact */}
-          <div>
-            <h3 className="text-lg font-bold mb-4">
-              {t('footer.contact')}
-            </h3>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li>{t('footer.email')}: support@rentalhub.com.ng</li>
-              <li>{t('footer.phone')}: +234 706 701 2884</li>
-              <li className="flex space-x-4 mt-4">
-              <a
-                href="https://facebook.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook"
-                className="hover:text-white"
-              >
-                <FaFacebook className="text-xl" />
-              </a>
-
-              <a
-                href="https://twitter.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Twitter"
-                className="hover:text-white"
-              >
-                <FaTwitter className="text-xl" />
-              </a>
-
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="hover:text-white"
-              >
-                <FaInstagram className="text-xl" />
-              </a>
-
-              <a
-                href="https://linkedin.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="LinkedIn"
-                className="hover:text-white"
-              >
-                <FaLinkedin className="text-xl" />
-              </a>
-            </li>
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold">{t('footer.contact')}</h3>
+            <ul className="space-y-3 text-sm text-gray-400">
+              <li className="flex items-start gap-2">
+                <span className="text-primary-400 mt-1">✉</span>
+                <span>support@rentalhub.com.ng</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary-400 mt-1">📞</span>
+                <span>+234 706 701 2884</span>
+              </li>
             </ul>
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-          <p>&copy; 2024 RentalHub NG. {t('footer.rights')}</p>
-          <div className="mt-2 space-x-4">
-            <Link to="/privacy" className="hover:text-white">
+        <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-gray-400">&copy; 2024 RentalHub NG. {t('footer.rights')}</p>
+          <div className="flex space-x-6 text-sm">
+            <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors duration-200">
               {t('footer.privacy')}
             </Link>
-            <Link to="/terms" className="hover:text-white">
+            <Link to="/terms" className="text-gray-400 hover:text-white transition-colors duration-200">
               {t('footer.terms')}
             </Link>
           </div>
@@ -139,5 +86,12 @@ const Footer = () => {
     </footer>
   );
 };
+
+const FooterLink = ({ to, label }) => (
+  <Link to={to} className="text-gray-400 hover:text-white transition-all duration-200 flex items-center gap-1 group">
+    <span className="text-xs opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all duration-200 text-primary-400">▸</span>
+    {label}
+  </Link>
+);
 
 export default Footer;

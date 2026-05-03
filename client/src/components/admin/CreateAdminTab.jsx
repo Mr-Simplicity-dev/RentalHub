@@ -213,6 +213,8 @@ const CreateAdminTab = () => {
           <option value="super_financial_admin">Super Financial Admin</option>
           <option value="super_support_admin">Super Support Admin</option>
           <option value="super_lawyer">Super Lawyer Admin</option>
+          <option value="fumigation_admin">Fumigation Admin</option>
+          <option value="transportation_admin">Transportation Admin</option>
           <option value="lawyer">Lawyer</option>
         </select>
                                                                                                                                                                      

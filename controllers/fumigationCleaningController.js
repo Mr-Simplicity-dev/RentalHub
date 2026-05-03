@@ -3,6 +3,17 @@ const { validationResult } = require('express-validator');
 const NotificationService = require('../services/notificationService');
 const db = require('../config/middleware/database');
 
+const FUMIGATION_ADMIN_ROLES = new Set([
+  'admin',
+  'super_admin',
+  'state_admin',
+  'state_financial_admin',
+  'fumigation_admin',
+]);
+
+const isFumigationAdminUser = (user) =>
+  Boolean(user?.is_admin) || FUMIGATION_ADMIN_ROLES.has(String(user?.user_type || '').toLowerCase());
+
 // ---------------------------------------------------------------------------
 // PaymentService — inline mock (replace body with real implementation later)
 // ---------------------------------------------------------------------------
@@ -33,6 +44,14 @@ const PaymentService = {
 // NotificationService — inline mock (replace body with real implementation later)
 // ---------------------------------------------------------------------------
 class FumigationCleaningController {
+  constructor() {
+    Object.getOwnPropertyNames(FumigationCleaningController.prototype)
+      .filter((method) => method !== 'constructor' && typeof this[method] === 'function')
+      .forEach((method) => {
+        this[method] = this[method].bind(this);
+      });
+  }
+
   // ============ HELPER METHODS ============
 
   // Get property state (helper method)
@@ -820,7 +839,7 @@ class FumigationCleaningController {
   // Get all bookings (admin)
   async getAllBookings(req, res) {
     try {
-      if (!req.user.is_admin) {
+      if (!isFumigationAdminUser(req.user)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. Admin privileges required'
@@ -848,7 +867,7 @@ class FumigationCleaningController {
   // Get admin statistics
   async getAdminStats(req, res) {
     try {
-      if (!req.user.is_admin) {
+      if (!isFumigationAdminUser(req.user)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. Admin privileges required'
@@ -876,7 +895,7 @@ class FumigationCleaningController {
   // Update booking status (admin)
   async updateBookingStatus(req, res) {
     try {
-      if (!req.user.is_admin) {
+      if (!isFumigationAdminUser(req.user)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. Admin privileges required'
@@ -941,7 +960,7 @@ class FumigationCleaningController {
   // Assign provider to booking (admin)
   async assignProvider(req, res) {
     try {
-      if (!req.user.is_admin) {
+      if (!isFumigationAdminUser(req.user)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. Admin privileges required'
@@ -1025,7 +1044,7 @@ class FumigationCleaningController {
   // Get available providers for booking (admin)
   async getAvailableProvidersForBooking(req, res) {
     try {
-      if (!req.user.is_admin) {
+      if (!isFumigationAdminUser(req.user)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. Admin privileges required'
@@ -1064,12 +1083,49 @@ class FumigationCleaningController {
     }
   }
 
+  // Get all active providers (admin)
+  async getProviders(req, res) {
+    try {
+      if (!isFumigationAdminUser(req.user)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Admin privileges required'
+        });
+      }
+
+      const result = await db.query(
+        `SELECT
+           sp.*,
+           COALESCE(AVG(sr.overall_rating), 0) AS avg_rating,
+           COUNT(sr.id)::INT AS total_reviews
+         FROM service_providers sp
+         LEFT JOIN service_reviews sr ON sp.id = sr.provider_id
+         WHERE sp.is_active = TRUE
+         GROUP BY sp.id
+         ORDER BY avg_rating DESC, sp.total_jobs_completed DESC, sp.company_name ASC`
+      );
+
+      res.json({
+        success: true,
+        data: result.rows,
+        message: 'Providers retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error getting providers:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve providers',
+        error: error.message
+      });
+    }
+  }
+
   // ============ SAFETY COMPLIANCE ENDPOINTS ============
 
   // Submit safety compliance record
   async submitSafetyCompliance(req, res) {
     try {
-      if (!req.user.is_admin) {
+      if (!isFumigationAdminUser(req.user)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. Admin privileges required'

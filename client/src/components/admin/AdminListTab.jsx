@@ -31,6 +31,10 @@ const getRoleBadgeClass = (role) => {
       return 'bg-emerald-100 text-emerald-700';
     case 'lawyer':
       return 'bg-violet-100 text-violet-700';
+    case 'fumigation_admin':
+      return 'bg-rose-100 text-rose-700';
+    case 'transportation_admin':
+      return 'bg-sky-100 text-sky-700';
     default:
       return 'bg-gray-100 text-gray-700';
   }

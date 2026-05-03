@@ -14,6 +14,8 @@ const dashboardPathByRole = {
   super_financial_admin: '/admin/super-financial-dashboard',
   state_support_admin: '/admin/state-support-dashboard',
   super_support_admin: '/admin/super-support-dashboard',
+  fumigation_admin: '/admin/fumigation-cleaning',
+  transportation_admin: '/admin/transportation',
   lawyer: '/lawyer',
   state_lawyer: '/lawyer/state',
   super_lawyer: '/lawyer/super',

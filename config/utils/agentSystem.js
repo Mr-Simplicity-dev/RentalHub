@@ -55,13 +55,20 @@ const ensureAgentSystemSchema = async () => {
           'tenant',
           'landlord',
           'lawyer',
+          'state_lawyer',
+          'super_lawyer',
           'admin',
           'state_admin',
           'state_financial_admin',
+          'state_support_admin',
           'super_admin',
           'financial_admin',
           'super_financial_admin',
-          'agent'
+          'super_support_admin',
+          'agent',
+          'lga_admin',
+          'fumigation_admin',
+          'transportation_admin'
         )
       );
 

@@ -41,6 +41,14 @@ const DEFAULT_MAP = {
     label: 'SUPER SUPPORT ADMIN',
     className: 'bg-orange-100 text-orange-700 border-orange-200',
   },
+  fumigation_admin: {
+    label: 'FUMIGATION ADMIN',
+    className: 'bg-rose-100 text-rose-700 border-rose-200',
+  },
+  transportation_admin: {
+    label: 'TRANSPORTATION ADMIN',
+    className: 'bg-sky-100 text-sky-700 border-sky-200',
+  },
   agent: {
     label: 'AGENT',
     className: 'bg-indigo-100 text-indigo-700 border-indigo-200',
