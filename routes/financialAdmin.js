@@ -13,6 +13,25 @@ const {
   isStateFinancialAdmin,
   isSuperAdminOrSuperFinancialAdmin: isSuperOrFinancialRole,
 } = require('../config/utils/roleScopes.js work on it');
+
+/**
+ * All admin roles that earn commissions and can request withdrawals.
+ * This includes state, super, and service-level admin roles.
+ */
+const WITHDRAWAL_ELIGIBLE_ROLES = new Set([
+  'admin',
+  'super_admin',
+  'state_admin',
+  'state_financial_admin',
+  'state_support_admin',
+  'state_lawyer_admin',
+  'financial_admin',
+  'super_financial_admin',
+  'super_support_admin',
+  'super_lawyer_admin',
+  'fumigation_admin',
+  'transportation_admin',
+]);
 const {
   createTransferRecipient,
   initiateTransfer,
@@ -166,7 +185,7 @@ router.get('/dashboard/state-admin',
 // ====================== COMMISSION WITHDRAWAL ROUTES ======================
 
 const canRequestAdminWithdrawal = (userType) =>
-  isStateFinancialAdmin(userType) || isSuperOrFinancialRole(userType);
+  WITHDRAWAL_ELIGIBLE_ROLES.has(userType);
 
 /**
  * Request personal commission withdrawal (eligible admin roles)

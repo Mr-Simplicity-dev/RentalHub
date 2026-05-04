@@ -918,6 +918,81 @@ const createUserFromPreparedRegistration = async ({
       }
     }
 
+    // ====================================================================
+    // LAWYER ACCESS FEE DISTRIBUTION (N2000)
+    // When useRentalhubLawyers is true, the total payment includes N2000
+    // for lawyer access. We need to:
+    //   1. Assign a round-robin lawyer (if not already assigned via invite)
+    //   2. Create a separate lawyer_access_fee payment record
+    //   3. Distribute the N2000 to eligible admins
+    // ====================================================================
+    if (preparedRegistration.useRentalhubLawyers && tenantRegistrationPayment) {
+      let assignedLawyerId = null;
+      let assignedAgentId = null;
+
+      // Assign round-robin lawyer in the client's state/LGA
+      try {
+        const roundRobinResult = await assignLawyerRoundRobin({
+          clientUserId: newUser.id,
+          stateId: preparedRegistration.preferredStateId,
+          lgaName: preparedRegistration.preferredLgaName,
+        });
+
+        if (roundRobinResult && roundRobinResult.assignedLawyer) {
+          assignedLawyerId = roundRobinResult.assignedLawyer.id;
+        }
+      } catch (roundRobinError) {
+        console.error('Round-robin lawyer assignment error (non-fatal):', roundRobinError);
+      }
+
+      // Create a separate payment record for the N2000 lawyer access fee
+      const lawyerFeePaymentResult = await db.query(
+        `INSERT INTO payments (
+           user_id,
+           payment_type,
+           amount,
+           currency,
+           payment_method,
+           transaction_reference,
+           payment_status,
+           gateway_response,
+           completed_at
+         )
+         VALUES ($1, 'lawyer_access_fee', $2, $3, $4, $5, 'completed', $6, $7)
+         RETURNING id`,
+        [
+          newUser.id,
+          2000,
+          tenantRegistrationPayment.currency,
+          tenantRegistrationPayment.payment_method,
+          `${tenantRegistrationPayment.transaction_reference}_LAWYER_FEE`,
+          tenantRegistrationPayment.gateway_response,
+          tenantRegistrationPayment.completed_at || new Date()
+        ]
+      );
+
+      const lawyerFeePaymentId = lawyerFeePaymentResult.rows[0].id;
+
+      // Distribute the N2000 to all eligible admin roles
+      try {
+        const { distributeLawyerAccessFee } = require('../services/commissionService');
+        const distributionResult = await distributeLawyerAccessFee({
+          paymentId: lawyerFeePaymentId,
+          userId: newUser.id,
+          assignedLawyerId,
+          assignedAgentId,
+          stateId: preparedRegistration.preferredStateId,
+          lgaName: preparedRegistration.preferredLgaName,
+        });
+
+        console.log(
+          `Lawyer access fee distributed: ₦2000 across ${Object.keys(distributionResult.distribution).length} admins`
+        );
+      } catch (distError) {
+        console.error('Lawyer access fee distribution error (non-fatal):', distError);
+      }
+    }
+
     const verificationToken = jwt.sign(
       { userId: newUser.id, email: newUser.email },
       process.env.JWT_SECRET,
@@ -1257,6 +1332,7 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       phone: storedPayload.phone,
       full_name: storedPayload.full_name,
       cleanLawyerEmail: storedPayload.cleanLawyerEmail || '',
+      useRentalhubLawyers: storedPayload.useRentalhubLawyers === true,
       user_type:
         tenantRegistrationPayment.user_type ||
         storedPayload.user_type,

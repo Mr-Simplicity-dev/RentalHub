@@ -6,6 +6,7 @@ import ApprovalTimeline from '../../components/common/ApprovalTimeline';
 import useRetryableAction from '../../hooks/useRetryableAction';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
+import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 
 const badgeClass = (status) => {
   if (status === 'approved') return 'bg-green-100 text-green-700';
@@ -114,8 +115,10 @@ const StateSupportAdminDashboard = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen space-y-6 bg-gradient-to-br from-state-50 via-white to-state-100/40 p-1">
+    return (
+    <div className="min-h-screen bg-gradient-to-br from-state-50 via-white to-state-100/40 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="space-y-6">
       <section className="rounded-xl bg-white p-6 shadow">
         <div className="flex items-center justify-between">
           <div>
@@ -207,6 +210,11 @@ const StateSupportAdminDashboard = () => {
           <p className="mt-2 text-2xl font-bold text-gray-900">{stats.incomingPending}</p>
         </article>
       </section>
+
+            {/* Commission Withdrawal Banner */}
+      <div className="mb-6">
+        <CommissionWithdrawalBanner />
+      </div>
 
       <section className="rounded-xl bg-white p-5 shadow">
         <div className="mb-4 flex items-center gap-3">
@@ -336,7 +344,9 @@ const StateSupportAdminDashboard = () => {
             rows: 3,
           },
         ]}
-      />
+            />
+        </div>
+      </div>
     </div>
   );
 };

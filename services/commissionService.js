@@ -573,3 +573,251 @@ exports.getAdminCommissionSummary = async (adminId) => {
     throw error;
   }
 };
+
+// ====================== LAWYER ACCESS FEE DISTRIBUTION ======================
+
+const LAWYER_ACCESS_FEE_TOTAL = 2000;
+
+const LAWYER_ACCESS_FEE_DISTRIBUTION = {
+  assigned_lawyer: 100,
+  assigned_agent: 80,
+  super_admin_base: 120,
+  state_admin: 140,
+  state_financial_admin: 140,
+  state_support_admin: 140,
+  state_lawyer_admin: 140,
+  super_financial_admin: 200,
+  super_support_admin: 200,
+  super_lawyer_admin: 200,
+  fumigation_admin: 120,
+  transportation_admin: 120,
+};
+
+const DISTRIBUTED_SUM =
+  LAWYER_ACCESS_FEE_DISTRIBUTION.assigned_lawyer +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.assigned_agent +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.super_admin_base +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.state_admin +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.state_financial_admin +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.state_support_admin +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.state_lawyer_admin +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.super_financial_admin +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.super_support_admin +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.super_lawyer_admin +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.fumigation_admin +
+  LAWYER_ACCESS_FEE_DISTRIBUTION.transportation_admin;
+
+// Remainder to super admin
+const LAWYER_ACCESS_FEE_REMAINDER = LAWYER_ACCESS_FEE_TOTAL - DISTRIBUTED_SUM;
+
+/**
+ * Distribute the N2000 lawyer access fee to all eligible admin roles.
+ * Called after a user pays for RentalHub NG lawyer access during registration.
+ *
+ * @param {Object} params
+ * @param {number} params.paymentId - The payments.id
+ * @param {number} params.userId - The client user id
+ * @param {number|null} params.assignedLawyerId - The lawyer assigned via round-robin
+ * @param {number|null} params.assignedAgentId - The agent assigned (if any)
+ * @param {number} params.stateId - The state id for the client's chosen state
+ * @param {string} params.lgaName - The LGA name
+ */
+exports.distributeLawyerAccessFee = async ({
+  paymentId,
+  userId,
+  assignedLawyerId,
+  assignedAgentId,
+  stateId,
+  lgaName,
+}) => {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Resolve state name from stateId (state admins use assigned_state VARCHAR name)
+    const stateNameResult = await client.query(
+      'SELECT state_name FROM states WHERE id = $1 LIMIT 1',
+      [stateId]
+    );
+    const stateName = stateNameResult.rows[0]?.state_name || null;
+
+    if (!stateName) {
+      console.error(`State not found for state_id ${stateId}`);
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    // Look up state-level admins by assigned_state (VARCHAR name) matching the client's state
+    const stateAdminsResult = await client.query(
+      `SELECT id, user_type FROM users
+       WHERE user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_lawyer_admin')
+         AND LOWER(assigned_state) = LOWER($1)
+         AND deleted_at IS NULL
+         AND account_suspended_at IS NULL
+         AND admin_funds_frozen = false`,
+      [stateName]
+    );
+
+    // Super-level admins (not tied to a specific state)
+    const superAdminsResult = await client.query(
+      `SELECT id, user_type FROM users
+       WHERE user_type IN ('super_admin', 'super_financial_admin', 'super_support_admin', 'super_lawyer_admin')
+         AND deleted_at IS NULL
+         AND account_suspended_at IS NULL
+         AND admin_funds_frozen = false`
+    );
+
+    // Service admins (fumigation, transportation)
+    const serviceAdminsResult = await client.query(
+      `SELECT id, user_type FROM users
+       WHERE user_type IN ('fumigation_admin', 'transportation_admin')
+         AND deleted_at IS NULL
+         AND account_suspended_at IS NULL
+         AND admin_funds_frozen = false`
+    );
+
+    // Index admins by user_type for quick lookups
+    const stateAdminByRole = {};
+    for (const row of stateAdminsResult.rows) {
+      stateAdminByRole[row.user_type] = row.id;
+    }
+
+    const superAdminByRole = {};
+    for (const row of superAdminsResult.rows) {
+      superAdminByRole[row.user_type] = row.id;
+    }
+
+    const serviceAdminByRole = {};
+    for (const row of serviceAdminsResult.rows) {
+      serviceAdminByRole[row.user_type] = row.id;
+    }
+
+    const defaultSuperAdminId = superAdminByRole['super_admin'] || null;
+
+    // Build distribution map { adminId: totalAmount }
+    const distribution = {};
+
+    const credit = (amount, adminId) => {
+      if (!adminId) {
+        if (defaultSuperAdminId) {
+          distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + amount;
+        }
+        return;
+      }
+      distribution[adminId] = (distribution[adminId] || 0) + amount;
+    };
+
+    // 1. Assigned lawyer – N100 (if round-robin assigned a lawyer)
+    if (assignedLawyerId) {
+      credit(LAWYER_ACCESS_FEE_DISTRIBUTION.assigned_lawyer, assignedLawyerId);
+    } else if (defaultSuperAdminId) {
+      distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + LAWYER_ACCESS_FEE_DISTRIBUTION.assigned_lawyer;
+    }
+
+    // 2. Assigned agent – N80 (if any)
+    if (assignedAgentId) {
+      credit(LAWYER_ACCESS_FEE_DISTRIBUTION.assigned_agent, assignedAgentId);
+    } else if (defaultSuperAdminId) {
+      distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + LAWYER_ACCESS_FEE_DISTRIBUTION.assigned_agent;
+    }
+
+    // 3. Super admin base – N120
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.super_admin_base, superAdminByRole['super_admin']);
+    // 4. State admin – N140
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.state_admin, stateAdminByRole['state_admin']);
+    // 5. State financial admin – N140
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.state_financial_admin, stateAdminByRole['state_financial_admin']);
+    // 6. State support admin – N140
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.state_support_admin, stateAdminByRole['state_support_admin']);
+    // 7. State lawyer admin – N140
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.state_lawyer_admin, stateAdminByRole['state_lawyer_admin']);
+    // 8. Super financial admin – N200
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.super_financial_admin, superAdminByRole['super_financial_admin']);
+    // 9. Super support admin – N200
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.super_support_admin, superAdminByRole['super_support_admin']);
+    // 10. Super lawyer admin – N200
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.super_lawyer_admin, superAdminByRole['super_lawyer_admin']);
+    // 11. Fumigation admin – N120
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.fumigation_admin, serviceAdminByRole['fumigation_admin']);
+    // 12. Transportation admin – N120
+    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.transportation_admin, serviceAdminByRole['transportation_admin']);
+
+    // 13. Remainder to super admin
+    if (defaultSuperAdminId) {
+      distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + LAWYER_ACCESS_FEE_REMAINDER;
+    }
+
+    // Persist each commission record and credit admin wallets
+    const commissionIds = [];
+    for (const [adminId, amount] of Object.entries(distribution)) {
+      if (amount <= 0) continue;
+
+            const result = await client.query(
+        `INSERT INTO admin_commissions (
+          admin_id, user_id, payment_id, amount, source, commission_rate, state, city, status
+        ) VALUES ($1, $2, $3, $4, 'lawyer_access_fee', 1.0, $5, $6, 'pending')
+        RETURNING id`,
+        [adminId, userId, paymentId, amount, stateName, lgaName]
+      );
+
+      commissionIds.push(result.rows[0].id);
+
+      await client.query(
+        `UPDATE users
+         SET admin_wallet_balance = admin_wallet_balance + $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [amount, adminId]
+      );
+
+      await client.query(
+        `INSERT INTO transaction_audits
+         (payment_id, user_id, admin_id, action_type, amount, description)
+         VALUES ($1, $2, $3, 'commission_earned', $4, $5)`,
+        [
+          paymentId,
+          userId,
+          adminId,
+          amount,
+          `Lawyer access fee commission: ₦${amount.toLocaleString()}`,
+        ]
+      );
+    }
+
+    // Record the full distribution in the dedicated tracking table
+    const distributionRecord = await client.query(
+      `INSERT INTO lawyer_access_fee_distributions (
+        payment_id, user_id, assigned_lawyer_id, assigned_agent_id,
+        state_id, lga_name, total_amount, distribution
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id`,
+      [
+        paymentId,
+        userId,
+        assignedLawyerId,
+        assignedAgentId,
+        stateId,
+        lgaName,
+        LAWYER_ACCESS_FEE_TOTAL,
+        JSON.stringify(distribution),
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    console.log(`Lawyer access fee distributed: ₦${LAWYER_ACCESS_FEE_TOTAL.toLocaleString()} across ${Object.keys(distribution).length} recipients`);
+
+    return {
+      distribution_id: distributionRecord.rows[0].id,
+      commission_ids: commissionIds,
+      distribution,
+      total_distributed: Object.values(distribution).reduce((a, b) => a + b, 0),
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Distribute lawyer access fee error:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};

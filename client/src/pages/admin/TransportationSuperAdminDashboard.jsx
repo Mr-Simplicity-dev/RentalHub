@@ -13,6 +13,7 @@ import {
   SectionTabs,
   StatusPill,
 } from '../../components/admin/TransportationAdminUi';
+import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 
 const tabs = [
   { label: 'Overview', value: 'overview' },
@@ -192,7 +193,9 @@ export default function TransportationSuperAdminDashboard() {
   const stats = dashboard?.national_statistics || {};
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-100/40 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="space-y-6">
       <PageHeader
         eyebrow="Transportation Super Admin"
         title="National Logistics Command"
@@ -212,6 +215,11 @@ export default function TransportationSuperAdminDashboard() {
           </div>
         }
       />
+
+      {/* Commission Withdrawal Banner */}
+      <div className="mb-6">
+        <CommissionWithdrawalBanner />
+      </div>
 
       <SectionTabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
@@ -521,6 +529,8 @@ export default function TransportationSuperAdminDashboard() {
           )}
         </SectionCard>
       ) : null}
+        </div>
+      </div>
     </div>
   );
 }

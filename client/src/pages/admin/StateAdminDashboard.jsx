@@ -22,6 +22,7 @@ import { toast } from 'react-toastify';
 import api from '../../services/api';
 import Button from '../../components/common/Button';
 import useRetryableAction from '../../hooks/useRetryableAction';
+import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 
 const StateAdminDashboard = ({ initialTab = 'overview' }) => {
   const navigate = useNavigate();
@@ -236,8 +237,10 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
     );
   }
 
-  return (
-    <div className="space-y-6">
+    return (
+    <div className="min-h-screen bg-gradient-to-br from-state-50 via-white to-state-100/40 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="space-y-6">
       {/* Header */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between">
@@ -335,6 +338,11 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
           </div>
         </div>
       )}
+
+      {/* Commission Withdrawal Banner */}
+      <div className="mb-6">
+        <CommissionWithdrawalBanner />
+      </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1072,11 +1080,13 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                     )}
                   </tbody>
                 </table>
-              </div>
+                            </div>
             </div>
           )}
         </div>
+        </div>
       </div>
+    </div>
     </div>
   );
 };

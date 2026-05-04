@@ -12,6 +12,7 @@ import {
   FaUserShield,
   FaChartLine,
 } from 'react-icons/fa';
+import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -87,6 +88,8 @@ const AdminDashboard = () => {
 
         {Number(stats.pendingVerifications || 0) > 0 && (
           <div className="mb-6 rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4">
+
+              {/* ... existing pending verifications alert ... */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-amber-900">
@@ -155,6 +158,11 @@ const AdminDashboard = () => {
             </div>
           </div>
         )}
+
+        {/* Commission Withdrawal Banner */}
+        <div className="mb-6">
+          <CommissionWithdrawalBanner />
+        </div>
 
         <div className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <StatCard

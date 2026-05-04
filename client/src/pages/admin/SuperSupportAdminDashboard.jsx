@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import {
   FaBell,
   FaCalendarDay,
@@ -306,7 +307,12 @@ const SuperSupportAdminDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-100/40 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="space-y-6">
+
+      {/* Commission Withdrawal Banner */}
+      <CommissionWithdrawalBanner />
 
       <div className={`rounded-xl border p-4 ${commissionCheck.toneClass}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1521,7 +1527,9 @@ const SuperSupportAdminDashboard = () => {
             </button>
           </div>
         </div>
-      )}
+            )}
+        </div>
+      </div>
     </div>
   );
 };

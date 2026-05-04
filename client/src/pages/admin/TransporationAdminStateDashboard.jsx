@@ -13,6 +13,7 @@ import {
   SectionTabs,
   StatusPill,
 } from '../../components/admin/TransportationAdminUi';
+import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 
 const tabs = [
   { label: 'Overview', value: 'overview' },
@@ -130,7 +131,9 @@ export default function TransportationAdminStateDashboard() {
     : 'Assigned state scope';
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-100/40 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="space-y-6">
       <PageHeader
         eyebrow="State Transportation Monitoring"
         title="State Logistics Oversight"
@@ -150,6 +153,11 @@ export default function TransportationAdminStateDashboard() {
           </div>
         }
       />
+
+      {/* Commission Withdrawal Banner */}
+      <div className="mb-6">
+        <CommissionWithdrawalBanner />
+      </div>
 
       <SectionTabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
@@ -417,6 +425,8 @@ export default function TransportationAdminStateDashboard() {
           </SectionCard>
         </div>
       ) : null}
+        </div>
+      </div>
     </div>
   );
 }

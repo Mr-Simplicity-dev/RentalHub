@@ -125,6 +125,54 @@ const Dashboard = () => {
         ? 'pending'
         : 'not_submitted');
 
+    // ── Combined dashboard loader (stats + activities + optional transport/rent) ──
+  const loadDashboardData = useCallback(async (showLoading = true) => {
+    if (!user) return;
+
+    if (showLoading) setLoading(true);
+    try {
+      const endpoint =
+        user.user_type === 'tenant'
+          ? '/dashboard/tenant/stats'
+          : '/dashboard/landlord/stats';
+
+      const activitiesEndpoint =
+        user.user_type === 'tenant'
+          ? '/dashboard/tenant/recent-activities'
+          : '/dashboard/landlord/recent-activities';
+
+      const [statsResponse, activitiesResponse] = await Promise.all([
+        api.get(endpoint),
+        api.get(activitiesEndpoint),
+      ]);
+
+      if (statsResponse.data.success) {
+        setStats(statsResponse.data.data);
+      } else {
+        setStats(null);
+      }
+
+      if (activitiesResponse.data.success) {
+        setRecentActivities(activitiesResponse.data.data);
+      } else {
+        setRecentActivities([]);
+      }
+
+      // Load additional tenant-specific data
+      if (user.user_type === 'tenant') {
+        await loadTransportationData();
+        await loadRentSavingsData();
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      if (showLoading) {
+        toast.error(error?.response?.data?.message || error?.message || 'Could not load dashboard');
+      }
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  }, [user]);
+
   // Load transportation data for tenant
   const loadTransportationData = useCallback(async () => {
     if (user?.user_type !== 'tenant') return;
@@ -175,54 +223,6 @@ const Dashboard = () => {
       // Don't show error toast - it's optional
     }
   }, [user]);
-
-    // ── Combined dashboard loader (stats + activities + optional transport/rent) ──
-  const loadDashboardData = useCallback(async (showLoading = true) => {
-    if (!user) return;
-
-    if (showLoading) setLoading(true);
-    try {
-      const endpoint =
-        user.user_type === 'tenant'
-          ? '/dashboard/tenant/stats'
-          : '/dashboard/landlord/stats';
-
-      const activitiesEndpoint =
-        user.user_type === 'tenant'
-          ? '/dashboard/tenant/recent-activities'
-          : '/dashboard/landlord/recent-activities';
-
-      const [statsResponse, activitiesResponse] = await Promise.all([
-        api.get(endpoint),
-        api.get(activitiesEndpoint),
-      ]);
-
-      if (statsResponse.data.success) {
-        setStats(statsResponse.data.data);
-      } else {
-        setStats(null);
-      }
-
-      if (activitiesResponse.data.success) {
-        setRecentActivities(activitiesResponse.data.data);
-      } else {
-        setRecentActivities([]);
-      }
-
-      // Load additional tenant-specific data
-      if (user.user_type === 'tenant') {
-        await loadTransportationData();
-        await loadRentSavingsData();
-      }
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      if (showLoading) {
-        toast.error(error?.response?.data?.message || error?.message || 'Could not load dashboard');
-      }
-    } finally {
-      if (showLoading) setLoading(false);
-    }
-  }, [user, loadTransportationData, loadRentSavingsData]);
 
   useEffect(() => {
     if (!user) return;

@@ -257,8 +257,10 @@ const SuperFinancialAdminDashboard = () => {
     );
   }
 
-  return (
-    <div className="space-y-6">
+    return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100/40 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="space-y-6">
       {/* Keep this executive access banner copy and actions intact per product requirement. */}
       <section id="super-financial-overview" className="rounded-xl bg-white p-6 shadow">
         <div className="flex items-center justify-between">
@@ -641,6 +643,8 @@ const SuperFinancialAdminDashboard = () => {
         isLoading={submittingPersonalWithdraw}
         confirmLabel="Submit Withdrawal Request"
       />
+            </div>
+      </div>
     </div>
   );
 };

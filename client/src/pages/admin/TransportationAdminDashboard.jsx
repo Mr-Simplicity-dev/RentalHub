@@ -13,6 +13,7 @@ import {
   SectionTabs,
   StatusPill,
 } from '../../components/admin/TransportationAdminUi';
+import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 
 const tabs = [
   { label: 'Overview', value: 'overview' },
@@ -202,7 +203,9 @@ const TransportationAdminDashboard = () => {
   const overview = dashboard?.overview || {};
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-100/40 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="space-y-6">
       <PageHeader
         eyebrow="Transportation Admin"
         title="Tenant Move Logistics Console"
@@ -217,6 +220,11 @@ const TransportationAdminDashboard = () => {
           </button>
         }
       />
+
+      {/* Commission Withdrawal Banner */}
+      <div className="mb-6">
+        <CommissionWithdrawalBanner />
+      </div>
 
       <SectionTabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
@@ -648,6 +656,8 @@ const TransportationAdminDashboard = () => {
           </SectionCard>
         </div>
       ) : null}
+        </div>
+      </div>
     </div>
   );
 };
