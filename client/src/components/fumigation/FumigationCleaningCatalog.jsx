@@ -120,7 +120,7 @@ const FumigationCleaningCatalog = () => {
     }
   };
   
-  const handleBookService = (serviceId) => {
+    const handleBookService = (serviceId) => {
     if (!user) {
       toast.error('Please login to book services');
       navigate('/login');
@@ -133,8 +133,8 @@ const FumigationCleaningCatalog = () => {
       return;
     }
     
-    // Navigate to properties page to select property first
-    navigate('/my-properties?service=fumigation-cleaning');
+    // Navigate to booking page where they can select a property
+    navigate(`/fumigation-cleaning/booking?serviceId=${serviceId}`);
   };
   
   const toggleServiceDetails = (serviceId) => {
@@ -465,7 +465,7 @@ const FumigationCleaningCatalog = () => {
           </div>
         </div>
         
-        {/* Call to Action */}
+                {/* Call to Action */}
         <div className="mt-12 bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-8 text-center text-white">
           <h2 className="text-2xl font-bold mb-4">
             Ready to Book Professional Services?
@@ -475,18 +475,36 @@ const FumigationCleaningCatalog = () => {
             Certified professionals, guaranteed quality, and easy booking.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => navigate('/login')}
-              className="btn bg-white text-blue-600 hover:bg-gray-100"
-            >
-              Login to Book
-            </button>
-            <button
-              onClick={() => navigate('/register')}
-              className="btn bg-transparent border-2 border-white text-white hover:bg-white hover:text-blue-600"
-            >
-              Create Account
-            </button>
+            {user ? (
+              user.user_type === 'tenant' ? (
+                <button
+                  onClick={() => navigate('/my-properties?service=fumigation-cleaning')}
+                  className="btn bg-white text-blue-600 hover:bg-gray-100"
+                >
+                  Book a Service Now
+                </button>
+              ) : (
+                <div className="text-white opacity-90">
+                  <p>Fumigation & Cleaning services are available for tenants only.</p>
+                  <p className="text-sm mt-2">Switch to a tenant account to book services.</p>
+                </div>
+              )
+            ) : (
+              <>
+                <button
+                  onClick={() => navigate('/login')}
+                  className="btn bg-white text-blue-600 hover:bg-gray-100"
+                >
+                  Login to Book
+                </button>
+                <button
+                  onClick={() => navigate('/register')}
+                  className="btn bg-transparent border-2 border-white text-white hover:bg-white hover:text-blue-600"
+                >
+                  Create Account
+                </button>
+              </>
+            )}
           </div>
         </div>
 

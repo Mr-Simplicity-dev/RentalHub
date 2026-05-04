@@ -466,6 +466,7 @@ const validateAndPrepareRegistration = async (payload) => {
     agent_full_name,
     agent_email,
     agent_phone,
+    use_rentalhub_lawyers,
   } = payload;
 
   const cleanEmail = String(email || '').trim().toLowerCase();
@@ -672,6 +673,7 @@ const validateAndPrepareRegistration = async (payload) => {
       phone: cleanPhone,
       full_name: cleanFullName,
       cleanLawyerEmail,
+      useRentalhubLawyers: use_rentalhub_lawyers === true || use_rentalhub_lawyers === 'true',
       user_type,
       cleanNIN,
       ninVerified,
@@ -682,6 +684,103 @@ const validateAndPrepareRegistration = async (payload) => {
     },
     plainPassword: password,
     verificationMeta
+  };
+};
+
+/**
+ * Assign a lawyer to a client using round-robin from available lawyers
+ * in the client's state and LGA.
+ */
+const assignLawyerRoundRobin = async ({ clientUserId, stateId, lgaName }) => {
+  // Get all active lawyers in the specified state/LGA
+  let lawyersQuery = `
+    SELECT id, full_name, email
+    FROM users
+    WHERE user_type = 'lawyer'
+      AND assigned_state_id = $1
+      AND assigned_lga_name = $2
+      AND account_suspended_at IS NULL
+      AND deleted_at IS NULL
+    ORDER BY id ASC
+  `;
+  let lawyersParams = [stateId, lgaName];
+
+  // If no lawyers found at LGA level, try state level
+  let lawyersResult = await db.query(lawyersQuery, lawyersParams);
+
+  if (lawyersResult.rows.length === 0) {
+    // Fallback to state-wide lawyers if no LGA-specific lawyers
+    lawyersQuery = `
+      SELECT id, full_name, email
+      FROM users
+      WHERE user_type = 'lawyer'
+        AND assigned_state_id = $1
+        AND account_suspended_at IS NULL
+        AND deleted_at IS NULL
+      ORDER BY id ASC
+    `;
+    lawyersResult = await db.query(lawyersQuery, [stateId]);
+  }
+
+  if (lawyersResult.rows.length === 0) {
+    console.error(`No available lawyers found for state_id ${stateId} / LGA ${lgaName}`);
+    return null;
+  }
+
+  // Find the last assigned lawyer index for round-robin
+  const lastAssignmentResult = await db.query(
+    `SELECT la.lawyer_user_id
+     FROM legal_authorizations la
+     JOIN users u ON u.id = la.lawyer_user_id
+     WHERE u.user_type = 'lawyer'
+       AND (u.assigned_state_id = $1 OR u.assigned_state_id IS NULL)
+       AND la.status = 'active'
+       AND la.property_id IS NULL
+     ORDER BY la.created_at DESC
+     LIMIT 1`,
+    [stateId]
+  );
+
+  let nextIndex = 0;
+
+  if (lastAssignmentResult.rows.length > 0) {
+    const lastLawyerId = lastAssignmentResult.rows[0].lawyer_user_id;
+    const lastIndex = lawyersResult.rows.findIndex(l => l.id === lastLawyerId);
+    if (lastIndex !== -1) {
+      nextIndex = (lastIndex + 1) % lawyersResult.rows.length;
+    }
+  }
+
+  const selectedLawyer = lawyersResult.rows[nextIndex];
+
+  // Create legal authorization linking client to lawyer (without property)
+  await db.query(
+    `INSERT INTO legal_authorizations
+     (property_id, client_user_id, lawyer_user_id, granted_by, status)
+     VALUES (NULL, $1, $2, $3, 'active')`,
+    [clientUserId, selectedLawyer.id, selectedLawyer.id]
+  );
+
+  // Send notification to the lawyer
+  try {
+    const { sendNotification } = require('../config/utils/notificationService');
+
+    await sendNotification(
+      selectedLawyer.id,
+      'New Client Assignment',
+      `You have been assigned a new client (ID: ${clientUserId}) from your area as a RentalHub NG lawyer. Please check your dashboard for details.`,
+      'lawyer_assignment',
+      clientUserId,
+      'client'
+    );
+  } catch (notifError) {
+    console.error('Lawyer assignment notification error:', notifError);
+  }
+
+  return {
+    assignedLawyer: selectedLawyer,
+    roundRobinIndex: nextIndex,
+    totalLawyers: lawyersResult.rows.length
   };
 };
 

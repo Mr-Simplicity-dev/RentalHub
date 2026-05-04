@@ -268,8 +268,52 @@ router.post('/withdraw',
       }
       
       const db = require('../config/middleware/database');
+      const axios = require('axios');
       const adminId = req.user.id;
       const { amount, bank_name, account_number, account_name } = req.body;
+      
+      // ── Server-side account name verification via Paystack ──────────────
+      const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+      const PAYSTACK_BASE_URL = 'https://api.paystack.co';
+      if (PAYSTACK_SECRET_KEY) {
+        try {
+          const banksRes = await axios.get(`${PAYSTACK_BASE_URL}/bank`, {
+            headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+          });
+          const banks = banksRes.data?.data || [];
+          const bank = banks.find(b =>
+            b.name.toLowerCase().includes(bank_name.toLowerCase()) ||
+            bank_name.toLowerCase().includes(b.name.toLowerCase())
+          );
+          if (!bank) {
+            return res.status(400).json({ success: false, message: 'Bank not found. Please select a valid bank.' });
+          }
+          const verifyRes = await axios.get(
+            `${PAYSTACK_BASE_URL}/bank/resolve?account_number=${account_number}&bank_code=${bank.code}`,
+            {
+              headers: {
+                Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+          if (verifyRes.data?.status === true && verifyRes.data?.data?.account_name) {
+            const verifiedName = verifyRes.data.data.account_name.trim().toLowerCase().replace(/\s+/g, ' ');
+            const providedName = account_name.trim().toLowerCase().replace(/\s+/g, ' ');
+            if (verifiedName !== providedName) {
+              return res.status(400).json({
+                success: false,
+                message: `Account name mismatch. The bank record shows "${verifyRes.data.data.account_name}". Please use the exact name as registered with your bank.`,
+              });
+            }
+          } else {
+            return res.status(400).json({ success: false, message: 'Unable to verify account. Please check the account number and try again.' });
+          }
+        } catch (verifyErr) {
+          console.error('Account verification error:', verifyErr?.response?.data || verifyErr.message);
+          return res.status(400).json({ success: false, message: 'Could not verify account details. Please try again.' });
+        }
+      }
       
       // Check if admin has sufficient balance
       const adminResult = await db.query(

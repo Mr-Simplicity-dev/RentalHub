@@ -180,7 +180,7 @@ export default function AdminWithdrawalModal({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Account Name *</label>
             <div className="relative">
-              <input
+                            <input
                 type="text"
                 value={form.account_name}
                 onChange={(e) => setForm((p) => ({ ...p, account_name: e.target.value }))}
@@ -190,7 +190,7 @@ export default function AdminWithdrawalModal({
                     ? "Verifying…"
                     : "Auto-filled after bank & account number"
                 }
-                readOnly={accountNameLoading}
+                readOnly={accountNameLoading || (form.account_name && !accountNameError)}
               />
               {accountNameLoading && (
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-indigo-500 animate-pulse">

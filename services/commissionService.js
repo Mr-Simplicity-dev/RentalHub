@@ -361,6 +361,52 @@ exports.calculatePerformanceBonus = async (adminId, month, year) => {
  */
 exports.processAdminWithdrawal = async (adminId, amount, bankDetails) => {
   try {
+    const axios = require('axios');
+    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+    const PAYSTACK_BASE_URL = 'https://api.paystack.co';
+
+    // ── Server-side account name verification via Paystack ──────────────
+    if (PAYSTACK_SECRET_KEY && bankDetails.bank_name && bankDetails.account_number) {
+      try {
+        const banksRes = await axios.get(`${PAYSTACK_BASE_URL}/bank`, {
+          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+        });
+        const banks = banksRes.data?.data || [];
+        const bank = banks.find(b =>
+          b.name.toLowerCase().includes(bankDetails.bank_name.toLowerCase()) ||
+          bankDetails.bank_name.toLowerCase().includes(b.name.toLowerCase())
+        );
+        if (bank) {
+          const verifyRes = await axios.get(
+            `${PAYSTACK_BASE_URL}/bank/resolve?account_number=${bankDetails.account_number}&bank_code=${bank.code}`,
+            {
+              headers: {
+                Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+          if (verifyRes.data?.status === true && verifyRes.data?.data?.account_name) {
+            const verifiedName = verifyRes.data.data.account_name.trim().toLowerCase().replace(/\s+/g, ' ');
+            const providedName = (bankDetails.account_name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            if (verifiedName !== providedName) {
+              throw new Error(`Account name mismatch. The bank record shows "${verifyRes.data.data.account_name}". Please use the exact name as registered with your bank.`);
+            }
+          } else {
+            throw new Error('Unable to verify account. Please check the account number and try again.');
+          }
+        } else {
+          throw new Error('Bank not found. Please select a valid bank.');
+        }
+      } catch (verifyErr) {
+        if (verifyErr.message && (verifyErr.message.includes('mismatch') || verifyErr.message.includes('bank') || verifyErr.message.includes('account'))) {
+          throw verifyErr;
+        }
+        console.error('Account verification error in withdrawal:', verifyErr?.response?.data || verifyErr.message);
+        throw new Error('Could not verify account details. Please try again.');
+      }
+    }
+
     // Check admin wallet balance
     const adminResult = await db.query(
       `SELECT 

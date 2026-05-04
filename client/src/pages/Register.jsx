@@ -7,6 +7,8 @@ import api from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { setAuthSession } from '../services/authStorage';
 
+const LAWYER_ACCESS_FEE = 2000; // Fee for using RentalHub NG lawyers during registration
+
 const Register = () => {
   const [searchParams] = useSearchParams();
   const registrationReference =
@@ -18,6 +20,7 @@ const Register = () => {
     full_name: '',
     email: '',
     lawyer_email: '',
+    use_rentalhub_lawyers: false,
     phone: '',
     add_agent: false,
     agent_full_name: '',
@@ -91,17 +94,18 @@ const Register = () => {
     return registrationData;
   };
 
-  const requiresRegistrationPayment =
+    const requiresRegistrationPayment =
     (formData.user_type === 'tenant' && registrationFlags.tenant_registration_payment) ||
     (formData.user_type === 'landlord' && registrationFlags.landlord_registration_payment);
+  const requiresLawyerPayment = formData.use_rentalhub_lawyers;
+  const requiresPayment = requiresRegistrationPayment || requiresLawyerPayment;
 
   const selectedStateOption = locationOptions.find(
     (item) => String(item.id) === String(formData.state_id)
   );
   const availableLgas = selectedStateOption?.lgas || [];
-  const displayedRegistrationAmount =
-    registrationPricing.amount ||
-    (formData.user_type === 'tenant' ? 2500 : 5000);
+    const baseAmount = registrationPricing.amount || (formData.user_type === 'tenant' ? 2500 : 5000);
+    const displayedRegistrationAmount = (requiresRegistrationPayment ? baseAmount : 0) + (requiresLawyerPayment ? LAWYER_ACCESS_FEE : 0);
   const registrationLocationBrowseUrl = formData.state_id
     ? `/properties?state_id=${encodeURIComponent(formData.state_id)}${
         formData.lga_name
@@ -372,8 +376,8 @@ const Register = () => {
     return;
   }
 
- if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.lawyer_email || "")) {
-    toast.error("Enter one valid lawyer email");
+ if (!formData.use_rentalhub_lawyers && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.lawyer_email || "")) {
+    toast.error("Enter one valid lawyer email or check the box to use RentalHub NG lawyers");
     return;
   }
 
@@ -436,29 +440,29 @@ const Register = () => {
     }
   }
 
-  setLoading(true);
+    setLoading(true);
 
-  try {
+    try {
     // Build cleaned payload
     const registrationData = buildRegistrationData();
 
-    if (requiresRegistrationPayment && !registrationData.state_id) {
-      toast.error('Select your state to calculate the registration fee');
+    if (requiresPayment && !registrationData.state_id) {
+      toast.error('Select your state to calculate the fee');
       return;
     }
 
-    if (requiresRegistrationPayment && !String(registrationData.lga_name || '').trim()) {
-      toast.error('Select your local government area to calculate the registration fee');
+    if (requiresPayment && !String(registrationData.lga_name || '').trim()) {
+      toast.error('Select your local government area to calculate the fee');
       return;
     }
 
-    if (requiresRegistrationPayment && !registrationPricing.location_complete) {
-      toast.error('Complete your location selection to confirm the exact registration fee');
+    if (requiresPayment && !registrationPricing.location_complete) {
+      toast.error('Complete your location selection to confirm the exact fee');
       return;
     }
 
     // Payment-required roles must complete payment before account creation
-    if (requiresRegistrationPayment) {
+    if (requiresPayment) {
       const paymentResponse = await api.post(
         "/auth/register/payment",
         registrationData
@@ -550,10 +554,12 @@ const validateStep = () => {
       newErrors.email = "Enter a valid email";
     }
     if (!String(formData.phone || "").trim()) newErrors.phone = "Phone required";
-    if (!String(formData.lawyer_email || "").trim()) {
-      newErrors.lawyer_email = "Lawyer email required";
-    } else if (!emailPattern.test(String(formData.lawyer_email || "").trim())) {
-      newErrors.lawyer_email = "Enter a valid lawyer email";
+    if (!formData.use_rentalhub_lawyers) {
+      if (!String(formData.lawyer_email || "").trim()) {
+        newErrors.lawyer_email = "Enter a lawyer email or check to use RentalHub NG lawyers";
+      } else if (!emailPattern.test(String(formData.lawyer_email || "").trim())) {
+        newErrors.lawyer_email = "Enter a valid lawyer email";
+      }
     }
 
     if (formData.user_type === 'landlord' && formData.add_agent) {
@@ -606,7 +612,7 @@ const validateStep = () => {
         newErrors.nationality = "Nationality required";
     }
 
-    if (requiresRegistrationPayment) {
+        if (requiresPayment) {
       if (!formData.state_id) newErrors.state = "State required";
       if (!String(formData.lga_name || "").trim()) newErrors.lga = "LGA required";
       if (
@@ -636,7 +642,7 @@ const isStepTwoComplete =
   String(formData.full_name || "").trim() &&
   emailPattern.test(String(formData.email || "").trim()) &&
   String(formData.phone || "").trim() &&
-  emailPattern.test(String(formData.lawyer_email || "").trim()) &&
+  (formData.use_rentalhub_lawyers || emailPattern.test(String(formData.lawyer_email || "").trim())) &&
   (
     formData.user_type !== 'landlord' ||
     !formData.add_agent ||
@@ -672,7 +678,7 @@ const isStepThreeComplete = (() => {
     }
   }
 
-  if (requiresRegistrationPayment) {
+    if (requiresPayment) {
     if (!formData.state_id || !String(formData.lga_name || "").trim()) {
       return false;
     }
@@ -694,7 +700,7 @@ const submitDisabled =
   loading ||
   !registrationFlags.loaded ||
   !registrationFlags.allow_registration ||
-  (requiresRegistrationPayment && !registrationPricing.location_complete) ||
+  (requiresPayment && !registrationPricing.location_complete) ||
   !isStepFourComplete;
 
 
@@ -741,15 +747,26 @@ return (
             </Link>
           </p>
 
-          {requiresRegistrationPayment && (
+                                        {requiresRegistrationPayment && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-left text-sm text-blue-800">
               {formData.user_type === "tenant" ? "Tenant" : "Landlord"} account creation
-              requires a one-time general platform payment of N
-              {displayedRegistrationAmount.toLocaleString()} before the account is created
+              requires a registration payment of N
+              {baseAmount.toLocaleString()} before the account is created
               for this location.
               {!registrationPricing.location_complete && (
                 <div className="mt-2 text-xs text-blue-700">
                   Select your state and local government area to confirm the exact fee.
+                </div>
+              )}
+            </div>
+          )}
+          {requiresLawyerPayment && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-800">
+              You selected RentalHub NG lawyers. A lawyer access fee of N
+              {LAWYER_ACCESS_FEE.toLocaleString()} applies to unlock full lawyer contact details in your selected state and local government area.
+              {!registrationPricing.location_complete && (
+                <div className="mt-2 text-xs text-amber-700">
+                  Select your state and local government area to confirm.
                 </div>
               )}
             </div>
@@ -921,7 +938,7 @@ return (
 
                 {/* Lawyer Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Lawyer Email *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Lawyer Email {formData.use_rentalhub_lawyers ? '' : '*'}</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaEnvelope className="text-gray-400" />
@@ -931,12 +948,36 @@ return (
                       type="email"
                       autoComplete="off"
                       value={formData.lawyer_email}
+                      disabled={formData.use_rentalhub_lawyers}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, lawyer_email: null })); }}
-                      className={`input pl-10 ${errors.lawyer_email ? 'border-red-500' : ''}`}
-                      placeholder="lawyer@example.com"
+                      className={`input pl-10 ${errors.lawyer_email ? 'border-red-500' : ''} ${formData.use_rentalhub_lawyers ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      placeholder={formData.use_rentalhub_lawyers ? 'Using RentalHub NG lawyers' : "lawyer@example.com"}
                     />
                   </div>
                   {errors.lawyer_email && <p className="text-red-500 text-sm mt-1">{errors.lawyer_email}</p>}
+                  <div className="mt-2 flex items-start">
+                    <input
+                      id="use_rentalhub_lawyers"
+                      type="checkbox"
+                      checked={formData.use_rentalhub_lawyers}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormData((prev) => ({
+                          ...prev,
+                          use_rentalhub_lawyers: checked,
+                          ...(checked ? { lawyer_email: '' } : {}),
+                        }));
+                        setErrors((prev) => ({ ...prev, lawyer_email: null }));
+                      }}
+                      className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-0.5 cursor-pointer"
+                    />
+                    <label htmlFor="use_rentalhub_lawyers" className="ml-2 block text-sm text-gray-700 cursor-pointer">
+                      Use RentalHub NG lawyers instead —{' '}
+                      <Link to="/lawyers" className="text-indigo-600 hover:text-indigo-500 underline">
+                        pay to unlock full contact details in your state and local government area
+                      </Link>
+                    </label>
+                  </div>
                 </div>
 
                 {formData.user_type === 'landlord' && (
@@ -1172,9 +1213,9 @@ return (
                     </div>
                   </div>
 
-                  {requiresRegistrationPayment && formData.state_id && formData.lga_name && registrationPricing.location_complete && (
+                                    {requiresPayment && formData.state_id && formData.lga_name && registrationPricing.location_complete && (
                     <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                      Exact registration fee for this location: ₦{displayedRegistrationAmount.toLocaleString()}.
+                      Exact total fee for this location: ?{displayedRegistrationAmount.toLocaleString()}.
                     </div>
                   )}
 
@@ -1251,12 +1292,12 @@ return (
               <form onSubmit={handleSubmit} className="space-y-4">
 
                 {/* Payment notice */}
-                {requiresRegistrationPayment && (
+                                {requiresRegistrationPayment && (
                   <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
                     {formData.user_type === 'tenant' ? 'Tenant' : 'Landlord'} account creation
-                    requires a one-time general platform payment of ₦
-                    {displayedRegistrationAmount.toLocaleString()}
-                    {' '}before the account is created for this location.
+                    requires a registration payment of ?
+                    {baseAmount.toLocaleString()}
+                    {' '}before the account is created.
                     {!registrationPricing.location_complete && (
                       <div className="mt-2 text-xs text-blue-700">
                         Select your state and local government area to confirm the exact fee.
@@ -1264,6 +1305,18 @@ return (
                     )}
                   </div>
                 )}
+                {requiresLawyerPayment && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    You selected RentalHub NG lawyers. A lawyer access fee of N
+                    {LAWYER_ACCESS_FEE.toLocaleString()} applies to unlock full lawyer contact details in your selected state and local government area.
+                    {!registrationPricing.location_complete && (
+                      <div className="mt-2 text-xs text-amber-700">
+                        Select your state and local government area to confirm.
+                      </div>
+                    )}
+                  </div>
+                )}
+                
 
                 {/* Password */}
                 <div>
@@ -1377,10 +1430,10 @@ return (
                     disabled={submitDisabled}
                     className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading
-                      ? (requiresRegistrationPayment ? 'Processing...' : 'Creating account...')
-                      : requiresRegistrationPayment
-                      ? `Pay ₦${displayedRegistrationAmount.toLocaleString()}`
+                                        {loading
+                      ? 'Processing...'
+                      : requiresPayment
+                      ? `Pay ?${displayedRegistrationAmount.toLocaleString()}`
                       : 'Create Account'}
                   </button>
                 </div>

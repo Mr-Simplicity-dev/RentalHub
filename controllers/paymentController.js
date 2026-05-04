@@ -1673,11 +1673,143 @@ exports.getPaymentDetails = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Failed to fetch payment details"
+            message: "Failed to fetch payment details"
     });
   }
 };
 
+
+// Retry a pending payment – create a fresh Paystack transaction for it
+exports.retryPayment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { paymentId } = req.params;
+
+    // Look up the original payment record
+    const paymentResult = await db.query(
+      `SELECT p.*, prop.title AS property_title
+       FROM payments p
+       LEFT JOIN properties prop ON p.property_id = prop.id
+       WHERE p.id = $1 AND p.user_id = $2`,
+      [paymentId, userId]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found"
+      });
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // Only allow retry of pending payments
+    if (payment.payment_status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot retry a payment with status "${payment.payment_status}". Only pending payments can be retried.`
+      });
+    }
+
+    // Get user email for Paystack
+    const userResult = await db.query(
+      "SELECT email, full_name FROM users WHERE id = $1",
+      [userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    const user = userResult.rows[0];
+
+    // Create a new payment record for this retry attempt
+    const newPaymentResult = await db.query(
+      `INSERT INTO payments (user_id, payment_type, amount, currency,
+                             property_id, payment_method, payment_status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+       RETURNING id`,
+      [
+        userId,
+        payment.payment_type,
+        payment.amount,
+        payment.currency || 'NGN',
+        payment.property_id,
+        payment.payment_method || 'paystack'
+      ]
+    );
+    const newPaymentId = newPaymentResult.rows[0].id;
+
+        // Determine callback URL and reference prefix based on payment type
+    const CALLBACK_MAP = {
+      rent_payment:       `${FRONTEND_URL}/payment/verify-rent`,
+      tenant_subscription:`${FRONTEND_URL}/payment/verify-subscription`,
+      property_unlock:    `${FRONTEND_URL}/properties/${payment.property_id || ''}`,
+      wallet_funding:     `${FRONTEND_URL}/payment/verify-wallet-funding`,
+      landlord_listing:   `${FRONTEND_URL}/payment/verify-listing`,
+    };
+    const REF_PREFIX_MAP = {
+      rent_payment:       'RETRY_RENT',
+      tenant_subscription:'RETRY_SUB',
+      property_unlock:    'RETRY_UNLOCK',
+      wallet_funding:     'RETRY_WALLET',
+      landlord_listing:   'RETRY_LIST',
+    };
+    const callbackUrl = CALLBACK_MAP[payment.payment_type] || `${FRONTEND_URL}/payment/verify-rent`;
+    const refPrefix = REF_PREFIX_MAP[payment.payment_type] || 'RETRY';
+
+    // Initialize Paystack transaction
+    const paystackResponse = await axios.post(
+      `${PAYSTACK_BASE_URL}/transaction/initialize`,
+      {
+        email: user.email,
+        amount: Number(payment.amount) * 100,
+        reference: `${refPrefix}_${newPaymentId}_${Date.now()}`,
+        callback_url: callbackUrl,
+        metadata: {
+          payment_id: newPaymentId,
+          original_payment_id: payment.id,
+          user_id: userId,
+          property_id: payment.property_id,
+          payment_type: payment.payment_type,
+          tenant_name: user.full_name,
+          property_title: payment.property_title,
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    // Update the new payment with the transaction reference
+    await db.query(
+      "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
+      [paystackResponse.data.data.reference, newPaymentId]
+    );
+
+    return res.json({
+      success: true,
+      message: "Payment retry initialized",
+      data: {
+        payment_id: newPaymentId,
+        original_payment_id: payment.id,
+        authorization_url: paystackResponse.data.data.authorization_url,
+        access_code: paystackResponse.data.data.access_code,
+        reference: paystackResponse.data.data.reference,
+        amount: payment.amount,
+        payment_type: payment.payment_type
+      }
+    });
+  } catch (error) {
+    console.error("Retry payment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to retry payment",
+      error: error.message
+    });
+  }
+};
 
 
 

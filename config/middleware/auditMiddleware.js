@@ -1,13 +1,19 @@
 const db = require('./database');
 const crypto = require('crypto');
 
+const safeInt = (value) => {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
 const audit = (action, targetType) => {
   return (req, res, next) => {
     const start = Date.now();
 
     res.on('finish', async () => {
       try {
-        const actorId = req.user ? req.user.id : null;
+        const actorId = safeInt(req.user ? req.user.id : null);
 
         // Get previous hash
         const lastLog = await db.query(
@@ -25,13 +31,14 @@ const audit = (action, targetType) => {
 
         const params = req.params || {};
 
-        const targetId =
+        const targetId = safeInt(
           params.disputeId ||
           params.propertyId ||
           params.reportId ||
           params.userId ||
           params.id ||
-          null;
+          null
+        );
 
         const actionText = action || `${req.method} ${req.originalUrl}`;
 
@@ -87,3 +94,4 @@ const audit = (action, targetType) => {
 };
 
 module.exports = audit;
+

@@ -1020,7 +1020,7 @@ export default function SuperAdminDashboard() {
                     onChange={(e) => setPersonalWithdrawForm((p) => ({ ...p, account_name: e.target.value }))}
                     className="input w-full pr-20"
                     placeholder={withdrawAccountNameLoading ? 'Verifying…' : 'Auto-filled after bank & account number'}
-                    readOnly={withdrawAccountNameLoading}
+                    readOnly={withdrawAccountNameLoading || (personalWithdrawForm.account_name && !withdrawAccountNameError)}
                   />
                   {withdrawAccountNameLoading && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-indigo-500 animate-pulse">

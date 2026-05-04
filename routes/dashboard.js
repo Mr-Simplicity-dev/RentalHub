@@ -125,6 +125,7 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
 
     res.json({ success: true, data: stats.rows[0] });
   } catch (error) {
+    console.error("Tenant dashboard stats error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch tenant statistics",
@@ -225,14 +226,14 @@ router.get("/tenant/recent-activities", authenticate, isTenant, async (req, res)
           'application' AS type,
           a.id,
           a.status,
-          GREATEST(a.created_at, COALESCE(a.updated_at, a.created_at)) AS activity_date,
+          a.created_at AS activity_date,
           p.title AS property_title,
           p.id AS property_id,
           NULL::text AS user_name
         FROM applications a
         JOIN properties p ON a.property_id = p.id
         WHERE a.tenant_id = $1
-        ORDER BY GREATEST(a.created_at, COALESCE(a.updated_at, a.created_at)) DESC
+        ORDER BY a.created_at DESC
         LIMIT $2
       )
       UNION ALL
@@ -275,6 +276,7 @@ router.get("/tenant/recent-activities", authenticate, isTenant, async (req, res)
 
     res.json({ success: true, data: activities.rows });
   } catch (error) {
+    console.error("Tenant recent activities error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch recent activities",
@@ -349,6 +351,7 @@ router.get("/landlord/recent-activities", authenticate, isLandlord, async (req, 
 
     res.json({ success: true, data: activities.rows });
   } catch (error) {
+    console.error("Landlord recent activities error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch recent activities",
@@ -394,6 +397,7 @@ router.get("/admin/stats", authenticate, async (req, res) => {
 
     res.json({ success: true, data: stats.rows[0] });
   } catch (error) {
+    console.error("Admin dashboard stats error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch admin statistics",

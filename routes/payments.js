@@ -138,6 +138,12 @@ router.get('/history', authenticate, paymentController.getPaymentHistory);
 // Get specific payment details
 router.get('/:paymentId', authenticate, paymentController.getPaymentDetails);
 
+// Retry a pending payment (create a fresh Paystack transaction for it)
+router.post('/retry/:paymentId',
+  authenticate,
+  paymentController.retryPayment
+);
+
 // ============ WEBHOOKS ============
 
 // Paystack webhook

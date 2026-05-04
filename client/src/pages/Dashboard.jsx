@@ -125,10 +125,62 @@ const Dashboard = () => {
         ? 'pending'
         : 'not_submitted');
 
-  const loadDashboardData = useCallback(async () => {
+  // Load transportation data for tenant
+  const loadTransportationData = useCallback(async () => {
+    if (user?.user_type !== 'tenant') return;
+
+    setTransportLoading(true);
+    try {
+      const [statsRes, upcomingRes] = await Promise.all([
+        api.get('/transportation/stats'),
+        api.get('/transportation/upcoming?limit=3')
+      ]);
+
+      if (statsRes.data?.success) {
+        setTransportStats(statsRes.data.data);
+      }
+
+      if (upcomingRes.data?.success) {
+        setUpcomingTransportBookings(upcomingRes.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading transportation data:', error);
+      // Don't show error toast for transportation data - it's optional
+    } finally {
+      setTransportLoading(false);
+    }
+  }, [user]);
+
+  // Load rent savings data for tenants
+  const loadRentSavingsData = useCallback(async () => {
+    if (user?.user_type !== 'tenant') return;
+
+    try {
+      const [summaryRes, propertiesRes] = await Promise.all([
+        api.get('/rent-savings/summary'),
+        api.get('/properties/tenant'),
+      ]);
+
+      if (summaryRes.data?.success) {
+        setRentSavingsStats(summaryRes.data.data);
+      }
+
+      if (propertiesRes.data?.success) {
+        setTenantProperties(propertiesRes.data.data || []);
+      } else if (Array.isArray(propertiesRes.data)) {
+        setTenantProperties(propertiesRes.data);
+      }
+    } catch (error) {
+      console.error('Error loading rent savings data:', error);
+      // Don't show error toast - it's optional
+    }
+  }, [user]);
+
+    // ── Combined dashboard loader (stats + activities + optional transport/rent) ──
+  const loadDashboardData = useCallback(async (showLoading = true) => {
     if (!user) return;
 
-    setLoading(true);
+    if (showLoading) setLoading(true);
     try {
       const endpoint =
         user.user_type === 'tenant'
@@ -147,92 +199,30 @@ const Dashboard = () => {
 
       if (statsResponse.data.success) {
         setStats(statsResponse.data.data);
+      } else {
+        setStats(null);
       }
 
       if (activitiesResponse.data.success) {
         setRecentActivities(activitiesResponse.data.data);
+      } else {
+        setRecentActivities([]);
+      }
+
+      // Load additional tenant-specific data
+      if (user.user_type === 'tenant') {
+        await loadTransportationData();
+        await loadRentSavingsData();
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-    // Load transportation data for tenant
-  const loadTransportationData = useCallback(async () => {
-    if (user?.user_type !== 'tenant') return;
-    
-    setTransportLoading(true);
-    try {
-      const [statsRes, upcomingRes] = await Promise.all([
-        api.get('/transportation/stats'),
-        api.get('/transportation/upcoming?limit=3')
-      ]);
-      
-      if (statsRes.data?.success) {
-        setTransportStats(statsRes.data.data);
+      if (showLoading) {
+        toast.error(error?.response?.data?.message || error?.message || 'Could not load dashboard');
       }
-      
-      if (upcomingRes.data?.success) {
-        setUpcomingTransportBookings(upcomingRes.data.data);
-      }
-    } catch (error) {
-      console.error('Error loading transportation data:', error);
-      // Don't show error toast for transportation data - it's optional
     } finally {
-      setTransportLoading(false);
+      if (showLoading) setLoading(false);
     }
-  }, [user]);
-
-// Load rent savings data for tenants
-const loadRentSavingsData = useCallback(async () => {
-  if (user?.user_type !== 'tenant') return;
-  
-  try {
-    const [summaryRes, propertiesRes] = await Promise.all([
-      api.get('/rent-savings/summary'),
-      api.get('/properties/tenant'),
-    ]);
-    
-    if (summaryRes.data?.success) {
-      setRentSavingsStats(summaryRes.data.data);
-    }
-    
-    if (propertiesRes.data?.success) {
-      setTenantProperties(propertiesRes.data.data || []);
-    } else if (Array.isArray(propertiesRes.data)) {
-      setTenantProperties(propertiesRes.data);
-    }
-  } catch (error) {
-    console.error('Error loading rent savings data:', error);
-    // Don't show error toast - it's optional
-  }
-}, [user]);
-
-// Update the existing loadDashboard function to also load transportation data
-const loadDashboard = useCallback(async () => {
-  setLoading(true);
-  try {
-    const [statsRes, activitiesRes] = await Promise.all([
-      user?.user_type === 'tenant' ? api.get('/dashboard/tenant/stats') : api.get('/dashboard/landlord/stats'),
-      user?.user_type === 'tenant' ? api.get('/dashboard/tenant/recent-activities') : api.get('/dashboard/landlord/recent-activities'),
-    ]);
-
-    setStats(statsRes.data?.data || {});
-    setRecentActivities(activitiesRes.data?.data || []);
-    
-    // Load transportation data for tenants
-    if (user?.user_type === 'tenant') {
-      await loadTransportationData();
-      await loadRentSavingsData();
-    }
-  } catch (error) {
-    toast.error(error?.response?.data?.message || error?.message || 'Could not load dashboard');
-  } finally {
-    setLoading(false);
-  }
-}, [user, loadTransportationData, loadRentSavingsData]);
+  }, [user, loadTransportationData, loadRentSavingsData]);
 
   useEffect(() => {
     if (!user) return;
@@ -282,18 +272,19 @@ const loadDashboard = useCallback(async () => {
       return;
     }
 
-    loadDashboard();
-  }, [user, navigate, loadDashboard]);
+    loadDashboardData(true);
+  }, [user, navigate, loadDashboardData]);
 
+  // Silent background refresh (no loading spinner) every 60 seconds + on window focus
   useEffect(() => {
     if (!user) return undefined;
 
     const intervalId = setInterval(() => {
-      loadDashboard();
-    }, 30000);
+      loadDashboardData(false); // false = no loading circle, no error toast
+    }, 60000);
 
     const handleWindowFocus = () => {
-      loadDashboard();
+      loadDashboardData(false); // silent refresh on focus too
     };
 
     window.addEventListener('focus', handleWindowFocus);
@@ -302,7 +293,7 @@ const loadDashboard = useCallback(async () => {
       clearInterval(intervalId);
       window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [user, loadDashboard]);
+  }, [user, loadDashboardData]);
 
   // ── Bank account verification function ───────────────────────────────────
   const fetchAccountName = async (bankName, accountNumber) => {
@@ -988,7 +979,7 @@ const loadDashboard = useCallback(async () => {
               />
               <QuickActionCard
                 title="Withdraw Funds"
-                description="Fund Wallet/Withdraw approved refunds to your bank"
+                description="Withdraw approved refunds to your bank"
                 icon={<FaUniversity />}
                 onClick={openWithdrawModal}
               />

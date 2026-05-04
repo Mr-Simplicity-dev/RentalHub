@@ -12,17 +12,12 @@ import {
   FaChartLine,
   FaFilter,
   FaSearch,
-  FaEdit,
-  FaTrash,
   FaEye,
   FaCheckCircle,
   FaTimesCircle,
-  FaClock,
   FaHome,
   FaUserCheck,
-  FaShieldAlt,
   FaSortAmountDown,
-  FaSortAmountUp,
   FaDownload,
   FaPrint
 } from 'react-icons/fa';

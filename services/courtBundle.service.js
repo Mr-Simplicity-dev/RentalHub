@@ -11,7 +11,7 @@ const db = require('../config/middleware/database');
 async function generateCourtBundle(disputeId) {
   const disputeRes = await db.query(
     `SELECT d.id, d.status, d.created_at, d.description,
-            p.title AS property_title, p.address AS property_address
+            p.title AS property_title, p.full_address AS property_address
      FROM disputes d
      LEFT JOIN properties p ON p.id = d.property_id
      WHERE d.id = $1`,

@@ -98,4 +98,10 @@ export const paymentService = {
     const response = await api.get(`/payments/unlock-status/${propertyId}`);
     return response.data;
   },
+
+  // Retry a pending payment
+  retryPayment: async (paymentId) => {
+    const response = await api.post(`/payments/retry/${paymentId}`);
+    return response.data;
+  },
 };

@@ -9,6 +9,7 @@ const PAYMENT_TYPE_LABELS = {
   property_unlock: 'Property Unlock',
   landlord_listing: 'Listing Payment',
   rent_payment: 'Rent Payment',
+  wallet_funding: 'Wallet Funding',
   general_platform_fee: 'General Platform Payment',
 };
 
@@ -17,6 +18,8 @@ const PAYMENT_STATUS_STYLES = {
   pending: 'bg-yellow-100 text-yellow-700',
   failed: 'bg-red-100 text-red-700',
 };
+
+const PAYMENT_TYPES_WITH_RETRY = ['rent_payment', 'tenant_subscription', 'property_unlock', 'wallet_funding'];
 
 const formatAmount = (amount, currency = 'NGN') => {
   const value = Number(amount || 0);
@@ -39,6 +42,7 @@ const formatPaymentType = (paymentType) =>
 const PaymentHistory = () => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [payingPaymentId, setPayingPaymentId] = useState(null);
 
   const loadPayments = useCallback(async () => {
     setLoading(true);
@@ -59,6 +63,27 @@ const PaymentHistory = () => {
   useEffect(() => {
     loadPayments();
   }, [loadPayments]);
+
+  const handlePayNow = async (payment) => {
+    setPayingPaymentId(payment.id);
+
+    try {
+      const response = await paymentService.retryPayment(payment.id);
+
+      if (response.success && response.data?.authorization_url) {
+        // Open Paystack checkout in a new tab
+        window.open(response.data.authorization_url, '_blank');
+        toast.info('Payment page opened in a new tab. Please complete the payment.');
+      } else {
+        toast.error(response.message || 'Failed to initialize payment retry');
+      }
+    } catch (error) {
+      const message = error?.response?.data?.message || error.message || 'Payment initialization failed';
+      toast.error(message);
+    } finally {
+      setPayingPaymentId(null);
+    }
+  };
 
   if (loading) {
     return <Loader />;
@@ -113,6 +138,25 @@ const PaymentHistory = () => {
                     <div className="text-xs text-gray-500 mt-1 break-all">
                       Ref: {payment.transaction_reference}
                     </div>
+                  )}
+                  {payment.payment_status === 'pending' && PAYMENT_TYPES_WITH_RETRY.includes(payment.payment_type) && (
+                    <button
+                      onClick={() => handlePayNow(payment)}
+                      disabled={payingPaymentId === payment.id}
+                      className="mt-3 inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {payingPaymentId === payment.id ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-1.5 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </>
+                      ) : (
+                        'Pay Now'
+                      )}
+                    </button>
                   )}
                 </div>
               </div>

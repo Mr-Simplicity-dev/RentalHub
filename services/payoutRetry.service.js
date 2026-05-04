@@ -105,10 +105,11 @@ const insertRetryAudit = async ({
 };
 
 const logSecurityAudit = async ({ action, targetType, targetId, metadata }) => {
+  const safeTargetId = (targetId === null || targetId === undefined) ? null : (Number.isFinite(Number(targetId)) ? Number(targetId) : null);
   await db.query(
     `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
      VALUES ($1, $2, $3, $4, $5)`,
-    [null, action, targetType, targetId, JSON.stringify(metadata || {})]
+    [null, action, targetType, safeTargetId, JSON.stringify(metadata || {})]
   );
 };
 

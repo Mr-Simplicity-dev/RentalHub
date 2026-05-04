@@ -237,8 +237,8 @@ exports.getMyPlans = async (req, res) => {
 
     const result = await db.query(
       `SELECT rsp.*,
-              p.title   AS property_title,
-              p.address AS property_address,
+                            p.title   AS property_title,
+              p.full_address AS property_address,
               COALESCE(c.contribution_count, 0) AS contribution_count,
               COALESCE(c.total_contributed, 0)  AS total_contributed
        FROM rent_savings_plans rsp
@@ -269,7 +269,7 @@ exports.getPlanDetails = async (req, res) => {
     const userId = req.user.id;
 
     const planResult = await db.query(
-      `SELECT rsp.*, p.title AS property_title, p.address AS property_address
+      `SELECT rsp.*, p.title AS property_title, p.full_address AS property_address
        FROM rent_savings_plans rsp
        JOIN properties p ON rsp.property_id = p.id
        WHERE rsp.id = $1 AND rsp.tenant_id = $2`,
@@ -903,7 +903,7 @@ exports.adminGetAllPlans = async (req, res) => {
     const result = await db.query(
       `SELECT rsp.*,
               u.full_name AS tenant_name, u.email AS tenant_email,
-              p.title     AS property_title, p.address AS property_address,
+              p.title     AS property_title, p.full_address AS property_address,
               COALESCE(c.contribution_count, 0)  AS contribution_count,
               COALESCE(c.total_contributed, 0)   AS total_contributed
        FROM rent_savings_plans rsp

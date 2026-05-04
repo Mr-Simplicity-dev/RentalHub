@@ -8,6 +8,10 @@ exports.addLedgerEntry = async ({
   targetId
 }) => {
   try {
+    // Ensure integer fields are safe
+    const safeActorId = (actorId === null || actorId === undefined) ? null : (Number.isFinite(Number(actorId)) ? Number(actorId) : null);
+    const safeTargetId = (targetId === null || targetId === undefined) ? null : (Number.isFinite(Number(targetId)) ? Number(targetId) : null);
+
     // Get last log
     const lastLog = await db.query(
       `SELECT current_hash FROM audit_logs
@@ -23,10 +27,10 @@ exports.addLedgerEntry = async ({
     const timestamp = new Date().toISOString();
 
     const dataString =
-      actorId +
+      (safeActorId || '') +
       action +
-      targetType +
-      targetId +
+      (targetType || '') +
+      (safeTargetId || '') +
       timestamp +
       previousHash;
 
@@ -40,10 +44,10 @@ exports.addLedgerEntry = async ({
        (actor_id, action, target_type, target_id, previous_hash, current_hash)
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [
-        actorId,
+        safeActorId,
         action,
         targetType,
-        targetId,
+        safeTargetId,
         previousHash,
         currentHash
       ]

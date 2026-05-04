@@ -608,6 +608,50 @@ exports.getWalletBalance = async (req, res) => {
 // =====================================================
 //     TENANT / LANDLORD — Request Withdrawal
 // =====================================================
+
+/**
+ * Helper: verify bank account details with Paystack and return the verified account name.
+ * Throws with a user-friendly message on failure.
+ */
+const verifyBankAccountWithPaystack = async (bankName, accountNumber) => {
+  if (!PAYSTACK_SECRET_KEY) {
+    throw new Error('Payment service is not configured');
+  }
+
+  // Fetch banks from Paystack
+  const banksRes = await axios.get(`${PAYSTACK_BASE_URL}/bank`, {
+    headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+  });
+  const banks = banksRes.data?.data || [];
+  const bank = banks.find(b =>
+    b.name.toLowerCase().includes(bankName.toLowerCase()) ||
+    bankName.toLowerCase().includes(b.name.toLowerCase())
+  );
+
+  if (!bank) {
+    throw new Error('Bank not found. Please select a valid bank from the list.');
+  }
+
+  const verifyRes = await axios.get(
+    `${PAYSTACK_BASE_URL}/bank/resolve?account_number=${accountNumber}&bank_code=${bank.code}`,
+    {
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (verifyRes.data?.status !== true || !verifyRes.data?.data?.account_name) {
+    throw new Error('Unable to verify account. Please check the account number and try again.');
+  }
+
+  return {
+    verifiedName: verifyRes.data.data.account_name,
+    bankCode: bank.code,
+  };
+};
+
 exports.requestWithdrawal = async (req, res) => {
   try {
     await ensureRefundSchema();
@@ -625,6 +669,25 @@ exports.requestWithdrawal = async (req, res) => {
     const withdrawAmount = Number(amount);
     if (withdrawAmount <= 0) {
       return res.status(400).json({ success: false, message: 'Amount must be greater than zero' });
+    }
+
+    // ── Server-side account name verification ──────────────────────────────
+    try {
+      const { verifiedName } = await verifyBankAccountWithPaystack(bank_name, account_number);
+      // Compare names — allow case-insensitive and partial word matching
+      const normalizedVerified = verifiedName.trim().toLowerCase().replace(/\s+/g, ' ');
+      const normalizedProvided = account_name.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (normalizedVerified !== normalizedProvided) {
+        return res.status(400).json({
+          success: false,
+          message: `Account name mismatch. The bank record shows "${verifiedName}". Please use the exact name as registered with your bank.`,
+        });
+      }
+    } catch (verifyErr) {
+      return res.status(400).json({
+        success: false,
+        message: verifyErr.message || 'Could not verify account details. Please try again.',
+      });
     }
 
     // Check wallet balance
