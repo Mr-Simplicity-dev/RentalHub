@@ -37,6 +37,10 @@ const {
   hashAgentInviteToken,
   inviteAgentForLandlord,
 } = require('../config/utils/agentSystem');
+const {
+  ensurePlatformAgentSchema,
+  fetchPublicPlatformAgents,
+} = require('../config/utils/platformAgentProgram');
 
 // Store OTP codes temporarily (use Redis in production)
 const otpStore = new Map();
@@ -467,7 +471,8 @@ const validateAndPrepareRegistration = async (payload) => {
     agent_email,
     agent_phone,
     use_rentalhub_lawyers,
-  } = payload;
+    use_rentalhub_agents,
+    } = payload;
 
   const cleanEmail = String(email || '').trim().toLowerCase();
   const cleanPhone = String(phone || '').replace(/\s+/g, '');
@@ -673,8 +678,9 @@ const validateAndPrepareRegistration = async (payload) => {
       phone: cleanPhone,
       full_name: cleanFullName,
       cleanLawyerEmail,
-      useRentalhubLawyers: use_rentalhub_lawyers === true || use_rentalhub_lawyers === 'true',
-      user_type,
+            useRentalhubLawyers: use_rentalhub_lawyers === true || use_rentalhub_lawyers === 'true',
+      useRentalhubAgents: use_rentalhub_agents === true || use_rentalhub_agents === 'true',
+        user_type,
       cleanNIN,
       ninVerified,
       identityType,
@@ -781,6 +787,114 @@ const assignLawyerRoundRobin = async ({ clientUserId, stateId, lgaName }) => {
     assignedLawyer: selectedLawyer,
     roundRobinIndex: nextIndex,
     totalLawyers: lawyersResult.rows.length
+  };
+};
+
+/**
+ * Assign a platform agent to a landlord using round-robin from available platform agents
+ * in the landlord's state and LGA.
+ */
+const assignAgentRoundRobin = async ({ landlordUserId, stateId, lgaName }) => {
+  await ensurePlatformAgentSchema();
+
+  // Get all active platform agents (users with user_type = 'agent' who are listed in platform_agents)
+  let agentsQuery = `
+    SELECT u.id, u.full_name, u.email
+    FROM platform_agents pa
+    JOIN users u ON u.id = pa.agent_user_id
+    WHERE pa.is_active = TRUE
+      AND u.user_type = 'agent'
+      AND u.account_suspended_at IS NULL
+      AND u.deleted_at IS NULL
+      AND u.assigned_state_id = $1
+      AND u.assigned_lga_name = $2
+    ORDER BY u.id ASC
+  `;
+  let agentsParams = [stateId, lgaName];
+
+  let agentsResult = await db.query(agentsQuery, agentsParams);
+
+  // Fallback to state-wide agents if no LGA-specific agents
+  if (agentsResult.rows.length === 0) {
+    agentsQuery = `
+      SELECT u.id, u.full_name, u.email
+      FROM platform_agents pa
+      JOIN users u ON u.id = pa.agent_user_id
+      WHERE pa.is_active = TRUE
+        AND u.user_type = 'agent'
+        AND u.account_suspended_at IS NULL
+        AND u.deleted_at IS NULL
+        AND u.assigned_state_id = $1
+      ORDER BY u.id ASC
+    `;
+    agentsResult = await db.query(agentsQuery, [stateId]);
+  }
+
+  if (agentsResult.rows.length === 0) {
+    console.error(`No available platform agents found for state_id ${stateId} / LGA ${lgaName}`);
+    return null;
+  }
+
+  // Find the last assigned agent index for round-robin
+  const lastAssignmentResult = await db.query(
+    `SELECT la.agent_user_id
+     FROM landlord_agents la
+     JOIN users u ON u.id = la.agent_user_id
+     WHERE u.user_type = 'agent'
+       AND la.status = 'active'
+     ORDER BY la.created_at DESC
+     LIMIT 1`,
+    []
+  );
+
+  let nextIndex = 0;
+
+  if (lastAssignmentResult.rows.length > 0) {
+    const lastAgentId = lastAssignmentResult.rows[0].agent_user_id;
+    const lastIndex = agentsResult.rows.findIndex(a => a.id === lastAgentId);
+    if (lastIndex !== -1) {
+      nextIndex = (lastIndex + 1) % agentsResult.rows.length;
+    }
+  }
+
+  const selectedAgent = agentsResult.rows[nextIndex];
+
+  // Create the landlord-agent assignment directly
+  await db.query(
+    `INSERT INTO landlord_agents (
+       landlord_user_id, agent_user_id, assigned_by_user_id, status,
+       can_manage_properties, can_manage_damage_reports, can_manage_disputes,
+       can_manage_legal, can_manage_finances
+     )
+     VALUES ($1, $2, $3, 'active', TRUE, TRUE, TRUE, TRUE, FALSE)
+     ON CONFLICT (landlord_user_id, agent_user_id)
+     DO UPDATE SET
+       status = 'active',
+       revoked_at = NULL,
+       updated_at = CURRENT_TIMESTAMP`,
+    [landlordUserId, selectedAgent.id, selectedAgent.id]
+  );
+
+  // Send notification to the agent
+  try {
+    const { sendNotification } = require('../config/utils/notificationService');
+
+    await sendNotification(
+      selectedAgent.id,
+      'New Landlord Assignment',
+      `You have been assigned a new landlord (ID: ${landlordUserId}) from your area as a RentalHub NG platform agent. Please check your dashboard for details.`,
+      'agent_assignment',
+      landlordUserId,
+      'landlord'
+    );
+  } catch (notifError) {
+    console.error('Agent assignment notification error:', notifError);
+  }
+
+  return {
+    assignedAgent: selectedAgent,
+    roundRobinIndex: nextIndex,
+    totalAgents: agentsResult.rows.length
   };
 };
 
@@ -990,6 +1104,104 @@ const createUserFromPreparedRegistration = async ({
         );
       } catch (distError) {
         console.error('Lawyer access fee distribution error (non-fatal):', distError);
+        }
+      }
+
+    // ====================================================================
+    // AGENT ACCESS FEE DISTRIBUTION (N5000)
+    // When useRentalhubAgents is true, the total payment includes N5000
+    // for agent access. We need to:
+    //   1. Assign a round-robin agent (from platform_agents)
+    //   2. Create a separate agent_access_fee payment record
+    //   3. Distribute the N5000 to eligible recipients
+    // ====================================================================
+    if (preparedRegistration.useRentalhubAgents && tenantRegistrationPayment) {
+      let assignedAgentId = null;
+      let assignedLawyerId = null;
+
+      // Check if the landlord already has a lawyer from the lawyer access fee
+      // (the lawyer was already assigned above if useRentalhubLawyers is also true)
+      if (preparedRegistration.useRentalhubLawyers) {
+        // The lawyer was already assigned in the block above; look it up
+        try {
+          const legalAuthResult = await db.query(
+            `SELECT lawyer_user_id
+             FROM legal_authorizations
+             WHERE client_user_id = $1
+               AND property_id IS NULL
+               AND status = 'active'
+             ORDER BY created_at DESC
+             LIMIT 1`,
+            [newUser.id]
+          );
+          if (legalAuthResult.rows.length > 0) {
+            assignedLawyerId = legalAuthResult.rows[0].lawyer_user_id;
+          }
+        } catch (lookupError) {
+          console.error('Error looking up assigned lawyer for agent fee:', lookupError);
+        }
+      }
+
+      // Assign round-robin agent in the landlord's state/LGA
+      try {
+        const roundRobinResult = await assignAgentRoundRobin({
+          landlordUserId: newUser.id,
+          stateId: preparedRegistration.preferredStateId,
+          lgaName: preparedRegistration.preferredLgaName,
+        });
+
+        if (roundRobinResult && roundRobinResult.assignedAgent) {
+          assignedAgentId = roundRobinResult.assignedAgent.id;
+        }
+      } catch (roundRobinError) {
+        console.error('Round-robin agent assignment error (non-fatal):', roundRobinError);
+      }
+
+      // Create a separate payment record for the N5000 agent access fee
+      const agentFeePaymentResult = await db.query(
+        `INSERT INTO payments (
+           user_id,
+           payment_type,
+           amount,
+           currency,
+           payment_method,
+           transaction_reference,
+           payment_status,
+           gateway_response,
+           completed_at
+         )
+         VALUES ($1, 'agent_access_fee', $2, $3, $4, $5, 'completed', $6, $7)
+         RETURNING id`,
+        [
+          newUser.id,
+          5000,
+          tenantRegistrationPayment.currency,
+          tenantRegistrationPayment.payment_method,
+          `${tenantRegistrationPayment.transaction_reference}_AGENT_FEE`,
+          tenantRegistrationPayment.gateway_response,
+          tenantRegistrationPayment.completed_at || new Date()
+        ]
+      );
+
+      const agentFeePaymentId = agentFeePaymentResult.rows[0].id;
+
+      // Distribute the N5000 to all eligible recipients
+      try {
+        const { distributeAgentAccessFee } = require('../services/commissionService');
+        const distributionResult = await distributeAgentAccessFee({
+          paymentId: agentFeePaymentId,
+          userId: newUser.id,
+          assignedAgentId,
+          assignedLawyerId,
+          stateId: preparedRegistration.preferredStateId,
+          lgaName: preparedRegistration.preferredLgaName,
+        });
+
+        console.log(
+          `Agent access fee distributed: N5000 across ${Object.keys(distributionResult.distribution).length} recipients`
+        );
+      } catch (distError) {
+        console.error('Agent access fee distribution error (non-fatal):', distError);
       }
     }
 
@@ -1332,8 +1544,9 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       phone: storedPayload.phone,
       full_name: storedPayload.full_name,
       cleanLawyerEmail: storedPayload.cleanLawyerEmail || '',
-      useRentalhubLawyers: storedPayload.useRentalhubLawyers === true,
-      user_type:
+            useRentalhubLawyers: storedPayload.useRentalhubLawyers === true,
+      useRentalhubAgents: storedPayload.useRentalhubAgents === true,
+        user_type:
         tenantRegistrationPayment.user_type ||
         storedPayload.user_type,
       cleanNIN: storedPayload.cleanNIN || null,
@@ -1692,6 +1905,20 @@ exports.acceptLawyerInvite = async (req, res) => {
       [invite.id, lawyerUserId]
     );
 
+    // Send notification to the client (tenant/landlord) that their lawyer has accepted
+    try {
+      const { createNotification } = require('../config/utils/notificationService');
+      await createNotification(
+        invite.client_user_id,
+        'lawyer_invite_accepted',
+        'Lawyer invitation accepted',
+        `${invite.lawyer_email} accepted the invitation on ${new Date().toLocaleDateString()}.`,
+        '/dashboard'
+      );
+    } catch (notifError) {
+      console.error('Lawyer accepted notification error:', notifError);
+    }
+
     // Send OTP to lawyer's phone for verification
     const otpResult = await sendVerificationCode(cleanPhone);
 
@@ -1906,6 +2133,22 @@ exports.acceptPlatformLawyerInvite = async (req, res) => {
        WHERE id = $1`,
       [invite.id, lawyerUserId]
     );
+
+    // Send notification to the super admin (if created_by exists) that platform lawyer has accepted
+    try {
+      const { createNotification } = require('../config/utils/notificationService');
+      if (invite.created_by) {
+        await createNotification(
+          invite.created_by,
+          'lawyer_invite_accepted',
+          'Platform lawyer invitation accepted',
+          `${invite.lawyer_email} accepted the platform lawyer invitation on ${new Date().toLocaleDateString()}.`,
+          '/super-admin'
+        );
+      }
+    } catch (notifError) {
+      console.error('Platform lawyer accepted notification error:', notifError);
+    }
 
     const otpResult = await sendVerificationCode(cleanPhone);
 

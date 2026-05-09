@@ -287,4 +287,14 @@ router.delete('/pricing-rules/:ruleId', authenticate, requireSuperAdmin, superCt
 router.get('/fraud', authenticate, requireSuperAdmin, superCtrl.getFraudFlags);
 router.patch('/fraud/:id/resolve', authenticate, requireSuperAdmin, superCtrl.resolveFraudFlag);
 
+// Send verification reminder notification to a user
+router.post('/users/:userId/verification-reminder', authenticate, requireSuperAdmin, superCtrl.sendUserVerificationReminder);
+
+// ====================== PLATFORM AGENTS ======================
+
+router.get('/platform-agents', authenticate, requireSuperAdmin, superCtrl.getPlatformAgentManagementData);
+router.post('/platform-agents/manual', authenticate, requireSuperAdmin, superCtrl.createManualPlatformAgent);
+router.patch('/platform-agents/:agentId', authenticate, requireSuperAdmin, superCtrl.updatePlatformAgent);
+router.delete('/platform-agents/:agentId', authenticate, requireSuperAdmin, superCtrl.deletePlatformAgent);
+
 module.exports = router;

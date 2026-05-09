@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import {
   EmptyState,
@@ -35,7 +36,11 @@ const defaultServiceForm = {
 };
 
 const TransportationAdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(() => {
+    return new URLSearchParams(location.search).get('tab') || 'overview';
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -105,6 +110,25 @@ const TransportationAdminDashboard = () => {
   useEffect(() => {
     loadPage();
   }, [loadPage]);
+
+  // Sync internal activeTab with URL search params for sidebar highlighting
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabFromUrl = params.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When activeTab changes, update URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const currentTab = params.get('tab') || 'overview';
+    if (activeTab !== currentTab) {
+      params.set('tab', activeTab);
+      navigate({ search: params.toString() }, { replace: true });
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateBookingStatus = async (bookingId, booking_status) => {
     const key = `booking-${bookingId}-${booking_status}`;

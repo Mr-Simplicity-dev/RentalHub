@@ -42,6 +42,8 @@ export const clearAuthSession = () => {
   if (local) {
     local.removeItem(TOKEN_KEY);
     local.removeItem(USER_KEY);
+    // Clean up dismissed state so next login can show fresh modals
+    localStorage.removeItem('lawyer_accepted_dismissed');
   }
 };
 

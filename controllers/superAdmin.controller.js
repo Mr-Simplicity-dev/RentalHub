@@ -135,6 +135,16 @@ const getAllUsers = async (req, res) => {
          u.identity_verified_at,
          u.is_active,
          u.created_at,
+         u.email_verified,
+         u.phone_verified,
+         u.nin_verified,
+         u.nin,
+         u.passport_photo_url,
+         u.identity_document_type,
+         u.international_passport_number,
+         u.identity_verification_status,
+         u.approval_status,
+         ${USER_VERIFICATION_STATUS_EXPR} AS identity_verification_status,
          v.full_name AS identity_verified_by_name,
          COALESCE(vc.total_verified, 0)::INT AS credentials_verified_count
        FROM users u
@@ -2243,6 +2253,65 @@ const getLawyerActivities = async (req, res) => {
   }
 };
 
+// Send verification reminder notification to a user
+const sendUserVerificationReminder = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { message } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    // Verify user exists
+    const userResult = await db.query(
+      `SELECT id, full_name, email, email_verified, phone_verified,
+              nin, nin_verified, passport_photo_url,
+              international_passport_number, identity_verified,
+              identity_verification_status
+       FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [userId]
+    );
+
+    if (!userResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const user = userResult.rows[0];
+
+    // Build a detailed message if none provided
+    const steps = [];
+    if (!user.email_verified) steps.push('Verify your email address');
+    if (!user.phone_verified) steps.push('Verify your phone number');
+    if (!user.passport_photo_url) steps.push('Upload your identity document (passport photo)');
+    if (!user.nin && !user.international_passport_number) steps.push('Provide your NIN or International Passport number');
+
+    const finalMessage = message || (
+      steps.length > 0
+        ? `You have pending verification steps:\n${steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\nPlease complete these steps to proceed.`
+        : 'Your account verification is complete. No action needed at this time.'
+    );
+
+    // Create the notification using the utility
+    const { createNotification } = require('../config/utils/notificationService');
+    await createNotification(
+      Number(userId),
+      'verification_reminder',
+      'Verification Reminder from Admin',
+      finalMessage,
+      '/verification-status'
+    );
+
+    res.json({
+      success: true,
+      message: 'Verification reminder sent to user successfully'
+    });
+  } catch (error) {
+    console.error('Send verification reminder error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send verification reminder' });
+  }
+};
+
 module.exports = {
   getAllUsers,
   impersonateAdmin,
@@ -2288,4 +2357,5 @@ module.exports = {
   getFraudFlags,
   resolveFraudFlag,
   getLawyerActivities,
+  sendUserVerificationReminder,
 };

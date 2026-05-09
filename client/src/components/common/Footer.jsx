@@ -65,7 +65,11 @@ const Footer = () => {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary-400 mt-1">📞</span>
-                <span>+234 706 701 2884</span>
+                <span>+234 8030601238</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary-400 mt-1">📞</span>
+                <span>+234 9052187099</span>
               </li>
             </ul>
           </div>

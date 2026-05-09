@@ -21,6 +21,7 @@ import {
   FaThumbsDown,
   FaTruck,
   FaSprayCan,
+  FaUserCheck,
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
@@ -77,15 +78,15 @@ const Dashboard = () => {
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [transportLoading, setTransportLoading] = useState(false);
 
-  // ── Refund state ──────────────────────────────────────────────────────────
+  // Refund state
   const [showRefundModal, setShowRefundModal] = useState(false);
-  const [refundView, setRefundView] = useState('form');        // 'form' | 'history' | 'success'
+  const [refundView, setRefundView] = useState('form'); // 'form' | 'history' | 'success'
   const [eligiblePayments, setEligiblePayments] = useState([]);
   const [myRefundRequests, setMyRefundRequests] = useState([]);
   const [refundForm, setRefundForm] = useState({ payment_id: '', reason: '', details: '' });
   const [refundLoading, setRefundLoading] = useState(false);
 
-  // ── Withdrawal state (tenant + landlord) ──────────────────────────────────
+  // Withdrawal state (tenant + landlord)
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showFundModal, setShowFundModal] = useState(false);
   const [walletBalance, setWalletBalance] = useState(null);
@@ -94,21 +95,20 @@ const Dashboard = () => {
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [withdrawHistory, setWithdrawHistory] = useState([]);
   const [fundLoading, setFundLoading] = useState(false);
-  
-  // ── Bank verification states ──────────────────────────────────────────────
+
+  // Bank verification states
   const [accountNameLoading, setAccountNameLoading] = useState(false);
   const [accountNameError, setAccountNameError] = useState('');
   const [consentChecked, setConsentChecked] = useState(false);
   const [banks, setBanks] = useState([]);
   const [banksLoading, setBanksLoading] = useState(false);
 
-   // Rent Savings state (tenant only)
+  // Rent Savings state (tenant only)
   const [showRentSavingsModal, setShowRentSavingsModal] = useState(false);
   const [tenantProperties, setTenantProperties] = useState([]);
   const [rentSavingsStats, setRentSavingsStats] = useState(null);
 
-
-  // ── Landlord refund management state ─────────────────────────────────────
+  // Landlord refund management state
   const [showLandlordRefundModal, setShowLandlordRefundModal] = useState(false);
   const [landlordRefunds, setLandlordRefunds] = useState([]);
   const [landlordRefundFilter, setLandlordRefundFilter] = useState('pending');
@@ -116,6 +116,7 @@ const Dashboard = () => {
   const [approveForm, setApproveForm] = useState({ refund_type: 'full', refund_months: '', approved_amount: '', landlord_note: '' });
   const [rejectNote, setRejectNote] = useState('');
   const [refundActionLoading, setRefundActionLoading] = useState(false);
+
   const hasSubmittedVerification = !!user?.passport_photo_url;
   const verificationReviewStatus =
     user?.identity_verification_status ||
@@ -125,7 +126,7 @@ const Dashboard = () => {
         ? 'pending'
         : 'not_submitted');
 
-    // ── Combined dashboard loader (stats + activities + optional transport/rent) ──
+  // Combined dashboard loader (stats + activities + optional transport/rent)
   const loadDashboardData = useCallback(async (showLoading = true) => {
     if (!user) return;
 
@@ -193,7 +194,6 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error loading transportation data:', error);
-      // Don't show error toast for transportation data - it's optional
     } finally {
       setTransportLoading(false);
     }
@@ -220,7 +220,6 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error loading rent savings data:', error);
-      // Don't show error toast - it's optional
     }
   }, [user]);
 
@@ -275,16 +274,16 @@ const Dashboard = () => {
     loadDashboardData(true);
   }, [user, navigate, loadDashboardData]);
 
-  // Silent background refresh (no loading spinner) every 60 seconds + on window focus
+  // Silent background refresh every 60 seconds + on window focus
   useEffect(() => {
     if (!user) return undefined;
 
     const intervalId = setInterval(() => {
-      loadDashboardData(false); // false = no loading circle, no error toast
+      loadDashboardData(false);
     }, 60000);
 
     const handleWindowFocus = () => {
-      loadDashboardData(false); // silent refresh on focus too
+      loadDashboardData(false);
     };
 
     window.addEventListener('focus', handleWindowFocus);
@@ -295,22 +294,22 @@ const Dashboard = () => {
     };
   }, [user, loadDashboardData]);
 
-  // ── Bank account verification function ───────────────────────────────────
+  // Bank account verification function
   const fetchAccountName = async (bankName, accountNumber) => {
     if (!bankName || !accountNumber || accountNumber.length !== 10) {
       setAccountNameError('');
       return;
     }
-    
+
     setAccountNameLoading(true);
     setAccountNameError('');
-    
+
     try {
       const res = await api.post('/payments/verify-account', {
         bank_name: bankName,
         account_number: accountNumber
       });
-      
+
       if (res.data?.success && res.data.data?.account_name) {
         setWithdrawForm(prev => ({ ...prev, account_name: res.data.data.account_name }));
         setAccountNameError('');
@@ -325,7 +324,6 @@ const Dashboard = () => {
     }
   };
 
-  
   // Fetch banks list on component mount
   useEffect(() => {
     const fetchBanks = async () => {
@@ -337,7 +335,6 @@ const Dashboard = () => {
         }
       } catch (err) {
         console.error('Error fetching banks:', err);
-        // Fallback to hardcoded banks if API fails
         setBanks(NIGERIAN_BANKS.map(name => ({ name, code: '', slug: '' })));
       } finally {
         setBanksLoading(false);
@@ -347,17 +344,15 @@ const Dashboard = () => {
     fetchBanks();
   }, []);
 
-  // ── Account number change handler with debounce ──────────────────────────
+  // Account number change handler with debounce
   const handleAccountNumberChange = (e) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 10);
     setWithdrawForm(prev => ({ ...prev, account_number: value }));
-    
-    // Clear previous account name when account number changes
+
     if (withdrawForm.account_name) {
       setWithdrawForm(prev => ({ ...prev, account_name: '' }));
     }
-    
-    // Fetch account name when we have both bank and valid account number
+
     if (value.length === 10 && withdrawForm.bank_name) {
       const timeoutId = setTimeout(() => {
         fetchAccountName(withdrawForm.bank_name, value);
@@ -366,18 +361,17 @@ const Dashboard = () => {
     }
   };
 
-  // ── Bank change handler ──────────────────────────────────────────────────
+  // Bank change handler
   const handleBankChange = (e) => {
     const bankName = e.target.value;
     setWithdrawForm(prev => ({ ...prev, bank_name: bankName, account_name: '' }));
-    
-    // If we already have a valid account number, fetch new account name
+
     if (withdrawForm.account_number.length === 10 && bankName) {
       fetchAccountName(bankName, withdrawForm.account_number);
     }
   };
 
-  // ── Withdrawal helpers ───────────────────────────────────────────────────
+  // Withdrawal helpers
   const openWithdrawModal = async () => {
     setWithdrawForm({ amount: '', bank_name: '', account_number: '', account_name: '' });
     setConsentChecked(false);
@@ -449,7 +443,6 @@ const Dashboard = () => {
     try {
       const res = await api.post('/payments/wallet/fund', { amount: amountInput });
       if (res.data?.success && res.data.data?.authorization_url) {
-        // Redirect to Paystack
         window.location.href = res.data.data.authorization_url;
       } else {
         toast.error(res.data?.message || 'Failed to initialize payment');
@@ -471,7 +464,7 @@ const Dashboard = () => {
     return map[status] || 'bg-gray-100 text-gray-700';
   };
 
-  // ── Landlord refund management helpers ───────────────────────────────────
+  // Landlord refund management helpers
   const openLandlordRefundModal = async (filter = 'pending') => {
     setLandlordRefundFilter(filter);
     setSelectedRefund(null);
@@ -536,7 +529,7 @@ const Dashboard = () => {
     }
   };
 
-  // ── Refund helpers ────────────────────────────────────────────────────────
+  // Refund helpers
   const openRefundModal = async () => {
     setRefundForm({ payment_id: '', reason: '', details: '' });
     setRefundView('form');
@@ -630,6 +623,40 @@ const Dashboard = () => {
   const closeRentSavingsModal = () => {
     setShowRentSavingsModal(false);
     loadRentSavingsData();
+  };
+
+    // Show popup modal when lawyer invite is newly accepted
+  const [showLawyerAcceptedPopup, setShowLawyerAcceptedPopup] = useState(false);
+
+    // Track dismissal so the popup never shows again once dismissed (even on refresh)
+  // Keyed by lawyer email so a different invitation acceptance can show again
+  const [lawyerAcceptedDismissed, setLawyerAcceptedDismissed] = useState(() => {
+    const dismissedData = localStorage.getItem('lawyer_accepted_dismissed');
+    if (!dismissedData) return false;
+    try {
+      const { email } = JSON.parse(dismissedData);
+      return email === stats?.lawyer_email;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (
+      stats?.lawyer_invite_status === 'accepted' &&
+      stats?.lawyer_email &&
+      !lawyerAcceptedDismissed
+    ) {
+      setShowLawyerAcceptedPopup(true);
+    }
+  }, [stats?.lawyer_invite_status, stats?.lawyer_email, lawyerAcceptedDismissed]);
+
+  const dismissLawyerAcceptedPopup = () => {
+    setShowLawyerAcceptedPopup(false);
+    setLawyerAcceptedDismissed(true);
+    if (stats?.lawyer_email) {
+      localStorage.setItem('lawyer_accepted_dismissed', JSON.stringify({ email: stats.lawyer_email }));
+    }
   };
 
   const getLawyerInviteSummary = () => {
@@ -782,17 +809,20 @@ const Dashboard = () => {
           </div>
         )}
 
-        <div className={`${lawyerInviteSummary.containerClass} border rounded-lg p-6 mb-6 text-center`}>
-          <div className="flex flex-col items-center">
-            {lawyerInviteSummary.icon}
-            <h3 className={`font-semibold ${lawyerInviteSummary.titleClass}`}>
-              {lawyerInviteSummary.title}
-            </h3>
-            <p className={`text-sm mt-2 ${lawyerInviteSummary.textClass}`}>
-              {lawyerInviteSummary.description}
-            </p>
+                {/* Lawyer Invite Banner - only show when pending/not_accepted, NOT when accepted or not_sent */}
+        {stats?.lawyer_invite_status && stats.lawyer_invite_status !== 'accepted' && stats.lawyer_invite_status !== 'not_sent' && (
+          <div className={`${lawyerInviteSummary.containerClass} border rounded-lg p-6 mb-6 text-center`}>
+            <div className="flex flex-col items-center">
+              {lawyerInviteSummary.icon}
+              <h3 className={`font-semibold ${lawyerInviteSummary.titleClass}`}>
+                {lawyerInviteSummary.title}
+              </h3>
+              <p className={`text-sm mt-2 ${lawyerInviteSummary.textClass}`}>
+                {lawyerInviteSummary.description}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tenant Unlock Alert */}
         {user?.user_type === 'tenant' && (
@@ -843,7 +873,6 @@ const Dashboard = () => {
                 value={getTenantSubscriptionValue()}
                 onClick={() => navigate('/subscribe')}
               />
-               {/* Transportation Booking Card */}
               <StatCard
                 title="Transport Bookings"
                 value={transportStats?.total_bookings || 0}
@@ -1233,12 +1262,12 @@ const Dashboard = () => {
                   &times;
                 </button>
               </div>
-              
+
               <div className="mb-6">
                 <p className="text-gray-600 mb-4">
                   Book transportation to move your items after paying tenancy. Available services include vans, trucks, and full moving services.
                 </p>
-                
+
                 {transportLoading ? (
                   <div className="text-center py-4">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -1264,7 +1293,7 @@ const Dashboard = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     {upcomingTransportBookings.length > 0 && (
                       <div className="mb-4">
                         <h4 className="font-semibold text-gray-800 mb-2">Upcoming Bookings</h4>
@@ -1294,7 +1323,7 @@ const Dashboard = () => {
                     )}
                   </>
                 )}
-                
+
                 <div className="flex flex-col space-y-3">
                   <button
                     onClick={() => {
@@ -1306,7 +1335,7 @@ const Dashboard = () => {
                     <FaTruck className="inline mr-2" />
                     Book Transportation Now
                   </button>
-                  
+
                   <button
                     onClick={() => {
                       setShowTransportModal(false);
@@ -1316,7 +1345,7 @@ const Dashboard = () => {
                   >
                     View All Bookings
                   </button>
-                  
+
                   <button
                     onClick={() => setShowTransportModal(false)}
                     className="btn btn-gray w-full py-3"
@@ -1376,6 +1405,37 @@ const Dashboard = () => {
         user={user}
         properties={tenantProperties}
       />
+
+            {/* LAWYER INVITE ACCEPTED POPUP MODAL */}
+      {showLawyerAcceptedPopup && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={dismissLawyerAcceptedPopup}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <FaUserCheck className="text-green-500 text-5xl mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Lawyer Invitation Accepted!</h3>
+            {stats?.lawyer_email && (
+              <p className="text-gray-600 mb-6">
+                <strong>{stats.lawyer_email}</strong> accepted the invitation
+                {stats?.lawyer_invite_accepted_at
+                  ? ` on ${new Date(stats.lawyer_invite_accepted_at).toLocaleDateString()}`
+                  : ''}.
+                Your lawyer is now connected to your account.
+              </p>
+            )}
+            <button
+              onClick={dismissLawyerAcceptedPopup}
+              className="btn btn-primary w-full"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* LANDLORD REFUND MANAGEMENT MODAL */}
       {showLandlordRefundModal && user?.user_type === 'landlord' && (
@@ -1443,6 +1503,7 @@ const Dashboard = () => {
                         {rr.landlord_note && <p className="text-green-600 text-xs mt-1">{rr.landlord_note}</p>}
                       </div>
                     )}
+
                     {rr.status === 'rejected' && rr.landlord_note && (
                       <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
                         <strong>Rejection reason:</strong> {rr.landlord_note}

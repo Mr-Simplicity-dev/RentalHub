@@ -18,7 +18,21 @@ import {
   FaLifeRing,
   FaGlobe,
   FaTruck,
-  FaSprayCan
+  FaSprayCan,
+  FaSearch,
+  FaChartLine,
+  FaExclamationTriangle,
+  FaCog,
+  FaFlag,
+  FaBroadcastTower,
+  FaGavel,
+  FaChartBar,
+  FaClipboardList,
+  FaWallet,
+  FaHeadset,
+  FaExchangeAlt,
+  FaBan,
+  FaUserShield,
 } from 'react-icons/fa';
 
 const AdminLayout = () => {
@@ -200,16 +214,34 @@ const AdminLayout = () => {
         : roleTheme.hoverNav
     }`;
 
-  const superAdminNavItem = (tab) =>
+    const superAdminNavItem = (tab) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
-      location.pathname === '/super-admin' && superAdminTab === tab
+      (location.pathname === '/super-admin' && superAdminTab === tab) ||
+      (location.pathname === '/super-admin/transportation' && tab === 'transportation') ||
+      (location.pathname === '/super-admin/fumigation-cleaning' && tab === 'fumigation-cleaning')
         ? roleTheme.activeNav
         : roleTheme.hoverNav
     }`;
-  const superFinancialPanel = new URLSearchParams(location.search).get('panel') || 'overview';
+    const superFinancialPanel = new URLSearchParams(location.search).get('panel') || 'overview';
   const superFinancialNavItem = (panel) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
       location.pathname === '/admin/super-financial-dashboard' && superFinancialPanel === panel
+        ? roleTheme.activeNav
+        : roleTheme.hoverNav
+    }`;
+
+    const financialTab = new URLSearchParams(location.search).get('tab') || 'overview';
+  const financialNavItem = (tab) =>
+    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+      location.pathname === '/admin/financial-dashboard' && financialTab === tab
+        ? roleTheme.activeNav
+        : roleTheme.hoverNav
+    }`;
+
+  const transportationTab = new URLSearchParams(location.search).get('tab') || 'overview';
+  const transportationNavItem = (tab) =>
+    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+      location.pathname === '/admin/transportation' && transportationTab === tab
         ? roleTheme.activeNav
         : roleTheme.hoverNav
     }`;
@@ -232,7 +264,7 @@ const AdminLayout = () => {
             </div>
           )}
 
-          {/* SUPER SUPPORT */}
+                              {/* SUPER SUPPORT */}
           {isSuperSupportAdmin && (
             <div>
               <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
@@ -277,6 +309,9 @@ const AdminLayout = () => {
               </div>
             </div>
           )}
+        </div>
+
+                <nav className="flex-1 p-4 space-y-6">
 
           {/* SUPER ADMIN */}
           {isSuperAdmin && (
@@ -309,6 +344,11 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin?tab=platform_lawyers" className={() => superAdminNavItem('platform_lawyers')}>
                   <FaUsers className="mr-3" />
                   Platform Lawyers
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=platform_agents" className={() => superAdminNavItem('platform_agents')}>
+                  <FaUsers className="mr-3" />
+                  Platform Agents
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=lawyer_activity" className={() => superAdminNavItem('lawyer_activity')}>
@@ -362,21 +402,18 @@ const AdminLayout = () => {
                   {badgePill(liveBadges.pendingAdminApprovals, 'amber')}
                 </NavLink>
 
-                <NavLink to="/super-admin/transportation" className={navItem}>
+                <NavLink to="/super-admin?tab=transportation" className={() => superAdminNavItem('transportation')}>
                   <FaTruck className="mr-3" />
                   Transportation
                 </NavLink>
 
-                <NavLink to="/super-admin/fumigation-cleaning" className={navItem}>
+                <NavLink to="/super-admin?tab=fumigation-cleaning" className={() => superAdminNavItem('fumigation-cleaning')}>
                   <FaSprayCan className="mr-3" />
                   Fumigation
                 </NavLink>
               </div>
             </div>
           )}
-        </div>
-
-        <nav className="flex-1 p-4 space-y-6">
 
           {/* STATE ADMIN */}
           {isStateAdmin && (
@@ -453,36 +490,62 @@ const AdminLayout = () => {
                 Transportation
               </NavLink>
 
-              <NavLink to="/admin/fumigation-cleaning" className={navItem}>
+                            <NavLink to="/admin/fumigation-cleaning" className={navItem}>
                 <FaSprayCan className="mr-3" />
                 Fumigation
+              </NavLink>
+
+              <NavLink to="/admin/agents" className={navItem}>
+                <FaUserShield className="mr-3" />
+                Agent Management
               </NavLink>
 
           </div>
           </div>
           )}
 
-          {/* SERVICE ADMINS */}
-          {(isFumigationAdmin || isTransportationAdmin) && (
+                    {/* FUMIGATION ADMIN */}
+          {isFumigationAdmin && (
             <div>
               <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
-                Service Admin
+                Fumigation Admin
               </p>
-
               <div className="space-y-2">
-                {isFumigationAdmin && (
-                  <NavLink to="/admin/fumigation-cleaning" className={navItem}>
-                    <FaSprayCan className="mr-3" />
-                    Fumigation
-                  </NavLink>
-                )}
+                <NavLink to="/admin/fumigation-cleaning" className={navItem}>
+                  <FaSprayCan className="mr-3" />
+                  Fumigation Dashboard
+                </NavLink>
+              </div>
+            </div>
+          )}
 
-                {isTransportationAdmin && (
-                  <NavLink to="/admin/transportation" className={navItem}>
-                    <FaTruck className="mr-3" />
-                    Transportation
-                  </NavLink>
-                )}
+          {/* TRANSPORTATION ADMIN */}
+          {isTransportationAdmin && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Transportation Admin
+              </p>
+              <div className="space-y-2">
+                <NavLink to="/admin/transportation?tab=overview" className={() => transportationNavItem('overview')}>
+                  <FaTachometerAlt className="mr-3" />
+                  Overview
+                </NavLink>
+                <NavLink to="/admin/transportation?tab=bookings" className={() => transportationNavItem('bookings')}>
+                  <FaClipboardList className="mr-3" />
+                  Bookings
+                </NavLink>
+                <NavLink to="/admin/transportation?tab=services" className={() => transportationNavItem('services')}>
+                  <FaTruck className="mr-3" />
+                  Services
+                </NavLink>
+                <NavLink to="/admin/transportation?tab=alerts" className={() => transportationNavItem('alerts')}>
+                  <FaExclamationTriangle className="mr-3" />
+                  Alerts
+                </NavLink>
+                <NavLink to="/admin/transportation?tab=analytics" className={() => transportationNavItem('analytics')}>
+                  <FaChartLine className="mr-3" />
+                  Analytics
+                </NavLink>
               </div>
             </div>
           )}
@@ -553,7 +616,7 @@ const AdminLayout = () => {
           </div>
           )}
 
-          {/* FINANCIAL ADMIN NAV */}
+                    {/* FINANCIAL ADMIN NAV */}
           {isFinancialAdmin && (
             <div>
               <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
@@ -561,14 +624,34 @@ const AdminLayout = () => {
               </p>
 
               <div className="space-y-2">
-                <NavLink to="/admin/financial-dashboard" className={navItem}>
+                <NavLink to="/admin/financial-dashboard?tab=overview" className={() => financialNavItem('overview')}>
                   <FaMoneyBill className="mr-3" />
-                  Financial Dashboard
+                  Overview
                 </NavLink>
 
-                <NavLink to="/admin/withdrawals" className={navItem}>
+                <NavLink to="/admin/financial-dashboard?tab=transactions" className={() => financialNavItem('transactions')}>
+                  <FaFileAlt className="mr-3" />
+                  Transactions
+                </NavLink>
+
+                <NavLink to="/admin/financial-dashboard?tab=state-admins" className={() => financialNavItem('state-admins')}>
+                  <FaUsers className="mr-3" />
+                  State Admins
+                </NavLink>
+
+                <NavLink to="/admin/financial-dashboard?tab=frozen-funds" className={() => financialNavItem('frozen-funds')}>
+                  <FaLock className="mr-3" />
+                  Frozen Funds
+                </NavLink>
+
+                <NavLink to="/admin/financial-dashboard?tab=withdrawals" className={() => financialNavItem('withdrawals')}>
                   <FaMoneyBill className="mr-3" />
-                  Withdrawals Queue
+                  Withdrawals
+                </NavLink>
+
+                <NavLink to="/admin/financial-dashboard?tab=audit-trail" className={() => financialNavItem('audit-trail')}>
+                  <FaShieldAlt className="mr-3" />
+                  Audit Trail
                 </NavLink>
               </div>
             </div>
@@ -627,7 +710,6 @@ const AdminLayout = () => {
                   <NavLink to="/admin/withdrawals" className={navItem}>
                     <FaMoneyBill className="mr-3" />
                     Commission Withdrawals
-                    {badgePill(liveBadges.pendingWithdrawals, 'blue')}
                     {badgePill(liveBadges.pendingWithdrawals, 'blue')}
                   </NavLink>
                 )}

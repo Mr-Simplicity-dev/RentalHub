@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -26,12 +26,15 @@ import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdra
 
 const StateAdminDashboard = ({ initialTab = 'overview' }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [managedUsers, setManagedUsers] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(() => {
+    return new URLSearchParams(location.search).get('tab') || initialTab;
+  });
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [oversightStateFilter, setOversightStateFilter] = useState('all');
   const [oversightLgaFilter, setOversightLgaFilter] = useState('all');
@@ -75,8 +78,27 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       }
     };
 
-    initializeDashboard();
+        initializeDashboard();
   }, [navigate]);
+
+  // Sync internal activeTab with URL search params for sidebar highlighting
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabFromUrl = params.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When activeTab changes, update URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const currentTab = params.get('tab') || 'overview';
+    if (activeTab !== currentTab) {
+      params.set('tab', activeTab);
+      navigate({ search: params.toString() }, { replace: true });
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchDashboardData = async () => {
     try {

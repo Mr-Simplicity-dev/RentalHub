@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { setAuthSession } from '../services/authStorage';
 
 const LAWYER_ACCESS_FEE = 2000; // Fee for using RentalHub NG lawyers during registration
+const AGENT_ACCESS_FEE = 5000; // Fee for using RentalHub NG agents during registration
 
 const Register = () => {
   const [searchParams] = useSearchParams();
@@ -21,6 +22,7 @@ const Register = () => {
     email: '',
     lawyer_email: '',
     use_rentalhub_lawyers: false,
+    use_rentalhub_agents: false,
     phone: '',
     add_agent: false,
     agent_full_name: '',
@@ -85,7 +87,13 @@ const Register = () => {
       delete registrationData.identity_document_type;
     }
 
-    if (registrationData.user_type !== 'landlord' || add_agent !== true) {
+        if (registrationData.user_type !== 'landlord' || (add_agent !== true && !registrationData.use_rentalhub_agents)) {
+      registrationData.agent_full_name = '';
+      registrationData.agent_email = '';
+      registrationData.agent_phone = '';
+    }
+
+    if (registrationData.use_rentalhub_agents) {
       registrationData.agent_full_name = '';
       registrationData.agent_email = '';
       registrationData.agent_phone = '';
@@ -97,15 +105,16 @@ const Register = () => {
     const requiresRegistrationPayment =
     (formData.user_type === 'tenant' && registrationFlags.tenant_registration_payment) ||
     (formData.user_type === 'landlord' && registrationFlags.landlord_registration_payment);
-  const requiresLawyerPayment = formData.use_rentalhub_lawyers;
-  const requiresPayment = requiresRegistrationPayment || requiresLawyerPayment;
+    const requiresLawyerPayment = formData.use_rentalhub_lawyers;
+  const requiresAgentPayment = formData.use_rentalhub_agents;
+  const requiresPayment = requiresRegistrationPayment || requiresLawyerPayment || requiresAgentPayment;
 
   const selectedStateOption = locationOptions.find(
     (item) => String(item.id) === String(formData.state_id)
   );
   const availableLgas = selectedStateOption?.lgas || [];
     const baseAmount = registrationPricing.amount || (formData.user_type === 'tenant' ? 2500 : 5000);
-    const displayedRegistrationAmount = (requiresRegistrationPayment ? baseAmount : 0) + (requiresLawyerPayment ? LAWYER_ACCESS_FEE : 0);
+    const displayedRegistrationAmount = (requiresRegistrationPayment ? baseAmount : 0) + (requiresLawyerPayment ? LAWYER_ACCESS_FEE : 0) + (requiresAgentPayment ? AGENT_ACCESS_FEE : 0);
   const registrationLocationBrowseUrl = formData.state_id
     ? `/properties?state_id=${encodeURIComponent(formData.state_id)}${
         formData.lga_name
@@ -381,38 +390,38 @@ const Register = () => {
     return;
   }
 
-  if (formData.user_type === 'landlord' && formData.add_agent) {
-    if (!String(formData.agent_full_name || '').trim()) {
-      toast.error('Agent full name is required');
-      return;
+    if (formData.user_type === 'landlord' && formData.add_agent && !formData.use_rentalhub_agents) {
+      if (!String(formData.agent_full_name || '').trim()) {
+        toast.error('Agent full name is required');
+        return;
+      }
+  
+      if (!emailPattern.test(String(formData.agent_email || '').trim())) {
+        toast.error('Enter a valid agent email');
+        return;
+      }
+  
+      if (!String(formData.agent_phone || '').trim()) {
+        toast.error('Agent phone number is required');
+        return;
+      }
+  
+      if (
+        String(formData.agent_email || '').trim().toLowerCase() ===
+        String(formData.email || '').trim().toLowerCase()
+      ) {
+        toast.error('Agent email must be different from landlord email');
+        return;
+      }
+  
+      if (
+        String(formData.agent_phone || '').replace(/\s+/g, '') ===
+        String(formData.phone || '').replace(/\s+/g, '')
+      ) {
+        toast.error('Agent phone must be different from landlord phone');
+        return;
+      }
     }
-
-    if (!emailPattern.test(String(formData.agent_email || '').trim())) {
-      toast.error('Enter a valid agent email');
-      return;
-    }
-
-    if (!String(formData.agent_phone || '').trim()) {
-      toast.error('Agent phone number is required');
-      return;
-    }
-
-    if (
-      String(formData.agent_email || '').trim().toLowerCase() ===
-      String(formData.email || '').trim().toLowerCase()
-    ) {
-      toast.error('Agent email must be different from landlord email');
-      return;
-    }
-
-    if (
-      String(formData.agent_phone || '').replace(/\s+/g, '') ===
-      String(formData.phone || '').replace(/\s+/g, '')
-    ) {
-      toast.error('Agent phone must be different from landlord phone');
-      return;
-    }
-  }
 
   if (!termsAccepted) {
     toast.error("You must agree to the terms and privacy policy");
@@ -562,31 +571,31 @@ const validateStep = () => {
       }
     }
 
-    if (formData.user_type === 'landlord' && formData.add_agent) {
-      if (!String(formData.agent_full_name || '').trim()) {
-        newErrors.agent_full_name = 'Agent full name required';
+        if (formData.user_type === 'landlord' && formData.add_agent && !formData.use_rentalhub_agents) {
+        if (!String(formData.agent_full_name || '').trim()) {
+          newErrors.agent_full_name = 'Agent full name required';
+        }
+  
+        if (!String(formData.agent_email || '').trim()) {
+          newErrors.agent_email = 'Agent email required';
+        } else if (!emailPattern.test(String(formData.agent_email || '').trim())) {
+          newErrors.agent_email = 'Enter a valid agent email';
+        } else if (
+          String(formData.agent_email || '').trim().toLowerCase() ===
+          String(formData.email || '').trim().toLowerCase()
+        ) {
+          newErrors.agent_email = 'Agent email must be different from landlord email';
+        }
+  
+        if (!String(formData.agent_phone || '').trim()) {
+          newErrors.agent_phone = 'Agent phone required';
+        } else if (
+          String(formData.agent_phone || '').replace(/\s+/g, '') ===
+          String(formData.phone || '').replace(/\s+/g, '')
+        ) {
+          newErrors.agent_phone = 'Agent phone must be different from landlord phone';
+        }
       }
-
-      if (!String(formData.agent_email || '').trim()) {
-        newErrors.agent_email = 'Agent email required';
-      } else if (!emailPattern.test(String(formData.agent_email || '').trim())) {
-        newErrors.agent_email = 'Enter a valid agent email';
-      } else if (
-        String(formData.agent_email || '').trim().toLowerCase() ===
-        String(formData.email || '').trim().toLowerCase()
-      ) {
-        newErrors.agent_email = 'Agent email must be different from landlord email';
-      }
-
-      if (!String(formData.agent_phone || '').trim()) {
-        newErrors.agent_phone = 'Agent phone required';
-      } else if (
-        String(formData.agent_phone || '').replace(/\s+/g, '') ===
-        String(formData.phone || '').replace(/\s+/g, '')
-      ) {
-        newErrors.agent_phone = 'Agent phone must be different from landlord phone';
-      }
-    }
   }
 
   if (step === 3) {
@@ -644,17 +653,18 @@ const isStepTwoComplete =
   String(formData.phone || "").trim() &&
   (formData.use_rentalhub_lawyers || emailPattern.test(String(formData.lawyer_email || "").trim())) &&
   (
-    formData.user_type !== 'landlord' ||
-    !formData.add_agent ||
-    (
-      String(formData.agent_full_name || '').trim() &&
-      emailPattern.test(String(formData.agent_email || '').trim()) &&
-      String(formData.agent_phone || '').trim() &&
-      String(formData.agent_email || '').trim().toLowerCase() !==
-        String(formData.email || '').trim().toLowerCase() &&
-      String(formData.agent_phone || '').replace(/\s+/g, '') !==
-        String(formData.phone || '').replace(/\s+/g, '')
-    )
+        formData.user_type !== 'landlord' ||
+      (!formData.add_agent && !formData.use_rentalhub_agents) ||
+      formData.use_rentalhub_agents ||
+      (
+        String(formData.agent_full_name || '').trim() &&
+        emailPattern.test(String(formData.agent_email || '').trim()) &&
+        String(formData.agent_phone || '').trim() &&
+        String(formData.agent_email || '').trim().toLowerCase() !==
+          String(formData.email || '').trim().toLowerCase() &&
+        String(formData.agent_phone || '').replace(/\s+/g, '') !==
+          String(formData.phone || '').replace(/\s+/g, '')
+      )
   );
 
 const isStepThreeComplete = (() => {
@@ -766,6 +776,17 @@ return (
               {LAWYER_ACCESS_FEE.toLocaleString()} applies to unlock full lawyer contact details in your selected state and local government area.
               {!registrationPricing.location_complete && (
                 <div className="mt-2 text-xs text-amber-700">
+                  Select your state and local government area to confirm.
+                </div>
+              )}
+            </div>
+                    )}
+          {requiresAgentPayment && (
+            <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-left text-sm text-purple-800">
+              You selected RentalHub NG agents. An agent access fee of N
+              {AGENT_ACCESS_FEE.toLocaleString()} applies to auto-assign a platform agent for your area.
+              {!registrationPricing.location_complete && (
+                <div className="mt-2 text-xs text-purple-700">
                   Select your state and local government area to confirm.
                 </div>
               )}
@@ -1087,6 +1108,56 @@ return (
                         </div>
                       </div>
                     )}
+                                    </div>
+                )}
+
+                {formData.user_type === 'landlord' && (
+                  <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">Use RentalHub NG Agents</h3>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Opt in to have a platform agent automatically assigned to help manage your properties
+                          and handle day-to-day tasks. A one-time agent access fee of N
+                          {AGENT_ACCESS_FEE.toLocaleString()} applies.
+                        </p>
+                      </div>
+                      <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                        <input
+                          id="use_rentalhub_agents"
+                          type="checkbox"
+                          checked={formData.use_rentalhub_agents}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setFormData((prev) => ({
+                              ...prev,
+                              use_rentalhub_agents: checked,
+                              ...(checked ? { add_agent: false, agent_full_name: '', agent_email: '', agent_phone: '' } : {}),
+                            }));
+                            if (checked) {
+                              setErrors((prev) => ({
+                                ...prev,
+                                agent_full_name: null,
+                                agent_email: null,
+                                agent_phone: null,
+                              }));
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        Use RentalHub NG agents
+                      </label>
+                    </div>
+                    {formData.use_rentalhub_agents && (
+                      <div className="mt-2 text-xs text-purple-700">
+                        A platform agent will be auto-assigned to you. No need to manually add an agent.
+                        {!registrationPricing.location_complete && (
+                          <div className="mt-1">
+                            Select your state and local government area to confirm the agent access fee.
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1305,7 +1376,7 @@ return (
                     )}
                   </div>
                 )}
-                {requiresLawyerPayment && (
+                                {requiresLawyerPayment && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     You selected RentalHub NG lawyers. A lawyer access fee of N
                     {LAWYER_ACCESS_FEE.toLocaleString()} applies to unlock full lawyer contact details in your selected state and local government area.
@@ -1316,7 +1387,17 @@ return (
                     )}
                   </div>
                 )}
-                
+                {requiresAgentPayment && (
+                  <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-800">
+                    You selected RentalHub NG agents. An agent access fee of N
+                    {AGENT_ACCESS_FEE.toLocaleString()} applies to auto-assign a platform agent for your area.
+                    {!registrationPricing.location_complete && (
+                      <div className="mt-2 text-xs text-purple-700">
+                        Select your state and local government area to confirm.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Password */}
                 <div>

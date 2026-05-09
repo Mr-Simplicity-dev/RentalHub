@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDown } from 'react-icons/fa';
+import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDown, FaIdCard, FaTachometerAlt, FaFileAlt } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
@@ -25,6 +25,12 @@ const Header = () => {
     pendingSupportQueue: 0,
     pendingWithdrawals: 0,
   });
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [notifUnreadCount, setNotifUnreadCount] = useState(0);
+    const [selectedNotification, setSelectedNotification] = useState(null);
+    const [showAvatarPopup, setShowAvatarPopup] = useState(false);
+    const notifRef = useRef(null);
   const { t } = useTranslation();
   const impersonationSession = getImpersonationOriginalSession();
   const isImpersonating = Boolean(impersonationSession);
@@ -54,11 +60,14 @@ const Header = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close menu on outside click
+    // Close menus on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setShowUserMenu(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifications(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -141,6 +150,56 @@ const Header = () => {
       clearInterval(intervalId);
     };
   }, [isAuthenticated, role, user?.id]);
+
+      // Fetch user notifications (reminders from admin)
+  const fetchNotifications = useCallback(async () => {
+    if (!isAuthenticated || !user?.id) return;
+    try {
+      const res = await api.get('/notifications', { params: { limit: 10 } });
+      if (res.data?.success) {
+        setNotifications(res.data.data || []);
+      }
+    } catch {
+      // Ignore errors
+    }
+    try {
+      const countRes = await api.get('/notifications/unread/count');
+      if (countRes.data?.success) {
+        setNotifUnreadCount(Number(countRes.data?.data?.unread_count || 0));
+      }
+    } catch {
+      // Ignore errors
+    }
+  }, [isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    fetchNotifications();
+    const intervalId = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(intervalId);
+  }, [fetchNotifications]);
+
+  const markNotifAsRead = async (notifId) => {
+    try {
+      await api.patch(`/notifications/${notifId}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notifId ? { ...n, is_read: true } : n))
+      );
+      setNotifUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {
+      // Ignore
+    }
+  };
+
+  const markAllNotifsAsRead = async () => {
+    try {
+      await api.patch('/notifications/read-all');
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setNotifUnreadCount(0);
+      toast.success('All notifications marked as read');
+    } catch {
+      // Ignore
+    }
+  };
 
   const headerAttentionCount =
     badgeCounts.pendingVerifications +
@@ -233,21 +292,191 @@ const Header = () => {
                   )}
                 </Link>
 
-                <Link to="/notifications" className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
-                  <FaBell className="text-lg" />
-                  {headerAttentionCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white animate-pulse-soft" />
-                  )}
-                </Link>
+                                                {/* Notification Bell */}
+                <div className="relative" ref={notifRef}>
+                  <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
+                    aria-label="Notifications"
+                  >
+                    <FaBell className="text-lg" />
+                    {(notifUnreadCount > 0 || headerAttentionCount > 0) && (
+                      <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white animate-pulse-soft" />
+                    )}
+                  </button>
 
-                {/* User Menu */}
+                  {showNotifications && (
+                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-elevated-lg border border-gray-100 py-2 animate-scaleIn origin-top-right max-h-[70vh] flex flex-col">
+                      <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                        {notifUnreadCount > 0 && (
+                          <button
+                            onClick={markAllNotifsAsRead}
+                            className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                          >
+                            Mark all as read
+                          </button>
+                        )}
+                      </div>
+                      <div className="overflow-y-auto flex-1">
+                        {notifications.length === 0 ? (
+                          <div className="px-4 py-8 text-center">
+                            <FaBell className="mx-auto text-gray-300 text-2xl mb-2" />
+                            <p className="text-sm text-gray-500">No notifications yet</p>
+                          </div>
+                        ) : (
+                                                    notifications.map((notif) => (
+                            <div
+                              key={notif.id}
+                              className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${
+                                !notif.is_read ? 'bg-primary-50/40' : ''
+                              }`}
+                              onClick={() => {
+                                setSelectedNotification(notif);
+                                if (!notif.is_read) markNotifAsRead(notif.id);
+                              }}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900">{notif.title}</p>
+                                  <p className="text-xs text-gray-600 mt-0.5 truncate">{notif.message}</p>
+                                  <p className="text-[10px] text-gray-400 mt-1">
+                                    {new Date(notif.created_at).toLocaleDateString(undefined, {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </p>
+                                </div>
+                                {!notif.is_read && (
+                                  <span className="shrink-0 w-2 h-2 rounded-full bg-primary-500 mt-2" />
+                                )}
+                              </div>
+                              {notif.link && (
+                                <div className="mt-2 flex justify-end">
+                                  <Link
+                                    to={notif.link}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowNotifications(false);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+                                  >
+                                    <FaIdCard className="text-[10px]" />
+                                    Take Action
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Full Message Modal */}
+                {selectedNotification && (
+                  <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                    onClick={() => setSelectedNotification(null)}
+                  >
+                    <div
+                      className="bg-white rounded-2xl shadow-elevated-lg border border-gray-100 max-w-lg w-full mx-4 animate-scaleIn"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="text-base font-semibold text-gray-900">
+                          {selectedNotification.title}
+                        </h3>
+                        <button
+                          onClick={() => setSelectedNotification(null)}
+                          className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                      <div className="px-6 py-4">
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                          {selectedNotification.message}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-4">
+                          {new Date(selectedNotification.created_at).toLocaleDateString(undefined, {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                                            {selectedNotification.link && (
+                        <div className="px-6 py-4 border-t border-gray-100 flex justify-center">
+                          <Link
+                            to={selectedNotification.link}
+                            onClick={() => {
+                              setSelectedNotification(null);
+                              setShowNotifications(false);
+                            }}
+                            className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+                          >
+                            <FaIdCard className="text-xs" />
+                            Take Action
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Avatar Popup Modal */}
+                {showAvatarPopup && user?.passport_photo_url && (
+                  <div
+                    className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    onClick={() => setShowAvatarPopup(false)}
+                  >
+                    <div
+                      className="relative max-w-xl w-full mx-4 animate-scaleIn"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => setShowAvatarPopup(false)}
+                        className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-gray-600 hover:text-gray-800 text-lg leading-none"
+                      >
+                        &times;
+                      </button>
+                      <img
+                        src={user.passport_photo_url}
+                        alt="Profile"
+                        className="w-full h-auto rounded-2xl shadow-2xl border-4 border-white"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                                {/* User Menu */}
                 <div className="relative" ref={menuRef}>
                   <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    onClick={() => setShowUserMenu(prev => !prev)}
                     className="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-sm font-semibold shadow-sm">
-                      {user?.full_name?.charAt(0)?.toUpperCase() || <FaUser />}
+                    <div
+                      className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-sm font-semibold shadow-sm"
+                    >
+                      {user?.passport_photo_url ? (
+                        <img
+                          src={user.passport_photo_url}
+                          alt=""
+                          className="w-full h-full object-cover cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowAvatarPopup(true);
+                          }}
+                        />
+                      ) : (
+                        user?.full_name?.charAt(0)?.toUpperCase() || <FaUser />
+                      )}
                     </div>
                     <span className="hidden lg:block text-sm font-medium">{user?.full_name}</span>
                     <FaChevronDown className={`hidden lg:block text-xs transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} />
@@ -255,24 +484,36 @@ const Header = () => {
 
                   {showUserMenu && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-elevated-lg border border-gray-100 py-2 animate-scaleIn origin-top-right">
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{user?.full_name}</p>
-                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                      </div>
+                                            <div className="px-4 py-3 border-b border-gray-100">
+                                              <p className="text-sm font-semibold text-gray-900 truncate">{user?.full_name}</p>
+                                              <p className="text-xs text-gray-500 truncate">
+                                                {user?.email?.replace(/^(.)(.*)(@.*)$/, (_, first, middle, domain) =>
+                                                  `${first}${'*'.repeat(Math.min(middle.length, 4))}${domain}`
+                                                )}
+                                              </p>
+                                            </div>
 
-                      <Link to={roleDashboardPath} className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
-                        <span>{t('header.dashboard')}</span>
+                                            <Link to={roleDashboardPath} className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
+                                                <FaTachometerAlt className="text-xs text-primary-500" />
+                                                <span className="flex-1">{t('header.dashboard')}</span>
                         {headerAttentionCount > 0 && (
                           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{headerAttentionCount}</span>
                         )}
                       </Link>
 
-                      <Link to="/profile" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
-                        {t('header.profile')}
+                      <Link to="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
+                                                <FaUser className="text-xs text-primary-500" />
+                                                <span>{t('header.profile')}</span>
                       </Link>
 
-                      <Link to="/applications" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
-                        {t('header.applications')}
+                      <Link to="/applications" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
+                                                <FaFileAlt className="text-xs text-primary-500" />
+                                                <span>{t('header.applications')}</span>
+                      </Link>
+
+                      <Link to="/verification-status" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-150" onClick={() => setShowUserMenu(false)}>
+                        <FaIdCard className="text-xs text-primary-500" />
+                        <span>Verification</span>
                       </Link>
 
                       <div className="border-t border-gray-100 mt-1 pt-1">

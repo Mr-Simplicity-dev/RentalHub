@@ -88,7 +88,9 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
         assigned_state, 
         assigned_city,
         admin_commission_rate,
-        admin_funds_frozen
+        admin_funds_frozen,
+        is_active,
+        account_suspended_at
        FROM users 
        WHERE id = $1 AND user_type IN ('state_admin', 'state_financial_admin')`,
       [referredBy]
@@ -101,11 +103,11 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
     
     const admin = adminCheck.rows[0];
     
-    // Check if admin funds are frozen
-    if (admin.admin_funds_frozen) {
-      console.log(`Admin ${admin.id} funds are frozen, skipping commission`);
-      return null;
-    }
+        // Check if admin funds are frozen
+    // When funds are frozen: commission is still created and wallet credited,
+    // but withdrawal is blocked by processAdminWithdrawal which checks admin_funds_frozen.
+    // The commission record note indicates it was earned while funds were frozen.
+    const isFundsFrozen = admin.admin_funds_frozen;
     
     // Check if transaction is in admin's assigned area
     if (propertyState && admin.assigned_state && 
@@ -129,14 +131,132 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
     
     // Calculate commission
     const platformFee = amount * commissionConfig.platform_fee_rate;
-    const adminCommission = platformFee * commissionConfig.admin_share;
-    const superAdminCommission = platformFee * commissionConfig.super_admin_share;
     
     // Use admin's custom rate if set, otherwise use default
     const finalCommissionRate = admin.admin_commission_rate || commissionConfig.admin_share;
     const finalCommission = platformFee * finalCommissionRate;
     
-    // Create commission record
+    // ========== HANDLE SUSPENDED OR MISSING STATE ADMIN ==========
+    const referralAdminId = admin.id;
+    const isAdminSuspended = admin.is_active === false || admin.account_suspended_at !== null;
+    
+    // Find the super admin (needed for redistributions)
+    const superAdminResult = await db.query(
+      `SELECT id FROM users 
+       WHERE user_type = 'super_admin' 
+       AND deleted_at IS NULL 
+       AND account_suspended_at IS NULL 
+       AND admin_funds_frozen = false
+       LIMIT 1`
+    );
+    const defaultSuperAdminId = superAdminResult.rows[0]?.id || null;
+    
+    if (isAdminSuspended) {
+      // Admin is suspended: 60% to remaining active state admins, 40% to super admin
+      console.log(`Admin ${referralAdminId} is suspended, redistributing commission`);
+      
+      const sixtyPercent = Math.round(finalCommission * 0.6 * 100) / 100;
+      const fortyPercent = finalCommission - sixtyPercent;
+      
+      // Get all active (non-suspended) state admins in the same state
+      const activeStateAdminsResult = await db.query(
+        `SELECT id FROM users
+         WHERE user_type IN ('state_admin', 'state_financial_admin')
+           AND LOWER(assigned_state) = LOWER($1)
+           AND id != $2
+           AND deleted_at IS NULL
+           AND account_suspended_at IS NULL
+           AND admin_funds_frozen = false
+           AND is_active = true`,
+        [admin.assigned_state, referralAdminId]
+      );
+      
+      const activeStateAdmins = activeStateAdminsResult.rows;
+      
+      // Build distribution map
+      const distribution = {};
+      
+      if (activeStateAdmins.length > 0) {
+        // Split 60% equally among remaining active state admins
+        const equalShare = Math.round((sixtyPercent / activeStateAdmins.length) * 100) / 100;
+        let distributedSoFar = 0;
+        
+        for (let i = 0; i < activeStateAdmins.length; i++) {
+          const share = (i === activeStateAdmins.length - 1)
+            ? sixtyPercent - distributedSoFar  // last admin gets remainder to avoid rounding issues
+            : equalShare;
+          distribution[activeStateAdmins[i].id] = (distribution[activeStateAdmins[i].id] || 0) + share;
+          distributedSoFar += share;
+        }
+      } else {
+        // No active state admins in that state, the 60% goes to super admin too
+        if (defaultSuperAdminId) {
+          distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + sixtyPercent;
+        }
+      }
+      
+      // 40% to super admin
+      if (defaultSuperAdminId && fortyPercent > 0) {
+        distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + fortyPercent;
+      }
+      
+      // Persist all commissions in the distribution
+      const commissionIds = [];
+      for (const [distAdminId, distAmount] of Object.entries(distribution)) {
+        if (distAmount <= 0) continue;
+        
+        const distResult = await db.query(
+          `INSERT INTO admin_commissions (
+            admin_id, user_id, payment_id, amount, source, commission_rate, state, city, status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+          RETURNING id`,
+          [distAdminId, userId, paymentId, distAmount, paymentType, finalCommissionRate, propertyState, propertyCity]
+        );
+        commissionIds.push(distResult.rows[0].id);
+        
+        await db.query(
+          `UPDATE users 
+           SET admin_wallet_balance = admin_wallet_balance + $1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [distAmount, distAdminId]
+        );
+        
+        await db.query(
+          `INSERT INTO transaction_audits 
+           (payment_id, user_id, admin_id, action_type, amount, description)
+           VALUES ($1, $2, $3, 'commission_earned', $4, $5)`,
+          [
+            paymentId, userId, distAdminId, distAmount,
+            `Redistributed commission (admin suspended) from ${paymentType}: ₦${distAmount.toLocaleString()}`
+          ]
+        );
+      }
+      
+      console.log(`Commission redistributed: ₦${finalCommission.toLocaleString()} (60% to state admins, 40% to super admin) for suspended admin ${referralAdminId}`);
+      
+      return {
+        commission_id: commissionIds[0] || null,
+        admin_id: null,
+        amount: finalCommission,
+        rate: finalCommissionRate,
+        platform_fee: platformFee,
+        super_admin_commission: 0,
+        redistributed: true,
+        distribution
+      };
+    }
+    
+        // ========== ADMIN IS ACTIVE - NORMAL COMMISSION FLOW ==========
+    
+    // Determine commission status
+    // If funds are frozen, we still create the record (status 'pending') and credit the wallet.
+    // The withdrawal logic (processAdminWithdrawal) already blocks frozen admins from withdrawing.
+    const commissionDescription = isFundsFrozen
+      ? `Commission earned from ${paymentType} (while funds frozen): ₦${finalCommission.toLocaleString()}`
+      : `Commission earned from ${paymentType}: ₦${finalCommission.toLocaleString()}`;
+    
+    // Create commission record for the referral admin
     const commissionResult = await db.query(
       `INSERT INTO admin_commissions (
         admin_id,
@@ -181,11 +301,12 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
         userId,
         admin.id,
         finalCommission,
-        `Commission earned from ${paymentType}: ₦${finalCommission.toLocaleString()}`
+        commissionDescription
       ]
     );
     
-    console.log(`Commission calculated: ₦${finalCommission.toLocaleString()} for admin ${admin.id}`);
+    const statusNote = isFundsFrozen ? ' (funds frozen - withdrawal blocked)' : '';
+    console.log(`Commission calculated: ₦${finalCommission.toLocaleString()} for admin ${admin.id}${statusNote}`);
     
     return {
       commission_id: commissionResult.rows[0].id,
@@ -193,7 +314,8 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
       amount: finalCommission,
       rate: finalCommissionRate,
       platform_fee: platformFee,
-      super_admin_commission: superAdminCommission
+      super_admin_commission: 0,
+      ...(isFundsFrozen && { funds_frozen: true })
     };
     
   } catch (error) {
@@ -647,14 +769,14 @@ exports.distributeLawyerAccessFee = async ({
       return null;
     }
 
-    // Look up state-level admins by assigned_state (VARCHAR name) matching the client's state
+        // Look up state-level admins by assigned_state (VARCHAR name) matching the client's state
+    // NOTE: We now fetch ALL state admins including suspended ones so we can implement
+    // the 60/40 redistribution rule when a state admin role is suspended/missing
     const stateAdminsResult = await client.query(
-      `SELECT id, user_type FROM users
+      `SELECT id, user_type, is_active, account_suspended_at FROM users
        WHERE user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_lawyer_admin')
          AND LOWER(assigned_state) = LOWER($1)
-         AND deleted_at IS NULL
-         AND account_suspended_at IS NULL
-         AND admin_funds_frozen = false`,
+         AND deleted_at IS NULL`,
       [stateName]
     );
 
@@ -678,8 +800,14 @@ exports.distributeLawyerAccessFee = async ({
 
     // Index admins by user_type for quick lookups
     const stateAdminByRole = {};
+    // Track which state-level roles have an active admin present (for 60/40 redistribution)
+    const activeStateAdminIds = [];
     for (const row of stateAdminsResult.rows) {
       stateAdminByRole[row.user_type] = row.id;
+      const isSuspended = row.is_active === false || row.account_suspended_at !== null;
+      if (!isSuspended) {
+        activeStateAdminIds.push(row.id);
+      }
     }
 
     const superAdminByRole = {};
@@ -697,6 +825,53 @@ exports.distributeLawyerAccessFee = async ({
     // Build distribution map { adminId: totalAmount }
     const distribution = {};
 
+    /**
+     * Helper: credit a state-level role amount. If the role's admin is missing or suspended,
+     * apply the 60/40 rule: 60% to remaining active state admins, 40% to super admin.
+     */
+    const creditStateRole = (amount, roleType) => {
+      const adminId = stateAdminByRole[roleType];
+      
+      // Check if the admin for this role exists and is active
+      const adminRow = stateAdminsResult.rows.find(r => r.user_type === roleType);
+      const isActive = adminRow && adminRow.is_active !== false && adminRow.account_suspended_at === null;
+      
+      if (adminId && isActive) {
+        // Admin exists and is active - give them their share
+        distribution[adminId] = (distribution[adminId] || 0) + amount;
+      } else if (activeStateAdminIds.length > 0) {
+        // Role is missing/suspended: 60% to remaining active state admins, 40% to super admin
+        const sixtyPercent = Math.round(amount * 0.6 * 100) / 100;
+        const fortyPercent = amount - sixtyPercent;
+        
+        // Share 60% equally among active state admins
+        const equalShare = Math.round((sixtyPercent / activeStateAdminIds.length) * 100) / 100;
+        let distributedSoFar = 0;
+        for (let i = 0; i < activeStateAdminIds.length; i++) {
+          const share = (i === activeStateAdminIds.length - 1)
+            ? sixtyPercent - distributedSoFar
+            : equalShare;
+          if (share > 0) {
+            distribution[activeStateAdminIds[i]] = (distribution[activeStateAdminIds[i]] || 0) + share;
+            distributedSoFar += share;
+          }
+        }
+        
+        // 40% to super admin
+        if (defaultSuperAdminId && fortyPercent > 0) {
+          distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + fortyPercent;
+        }
+      } else {
+        // No active state admins at all - everything goes to super admin
+        if (defaultSuperAdminId) {
+          distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + amount;
+        }
+      }
+    };
+
+    /**
+     * Helper: credit any admin by ID. If adminId is falsy, falls to defaultSuperAdminId.
+     */
     const credit = (amount, adminId) => {
       if (!adminId) {
         if (defaultSuperAdminId) {
@@ -723,14 +898,14 @@ exports.distributeLawyerAccessFee = async ({
 
     // 3. Super admin base – N120
     credit(LAWYER_ACCESS_FEE_DISTRIBUTION.super_admin_base, superAdminByRole['super_admin']);
-    // 4. State admin – N140
-    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.state_admin, stateAdminByRole['state_admin']);
-    // 5. State financial admin – N140
-    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.state_financial_admin, stateAdminByRole['state_financial_admin']);
-    // 6. State support admin – N140
-    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.state_support_admin, stateAdminByRole['state_support_admin']);
-    // 7. State lawyer admin – N140
-    credit(LAWYER_ACCESS_FEE_DISTRIBUTION.state_lawyer_admin, stateAdminByRole['state_lawyer_admin']);
+    // 4. State admin – N140 (with 60/40 redistribution if suspended/missing)
+    creditStateRole(LAWYER_ACCESS_FEE_DISTRIBUTION.state_admin, 'state_admin');
+    // 5. State financial admin – N140 (with 60/40 redistribution if suspended/missing)
+    creditStateRole(LAWYER_ACCESS_FEE_DISTRIBUTION.state_financial_admin, 'state_financial_admin');
+    // 6. State support admin – N140 (with 60/40 redistribution if suspended/missing)
+    creditStateRole(LAWYER_ACCESS_FEE_DISTRIBUTION.state_support_admin, 'state_support_admin');
+    // 7. State lawyer admin – N140 (with 60/40 redistribution if suspended/missing)
+    creditStateRole(LAWYER_ACCESS_FEE_DISTRIBUTION.state_lawyer_admin, 'state_lawyer_admin');
     // 8. Super financial admin – N200
     credit(LAWYER_ACCESS_FEE_DISTRIBUTION.super_financial_admin, superAdminByRole['super_financial_admin']);
     // 9. Super support admin – N200
@@ -813,9 +988,247 @@ exports.distributeLawyerAccessFee = async ({
       distribution,
       total_distributed: Object.values(distribution).reduce((a, b) => a + b, 0),
     };
-  } catch (error) {
+    } catch (error) {
     await client.query('ROLLBACK');
     console.error('Distribute lawyer access fee error:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+// ====================== AGENT ACCESS FEE DISTRIBUTION (N5000) ======================
+
+const AGENT_ACCESS_FEE_TOTAL = 5000;
+
+const AGENT_ACCESS_FEE_DISTRIBUTION = {
+  assigned_agent: 2800,
+  assigned_lawyer: 500,
+  super_admin: 800,
+  state_admin: 100,
+};
+
+const AGENT_ACCESS_FEE_REMAINING =
+  AGENT_ACCESS_FEE_TOTAL -
+  AGENT_ACCESS_FEE_DISTRIBUTION.assigned_agent -
+  AGENT_ACCESS_FEE_DISTRIBUTION.assigned_lawyer -
+  AGENT_ACCESS_FEE_DISTRIBUTION.super_admin -
+  AGENT_ACCESS_FEE_DISTRIBUTION.state_admin;
+
+/**
+ * Distribute the N5000 agent access fee to eligible recipients.
+ * Called after a landlord pays for RentalHub NG agent access during registration.
+ *
+ * Distribution:
+ *   Assigned agent:         N2,800
+ *   Assigned landlord's
+ *   lawyer (if any):        N500
+ *   Super admin:            N800
+ *   State admin:            N100
+ *   Remainder to super admin
+ *
+ * @param {Object} params
+ * @param {number} params.paymentId - The payments.id
+ * @param {number} params.userId - The landlord user id
+ * @param {number|null} params.assignedAgentId - The agent assigned via round-robin
+ * @param {number|null} params.assignedLawyerId - The lawyer assigned to the landlord (if any)
+ * @param {number} params.stateId - The state id for the landlord's chosen state
+ * @param {string} params.lgaName - The LGA name
+ */
+exports.distributeAgentAccessFee = async ({
+  paymentId,
+  userId,
+  assignedAgentId,
+  assignedLawyerId,
+  stateId,
+  lgaName,
+}) => {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+
+    const stateNameResult = await client.query(
+      'SELECT state_name FROM states WHERE id = $1 LIMIT 1',
+      [stateId]
+    );
+    const stateName = stateNameResult.rows[0]?.state_name || null;
+
+    if (!stateName) {
+      console.error(`State not found for state_id ${stateId}`);
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const stateAdminsResult = await client.query(
+      `SELECT id, user_type, is_active, account_suspended_at FROM users
+       WHERE user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_lawyer_admin')
+         AND LOWER(assigned_state) = LOWER($1)
+         AND deleted_at IS NULL`,
+      [stateName]
+    );
+
+    const superAdminsResult = await client.query(
+      `SELECT id, user_type FROM users
+       WHERE user_type IN ('super_admin', 'super_financial_admin', 'super_support_admin', 'super_lawyer_admin')
+         AND deleted_at IS NULL
+         AND account_suspended_at IS NULL
+         AND admin_funds_frozen = false`
+    );
+
+    const serviceAdminsResult = await client.query(
+      `SELECT id, user_type FROM users
+       WHERE user_type IN ('fumigation_admin', 'transportation_admin')
+         AND deleted_at IS NULL
+         AND account_suspended_at IS NULL
+         AND admin_funds_frozen = false`
+    );
+
+    const stateAdminByRole = {};
+    const activeStateAdminIds = [];
+    for (const row of stateAdminsResult.rows) {
+      stateAdminByRole[row.user_type] = row.id;
+      const isSuspended = row.is_active === false || row.account_suspended_at !== null;
+      if (!isSuspended) {
+        activeStateAdminIds.push(row.id);
+      }
+    }
+
+    const superAdminByRole = {};
+    for (const row of superAdminsResult.rows) {
+      superAdminByRole[row.user_type] = row.id;
+    }
+
+    const serviceAdminByRole = {};
+    for (const row of serviceAdminsResult.rows) {
+      serviceAdminByRole[row.user_type] = row.id;
+    }
+
+    const defaultSuperAdminId = superAdminByRole['super_admin'] || null;
+
+    const distribution = {};
+
+    const creditStateRole = (amount, roleType) => {
+      const adminId = stateAdminByRole[roleType];
+      const adminRow = stateAdminsResult.rows.find(r => r.user_type === roleType);
+      const isActive = adminRow && adminRow.is_active !== false && adminRow.account_suspended_at === null;
+
+      if (adminId && isActive) {
+        distribution[adminId] = (distribution[adminId] || 0) + amount;
+      } else if (activeStateAdminIds.length > 0) {
+        const sixtyPercent = Math.round(amount * 0.6 * 100) / 100;
+        const fortyPercent = amount - sixtyPercent;
+
+        const equalShare = Math.round((sixtyPercent / activeStateAdminIds.length) * 100) / 100;
+        let distributedSoFar = 0;
+        for (let i = 0; i < activeStateAdminIds.length; i++) {
+          const share = (i === activeStateAdminIds.length - 1)
+            ? sixtyPercent - distributedSoFar
+            : equalShare;
+          if (share > 0) {
+            distribution[activeStateAdminIds[i]] = (distribution[activeStateAdminIds[i]] || 0) + share;
+            distributedSoFar += share;
+          }
+        }
+        if (defaultSuperAdminId && fortyPercent > 0) {
+          distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + fortyPercent;
+        }
+      } else {
+        if (defaultSuperAdminId) {
+          distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + amount;
+        }
+      }
+    };
+
+    const credit = (amount, adminId) => {
+      if (!adminId) {
+        if (defaultSuperAdminId) {
+          distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + amount;
+        }
+        return;
+      }
+      distribution[adminId] = (distribution[adminId] || 0) + amount;
+    };
+
+    // 1. Assigned agent – N2,800
+    if (assignedAgentId) {
+      distribution[assignedAgentId] = (distribution[assignedAgentId] || 0) + AGENT_ACCESS_FEE_DISTRIBUTION.assigned_agent;
+    } else if (defaultSuperAdminId) {
+      distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + AGENT_ACCESS_FEE_DISTRIBUTION.assigned_agent;
+    }
+
+    // 2. Assigned lawyer – N500 (if landlord also has a platform lawyer)
+    if (assignedLawyerId) {
+      credit(AGENT_ACCESS_FEE_DISTRIBUTION.assigned_lawyer, assignedLawyerId);
+    } else if (defaultSuperAdminId) {
+      distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + AGENT_ACCESS_FEE_DISTRIBUTION.assigned_lawyer;
+    }
+
+    // 3. Super admin – N800
+    credit(AGENT_ACCESS_FEE_DISTRIBUTION.super_admin, superAdminByRole['super_admin']);
+
+    // 4. State admin – N100 (with 60/40 redistribution)
+    creditStateRole(AGENT_ACCESS_FEE_DISTRIBUTION.state_admin, 'state_admin');
+
+    // 5. Remainder to super admin
+    if (defaultSuperAdminId && AGENT_ACCESS_FEE_REMAINING > 0) {
+      distribution[defaultSuperAdminId] = (distribution[defaultSuperAdminId] || 0) + AGENT_ACCESS_FEE_REMAINING;
+    }
+
+    // Persist each commission record and credit admin wallets
+    const commissionIds = [];
+    for (const [adminId, amount] of Object.entries(distribution)) {
+      if (amount <= 0) continue;
+
+      const result = await client.query(
+        `INSERT INTO admin_commissions (
+          admin_id, user_id, payment_id, amount, source, commission_rate, state, city, status
+        ) VALUES ($1, $2, $3, $4, 'agent_access_fee', 1.0, $5, $6, 'pending')
+        RETURNING id`,
+        [adminId, userId, paymentId, amount, stateName, lgaName]
+      );
+      commissionIds.push(result.rows[0].id);
+
+      await client.query(
+        `UPDATE users
+         SET admin_wallet_balance = admin_wallet_balance + $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [amount, adminId]
+      );
+
+      await client.query(
+        `INSERT INTO transaction_audits
+         (payment_id, user_id, admin_id, action_type, amount, description)
+         VALUES ($1, $2, $3, 'commission_earned', $4, $5)`,
+        [paymentId, userId, adminId, amount, `Agent access fee commission: ₦${amount.toLocaleString()}`]
+      );
+    }
+
+    const distributionRecord = await client.query(
+      `INSERT INTO agent_access_fee_distributions (
+        payment_id, user_id, assigned_agent_id, assigned_lawyer_id,
+        state_id, lga_name, total_amount, distribution
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id`,
+      [
+        paymentId, userId, assignedAgentId, assignedLawyerId,
+        stateId, lgaName, AGENT_ACCESS_FEE_TOTAL, JSON.stringify(distribution),
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    console.log(`Agent access fee distributed: ₦${AGENT_ACCESS_FEE_TOTAL.toLocaleString()} across ${Object.keys(distribution).length} recipients`);
+
+    return {
+      distribution_id: distributionRecord.rows[0].id,
+      commission_ids: commissionIds,
+      distribution,
+      total_distributed: Object.values(distribution).reduce((a, b) => a + b, 0),
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Distribute agent access fee error:', error);
     throw error;
   } finally {
     client.release();

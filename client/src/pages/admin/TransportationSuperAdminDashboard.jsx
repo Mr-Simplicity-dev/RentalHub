@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import {
   EmptyState,
@@ -36,7 +37,11 @@ const defaultAssignmentForm = {
 const STATE_ADMIN_USER_TYPES = ['state_admin', 'state_financial_admin', 'state_support_admin'];
 
 export default function TransportationSuperAdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(() => {
+    return new URLSearchParams(location.search).get('tab') || 'overview';
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -119,6 +124,25 @@ export default function TransportationSuperAdminDashboard() {
   useEffect(() => {
     loadPage();
   }, [loadPage]);
+
+  // Sync internal activeTab with URL search params for sidebar highlighting
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabFromUrl = params.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When activeTab changes, update URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const currentTab = params.get('tab') || 'overview';
+    if (activeTab !== currentTab) {
+      params.set('tab', activeTab);
+      navigate({ search: params.toString() }, { replace: true });
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const assignJurisdiction = async (event) => {
     event.preventDefault();

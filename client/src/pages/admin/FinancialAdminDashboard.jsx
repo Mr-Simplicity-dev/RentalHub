@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -24,13 +24,16 @@ import useRetryableAction from '../../hooks/useRetryableAction';
 
 const FinancialAdminDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [frozenFunds, setFrozenFunds] = useState([]);
   const [stateAdmins, setStateAdmins] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    return new URLSearchParams(location.search).get('tab') || 'overview';
+  });
   const [showFreezeDialog, setShowFreezeDialog] = useState(false);
   const [freezeInputs, setFreezeInputs] = useState({
     user_id: '',
@@ -107,8 +110,27 @@ const FinancialAdminDashboard = () => {
       }
     };
 
-    initializeDashboard();
+        initializeDashboard();
   }, [navigate]);
+
+  // Sync internal activeTab with URL search params for sidebar highlighting
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabFromUrl = params.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When activeTab changes, update URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const currentTab = params.get('tab') || 'overview';
+    if (activeTab !== currentTab) {
+      params.set('tab', activeTab);
+      navigate({ search: params.toString() }, { replace: true });
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchDashboardData = async () => {
     try {
