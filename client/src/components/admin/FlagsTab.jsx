@@ -17,6 +17,14 @@ const FLAG_META = {
     label: "Property Alert Payment",
     description: 'Require payment before processing "Notify me when available" requests. Base fee is N5,000 and location pricing rules can override it.',
   },
+  ads_enabled: {
+    label: "Ad Spaces",
+    description: "Show or hide Super Admin managed ads on Home, Dashboard, and Properties pages.",
+  },
+  tenant_landlord_referrals: {
+    label: "Tenant & Landlord Referrals",
+    description: "Allow tenants and landlords to share invite links and earn N1,000 subscription credit for each successful registration.",
+  },
   nin_number: {
     label: "NIN Requirement",
     description: "Require and allow NIN collection for local registrations.",
@@ -37,6 +45,8 @@ const REGISTRATION_FLAG_ORDER = [
 
 const PLATFORM_PRIORITY_FLAG_ORDER = [
   "property_alert_payment",
+  "ads_enabled",
+  "tenant_landlord_referrals",
 ];
 
 const FlagsTab = ({ flags, toggleFlag }) => {

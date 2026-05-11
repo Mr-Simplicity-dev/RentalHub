@@ -736,6 +736,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                     <option>All Types</option>
                     <option>rent_payment</option>
                     <option>tenant_subscription</option>
+                    <option>landlord_subscription</option>
                     <option>landlord_listing</option>
                   </select>
                   <input

@@ -134,4 +134,52 @@
   .animate-pulse-soft {
     animation: pulse-soft 2s ease-in-out infinite;
   }
+
+  .ad-marquee {
+    overflow: hidden;
+    position: relative;
+  }
+
+  .ad-marquee-track {
+    display: flex;
+    width: max-content;
+    animation: adMarqueeScroll var(--ad-marquee-duration, 36s) linear infinite;
+    will-change: transform;
+  }
+
+  .ad-marquee:hover .ad-marquee-track,
+  .ad-marquee:focus-within .ad-marquee-track {
+    animation-play-state: paused;
+  }
+
+  .ad-marquee-group {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 1rem;
+    padding-right: 1rem;
+  }
+
+  .ad-marquee-item {
+    flex: 0 0 auto;
+    width: min(82vw, 560px);
+  }
+
+  @keyframes adMarqueeScroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ad-marquee {
+      overflow-x: auto;
+    }
+
+    .ad-marquee-track {
+      animation: none;
+    }
+  }
 }

@@ -11,6 +11,7 @@ import AnalyticsTab from "../components/admin/AnalyticsTab";
 import ReportsTab from "../components/admin/ReportsTab";
 import LogsTab from "../components/admin/LogsTab";
 import BroadcastTab from "../components/admin/BroadcastTab";
+import AdSpacesTab from "../components/admin/AdSpacesTab";
 import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
 import PricingRulesTab from "../components/admin/PricingRulesTab";
@@ -38,6 +39,7 @@ const tabs = [
   "reports",
   "logs",
   "broadcast",
+  "ad_spaces",
   "pricing",
   "flags",
   "fraud",
@@ -847,6 +849,10 @@ export default function SuperAdminDashboard() {
           sendBroadcast={sendBroadcast}
           broadcasts={broadcasts}
         />
+      )}
+
+      {tab === "ad_spaces" && (
+        <AdSpacesTab />
       )}
 
       {tab === "flags" && (

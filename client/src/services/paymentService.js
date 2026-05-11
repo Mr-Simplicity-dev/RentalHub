@@ -14,11 +14,13 @@ export const paymentService = {
   },
 
   // Initialize subscription payment
-  initializeSubscription: async (planId, paymentMethod) => {
-    const response = await api.post('/payments/subscribe', {
-      plan_id: planId,
-      payment_method: paymentMethod
-    });
+  initializeSubscription: async (subscriptionData = {}) => {
+    const response = await api.post('/payments/subscribe', subscriptionData);
+    return response.data;
+  },
+
+  getSubscriptionQuote: async (params = {}) => {
+    const response = await api.get('/payments/subscription-quote', { params });
     return response.data;
   },
 

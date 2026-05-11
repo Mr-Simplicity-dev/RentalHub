@@ -20,6 +20,9 @@ const {
   ensurePlatformLawyerSchema,
 } = require('../config/utils/platformLawyerProgram');
 const {
+  ensurePlatformAgentSchema,
+} = require('../config/utils/platformAgentProgram');
+const {
   sendPlatformLawyerInviteEmail,
 } = require('../config/utils/emailService');
 const {
@@ -1738,6 +1741,163 @@ const rejectPlatformLawyerApplication = async (req, res) => {
   }
 };
 
+const getPlatformAgentManagementData = async (req, res) => {
+  try {
+    await ensurePlatformAgentSchema();
+
+    const { rows } = await db.query(
+      `SELECT
+         pa.*,
+         pa.agent_user_id AS linked_user_id,
+         COALESCE(NULLIF(u.full_name, ''), pa.full_name) AS display_name,
+         COALESCE(NULLIF(u.email, ''), pa.email) AS display_email,
+         COALESCE(NULLIF(u.phone, ''), pa.phone) AS display_phone,
+         COALESCE(NULLIF(u.nationality, ''), pa.nationality, 'Nigeria') AS display_nationality,
+         creator.full_name AS created_by_name,
+         updater.full_name AS updated_by_name
+       FROM platform_agents pa
+       LEFT JOIN users u ON u.id = pa.agent_user_id
+       LEFT JOIN users creator ON creator.id = pa.created_by
+       LEFT JOIN users updater ON updater.id = pa.updated_by
+       ORDER BY pa.created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        entries: rows,
+      },
+    });
+  } catch (error) {
+    console.error('Get platform agent management data error:', error);
+    res.status(500).json({ message: 'Failed to load platform agents' });
+  }
+};
+
+const createManualPlatformAgent = async (req, res) => {
+  try {
+    await ensurePlatformAgentSchema();
+
+    const fullName = String(req.body.full_name || '').trim();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const phone = String(req.body.phone || '').trim();
+    const nationality = String(req.body.nationality || 'Nigeria').trim();
+    const isActive = req.body.is_active !== false;
+
+    if (!fullName || !email) {
+      return res.status(400).json({ message: 'Full name and email are required' });
+    }
+
+    const userResult = await db.query(
+      `SELECT id
+       FROM users
+       WHERE LOWER(email) = LOWER($1)
+         AND user_type = 'agent'
+         AND deleted_at IS NULL
+       LIMIT 1`,
+      [email]
+    );
+    const linkedUserId = userResult.rows[0]?.id || null;
+
+    const duplicateResult = await db.query(
+      `SELECT id
+       FROM platform_agents
+       WHERE LOWER(email) = LOWER($1)
+          OR ($2::INTEGER IS NOT NULL AND agent_user_id = $2)
+       LIMIT 1`,
+      [email, linkedUserId]
+    );
+
+    if (duplicateResult.rows.length) {
+      return res.status(409).json({ message: 'This platform agent already exists' });
+    }
+
+    const { rows } = await db.query(
+      `INSERT INTO platform_agents (
+         source_type, agent_user_id, full_name, email, phone, nationality,
+         is_active, created_by, updated_by
+       )
+       VALUES ('manual', $1, $2, $3, $4, $5, $6, $7, $7)
+       RETURNING *`,
+      [
+        linkedUserId,
+        fullName,
+        email,
+        phone || null,
+        nationality || 'Nigeria',
+        isActive,
+        req.user.id,
+      ]
+    );
+
+    await logAction(req.user.id, 'CREATE_PLATFORM_AGENT', 'platform_agent', rows[0].id);
+
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Create platform agent error:', error);
+    res.status(500).json({ message: 'Failed to create platform agent record' });
+  }
+};
+
+const updatePlatformAgent = async (req, res) => {
+  try {
+    await ensurePlatformAgentSchema();
+
+    const agentId = Number(req.params.agentId);
+    if (!Number.isInteger(agentId) || agentId <= 0) {
+      return res.status(400).json({ message: 'Invalid platform agent id' });
+    }
+
+    const result = await db.query(
+      `UPDATE platform_agents
+       SET is_active = $2,
+           updated_by = $3,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING *`,
+      [agentId, req.body.is_active !== false, req.user.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: 'Platform agent not found' });
+    }
+
+    await logAction(req.user.id, 'UPDATE_PLATFORM_AGENT', 'platform_agent', agentId);
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Update platform agent error:', error);
+    res.status(500).json({ message: 'Failed to update platform agent record' });
+  }
+};
+
+const deletePlatformAgent = async (req, res) => {
+  try {
+    await ensurePlatformAgentSchema();
+
+    const agentId = Number(req.params.agentId);
+    if (!Number.isInteger(agentId) || agentId <= 0) {
+      return res.status(400).json({ message: 'Invalid platform agent id' });
+    }
+
+    const result = await db.query(
+      `DELETE FROM platform_agents WHERE id = $1 RETURNING id`,
+      [agentId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: 'Platform agent not found' });
+    }
+
+    await logAction(req.user.id, 'DELETE_PLATFORM_AGENT', 'platform_agent', agentId);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete platform agent error:', error);
+    res.status(500).json({ message: 'Failed to delete platform agent record' });
+  }
+};
+
 // Bulk actions
 const bulkUserAction = async (req, res) => {
   const { ids, action } = req.body;
@@ -2346,6 +2506,10 @@ module.exports = {
   createPlatformLawyerRecruitmentBroadcast,
   approvePlatformLawyerApplication,
   rejectPlatformLawyerApplication,
+  getPlatformAgentManagementData,
+  createManualPlatformAgent,
+  updatePlatformAgent,
+  deletePlatformAgent,
   bulkUserAction,
   bulkPropertyAction,
   getFeatureFlags,

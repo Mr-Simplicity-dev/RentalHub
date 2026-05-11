@@ -150,6 +150,7 @@ router.get("/landlord/stats", authenticate, isLandlord, async (req, res) => {
         (SELECT COUNT(*) FROM applications a JOIN properties p ON a.property_id = p.id WHERE p.landlord_id = $1) AS total_applications,
         (SELECT COUNT(*) FROM applications a JOIN properties p ON a.property_id = p.id WHERE p.landlord_id = $1 AND a.status = 'pending') AS pending_applications,
         (SELECT COUNT(*) FROM messages WHERE receiver_id = $1 AND is_read = FALSE) AS unread_messages,
+        (SELECT subscription_expires_at FROM users WHERE id = $1) AS subscription_expires_at,
         (SELECT SUM(amount) FROM payments WHERE user_id = $1 AND payment_type = 'landlord_listing' AND payment_status = 'completed') AS total_spent,
         (SELECT COUNT(*) FROM reviews r JOIN properties p ON r.property_id = p.id WHERE p.landlord_id = $1) AS total_reviews,
         (SELECT AVG(r.rating) FROM reviews r JOIN properties p ON r.property_id = p.id WHERE p.landlord_id = $1) AS avg_rating,
@@ -389,7 +390,7 @@ router.get("/admin/stats", authenticate, async (req, res) => {
         (SELECT COUNT(*) FROM applications) AS total_applications,
         (SELECT COUNT(*) FROM applications WHERE status = 'pending') AS pending_applications,
         (SELECT SUM(amount) FROM payments WHERE payment_status = 'completed') AS total_revenue,
-        (SELECT SUM(amount) FROM payments WHERE payment_type = 'tenant_subscription' AND payment_status = 'completed') AS subscription_revenue,
+        (SELECT SUM(amount) FROM payments WHERE payment_type IN ('tenant_subscription', 'landlord_subscription') AND payment_status = 'completed') AS subscription_revenue,
         (SELECT SUM(amount) FROM payments WHERE payment_type = 'landlord_listing' AND payment_status = 'completed') AS listing_revenue,
         (SELECT COUNT(*) FROM reviews) AS total_reviews,
         (SELECT AVG(rating) FROM reviews) AS avg_rating

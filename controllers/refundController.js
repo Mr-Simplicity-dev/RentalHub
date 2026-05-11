@@ -104,6 +104,21 @@ const ensureRefundSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
     CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_user ON withdrawal_requests(user_id);
+
+    CREATE TABLE IF NOT EXISTS landlord_rent_deductions (
+      id SERIAL PRIMARY KEY,
+      landlord_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+      amount NUMERIC(12,2) NOT NULL,
+      deduction_type VARCHAR(40) NOT NULL DEFAULT 'subscription',
+      description TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT chk_landlord_rent_deduction_type
+        CHECK (deduction_type IN ('subscription'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_landlord_rent_deductions_landlord
+      ON landlord_rent_deductions(landlord_id, created_at DESC);
   `);
 
   refundSchemaReady = true;
@@ -1078,15 +1093,35 @@ exports.getLandlordWalletBalance = async (req, res) => {
       [landlordId]
     );
 
+    const walletResult = await db.query(
+      `SELECT balance FROM wallets WHERE user_id = $1 LIMIT 1`,
+      [landlordId]
+    );
+
+    const rentDeductionResult = await db.query(
+      `SELECT COALESCE(SUM(amount), 0) AS deducted_amount
+       FROM landlord_rent_deductions
+       WHERE landlord_id = $1`,
+      [landlordId]
+    );
+
     const cleared   = Number(clearedResult.rows[0].cleared_amount);
     const pending   = Number(pendingResult.rows[0].pending_amount);
     const withdrawn = Number(withdrawnResult.rows[0].withdrawn_amount);
-    const available = Math.max(0, cleared - withdrawn);
+    const rentDeductions = Number(rentDeductionResult.rows[0].deducted_amount);
+    const walletBalance = walletResult.rows.length
+      ? Number(walletResult.rows[0].balance || 0)
+      : 0;
+    const rentAvailable = Math.max(0, cleared - withdrawn - rentDeductions);
+    const available = rentAvailable + walletBalance;
 
     res.json({
       success: true,
       data: {
         cleared_balance:   cleared,
+        wallet_balance:    walletBalance,
+        rent_available_to_withdraw: rentAvailable,
+        rent_deductions_total: rentDeductions,
         pending_balance:   pending,
         withdrawn_total:   withdrawn,
         available_to_withdraw: available,

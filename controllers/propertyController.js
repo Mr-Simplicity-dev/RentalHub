@@ -1,5 +1,6 @@
 // ====================== IMPORTS ======================
 const db = require('../config/middleware/database');
+const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const { cloudinary } = require('../config/middleware/upload');
 const { submitURL } = require("../utils/googleIndexing");
@@ -9,6 +10,66 @@ const { getPropertyManagerContext } = require('../config/utils/agentSystem');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
 const { statesMatch } = require('../config/utils/stateScope');
 let propertySchemaReady = false;
+
+const PROPERTY_IMAGE_CAPTURE_TTL_MS =
+  Number(process.env.PROPERTY_IMAGE_CAPTURE_TTL_MS) || 10 * 60 * 1000;
+const propertyImageCaptureSessions = new Map();
+
+const getPropertyImageCaptureKey = (userId, token) => `${userId}:${token}`;
+
+const prunePropertyImageCaptureSessions = () => {
+  const now = Date.now();
+
+  for (const [key, value] of propertyImageCaptureSessions.entries()) {
+    if (!value || value.expiresAt <= now) {
+      propertyImageCaptureSessions.delete(key);
+    }
+  }
+};
+
+const createPropertyImageCaptureToken = (userId) => {
+  prunePropertyImageCaptureSessions();
+
+  const token = crypto.randomBytes(24).toString('hex');
+  propertyImageCaptureSessions.set(getPropertyImageCaptureKey(userId, token), {
+    expiresAt: Date.now() + PROPERTY_IMAGE_CAPTURE_TTL_MS,
+  });
+
+  return token;
+};
+
+const consumePropertyImageCaptureToken = (userId, token) => {
+  if (!token || typeof token !== 'string') return false;
+
+  prunePropertyImageCaptureSessions();
+
+  const key = getPropertyImageCaptureKey(userId, token);
+  const session = propertyImageCaptureSessions.get(key);
+  if (!session) return false;
+
+  propertyImageCaptureSessions.delete(key);
+  return session.expiresAt > Date.now();
+};
+
+const parsePropertyImageCaptureTokens = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+  } catch {
+    return String(value)
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+};
 
 const ensurePropertySchema = async () => {
   if (propertySchemaReady) return;
@@ -864,6 +925,26 @@ exports.getPropertyUsers = async (req, res) => {
 // =============== LANDLORD ENDPOINTS ===================
 // =====================================================
 
+exports.createPropertyImageCaptureSession = async (req, res) => {
+  try {
+    const token = createPropertyImageCaptureToken(req.user.id);
+
+    return res.json({
+      success: true,
+      data: {
+        token,
+        expires_in_seconds: Math.floor(PROPERTY_IMAGE_CAPTURE_TTL_MS / 1000),
+      },
+    });
+  } catch (error) {
+    console.error('Create property image capture session error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create live capture session',
+    });
+  }
+};
+
 
 // -----------------------------------------------------
 // Create New Property
@@ -916,6 +997,8 @@ exports.createProperty = async (req, res) => {
 
     const images = req.files?.images || [];
     const video = req.files?.video?.[0] || null;
+    const imageCaptureSource = String(req.body.image_capture_source || '').trim();
+    const imageCaptureTokens = parsePropertyImageCaptureTokens(req.body.image_capture_tokens);
     const allowedTypes = [
       'apartment',
       'house',
@@ -925,6 +1008,46 @@ exports.createProperty = async (req, res) => {
       'flat',
       'room',
     ];
+
+    if (!images.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Capture at least one live property image.',
+      });
+    }
+
+    if (imageCaptureSource !== 'live_camera') {
+      return res.status(400).json({
+        success: false,
+        message: 'Property images must be captured with the live camera.',
+      });
+    }
+
+    if (imageCaptureTokens.length !== images.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Every property image must be captured live before publishing.',
+      });
+    }
+
+    const uniqueTokens = new Set(imageCaptureTokens);
+    if (uniqueTokens.size !== imageCaptureTokens.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Each live property image must have its own capture session.',
+      });
+    }
+
+    const allImageTokensValid = imageCaptureTokens.every((token) =>
+      consumePropertyImageCaptureToken(req.user.id, token)
+    );
+
+    if (!allImageTokensValid) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid or expired live image capture session. Please retake the property photos.',
+      });
+    }
 
     if (!allowedTypes.includes(property_type)) {
       return res.status(400).json({
@@ -1112,6 +1235,42 @@ exports.uploadPropertyPhotos = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Please upload at least one photo'
+      });
+    }
+
+    const imageCaptureSource = String(req.body.image_capture_source || '').trim();
+    const imageCaptureTokens = parsePropertyImageCaptureTokens(req.body.image_capture_tokens);
+
+    if (imageCaptureSource !== 'live_camera') {
+      return res.status(400).json({
+        success: false,
+        message: 'Property images must be captured with the live camera.',
+      });
+    }
+
+    if (imageCaptureTokens.length !== req.files.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Every property image must be captured live before upload.',
+      });
+    }
+
+    const uniqueTokens = new Set(imageCaptureTokens);
+    if (uniqueTokens.size !== imageCaptureTokens.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Each live property image must have its own capture session.',
+      });
+    }
+
+    const allImageTokensValid = imageCaptureTokens.every((token) =>
+      consumePropertyImageCaptureToken(req.user.id, token)
+    );
+
+    if (!allImageTokensValid) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid or expired live image capture session. Please retake the property photos.',
       });
     }
 

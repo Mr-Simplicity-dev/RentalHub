@@ -27,6 +27,9 @@ const transportationAdminRoutes = require('./routes/transportationAdmin');
 const fumigationCleaningRoutes = require('./routes/fumigationCleaning');
 const propertyUtilsRoutes = require('./routes/propertyUtils');
 const propertyAlertsRoutes = require('./routes/propertyAlerts');
+const adRoutes = require('./routes/ads');
+const referralRoutes = require('./routes/referrals');
+const smsDeliveryRoutes = require('./routes/smsDelivery');
 const appLinksRoutes = require('./routes/appLinks');
 
 const disputesRoutes = require('./routes/disputes');
@@ -47,6 +50,7 @@ const damageReportRoutes = require('./routes/damageReports');
 const rentSavingsRoutes = require('./routes/rentSavings');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 const { startRentSavingsJobs } = require('./jobs/rentSavingsJobs');
+const { startSmsDeliveryJobs } = require('./jobs/smsDeliveryJobs');
 const csrfProtection = require('./config/middleware/csrfProtection');
 const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
 const {
@@ -356,6 +360,7 @@ app.get('/sitemap.xml', async (req, res) => {
   }
 });
 
+app.use('/api/sms', smsDeliveryRoutes);
 app.use('/api', enforceFlags);
 
 app.get('/api/auth/verify-email', async (req, res) => {
@@ -416,6 +421,8 @@ app.use('/api/transportation-admin', transportationAdminRoutes);
 app.use('/api/fumigation-cleaning', fumigationCleaningRoutes);
 app.use('/api/property-utils', propertyUtilsRoutes);
 app.use('/api/property-alerts', propertyAlertsRoutes);
+app.use('/api/ads', adRoutes);
+app.use('/api/referrals', referralRoutes);
 
 app.use('/api/disputes', disputesRoutes);
 app.use('/api/disputes', disputeRoutes);
@@ -470,6 +477,7 @@ const startBackgroundServices = () => {
   startPaymentJobs();
   startPropertyJobs();
   startRentSavingsJobs();
+  startSmsDeliveryJobs();
   startScheduler();
   scheduleEvidenceIntegrityMonitoring();
   schedulePayoutRetries();

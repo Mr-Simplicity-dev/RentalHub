@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
-import { FaUser, FaEnvelope, FaPhone, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaPhone, FaLock, FaEye, FaEyeSlash, FaGift } from 'react-icons/fa';
 import api from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { setAuthSession } from '../services/authStorage';
@@ -16,6 +16,12 @@ const Register = () => {
     searchParams.get('registration_ref') ||
     searchParams.get('reference') ||
     searchParams.get('trxref');
+  const referralCode = (
+    searchParams.get('ref') ||
+    searchParams.get('referral') ||
+    searchParams.get('invite') ||
+    ''
+  ).trim().replace(/\s+/g, '').toUpperCase();
   const [formData, setFormData] = useState({
     user_type: 'tenant',
     full_name: '',
@@ -36,6 +42,7 @@ const Register = () => {
     nationality: '',
     state_id: '',
     lga_name: '',
+    referral_code: referralCode,
   });
   const [loading, setLoading] = useState(false);
   const [locationOptions, setLocationOptions] = useState([]);
@@ -97,6 +104,13 @@ const Register = () => {
       registrationData.agent_full_name = '';
       registrationData.agent_email = '';
       registrationData.agent_phone = '';
+    }
+
+    const cleanReferralCode = String(registrationData.referral_code || '').trim();
+    if (cleanReferralCode) {
+      registrationData.referral_code = cleanReferralCode;
+    } else {
+      delete registrationData.referral_code;
     }
 
     return registrationData;
@@ -536,6 +550,7 @@ const [step, setStep] = useState(1);
 const [errors, setErrors] = useState({});
 const [termsAccepted, setTermsAccepted] = useState(false);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const referralCodePattern = /^[A-Za-z0-9_-]+$/;
 const passportPattern = /^[A-Za-z0-9]{6,20}$/;
 
 const getPasswordStrength = (pwd) => {
@@ -563,6 +578,12 @@ const validateStep = () => {
       newErrors.email = "Enter a valid email";
     }
     if (!String(formData.phone || "").trim()) newErrors.phone = "Phone required";
+    if (
+      String(formData.referral_code || "").trim() &&
+      !referralCodePattern.test(String(formData.referral_code || "").trim())
+    ) {
+      newErrors.referral_code = "Referral code can only contain letters, numbers, - or _";
+    }
     if (!formData.use_rentalhub_lawyers) {
       if (!String(formData.lawyer_email || "").trim()) {
         newErrors.lawyer_email = "Enter a lawyer email or check to use RentalHub NG lawyers";
@@ -651,6 +672,10 @@ const isStepTwoComplete =
   String(formData.full_name || "").trim() &&
   emailPattern.test(String(formData.email || "").trim()) &&
   String(formData.phone || "").trim() &&
+  (
+    !String(formData.referral_code || "").trim() ||
+    referralCodePattern.test(String(formData.referral_code || "").trim())
+  ) &&
   (formData.use_rentalhub_lawyers || emailPattern.test(String(formData.lawyer_email || "").trim())) &&
   (
         formData.user_type !== 'landlord' ||
@@ -757,10 +782,26 @@ return (
             </Link>
           </p>
 
+          {referralCode && formData.referral_code && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-left text-sm text-emerald-800">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold">Invite link applied</p>
+                  <p className="mt-0.5 text-emerald-700">
+                    Complete registration to reward the person who invited you.
+                  </p>
+                </div>
+                <span className="w-fit rounded-full bg-white px-3 py-1 font-mono text-xs font-semibold text-emerald-700 shadow-sm">
+                  {formData.referral_code}
+                </span>
+              </div>
+            </div>
+          )}
+
                                         {requiresRegistrationPayment && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-left text-sm text-blue-800">
               {formData.user_type === "tenant" ? "Tenant" : "Landlord"} account creation
-              requires a registration payment of N
+              requires a registration payment of ₦
               {baseAmount.toLocaleString()} before the account is created
               for this location.
               {!registrationPricing.location_complete && (
@@ -955,6 +996,39 @@ return (
                     />
                   </div>
                   {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
+                </div>
+
+                {/* Referral Code */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Referral Code <span className="text-gray-400">(Optional)</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FaGift className="text-gray-400" />
+                    </div>
+                    <input
+                      name="referral_code"
+                      type="text"
+                      autoComplete="off"
+                      value={formData.referral_code}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\s+/g, '').toUpperCase();
+                        setFormData((prev) => ({ ...prev, referral_code: value }));
+                        setErrors((prev) => ({ ...prev, referral_code: null }));
+                      }}
+                      className={`input pl-10 ${errors.referral_code ? 'border-red-500' : ''}`}
+                      placeholder="RH123ABC"
+                      maxLength={64}
+                    />
+                  </div>
+                  {errors.referral_code ? (
+                    <p className="text-red-500 text-sm mt-1">{errors.referral_code}</p>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Invite links fill this automatically, but you can paste a code here.
+                    </p>
+                  )}
                 </div>
 
                 {/* Lawyer Email */}
@@ -1366,7 +1440,7 @@ return (
                                 {requiresRegistrationPayment && (
                   <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
                     {formData.user_type === 'tenant' ? 'Tenant' : 'Landlord'} account creation
-                    requires a registration payment of ?
+                    requires a registration payment of ₦
                     {baseAmount.toLocaleString()}
                     {' '}before the account is created.
                     {!registrationPricing.location_complete && (

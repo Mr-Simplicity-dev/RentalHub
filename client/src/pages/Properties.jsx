@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import PropertyList from '../components/properties/PropertyList';
 import PropertyFilters from '../components/properties/PropertyFilters';
+import AdSpace from '../components/common/AdSpace';
 import { toast } from 'react-toastify';
 import ReactPaginate from 'react-paginate';
 import { useTranslation } from 'react-i18next';
@@ -387,6 +388,8 @@ const Properties = () => {
           {filters.featured ? 'Featured Properties' : t('properties.title')}
         </h1>
 
+        <AdSpace placement="properties_top" className="mb-6" />
+
         {/* Filters */}
         <PropertyFilters
           onFilterChange={handleFilterChange}
@@ -433,6 +436,8 @@ const Properties = () => {
           onSave={handleSaveProperty}
           savedPropertyIds={savedPropertyIds}
         />
+
+        <AdSpace placement="properties_inline" className="mt-8" />
 
         {(showRequestForm || (!loading && properties.length === 0)) && (
           <div id="tenant-request" ref={requestSectionRef} className="card mt-8">

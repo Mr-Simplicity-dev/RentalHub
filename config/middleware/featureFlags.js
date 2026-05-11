@@ -47,6 +47,16 @@ const DEFAULT_FEATURE_FLAGS = [
     enabled: false,
     description: 'Require N5,000 payment before processing "Notify me when available" requests.',
   },
+  {
+    key: 'ads_enabled',
+    enabled: true,
+    description: 'Show Super Admin managed ads on Home, Dashboard, and Properties pages.',
+  },
+  {
+    key: 'tenant_landlord_referrals',
+    enabled: true,
+    description: 'Allow tenants and landlords to earn N1,000 subscription credit for successful referral registrations.',
+  },
 ];
 
 let featureFlagsReady = false;

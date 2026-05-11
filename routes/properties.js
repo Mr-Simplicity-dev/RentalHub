@@ -98,6 +98,13 @@ router.get(
   propertyController.getMyProperties
 );
 
+router.post(
+  '/live-capture/session',
+  authenticate,
+  isLandlordOrAgent,
+  propertyController.createPropertyImageCaptureSession
+);
+
 // Create new property (with media)
 router.post(
   '/',

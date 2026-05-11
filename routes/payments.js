@@ -10,14 +10,20 @@ const { authenticate, isTenant, isLandlord, isVerified } = require('../config/mi
 // Get subscription plans
 router.get('/subscription-plans', paymentController.getSubscriptionPlans);
 
-// Initialize tenant subscription payment
+// Get current tenant/landlord monthly subscription quote
+router.get('/subscription-quote',
+  authenticate,
+  paymentController.getSubscriptionQuote
+);
+
+// Activate tenant/landlord monthly subscription from internal balances
 router.post('/subscribe',
   authenticate,
-  isTenant,
   isVerified,
   [
-    body('plan_id').notEmpty(),
-    body('payment_method').isIn(['paystack', 'bank_transfer'])
+    body('plan_id').optional({ checkFalsy: true }).trim(),
+    body('state_id').optional({ checkFalsy: true }).isInt({ min: 1 }),
+    body('lga_name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 })
   ],
   paymentController.initializeSubscription
 );
@@ -31,7 +37,6 @@ router.get('/verify-subscription/:reference',
 // Check subscription status
 router.get('/subscription-status', 
   authenticate, 
-  isTenant,
   paymentController.getSubscriptionStatus
 );
 

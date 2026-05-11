@@ -7,6 +7,7 @@ import { DamageReportButton } from '../components/damage';
 import { propertyService } from '../services/propertyService';
 import { useAuth } from '../hooks/useAuth';
 import BackToDashboard from '../components/common/BackToDashboard';
+import LivePropertyPhotoCapture from '../components/properties/LivePropertyPhotoCapture';
 
 const PROPERTY_TYPES = ['apartment', 'house', 'bungalow', 'duplex', 'studio', 'flat', 'room'];
 
@@ -26,6 +27,7 @@ const AddProperty = () => {
   });
   const [locationOptions, setLocationOptions] = useState([]);
   const [images, setImages] = useState([]);
+  const [imageCaptureTokens, setImageCaptureTokens] = useState([]);
   const [video, setVideo] = useState(null);
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const locationPrefillAppliedRef = useRef(false);
@@ -138,6 +140,8 @@ const AddProperty = () => {
       return toast.error(t('add_property.required'));
     }
     if (!form.latitude || !form.longitude) return toast.error('Please pick the property location on the map.');
+    if (images.length === 0) return toast.error('Capture at least one live property image.');
+    if (imageCaptureTokens.length !== images.length) return toast.error('Retake the property images so every photo is verified as live.');
     setStep(2);
   };
 
@@ -148,6 +152,8 @@ const AddProperty = () => {
       const fd = new FormData();
       Object.entries(form).forEach(([key, value]) => fd.append(key, value));
       fd.append('amenities', JSON.stringify(form.amenities ? form.amenities.split(',').map((item) => item.trim()).filter(Boolean) : []));
+      fd.append('image_capture_source', 'live_camera');
+      fd.append('image_capture_tokens', JSON.stringify(imageCaptureTokens));
       images.forEach((image) => fd.append('images', image));
       if (video) fd.append('video', video);
       const res = await propertyService.createProperty(fd);
@@ -218,7 +224,16 @@ const AddProperty = () => {
             <MapPicker value={form.latitude && form.longitude ? { lat: Number(form.latitude), lng: Number(form.longitude) } : null} onChange={({ lat, lng }) => setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }))} />
             {form.latitude && form.longitude && <p className="text-xs text-gray-500">{Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}</p>}
           </div>
-          <div><label className="mb-1 block text-sm font-medium">Property Images</label><input type="file" multiple accept="image/*" onChange={(e) => setImages(Array.from(e.target.files || []))} /></div>
+          <LivePropertyPhotoCapture
+            photos={images}
+            captureTokens={imageCaptureTokens}
+            onChange={(nextImages, nextTokens = imageCaptureTokens) => {
+              setImages(nextImages);
+              setImageCaptureTokens(nextTokens);
+            }}
+            onTokensChange={setImageCaptureTokens}
+            disabled={loading}
+          />
           <div><label className="mb-1 block text-sm font-medium">Short Video Clip</label><input type="file" accept="video/*" onChange={(e) => setVideo(e.target.files?.[0] || null)} /></div>
           <label className="flex items-center space-x-2"><input type="checkbox" name="is_available" checked={form.is_available} onChange={handleChange} /><span>{t('add_property.form.available')}</span></label>
           <button className="btn btn-primary w-full">{t('add_property.continue')}</button>

@@ -17,6 +17,16 @@ const PRICING_TARGETS = {
     label: 'Property Alert Request',
     base_amount: 5000,
   },
+  tenant_monthly_subscription: {
+    key: 'tenant_monthly_subscription',
+    label: 'Tenant Monthly Subscription',
+    base_amount: 200,
+  },
+  landlord_monthly_subscription: {
+    key: 'landlord_monthly_subscription',
+    label: 'Landlord Monthly Subscription',
+    base_amount: 200,
+  },
 };
 
 let locationPricingSchemaReady = false;
@@ -33,7 +43,9 @@ const ensureLocationPricingSchema = async () => {
         applies_to IN (
           'tenant_registration',
           'landlord_registration',
-          'property_alert_request'
+          'property_alert_request',
+          'tenant_monthly_subscription',
+          'landlord_monthly_subscription'
         )
       ),
       state_id INTEGER NOT NULL REFERENCES states(id) ON DELETE CASCADE,
@@ -56,6 +68,21 @@ const ensureLocationPricingSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_location_pricing_rules_lookup
       ON location_pricing_rules(applies_to, state_id, location_key, is_active);
+
+    ALTER TABLE location_pricing_rules
+      DROP CONSTRAINT IF EXISTS location_pricing_rules_applies_to_check;
+
+    ALTER TABLE location_pricing_rules
+      ADD CONSTRAINT location_pricing_rules_applies_to_check
+      CHECK (
+        applies_to IN (
+          'tenant_registration',
+          'landlord_registration',
+          'property_alert_request',
+          'tenant_monthly_subscription',
+          'landlord_monthly_subscription'
+        )
+      );
   `);
 
   locationPricingSchemaReady = true;

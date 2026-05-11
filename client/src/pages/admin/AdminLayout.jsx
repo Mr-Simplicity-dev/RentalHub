@@ -381,6 +381,11 @@ const AdminLayout = () => {
                   Broadcast
                 </NavLink>
 
+                <NavLink to="/super-admin?tab=ad_spaces" className={() => superAdminNavItem('ad_spaces')}>
+                  <FaBroadcastTower className="mr-3" />
+                  Ad Spaces
+                </NavLink>
+
                 <NavLink to="/super-admin?tab=pricing" className={() => superAdminNavItem('pricing')}>
                   <FaMoneyBill className="mr-3" />
                   Pricing

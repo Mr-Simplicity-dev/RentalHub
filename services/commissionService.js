@@ -14,6 +14,11 @@ const COMMISSION_RATES = {
     admin_share: 0.15, // 15% of platform fee goes to admin
     super_admin_share: 0.10 // 10% of platform fee goes to super admin
   },
+  landlord_subscription: {
+    platform_fee_rate: 0.10,
+    admin_share: 0.15,
+    super_admin_share: 0.10
+  },
   landlord_listing: {
     platform_fee_rate: 0.10, // 10% platform fee from listing
     admin_share: 0.15, // 15% of platform fee goes to admin

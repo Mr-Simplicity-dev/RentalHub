@@ -70,6 +70,12 @@ const ensureAdminRoleSchema = async () => {
     ALTER TABLE users
       ALTER COLUMN user_type TYPE VARCHAR(50);
 
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS assigned_state VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS assigned_city VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) NOT NULL DEFAULT 'approved',
+      ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+
     DO $$
     DECLARE
       existing_check_name TEXT;
@@ -1948,6 +1954,26 @@ exports.createAdmin = async (req, res) => {
       'super_lawyer',
     ]);
 
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPhone = String(phone || '').trim();
+    const normalizedFullName = String(full_name || '').trim();
+    const normalizedNin = String(nin || '').trim();
+    const normalizedPassword = String(password || '');
+
+    if (!normalizedFullName || !normalizedEmail || !normalizedPhone || !normalizedPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Full name, email, phone and password are required',
+      });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid email address',
+      });
+    }
+
     if (!allowedCreateRoles.includes(user_type)) {
       return res.status(400).json({
         success: false,
@@ -1992,13 +2018,13 @@ exports.createAdmin = async (req, res) => {
     }
 
     await releaseDeletedUserIdentityConflicts({
-      email,
-      phone,
-      nin,
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      nin: normalizedNin,
     });
 
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    const passwordHash = await bcrypt.hash(normalizedPassword, salt);
 
     // Roles that require super-admin approval before the account is active
     const requiresApprovalRoles = new Set([
@@ -2029,11 +2055,11 @@ exports.createAdmin = async (req, res) => {
       RETURNING id, email, user_type, assigned_state, assigned_city, lawyer_client_scope, approval_status`,
       [
         user_type,
-        email,
-        phone,
+        normalizedEmail,
+        normalizedPhone,
         passwordHash,
-        full_name,
-        nin,
+        normalizedFullName,
+        normalizedNin || null,
         normalizedState || null,
         user_type === 'admin' ? normalizedCity : null,
         normalizedLawyerScope,

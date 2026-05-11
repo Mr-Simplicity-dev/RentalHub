@@ -1,16 +1,40 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaFacebook, FaTwitter, FaInstagram, FaLinkedin, FaArrowRight } from 'react-icons/fa';
+import { FaEnvelope, FaFacebook, FaInstagram, FaLinkedin, FaPhoneAlt, FaTwitter } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 const Footer = () => {
   const { t } = useTranslation();
+  const [mobileContactLinksEnabled, setMobileContactLinksEnabled] = useState(false);
+
+  useEffect(() => {
+    const detectMobilePhone = () => {
+      if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+        return false;
+      }
+
+      const userAgent = navigator.userAgent || '';
+      const looksLikePhone = /Android.*Mobile|iPhone|iPod|Windows Phone|BlackBerry|Opera Mini|IEMobile/i.test(userAgent);
+      const hasMobilePointer = window.matchMedia?.('(hover: none) and (pointer: coarse)')?.matches;
+      const phoneSizedViewport = window.matchMedia?.('(max-width: 820px)')?.matches;
+
+      return Boolean(looksLikePhone || (hasMobilePointer && phoneSizedViewport));
+    };
+
+    const updateContactMode = () => {
+      setMobileContactLinksEnabled(detectMobilePhone());
+    };
+
+    updateContactMode();
+    window.addEventListener('resize', updateContactMode);
+
+    return () => window.removeEventListener('resize', updateContactMode);
+  }, []);
 
   return (
     <footer className="bg-gray-900 text-white">
       <div className="container mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-          {/* About */}
           <div className="space-y-4">
             <h3 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-primary-200 bg-clip-text text-transparent">
               RentalHub NG
@@ -34,7 +58,6 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Quick Links */}
           <div className="space-y-4">
             <h3 className="text-lg font-bold">{t('footer.quick_links')}</h3>
             <ul className="space-y-3">
@@ -45,7 +68,6 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* For Landlords */}
           <div className="space-y-4">
             <h3 className="text-lg font-bold">{t('footer.landlords')}</h3>
             <ul className="space-y-3">
@@ -55,21 +77,35 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Contact */}
           <div className="space-y-4">
             <h3 className="text-lg font-bold">{t('footer.contact')}</h3>
             <ul className="space-y-3 text-sm text-gray-400">
-              <li className="flex items-start gap-2">
-                <span className="text-primary-400 mt-1">✉</span>
-                <span>support@rentalhub.com.ng</span>
+              <li>
+                <FooterContact
+                  href="mailto:support@rentalhub.com.ng"
+                  enabled={mobileContactLinksEnabled}
+                >
+                  <FaEnvelope className="text-primary-400 mt-1 shrink-0" />
+                  <span>support@rentalhub.com.ng</span>
+                </FooterContact>
               </li>
-              <li className="flex items-start gap-2">
-                <span className="text-primary-400 mt-1">📞</span>
-                <span>+234 8030601238</span>
+              <li>
+                <FooterContact
+                  href="tel:+234 8030601238"
+                  enabled={mobileContactLinksEnabled}
+                >
+                  <FaPhoneAlt className="text-primary-400 mt-1 shrink-0" />
+                  <span>+234 8030601238</span>
+                </FooterContact>
               </li>
-              <li className="flex items-start gap-2">
-                <span className="text-primary-400 mt-1">📞</span>
-                <span>+234 9052187099</span>
+              <li>
+                <FooterContact
+                  href="tel:+234 9052187099"
+                  enabled={mobileContactLinksEnabled}
+                >
+                  <FaPhoneAlt className="text-primary-400 mt-1 shrink-0" />
+                  <span>+234 9052187099</span>
+                </FooterContact>
               </li>
             </ul>
           </div>
@@ -93,9 +129,25 @@ const Footer = () => {
 
 const FooterLink = ({ to, label }) => (
   <Link to={to} className="text-gray-400 hover:text-white transition-all duration-200 flex items-center gap-1 group">
-    <span className="text-xs opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all duration-200 text-primary-400">▸</span>
+    <span className="text-xs opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all duration-200 text-primary-400">{'>'}</span>
     {label}
   </Link>
 );
+
+const FooterContact = ({ href, enabled, children }) => {
+  const className = enabled
+    ? 'flex items-start gap-2 hover:text-white transition-colors duration-200'
+    : 'flex items-start gap-2';
+
+  if (!enabled) {
+    return <span className={className}>{children}</span>;
+  }
+
+  return (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  );
+};
 
 export default Footer;

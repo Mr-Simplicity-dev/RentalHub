@@ -22,6 +22,10 @@ import {
   FaTruck,
   FaSprayCan,
   FaUserCheck,
+  FaShareAlt,
+  FaCopy,
+  FaGift,
+  FaWhatsapp,
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
@@ -30,6 +34,7 @@ import ApprovalTimeline from '../components/common/ApprovalTimeline';
 import WalletFundModal from '../components/dashboard/WalletFundModal';
 import WalletWithdrawModal from '../components/dashboard/WalletWithdrawModal';
 import RentSavingsModal from '../components/dashboard/RentSavingsModal';
+import AdSpace from '../components/common/AdSpace';
 
 const NIGERIAN_BANKS = [
   'Access Bank',
@@ -63,6 +68,23 @@ const NIGERIAN_BANKS = [
   'Zenith Bank',
 ];
 
+const copyTextToClipboard = async (text) => {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'readonly');
+  textarea.style.position = 'absolute';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+};
+
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -91,6 +113,8 @@ const Dashboard = () => {
   const [showFundModal, setShowFundModal] = useState(false);
   const [walletBalance, setWalletBalance] = useState(null);
   const [landlordWallet, setLandlordWallet] = useState(null);
+  const [referralInfo, setReferralInfo] = useState(null);
+  const [referralLoading, setReferralLoading] = useState(false);
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', bank_name: '', account_number: '', account_name: '' });
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [withdrawHistory, setWithdrawHistory] = useState([]);
@@ -157,6 +181,23 @@ const Dashboard = () => {
         setRecentActivities(activitiesResponse.data.data);
       } else {
         setRecentActivities([]);
+      }
+
+      if (['tenant', 'landlord'].includes(user.user_type)) {
+        setReferralLoading(true);
+        try {
+          const referralResponse = await api.get('/referrals/me');
+          if (referralResponse.data?.success) {
+            setReferralInfo(referralResponse.data.data);
+          } else {
+            setReferralInfo(null);
+          }
+        } catch (referralError) {
+          console.error('Error loading referral invite:', referralError);
+          setReferralInfo(null);
+        } finally {
+          setReferralLoading(false);
+        }
       }
 
       // Load additional tenant-specific data
@@ -454,6 +495,49 @@ const Dashboard = () => {
     }
   };
 
+  const copyReferralInvite = async () => {
+    if (!referralInfo?.invite_url) return;
+
+    try {
+      await copyTextToClipboard(referralInfo.invite_url);
+      toast.success('Invite link copied');
+    } catch (error) {
+      toast.error('Unable to copy invite link right now');
+    }
+  };
+
+  const shareReferralInvite = async () => {
+    if (!referralInfo?.invite_url) return;
+
+    const shareText = `Join RentalHub NG with my invite link and I earn ₦${Number(referralInfo.reward_amount || 1000).toLocaleString()} subscription credit when your registration is complete.`;
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'RentalHub NG invite',
+          text: shareText,
+          url: referralInfo.invite_url,
+        });
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+    }
+
+    await copyReferralInvite();
+  };
+
+  const openWhatsappReferralShare = () => {
+    if (!referralInfo?.invite_url) return;
+
+    const shareText = `Join RentalHub NG with my invite link: ${referralInfo.invite_url}`;
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(shareText)}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+  };
+
   const withdrawStatusBadge = (status) => {
     const map = {
       pending:   'bg-yellow-100 text-yellow-800',
@@ -748,6 +832,8 @@ const Dashboard = () => {
           </p>
         </div>
 
+        <AdSpace placement="dashboard_top" contained={false} className="mb-8" />
+
         {/* Verification Alert */}
         {!user?.identity_verified && verificationReviewStatus === 'not_submitted' && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
@@ -936,11 +1022,122 @@ const Dashboard = () => {
                 value={landlordWallet ? `₦${Number(landlordWallet.available_to_withdraw).toLocaleString()}` : '—'}
                 onClick={openWithdrawModal}
               />
+              <StatCard
+                icon={<FaClock className="text-indigo-500" />}
+                title="Subscription"
+                value={getTenantSubscriptionValue()}
+                onClick={() => navigate('/subscribe')}
+              />
             </>
           )}
         </div>
 
-        {/* Landlord — 14 working days withdrawal notice */}
+        {/* Referral invite */}
+        {referralInfo?.enabled && referralInfo.invite_url && (
+          <section
+            className="mb-8 overflow-hidden rounded-lg border border-emerald-200 bg-white shadow-sm"
+            aria-labelledby="referral-invite-title"
+          >
+            <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
+              <div className="p-5 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                    <FaGift className="text-2xl" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-semibold uppercase text-emerald-600">
+                        Invite & Earn
+                      </p>
+                      {referralInfo.referral_code && (
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-mono text-xs font-semibold text-emerald-700">
+                          {referralInfo.referral_code}
+                        </span>
+                      )}
+                    </div>
+                    <h2 id="referral-invite-title" className="mt-1 text-xl font-bold text-gray-900">
+                      Earn ₦{Number(referralInfo.reward_amount || 1000).toLocaleString()} for every successful invite
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm text-gray-600">
+                      Share your link with tenants or landlords. Once they complete registration, the reward is added to your subscription credit.
+                    </p>
+                    <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div className="border-l-2 border-emerald-300 pl-3">
+                        <p className="text-xs font-medium uppercase text-gray-500">Referrals</p>
+                        <p className="mt-1 text-lg font-bold text-gray-900">
+                          {Number(referralInfo.total_referrals || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="border-l-2 border-indigo-300 pl-3">
+                        <p className="text-xs font-medium uppercase text-gray-500">Earned</p>
+                        <p className="mt-1 text-lg font-bold text-gray-900">
+                          ₦{Number(referralInfo.total_earned || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="border-l-2 border-blue-300 pl-3">
+                        <p className="text-xs font-medium uppercase text-gray-500">Credit</p>
+                        <p className="mt-1 text-lg font-bold text-gray-900">
+                          ₦{Number(referralInfo.subscription_credit_balance || 0).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-emerald-100 bg-emerald-50/60 p-5 sm:p-6 lg:border-l lg:border-t-0">
+                <label htmlFor="referral-invite-link" className="mb-2 block text-sm font-semibold text-gray-800">
+                  Invite link
+                </label>
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row">
+                  <input
+                    id="referral-invite-link"
+                    type="text"
+                    readOnly
+                    value={referralInfo.invite_url}
+                    title={referralInfo.invite_url}
+                    className="input min-w-0 flex-1 font-mono text-xs sm:text-sm"
+                    aria-label="Referral invite link"
+                  />
+                  <button
+                    type="button"
+                    onClick={copyReferralInvite}
+                    className="btn btn-secondary shrink-0 gap-2 whitespace-nowrap"
+                  >
+                    <FaCopy />
+                    Copy link
+                  </button>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={shareReferralInvite}
+                    className="btn btn-primary gap-2"
+                  >
+                    <FaShareAlt />
+                    Share
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openWhatsappReferralShare}
+                    className="btn btn-secondary gap-2"
+                  >
+                    <FaWhatsapp />
+                    WhatsApp
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {referralLoading && !referralInfo && (
+          <div className="bg-white border border-gray-200 rounded-lg p-5 mb-8 text-sm text-gray-500">
+            Loading invite link...
+          </div>
+        )}
+
+        {/* Landlord withdrawal notice */}
         {user?.user_type === 'landlord' && (
           <div className="bg-green-50 border border-green-200 rounded-lg px-5 py-4 mb-8 flex items-start gap-3">
             <FaMoneyBillWave className="text-green-600 text-xl mt-0.5 shrink-0" />
@@ -971,6 +1168,8 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        <AdSpace placement="dashboard_inline" contained={false} className="mt-8" />
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
@@ -1062,6 +1261,12 @@ const Dashboard = () => {
                 description="Top up your wallet balance"
                 icon={<FaWallet />}
                 onClick={openFundModal}
+              />
+              <QuickActionCard
+                title="Subscription"
+                description="Renew your monthly landlord access"
+                icon={<FaClock />}
+                onClick={() => navigate('/subscribe')}
               />
             </>
           )}

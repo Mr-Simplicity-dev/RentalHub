@@ -50,6 +50,11 @@ export const propertyService = {
     return response.data;
   },
 
+  createLiveCaptureSession: async () => {
+    const response = await api.post('/properties/live-capture/session');
+    return response.data;
+  },
+
   // Update property
   updateProperty: async (id, propertyData) => {
     const response = await api.put(`/properties/${id}`, propertyData);
@@ -63,8 +68,10 @@ export const propertyService = {
   },
 
   // Upload property photos
-  uploadPhotos: async (propertyId, files) => {
+  uploadPhotos: async (propertyId, files, captureTokens = []) => {
     const formData = new FormData();
+    formData.append('image_capture_source', 'live_camera');
+    formData.append('image_capture_tokens', JSON.stringify(captureTokens));
     files.forEach(file => {
       formData.append('photos', file);
     });

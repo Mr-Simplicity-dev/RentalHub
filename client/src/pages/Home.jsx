@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import PropertyCard from '../components/properties/PropertyCard';
 import Loader from '../components/common/Loader';
+import AdSpace from '../components/common/AdSpace';
 import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt, FaMobileAlt, FaTimes, FaArrowRight, FaMapMarkerAlt } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
@@ -275,6 +276,8 @@ const Home = () => {
         </div>
       </section>
 
+      <AdSpace placement="home_top" variant="marquee" className="bg-white py-6" />
+
       {/* Features */}
       <section 
         ref={featuresRef}
@@ -357,6 +360,8 @@ const Home = () => {
           )}
         </div>
       </section>
+
+      <AdSpace placement="home_featured" variant="marquee" className="bg-gray-50 pb-8" />
 
       {/* Popular Locations */}
       <section 

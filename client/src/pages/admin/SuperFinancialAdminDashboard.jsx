@@ -408,6 +408,7 @@ const SuperFinancialAdminDashboard = () => {
             <option value="rent_payment">Rent payment</option>
             <option value="wallet_funding">Wallet funding</option>
             <option value="tenant_subscription">Tenant subscription</option>
+            <option value="landlord_subscription">Landlord subscription</option>
             <option value="landlord_listing">Landlord listing</option>
             <option value="property_unlock">Property unlock</option>
           </select>

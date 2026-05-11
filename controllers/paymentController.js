@@ -4,11 +4,17 @@ const crypto = require("crypto");
 const db = require('../config/middleware/database');
 const { validationResult } = require("express-validator");
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+const { getLocationPricingQuote } = require('../config/utils/locationPricing');
 const {
   LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
   ensureLawyerDirectoryUnlockSchema,
   getLawyerDirectoryUnlockStatus: readLawyerDirectoryUnlockStatus,
 } = require('../config/utils/lawyerDirectoryAccess');
+const {
+  ensureSubscriptionCreditSchema,
+  getSubscriptionCreditBalance,
+  debitSubscriptionBalance,
+} = require('../services/subscriptionCreditService');
 const commissionService = require('../services/commissionService');
 const AgentWithdrawalService = require('../services/agentWithdrawalService');
 
@@ -17,9 +23,20 @@ const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
 const PROPERTY_UNLOCK_PRICE_NGN = Number(process.env.PROPERTY_UNLOCK_PRICE_NGN || 1000);
 const FRONTEND_URL = getFrontendUrl();
+const MONTHLY_SUBSCRIPTION_DURATION_DAYS = 30;
+const MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN = 200;
+const SUBSCRIPTION_PRICING_TARGETS = {
+  tenant: 'tenant_monthly_subscription',
+  landlord: 'landlord_monthly_subscription',
+};
+const SUBSCRIPTION_PAYMENT_TYPES = {
+  tenant: 'tenant_subscription',
+  landlord: 'landlord_subscription',
+};
 
 let propertyUnlockSchemaReady = false;
 let walletLedgerSchemaReady = false;
+let internalSubscriptionSchemaReady = false;
 let bankCache = {
   data: null,
   fetchedAt: 0,
@@ -68,6 +85,56 @@ const ensureWalletLedgerSchema = async () => {
   walletLedgerSchemaReady = true;
 };
 
+const ensureInternalSubscriptionSchema = async () => {
+  if (internalSubscriptionSchemaReady) return;
+
+  await ensureWalletLedgerSchema();
+  await ensureSubscriptionCreditSchema();
+
+  await db.query(`
+    ALTER TABLE payments
+      DROP CONSTRAINT IF EXISTS payments_payment_type_check;
+
+    ALTER TABLE payments
+      ADD CONSTRAINT payments_payment_type_check
+      CHECK (
+        payment_type IN (
+          'tenant_subscription',
+          'landlord_subscription',
+          'landlord_listing',
+          'rent_payment',
+          'property_unlock',
+          'general_platform_fee',
+          'registration_fee',
+          'wallet_funding',
+          'tenant_property_alert',
+          'evidence_verification',
+          'lawyer_directory_unlock',
+          'lawyer_access_fee',
+          'agent_access_fee',
+          'transportation_booking'
+        )
+      );
+
+    CREATE TABLE IF NOT EXISTS landlord_rent_deductions (
+      id SERIAL PRIMARY KEY,
+      landlord_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+      amount NUMERIC(12,2) NOT NULL,
+      deduction_type VARCHAR(40) NOT NULL DEFAULT 'subscription',
+      description TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT chk_landlord_rent_deduction_type
+        CHECK (deduction_type IN ('subscription'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_landlord_rent_deductions_landlord
+      ON landlord_rent_deductions(landlord_id, created_at DESC);
+  `);
+
+  internalSubscriptionSchemaReady = true;
+};
+
 const fetchBanksFromPaystack = async (forceRefresh = false) => {
   if (!PAYSTACK_SECRET_KEY) {
     throw new Error('Payment service is not configured');
@@ -101,46 +168,6 @@ const fetchBanksFromPaystack = async (forceRefresh = false) => {
 // =====================================================
 //               SUBSCRIPTION PLANS
 // =====================================================
-
-const SUBSCRIPTION_PLANS = [
-  {
-    id: "basic_monthly",
-    name: "Basic Monthly",
-    duration_days: 30,
-    price: 1000,
-    features: [
-      "View all properties",
-      "Contact landlords",
-      "Save favorites"
-    ]
-  },
-  {
-    id: "standard_quarterly",
-    name: "Standard Quarterly",
-    duration_days: 90,
-    price: 2500,
-    features: [
-      "View all properties",
-      "Contact landlords",
-      "Save favorites",
-      "Priority support"
-    ]
-  },
-  {
-    id: "premium_yearly",
-    name: "Premium Yearly",
-    duration_days: 365,
-    price: 8000,
-    features: [
-      "View all properties",
-      "Contact landlords",
-      "Save favorites",
-      "Priority support",
-      "Early access to new listings"
-    ]
-  }
-];
-
 
 const LISTING_PLANS = [
   {
@@ -185,6 +212,288 @@ const LISTING_PLANS = [
   }
 ];
 
+const getMonthlySubscriptionTarget = (userType) => {
+  const target = SUBSCRIPTION_PRICING_TARGETS[userType];
+
+  if (!target) {
+    const error = new Error('Monthly subscriptions are only available to tenants and landlords');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return target;
+};
+
+const getMonthlySubscriptionPaymentType = (userType) => {
+  const paymentType = SUBSCRIPTION_PAYMENT_TYPES[userType];
+
+  if (!paymentType) {
+    const error = new Error('Monthly subscriptions are only available to tenants and landlords');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return paymentType;
+};
+
+const resolveSubscriptionLocationForUser = async ({
+  userId,
+  userType,
+  stateId,
+  lgaName,
+}) => {
+  if (stateId) {
+    return {
+      stateId,
+      lgaName: lgaName || null,
+      source: 'selected',
+    };
+  }
+
+  const userResult = await db.query(
+    `SELECT preferred_state_id, preferred_lga_name
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [userId]
+  );
+  const user = userResult.rows[0] || {};
+
+  if (user.preferred_state_id) {
+    return {
+      stateId: user.preferred_state_id,
+      lgaName: user.preferred_lga_name || null,
+      source: 'profile',
+    };
+  }
+
+  if (userType === 'landlord') {
+    const propertyLocationResult = await db.query(
+      `SELECT state_id, lga_name
+       FROM properties
+       WHERE landlord_id = $1
+         AND state_id IS NOT NULL
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    const propertyLocation = propertyLocationResult.rows[0];
+
+    if (propertyLocation?.state_id) {
+      return {
+        stateId: propertyLocation.state_id,
+        lgaName: propertyLocation.lga_name || null,
+        source: 'latest_property',
+      };
+    }
+  }
+
+  return {
+    stateId: null,
+    lgaName: null,
+    source: 'base',
+  };
+};
+
+const buildMonthlySubscriptionQuote = async ({
+  userId,
+  userType,
+  stateId = null,
+  lgaName = null,
+}) => {
+  const target = getMonthlySubscriptionTarget(userType);
+  const location = await resolveSubscriptionLocationForUser({
+    userId,
+    userType,
+    stateId,
+    lgaName,
+  });
+
+  const quote = await getLocationPricingQuote({
+    appliesTo: target,
+    stateId: location.stateId,
+    lgaName: location.lgaName,
+  });
+
+  return {
+    ...quote,
+    amount: Math.max(
+      MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN,
+      Number(quote.amount || MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN)
+    ),
+    base_amount: MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN,
+    pricing_target: target,
+    duration_days: MONTHLY_SUBSCRIPTION_DURATION_DAYS,
+    location_source: location.source,
+    state_id: location.stateId,
+    lga_name: location.lgaName,
+  };
+};
+
+const getTenantRentSavingsBalance = async (userId, executor = db) => {
+  try {
+    const result = await executor.query(
+      `SELECT COALESCE(SUM(total_saved), 0) AS balance
+       FROM rent_savings_plans
+       WHERE tenant_id = $1
+         AND status = 'active'
+         AND is_active = TRUE`,
+      [userId]
+    );
+
+    return Number(result.rows[0]?.balance || 0);
+  } catch (error) {
+    if (error.code === '42P01') {
+      return 0;
+    }
+
+    throw error;
+  }
+};
+
+const deductTenantRentSavings = async ({
+  executor,
+  userId,
+  amount,
+}) => {
+  const amountToDeduct = Number(amount || 0);
+
+  if (amountToDeduct <= 0) {
+    return { deducted: 0, deductions: [] };
+  }
+
+  let plansResult;
+
+  try {
+    plansResult = await executor.query(
+      `SELECT id, total_saved
+       FROM rent_savings_plans
+       WHERE tenant_id = $1
+         AND status = 'active'
+         AND is_active = TRUE
+         AND total_saved > 0
+       ORDER BY rent_due_date ASC, id ASC
+       FOR UPDATE`,
+      [userId]
+    );
+  } catch (error) {
+    if (error.code === '42P01') {
+      return { deducted: 0, insufficient: true, available: 0, deductions: [] };
+    }
+
+    throw error;
+  }
+
+  const totalAvailable = plansResult.rows.reduce(
+    (sum, plan) => sum + Number(plan.total_saved || 0),
+    0
+  );
+
+  if (totalAvailable < amountToDeduct) {
+    return { deducted: 0, insufficient: true, available: totalAvailable, deductions: [] };
+  }
+
+  let remaining = amountToDeduct;
+  const deductions = [];
+
+  for (const plan of plansResult.rows) {
+    if (remaining <= 0) break;
+
+    const planBalance = Number(plan.total_saved || 0);
+    const deduction = Math.min(planBalance, remaining);
+
+    if (deduction <= 0) continue;
+
+    await executor.query(
+      `UPDATE rent_savings_plans
+       SET total_saved = total_saved - $2,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [plan.id, deduction]
+    );
+
+    deductions.push({ plan_id: plan.id, amount: deduction });
+    remaining = Math.round((remaining - deduction) * 100) / 100;
+  }
+
+  return {
+    deducted: amountToDeduct,
+    deductions,
+  };
+};
+
+const getLandlordRentFundingBalance = async (landlordId, executor = db) => {
+  const clearedResult = await executor.query(
+    `SELECT COALESCE(SUM(p.amount), 0) AS cleared_amount
+     FROM payments p
+     JOIN properties prop ON p.property_id = prop.id
+     WHERE prop.landlord_id = $1
+       AND p.payment_type = 'rent_payment'
+       AND p.payment_status = 'completed'
+       AND p.completed_at < NOW() - INTERVAL '20 days'
+       AND NOT EXISTS (
+         SELECT 1 FROM refund_requests rr
+         WHERE rr.payment_id = p.id
+           AND rr.status IN ('pending','approved')
+       )`,
+    [landlordId]
+  );
+
+  const withdrawnResult = await executor.query(
+    `SELECT COALESCE(SUM(amount), 0) AS withdrawn_amount
+     FROM withdrawal_requests
+     WHERE user_id = $1
+       AND status IN ('approved','processed')`,
+    [landlordId]
+  );
+
+  const deductionResult = await executor.query(
+    `SELECT COALESCE(SUM(amount), 0) AS deducted_amount
+     FROM landlord_rent_deductions
+     WHERE landlord_id = $1`,
+    [landlordId]
+  );
+
+  return Math.max(
+    0,
+    Number(clearedResult.rows[0]?.cleared_amount || 0) -
+      Number(withdrawnResult.rows[0]?.withdrawn_amount || 0) -
+      Number(deductionResult.rows[0]?.deducted_amount || 0)
+  );
+};
+
+const buildSubscriptionFundingSnapshot = async ({
+  userId,
+  userType,
+  amount,
+}) => {
+  const subscriptionCreditBalance = await getSubscriptionCreditBalance(userId);
+  const walletResult = await db.query(
+    `SELECT balance FROM wallets WHERE user_id = $1 LIMIT 1`,
+    [userId]
+  );
+  const walletBalance = walletResult.rows.length
+    ? Number(walletResult.rows[0].balance || 0)
+    : 0;
+
+  const rentSavingsBalance =
+    userType === 'tenant' ? await getTenantRentSavingsBalance(userId) : 0;
+  const landlordRentBalance =
+    userType === 'landlord' ? await getLandlordRentFundingBalance(userId) : 0;
+
+  return {
+    amount_required: Number(amount || 0),
+    subscription_credit_balance: subscriptionCreditBalance,
+    wallet_balance: userType === 'tenant' ? walletBalance : 0,
+    rent_savings_balance: rentSavingsBalance,
+    landlord_rent_balance: landlordRentBalance,
+    total_available:
+      subscriptionCreditBalance +
+      (userType === 'tenant' ? walletBalance + rentSavingsBalance : landlordRentBalance),
+  };
+};
+
 
 // =====================================================
 //              PUBLIC PLAN ENDPOINTS
@@ -194,7 +503,20 @@ const LISTING_PLANS = [
 exports.getSubscriptionPlans = (req, res) => {
   res.json({
     success: true,
-    data: SUBSCRIPTION_PLANS
+    data: [
+      {
+        id: 'monthly_subscription',
+        name: 'Monthly Subscription',
+        duration_days: MONTHLY_SUBSCRIPTION_DURATION_DAYS,
+        price: MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN,
+        minimum_price: MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN,
+        features: [
+          'Monthly platform access',
+          'Location-based pricing from Super Admin',
+          'Paid from subscription credit and internal balances',
+        ],
+      },
+    ],
   });
 };
 
@@ -211,108 +533,313 @@ exports.getListingPlans = (req, res) => {
 //          TENANT SUBSCRIPTION PAYMENT
 // =====================================================
 
-exports.initializeSubscription = async (req, res) => {
+exports.getSubscriptionQuote = async (req, res) => {
   try {
+    await ensureInternalSubscriptionSchema();
+
+    const userId = req.user.id;
+    const userType = req.user.user_type;
+
+    if (!['tenant', 'landlord'].includes(userType)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Monthly subscriptions are only available to tenants and landlords',
+      });
+    }
+
+    const quote = await buildMonthlySubscriptionQuote({
+      userId,
+      userType,
+      stateId: req.query.state_id,
+      lgaName: req.query.lga_name,
+    });
+    const funding = await buildSubscriptionFundingSnapshot({
+      userId,
+      userType,
+      amount: quote.amount,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        plan: {
+          id: 'monthly_subscription',
+          name: `${userType === 'tenant' ? 'Tenant' : 'Landlord'} Monthly Subscription`,
+          duration_days: MONTHLY_SUBSCRIPTION_DURATION_DAYS,
+        },
+        quote,
+        funding,
+      },
+    });
+  } catch (error) {
+    console.error('Subscription quote error:', error);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to load subscription quote',
+    });
+  }
+};
+
+exports.initializeSubscription = async (req, res) => {
+  const client = await db.connect();
+
+  try {
+    await ensureInternalSubscriptionSchema();
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ success: false, errors: errors.array() });
     }
 
     const userId = req.user.id;
-    const { plan_id, payment_method } = req.body;
+    const userType = req.user.user_type;
 
-    // Find plan
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.id === plan_id);
-    if (!plan) {
-      return res.status(404).json({
+    if (!['tenant', 'landlord'].includes(userType)) {
+      return res.status(403).json({
         success: false,
-        message: "Subscription plan not found"
+        message: 'Monthly subscriptions are only available to tenants and landlords',
       });
     }
 
-    // Get user email
-    const userResult = await db.query(
-      "SELECT email, full_name FROM users WHERE id = $1",
+    const quote = await buildMonthlySubscriptionQuote({
+      userId,
+      userType,
+      stateId: req.body.state_id,
+      lgaName: req.body.lga_name,
+    });
+    const amount = Number(quote.amount || MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN);
+    const paymentType = getMonthlySubscriptionPaymentType(userType);
+    const reference = `SUB_INTERNAL_${userId}_${Date.now()}`;
+
+    await client.query('BEGIN');
+
+    const userResult = await client.query(
+      `SELECT id, email, full_name, subscription_expires_at
+       FROM users
+       WHERE id = $1
+       FOR UPDATE`,
       [userId]
     );
     const user = userResult.rows[0];
 
-    // Create payment record
-    const paymentResult = await db.query(
-      `INSERT INTO payments (user_id, payment_type, amount, currency,
-                             subscription_duration_days, payment_method, payment_status)
-       VALUES ($1, 'tenant_subscription', $2, 'NGN', $3, $4, 'pending')
+    if (!user) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    let remaining = amount;
+    const fundingBreakdown = {
+      subscription_credit: 0,
+      wallet: 0,
+      rent_savings: 0,
+      landlord_rent: 0,
+      rent_savings_deductions: [],
+    };
+
+    const creditDebit = await debitSubscriptionBalance({
+      userId,
+      amount: remaining,
+      source: 'monthly_subscription',
+      reference,
+      metadata: {
+        payment_type: paymentType,
+        pricing_target: quote.pricing_target,
+      },
+      executor: client,
+    });
+
+    fundingBreakdown.subscription_credit = creditDebit.debited;
+    remaining = Math.round((remaining - creditDebit.debited) * 100) / 100;
+
+    if (userType === 'tenant' && remaining > 0) {
+      await client.query(
+        `INSERT INTO wallets (user_id, balance)
+         VALUES ($1, 0)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [userId]
+      );
+
+      const walletResult = await client.query(
+        `SELECT balance
+         FROM wallets
+         WHERE user_id = $1
+         FOR UPDATE`,
+        [userId]
+      );
+      const walletBalance = Number(walletResult.rows[0]?.balance || 0);
+      const walletDebit = Math.min(walletBalance, remaining);
+
+      if (walletDebit > 0) {
+        await client.query(
+          `UPDATE wallets
+           SET balance = balance - $2,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE user_id = $1`,
+          [userId, walletDebit]
+        );
+
+        fundingBreakdown.wallet = walletDebit;
+        remaining = Math.round((remaining - walletDebit) * 100) / 100;
+      }
+
+      if (remaining > 0) {
+        const rentSavingsDebit = await deductTenantRentSavings({
+          executor: client,
+          userId,
+          amount: remaining,
+        });
+
+        if (rentSavingsDebit.insufficient) {
+          await client.query('ROLLBACK');
+          return res.status(402).json({
+            success: false,
+            message: 'Insufficient subscription funding. Add wallet funds or rent savings before subscribing.',
+            data: {
+              amount_required: amount,
+              amount_remaining: remaining,
+              rent_savings_available: rentSavingsDebit.available,
+              funding: await buildSubscriptionFundingSnapshot({ userId, userType, amount }),
+            },
+          });
+        }
+
+        fundingBreakdown.rent_savings = rentSavingsDebit.deducted;
+        fundingBreakdown.rent_savings_deductions = rentSavingsDebit.deductions;
+        remaining = Math.round((remaining - rentSavingsDebit.deducted) * 100) / 100;
+      }
+    }
+
+    if (userType === 'landlord' && remaining > 0) {
+      const landlordRentAvailable = await getLandlordRentFundingBalance(userId, client);
+
+      if (landlordRentAvailable < remaining) {
+        await client.query('ROLLBACK');
+        return res.status(402).json({
+          success: false,
+          message: 'Insufficient cleared rent balance for landlord subscription.',
+          data: {
+            amount_required: amount,
+            amount_remaining: remaining,
+            landlord_rent_available: landlordRentAvailable,
+            funding: await buildSubscriptionFundingSnapshot({ userId, userType, amount }),
+          },
+        });
+      }
+
+      fundingBreakdown.landlord_rent = remaining;
+      remaining = 0;
+    }
+
+    if (remaining > 0) {
+      await client.query('ROLLBACK');
+      return res.status(402).json({
+        success: false,
+        message: 'Insufficient subscription funding.',
+        data: {
+          amount_required: amount,
+          amount_remaining: remaining,
+          funding: await buildSubscriptionFundingSnapshot({ userId, userType, amount }),
+        },
+      });
+    }
+
+    const paymentResult = await client.query(
+      `INSERT INTO payments (
+         user_id,
+         payment_type,
+         amount,
+         currency,
+         subscription_duration_days,
+         payment_method,
+         payment_status,
+         transaction_reference,
+         completed_at,
+         gateway_response
+       )
+       VALUES ($1, $2, $3, 'NGN', $4, 'internal_balance', 'completed', $5, CURRENT_TIMESTAMP, $6)
        RETURNING id`,
-      [userId, plan.price, plan.duration_days, payment_method]
+      [
+        userId,
+        paymentType,
+        amount,
+        MONTHLY_SUBSCRIPTION_DURATION_DAYS,
+        reference,
+        JSON.stringify({
+          funding_source: 'internal',
+          funding_breakdown: fundingBreakdown,
+          quote,
+          full_name: user.full_name,
+          email: user.email,
+        }),
+      ]
     );
 
     const paymentId = paymentResult.rows[0].id;
 
-    // PAYSTACK
-    if (payment_method === "paystack") {
-      const paystackResponse = await axios.post(
-        `${PAYSTACK_BASE_URL}/transaction/initialize`,
-        {
-          email: user.email,
-          amount: plan.price * 100,
-          reference: `SUB_${paymentId}_${Date.now()}`,
-          callback_url: `${FRONTEND_URL}/payment/verify-subscription`,
-          metadata: {
-            payment_id: paymentId,
-            user_id: userId,
-            plan_id: plan_id,
-            payment_type: "tenant_subscription",
-            full_name: user.full_name
-          }
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-            "Content-Type": "application/json"
-          }
-        }
+    if (userType === 'landlord' && fundingBreakdown.landlord_rent > 0) {
+      await client.query(
+        `INSERT INTO landlord_rent_deductions (
+           landlord_id, payment_id, amount, deduction_type, description
+         )
+         VALUES ($1, $2, $3, 'subscription', $4)`,
+        [
+          userId,
+          paymentId,
+          fundingBreakdown.landlord_rent,
+          `Monthly subscription ${reference}`,
+        ]
       );
-
-      // Update DB with reference
-      await db.query(
-        "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
-        [paystackResponse.data.data.reference, paymentId]
-      );
-
-      return res.json({
-        success: true,
-        message: "Payment initialized",
-        data: {
-          payment_id: paymentId,
-          authorization_url: paystackResponse.data.data.authorization_url,
-          access_code: paystackResponse.data.data.access_code,
-          reference: paystackResponse.data.data.reference
-        }
-      });
     }
 
-    // Bank transfer fallback
-    if (payment_method === "bank_transfer") {
-      return res.json({
-        success: true,
-        message: "Please transfer to the account below",
-        data: {
-          payment_id: paymentId,
-          bank_name: "Your Bank Name",
-          account_number: "1234567890",
-          account_name: "Rental Hub NG",
-          amount: plan.price,
-          reference: `SUB_${paymentId}_${Date.now()}`
-        }
-      });
+    const currentExpiry = user.subscription_expires_at
+      ? new Date(user.subscription_expires_at)
+      : null;
+    const startDate =
+      currentExpiry && currentExpiry > new Date() ? currentExpiry : new Date();
+    const expiryDate = new Date(startDate);
+    expiryDate.setDate(expiryDate.getDate() + MONTHLY_SUBSCRIPTION_DURATION_DAYS);
+
+    await client.query(
+      `UPDATE users
+       SET subscription_active = TRUE,
+           subscription_expires_at = $1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [expiryDate, userId]
+    );
+
+    await client.query('COMMIT');
+
+    if (['tenant_subscription', 'landlord_subscription'].includes(paymentType)) {
+      await commissionService.processPaymentCommission(paymentId);
     }
+
+    return res.json({
+      success: true,
+      message: 'Monthly subscription activated successfully',
+      data: {
+        payment_id: paymentId,
+        reference,
+        amount_paid: amount,
+        funding_breakdown: fundingBreakdown,
+        subscription_expires_at: expiryDate,
+      },
+    });
   } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // Ignore rollback errors when the transaction was not started or already closed.
+    }
+
     console.error("Subscription initialization error:", error);
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
-      message: "Failed to initialize subscription payment",
+      message: error.message || "Failed to initialize subscription payment",
       error: error.message
     });
+  } finally {
+    client.release();
   }
 };
 
@@ -404,7 +931,10 @@ exports.verifySubscription = async (req, res) => {
 
 exports.getSubscriptionStatus = async (req, res) => {
   try {
+    await ensureInternalSubscriptionSchema();
+
     const userId = req.user.id;
+    const userType = req.user.user_type;
 
     const result = await db.query(
       `SELECT subscription_active, subscription_expires_at 
@@ -413,6 +943,21 @@ exports.getSubscriptionStatus = async (req, res) => {
     );
 
     const user = result.rows[0];
+    const quote = ['tenant', 'landlord'].includes(userType)
+      ? await buildMonthlySubscriptionQuote({
+          userId,
+          userType,
+          stateId: req.query.state_id,
+          lgaName: req.query.lga_name,
+        })
+      : null;
+    const funding = quote
+      ? await buildSubscriptionFundingSnapshot({
+          userId,
+          userType,
+          amount: quote.amount,
+        })
+      : null;
     const now = new Date();
     const isActive =
       user.subscription_active &&
@@ -424,6 +969,8 @@ exports.getSubscriptionStatus = async (req, res) => {
       data: {
         active: isActive,
         expires_at: user.subscription_expires_at,
+        quote,
+        funding,
         days_remaining: isActive
           ? Math.ceil(
               (new Date(user.subscription_expires_at) - now) /

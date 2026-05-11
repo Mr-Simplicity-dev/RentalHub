@@ -45,6 +45,7 @@ const ensureLawyerDirectoryUnlockSchema = async () => {
       CHECK (
         payment_type IN (
           'tenant_subscription',
+          'landlord_subscription',
           'landlord_listing',
           'rent_payment',
           'property_unlock',
@@ -53,7 +54,10 @@ const ensureLawyerDirectoryUnlockSchema = async () => {
           'wallet_funding',
           'tenant_property_alert',
           'evidence_verification',
-          'lawyer_directory_unlock'
+          'lawyer_directory_unlock',
+          'lawyer_access_fee',
+          'agent_access_fee',
+          'transportation_booking'
         )
       );
   `);

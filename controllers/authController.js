@@ -41,6 +41,10 @@ const {
   ensurePlatformAgentSchema,
   fetchPublicPlatformAgents,
 } = require('../config/utils/platformAgentProgram');
+const {
+  creditReferralRewardForRegistration,
+  normalizeReferralCode,
+} = require('../services/referralService');
 
 // Store OTP codes temporarily (use Redis in production)
 const otpStore = new Map();
@@ -208,6 +212,7 @@ const ensureTenantRegistrationPaymentSchema = async () => {
       CHECK (
         payment_type IN (
           'tenant_subscription',
+          'landlord_subscription',
           'landlord_listing',
           'rent_payment',
           'property_unlock',
@@ -216,7 +221,10 @@ const ensureTenantRegistrationPaymentSchema = async () => {
           'wallet_funding',
           'tenant_property_alert',
           'evidence_verification',
-          'lawyer_directory_unlock'
+          'lawyer_directory_unlock',
+          'lawyer_access_fee',
+          'agent_access_fee',
+          'transportation_booking'
         )
       );
   `);
@@ -472,6 +480,7 @@ const validateAndPrepareRegistration = async (payload) => {
     agent_phone,
     use_rentalhub_lawyers,
     use_rentalhub_agents,
+    referral_code,
     } = payload;
 
   const cleanEmail = String(email || '').trim().toLowerCase();
@@ -480,6 +489,7 @@ const validateAndPrepareRegistration = async (payload) => {
   const cleanLawyerEmail = lawyer_email
     ? String(lawyer_email).trim().toLowerCase()
     : '';
+  const cleanReferralCode = normalizeReferralCode(referral_code);
   const optionalAgentInvite =
     user_type === 'landlord'
       ? await normalizeOptionalAgentInvite({
@@ -687,6 +697,7 @@ const validateAndPrepareRegistration = async (payload) => {
       cleanPassportNumber,
       cleanNationality,
       optionalAgentInvite,
+      referralCode: cleanReferralCode || null,
     },
     plainPassword: password,
     verificationMeta
@@ -999,8 +1010,20 @@ const createUserFromPreparedRegistration = async ({
 
     await client.query('COMMIT');
 
+    let referralReward = null;
     let lawyerInvite = null;
     let agentInvite = null;
+
+    if (preparedRegistration.referralCode) {
+      try {
+        referralReward = await creditReferralRewardForRegistration({
+          referralCode: preparedRegistration.referralCode,
+          referredUserId: newUser.id,
+        });
+      } catch (referralError) {
+        console.error('Referral reward credit error (non-fatal):', referralError);
+      }
+    }
 
     if (preparedRegistration.cleanLawyerEmail) {
       try {
@@ -1236,6 +1259,7 @@ const createUserFromPreparedRegistration = async ({
       },
       token,
       verification: verificationMeta,
+      referral_reward: referralReward,
       lawyer_invite: lawyerInvite,
       agent_invite: agentInvite,
     };
@@ -1555,6 +1579,7 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       cleanPassportNumber: storedPayload.cleanPassportNumber || null,
       cleanNationality: storedPayload.cleanNationality || 'Nigeria',
       optionalAgentInvite: storedPayload.optionalAgentInvite || null,
+      referralCode: normalizeReferralCode(storedPayload.referralCode || storedPayload.referral_code),
       preferredStateId:
         storedPayload.preferredStateId ||
         storedPayload.state_id ||

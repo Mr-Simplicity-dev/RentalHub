@@ -76,6 +76,13 @@ const registerValidators = [
   body('user_type')
     .isIn(['landlord', 'tenant'])
     .withMessage('User type must be tenant or landlord'),
+  body('referral_code')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 64 })
+    .withMessage('Referral code is too long')
+    .matches(/^[A-Za-z0-9_-]+$/)
+    .withMessage('Referral code is invalid'),
 ];
 
 // ================= ROUTES =================
