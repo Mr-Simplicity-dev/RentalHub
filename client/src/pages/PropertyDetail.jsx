@@ -314,8 +314,8 @@ const PropertyDetail = () => {
       )}`
     : property.title;
   const propertySeoDescription = propertyLocation
-    ? `Browse verified details for ${property.title} in ${propertyLocation}. See rent, property features, photos, and landlord contact options on RenatalHub.`
-    : `Browse verified details for ${property.title} on RenatalHub.`;
+    ? `Browse verified details for ${property.title} in ${propertyLocation}. See rent, property features, photos, and landlord contact options on RentalHub.`
+    : `Browse verified details for ${property.title} on RentalHub.`;
   const propertyCanonical = `${window.location.origin}/properties/${property.id}`;
   const propertyShareImageRaw =
     property.photos?.[0] ||

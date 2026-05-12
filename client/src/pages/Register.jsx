@@ -1067,7 +1067,7 @@ return (
                       className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-0.5 cursor-pointer"
                     />
                     <label htmlFor="use_rentalhub_lawyers" className="ml-2 block text-sm text-gray-700 cursor-pointer">
-                      Use RentalHub NG lawyers instead —{' '}
+                      Use Our lawyers instead —{' '}
                       <Link to="/lawyers" className="text-indigo-600 hover:text-indigo-500 underline">
                         pay to unlock full contact details in your state and local government area
                       </Link>
@@ -1079,7 +1079,7 @@ return (
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-900">Add an Agent Now</h3>
+                        <h3 className="text-sm font-semibold text-gray-900">Use your Agent Now</h3>
                         <p className="text-xs text-gray-600 mt-1">
                           Optional. An agent can help the landlord handle property listing, property updates, and other difficult day-to-day tasks later.
                         </p>
@@ -1219,7 +1219,7 @@ return (
                           }}
                           className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
-                        Use RentalHub NG agents
+                        Use Our agents
                       </label>
                     </div>
                     {formData.use_rentalhub_agents && (

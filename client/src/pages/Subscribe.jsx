@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { FaCheckCircle, FaClock, FaMapMarkerAlt, FaWallet } from 'react-icons/fa';
+import { FaCheckCircle, FaClock, FaHome, FaWallet } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
 import BackToDashboard from '../components/common/BackToDashboard';
 import { paymentService } from '../services/paymentService';
-import { propertyService } from '../services/propertyService';
 
 const formatCurrency = (value) => `\u20A6${Number(value || 0).toLocaleString()}`;
 
@@ -14,21 +13,14 @@ const getSubscriptionLabel = (userType) =>
 const Subscribe = () => {
   const { user, updateUser } = useAuth();
   const [quoteData, setQuoteData] = useState(null);
-  const [locations, setLocations] = useState([]);
-  const [form, setForm] = useState({
-    state_id: user?.preferred_state_id ? String(user.preferred_state_id) : '',
-    lga_name: user?.preferred_lga_name || '',
-  });
   const [loading, setLoading] = useState(true);
-  const [subscribing, setSubscribing] = useState(false);
+  const [subscribingType, setSubscribingType] = useState(null);
 
-  const selectedState = useMemo(
-    () => locations.find((item) => String(item.id) === String(form.state_id)),
-    [locations, form.state_id]
-  );
-  const availableLgas = selectedState?.lgas || [];
   const quote = quoteData?.quote || {};
   const funding = quoteData?.funding || {};
+  const multipleProperty = quoteData?.multiple_property || null;
+  const multiplePropertyQuote = multipleProperty?.quote || {};
+  const multiplePropertyFunding = multipleProperty?.funding || {};
   const isLandlord = user?.user_type === 'landlord';
   const isTenant = user?.user_type === 'tenant';
   const expiresAt = user?.subscription_expires_at
@@ -40,16 +32,12 @@ const Subscribe = () => {
     !Number.isNaN(expiresAt.getTime()) &&
     expiresAt > new Date();
 
-  const loadQuote = async (nextForm = form) => {
+  const loadQuote = async () => {
     if (!user) return;
 
     try {
       setLoading(true);
-      const params = {};
-      if (nextForm.state_id) params.state_id = nextForm.state_id;
-      if (nextForm.lga_name) params.lga_name = nextForm.lga_name;
-
-      const response = await paymentService.getSubscriptionQuote(params);
+      const response = await paymentService.getSubscriptionQuote();
       if (response.success) {
         setQuoteData(response.data);
       }
@@ -61,54 +49,26 @@ const Subscribe = () => {
   };
 
   useEffect(() => {
-    const loadLocations = async () => {
-      try {
-        const response = await propertyService.getLocationOptions();
-        if (response.success) {
-          setLocations(response.data || []);
-        }
-      } catch (error) {
-        console.error('Failed to load locations', error);
-      }
-    };
-
-    loadLocations();
-  }, []);
-
-  useEffect(() => {
     loadQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    const nextForm = {
-      ...form,
-      [name]: value,
-      ...(name === 'state_id' ? { lga_name: '' } : {}),
-    };
-
-    setForm(nextForm);
-    loadQuote(nextForm);
-  };
-
-  const handleSubscribe = async () => {
+  const handleSubscribe = async (subscriptionType = 'monthly') => {
     try {
-      setSubscribing(true);
+      setSubscribingType(subscriptionType);
 
-      const payload = {};
-      if (form.state_id) payload.state_id = Number(form.state_id);
-      if (form.lga_name) payload.lga_name = form.lga_name;
-
+      const payload = { subscription_type: subscriptionType };
       const response = await paymentService.initializeSubscription(payload);
 
       if (response.success) {
         toast.success(response.message || 'Subscription activated');
-        updateUser({
-          ...user,
-          subscription_active: true,
-          subscription_expires_at: response.data?.subscription_expires_at,
-        });
+        if (subscriptionType === 'monthly') {
+          updateUser({
+            ...user,
+            subscription_active: true,
+            subscription_expires_at: response.data?.subscription_expires_at,
+          });
+        }
         await loadQuote();
       } else {
         toast.error(response.message || 'Could not activate subscription');
@@ -116,7 +76,7 @@ const Subscribe = () => {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Could not activate subscription');
     } finally {
-      setSubscribing(false);
+      setSubscribingType(null);
     }
   };
 
@@ -149,7 +109,8 @@ const Subscribe = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="card lg:col-span-2">
+        <div className="space-y-6 lg:col-span-2">
+        <div className="card">
           <div className="flex items-start gap-4">
             <div className="h-12 w-12 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
               <FaClock className="text-2xl" />
@@ -160,7 +121,7 @@ const Subscribe = () => {
                 {loading ? 'Loading...' : `${formatCurrency(quote.amount)} / month`}
               </h2>
               <p className="mt-2 text-sm text-gray-600">
-                Base price is {formatCurrency(200)}. Super Admin location pricing can increase the amount by state or LGA.
+                Super Admin controls this amount from pricing rules. Your account location is used automatically.
               </p>
             </div>
           </div>
@@ -171,50 +132,9 @@ const Subscribe = () => {
             </div>
           )}
 
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Pricing State
-              </label>
-              <select
-                name="state_id"
-                value={form.state_id}
-                onChange={handleChange}
-                className="input"
-              >
-                <option value="">Use saved/default pricing</option>
-                {locations.map((state) => (
-                  <option key={state.id} value={state.id}>
-                    {state.state_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Pricing LGA
-              </label>
-              <select
-                name="lga_name"
-                value={form.lga_name}
-                onChange={handleChange}
-                className="input"
-                disabled={!form.state_id}
-              >
-                <option value="">Whole state</option>
-                {availableLgas.map((lga) => (
-                  <option key={lga} value={lga}>
-                    {lga}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
             <div className="flex items-center gap-2 text-gray-800">
-              <FaMapMarkerAlt className="text-indigo-500" />
+              <FaCheckCircle className="text-indigo-500" />
               <span>
                 Pricing source: {quote.rule_scope || 'base'}
                 {quote.location_source ? ` (${quote.location_source})` : ''}
@@ -224,11 +144,11 @@ const Subscribe = () => {
 
           <button
             type="button"
-            onClick={handleSubscribe}
-            disabled={loading || subscribing || Number(funding.total_available || 0) < Number(quote.amount || 0)}
+            onClick={() => handleSubscribe('monthly')}
+            disabled={loading || subscribingType === 'monthly' || Number(funding.total_available || 0) < Number(quote.amount || 0)}
             className="btn btn-primary mt-6 w-full py-3 text-lg disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {subscribing ? 'Activating...' : 'Activate Monthly Subscription'}
+            {subscribingType === 'monthly' ? 'Activating...' : 'Activate Monthly Subscription'}
           </button>
 
           {Number(funding.total_available || 0) < Number(quote.amount || 0) && !loading && (
@@ -236,6 +156,70 @@ const Subscribe = () => {
               Insufficient internal balance for this subscription.
             </p>
           )}
+        </div>
+
+        {isTenant && (
+          <div className="card">
+            <div className="flex items-start gap-4">
+              <div className="h-12 w-12 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <FaHome className="text-2xl" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold uppercase text-emerald-600">
+                  Multiple Property Add-on
+                </p>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {loading ? 'Loading...' : `${formatCurrency(multiplePropertyQuote.amount)} / month`}
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  One rented property is included with your tenant account. Activate this before renting a second property or more.
+                </p>
+              </div>
+            </div>
+
+            {multipleProperty?.active && multipleProperty?.expires_at && (
+              <div className="mt-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                Active until {new Date(multipleProperty.expires_at).toLocaleDateString()}. Renewing adds another 30 days.
+              </div>
+            )}
+
+            <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-gray-800">
+                <FaCheckCircle className="text-emerald-500" />
+                <span>
+                  Pricing source: {multiplePropertyQuote.rule_scope || 'base'}
+                  {multiplePropertyQuote.location_source ? ` (${multiplePropertyQuote.location_source})` : ''}
+                </span>
+              </div>
+              <p className="mt-2">
+                Rented properties on this account: {multipleProperty?.rented_properties_count || 0}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleSubscribe('multiple_property')}
+              disabled={
+                loading ||
+                subscribingType === 'multiple_property' ||
+                Number(multiplePropertyFunding.total_available || 0) < Number(multiplePropertyQuote.amount || 0)
+              }
+              className="btn btn-primary mt-6 w-full py-3 text-lg disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {subscribingType === 'multiple_property'
+                ? 'Activating...'
+                : multipleProperty?.active
+                  ? 'Renew Multiple Property Subscription'
+                  : 'Activate Multiple Property Subscription'}
+            </button>
+
+            {Number(multiplePropertyFunding.total_available || 0) < Number(multiplePropertyQuote.amount || 0) && !loading && (
+              <p className="mt-3 text-center text-sm text-red-600">
+                Insufficient internal balance for this add-on.
+              </p>
+            )}
+          </div>
+        )}
         </div>
 
         <div className="card">

@@ -1,5 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FaTimes, FaInfoCircle } from 'react-icons/fa';
+
+const buildInitialInputValues = (inputs = [], initialValues = {}) => {
+  const values = {};
+  inputs.forEach(input => {
+    values[input.name] = initialValues[input.name] || input.defaultValue || '';
+  });
+  return values;
+};
 
 const InputDialog = ({
   isOpen,
@@ -14,15 +22,20 @@ const InputDialog = ({
   inputs = [],
   initialValues = {}
 }) => {
-  const [inputValues, setInputValues] = useState(() => {
-    const values = {};
-    inputs.forEach(input => {
-      values[input.name] = initialValues[input.name] || input.defaultValue || '';
-    });
-    return values;
-  });
+  const [inputValues, setInputValues] = useState(() =>
+    buildInitialInputValues(inputs, initialValues)
+  );
 
   const [errors, setErrors] = useState({});
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      setInputValues(buildInitialInputValues(inputs, initialValues));
+      setErrors({});
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, inputs, initialValues]);
 
   if (!isOpen) return null;
 

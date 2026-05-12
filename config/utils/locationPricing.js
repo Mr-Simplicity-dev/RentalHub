@@ -17,6 +17,11 @@ const PRICING_TARGETS = {
     label: 'Property Alert Request',
     base_amount: 5000,
   },
+  tenant_location_access: {
+    key: 'tenant_location_access',
+    label: 'Tenant Location Access',
+    base_amount: 10000,
+  },
   tenant_monthly_subscription: {
     key: 'tenant_monthly_subscription',
     label: 'Tenant Monthly Subscription',
@@ -26,6 +31,21 @@ const PRICING_TARGETS = {
     key: 'landlord_monthly_subscription',
     label: 'Landlord Monthly Subscription',
     base_amount: 200,
+  },
+  tenant_multiple_property_subscription: {
+    key: 'tenant_multiple_property_subscription',
+    label: 'Tenant Multiple Property Subscription',
+    base_amount: 5000,
+  },
+  landlord_annual_listing_renewal_fee: {
+    key: 'landlord_annual_listing_renewal_fee',
+    label: 'Landlord Annual Listing Renewal Fee',
+    base_amount: 500,
+  },
+  landlord_monthly_maintenance_fee: {
+    key: 'landlord_monthly_maintenance_fee',
+    label: 'Landlord Monthly Maintenance Fee',
+    base_amount: 100,
   },
 };
 
@@ -44,8 +64,12 @@ const ensureLocationPricingSchema = async () => {
           'tenant_registration',
           'landlord_registration',
           'property_alert_request',
+          'tenant_location_access',
           'tenant_monthly_subscription',
-          'landlord_monthly_subscription'
+          'landlord_monthly_subscription',
+          'tenant_multiple_property_subscription',
+          'landlord_annual_listing_renewal_fee',
+          'landlord_monthly_maintenance_fee'
         )
       ),
       state_id INTEGER NOT NULL REFERENCES states(id) ON DELETE CASCADE,
@@ -79,8 +103,12 @@ const ensureLocationPricingSchema = async () => {
           'tenant_registration',
           'landlord_registration',
           'property_alert_request',
+          'tenant_location_access',
           'tenant_monthly_subscription',
-          'landlord_monthly_subscription'
+          'landlord_monthly_subscription',
+          'tenant_multiple_property_subscription',
+          'landlord_annual_listing_renewal_fee',
+          'landlord_monthly_maintenance_fee'
         )
       );
   `);

@@ -5,6 +5,7 @@ const { authenticate, isTenant, isLandlord } = require("../config/middleware/aut
 
 let tenantDashboardSchemaReady = false;
 let lawyerInviteDashboardSchemaReady = false;
+let propertyLocationColumnsReady = false;
 
 const ensureTenantDashboardSchema = async () => {
   if (tenantDashboardSchemaReady) return;
@@ -49,6 +50,18 @@ const ensureLawyerInviteDashboardSchema = async () => {
   `);
 
   lawyerInviteDashboardSchemaReady = true;
+};
+
+const ensurePropertyLocationColumns = async () => {
+  if (propertyLocationColumnsReady) return;
+
+  await db.query(`
+    ALTER TABLE properties
+    ADD COLUMN IF NOT EXISTS latitude DECIMAL(10, 8),
+    ADD COLUMN IF NOT EXISTS longitude DECIMAL(11, 8);
+  `);
+
+  propertyLocationColumnsReady = true;
 };
 
 // =====================================================
@@ -129,6 +142,114 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch tenant statistics",
+    });
+  }
+});
+
+// =====================================================
+//       TENANT PAID PROPERTY LOCATIONS FOR MAPS
+// =====================================================
+
+router.get("/tenant/paid-property-locations", authenticate, isTenant, async (req, res) => {
+  try {
+    await ensureTenantDashboardSchema();
+    await ensurePropertyLocationColumns();
+
+    const userId = req.user.id;
+    const parsedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 50)
+      : 6;
+
+    const locations = await db.query(
+      `WITH tenant_property_candidates AS (
+        SELECT
+          tu.property_id,
+          tu.unlocked_at AS activity_at,
+          'property_unlock'::text AS source_type,
+          FALSE AS rent_paid,
+          FALSE AS rent_pending
+        FROM tenant_property_unlocks tu
+        WHERE tu.tenant_id = $1
+
+        UNION ALL
+
+        SELECT
+          sp.property_id,
+          sp.created_at AS activity_at,
+          'saved_property'::text AS source_type,
+          FALSE AS rent_paid,
+          FALSE AS rent_pending
+        FROM saved_properties sp
+        WHERE sp.tenant_id = $1
+
+        UNION ALL
+
+        SELECT
+          p.property_id,
+          COALESCE(p.completed_at, p.created_at) AS activity_at,
+          p.payment_type AS source_type,
+          p.payment_type = 'rent_payment' AND p.payment_status = 'completed' AS rent_paid,
+          p.payment_type = 'rent_payment' AND p.payment_status = 'pending' AS rent_pending
+        FROM payments p
+        WHERE p.user_id = $1
+          AND p.payment_type IN ('property_unlock', 'rent_payment')
+          AND p.property_id IS NOT NULL
+      ),
+      ranked AS (
+        SELECT
+          property_id,
+          MAX(activity_at) AS activity_at,
+          BOOL_OR(rent_paid) AS rent_paid,
+          BOOL_OR(rent_pending) AS rent_pending,
+          BOOL_OR(source_type = 'property_unlock') AS has_property_unlock,
+          BOOL_OR(source_type = 'saved_property') AS has_saved_property
+        FROM tenant_property_candidates
+        GROUP BY property_id
+      )
+      SELECT
+        p.id AS property_id,
+        p.title,
+        p.full_address,
+        p.city,
+        p.area,
+        p.latitude,
+        p.longitude,
+        s.state_name,
+        r.activity_at,
+        r.rent_paid,
+        r.rent_pending,
+        CASE
+          WHEN r.rent_paid THEN 'rent_payment'
+          WHEN r.rent_pending THEN 'rent_pending'
+          WHEN r.has_property_unlock THEN 'property_unlock'
+          WHEN r.has_saved_property THEN 'saved_property'
+          ELSE 'property_access'
+        END AS payment_type,
+        (
+          SELECT photo_url
+          FROM property_photos
+          WHERE property_id = p.id
+          ORDER BY is_primary DESC, upload_order ASC, id ASC
+          LIMIT 1
+        ) AS primary_photo
+      FROM ranked r
+      JOIN properties p ON p.id = r.property_id
+      LEFT JOIN states s ON p.state_id = s.id
+      ORDER BY r.rent_paid DESC, r.activity_at DESC
+      LIMIT $2`,
+      [userId, limit]
+    );
+
+    res.json({
+      success: true,
+      data: locations.rows,
+    });
+  } catch (error) {
+    console.error("Tenant paid property locations error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch paid property locations",
     });
   }
 });
@@ -390,7 +511,7 @@ router.get("/admin/stats", authenticate, async (req, res) => {
         (SELECT COUNT(*) FROM applications) AS total_applications,
         (SELECT COUNT(*) FROM applications WHERE status = 'pending') AS pending_applications,
         (SELECT SUM(amount) FROM payments WHERE payment_status = 'completed') AS total_revenue,
-        (SELECT SUM(amount) FROM payments WHERE payment_type IN ('tenant_subscription', 'landlord_subscription') AND payment_status = 'completed') AS subscription_revenue,
+        (SELECT SUM(amount) FROM payments WHERE payment_type IN ('tenant_subscription', 'tenant_multiple_property_subscription', 'landlord_subscription') AND payment_status = 'completed') AS subscription_revenue,
         (SELECT SUM(amount) FROM payments WHERE payment_type = 'landlord_listing' AND payment_status = 'completed') AS listing_revenue,
         (SELECT COUNT(*) FROM reviews) AS total_reviews,
         (SELECT AVG(rating) FROM reviews) AS avg_rating

@@ -26,6 +26,9 @@ import {
   FaCopy,
   FaGift,
   FaWhatsapp,
+  FaMapMarkedAlt,
+  FaExternalLinkAlt,
+  FaLock,
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
@@ -85,6 +88,27 @@ const copyTextToClipboard = async (text) => {
   document.body.removeChild(textarea);
 };
 
+const getPropertyMapAddress = (property = {}) =>
+  property.full_address ||
+  [property.area, property.city, property.state_name].filter(Boolean).join(', ');
+
+const buildGoogleMapsUrl = (property = {}) => {
+  const latitude = Number(property.latitude);
+  const longitude = Number(property.longitude);
+
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+  }
+
+  const address = getPropertyMapAddress(property);
+  if (!address) return '';
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+};
+
+const canOpenPropertyMap = (property = {}) =>
+  property.rent_paid === true || property.payment_type === 'rent_payment';
+
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -113,6 +137,8 @@ const Dashboard = () => {
   const [showFundModal, setShowFundModal] = useState(false);
   const [walletBalance, setWalletBalance] = useState(null);
   const [landlordWallet, setLandlordWallet] = useState(null);
+  const [landlordPropertyFee, setLandlordPropertyFee] = useState(null);
+  const [landlordPropertyFeeLoading, setLandlordPropertyFeeLoading] = useState(false);
   const [referralInfo, setReferralInfo] = useState(null);
   const [referralLoading, setReferralLoading] = useState(false);
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', bank_name: '', account_number: '', account_name: '' });
@@ -130,6 +156,7 @@ const Dashboard = () => {
   // Rent Savings state (tenant only)
   const [showRentSavingsModal, setShowRentSavingsModal] = useState(false);
   const [tenantProperties, setTenantProperties] = useState([]);
+  const [paidPropertyLocations, setPaidPropertyLocations] = useState([]);
   const [rentSavingsStats, setRentSavingsStats] = useState(null);
 
   // Landlord refund management state
@@ -149,6 +176,88 @@ const Dashboard = () => {
       : hasSubmittedVerification
         ? 'pending'
         : 'not_submitted');
+
+  const loadPaidPropertyLocations = useCallback(async () => {
+    if (user?.user_type !== 'tenant') return;
+
+    try {
+      const res = await api.get('/dashboard/tenant/paid-property-locations', {
+        params: { limit: 6 },
+      });
+
+      if (res.data?.success) {
+        setPaidPropertyLocations(res.data.data || []);
+      } else {
+        setPaidPropertyLocations([]);
+      }
+    } catch (error) {
+      console.error('Error loading paid property locations:', error);
+      setPaidPropertyLocations([]);
+    }
+  }, [user]);
+
+  // Load transportation data for tenant
+  const loadTransportationData = useCallback(async () => {
+    if (user?.user_type !== 'tenant') return;
+
+    setTransportLoading(true);
+    try {
+      const [statsRes, upcomingRes] = await Promise.all([
+        api.get('/transportation/stats'),
+        api.get('/transportation/upcoming?limit=3')
+      ]);
+
+      if (statsRes.data?.success) {
+        setTransportStats(statsRes.data.data);
+      }
+
+      if (upcomingRes.data?.success) {
+        setUpcomingTransportBookings(upcomingRes.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading transportation data:', error);
+    } finally {
+      setTransportLoading(false);
+    }
+  }, [user]);
+
+  // Load rent savings data for tenants
+  const loadRentSavingsData = useCallback(async () => {
+    if (user?.user_type !== 'tenant') return;
+
+    try {
+      const [summaryRes, propertiesRes] = await Promise.all([
+        api.get('/rent-savings/summary'),
+        api.get('/properties/tenant'),
+      ]);
+
+      if (summaryRes.data?.success) {
+        setRentSavingsStats(summaryRes.data.data);
+      }
+
+      if (propertiesRes.data?.success) {
+        setTenantProperties(propertiesRes.data.data || []);
+      } else if (Array.isArray(propertiesRes.data)) {
+        setTenantProperties(propertiesRes.data);
+      }
+    } catch (error) {
+      console.error('Error loading rent savings data:', error);
+    }
+  }, [user]);
+
+  const loadLandlordPropertyFeeStatus = useCallback(async () => {
+    if (user?.user_type !== 'landlord') return;
+
+    try {
+      const res = await api.get('/payments/landlord-property-fee/status');
+      if (res.data?.success) {
+        setLandlordPropertyFee(res.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading landlord property fee status:', error);
+      setLandlordPropertyFee(null);
+    }
+  }, [user]);
 
   // Combined dashboard loader (stats + activities + optional transport/rent)
   const loadDashboardData = useCallback(async (showLoading = true) => {
@@ -204,6 +313,9 @@ const Dashboard = () => {
       if (user.user_type === 'tenant') {
         await loadTransportationData();
         await loadRentSavingsData();
+        await loadPaidPropertyLocations();
+      } else if (user.user_type === 'landlord') {
+        await loadLandlordPropertyFeeStatus();
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -213,56 +325,7 @@ const Dashboard = () => {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, [user]);
-
-  // Load transportation data for tenant
-  const loadTransportationData = useCallback(async () => {
-    if (user?.user_type !== 'tenant') return;
-
-    setTransportLoading(true);
-    try {
-      const [statsRes, upcomingRes] = await Promise.all([
-        api.get('/transportation/stats'),
-        api.get('/transportation/upcoming?limit=3')
-      ]);
-
-      if (statsRes.data?.success) {
-        setTransportStats(statsRes.data.data);
-      }
-
-      if (upcomingRes.data?.success) {
-        setUpcomingTransportBookings(upcomingRes.data.data);
-      }
-    } catch (error) {
-      console.error('Error loading transportation data:', error);
-    } finally {
-      setTransportLoading(false);
-    }
-  }, [user]);
-
-  // Load rent savings data for tenants
-  const loadRentSavingsData = useCallback(async () => {
-    if (user?.user_type !== 'tenant') return;
-
-    try {
-      const [summaryRes, propertiesRes] = await Promise.all([
-        api.get('/rent-savings/summary'),
-        api.get('/properties/tenant'),
-      ]);
-
-      if (summaryRes.data?.success) {
-        setRentSavingsStats(summaryRes.data.data);
-      }
-
-      if (propertiesRes.data?.success) {
-        setTenantProperties(propertiesRes.data.data || []);
-      } else if (Array.isArray(propertiesRes.data)) {
-        setTenantProperties(propertiesRes.data);
-      }
-    } catch (error) {
-      console.error('Error loading rent savings data:', error);
-    }
-  }, [user]);
+  }, [loadLandlordPropertyFeeStatus, loadPaidPropertyLocations, loadRentSavingsData, loadTransportationData, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -424,7 +487,10 @@ const Dashboard = () => {
         if (res.data?.success) setWalletBalance(res.data.data.balance);
       } else {
         const res = await api.get('/payments/wallet/landlord-balance');
-        if (res.data?.success) setLandlordWallet(res.data.data);
+        if (res.data?.success) {
+          setLandlordWallet(res.data.data);
+          if (res.data.data?.property_fee) setLandlordPropertyFee(res.data.data.property_fee);
+        }
       }
       const histRes = await api.get('/payments/wallet/withdrawals');
       if (histRes.data?.success) setWithdrawHistory(histRes.data.data || []);
@@ -441,7 +507,10 @@ const Dashboard = () => {
         if (res.data?.success) setWalletBalance(res.data.data.balance);
       } else {
         const res = await api.get('/payments/wallet/landlord-balance');
-        if (res.data?.success) setLandlordWallet(res.data.data);
+        if (res.data?.success) {
+          setLandlordWallet(res.data.data);
+          if (res.data.data?.property_fee) setLandlordPropertyFee(res.data.data.property_fee);
+        }
       }
     } catch (err) {
       console.error('Failed to load wallet data', err);
@@ -472,6 +541,44 @@ const Dashboard = () => {
       toast.error(err.response?.data?.message || 'Failed to submit withdrawal');
     } finally {
       setWithdrawLoading(false);
+    }
+  };
+
+  const handleLandlordPropertyFeeSkip = async () => {
+    try {
+      setLandlordPropertyFeeLoading(true);
+      const res = await api.post('/payments/landlord-property-fee/skip');
+      if (res.data?.success) {
+        setLandlordPropertyFee(res.data.data);
+        toast.info('Landlord property billing reminder skipped for today');
+      } else {
+        toast.error(res.data?.message || 'Could not skip landlord property billing reminder');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not skip landlord property billing reminder');
+    } finally {
+      setLandlordPropertyFeeLoading(false);
+    }
+  };
+
+  const handleLandlordPropertyFeeAgree = async () => {
+    try {
+      setLandlordPropertyFeeLoading(true);
+      const res = await api.post('/payments/landlord-property-fee/agree');
+      if (res.data?.success) {
+        setLandlordPropertyFee(res.data.data?.status || null);
+        toast.success(res.data.message || 'Landlord property charges settled');
+        await loadDashboardData(false);
+      } else {
+        toast.error(res.data?.message || 'Could not settle landlord property charges');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not settle landlord property charges');
+      if (err.response?.data?.data?.status) {
+        setLandlordPropertyFee(err.response.data.data.status);
+      }
+    } finally {
+      setLandlordPropertyFeeLoading(false);
     }
   };
 
@@ -536,6 +643,22 @@ const Dashboard = () => {
       '_blank',
       'noopener,noreferrer'
     );
+  };
+
+  const openPropertyInGoogleMaps = (property) => {
+    if (!canOpenPropertyMap(property)) {
+      toast.info('This location card becomes active after rent payment is confirmed.');
+      return;
+    }
+
+    const mapsUrl = buildGoogleMapsUrl(property);
+
+    if (!mapsUrl) {
+      toast.info('No map location is available for this property yet.');
+      return;
+    }
+
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
   };
 
   const withdrawStatusBadge = (status) => {
@@ -818,6 +941,15 @@ const Dashboard = () => {
   }
 
   const lawyerInviteSummary = getLawyerInviteSummary();
+  const propertyLocationCards = paidPropertyLocations.length
+    ? paidPropertyLocations
+    : [{
+        property_id: 'pending-rent-location-card',
+        title: 'Property location',
+        payment_type: 'rent_required',
+        rent_paid: false,
+      }];
+  const hasActivePropertyLocation = propertyLocationCards.some(canOpenPropertyMap);
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -1032,6 +1164,91 @@ const Dashboard = () => {
           )}
         </div>
 
+        {user?.user_type === 'tenant' && (
+          <section
+            className={`mb-8 rounded-lg border bg-white p-5 shadow-sm ${
+              hasActivePropertyLocation ? 'border-emerald-200' : 'border-gray-200'
+            }`}
+          >
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className={`flex items-center gap-2 ${hasActivePropertyLocation ? 'text-emerald-700' : 'text-gray-500'}`}>
+                  {hasActivePropertyLocation ? <FaMapMarkedAlt /> : <FaLock />}
+                  <h2 className="text-lg font-bold text-gray-900">Property Location</h2>
+                </div>
+                <p className="mt-1 text-sm text-gray-600">
+                  {hasActivePropertyLocation
+                    ? 'Tap any active property card to open its location in Google Maps on your phone.'
+                    : 'This card becomes clickable after your rent payment is confirmed.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {propertyLocationCards.map((property) => {
+                const isActive = canOpenPropertyMap(property);
+
+                return (
+                  <button
+                    key={property.property_id}
+                    type="button"
+                    disabled={!isActive}
+                    onClick={() => openPropertyInGoogleMaps(property)}
+                    className={`rounded-lg border p-4 text-left transition focus:outline-none ${
+                      isActive
+                        ? 'border-gray-200 bg-gray-50 hover:border-emerald-300 hover:bg-emerald-50 focus:ring-2 focus:ring-emerald-500'
+                        : 'cursor-not-allowed border-gray-200 bg-gray-100 opacity-80'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`truncate font-semibold ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                          {property.title || 'Property location'}
+                        </p>
+                        <p className="mt-1 break-words text-sm text-gray-600">
+                          {getPropertyMapAddress(property) ||
+                            (isActive ? 'Location available' : 'Pay rent to activate Google Maps location')}
+                        </p>
+                      </div>
+                      {isActive ? (
+                        <FaExternalLinkAlt className="mt-1 shrink-0 text-emerald-600" />
+                      ) : (
+                        <FaLock className="mt-1 shrink-0 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <span
+                        className={`rounded-full px-2.5 py-1 font-semibold ${
+                          isActive
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-gray-200 text-gray-600'
+                        }`}
+                      >
+                        {isActive ? 'Rent paid' : 'Rent not paid'}
+                      </span>
+                      {isActive ? (
+                        property.latitude && property.longitude ? (
+                          <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-700">
+                            Map pin ready
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">
+                            Address search
+                          </span>
+                        )
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">
+                          Locked until confirmed
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Referral invite */}
         {referralInfo?.enabled && referralInfo.invite_url && (
           <section
@@ -1149,6 +1366,14 @@ const Dashboard = () => {
                 reviewed and resolved. Payments with no active refund dispute after 14 working days are
                 automatically cleared for withdrawal.
               </p>
+              {landlordPropertyFee?.reserve_required && Number(landlordPropertyFee?.amount_due || 0) > 0 && (
+                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {(landlordPropertyFee.fee_label || 'Landlord Property Charges')} reserve: N{Number(landlordPropertyFee.amount_due || 0).toLocaleString()} is due on{' '}
+                  {new Date(landlordPropertyFee.due_at).toLocaleDateString()} for{' '}
+                  {landlordPropertyFee.property_count} posted propert{Number(landlordPropertyFee.property_count) === 1 ? 'y' : 'ies'}.
+                  You cannot withdraw the reserved portion.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -1192,6 +1417,12 @@ const Dashboard = () => {
                 description="Track your property detail unlock payments"
                 icon={<FaFileAlt />}
                 onClick={() => navigate('/payment-history')}
+              />
+              <QuickActionCard
+                title="Subscription"
+                description="View Super Admin priced monthly access and multiple property add-on"
+                icon={<FaClock />}
+                onClick={() => navigate('/subscribe')}
               />
               <QuickActionCard
                 title="Fumigation & Cleaning"
@@ -1264,7 +1495,7 @@ const Dashboard = () => {
               />
               <QuickActionCard
                 title="Subscription"
-                description="Renew your monthly landlord access"
+                description="Renew your Super Admin priced monthly landlord access"
                 icon={<FaClock />}
                 onClick={() => navigate('/subscribe')}
               />
@@ -1564,6 +1795,18 @@ const Dashboard = () => {
         </div>
       )}
 
+      {user?.user_type === 'landlord' && landlordPropertyFee?.modal_required && (
+        <LandlordPropertyFeeModal
+          feeStatus={landlordPropertyFee}
+          isLoading={landlordPropertyFeeLoading}
+          onSkip={handleLandlordPropertyFeeSkip}
+          onAgree={handleLandlordPropertyFeeAgree}
+          onFundWallet={() => {
+            setShowFundModal(true);
+          }}
+        />
+      )}
+
       <WalletFundModal
         isOpen={showFundModal}
         onClose={() => setShowFundModal(false)}
@@ -1586,6 +1829,7 @@ const Dashboard = () => {
         userType={user?.user_type}
         walletBalance={walletBalance}
         landlordWallet={landlordWallet}
+        propertyFeeReserve={landlordPropertyFee || landlordWallet?.property_fee}
         withdrawForm={withdrawForm}
         setWithdrawForm={setWithdrawForm}
         handleBankChange={handleBankChange}
@@ -1854,6 +2098,144 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const LandlordPropertyFeeModal = ({
+  feeStatus,
+  isLoading,
+  onSkip,
+  onAgree,
+  onFundWallet,
+}) => {
+  const feeItems = feeStatus?.modal_fees?.length
+    ? feeStatus.modal_fees
+    : feeStatus
+      ? [feeStatus]
+      : [];
+  const amountDue = Number(feeStatus?.modal_amount_due || feeStatus?.amount_due || 0);
+  const propertyCount = Number(feeStatus?.property_count || 0);
+  const canSettle = feeStatus?.can_settle !== false;
+  const action = feeStatus?.modal_action;
+  const title = feeItems.length === 1
+    ? feeItems[0].fee_label || feeItems[0].label || 'Landlord Property Charges'
+    : 'Landlord Property Charges';
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+        <div className="border-b px-6 py-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-amber-100 p-3 text-amber-700">
+              <FaExclamationTriangle />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">
+                {title}
+              </h2>
+              <p className="mt-1 text-sm text-gray-600">
+                These charges keep your posted landlord properties active and maintained on RentalHub.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 px-6 py-5">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+              <p className="text-xs text-gray-500">Properties</p>
+              <p className="text-xl font-bold text-gray-900">{propertyCount}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+              <p className="text-xs text-gray-500">{feeItems.length > 1 ? 'Charges' : 'Per Property'}</p>
+              <p className="text-xl font-bold text-gray-900">
+                {feeItems.length > 1
+                  ? feeItems.length
+                  : `N${Number(feeItems[0]?.fee_per_property || feeStatus?.fee_per_property || 0).toLocaleString()}`}
+              </p>
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+              <p className="text-xs text-amber-700">Total Due</p>
+              <p className="text-xl font-bold text-amber-900">
+                N{amountDue.toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {feeItems.map((fee) => (
+              <div
+                key={`${fee.fee_type || fee.fee_label}-${fee.event_id || fee.due_at}`}
+                className="rounded-lg border border-gray-200 bg-white px-4 py-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {fee.fee_label || fee.label || 'Property Charge'}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      N{Number(fee.fee_per_property || 0).toLocaleString()} per property, {fee.cadence || 'scheduled'}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-gray-900">
+                    N{Number(fee.amount_due || 0).toLocaleString()}
+                  </p>
+                </div>
+                <p className="mt-2 text-xs text-gray-600">
+                  Due date: <strong>{fee.due_at ? new Date(fee.due_at).toLocaleDateString() : 'Pending'}</strong>
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+            <p>
+              Next due date: <strong>{feeStatus?.due_at ? new Date(feeStatus.due_at).toLocaleDateString() : 'Pending'}</strong>
+            </p>
+            <p className="mt-1">
+              Funding source: wallet balance first, then cleared rent balance if needed.
+            </p>
+          </div>
+
+          {!canSettle && action === 'agree' && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Your current wallet and cleared rent balance cannot cover these charges yet. Fund your wallet to continue.
+            </div>
+          )}
+
+          {action === 'skip' ? (
+            <button
+              type="button"
+              onClick={onSkip}
+              disabled={isLoading}
+              className="btn btn-primary w-full py-3 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoading ? 'Saving...' : 'Skip for Today'}
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={onAgree}
+              disabled={isLoading || !canSettle}
+              className="btn btn-primary w-full py-3 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+                {isLoading ? 'Processing...' : 'Agree and Settle Charges'}
+              </button>
+              {!canSettle && (
+                <button
+                  type="button"
+                  onClick={onFundWallet}
+                  className="btn w-full py-3"
+                >
+                  Fund Wallet
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

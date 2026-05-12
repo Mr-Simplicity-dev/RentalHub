@@ -142,11 +142,11 @@ exports.getPaymentStats = async () => {
   try {
     const stats = await db.query(`
       SELECT 
-        COUNT(*) FILTER (WHERE payment_type IN ('tenant_subscription', 'landlord_subscription') AND payment_status = 'completed') as total_subscriptions,
+        COUNT(*) FILTER (WHERE payment_type IN ('tenant_subscription', 'tenant_multiple_property_subscription', 'landlord_subscription') AND payment_status = 'completed') as total_subscriptions,
         COUNT(*) FILTER (WHERE payment_type = 'landlord_listing' AND payment_status = 'completed') as total_listings_paid,
         COUNT(*) FILTER (WHERE payment_type = 'rent_payment' AND payment_status = 'completed') as total_rent_payments,
         SUM(amount) FILTER (WHERE payment_status = 'completed') as total_revenue,
-        SUM(amount) FILTER (WHERE payment_type IN ('tenant_subscription', 'landlord_subscription') AND payment_status = 'completed') as subscription_revenue,
+        SUM(amount) FILTER (WHERE payment_type IN ('tenant_subscription', 'tenant_multiple_property_subscription', 'landlord_subscription') AND payment_status = 'completed') as subscription_revenue,
         SUM(amount) FILTER (WHERE payment_type = 'landlord_listing' AND payment_status = 'completed') as listing_revenue,
         SUM(amount) FILTER (WHERE payment_type = 'rent_payment' AND payment_status = 'completed') as rent_revenue
       FROM payments

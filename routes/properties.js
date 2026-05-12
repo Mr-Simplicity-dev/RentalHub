@@ -4,6 +4,7 @@ const { body } = require('express-validator');
 const propertyController = require('../controllers/propertyController');
 const {
   authenticate,
+  optionalAuthenticate,
   isLandlordOrAgent,
   isTenant,
 } = require('../config/middleware/auth');
@@ -16,13 +17,13 @@ const { uploadPropertyMedia, uploadPropertyPhotos } = require('../config/middlew
 router.get('/states', propertyController.getAllStates);
 
 // Browse properties (limited info for non-subscribers)
-router.get('/browse', propertyController.browseProperties);
+router.get('/browse', optionalAuthenticate, propertyController.browseProperties);
 
 // Get featured properties
-router.get('/featured', propertyController.getFeaturedProperties);
+router.get('/featured', optionalAuthenticate, propertyController.getFeaturedProperties);
 
 // Search properties with filters
-router.get('/search', propertyController.searchProperties);
+router.get('/search', optionalAuthenticate, propertyController.searchProperties);
 
 // ============ TENANT ROUTES ============
 
@@ -122,6 +123,8 @@ router.post(
     body('city').trim().notEmpty(),
     body('area').trim().notEmpty(),
     body('full_address').optional().trim().notEmpty(),
+    body('latitude').isFloat({ min: -90, max: 90 }).withMessage('Valid latitude is required'),
+    body('longitude').isFloat({ min: -180, max: 180 }).withMessage('Valid longitude is required'),
     body('property_type').isIn([
       'apartment',
       'house',

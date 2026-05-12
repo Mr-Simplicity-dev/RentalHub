@@ -6,6 +6,7 @@ import BackToDashboard from '../components/common/BackToDashboard';
 
 const PAYMENT_TYPE_LABELS = {
   tenant_subscription: 'Subscription',
+  tenant_multiple_property_subscription: 'Multiple Property Subscription',
   landlord_subscription: 'Landlord Subscription',
   property_unlock: 'Property Unlock',
   landlord_listing: 'Listing Payment',

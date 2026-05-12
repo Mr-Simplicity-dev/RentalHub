@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const { body, param, validationResult } = require('express-validator');
+const { authenticate } = require('../config/middleware/auth');
+const { allowRoles } = require('../config/middleware/roleMiddleware');
 const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
@@ -13,7 +15,11 @@ const {
   createTenantAlertPayment,
   getTenantAlertById,
   getTenantAlertPaymentByReference,
+  listAssignableAdminsForPropertyRequest,
+  listTenantPropertyRequestsForAdmin,
   markTenantAlertPaymentCompleted,
+  reviewTenantPropertyRequest,
+  updateTenantPropertyRequestStateAction,
 } = require('../config/utils/propertyAlertService');
 
 const allowedPropertyTypes = [
@@ -132,7 +138,7 @@ router.post(
           success: true,
           payment_required: false,
           message:
-            'Request submitted. We will notify you by email and WhatsApp when a matching property is available.',
+            'Request submitted. Support admin will review it and assign it to the state team before sourcing starts.',
           data: alert,
         });
       }
@@ -251,7 +257,7 @@ router.post(
         return res.json({
           success: true,
           message:
-            'Request submitted. We will notify you by email and WhatsApp when a matching property is available.',
+            'Request submitted. Support admin will review it and assign it to the state team before sourcing starts.',
           data: existingAlert,
         });
       }
@@ -294,7 +300,7 @@ router.post(
       res.json({
         success: true,
         message:
-          'Request submitted. We will notify you by email and WhatsApp when a matching property is available.',
+          'Request submitted. Support admin will review it and assign it to the state team before sourcing starts.',
         data: alert,
       });
     } catch (error) {
@@ -302,6 +308,151 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Failed to complete notification request',
+      });
+    }
+  }
+);
+
+router.get(
+  '/admin/requests',
+  authenticate,
+  allowRoles(
+    'super_admin',
+    'super_support_admin',
+    'state_support_admin',
+    'state_admin',
+    'state_financial_admin',
+    'admin'
+  ),
+  async (req, res) => {
+    try {
+      const requests = await listTenantPropertyRequestsForAdmin({
+        viewer: req.user,
+        status: req.query.status || 'all',
+        limit: req.query.limit || 50,
+      });
+
+      res.json({
+        success: true,
+        data: requests,
+      });
+    } catch (error) {
+      console.error('List property requests error:', error);
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || 'Failed to load property requests',
+      });
+    }
+  }
+);
+
+router.get(
+  '/admin/assignable-admins',
+  authenticate,
+  allowRoles('super_admin', 'super_support_admin', 'state_support_admin'),
+  async (req, res) => {
+    try {
+      const admins = await listAssignableAdminsForPropertyRequest({
+        viewer: req.user,
+        stateName: req.query.state_name || null,
+      });
+
+      res.json({
+        success: true,
+        data: admins,
+      });
+    } catch (error) {
+      console.error('List assignable property request admins error:', error);
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || 'Failed to load assignable admins',
+      });
+    }
+  }
+);
+
+router.patch(
+  '/admin/requests/:requestId/support-review',
+  authenticate,
+  allowRoles('super_admin', 'super_support_admin', 'state_support_admin'),
+  [
+    param('requestId').isInt(),
+    body('decision').isIn(['approved', 'rejected']),
+    body('review_note').optional({ checkFalsy: true }).trim(),
+    body('assigned_admin_id').optional({ checkFalsy: true }).isInt(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
+      }
+
+      const request = await reviewTenantPropertyRequest({
+        alertId: Number(req.params.requestId),
+        reviewer: req.user,
+        decision: req.body.decision,
+        note: req.body.review_note || '',
+        assignedAdminId: req.body.assigned_admin_id || null,
+      });
+
+      res.json({
+        success: true,
+        message:
+          req.body.decision === 'approved'
+            ? 'Property request approved and sent to the state team'
+            : 'Property request rejected',
+        data: request,
+      });
+    } catch (error) {
+      console.error('Review property request error:', error);
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || 'Failed to review property request',
+      });
+    }
+  }
+);
+
+router.patch(
+  '/admin/requests/:requestId/state-action',
+  authenticate,
+  allowRoles('state_admin', 'state_financial_admin', 'admin'),
+  [
+    param('requestId').isInt(),
+    body('action').isIn(['sourcing', 'lga_missing', 'fulfilled']),
+    body('note').optional({ checkFalsy: true }).trim(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
+      }
+
+      const request = await updateTenantPropertyRequestStateAction({
+        alertId: Number(req.params.requestId),
+        actor: req.user,
+        action: req.body.action,
+        note: req.body.note || '',
+      });
+
+      res.json({
+        success: true,
+        message: 'Property request updated',
+        data: request,
+      });
+    } catch (error) {
+      console.error('State property request action error:', error);
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || 'Failed to update property request',
       });
     }
   }

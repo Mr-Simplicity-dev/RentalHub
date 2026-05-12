@@ -16,6 +16,9 @@ const {
   resolveBankCodeFromName,
   isValidPaystackSignature,
 } = require('../services/paystackTransfer.service');
+const {
+  getLandlordPropertyFeeStatus,
+} = require('../config/utils/landlordPropertyFee');
 
 const WALLET_WITHDRAWAL_ADMIN_ROLES = ['admin', 'super_admin', 'financial_admin', 'super_financial_admin'];
 
@@ -114,8 +117,29 @@ const ensureRefundSchema = async () => {
       description TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT chk_landlord_rent_deduction_type
-        CHECK (deduction_type IN ('subscription'))
+        CHECK (
+          deduction_type IN (
+            'subscription',
+            'property_fee',
+            'annual_listing_renewal',
+            'monthly_maintenance'
+          )
+        )
     );
+
+    ALTER TABLE landlord_rent_deductions
+      DROP CONSTRAINT IF EXISTS chk_landlord_rent_deduction_type;
+
+    ALTER TABLE landlord_rent_deductions
+      ADD CONSTRAINT chk_landlord_rent_deduction_type
+      CHECK (
+        deduction_type IN (
+          'subscription',
+          'property_fee',
+          'annual_listing_renewal',
+          'monthly_maintenance'
+        )
+      );
 
     CREATE INDEX IF NOT EXISTS idx_landlord_rent_deductions_landlord
       ON landlord_rent_deductions(landlord_id, created_at DESC);
@@ -705,6 +729,9 @@ exports.requestWithdrawal = async (req, res) => {
       });
     }
 
+    const userResult = await db.query(`SELECT user_type FROM users WHERE id = $1`, [userId]);
+    const userType = userResult.rows[0]?.user_type;
+
     // Check wallet balance
     const walletResult = await db.query(
       `SELECT balance FROM wallets WHERE user_id = $1`,
@@ -721,10 +748,25 @@ exports.requestWithdrawal = async (req, res) => {
     }
 
     // For landlords — enforce 14 working days hold
-    const userResult = await db.query(`SELECT user_type FROM users WHERE id = $1`, [userId]);
-    const userType = userResult.rows[0]?.user_type;
-
     if (userType === 'landlord') {
+      const feeStatus = await getLandlordPropertyFeeStatus(userId);
+      if (feeStatus.reserve_required && Number(feeStatus.amount_due || 0) > 0) {
+        const availableAfterReserve = Number(feeStatus.available_after_reserve || 0);
+
+        if (withdrawAmount > availableAfterReserve) {
+          const reserveLabel = feeStatus.reserve_label || 'landlord property charges';
+          return res.status(400).json({
+            success: false,
+            code: 'LANDLORD_PROPERTY_FEE_RESERVED',
+            message: `You cannot withdraw all funds now. Your ${reserveLabel} reserve of N${Number(feeStatus.amount_due || 0).toLocaleString()} is due on ${new Date(feeStatus.due_at).toLocaleDateString()} for ${feeStatus.property_count} posted propert${Number(feeStatus.property_count) === 1 ? 'y' : 'ies'}. Maximum available after reserve: N${availableAfterReserve.toLocaleString()}.`,
+            data: {
+              property_fee: feeStatus,
+              max_withdrawable_after_reserve: availableAfterReserve,
+            },
+          });
+        }
+      }
+
       // Check if there are any rent payments received within 14 working days
       // 14 working days ≈ 20 calendar days
       const recentPayments = await db.query(
@@ -1114,6 +1156,7 @@ exports.getLandlordWalletBalance = async (req, res) => {
       : 0;
     const rentAvailable = Math.max(0, cleared - withdrawn - rentDeductions);
     const available = rentAvailable + walletBalance;
+    const propertyFeeStatus = await getLandlordPropertyFeeStatus(landlordId);
 
     res.json({
       success: true,
@@ -1125,6 +1168,7 @@ exports.getLandlordWalletBalance = async (req, res) => {
         pending_balance:   pending,
         withdrawn_total:   withdrawn,
         available_to_withdraw: available,
+        property_fee: propertyFeeStatus,
       },
     });
   } catch (error) {

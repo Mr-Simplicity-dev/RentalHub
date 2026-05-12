@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
+import { paymentService } from '../services/paymentService';
 import PropertyList from '../components/properties/PropertyList';
 import PropertyFilters from '../components/properties/PropertyFilters';
 import AdSpace from '../components/common/AdSpace';
@@ -9,14 +10,35 @@ import ReactPaginate from 'react-paginate';
 import { useTranslation } from 'react-i18next';
 
 const PAGE_SIZE = 20;
+const IGNORED_PROPERTY_FILTER_PARAMS = [
+  'request',
+  'alert_ref',
+  'location_access_ref',
+  'reference',
+  'trxref',
+];
+
+const getPropertyFiltersFromSearchParams = (params) => {
+  const nextFilters = {};
+  params.forEach((value, key) => {
+    if (!IGNORED_PROPERTY_FILTER_PARAMS.includes(key)) {
+      nextFilters[key] = value;
+    }
+  });
+  return nextFilters;
+};
 
 const Properties = () => {
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
+  const genericPaymentReference =
+    searchParams.get('reference') || searchParams.get('trxref') || '';
+  const locationAccessReference =
+    searchParams.get('location_access_ref') ||
+    (genericPaymentReference.startsWith('LOC_') ? genericPaymentReference : '');
   const alertRequestReference =
     searchParams.get('alert_ref') ||
-    searchParams.get('reference') ||
-    searchParams.get('trxref');
+    (!locationAccessReference ? genericPaymentReference : '');
 
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +53,8 @@ const Properties = () => {
   const [requestLoading, setRequestLoading] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [locationOptions, setLocationOptions] = useState([]);
+  const [locationAccessRequirement, setLocationAccessRequirement] = useState(null);
+  const [locationAccessLoading, setLocationAccessLoading] = useState(false);
   const [alertPaymentEnabled, setAlertPaymentEnabled] = useState(false);
   const [alertPricing, setAlertPricing] = useState({
     amount: 5000,
@@ -66,6 +90,7 @@ const Properties = () => {
       });
 
       if (response.success) {
+        setLocationAccessRequirement(null);
         const exactResults = response.data || [];
 
         if (exactResults.length > 0 || page !== 1) {
@@ -125,7 +150,25 @@ const Properties = () => {
         setPagination(response.pagination);
       }
     } catch (error) {
-      toast.error(t('properties.load_failed'));
+      const responseData = error.response?.data;
+      if (
+        error.response?.status === 402 &&
+        responseData?.code === 'LOCATION_ACCESS_PAYMENT_REQUIRED'
+      ) {
+        setLocationAccessRequirement({
+          message: responseData.message,
+          ...(responseData.data || {}),
+        });
+        setProperties([]);
+        setPagination((prev) => ({
+          ...prev,
+          page,
+          total: 0,
+        }));
+        return;
+      }
+
+      toast.error(responseData?.message || t('properties.load_failed'));
       console.error('Error loading properties:', error);
     } finally {
       setLoading(false);
@@ -190,12 +233,7 @@ const Properties = () => {
 
   useEffect(() => {
     // Get initial filters from URL
-    const initialFilters = {};
-    searchParams.forEach((value, key) => {
-      if (!['request', 'alert_ref', 'reference', 'trxref'].includes(key)) {
-        initialFilters[key] = value;
-      }
-    });
+    const initialFilters = getPropertyFiltersFromSearchParams(searchParams);
 
     const shouldOpenRequestForm =
       searchParams.get('request') === '1' ||
@@ -268,6 +306,14 @@ const Properties = () => {
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
+  const clearCompletedLocationAccessParams = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('location_access_ref');
+    url.searchParams.delete('reference');
+    url.searchParams.delete('trxref');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
   const resetRequestOptionalFields = useCallback(() => {
     setRequestForm((prev) => ({
       ...prev,
@@ -295,7 +341,7 @@ const Properties = () => {
         if (res.success) {
           toast.success(
             res.message ||
-              'Request submitted successfully. We will notify you when a matching property is available.'
+              'Request submitted successfully. Support admin will review it before the state team starts sourcing.'
           );
           resetRequestOptionalFields();
           clearCompletedAlertRequestParams();
@@ -320,6 +366,86 @@ const Properties = () => {
       completeTenantRequestPayment(alertRequestReference);
     }
   }, [alertRequestReference, completeTenantRequestPayment]);
+
+  const completeLocationAccessPayment = useCallback(
+    async (reference) => {
+      if (!reference) {
+        return;
+      }
+
+      setLocationAccessLoading(true);
+      try {
+        const res = await paymentService.verifyLocationAccess(reference);
+
+        if (res.success) {
+          toast.success(res.message || 'Location access activated');
+          setLocationAccessRequirement(null);
+          clearCompletedLocationAccessParams();
+          const nextFilters = getPropertyFiltersFromSearchParams(
+            new URLSearchParams(window.location.search)
+          );
+          setFilters(nextFilters);
+          loadProperties(nextFilters, 1);
+        }
+      } catch (error) {
+        toast.error(
+          error.response?.data?.message || 'Failed to verify location access payment'
+        );
+      } finally {
+        setLocationAccessLoading(false);
+      }
+    },
+    [clearCompletedLocationAccessParams, loadProperties]
+  );
+
+  const handledLocationAccessRef = useRef('');
+
+  useEffect(() => {
+    if (
+      locationAccessReference &&
+      handledLocationAccessRef.current !== locationAccessReference
+    ) {
+      handledLocationAccessRef.current = locationAccessReference;
+      completeLocationAccessPayment(locationAccessReference);
+    }
+  }, [locationAccessReference, completeLocationAccessPayment]);
+
+  const handleLocationAccessPayment = useCallback(async () => {
+    const location = locationAccessRequirement?.location;
+
+    if (!location?.state_id) {
+      toast.error('Select a valid location before paying');
+      return;
+    }
+
+    setLocationAccessLoading(true);
+    try {
+      const res = await paymentService.initializeLocationAccess({
+        state_id: location.state_id,
+        lga_name: location.lga_name || undefined,
+      });
+
+      if (res.payment_required === false) {
+        toast.success(res.message || 'You already have access to this location');
+        setLocationAccessRequirement(null);
+        loadProperties(filters, 1);
+        return;
+      }
+
+      if (res.data?.authorization_url) {
+        window.location.href = res.data.authorization_url;
+        return;
+      }
+
+      toast.error(res.message || 'Unable to start location access payment');
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || 'Failed to start location access payment'
+      );
+    } finally {
+      setLocationAccessLoading(false);
+    }
+  }, [filters, loadProperties, locationAccessRequirement]);
 
   const submitTenantRequest = useCallback(async (e) => {
     e.preventDefault();
@@ -365,7 +491,7 @@ const Properties = () => {
       if (res.success) {
         toast.success(
           res.message ||
-            'Request submitted successfully. We will notify you when a matching property is available.'
+            'Request submitted successfully. Support admin will review it before the state team starts sourcing.'
         );
         resetRequestOptionalFields();
         return;
@@ -381,6 +507,26 @@ const Properties = () => {
     }
   }, [alertPaymentEnabled, requestForm, resetRequestOptionalFields]);
 
+  const locationAccessLocationLabel = locationAccessRequirement?.location
+    ? [
+        locationAccessRequirement.location.lga_name,
+        locationAccessRequirement.location.state_name,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : 'this location';
+  const locationAccessHomeLabel = locationAccessRequirement?.home_location
+    ? [
+        locationAccessRequirement.home_location.lga_name,
+        locationAccessRequirement.home_location.state_name,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : '';
+  const locationAccessFeeLabel = `N${Number(
+    locationAccessRequirement?.amount || 10000
+  ).toLocaleString()}`;
+
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="container mx-auto px-4">
@@ -395,6 +541,46 @@ const Properties = () => {
           onFilterChange={handleFilterChange}
           initialFilters={filters}
         />
+
+        {locationAccessRequirement && (
+          <div className="card mb-6 border border-amber-200 bg-amber-50">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-amber-700">
+                  Location access required
+                </p>
+                <h2 className="mt-1 text-xl font-bold text-gray-900">
+                  Pay {locationAccessFeeLabel} to browse {locationAccessLocationLabel}
+                </h2>
+                <p className="mt-2 text-sm text-gray-700">
+                  {locationAccessRequirement.message ||
+                    'Your tenant account can browse properties in your registered state and LGA. Pay once to unlock this selected location.'}
+                </p>
+                {locationAccessHomeLabel && (
+                  <p className="mt-1 text-xs text-gray-600">
+                    Your registered location: {locationAccessHomeLabel}
+                  </p>
+                )}
+                {locationAccessRequirement.access_days && (
+                  <p className="mt-1 text-xs text-gray-600">
+                    Access lasts for {locationAccessRequirement.access_days} days after payment.
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary w-full md:w-auto"
+                onClick={handleLocationAccessPayment}
+                disabled={locationAccessLoading}
+              >
+                {locationAccessLoading
+                  ? 'Processing...'
+                  : `Pay ${locationAccessFeeLabel}`}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Results Count */}
         <div className="mb-4">
@@ -446,6 +632,7 @@ const Properties = () => {
             </h2>
             <p className="text-gray-600 mb-4">
               Submit your request and we will notify you by email and WhatsApp once a matching property is available.
+              A support admin reviews each request before it is assigned to the state team.
             </p>
             <p className={`text-sm mb-4 ${alertPaymentEnabled ? 'text-primary-700' : 'text-green-700'}`}>
               {alertPaymentEnabled

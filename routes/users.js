@@ -103,6 +103,289 @@ const ensureIdentitySchema = async () => {
   identitySchemaReady = true;
 };
 
+let commissionPasswordSchemaReady = false;
+const ensureCommissionPasswordSchema = async () => {
+  if (commissionPasswordSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS commission_balance_password_hash VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS commission_balance_password_set_at TIMESTAMP;
+  `);
+
+  commissionPasswordSchemaReady = true;
+};
+
+const normalizeCommissionPassword = (value) => String(value || '').trim();
+
+const validateCommissionPassword = (value) => {
+  const password = normalizeCommissionPassword(value);
+  if (password.length < 6) {
+    return 'Commission password must be at least 6 characters';
+  }
+  if (password.length > 128) {
+    return 'Commission password must be 128 characters or fewer';
+  }
+  return null;
+};
+
+const getPasswordRecord = async (userId) => {
+  await ensureCommissionPasswordSchema();
+  const result = await db.query(
+    `SELECT password_hash,
+            commission_balance_password_hash,
+            commission_balance_password_set_at
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [userId]
+  );
+  return result.rows[0] || null;
+};
+
+const verifyLoginPassword = async (userId, password) => {
+  const record = await getPasswordRecord(userId);
+  if (!record?.password_hash) return false;
+  return bcrypt.compare(String(password || ''), record.password_hash);
+};
+
+const setCommissionPassword = async (userId, commissionPassword) => {
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(
+    normalizeCommissionPassword(commissionPassword),
+    salt
+  );
+
+  await db.query(
+    `UPDATE users
+     SET commission_balance_password_hash = $1,
+         commission_balance_password_set_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2`,
+    [passwordHash, userId]
+  );
+};
+
+// Commission balance password status
+router.get('/commission-password/status', authenticate, async (req, res) => {
+  try {
+    const record = await getPasswordRecord(req.user.id);
+
+    return res.json({
+      success: true,
+      data: {
+        has_commission_password: Boolean(record?.commission_balance_password_hash),
+        set_at: record?.commission_balance_password_set_at || null,
+      },
+    });
+  } catch (error) {
+    console.error('Commission password status error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load commission password status',
+    });
+  }
+});
+
+// Set commission balance password for the first time
+router.post('/commission-password/setup', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { login_password, commission_password } = req.body || {};
+    const validationError = validateCommissionPassword(commission_password);
+
+    if (!login_password || !commission_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Login password and commission password are required',
+      });
+    }
+
+    if (validationError) {
+      return res.status(400).json({
+        success: false,
+        message: validationError,
+      });
+    }
+
+    const record = await getPasswordRecord(userId);
+    if (record?.commission_balance_password_hash) {
+      return res.status(409).json({
+        success: false,
+        message: 'Commission password is already set. Use change or reset instead.',
+      });
+    }
+
+    const loginPasswordValid = await verifyLoginPassword(userId, login_password);
+    if (!loginPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Login password is incorrect',
+      });
+    }
+
+    await setCommissionPassword(userId, commission_password);
+
+    return res.json({
+      success: true,
+      message: 'Commission password set successfully',
+    });
+  } catch (error) {
+    console.error('Commission password setup error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to set commission password',
+    });
+  }
+});
+
+// Verify commission balance password for reveal actions
+router.post('/commission-password/verify', authenticate, async (req, res) => {
+  try {
+    const { commission_password } = req.body || {};
+    if (!commission_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Commission password is required',
+      });
+    }
+
+    const record = await getPasswordRecord(req.user.id);
+    if (!record?.commission_balance_password_hash) {
+      return res.status(409).json({
+        success: false,
+        code: 'COMMISSION_PASSWORD_NOT_SET',
+        message: 'Set a commission password before revealing this balance',
+      });
+    }
+
+    const isValid = await bcrypt.compare(
+      normalizeCommissionPassword(commission_password),
+      record.commission_balance_password_hash
+    );
+    if (!isValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect commission password',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Commission password verified',
+    });
+  } catch (error) {
+    console.error('Commission password verification error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify commission password',
+    });
+  }
+});
+
+// Change commission balance password when the current commission password is known
+router.put('/commission-password/change', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      current_commission_password,
+      new_commission_password,
+    } = req.body || {};
+    const validationError = validateCommissionPassword(new_commission_password);
+
+    if (!current_commission_password || !new_commission_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current and new commission passwords are required',
+      });
+    }
+
+    if (validationError) {
+      return res.status(400).json({
+        success: false,
+        message: validationError,
+      });
+    }
+
+    const record = await getPasswordRecord(userId);
+    if (!record?.commission_balance_password_hash) {
+      return res.status(409).json({
+        success: false,
+        code: 'COMMISSION_PASSWORD_NOT_SET',
+        message: 'Set a commission password before changing it',
+      });
+    }
+
+    const currentPasswordValid = await bcrypt.compare(
+      normalizeCommissionPassword(current_commission_password),
+      record.commission_balance_password_hash
+    );
+    if (!currentPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current commission password is incorrect',
+      });
+    }
+
+    await setCommissionPassword(userId, new_commission_password);
+
+    return res.json({
+      success: true,
+      message: 'Commission password changed successfully',
+    });
+  } catch (error) {
+    console.error('Commission password change error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to change commission password',
+    });
+  }
+});
+
+// Reset forgotten commission balance password with the normal login password
+router.post('/commission-password/reset', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { login_password, new_commission_password } = req.body || {};
+    const validationError = validateCommissionPassword(new_commission_password);
+
+    if (!login_password || !new_commission_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Login password and new commission password are required',
+      });
+    }
+
+    if (validationError) {
+      return res.status(400).json({
+        success: false,
+        message: validationError,
+      });
+    }
+
+    const loginPasswordValid = await verifyLoginPassword(userId, login_password);
+    if (!loginPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Login password is incorrect',
+      });
+    }
+
+    await setCommissionPassword(userId, new_commission_password);
+
+    return res.json({
+      success: true,
+      message: 'Commission password reset successfully',
+    });
+  } catch (error) {
+    console.error('Commission password reset error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reset commission password',
+    });
+  }
+});
+
 
 // Get user profile by ID (public info only)
 router.get('/:userId', async (req, res) => {

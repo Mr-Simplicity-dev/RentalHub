@@ -7,6 +7,7 @@ import useRetryableAction from '../../hooks/useRetryableAction';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
+import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 
 const badgeClass = (status) => {
   if (status === 'approved') return 'bg-green-100 text-green-700';
@@ -215,6 +216,11 @@ const StateSupportAdminDashboard = () => {
       <div className="mb-6">
         <CommissionWithdrawalBanner />
       </div>
+
+      <PropertyRequestWorkflowPanel
+        mode="support"
+        title="Tenant Property Requests in Your State"
+      />
 
       <section className="rounded-xl bg-white p-5 shadow">
         <div className="mb-4 flex items-center gap-3">

@@ -11,6 +11,14 @@ const {
   getLawyerDirectoryUnlockStatus: readLawyerDirectoryUnlockStatus,
 } = require('../config/utils/lawyerDirectoryAccess');
 const {
+  buildLocationPaymentPayload,
+  createTenantLocationAccessPayment,
+  ensureTenantLocationAccessSchema,
+  getTenantLocationAccessPaymentByReference,
+  grantTenantLocationAccess,
+  resolveTenantPropertyLocationAccess,
+} = require('../config/utils/tenantLocationAccess');
+const {
   ensureSubscriptionCreditSchema,
   getSubscriptionCreditBalance,
   debitSubscriptionBalance,
@@ -25,6 +33,9 @@ const PROPERTY_UNLOCK_PRICE_NGN = Number(process.env.PROPERTY_UNLOCK_PRICE_NGN |
 const FRONTEND_URL = getFrontendUrl();
 const MONTHLY_SUBSCRIPTION_DURATION_DAYS = 30;
 const MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN = 200;
+const TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_BASE_AMOUNT_NGN = 5000;
+const TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_TARGET = 'tenant_multiple_property_subscription';
+const TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_PAYMENT_TYPE = 'tenant_multiple_property_subscription';
 const SUBSCRIPTION_PRICING_TARGETS = {
   tenant: 'tenant_monthly_subscription',
   landlord: 'landlord_monthly_subscription',
@@ -100,6 +111,7 @@ const ensureInternalSubscriptionSchema = async () => {
       CHECK (
         payment_type IN (
           'tenant_subscription',
+          'tenant_multiple_property_subscription',
           'landlord_subscription',
           'landlord_listing',
           'rent_payment',
@@ -108,6 +120,7 @@ const ensureInternalSubscriptionSchema = async () => {
           'registration_fee',
           'wallet_funding',
           'tenant_property_alert',
+          'tenant_location_access',
           'evidence_verification',
           'lawyer_directory_unlock',
           'lawyer_access_fee',
@@ -115,6 +128,32 @@ const ensureInternalSubscriptionSchema = async () => {
           'transportation_booking'
         )
       );
+
+    DO $$
+    BEGIN
+      IF to_regclass('public.admin_commissions') IS NOT NULL THEN
+        ALTER TABLE admin_commissions
+          DROP CONSTRAINT IF EXISTS admin_commissions_source_check;
+
+        ALTER TABLE admin_commissions
+          ADD CONSTRAINT admin_commissions_source_check
+          CHECK (
+            source IN (
+              'rent_payment',
+              'tenant_subscription',
+              'tenant_multiple_property_subscription',
+              'landlord_subscription',
+              'landlord_listing',
+              'wallet_funding',
+              'property_unlock',
+              'withdrawal_fee',
+              'performance_bonus',
+              'lawyer_access_fee',
+              'agent_access_fee'
+            )
+          );
+      END IF;
+    END $$;
 
     CREATE TABLE IF NOT EXISTS landlord_rent_deductions (
       id SERIAL PRIMARY KEY,
@@ -125,11 +164,33 @@ const ensureInternalSubscriptionSchema = async () => {
       description TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT chk_landlord_rent_deduction_type
-        CHECK (deduction_type IN ('subscription'))
+        CHECK (
+          deduction_type IN (
+            'subscription',
+            'property_fee',
+            'annual_listing_renewal',
+            'monthly_maintenance'
+          )
+        )
     );
 
     CREATE INDEX IF NOT EXISTS idx_landlord_rent_deductions_landlord
       ON landlord_rent_deductions(landlord_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS tenant_multiple_property_subscriptions (
+      id SERIAL PRIMARY KEY,
+      tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+      payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+      transaction_reference VARCHAR(120),
+      amount NUMERIC(12,2) NOT NULL DEFAULT 5000,
+      activated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tenant_multiple_property_subscriptions_active
+      ON tenant_multiple_property_subscriptions(tenant_id, expires_at);
   `);
 
   internalSubscriptionSchemaReady = true;
@@ -331,6 +392,98 @@ const buildMonthlySubscriptionQuote = async ({
   };
 };
 
+const buildTenantMultiplePropertySubscriptionQuote = async ({ userId }) => {
+  const location = await resolveSubscriptionLocationForUser({
+    userId,
+    userType: 'tenant',
+    stateId: null,
+    lgaName: null,
+  });
+
+  const quote = await getLocationPricingQuote({
+    appliesTo: TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_TARGET,
+    stateId: location.stateId,
+    lgaName: location.lgaName,
+  });
+
+  return {
+    ...quote,
+    amount: Math.max(
+      TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_BASE_AMOUNT_NGN,
+      Number(quote.amount || TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_BASE_AMOUNT_NGN)
+    ),
+    base_amount: TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_BASE_AMOUNT_NGN,
+    pricing_target: TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_TARGET,
+    duration_days: MONTHLY_SUBSCRIPTION_DURATION_DAYS,
+    location_source: location.source,
+    state_id: location.stateId,
+    lga_name: location.lgaName,
+  };
+};
+
+const getActiveTenantMultiplePropertySubscription = async (tenantId, executor = db) => {
+  await ensureInternalSubscriptionSchema();
+
+  const result = await executor.query(
+    `SELECT id, tenant_id, payment_id, transaction_reference, amount, activated_at, expires_at
+     FROM tenant_multiple_property_subscriptions
+     WHERE tenant_id = $1
+       AND expires_at > CURRENT_TIMESTAMP
+     LIMIT 1`,
+    [tenantId]
+  );
+
+  return result.rows[0] || null;
+};
+
+const getTenantRentedPropertySummary = async (tenantId, targetPropertyId = null, executor = db) => {
+  const result = await executor.query(
+    `SELECT
+       COUNT(DISTINCT property_id) FILTER (WHERE property_id IS NOT NULL) AS rented_properties_count,
+       BOOL_OR(property_id = $2::int) AS already_rented_target
+     FROM payments
+     WHERE user_id = $1
+       AND payment_type = 'rent_payment'
+       AND payment_status = 'completed'`,
+    [tenantId, targetPropertyId]
+  );
+
+  const row = result.rows[0] || {};
+
+  return {
+    rented_properties_count: Number(row.rented_properties_count || 0),
+    already_rented_target: row.already_rented_target === true,
+  };
+};
+
+const resolveTenantMultiplePropertyRequirement = async ({
+  tenantId,
+  propertyId,
+  executor = db,
+}) => {
+  await ensureInternalSubscriptionSchema();
+
+  const summary = await getTenantRentedPropertySummary(tenantId, propertyId, executor);
+
+  if (summary.rented_properties_count < 1 || summary.already_rented_target) {
+    return {
+      required: false,
+      allowed: true,
+      ...summary,
+      subscription: null,
+    };
+  }
+
+  const subscription = await getActiveTenantMultiplePropertySubscription(tenantId, executor);
+
+  return {
+    required: !subscription,
+    allowed: Boolean(subscription),
+    ...summary,
+    subscription,
+  };
+};
+
 const getTenantRentSavingsBalance = async (userId, executor = db) => {
   try {
     const result = await executor.query(
@@ -516,6 +669,18 @@ exports.getSubscriptionPlans = (req, res) => {
           'Paid from subscription credit and internal balances',
         ],
       },
+      {
+        id: 'tenant_multiple_property_subscription',
+        name: 'Tenant Multiple Property Subscription',
+        duration_days: MONTHLY_SUBSCRIPTION_DURATION_DAYS,
+        price: TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_BASE_AMOUNT_NGN,
+        minimum_price: TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_BASE_AMOUNT_NGN,
+        features: [
+          'Required before a tenant rents more than one property',
+          'Amount is controlled from Super Admin pricing rules',
+          'Paid from subscription credit and internal balances',
+        ],
+      },
     ],
   });
 };
@@ -550,14 +715,28 @@ exports.getSubscriptionQuote = async (req, res) => {
     const quote = await buildMonthlySubscriptionQuote({
       userId,
       userType,
-      stateId: req.query.state_id,
-      lgaName: req.query.lga_name,
     });
     const funding = await buildSubscriptionFundingSnapshot({
       userId,
       userType,
       amount: quote.amount,
     });
+    const tenantMultiplePropertyQuote = userType === 'tenant'
+      ? await buildTenantMultiplePropertySubscriptionQuote({ userId })
+      : null;
+    const tenantMultiplePropertyFunding = tenantMultiplePropertyQuote
+      ? await buildSubscriptionFundingSnapshot({
+          userId,
+          userType,
+          amount: tenantMultiplePropertyQuote.amount,
+        })
+      : null;
+    const tenantMultiplePropertySubscription = userType === 'tenant'
+      ? await getActiveTenantMultiplePropertySubscription(userId)
+      : null;
+    const tenantRentalSummary = userType === 'tenant'
+      ? await getTenantRentedPropertySummary(userId)
+      : null;
 
     res.json({
       success: true,
@@ -569,6 +748,20 @@ exports.getSubscriptionQuote = async (req, res) => {
         },
         quote,
         funding,
+        multiple_property: userType === 'tenant'
+          ? {
+              plan: {
+                id: 'tenant_multiple_property_subscription',
+                name: 'Tenant Multiple Property Subscription',
+                duration_days: MONTHLY_SUBSCRIPTION_DURATION_DAYS,
+              },
+              quote: tenantMultiplePropertyQuote,
+              funding: tenantMultiplePropertyFunding,
+              active: Boolean(tenantMultiplePropertySubscription),
+              expires_at: tenantMultiplePropertySubscription?.expires_at || null,
+              rented_properties_count: tenantRentalSummary?.rented_properties_count || 0,
+            }
+          : null,
       },
     });
   } catch (error) {
@@ -593,6 +786,11 @@ exports.initializeSubscription = async (req, res) => {
 
     const userId = req.user.id;
     const userType = req.user.user_type;
+    const subscriptionType =
+      req.body.subscription_type === 'multiple_property' ||
+      req.body.plan_id === 'tenant_multiple_property_subscription'
+        ? 'multiple_property'
+        : 'monthly';
 
     if (!['tenant', 'landlord'].includes(userType)) {
       return res.status(403).json({
@@ -601,11 +799,214 @@ exports.initializeSubscription = async (req, res) => {
       });
     }
 
+    if (subscriptionType === 'multiple_property') {
+      if (userType !== 'tenant') {
+        return res.status(403).json({
+          success: false,
+          message: 'Multiple property subscription is only available to tenant accounts',
+        });
+      }
+
+      const quote = await buildTenantMultiplePropertySubscriptionQuote({ userId });
+      const amount = Number(
+        quote.amount || TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_BASE_AMOUNT_NGN
+      );
+      const reference = `MULTI_PROP_SUB_${userId}_${Date.now()}`;
+
+      await client.query('BEGIN');
+
+      const userResult = await client.query(
+        `SELECT id, email, full_name
+         FROM users
+         WHERE id = $1
+         FOR UPDATE`,
+        [userId]
+      );
+      const user = userResult.rows[0];
+
+      if (!user) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      let remaining = amount;
+      const fundingBreakdown = {
+        subscription_credit: 0,
+        wallet: 0,
+        rent_savings: 0,
+        rent_savings_deductions: [],
+      };
+
+      const creditDebit = await debitSubscriptionBalance({
+        userId,
+        amount: remaining,
+        source: TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_PAYMENT_TYPE,
+        reference,
+        metadata: {
+          payment_type: TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_PAYMENT_TYPE,
+          pricing_target: quote.pricing_target,
+        },
+        executor: client,
+      });
+
+      fundingBreakdown.subscription_credit = creditDebit.debited;
+      remaining = Math.round((remaining - creditDebit.debited) * 100) / 100;
+
+      if (remaining > 0) {
+        await client.query(
+          `INSERT INTO wallets (user_id, balance)
+           VALUES ($1, 0)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [userId]
+        );
+
+        const walletResult = await client.query(
+          `SELECT balance
+           FROM wallets
+           WHERE user_id = $1
+           FOR UPDATE`,
+          [userId]
+        );
+        const walletBalance = Number(walletResult.rows[0]?.balance || 0);
+        const walletDebit = Math.min(walletBalance, remaining);
+
+        if (walletDebit > 0) {
+          await client.query(
+            `UPDATE wallets
+             SET balance = balance - $2,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE user_id = $1`,
+            [userId, walletDebit]
+          );
+
+          fundingBreakdown.wallet = walletDebit;
+          remaining = Math.round((remaining - walletDebit) * 100) / 100;
+        }
+      }
+
+      if (remaining > 0) {
+        const rentSavingsDebit = await deductTenantRentSavings({
+          executor: client,
+          userId,
+          amount: remaining,
+        });
+
+        if (rentSavingsDebit.insufficient) {
+          await client.query('ROLLBACK');
+          return res.status(402).json({
+            success: false,
+            message: 'Insufficient subscription funding. Add wallet funds or rent savings before subscribing.',
+            data: {
+              amount_required: amount,
+              amount_remaining: remaining,
+              rent_savings_available: rentSavingsDebit.available,
+              funding: await buildSubscriptionFundingSnapshot({ userId, userType, amount }),
+            },
+          });
+        }
+
+        fundingBreakdown.rent_savings = rentSavingsDebit.deducted;
+        fundingBreakdown.rent_savings_deductions = rentSavingsDebit.deductions;
+        remaining = Math.round((remaining - rentSavingsDebit.deducted) * 100) / 100;
+      }
+
+      if (remaining > 0) {
+        await client.query('ROLLBACK');
+        return res.status(402).json({
+          success: false,
+          message: 'Insufficient subscription funding.',
+          data: {
+            amount_required: amount,
+            amount_remaining: remaining,
+            funding: await buildSubscriptionFundingSnapshot({ userId, userType, amount }),
+          },
+        });
+      }
+
+      const paymentResult = await client.query(
+        `INSERT INTO payments (
+           user_id,
+           payment_type,
+           amount,
+           currency,
+           subscription_duration_days,
+           payment_method,
+           payment_status,
+           transaction_reference,
+           completed_at,
+           gateway_response
+         )
+         VALUES ($1, $2, $3, 'NGN', $4, 'internal_balance', 'completed', $5, CURRENT_TIMESTAMP, $6)
+         RETURNING id`,
+        [
+          userId,
+          TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_PAYMENT_TYPE,
+          amount,
+          MONTHLY_SUBSCRIPTION_DURATION_DAYS,
+          reference,
+          JSON.stringify({
+            funding_source: 'internal',
+            funding_breakdown: fundingBreakdown,
+            quote,
+            full_name: user.full_name,
+            email: user.email,
+          }),
+        ]
+      );
+
+      const paymentId = paymentResult.rows[0].id;
+
+      const currentSubscriptionResult = await client.query(
+        `SELECT expires_at
+         FROM tenant_multiple_property_subscriptions
+         WHERE tenant_id = $1
+         FOR UPDATE`,
+        [userId]
+      );
+      const currentExpiry = currentSubscriptionResult.rows[0]?.expires_at
+        ? new Date(currentSubscriptionResult.rows[0].expires_at)
+        : null;
+      const startDate =
+        currentExpiry && currentExpiry > new Date() ? currentExpiry : new Date();
+      const expiryDate = new Date(startDate);
+      expiryDate.setDate(expiryDate.getDate() + MONTHLY_SUBSCRIPTION_DURATION_DAYS);
+
+      await client.query(
+        `INSERT INTO tenant_multiple_property_subscriptions (
+           tenant_id, payment_id, transaction_reference, amount, activated_at, expires_at
+         )
+         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, $5)
+         ON CONFLICT (tenant_id)
+         DO UPDATE SET
+           payment_id = EXCLUDED.payment_id,
+           transaction_reference = EXCLUDED.transaction_reference,
+           amount = EXCLUDED.amount,
+           activated_at = CURRENT_TIMESTAMP,
+           expires_at = EXCLUDED.expires_at,
+           updated_at = CURRENT_TIMESTAMP`,
+        [userId, paymentId, reference, amount, expiryDate]
+      );
+
+      await client.query('COMMIT');
+
+      await commissionService.processPaymentCommission(paymentId);
+
+      return res.json({
+        success: true,
+        message: 'Multiple property subscription activated successfully',
+        data: {
+          payment_id: paymentId,
+          reference,
+          amount_paid: amount,
+          funding_breakdown: fundingBreakdown,
+          multiple_property_subscription_expires_at: expiryDate,
+        },
+      });
+    }
+
     const quote = await buildMonthlySubscriptionQuote({
       userId,
       userType,
-      stateId: req.body.state_id,
-      lgaName: req.body.lga_name,
     });
     const amount = Number(quote.amount || MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN);
     const paymentType = getMonthlySubscriptionPaymentType(userType);
@@ -810,7 +1211,11 @@ exports.initializeSubscription = async (req, res) => {
 
     await client.query('COMMIT');
 
-    if (['tenant_subscription', 'landlord_subscription'].includes(paymentType)) {
+    if ([
+      'tenant_subscription',
+      'tenant_multiple_property_subscription',
+      'landlord_subscription',
+    ].includes(paymentType)) {
       await commissionService.processPaymentCommission(paymentId);
     }
 
@@ -947,8 +1352,6 @@ exports.getSubscriptionStatus = async (req, res) => {
       ? await buildMonthlySubscriptionQuote({
           userId,
           userType,
-          stateId: req.query.state_id,
-          lgaName: req.query.lga_name,
         })
       : null;
     const funding = quote
@@ -963,6 +1366,12 @@ exports.getSubscriptionStatus = async (req, res) => {
       user.subscription_active &&
       user.subscription_expires_at &&
       new Date(user.subscription_expires_at) > now;
+    const multiplePropertySubscription = userType === 'tenant'
+      ? await getActiveTenantMultiplePropertySubscription(userId)
+      : null;
+    const multiplePropertyQuote = userType === 'tenant'
+      ? await buildTenantMultiplePropertySubscriptionQuote({ userId })
+      : null;
 
     res.json({
       success: true,
@@ -976,7 +1385,14 @@ exports.getSubscriptionStatus = async (req, res) => {
               (new Date(user.subscription_expires_at) - now) /
                 (1000 * 60 * 60 * 24)
             )
-          : 0
+          : 0,
+        multiple_property: userType === 'tenant'
+          ? {
+              active: Boolean(multiplePropertySubscription),
+              expires_at: multiplePropertySubscription?.expires_at || null,
+              quote: multiplePropertyQuote,
+            }
+          : null,
       }
     });
   } catch (error) {
@@ -1255,6 +1671,297 @@ exports.getPropertyUnlockStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get property unlock status",
+    });
+  }
+};
+
+exports.getTenantLocationAccessQuote = async (req, res) => {
+  try {
+    const { state_id, lga_name } = req.query;
+
+    const access = await resolveTenantPropertyLocationAccess({
+      tenantId: req.user.id,
+      requestedStateId: state_id,
+      requestedLgaName: lga_name,
+    });
+
+    if (access.allowed) {
+      return res.json({
+        success: true,
+        payment_required: false,
+        data: {
+          location: access.location,
+          source: access.source,
+          grant_expires_at: access.grant?.expires_at || null,
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      payment_required: true,
+      code: access.code,
+      message: access.message,
+      data: {
+        amount: access.quote.amount,
+        base_amount: access.quote.base_amount,
+        rule_scope: access.quote.rule_scope,
+        access_days: access.quote.access_days,
+        location: access.location,
+        home_location: {
+          state_id: access.profile?.preferred_state_id,
+          state_name: access.profile?.state_name,
+          lga_name: access.profile?.preferred_lga_name,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Tenant location access quote error:', error);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      code: error.code || 'LOCATION_ACCESS_QUOTE_FAILED',
+      message: error.message || 'Failed to get location access quote',
+    });
+  }
+};
+
+exports.initializeTenantLocationAccess = async (req, res) => {
+  try {
+    await ensureTenantLocationAccessSchema();
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array(),
+      });
+    }
+
+    const userId = req.user.id;
+    const { state_id, lga_name, payment_method = 'paystack' } = req.body;
+
+    if (payment_method !== 'paystack') {
+      return res.status(400).json({
+        success: false,
+        message: 'Location access payment currently supports Paystack only',
+      });
+    }
+
+    const access = await resolveTenantPropertyLocationAccess({
+      tenantId: userId,
+      requestedStateId: state_id,
+      requestedLgaName: lga_name,
+    });
+
+    if (access.allowed) {
+      return res.json({
+        success: true,
+        payment_required: false,
+        message: 'You already have access to this location',
+        data: {
+          location: access.location,
+          source: access.source,
+          grant_expires_at: access.grant?.expires_at || null,
+        },
+      });
+    }
+
+    if (!PAYSTACK_SECRET_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment service is not configured',
+      });
+    }
+
+    const quote = await buildLocationPaymentPayload({
+      stateId: access.location.state_id,
+      lgaName: access.location.lga_name,
+    });
+
+    const paymentResult = await db.query(
+      `INSERT INTO payments (
+         user_id, payment_type, amount, currency,
+         payment_method, payment_status
+       )
+       VALUES ($1, 'tenant_location_access', $2, 'NGN', 'paystack', 'pending')
+       RETURNING id`,
+      [userId, quote.amount]
+    );
+    const paymentId = paymentResult.rows[0].id;
+    const reference = `LOC_${paymentId}_${Date.now()}`;
+
+    const query = new URLSearchParams({
+      state_id: String(access.location.state_id),
+      location_access_ref: reference,
+    });
+
+    if (access.location.lga_name) {
+      query.set('lga_name', access.location.lga_name);
+    }
+
+    const callbackUrl = `${FRONTEND_URL}/properties?${query.toString()}`;
+
+    const paystackResponse = await axios.post(
+      `${PAYSTACK_BASE_URL}/transaction/initialize`,
+      {
+        email: req.user.email,
+        amount: Number(quote.amount) * 100,
+        reference,
+        callback_url: callbackUrl,
+        metadata: {
+          payment_id: paymentId,
+          user_id: userId,
+          payment_type: 'tenant_location_access',
+          state_id: access.location.state_id,
+          state_name: access.location.state_name,
+          lga_name: access.location.lga_name,
+          amount: quote.amount,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    await db.query(
+      `UPDATE payments
+       SET transaction_reference = $1
+       WHERE id = $2`,
+      [reference, paymentId]
+    );
+
+    await createTenantLocationAccessPayment({
+      tenantId: userId,
+      stateId: access.location.state_id,
+      lgaName: access.location.lga_name,
+      amount: quote.amount,
+      paymentId,
+      transactionReference: reference,
+    });
+
+    res.json({
+      success: true,
+      payment_required: true,
+      message: `Pay N${Number(quote.amount).toLocaleString()} to browse properties in ${
+        access.location.lga_name || access.location.state_name
+      }.`,
+      data: {
+        payment_id: paymentId,
+        amount: quote.amount,
+        base_amount: quote.base_amount,
+        rule_scope: quote.rule_scope,
+        access_days: quote.access_days,
+        location: access.location,
+        authorization_url: paystackResponse.data.data.authorization_url,
+        access_code: paystackResponse.data.data.access_code,
+        reference,
+      },
+    });
+  } catch (error) {
+    console.error('Initialize tenant location access error:', error);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      code: error.code || 'LOCATION_ACCESS_PAYMENT_FAILED',
+      message: error.message || 'Failed to initialize location access payment',
+    });
+  }
+};
+
+exports.verifyTenantLocationAccess = async (req, res) => {
+  try {
+    await ensureTenantLocationAccessSchema();
+
+    const { reference } = req.params;
+    const userId = req.user.id;
+    const accessPayment = await getTenantLocationAccessPaymentByReference(reference, userId);
+
+    if (!accessPayment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Location access payment not found',
+      });
+    }
+
+    let transaction = accessPayment.gateway_response || null;
+
+    if (accessPayment.payment_status !== 'completed') {
+      if (!PAYSTACK_SECRET_KEY) {
+        return res.status(500).json({
+          success: false,
+          message: 'Payment service is not configured',
+        });
+      }
+
+      const paystackResponse = await axios.get(
+        `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
+        {
+          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+        }
+      );
+
+      transaction = paystackResponse.data.data;
+
+      if (transaction.status !== 'success') {
+        return res.status(402).json({
+          success: false,
+          payment_required: true,
+          message: 'Location access payment is not completed yet',
+          status: transaction.status,
+        });
+      }
+
+      const amountPaid = Number(transaction.amount || 0) / 100;
+      if (amountPaid < Number(accessPayment.amount)) {
+        return res.status(402).json({
+          success: false,
+          payment_required: true,
+          message: 'Location access payment amount is insufficient',
+        });
+      }
+
+      await db.query(
+        `UPDATE payments
+         SET payment_status = 'completed',
+             completed_at = CURRENT_TIMESTAMP,
+             gateway_response = $1
+         WHERE id = $2`,
+        [JSON.stringify(transaction), accessPayment.payment_id]
+      );
+    }
+
+    const grant = await grantTenantLocationAccess({
+      tenantId: userId,
+      stateId: accessPayment.state_id,
+      stateName: accessPayment.state_name,
+      lgaName: accessPayment.lga_name,
+      locationKey: accessPayment.location_key,
+      paymentId: accessPayment.payment_id,
+      transactionReference: reference,
+      gatewayResponse: transaction,
+    });
+
+    res.json({
+      success: true,
+      message: 'Location access activated',
+      data: {
+        location: {
+          state_id: grant.state_id,
+          state_name: grant.state_name,
+          lga_name: grant.lga_name,
+          location_key: grant.location_key,
+        },
+        expires_at: grant.expires_at,
+        reference,
+      },
+    });
+  } catch (error) {
+    console.error('Verify tenant location access error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify location access payment',
     });
   }
 };
@@ -1778,6 +2485,32 @@ exports.initializeRentPayment = async (req, res) => {
     );
 
     const user = userResult.rows[0];
+
+    const multiplePropertyRequirement = await resolveTenantMultiplePropertyRequirement({
+      tenantId: userId,
+      propertyId: property_id,
+    });
+
+    if (multiplePropertyRequirement.required) {
+      const quote = await buildTenantMultiplePropertySubscriptionQuote({ userId });
+      const funding = await buildSubscriptionFundingSnapshot({
+        userId,
+        userType: 'tenant',
+        amount: quote.amount,
+      });
+
+      return res.status(402).json({
+        success: false,
+        code: 'MULTIPLE_PROPERTY_SUBSCRIPTION_REQUIRED',
+        message: `You can rent one property on your tenant account. Activate the multiple property subscription for ${Number(quote.amount).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 })} to rent another property.`,
+        data: {
+          subscription_type: 'multiple_property',
+          rented_properties_count: multiplePropertyRequirement.rented_properties_count,
+          quote,
+          funding,
+        },
+      });
+    }
 
     // Platform commission (2.5%)
     const platformFee = amount * 0.025;
@@ -2500,6 +3233,7 @@ async function handleSuccessfulPayment(data) {
       paymentId &&
       [
         'tenant_subscription',
+        'tenant_multiple_property_subscription',
         'landlord_listing',
         'property_unlock',
         'rent_payment',
@@ -2712,7 +3446,7 @@ exports.verifyBankAccount = async (req, res) => {
       });
     }
 
-    const { bank_name, account_number } = req.body;
+    const { bank_code, bank_name, account_number } = req.body;
     
     if (!PAYSTACK_SECRET_KEY) {
       return res.status(500).json({
@@ -2722,10 +3456,21 @@ exports.verifyBankAccount = async (req, res) => {
     }
 
     const banks = await fetchBanksFromPaystack(false);
-    const bank = banks.find(b => 
-      b.name.toLowerCase().includes(bank_name.toLowerCase()) ||
-      bank_name.toLowerCase().includes(b.name.toLowerCase())
-    );
+    const normalizedBankCode = String(bank_code || '').trim();
+    const normalizedBankName = String(bank_name || '').trim().toLowerCase();
+    if (!normalizedBankCode && !normalizedBankName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bank code or bank name is required',
+      });
+    }
+
+    const bank = normalizedBankCode
+      ? banks.find(b => String(b.code) === normalizedBankCode)
+      : banks.find(b =>
+          b.name.toLowerCase().includes(normalizedBankName) ||
+          normalizedBankName.includes(b.name.toLowerCase())
+        );
 
     if (!bank) {
       return res.status(400).json({

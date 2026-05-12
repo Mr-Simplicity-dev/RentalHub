@@ -8,6 +8,7 @@ const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { getPropertyDisputeParticipants } = require('../config/utils/propertyDisputeParticipants');
 const { getPropertyManagerContext } = require('../config/utils/agentSystem');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
+const { resolveTenantPropertyLocationAccess } = require('../config/utils/tenantLocationAccess');
 const { statesMatch } = require('../config/utils/stateScope');
 let propertySchemaReady = false;
 
@@ -71,13 +72,26 @@ const parsePropertyImageCaptureTokens = (value) => {
   }
 };
 
+const parseCoordinate = (value, min, max) => {
+  if (value === undefined || value === null || value === '') return null;
+
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < min || numericValue > max) {
+    return null;
+  }
+
+  return numericValue;
+};
+
 const ensurePropertySchema = async () => {
   if (propertySchemaReady) return;
   await db.query(`
     ALTER TABLE properties
     ADD COLUMN IF NOT EXISTS full_address TEXT,
     ADD COLUMN IF NOT EXISTS video_url VARCHAR(500),
-    ADD COLUMN IF NOT EXISTS lga_name VARCHAR(120);
+    ADD COLUMN IF NOT EXISTS lga_name VARCHAR(120),
+    ADD COLUMN IF NOT EXISTS latitude DECIMAL(10, 8),
+    ADD COLUMN IF NOT EXISTS longitude DECIMAL(11, 8);
 
     ALTER TABLE property_photos
     ADD COLUMN IF NOT EXISTS upload_order INTEGER DEFAULT 0;
@@ -131,6 +145,103 @@ const ensureLandlordOwnerIsVerified = async (landlordUserId) => {
   );
 
   return result.rows[0]?.identity_verified === true;
+};
+
+const buildTenantLocationAccessResponse = (res, access) =>
+  res.status(access.statusCode || 402).json({
+    success: false,
+    payment_required: access.payment_required === true,
+    code: access.code || 'LOCATION_ACCESS_PAYMENT_REQUIRED',
+    message: access.message,
+    data: {
+      amount: access.quote?.amount,
+      base_amount: access.quote?.base_amount,
+      rule_scope: access.quote?.rule_scope,
+      access_days: access.quote?.access_days,
+      location: access.location,
+      home_location: {
+        state_id: access.profile?.preferred_state_id,
+        state_name: access.profile?.state_name,
+        lga_name: access.profile?.preferred_lga_name,
+      },
+    },
+  });
+
+const resolveStateIdFromQueryState = async (state) => {
+  const rawState = String(state || '').trim();
+  if (!rawState) return null;
+
+  const result = await db.query(
+    `SELECT id
+     FROM states
+     WHERE LOWER(state_name) = LOWER($1)
+        OR LOWER(state_code) = LOWER($1)
+     LIMIT 1`,
+    [rawState]
+  );
+
+  return result.rows[0]?.id || null;
+};
+
+const addTenantLocationScope = async ({
+  req,
+  res,
+  whereConditions,
+  params,
+  paramCount,
+  requestedStateId = null,
+  requestedState = null,
+  requestedLgaName = null,
+}) => {
+  if (req.user?.user_type !== 'tenant') {
+    return { blocked: false, paramCount };
+  }
+
+  const stateId =
+    requestedStateId ||
+    (await resolveStateIdFromQueryState(requestedState));
+
+  let access;
+  try {
+    access = await resolveTenantPropertyLocationAccess({
+      tenantId: req.user.id,
+      requestedStateId: stateId,
+      requestedLgaName,
+    });
+  } catch (error) {
+    return {
+      blocked: true,
+      response: () =>
+        res.status(error.statusCode || 500).json({
+          success: false,
+          code: error.code || 'TENANT_LOCATION_ACCESS_ERROR',
+          message: error.message || 'Failed to resolve tenant location access',
+        }),
+    };
+  }
+
+  if (!access.allowed) {
+    return {
+      blocked: true,
+      response: () => buildTenantLocationAccessResponse(res, access),
+    };
+  }
+
+  whereConditions.push(`p.state_id = $${paramCount}`);
+  params.push(access.location.state_id);
+  paramCount++;
+
+  if (access.location.lga_name) {
+    whereConditions.push(`(
+      LOWER(COALESCE(p.lga_name, '')) = LOWER($${paramCount}) OR
+      LOWER(COALESCE(p.city, '')) = LOWER($${paramCount}) OR
+      LOWER(COALESCE(p.area, '')) = LOWER($${paramCount})
+    )`);
+    params.push(access.location.lga_name);
+    paramCount++;
+  }
+
+  return { blocked: false, paramCount, access };
 };
 
 const buildDamageAiPrompt = () => `You are a property damage assessment expert. Analyze this damage photo and provide a JSON response with these fields:
@@ -243,6 +354,27 @@ exports.browseProperties = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
+    const params = [];
+    let paramCount = 1;
+    const whereConditions = [
+      'p.is_available = TRUE',
+      'p.is_verified = TRUE',
+      '(p.expires_at IS NULL OR p.expires_at > CURRENT_TIMESTAMP)',
+    ];
+
+    const tenantScope = await addTenantLocationScope({
+      req,
+      res,
+      whereConditions,
+      params,
+      paramCount,
+    });
+
+    if (tenantScope.blocked) {
+      return tenantScope.response();
+    }
+
+    paramCount = tenantScope.paramCount;
 
     const result = await db.query(
       `SELECT 
@@ -257,19 +389,18 @@ exports.browseProperties = async (req, res) => {
         (SELECT COUNT(*) FROM reviews WHERE property_id = p.id) AS review_count
       FROM properties p
       JOIN states s ON p.state_id = s.id
-      WHERE p.is_available = TRUE 
-        AND p.is_verified = TRUE
-        AND (p.expires_at IS NULL OR p.expires_at > CURRENT_TIMESTAMP)
+      WHERE ${whereConditions.join(' AND ')}
       ORDER BY p.featured DESC, p.created_at DESC
-      LIMIT $1 OFFSET $2`,
-      [limit, offset]
+      LIMIT $${paramCount} OFFSET $${paramCount + 1}`,
+      [...params, limit, offset]
     );
 
     const countResult = await db.query(
-      `SELECT COUNT(*) FROM properties 
-       WHERE is_available = TRUE 
-         AND is_verified = TRUE
-         AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)`
+      `SELECT COUNT(*)
+       FROM properties p
+       JOIN states s ON p.state_id = s.id
+       WHERE ${whereConditions.join(' AND ')}`,
+      params
     );
 
     res.json({
@@ -297,6 +428,28 @@ exports.browseProperties = async (req, res) => {
 exports.getFeaturedProperties = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
+    const params = [];
+    let paramCount = 1;
+    const whereConditions = [
+      'p.is_available = TRUE',
+      'p.is_verified = TRUE',
+      'p.featured = TRUE',
+      '(p.expires_at IS NULL OR p.expires_at > CURRENT_TIMESTAMP)',
+    ];
+
+    const tenantScope = await addTenantLocationScope({
+      req,
+      res,
+      whereConditions,
+      params,
+      paramCount,
+    });
+
+    if (tenantScope.blocked) {
+      return tenantScope.response();
+    }
+
+    paramCount = tenantScope.paramCount;
 
     const result = await db.query(
       `SELECT 
@@ -309,13 +462,10 @@ exports.getFeaturedProperties = async (req, res) => {
         (SELECT AVG(rating) FROM reviews WHERE property_id = p.id) AS avg_rating
       FROM properties p
       JOIN states s ON p.state_id = s.id
-      WHERE p.is_available = TRUE 
-        AND p.is_verified = TRUE
-        AND p.featured = TRUE
-        AND (p.expires_at IS NULL OR p.expires_at > CURRENT_TIMESTAMP)
+      WHERE ${whereConditions.join(' AND ')}
       ORDER BY p.created_at DESC
-      LIMIT $1`,
-      [limit]
+      LIMIT $${paramCount}`,
+      [...params, limit]
     );
 
     res.json({
@@ -365,6 +515,7 @@ exports.searchProperties = async (req, res) => {
       'p.is_verified = TRUE',
       '(p.expires_at IS NULL OR p.expires_at > CURRENT_TIMESTAMP)'
     ];
+    const tenantScoped = req.user?.user_type === 'tenant';
 
     const featuredOnly =
       String(featured).toLowerCase() === 'true' ||
@@ -374,20 +525,37 @@ exports.searchProperties = async (req, res) => {
       whereConditions.push('p.featured = TRUE');
     }
 
+    const tenantScope = await addTenantLocationScope({
+      req,
+      res,
+      whereConditions,
+      params,
+      paramCount,
+      requestedStateId: state_id,
+      requestedState: state,
+      requestedLgaName: lga_name,
+    });
+
+    if (tenantScope.blocked) {
+      return tenantScope.response();
+    }
+
+    paramCount = tenantScope.paramCount;
+
     // State Filter
-    if (state_id) {
+    if (!tenantScoped && state_id) {
       whereConditions.push(`p.state_id = $${paramCount}`);
       params.push(state_id);
       paramCount++;
     }
 
-    if (state) {
+    if (!tenantScoped && state) {
       whereConditions.push(`LOWER(s.state_name) LIKE LOWER($${paramCount})`);
       params.push(`%${state}%`);
       paramCount++;
     }
 
-    if (state_id && String(lga_name || '').trim()) {
+    if (!tenantScoped && state_id && String(lga_name || '').trim()) {
       const resolvedLocation = await resolveLocationSelection({
         stateId: state_id,
         lgaName: lga_name,
@@ -984,6 +1152,8 @@ exports.createProperty = async (req, res) => {
       city,
       area,
       full_address,
+      latitude,
+      longitude,
       property_type,
       bedrooms,
       bathrooms,
@@ -1126,18 +1296,29 @@ exports.createProperty = async (req, res) => {
         ? String(full_address).trim()
         : [area, city, resolvedStateName].filter(Boolean).join(', ');
 
+    const parsedLatitude = parseCoordinate(latitude, -90, 90);
+    const parsedLongitude = parseCoordinate(longitude, -180, 180);
+
+    if (parsedLatitude === null || parsedLongitude === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please pick a valid property location on the map.',
+      });
+    }
+
     client = await db.connect();
     await client.query('BEGIN');
 
     const result = await client.query(
       `INSERT INTO properties (
          landlord_id, user_id, state, state_id, lga_name, city, area, full_address,
+         latitude, longitude,
          property_type, bedrooms, bathrooms,
          price, rent_amount, payment_frequency,
          title, description, amenities, is_available, is_verified, status, video_url
        )
        VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
        )
       RETURNING *`,
       [
@@ -1149,6 +1330,8 @@ exports.createProperty = async (req, res) => {
         city,
         area,
         finalAddress,
+        parsedLatitude,
+        parsedLongitude,
         property_type,
         Number(bedrooms) || 0,
         Number(bathrooms) || 0,
@@ -1315,6 +1498,8 @@ exports.uploadPropertyPhotos = async (req, res) => {
 // -----------------------------------------------------
 exports.updateProperty = async (req, res) => {
   try {
+    await ensurePropertySchema();
+
     const { propertyId } = req.params;
     const userId = req.user.id;
 
@@ -1335,13 +1520,41 @@ exports.updateProperty = async (req, res) => {
     let paramCount = 1;
 
     const allowedFields = [
-      'state_id', 'lga_name', 'city', 'area', 'full_address', 'property_type',
+      'state_id', 'lga_name', 'city', 'area', 'full_address', 'latitude', 'longitude', 'property_type',
       'bedrooms', 'bathrooms', 'rent_amount', 'payment_frequency',
       'caution_deposit', 'title', 'description', 'amenities'
     ];
 
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
+        if (field === 'latitude') {
+          const parsedLatitude = parseCoordinate(req.body[field], -90, 90);
+          if (parsedLatitude === null) {
+            return res.status(400).json({
+              success: false,
+              message: 'Please provide a valid latitude.',
+            });
+          }
+          updates.push(`${field} = $${paramCount}`);
+          params.push(parsedLatitude);
+          paramCount++;
+          continue;
+        }
+
+        if (field === 'longitude') {
+          const parsedLongitude = parseCoordinate(req.body[field], -180, 180);
+          if (parsedLongitude === null) {
+            return res.status(400).json({
+              success: false,
+              message: 'Please provide a valid longitude.',
+            });
+          }
+          updates.push(`${field} = $${paramCount}`);
+          params.push(parsedLongitude);
+          paramCount++;
+          continue;
+        }
+
         updates.push(`${field} = $${paramCount}`);
         params.push(
           field === 'amenities'

@@ -101,6 +101,25 @@ export const paymentService = {
     return response.data;
   },
 
+  getLocationAccessQuote: async (params = {}) => {
+    const response = await api.get('/payments/location-access/quote', { params });
+    return response.data;
+  },
+
+  initializeLocationAccess: async ({ state_id, lga_name, payment_method = 'paystack' }) => {
+    const response = await api.post('/payments/location-access', {
+      state_id,
+      lga_name,
+      payment_method,
+    });
+    return response.data;
+  },
+
+  verifyLocationAccess: async (reference) => {
+    const response = await api.get(`/payments/location-access/verify/${reference}`);
+    return response.data;
+  },
+
   // Retry a pending payment
   retryPayment: async (paymentId) => {
     const response = await api.post(`/payments/retry/${paymentId}`);

@@ -23,6 +23,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 
 // Utility functions
 const badgeClass = (status) => {
@@ -178,7 +179,7 @@ const SuperSupportAdminDashboard = () => {
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    const allowedTabs = ['overview', 'queue', 'audit', 'tickets', 'alerts', 'reports', 'settings'];
+    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'alerts', 'reports', 'settings'];
     if (tab && allowedTabs.includes(tab)) {
       setActiveTab(tab);
       return;
@@ -405,6 +406,12 @@ const SuperSupportAdminDashboard = () => {
                 Open Migration Queue
               </button>
               <button
+                onClick={() => setActiveTab('property_requests')}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Open Property Requests
+              </button>
+              <button
                 onClick={() => setActiveTab('tickets')}
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
@@ -419,6 +426,13 @@ const SuperSupportAdminDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'property_requests' && (
+        <PropertyRequestWorkflowPanel
+          mode="support"
+          title="Tenant Property Request Review"
+        />
       )}
 
      {/* Migration Queue Tab */}

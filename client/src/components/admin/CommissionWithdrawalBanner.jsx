@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import api from "../../services/api";
 import InputDialog from "../common/InputDialog";
@@ -10,13 +11,25 @@ const formatCurrency = (value) =>
     minimumFractionDigits: 0,
   }).format(Number(value || 0));
 
+const getRequestErrorMessage = (error, fallback) => {
+  const data = error?.response?.data;
+  if (data?.message) return data.message;
+  if (error?.response?.status === 404) {
+    return "Commission password endpoint was not found. Restart the backend and try again.";
+  }
+  if (typeof data === "string" && data.trim()) {
+    return data.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180);
+  }
+  return error?.message || fallback;
+};
+
 /*
  * Module-level balance cache.
  *
  * Because CommissionWithdrawalBanner is mounted on many dashboard pages
  * simultaneously (e.g. when a user has multiple admin roles in the same
  * session), every instance used to fire its own GET to
- * /api/financial-admin/commissions/withdrawable.
+ * /financial-admin/commissions/withdrawable.
  *
  * This shared promise cache ensures we only make ONE network request per
  * page load, regardless of how many <CommissionWithdrawalBanner /> are
@@ -33,7 +46,7 @@ let withdrawableBalancePromise = null;
 function getWithdrawableBalance() {
   if (!withdrawableBalancePromise) {
     withdrawableBalancePromise = api
-      .get("/api/financial-admin/commissions/withdrawable")
+      .get("/financial-admin/commissions/withdrawable")
       .then((res) => res.data?.data || {})
       .catch((error) => {
         console.error("Failed to load withdrawable snapshot:", error);
@@ -52,7 +65,7 @@ function getWithdrawableBalance() {
  * CommissionWithdrawalBanner
  *
  * A reusable banner that shows "Withdrawable Commission" with a masked amount.
- * The user must enter their login password to unveil / reveal the commission amount.
+ * The user must enter their commission password to reveal the commission amount.
  * Once unveiled, a "Withdraw" button opens a personal withdrawal modal (via AdminWithdrawalModal).
  *
  * Props:
@@ -68,9 +81,13 @@ export default function CommissionWithdrawalBanner({
     total_earned: 0,
   });
   const [isWithdrawableVisible, setIsWithdrawableVisible] = useState(false);
-  const [showRevealAmountDialog, setShowRevealAmountDialog] = useState(false);
-  const [revealPasswordInput, setRevealPasswordInput] = useState({ password: "" });
-  const [verifyingRevealPassword, setVerifyingRevealPassword] = useState(false);
+  const [commissionPasswordStatus, setCommissionPasswordStatus] = useState({
+    has_commission_password: false,
+    loading: true,
+  });
+  const [commissionPasswordDialogMode, setCommissionPasswordDialogMode] = useState(null);
+  const [commissionPasswordInput, setCommissionPasswordInput] = useState({});
+  const [savingCommissionPassword, setSavingCommissionPassword] = useState(false);
 
   // Personal withdrawal modal state
   const [showPersonalWithdrawDialog, setShowPersonalWithdrawDialog] = useState(false);
@@ -120,23 +137,212 @@ export default function CommissionWithdrawalBanner({
     loadWithdrawableSnapshot();
   }, [loadWithdrawableSnapshot]);
 
-  const revealWithdrawableAmount = async (inputs) => {
+  const loadCommissionPasswordStatus = useCallback(async () => {
     try {
-      setVerifyingRevealPassword(true);
-      setRevealPasswordInput(inputs);
-
-      await api.post("/api/users/verify-password", {
-        password: String(inputs.password || ""),
+      const res = await api.get("/users/commission-password/status");
+      setCommissionPasswordStatus({
+        has_commission_password: Boolean(
+          res.data?.data?.has_commission_password
+        ),
+        set_at: res.data?.data?.set_at || null,
+        loading: false,
       });
-
-      setIsWithdrawableVisible(true);
-      setShowRevealAmountDialog(false);
-      setRevealPasswordInput({ password: "" });
-      toast.success("Withdrawable amount unlocked");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Password verification failed");
+      console.error("Failed to load commission password status:", error);
+      setCommissionPasswordStatus((prev) => ({ ...prev, loading: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCommissionPasswordStatus();
+  }, [loadCommissionPasswordStatus]);
+
+  const openCommissionPasswordDialog = (mode) => {
+    setCommissionPasswordDialogMode(mode);
+    setCommissionPasswordInput({});
+  };
+
+  const closeCommissionPasswordDialog = () => {
+    setCommissionPasswordDialogMode(null);
+    setCommissionPasswordInput({});
+  };
+
+  const getCommissionDialogConfig = () => {
+    switch (commissionPasswordDialogMode) {
+      case "setup":
+        return {
+          title: "Set Commission Password",
+          message:
+            "Create a separate password for revealing your withdrawable commission balance. Confirm with your login password.",
+          confirmText: "Set Password",
+          inputs: [
+            {
+              name: "login_password",
+              label: "Login Password",
+              type: "password",
+              placeholder: "Enter your login password",
+              required: true,
+            },
+            {
+              name: "commission_password",
+              label: "New Commission Password",
+              type: "password",
+              placeholder: "At least 6 characters",
+              required: true,
+            },
+            {
+              name: "confirm_commission_password",
+              label: "Confirm Commission Password",
+              type: "password",
+              placeholder: "Re-enter commission password",
+              required: true,
+            },
+          ],
+        };
+      case "change":
+        return {
+          title: "Change Commission Password",
+          message: "Enter your current commission password and choose a new one.",
+          confirmText: "Change Password",
+          inputs: [
+            {
+              name: "current_commission_password",
+              label: "Current Commission Password",
+              type: "password",
+              placeholder: "Enter current commission password",
+              required: true,
+            },
+            {
+              name: "new_commission_password",
+              label: "New Commission Password",
+              type: "password",
+              placeholder: "At least 6 characters",
+              required: true,
+            },
+            {
+              name: "confirm_commission_password",
+              label: "Confirm New Password",
+              type: "password",
+              placeholder: "Re-enter new commission password",
+              required: true,
+            },
+          ],
+        };
+      case "reset":
+        return {
+          title: "Reset Commission Password",
+          message:
+            "Use your login password to reset a forgotten commission password.",
+          confirmText: "Reset Password",
+          inputs: [
+            {
+              name: "login_password",
+              label: "Login Password",
+              type: "password",
+              placeholder: "Enter your login password",
+              required: true,
+            },
+            {
+              name: "new_commission_password",
+              label: "New Commission Password",
+              type: "password",
+              placeholder: "At least 6 characters",
+              required: true,
+            },
+            {
+              name: "confirm_commission_password",
+              label: "Confirm New Password",
+              type: "password",
+              placeholder: "Re-enter new commission password",
+              required: true,
+            },
+          ],
+        };
+      case "verify":
+      default:
+        return {
+          title: "Unlock Withdrawable Commission",
+          message:
+            "Enter your commission password to reveal your withdrawable commission balance.",
+          confirmText: "Unlock Amount",
+          inputs: [
+            {
+              name: "commission_password",
+              label: "Commission Password",
+              type: "password",
+              placeholder: "Enter your commission password",
+              required: true,
+            },
+          ],
+        };
+    }
+  };
+
+  const submitCommissionPasswordDialog = async (inputs) => {
+    const mode = commissionPasswordDialogMode;
+    const commissionPassword = String(inputs.commission_password || "");
+    const newCommissionPassword = String(inputs.new_commission_password || "");
+    const confirmation = String(inputs.confirm_commission_password || "");
+
+    if (
+      ["setup"].includes(mode) &&
+      commissionPassword !== confirmation
+    ) {
+      toast.error("Commission password confirmation does not match");
+      return;
+    }
+
+    if (
+      ["change", "reset"].includes(mode) &&
+      newCommissionPassword !== confirmation
+    ) {
+      toast.error("New commission password confirmation does not match");
+      return;
+    }
+
+    try {
+      setSavingCommissionPassword(true);
+
+      if (mode === "setup") {
+        await api.post("/users/commission-password/setup", {
+          login_password: String(inputs.login_password || ""),
+          commission_password: commissionPassword,
+        });
+        await loadCommissionPasswordStatus();
+        setIsWithdrawableVisible(true);
+        toast.success("Commission password set and balance unlocked");
+      } else if (mode === "change") {
+        await api.put("/users/commission-password/change", {
+          current_commission_password: String(
+            inputs.current_commission_password || ""
+          ),
+          new_commission_password: newCommissionPassword,
+        });
+        await loadCommissionPasswordStatus();
+        toast.success("Commission password changed");
+      } else if (mode === "reset") {
+        await api.post("/users/commission-password/reset", {
+          login_password: String(inputs.login_password || ""),
+          new_commission_password: newCommissionPassword,
+        });
+        await loadCommissionPasswordStatus();
+        setIsWithdrawableVisible(true);
+        toast.success("Commission password reset and balance unlocked");
+      } else {
+        await api.post("/users/commission-password/verify", {
+          commission_password: commissionPassword,
+        });
+        setIsWithdrawableVisible(true);
+        toast.success("Withdrawable amount unlocked");
+      }
+
+      closeCommissionPasswordDialog();
+    } catch (error) {
+      toast.error(
+        getRequestErrorMessage(error, "Commission password action failed")
+      );
     } finally {
-      setVerifyingRevealPassword(false);
+      setSavingCommissionPassword(false);
     }
   };
 
@@ -269,7 +475,7 @@ export default function CommissionWithdrawalBanner({
     }
     try {
       setSubmittingPersonalWithdraw(true);
-      await api.post("/api/financial-admin/withdraw/request", {
+      await api.post("/financial-admin/withdraw/request", {
         amount: parseFloat(amount),
         bank_name: String(bank_name).trim(),
         bank_code: String(bank_code || "").trim(),
@@ -322,7 +528,11 @@ export default function CommissionWithdrawalBanner({
                   type="button"
                   onClick={() => {
                     if (!isWithdrawableVisible) {
-                      setShowRevealAmountDialog(true);
+                      openCommissionPasswordDialog(
+                        commissionPasswordStatus.has_commission_password
+                          ? "verify"
+                          : "setup"
+                      );
                     }
                   }}
                   className="font-bold underline hover:text-indigo-900"
@@ -333,8 +543,39 @@ export default function CommissionWithdrawalBanner({
                 </button>
                 {!isWithdrawableVisible && (
                   <span className="ml-1 text-xs text-indigo-500">
-                    (click to unlock)
+                    {commissionPasswordStatus.has_commission_password
+                      ? "(click to unlock)"
+                      : "(set password to unlock)"}
                   </span>
+                )}
+              </p>
+              <p className="mt-1 flex flex-wrap gap-2 text-[11px] text-indigo-700">
+                {commissionPasswordStatus.has_commission_password ? (
+                  <>
+                    <button
+                      type="button"
+                      className="underline hover:text-indigo-900"
+                      onClick={() => openCommissionPasswordDialog("change")}
+                    >
+                      Change commission password
+                    </button>
+                    <span aria-hidden="true">|</span>
+                    <button
+                      type="button"
+                      className="underline hover:text-indigo-900"
+                      onClick={() => openCommissionPasswordDialog("reset")}
+                    >
+                      Forgot password?
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="underline hover:text-indigo-900"
+                    onClick={() => openCommissionPasswordDialog("setup")}
+                  >
+                    Set commission password
+                  </button>
                 )}
               </p>
             </div>
@@ -352,43 +593,50 @@ export default function CommissionWithdrawalBanner({
             <button
               type="button"
               onClick={() => {
-                if (!isWithdrawableVisible) {
-                  setShowRevealAmountDialog(true);
+                if (isWithdrawableVisible) {
+                  setIsWithdrawableVisible(false);
+                  toast.info("Commission balance locked");
+                } else {
+                  openCommissionPasswordDialog(
+                    commissionPasswordStatus.has_commission_password
+                      ? "verify"
+                      : "setup"
+                  );
                 }
               }}
-              className="rounded-md border border-indigo-300 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+              className="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+              title={isWithdrawableVisible ? "Lock balance" : "Unlock balance"}
+              aria-label={isWithdrawableVisible ? "Lock commission balance" : "Unlock commission balance"}
             >
-              {isWithdrawableVisible ? "View Balance" : "Unlock Balance"}
+              {isWithdrawableVisible ? (
+                <FaEyeSlash className="h-3.5 w-3.5" />
+              ) : (
+                <FaEye className="h-3.5 w-3.5" />
+              )}
+              {isWithdrawableVisible
+                ? "Lock Balance"
+                : commissionPasswordStatus.has_commission_password
+                ? "Unlock Balance"
+                : "Set Password"}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Reveal password dialog */}
+      {/* Commission password dialog */}
       <InputDialog
-        isOpen={showRevealAmountDialog}
-        onConfirm={revealWithdrawableAmount}
-        onCancel={() => setShowRevealAmountDialog(false)}
-        title="Unlock Withdrawable Commission"
-        message="Enter your login password to reveal your withdrawable commission balance."
+        key={commissionPasswordDialogMode || "commission-password"}
+        isOpen={Boolean(commissionPasswordDialogMode)}
+        onConfirm={submitCommissionPasswordDialog}
+        onCancel={closeCommissionPasswordDialog}
+        title={getCommissionDialogConfig().title}
+        message={getCommissionDialogConfig().message}
         type="info"
-        confirmText="Unlock Amount"
+        confirmText={getCommissionDialogConfig().confirmText}
         cancelText="Cancel"
-        isLoading={verifyingRevealPassword}
-        initialValues={revealPasswordInput}
-        inputs={[
-          {
-            name: "password",
-            label: "Password",
-            type: "password",
-            placeholder: "Enter your login password",
-            required: true,
-            validate: (value) =>
-              String(value || "").trim().length > 0
-                ? true
-                : "Password is required",
-          },
-        ]}
+        isLoading={savingCommissionPassword}
+        initialValues={commissionPasswordInput}
+        inputs={getCommissionDialogConfig().inputs}
       />
 
       {/* Withdrawal modal */}

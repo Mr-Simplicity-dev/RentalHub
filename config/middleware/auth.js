@@ -44,7 +44,9 @@ const authenticate = async (req, res, next) => {
     }
 
     const result = await db.query(
-      `SELECT id, email, user_type, identity_verified, subscription_active, deleted_at, is_active,
+      `SELECT id, email, user_type, identity_verified, subscription_active,
+              preferred_state_id, preferred_lga_name,
+              deleted_at, is_active,
               account_suspended_reason
        FROM users
        WHERE id = $1`,
@@ -85,6 +87,50 @@ const authenticate = async (req, res, next) => {
       success: false,
       message: 'Invalid or expired token.',
     });
+  }
+};
+
+const optionalAuthenticate = async (req, res, next) => {
+  try {
+    await ensureUserSuspensionSchema();
+
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(' ')[1];
+
+    if (!token) {
+      return next();
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId || decoded.id || decoded.user_id;
+
+    if (!userId) {
+      return next();
+    }
+
+    const result = await db.query(
+      `SELECT id, email, user_type, identity_verified, subscription_active,
+              preferred_state_id, preferred_lga_name,
+              deleted_at, is_active,
+              account_suspended_reason
+       FROM users
+       WHERE id = $1`,
+      [userId]
+    );
+
+    const currentUser = result.rows[0];
+
+    if (
+      currentUser &&
+      !currentUser.deleted_at &&
+      currentUser.is_active !== false
+    ) {
+      req.user = currentUser;
+    }
+
+    return next();
+  } catch {
+    return next();
   }
 };
 
@@ -171,6 +217,7 @@ const isLandlordOrAgent = (req, res, next) => {
 
 module.exports = {
   authenticate,
+  optionalAuthenticate,
   isLandlord,
   isLandlordOrAgent,
   isTenant,

@@ -23,6 +23,7 @@ import api from '../../services/api';
 import Button from '../../components/common/Button';
 import useRetryableAction from '../../hooks/useRetryableAction';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
+import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 
 const StateAdminDashboard = ({ initialTab = 'overview' }) => {
   const navigate = useNavigate();
@@ -306,6 +307,13 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               >
                 Local Govt Oversight
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('property_requests')}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Property Requests
+              </button>
             </div>
             <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -365,6 +373,13 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       <div className="mb-6">
         <CommissionWithdrawalBanner />
       </div>
+
+      {activeTab === 'property_requests' && (
+        <PropertyRequestWorkflowPanel
+          mode="state"
+          title="Assigned Tenant Property Requests"
+        />
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

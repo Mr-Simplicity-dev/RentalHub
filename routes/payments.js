@@ -3,6 +3,7 @@ const router = express.Router();
 const { body } = require('express-validator');
 const paymentController = require('../controllers/paymentController');
 const refundController  = require('../controllers/refundController');
+const landlordPropertyFeeController = require('../controllers/landlordPropertyFeeController');
 const { authenticate, isTenant, isLandlord, isVerified } = require('../config/middleware/auth');
 
 // ============ TENANT SUBSCRIPTION PAYMENTS ============
@@ -22,8 +23,7 @@ router.post('/subscribe',
   isVerified,
   [
     body('plan_id').optional({ checkFalsy: true }).trim(),
-    body('state_id').optional({ checkFalsy: true }).isInt({ min: 1 }),
-    body('lga_name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 })
+    body('subscription_type').optional({ checkFalsy: true }).isIn(['monthly', 'multiple_property']),
   ],
   paymentController.initializeSubscription
 );
@@ -69,6 +69,34 @@ router.get(
   authenticate,
   isTenant,
   paymentController.getPropertyUnlockStatus
+);
+
+// Paid access for tenants who want to browse properties outside their registered state/LGA
+router.get(
+  '/location-access/quote',
+  authenticate,
+  isTenant,
+  paymentController.getTenantLocationAccessQuote
+);
+
+router.post(
+  '/location-access',
+  authenticate,
+  isTenant,
+  isVerified,
+  [
+    body('state_id').isInt({ min: 1 }).withMessage('state_id is required'),
+    body('lga_name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
+    body('payment_method').optional({ checkFalsy: true }).isIn(['paystack']),
+  ],
+  paymentController.initializeTenantLocationAccess
+);
+
+router.get(
+  '/location-access/verify/:reference',
+  authenticate,
+  isTenant,
+  paymentController.verifyTenantLocationAccess
 );
 
 // ============ PLATFORM LAWYER DIRECTORY UNLOCK ============
@@ -135,10 +163,55 @@ router.get('/verify-rent/:reference',
   paymentController.verifyRentPayment
 );
 
+// ============ LANDLORD PROPERTY BILLING ============
+
+router.get('/landlord-property-fee/status',
+  authenticate,
+  isLandlord,
+  landlordPropertyFeeController.getStatus
+);
+
+router.post('/landlord-property-fee/skip',
+  authenticate,
+  isLandlord,
+  landlordPropertyFeeController.skipNotice
+);
+
+router.post('/landlord-property-fee/agree',
+  authenticate,
+  isLandlord,
+  landlordPropertyFeeController.agreeAndSettle
+);
+
 // ============ PAYMENT HISTORY ============
 
 // Get user payment history
 router.get('/history', authenticate, paymentController.getPaymentHistory);
+
+// ============ BANK ACCOUNT VERIFICATION ============
+
+// Get list of Nigerian banks (cached)
+router.get('/banks',
+  authenticate,
+  paymentController.getBanks
+);
+
+// Force refresh bank cache (admin only)
+router.post('/banks/refresh',
+  authenticate,
+  paymentController.refreshBankCache
+);
+
+// Verify bank account for withdrawals
+router.post('/verify-account',
+  authenticate,
+  [
+    body('bank_code').optional({ checkFalsy: true }).trim().isLength({ min: 2 }).withMessage('Bank code is invalid'),
+    body('bank_name').optional({ checkFalsy: true }).trim().isLength({ min: 2 }).withMessage('Bank name is invalid'),
+    body('account_number').isLength({ min: 10, max: 10 }).withMessage('Account number must be 10 digits')
+  ],
+  paymentController.verifyBankAccount
+);
 
 // Get specific payment details
 router.get('/:paymentId', authenticate, paymentController.getPaymentDetails);
@@ -261,30 +334,6 @@ router.post('/wallet/withdrawals/:withdrawalId/approve',
 router.post('/wallet/withdrawals/:withdrawalId/reject',
   authenticate,
   refundController.rejectWalletWithdrawal
-);
-
-// ============ BANK ACCOUNT VERIFICATION ============
-
-// Get list of Nigerian banks (cached)
-router.get('/banks',
-  authenticate,
-  paymentController.getBanks
-);
-
-// Force refresh bank cache (admin only)
-router.post('/banks/refresh',
-  authenticate,
-  paymentController.refreshBankCache
-);
-
-// Verify bank account for withdrawals
-router.post('/verify-account',
-  authenticate,
-  [
-    body('bank_name').notEmpty().withMessage('Bank name is required'),
-    body('account_number').isLength({ min: 10, max: 10 }).withMessage('Account number must be 10 digits')
-  ],
-  paymentController.verifyBankAccount
 );
 
 module.exports = router;

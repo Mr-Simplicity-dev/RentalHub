@@ -282,6 +282,11 @@ const AdminLayout = () => {
                   Migration Queue
                 </NavLink>
 
+                <NavLink to="/admin/super-support-dashboard?tab=property_requests" className={() => supportNavItem('property_requests')}>
+                  <FaHome className="mr-3" />
+                  Property Requests
+                </NavLink>
+
                 <NavLink to="/admin/super-support-dashboard?tab=audit" className={() => supportNavItem('audit')}>
                   <FaShieldAlt className="mr-3" />
                   Audit Trail
@@ -711,16 +716,23 @@ const AdminLayout = () => {
                   </NavLink>
                 )}
 
-                {isStateFinancialAdmin && (
-                  <NavLink to="/admin/withdrawals" className={navItem}>
-                    <FaMoneyBill className="mr-3" />
-                    Commission Withdrawals
-                    {badgePill(liveBadges.pendingWithdrawals, 'blue')}
-                  </NavLink>
-                )}
+                  {isStateFinancialAdmin && (
+                   <NavLink to="/admin/withdrawals" className={navItem}>
+                      <FaMoneyBill className="mr-3" />
+                      Commission Withdrawals
+                      {badgePill(liveBadges.pendingWithdrawals, 'blue')}
+                   </NavLink>
+                  )}
 
-                {isStateSupportAdmin && (
-                  <NavLink to="/admin/state-support-dashboard" className={navItem}>
+                  {(isStateAdmin || isStateFinancialAdmin) && (
+                   <NavLink to="/admin?tab=property_requests" className={navItem}>
+                      <FaHome className="mr-3" />
+                      Property Requests
+                   </NavLink>
+                  )}
+
+                  {isStateSupportAdmin && (
+                   <NavLink to="/admin/state-support-dashboard" className={navItem}>
                     <FaLifeRing className="mr-3" />
                     State Support Dashboard
                     {badgePill(liveBadges.pendingSupportQueue)}

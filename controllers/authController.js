@@ -212,6 +212,7 @@ const ensureTenantRegistrationPaymentSchema = async () => {
       CHECK (
         payment_type IN (
           'tenant_subscription',
+          'tenant_multiple_property_subscription',
           'landlord_subscription',
           'landlord_listing',
           'rent_payment',
@@ -220,6 +221,7 @@ const ensureTenantRegistrationPaymentSchema = async () => {
           'registration_fee',
           'wallet_funding',
           'tenant_property_alert',
+          'tenant_location_access',
           'evidence_verification',
           'lawyer_directory_unlock',
           'lawyer_access_fee',

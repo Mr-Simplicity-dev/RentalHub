@@ -5,6 +5,48 @@ import { toast } from 'react-toastify';
 import { FaEnvelope, FaEye, FaEyeSlash, FaLock } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
+const LOGIN_EMAIL_HISTORY_KEY = 'loginEmailHistory';
+const MAX_LOGIN_EMAIL_SUGGESTIONS = 8;
+
+const getStoredLoginEmails = () => {
+  try {
+    const rawEmails = JSON.parse(localStorage.getItem(LOGIN_EMAIL_HISTORY_KEY) || '[]');
+    const legacyEmail = localStorage.getItem('rememberedEmail');
+    const emails = Array.isArray(rawEmails) ? rawEmails : [];
+
+    if (legacyEmail) {
+      emails.unshift(legacyEmail);
+    }
+
+    return [...new Set(
+      emails
+        .map((item) => String(item || '').trim().toLowerCase())
+        .filter((item) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item))
+    )].slice(0, MAX_LOGIN_EMAIL_SUGGESTIONS);
+  } catch {
+    return [];
+  }
+};
+
+const saveLoginEmailSuggestion = (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return [];
+  }
+
+  try {
+    const nextEmails = [
+      normalizedEmail,
+      ...getStoredLoginEmails().filter((item) => item !== normalizedEmail),
+    ].slice(0, MAX_LOGIN_EMAIL_SUGGESTIONS);
+
+    localStorage.setItem(LOGIN_EMAIL_HISTORY_KEY, JSON.stringify(nextEmails));
+    return nextEmails;
+  } catch {
+    return [];
+  }
+};
+
 const Login = () => {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
@@ -12,6 +54,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [loginEmailSuggestions, setLoginEmailSuggestions] = useState([]);
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -19,11 +62,19 @@ const Login = () => {
   // Load saved email if user previously checked Remember Me
   useEffect(() => {
     const savedEmail = localStorage.getItem('rememberedEmail');
+    setLoginEmailSuggestions(getStoredLoginEmails());
+
     if (savedEmail) {
       setEmail(savedEmail);
       setRememberMe(true);
     }
   }, []);
+
+  const matchingEmailSuggestions = email.trim()
+    ? loginEmailSuggestions.filter((item) =>
+        item.toLowerCase().startsWith(email.trim().toLowerCase())
+      )
+    : [];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,6 +91,8 @@ const Login = () => {
         } else {
           localStorage.removeItem('rememberedEmail');
         }
+
+        setLoginEmailSuggestions(saveLoginEmailSuggestion(email));
 
         const role = response.data?.user?.user_type;
         const redirectParam = searchParams.get('redirect');
@@ -154,13 +207,20 @@ const Login = () => {
             <FaEnvelope className="absolute left-3 top-3 text-gray-400" />
             <input
               type="email"
+              name="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
+              list="login-email-suggestions"
               className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
               placeholder={t('login.email_placeholder')}
             />
+            <datalist id="login-email-suggestions">
+              {matchingEmailSuggestions.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
           </div>
 
           {/* PASSWORD */}
