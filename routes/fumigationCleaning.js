@@ -10,6 +10,9 @@ const FUMIGATION_ADMIN_ROLES = new Set([
   'state_admin',
   'state_financial_admin',
   'fumigation_admin',
+  'lga_fumigation_admin',
+  'state_fumigation_admin',
+  'super_fumigation_admin',
 ]);
 
 const requireFumigationAdminAccess = (req, res, next) => {

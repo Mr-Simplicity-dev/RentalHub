@@ -26,6 +26,7 @@ import PlatformLawyersTab from "../components/admin/PlatformLawyersTab";
 import PlatformAgentsTab from "../components/admin/PlatformAgentsTab";
 import LawyerActivityMonitor from "../components/admin/LawyerActivityMonitor";
 import InputDialog from "../components/common/InputDialog";
+import PropertyRequestWorkflowPanel from "../components/admin/PropertyRequestWorkflowPanel";
 
 const tabs = [
   "overview",
@@ -36,6 +37,7 @@ const tabs = [
   "platform_agents",
   "lawyer_activity",
   "properties",
+  "property_requests",
   "analytics",
   "reports",
   "logs",
@@ -984,6 +986,13 @@ export default function SuperAdminDashboard() {
             )}
           />
         </>
+      )}
+
+      {tab === "property_requests" && (
+        <PropertyRequestWorkflowPanel
+          mode="support"
+          title="National Tenant Property Requests"
+        />
       )}
 
       {tab === "analytics" && (

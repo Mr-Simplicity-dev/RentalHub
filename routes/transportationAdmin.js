@@ -12,6 +12,9 @@ const TRANSPORTATION_ADMIN_ROLES = new Set([
   'super_financial_admin',
   'super_support_admin',
   'transportation_admin',
+  'lga_transportation_admin',
+  'state_transportation_admin',
+  'super_transportation_admin',
 ]);
 
 const requireTransportationAdminAccess = (req, res, next) => {

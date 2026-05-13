@@ -340,7 +340,7 @@ const Dashboard = () => {
       return;
     }
 
-    if (user.user_type === 'financial_admin') {
+    if (user.user_type === 'financial_admin' || user.user_type === 'lga_financial_admin') {
       navigate('/admin/financial-dashboard', { replace: true });
       return;
     }
@@ -352,6 +352,36 @@ const Dashboard = () => {
 
     if (user.user_type === 'state_support_admin') {
       navigate('/admin/state-support-dashboard', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'super_fumigation_admin') {
+      navigate('/admin/fumigation-cleaning/super', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'state_fumigation_admin') {
+      navigate('/admin/fumigation-cleaning/state', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'fumigation_admin' || user.user_type === 'lga_fumigation_admin') {
+      navigate('/admin/fumigation-cleaning', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'super_transportation_admin') {
+      navigate('/admin/transportation/super', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'state_transportation_admin') {
+      navigate('/admin/transportation/state', { replace: true });
+      return;
+    }
+
+    if (user.user_type === 'transportation_admin' || user.user_type === 'lga_transportation_admin') {
+      navigate('/admin/transportation', { replace: true });
       return;
     }
 

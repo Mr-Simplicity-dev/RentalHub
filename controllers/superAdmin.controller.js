@@ -97,6 +97,7 @@ const getDashboardPathForRole = (userType) => {
     case 'super_financial_admin':
       return '/admin/super-financial-dashboard?panel=overview';
     case 'financial_admin':
+    case 'lga_financial_admin':
       return '/admin/financial-dashboard';
     case 'state_admin':
     case 'state_financial_admin':
@@ -107,8 +108,14 @@ const getDashboardPathForRole = (userType) => {
     case 'state_support_admin':
       return '/admin/state-support-dashboard';
     case 'fumigation_admin':
+    case 'lga_fumigation_admin':
+    case 'state_fumigation_admin':
+    case 'super_fumigation_admin':
       return '/admin/fumigation-cleaning';
     case 'transportation_admin':
+    case 'lga_transportation_admin':
+    case 'state_transportation_admin':
+    case 'super_transportation_admin':
       return '/admin/transportation';
     case 'super_lawyer':
       return '/lawyer/super';
@@ -194,6 +201,13 @@ const impersonateAdmin = async (req, res) => {
     const target = rows[0];
     const allowedRoles = new Set([
       'admin',
+      'lga_financial_admin',
+      'lga_transportation_admin',
+      'state_transportation_admin',
+      'super_transportation_admin',
+      'lga_fumigation_admin',
+      'state_fumigation_admin',
+      'super_fumigation_admin',
       'state_admin',
       'state_financial_admin',
       'financial_admin',
@@ -681,7 +695,10 @@ const getAdminPerformance = async (req, res) => {
          ON v.identity_verified_by = a.id
          AND v.identity_verified = TRUE
        WHERE (
-         a.user_type IN ('super_admin', 'admin', 'state_admin', 'financial_admin', 'lawyer',
+         a.user_type IN ('super_admin', 'admin', 'lga_financial_admin', 'lga_transportation_admin',
+                         'state_transportation_admin', 'super_transportation_admin',
+                         'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin',
+                         'state_admin', 'financial_admin', 'lawyer',
                          'state_financial_admin', 'state_support_admin', 'super_financial_admin', 'super_support_admin',
                          'state_lawyer', 'super_lawyer', 'fumigation_admin', 'transportation_admin')
          OR a.user_type LIKE 'state_%'
@@ -811,10 +828,15 @@ const updateAdminJurisdiction = async (req, res) => {
 
     const stateBoundRoles = new Set([
       'admin',
+      'lga_financial_admin',
+      'lga_transportation_admin',
+      'lga_fumigation_admin',
       'state_admin',
       'state_financial_admin',
       'state_support_admin',
       'state_lawyer',
+      'state_transportation_admin',
+      'state_fumigation_admin',
       'lawyer',
     ]);
 
@@ -825,10 +847,10 @@ const updateAdminJurisdiction = async (req, res) => {
       });
     }
 
-    if (targetRole === 'admin' && !normalizedCity) {
+    if (['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) && !normalizedCity) {
       return res.status(400).json({
         success: false,
-        message: 'Assigned local government is required for admin role',
+        message: 'Assigned local government is required for this LGA role',
       });
     }
 
@@ -843,7 +865,7 @@ const updateAdminJurisdiction = async (req, res) => {
       [
         adminId,
         normalizedState || null,
-        targetRole === 'admin' ? normalizedCity : null,
+        ['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) ? normalizedCity : null,
       ]
     );
 

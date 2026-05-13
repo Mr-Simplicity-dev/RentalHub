@@ -104,6 +104,13 @@ const ensureAdminRoleSchema = async () => {
           'super_lawyer',
           'admin',
           'state_admin',
+          'lga_financial_admin',
+          'lga_transportation_admin',
+          'state_transportation_admin',
+          'super_transportation_admin',
+          'lga_fumigation_admin',
+          'state_fumigation_admin',
+          'super_fumigation_admin',
           'state_financial_admin',
           'state_support_admin',
           'super_admin',
@@ -1922,6 +1929,13 @@ exports.createAdmin = async (req, res) => {
     const allowedCreateRoles = [
       'admin',
       'state_admin',
+      'lga_financial_admin',
+      'lga_transportation_admin',
+      'state_transportation_admin',
+      'super_transportation_admin',
+      'lga_fumigation_admin',
+      'state_fumigation_admin',
+      'super_fumigation_admin',
       'state_financial_admin',
       'state_support_admin',
       'super_financial_admin',
@@ -1942,10 +1956,15 @@ exports.createAdmin = async (req, res) => {
 
     const stateBoundRoles = new Set([
       'admin',
+      'lga_financial_admin',
+      'lga_transportation_admin',
+      'lga_fumigation_admin',
       'state_admin',
       'state_financial_admin',
       'state_support_admin',
       'state_lawyer',
+      'state_transportation_admin',
+      'state_fumigation_admin',
       'lawyer',
     ]);
     const lawyerRoles = new Set([
@@ -1999,10 +2018,10 @@ exports.createAdmin = async (req, res) => {
       }
     }
 
-    if (user_type === 'admin' && !normalizedCity) {
+    if (['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(user_type) && !normalizedCity) {
       return res.status(400).json({
         success: false,
-        message: 'Assigned local government is required for admin role',
+        message: 'Assigned local government is required for this LGA role',
       });
     }
 
@@ -2029,6 +2048,13 @@ exports.createAdmin = async (req, res) => {
     // Roles that require super-admin approval before the account is active
     const requiresApprovalRoles = new Set([
       'admin',
+      'lga_financial_admin',
+      'lga_transportation_admin',
+      'state_transportation_admin',
+      'super_transportation_admin',
+      'lga_fumigation_admin',
+      'state_fumigation_admin',
+      'super_fumigation_admin',
       'state_admin',
       'financial_admin',
       'super_financial_admin',
@@ -2061,7 +2087,7 @@ exports.createAdmin = async (req, res) => {
         normalizedFullName,
         normalizedNin || null,
         normalizedState || null,
-        user_type === 'admin' ? normalizedCity : null,
+        ['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(user_type) ? normalizedCity : null,
         normalizedLawyerScope,
         pendingApproval ? 'pending' : 'approved',
       ]

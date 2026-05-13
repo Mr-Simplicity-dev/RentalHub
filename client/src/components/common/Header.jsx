@@ -43,9 +43,13 @@ const Header = () => {
     if (role === 'state_support_admin') return '/admin/state-support-dashboard';
     if (role === 'state_admin' || role === 'state_financial_admin') return '/admin';
     if (role === 'super_financial_admin') return '/admin/super-financial-dashboard';
-    if (role === 'financial_admin') return '/admin/financial-dashboard';
-    if (role === 'fumigation_admin') return '/admin/fumigation-cleaning';
-    if (role === 'transportation_admin') return '/admin/transportation';
+    if (role === 'financial_admin' || role === 'lga_financial_admin') return '/admin/financial-dashboard';
+    if (role === 'super_fumigation_admin') return '/admin/fumigation-cleaning/super';
+    if (role === 'state_fumigation_admin') return '/admin/fumigation-cleaning/state';
+    if (role === 'fumigation_admin' || role === 'lga_fumigation_admin') return '/admin/fumigation-cleaning';
+    if (role === 'super_transportation_admin') return '/admin/transportation/super';
+    if (role === 'state_transportation_admin') return '/admin/transportation/state';
+    if (role === 'transportation_admin' || role === 'lga_transportation_admin') return '/admin/transportation';
     if (role === 'lawyer') return '/lawyer';
     if (role === 'state_lawyer') return '/lawyer/state';
     if (role === 'super_lawyer') return '/lawyer/super';

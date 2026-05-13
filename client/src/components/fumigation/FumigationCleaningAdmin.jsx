@@ -23,7 +23,22 @@ import {
 } from 'react-icons/fa';
 import Loader from '../common/Loader';
 
-const FumigationCleaningAdmin = () => {
+const FUMIGATION_ADMIN_ROLES = [
+  'admin',
+  'super_admin',
+  'state_admin',
+  'state_financial_admin',
+  'fumigation_admin',
+  'lga_fumigation_admin',
+  'state_fumigation_admin',
+  'super_fumigation_admin',
+];
+
+const FumigationCleaningAdmin = ({
+  title = 'Fumigation & Cleaning Admin',
+  subtitle = 'Manage fumigation and cleaning service bookings',
+  scopeLabel = '',
+}) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -47,7 +62,7 @@ const FumigationCleaningAdmin = () => {
   // Load admin data
   useEffect(() => {
     const loadAdminData = async () => {
-      if (!user || !['admin', 'super_admin', 'fumigation_admin'].includes(user.user_type)) {
+      if (!user || !FUMIGATION_ADMIN_ROLES.includes(user.user_type)) {
         toast.error('Access denied');
         navigate('/dashboard');
         return;
@@ -280,11 +295,16 @@ const FumigationCleaningAdmin = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Fumigation & Cleaning Admin
+            {title}
           </h1>
           <p className="text-gray-600">
-            Manage fumigation and cleaning service bookings
+            {subtitle}
           </p>
+          {scopeLabel && (
+            <div className="mt-3 inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
+              {scopeLabel}
+            </div>
+          )}
         </div>
         
         {/* Stats Cards */}

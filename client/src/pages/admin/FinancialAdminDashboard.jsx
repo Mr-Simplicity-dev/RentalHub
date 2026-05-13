@@ -31,6 +31,11 @@ const FinancialAdminDashboard = () => {
   const [frozenFunds, setFrozenFunds] = useState([]);
   const [stateAdmins, setStateAdmins] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [withdrawableSnapshot, setWithdrawableSnapshot] = useState({
+    withdrawable_amount: 0,
+    total_earned: 0,
+  });
   const [activeTab, setActiveTab] = useState(() => {
     return new URLSearchParams(location.search).get('tab') || 'overview';
   });
@@ -41,12 +46,6 @@ const FinancialAdminDashboard = () => {
     reason: '',
   });
   const [showPersonalWithdrawDialog, setShowPersonalWithdrawDialog] = useState(false);
-  const [personalWithdrawInputs, setPersonalWithdrawInputs] = useState({
-    amount: '',
-    bank_name: '',
-    account_number: '',
-    account_name: '',
-  });
 
   const freezeFundsAction = useRetryableAction(
     async (inputs) => {
@@ -87,8 +86,11 @@ const FinancialAdminDashboard = () => {
       onSuccess: async () => {
         toast.success('Personal commission withdrawal request submitted');
         setShowPersonalWithdrawDialog(false);
-        setPersonalWithdrawInputs({ amount: '', bank_name: '', account_number: '', account_name: '' });
-        await fetchDashboardData();
+        if (profile?.user_type === 'lga_financial_admin') {
+          await fetchLgaFinanceData();
+        } else {
+          await fetchDashboardData();
+        }
       },
       onError: (error) => {
         toast.error(error?.message || 'Failed to submit withdrawal request');
@@ -100,11 +102,19 @@ const FinancialAdminDashboard = () => {
     const initializeDashboard = async () => {
       try {
         const response = await api.get('/api/users/me');
-        if (response.data.data.user_type !== 'financial_admin') {
+        const me = response.data.data;
+        setProfile(me);
+
+        if (!['financial_admin', 'lga_financial_admin'].includes(me.user_type)) {
           navigate('/admin/dashboard');
           return;
         }
-        await fetchDashboardData();
+
+        if (me.user_type === 'lga_financial_admin') {
+          await fetchLgaFinanceData();
+        } else {
+          await fetchDashboardData();
+        }
       } catch (error) {
         navigate('/login');
       }
@@ -151,6 +161,28 @@ const FinancialAdminDashboard = () => {
       setWithdrawals(withdrawalsRes.data.data || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLgaFinanceData = async () => {
+    try {
+      setLoading(true);
+
+      const [withdrawableRes, withdrawalsRes] = await Promise.all([
+        api.get('/api/financial-admin/commissions/withdrawable'),
+        api.get('/api/financial-admin/withdrawals/history'),
+      ]);
+
+      setWithdrawableSnapshot(withdrawableRes.data?.data || {
+        withdrawable_amount: 0,
+        total_earned: 0,
+      });
+      setWithdrawals(withdrawalsRes.data?.data || []);
+    } catch (error) {
+      console.error('Error fetching LGA finance dashboard data:', error);
+      toast.error(error.response?.data?.message || 'Failed to load LGA finance dashboard');
     } finally {
       setLoading(false);
     }
@@ -214,6 +246,121 @@ const FinancialAdminDashboard = () => {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (profile?.user_type === 'lga_financial_admin') {
+    const withdrawalTotal = withdrawals.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const pendingCount = withdrawals.filter((item) => String(item.status || '').toLowerCase() === 'pending').length;
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-100/40 p-6">
+        <div className="mx-auto max-w-6xl space-y-6">
+          <div className="rounded-lg bg-white p-6 shadow">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">LGA Financial Admin Dashboard</h1>
+                <p className="mt-1 text-sm text-gray-600">
+                  Monitor your assigned LGA finance activity and manage your commission withdrawals.
+                </p>
+                <div className="mt-3 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                  {profile.assigned_state || 'Unassigned State'}{profile.assigned_city ? `, ${profile.assigned_city} LGA` : ''}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPersonalWithdrawDialog(true)}
+                className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                Request Withdrawal
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-lg bg-white p-5 shadow">
+              <p className="text-sm font-medium text-gray-600">Withdrawable Balance</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {formatCurrency(withdrawableSnapshot.withdrawable_amount || 0)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-white p-5 shadow">
+              <p className="text-sm font-medium text-gray-600">Total Earned</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {formatCurrency(withdrawableSnapshot.total_earned || 0)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-white p-5 shadow">
+              <p className="text-sm font-medium text-gray-600">Withdrawal Requests</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{withdrawals.length}</p>
+              <p className="mt-1 text-xs text-amber-700">{pendingCount} pending</p>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-white p-6 shadow">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Withdrawal History</h2>
+                <p className="text-sm text-gray-500">
+                  Total requested: {formatCurrency(withdrawalTotal)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchLgaFinanceData}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Refresh
+              </button>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Amount</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Bank</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {withdrawals.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
+                        No withdrawal requests yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    withdrawals.map((withdrawal) => (
+                      <tr key={withdrawal.id}>
+                        <td className="px-4 py-3 text-gray-600">{formatDate(withdrawal.requested_at || withdrawal.created_at)}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-900">{formatCurrency(withdrawal.amount)}</td>
+                        <td className="px-4 py-3 text-gray-600">{withdrawal.bank_name || '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold capitalize text-gray-700">
+                            {withdrawal.status || 'pending'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <AdminWithdrawalModal
+            isOpen={showPersonalWithdrawDialog}
+            onClose={() => setShowPersonalWithdrawDialog(false)}
+            onSubmit={async (formData) => {
+              await personalWithdrawAction.execute(formData);
+            }}
+            isLoading={personalWithdrawAction.isLoading}
+            confirmLabel="Submit Withdrawal Request"
+          />
+        </div>
       </div>
     );
   }
@@ -982,7 +1129,6 @@ const FinancialAdminDashboard = () => {
           isOpen={showPersonalWithdrawDialog}
           onClose={() => setShowPersonalWithdrawDialog(false)}
           onSubmit={async (formData) => {
-            setPersonalWithdrawInputs(formData);
             await personalWithdrawAction.execute(formData);
           }}
           isLoading={personalWithdrawAction.isLoading}

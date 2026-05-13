@@ -49,13 +49,36 @@ const AdminLayout = () => {
   const isCoreAdmin = role === 'admin';
   const isSuperAdmin = role === 'super_admin';
   const isFinancialAdmin = role === 'financial_admin';
+  const isLgaFinancialAdmin = role === 'lga_financial_admin';
   const isSuperFinancialAdmin = role === 'super_financial_admin';
   const isStateFinancialAdmin = role === 'state_financial_admin';
   const isStateSupportAdmin = role === 'state_support_admin';
-  const isFumigationAdmin = role === 'fumigation_admin';
-  const isTransportationAdmin = role === 'transportation_admin';
-  const isStateScopedAdmin = ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_lawyer'].includes(role);
+  const isFumigationAdmin = ['fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin'].includes(role);
+  const isTransportationAdmin = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin'].includes(role);
+  const isStateScopedAdmin = [
+    'state_admin',
+    'state_financial_admin',
+    'state_support_admin',
+    'state_lawyer',
+    'state_transportation_admin',
+    'state_fumigation_admin',
+    'admin',
+    'lga_financial_admin',
+    'lga_transportation_admin',
+    'lga_fumigation_admin',
+  ].includes(role);
   const assignedStateLabel = user?.assigned_state || 'Not Assigned';
+  const assignedLgaLabel = user?.assigned_city || '';
+  const fumigationBasePath = role === 'super_fumigation_admin'
+    ? '/admin/fumigation-cleaning/super'
+    : role === 'state_fumigation_admin'
+    ? '/admin/fumigation-cleaning/state'
+    : '/admin/fumigation-cleaning';
+  const transportationBasePath = role === 'super_transportation_admin'
+    ? '/admin/transportation/super'
+    : role === 'state_transportation_admin'
+    ? '/admin/transportation/state'
+    : '/admin/transportation';
   const [liveBadges, setLiveBadges] = useState({
     pendingVerifications: 0,
     pendingAdminApprovals: 0,
@@ -169,13 +192,27 @@ const AdminLayout = () => {
         mainBg: 'bg-gradient-to-br from-amber-50 via-white to-amber-100/40',
         panelTitle: 'State Support Console',
       }
+    : isFinancialAdmin || isLgaFinancialAdmin
+    ? {
+        sidebarBg: 'from-emerald-700 to-emerald-600',
+        activeNav: 'bg-emerald-600 text-white',
+        hoverNav: 'text-gray-700 hover:bg-emerald-50',
+        mainBg: 'bg-gradient-to-br from-emerald-50 via-white to-emerald-100/40',
+        panelTitle: isLgaFinancialAdmin ? 'LGA Finance Console' : 'Financial Admin Console',
+      }
     : isFumigationAdmin
     ? {
         sidebarBg: 'from-rose-700 to-rose-600',
         activeNav: 'bg-rose-600 text-white',
         hoverNav: 'text-gray-700 hover:bg-rose-50',
         mainBg: 'bg-gradient-to-br from-rose-50 via-white to-rose-100/40',
-        panelTitle: 'Fumigation Admin',
+        panelTitle: role === 'lga_fumigation_admin'
+          ? 'LGA Fumigation Console'
+          : role === 'state_fumigation_admin'
+          ? 'State Fumigation Console'
+          : role === 'super_fumigation_admin'
+          ? 'Super Fumigation Console'
+          : 'Fumigation Admin',
       }
     : isTransportationAdmin
     ? {
@@ -183,7 +220,13 @@ const AdminLayout = () => {
         activeNav: 'bg-sky-600 text-white',
         hoverNav: 'text-gray-700 hover:bg-sky-50',
         mainBg: 'bg-gradient-to-br from-sky-50 via-white to-sky-100/40',
-        panelTitle: 'Transportation Admin',
+        panelTitle: role === 'lga_transportation_admin'
+          ? 'LGA Transportation Console'
+          : role === 'state_transportation_admin'
+          ? 'State Transportation Console'
+          : role === 'super_transportation_admin'
+          ? 'Super Transportation Console'
+          : 'Transportation Admin',
       }
     : {
         sidebarBg: 'from-admin-700 to-admin-600',
@@ -241,7 +284,7 @@ const AdminLayout = () => {
   const transportationTab = new URLSearchParams(location.search).get('tab') || 'overview';
   const transportationNavItem = (tab) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
-      location.pathname === '/admin/transportation' && transportationTab === tab
+      location.pathname === transportationBasePath && transportationTab === tab
         ? roleTheme.activeNav
         : roleTheme.hoverNav
     }`;
@@ -260,7 +303,7 @@ const AdminLayout = () => {
           <RoleBadge role={role} className="mt-2" />
           {isStateScopedAdmin && (
             <div className="mt-2 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-              Scope: {assignedStateLabel}
+              Scope: {assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}
             </div>
           )}
 
@@ -366,6 +409,11 @@ const AdminLayout = () => {
                   Properties
                 </NavLink>
 
+                <NavLink to="/super-admin?tab=property_requests" className={() => superAdminNavItem('property_requests')}>
+                  <FaClipboardList className="mr-3" />
+                  Property Requests
+                </NavLink>
+
                 <NavLink to="/super-admin?tab=analytics" className={() => superAdminNavItem('analytics')}>
                   <FaShieldAlt className="mr-3" />
                   Analytics
@@ -412,12 +460,12 @@ const AdminLayout = () => {
                   {badgePill(liveBadges.pendingAdminApprovals, 'amber')}
                 </NavLink>
 
-                <NavLink to="/super-admin?tab=transportation" className={() => superAdminNavItem('transportation')}>
+                <NavLink to="/super-admin/transportation" className={() => superAdminNavItem('transportation')}>
                   <FaTruck className="mr-3" />
                   Transportation
                 </NavLink>
 
-                <NavLink to="/super-admin?tab=fumigation-cleaning" className={() => superAdminNavItem('fumigation-cleaning')}>
+                <NavLink to="/super-admin/fumigation-cleaning" className={() => superAdminNavItem('fumigation-cleaning')}>
                   <FaSprayCan className="mr-3" />
                   Fumigation
                 </NavLink>
@@ -495,6 +543,11 @@ const AdminLayout = () => {
                 Applications
               </NavLink>
 
+              <NavLink to="/admin?tab=property_requests" className={navItem}>
+                <FaHome className="mr-3" />
+                Property Requests
+              </NavLink>
+
               <NavLink to="/admin/transportation" className={navItem}>
                 <FaTruck className="mr-3" />
                 Transportation
@@ -521,7 +574,7 @@ const AdminLayout = () => {
                 Fumigation Admin
               </p>
               <div className="space-y-2">
-                <NavLink to="/admin/fumigation-cleaning" className={navItem}>
+                <NavLink to={fumigationBasePath} className={navItem}>
                   <FaSprayCan className="mr-3" />
                   Fumigation Dashboard
                 </NavLink>
@@ -536,23 +589,23 @@ const AdminLayout = () => {
                 Transportation Admin
               </p>
               <div className="space-y-2">
-                <NavLink to="/admin/transportation?tab=overview" className={() => transportationNavItem('overview')}>
+                <NavLink to={`${transportationBasePath}?tab=overview`} className={() => transportationNavItem('overview')}>
                   <FaTachometerAlt className="mr-3" />
                   Overview
                 </NavLink>
-                <NavLink to="/admin/transportation?tab=bookings" className={() => transportationNavItem('bookings')}>
+                <NavLink to={`${transportationBasePath}?tab=bookings`} className={() => transportationNavItem('bookings')}>
                   <FaClipboardList className="mr-3" />
                   Bookings
                 </NavLink>
-                <NavLink to="/admin/transportation?tab=services" className={() => transportationNavItem('services')}>
+                <NavLink to={`${transportationBasePath}?tab=services`} className={() => transportationNavItem('services')}>
                   <FaTruck className="mr-3" />
                   Services
                 </NavLink>
-                <NavLink to="/admin/transportation?tab=alerts" className={() => transportationNavItem('alerts')}>
+                <NavLink to={`${transportationBasePath}?tab=alerts`} className={() => transportationNavItem('alerts')}>
                   <FaExclamationTriangle className="mr-3" />
                   Alerts
                 </NavLink>
-                <NavLink to="/admin/transportation?tab=analytics" className={() => transportationNavItem('analytics')}>
+                <NavLink to={`${transportationBasePath}?tab=analytics`} className={() => transportationNavItem('analytics')}>
                   <FaChartLine className="mr-3" />
                   Analytics
                 </NavLink>
@@ -667,6 +720,27 @@ const AdminLayout = () => {
             </div>
           )}
 
+          {/* LGA FINANCIAL ADMIN NAV */}
+          {isLgaFinancialAdmin && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                LGA Finance
+              </p>
+
+              <div className="space-y-2">
+                <NavLink to="/admin/financial-dashboard?tab=overview" className={() => financialNavItem('overview')}>
+                  <FaMoneyBill className="mr-3" />
+                  Overview
+                </NavLink>
+
+                <NavLink to="/admin/financial-dashboard?tab=withdrawals" className={() => financialNavItem('withdrawals')}>
+                  <FaWallet className="mr-3" />
+                  My Withdrawals
+                </NavLink>
+              </div>
+            </div>
+          )}
+
           {/* SUPER FINANCIAL ADMIN NAV */}
           {isSuperFinancialAdmin && (
             <div>
@@ -772,7 +846,7 @@ const AdminLayout = () => {
       <main className="flex-1 p-6 overflow-y-auto animate-fadeIn">
         {isStateScopedAdmin && (
           <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-800">
-            You are viewing state-scoped admin data for <span className="font-semibold">{assignedStateLabel}</span>.
+            You are viewing scoped admin data for <span className="font-semibold">{assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>.
           </div>
         )}
         <Outlet />

@@ -616,7 +616,7 @@ const LawyerDashboardContent = ({
                   {rolePillLabel}
                 </span>
                 <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
-                  Assigned State: {lawyerProfile?.assigned_state || 'Not configured'}
+                  Assigned Jurisdiction: {lawyerProfile?.assigned_state || 'Not configured'}{lawyerProfile?.assigned_city ? `, ${lawyerProfile.assigned_city}` : ''}
                 </span>
               </div>
             </div>
@@ -665,7 +665,7 @@ const LawyerDashboardContent = ({
                 </p>
               </div>
               <div className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-700">
-                Scope: {lawyerProfile?.assigned_state || 'Not configured'}
+                Scope: {lawyerProfile?.assigned_state || 'Not configured'}{lawyerProfile?.assigned_city ? `, ${lawyerProfile.assigned_city}` : ''}
               </div>
             </div>
           </motion.section>
@@ -689,7 +689,7 @@ const LawyerDashboardContent = ({
                 <p>Email: {lawyerProfile?.email || '-'}</p>
                 <p>Phone: {lawyerProfile?.phone || '-'}</p>
                 <p>Chamber: {lawyerProfile?.chamber_name || 'No chamber provided'}</p>
-                <p>Jurisdiction: {lawyerProfile?.assigned_state || 'Not configured'}</p>
+                <p>Jurisdiction: {lawyerProfile?.assigned_state || 'Not configured'}{lawyerProfile?.assigned_city ? `, ${lawyerProfile.assigned_city}` : ''}</p>
               </div>
             </div>
 

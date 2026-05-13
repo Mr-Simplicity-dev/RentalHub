@@ -111,15 +111,23 @@ const Login = () => {
           navigate('/admin/state-support-dashboard');
         } else if (role === 'super_financial_admin') {
           navigate('/admin/super-financial-dashboard');
-        } else if (role === 'financial_admin') {
+        } else if (role === 'financial_admin' || role === 'lga_financial_admin') {
           navigate('/admin/financial-dashboard');
         } else if (role === 'state_admin' || role === 'state_financial_admin') {
           navigate('/admin');
         } else if (role === 'admin') {
           navigate('/admin');
-        } else if (role === 'fumigation_admin') {
+        } else if (role === 'super_fumigation_admin') {
+          navigate('/admin/fumigation-cleaning/super');
+        } else if (role === 'state_fumigation_admin') {
+          navigate('/admin/fumigation-cleaning/state');
+        } else if (role === 'fumigation_admin' || role === 'lga_fumigation_admin') {
           navigate('/admin/fumigation-cleaning');
-        } else if (role === 'transportation_admin') {
+        } else if (role === 'super_transportation_admin') {
+          navigate('/admin/transportation/super');
+        } else if (role === 'state_transportation_admin') {
+          navigate('/admin/transportation/state');
+        } else if (role === 'transportation_admin' || role === 'lga_transportation_admin') {
           navigate('/admin/transportation');
         } else if (role === 'super_lawyer') {
           navigate('/lawyer/super');

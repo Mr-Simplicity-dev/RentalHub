@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
+  FaBell,
   FaCheckCircle,
   FaExclamationTriangle,
   FaMapMarkerAlt,
+  FaPaperPlane,
   FaSearch,
   FaSyncAlt,
   FaTimesCircle,
@@ -59,6 +61,7 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
     resolvedMode === 'support' ? 'pending_support_review' : 'approved_assigned'
   );
   const [actionId, setActionId] = useState(null);
+  const [notificationForms, setNotificationForms] = useState({});
 
   const statusOptions = useMemo(() => {
     if (resolvedMode === 'support') {
@@ -153,8 +156,58 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
     }
   };
 
+  const getNotificationForm = (requestId) => notificationForms[requestId] || {
+    admin_scope: 'request_lga',
+    state_names: '',
+    lga_names: '',
+  };
+
+  const updateNotificationForm = (requestId, patch) => {
+    setNotificationForms((prev) => ({
+      ...prev,
+      [requestId]: {
+        ...(prev[requestId] || {
+          admin_scope: 'request_lga',
+          state_names: '',
+          lga_names: '',
+        }),
+        ...patch,
+      },
+    }));
+  };
+
+  const parseCsv = (value) =>
+    String(value || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  const resendNotifications = async (request, target) => {
+    const form = getNotificationForm(request.id);
+
+    try {
+      setActionId(request.id);
+      const response = await api.post(`/property-alerts/admin/requests/${request.id}/resend-notifications`, {
+        target,
+        admin_scope: form.admin_scope,
+        state_names: parseCsv(form.state_names),
+        lga_names: parseCsv(form.lga_names),
+      });
+      const sent = response.data?.data?.sent ?? 0;
+      const skipped = response.data?.data?.skipped ?? 0;
+      toast.success(`Notification sent to ${sent} recipient${sent === 1 ? '' : 's'}${skipped ? ` (${skipped} skipped)` : ''}`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Notification failed');
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const pendingCount = requests.filter((item) => item.workflow_status === 'pending_support_review').length;
   const lgaMissingCount = requests.filter((item) => item.workflow_status === 'lga_coverage_missing').length;
+  const canNotifyLandlords = ['admin', 'state_admin', 'state_financial_admin', 'state_support_admin', 'super_admin', 'super_support_admin'].includes(role);
+  const canNotifyLgaAdmins = ['state_admin', 'state_financial_admin', 'state_support_admin', 'super_admin', 'super_support_admin'].includes(role);
+  const isSuperNotificationRole = ['super_admin', 'super_support_admin'].includes(role);
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -334,6 +387,71 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
                 </>
               )}
             </div>
+
+            {(canNotifyLandlords || canNotifyLgaAdmins) && ['approved_assigned', 'sourcing', 'lga_coverage_missing'].includes(request.workflow_status) && (
+              <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Notification Controls</p>
+                    <p className="mt-1 text-xs text-emerald-700">
+                      Send bell alerts to the right people for this request.
+                    </p>
+                  </div>
+                  {canNotifyLandlords && (
+                    <button
+                      type="button"
+                      disabled={actionId === request.id}
+                      onClick={() => resendNotifications(request, 'landlords')}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      <FaBell /> Notify Landlords
+                    </button>
+                  )}
+                </div>
+
+                {canNotifyLgaAdmins && (
+                  <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[180px_1fr_1fr_auto]">
+                    <select
+                      value={getNotificationForm(request.id).admin_scope}
+                      onChange={(event) => updateNotificationForm(request.id, { admin_scope: event.target.value })}
+                      className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-slate-700"
+                    >
+                      <option value="request_lga">Request LGA admin</option>
+                      <option value="all_state_lgas">All LGA admins in state</option>
+                      <option value="specific_lga">Specific LGA admin</option>
+                    </select>
+
+                    {isSuperNotificationRole && (
+                      <input
+                        type="text"
+                        value={getNotificationForm(request.id).state_names}
+                        onChange={(event) => updateNotificationForm(request.id, { state_names: event.target.value })}
+                        placeholder="States, comma separated (blank uses request state)"
+                        className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-slate-700"
+                      />
+                    )}
+
+                    <input
+                      type="text"
+                      value={getNotificationForm(request.id).lga_names}
+                      onChange={(event) => updateNotificationForm(request.id, { lga_names: event.target.value })}
+                      placeholder="LGAs, comma separated"
+                      disabled={getNotificationForm(request.id).admin_scope === 'all_state_lgas'}
+                      className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-slate-700 disabled:bg-slate-100"
+                    />
+
+                    <button
+                      type="button"
+                      disabled={actionId === request.id}
+                      onClick={() => resendNotifications(request, 'lga_admins')}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                    >
+                      <FaPaperPlane /> Notify LGA Admins
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </article>
         ))}
       </div>

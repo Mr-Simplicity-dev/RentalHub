@@ -20,6 +20,7 @@ const {
  */
 const WITHDRAWAL_ELIGIBLE_ROLES = new Set([
   'admin',
+  'lga_financial_admin',
   'super_admin',
   'state_admin',
   'state_financial_admin',
@@ -30,7 +31,13 @@ const WITHDRAWAL_ELIGIBLE_ROLES = new Set([
   'super_support_admin',
   'super_lawyer_admin',
   'fumigation_admin',
+  'lga_fumigation_admin',
+  'state_fumigation_admin',
+  'super_fumigation_admin',
   'transportation_admin',
+  'lga_transportation_admin',
+  'state_transportation_admin',
+  'super_transportation_admin',
 ]);
 const {
   createTransferRecipient,

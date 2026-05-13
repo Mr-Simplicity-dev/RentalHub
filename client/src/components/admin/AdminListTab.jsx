@@ -14,6 +14,139 @@ import {
 
 const ADMINS_PAGE_SIZE = 10;
 
+const ROLE_META = {
+  admin: {
+    label: 'LGA Admin',
+    department: 'General Operations',
+    duty: 'Manages users, properties, applications, and local property request sourcing inside one LGA.',
+    reportsTo: 'State Admin',
+  },
+  lga_financial_admin: {
+    label: 'LGA Financial Admin',
+    department: 'Finance',
+    duty: 'Handles local commission visibility and withdrawal activity for one assigned LGA.',
+    reportsTo: 'State Financial Admin',
+  },
+  state_admin: {
+    label: 'State Admin',
+    department: 'General Operations',
+    duty: 'Oversees LGA admins, state users, properties, applications, and state-level sourcing.',
+    reportsTo: 'Super Admin',
+  },
+  state_financial_admin: {
+    label: 'State Financial Admin',
+    department: 'Finance',
+    duty: 'Oversees state finance activity, state withdrawals, and finance performance.',
+    reportsTo: 'Super Financial Admin',
+  },
+  super_financial_admin: {
+    label: 'Super Financial Admin',
+    department: 'Finance',
+    duty: 'Monitors national finance, transactions, withdrawals, frozen funds, and finance controls.',
+    reportsTo: 'Super Admin',
+  },
+  financial_admin: {
+    label: 'Financial Admin',
+    department: 'Finance',
+    duty: 'Handles platform finance operations assigned by the super finance structure.',
+    reportsTo: 'Super Financial Admin',
+  },
+  state_support_admin: {
+    label: 'State Support Admin',
+    department: 'Support',
+    duty: 'Reviews tenant property requests and support queues for one assigned state.',
+    reportsTo: 'Super Support Admin',
+  },
+  super_support_admin: {
+    label: 'Super Support Admin',
+    department: 'Support',
+    duty: 'Oversees support across states, escalations, audit trails, and delayed requests.',
+    reportsTo: 'Super Admin',
+  },
+  lawyer: {
+    label: 'LGA Lawyer',
+    department: 'Legal',
+    duty: 'Handles assigned legal matters for one local government and the selected client scope.',
+    reportsTo: 'State/Super Lawyer',
+  },
+  state_lawyer: {
+    label: 'State Lawyer',
+    department: 'Legal',
+    duty: 'Oversees legal work and lawyer activity within one state.',
+    reportsTo: 'Super Lawyer',
+  },
+  super_lawyer: {
+    label: 'Super Lawyer',
+    department: 'Legal',
+    duty: 'Oversees legal coverage and lawyer activity across the platform.',
+    reportsTo: 'Super Admin',
+  },
+  fumigation_admin: {
+    label: 'Fumigation Admin',
+    department: 'Fumigation',
+    duty: 'Manages fumigation and cleaning service operations in the assigned service scope.',
+    reportsTo: 'Super Admin',
+  },
+  lga_fumigation_admin: {
+    label: 'LGA Fumigation Admin',
+    department: 'Fumigation',
+    duty: 'Handles fumigation and cleaning operations within one assigned LGA.',
+    reportsTo: 'State Fumigation Admin',
+  },
+  state_fumigation_admin: {
+    label: 'State Fumigation Admin',
+    department: 'Fumigation',
+    duty: 'Oversees fumigation and cleaning operations across LGAs in one state.',
+    reportsTo: 'Super Fumigation Admin',
+  },
+  super_fumigation_admin: {
+    label: 'Super Fumigation Admin',
+    department: 'Fumigation',
+    duty: 'Oversees fumigation and cleaning operations nationally.',
+    reportsTo: 'Super Admin',
+  },
+  transportation_admin: {
+    label: 'Transportation Admin',
+    department: 'Transportation',
+    duty: 'Manages transportation bookings, services, alerts, and operational follow-up.',
+    reportsTo: 'Super Admin',
+  },
+  lga_transportation_admin: {
+    label: 'LGA Transportation Admin',
+    department: 'Transportation',
+    duty: 'Handles transportation bookings, services, and follow-up within one LGA.',
+    reportsTo: 'State Transportation Admin',
+  },
+  state_transportation_admin: {
+    label: 'State Transportation Admin',
+    department: 'Transportation',
+    duty: 'Oversees transportation operations across LGAs in one state.',
+    reportsTo: 'Super Transportation Admin',
+  },
+  super_transportation_admin: {
+    label: 'Super Transportation Admin',
+    department: 'Transportation',
+    duty: 'Oversees transportation operations nationally.',
+    reportsTo: 'Super Admin',
+  },
+  super_admin: {
+    label: 'Super Admin',
+    department: 'Platform Control',
+    duty: 'Owns platform configuration, roles, pricing, flags, oversight, and final escalation.',
+    reportsTo: 'Platform Owner',
+  },
+};
+
+const getRoleMeta = (role) => {
+  const key = String(role || '').trim().toLowerCase();
+  return ROLE_META[key] || {
+    label: key ? key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) : 'Admin',
+    department: 'Administration',
+    duty: 'Handles assigned administrative duties for the configured role.',
+    reportsTo: 'Super Admin',
+  };
+};
+
 const getRoleBadgeClass = (role) => {
   switch (role) {
     case 'super_admin':
@@ -22,6 +155,8 @@ const getRoleBadgeClass = (role) => {
     case 'super_support_admin':
     case 'super_lawyer':
       return 'bg-red-100 text-red-700';
+    case 'lga_financial_admin':
+      return 'bg-emerald-100 text-emerald-700';
     case 'state_admin':
     case 'state_financial_admin':
     case 'state_support_admin':
@@ -32,15 +167,21 @@ const getRoleBadgeClass = (role) => {
     case 'lawyer':
       return 'bg-violet-100 text-violet-700';
     case 'fumigation_admin':
+    case 'lga_fumigation_admin':
+    case 'state_fumigation_admin':
+    case 'super_fumigation_admin':
       return 'bg-rose-100 text-rose-700';
     case 'transportation_admin':
+    case 'lga_transportation_admin':
+    case 'state_transportation_admin':
+    case 'super_transportation_admin':
       return 'bg-sky-100 text-sky-700';
     default:
       return 'bg-gray-100 text-gray-700';
   }
 };
 
-const formatRoleLabel = (role) => String(role || 'admin').replace(/_/g, ' ');
+const formatRoleLabel = (role) => getRoleMeta(role).label;
 
 const AdminListTab = () => {
   const navigate = useNavigate();
@@ -127,7 +268,7 @@ const AdminListTab = () => {
 
   const isJurisdictionRole = (role) => {
     const value = String(role || '');
-    return value === 'admin' || value.startsWith('state_') || value === 'lawyer';
+    return value === 'admin' || value === 'lga_financial_admin' || value === 'lawyer' || value.startsWith('lga_') || value.startsWith('state_');
   };
 
   const editJurisdiction = async (admin) => {
@@ -142,7 +283,7 @@ const AdminListTab = () => {
       }
 
       let normalizedCity = '';
-      if (admin.user_type === 'admin') {
+      if (['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(admin.user_type)) {
         const lgaInput = window.prompt('Assigned Local Government (LGA)', admin.assigned_city || '');
         if (lgaInput === null) return;
         normalizedCity = String(lgaInput || '').trim();
@@ -282,8 +423,13 @@ const AdminListTab = () => {
                     <span
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold capitalize ${getRoleBadgeClass(admin.user_type)}`}
                     >
-                      {formatRoleLabel(admin.user_type)}
-                    </span>
+                          {formatRoleLabel(admin.user_type)}
+                        </span>
+                    <div className="mt-2 max-w-[260px] text-xs leading-5 text-gray-600">
+                      <p className="font-semibold text-gray-800">{getRoleMeta(admin.user_type).department}</p>
+                      <p>{getRoleMeta(admin.user_type).duty}</p>
+                      <p className="mt-1 text-gray-500">Reports to: {getRoleMeta(admin.user_type).reportsTo}</p>
+                    </div>
                   </td>
                   <td className="p-3">{admin.assigned_state || '-'}</td>
                   <td className="p-3">{admin.assigned_city || '-'}</td>

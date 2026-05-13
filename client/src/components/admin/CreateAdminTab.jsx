@@ -10,11 +10,16 @@ const NIGERIAN_STATES = [
 
 const STATE_BOUND_ROLES = new Set([
   'admin',
+  'lga_financial_admin',
+  'lawyer',
+  'lga_transportation_admin',
+  'lga_fumigation_admin',
   'state_admin',
   'state_financial_admin',
   'state_support_admin',
   'state_lawyer',
-  'lawyer',
+  'state_transportation_admin',
+  'state_fumigation_admin',
 ]);
 
 const LAWYER_ROLES = new Set([
@@ -106,7 +111,7 @@ const CreateAdminTab = () => {
           assigned_state: STATE_BOUND_ROLES.has(formData.user_type)
             ? formData.assigned_state
             : null,
-          assigned_city: formData.user_type === 'admin'
+          assigned_city: ['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(formData.user_type)
             ? String(formData.assigned_city || '').trim()
             : null,
           lawyer_client_scope: LAWYER_ROLES.has(formData.user_type)
@@ -148,7 +153,7 @@ const CreateAdminTab = () => {
       <h2>Create Admin</h2>
 
       <p className="mb-3 text-sm text-gray-600">
-        Admin requires state and local government. State roles require selecting assigned state.
+        LGA roles require state and local government. State roles require selecting assigned state.
       </p>
 
       {message && <p>{message}</p>}
@@ -205,17 +210,22 @@ const CreateAdminTab = () => {
           value={formData.user_type}
           onChange={handleChange}
         >
-          <option value="admin">Admin</option>
+          <option value="admin">LGA Admin</option>
+          <option value="lga_financial_admin">LGA Financial Admin</option>
+          <option value="lawyer">LGA Lawyer</option>
+          <option value="lga_transportation_admin">LGA Transportation Admin</option>
+          <option value="lga_fumigation_admin">LGA Fumigation Admin</option>
           <option value="state_admin">State Admin</option>
           <option value="state_financial_admin">State Financial Admin</option>
           <option value="state_support_admin">State Support Admin</option>
-          <option value="state_lawyer">State Lawyer Admin</option>
+          <option value="state_lawyer">State Lawyer</option>
+          <option value="state_transportation_admin">State Transportation Admin</option>
+          <option value="state_fumigation_admin">State Fumigation Admin</option>
           <option value="super_financial_admin">Super Financial Admin</option>
           <option value="super_support_admin">Super Support Admin</option>
-          <option value="super_lawyer">Super Lawyer Admin</option>
-          <option value="fumigation_admin">Fumigation Admin</option>
-          <option value="transportation_admin">Transportation Admin</option>
-          <option value="lawyer">Lawyer</option>
+          <option value="super_lawyer">Super Lawyer</option>
+          <option value="super_transportation_admin">Super Transportation Admin</option>
+          <option value="super_fumigation_admin">Super Fumigation Admin</option>
         </select>
                                                                                                                                                                      
         {STATE_BOUND_ROLES.has(formData.user_type) && (
@@ -232,7 +242,7 @@ const CreateAdminTab = () => {
               ))}
             </select>
 
-            {formData.user_type === 'admin' && (
+            {['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(formData.user_type) && (
               <select
                 name="assigned_city"
                 value={formData.assigned_city}

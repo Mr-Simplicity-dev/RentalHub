@@ -2,6 +2,7 @@ const db = require('../middleware/database');
 const { sendEmail } = require('./mailer');
 const { getFrontendUrl } = require('./frontendUrl');
 const { sendWhatsAppText } = require('./whatsappService');
+const { createNotification } = require('./notificationService');
 
 let schemaReady = false;
 const ALERT_REQUEST_FEE_NGN = 5000;
@@ -114,6 +115,25 @@ const ensureAlertSchema = async () => {
 
     ALTER TABLE tenant_property_alert_payments
       ADD COLUMN IF NOT EXISTS lga_name VARCHAR(120);
+
+    CREATE TABLE IF NOT EXISTS tenant_property_request_notification_logs (
+      id SERIAL PRIMARY KEY,
+      alert_id INTEGER NOT NULL REFERENCES tenant_property_alerts(id) ON DELETE CASCADE,
+      recipient_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      recipient_role VARCHAR(50),
+      notification_group VARCHAR(60) NOT NULL,
+      send_count INTEGER NOT NULL DEFAULT 1,
+      first_sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      sent_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE(alert_id, recipient_user_id, notification_group)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tenant_request_notification_logs_alert
+    ON tenant_property_request_notification_logs(alert_id, notification_group);
+
+    CREATE INDEX IF NOT EXISTS idx_tenant_request_notification_logs_recipient
+    ON tenant_property_request_notification_logs(recipient_user_id, last_sent_at DESC);
   `);
 
   schemaReady = true;
@@ -472,6 +492,279 @@ const normalizeStatusFilter = (status) => {
 
 const normalizeState = (value) => String(value || '').trim().toLowerCase();
 
+const normalizeList = (items) => {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+};
+
+const normalizeListForSql = (items) =>
+  normalizeList(items).map((item) => item.toLowerCase());
+
+const buildRequestLocationLabel = (alert) =>
+  [alert.state_name, alert.lga_name, alert.city].filter(Boolean).join(', ');
+
+const buildLandlordRequestMessage = (alert) => {
+  const location = buildRequestLocationLabel(alert) || 'your area';
+  const budget = [
+    alert.min_price ? `from NGN ${Number(alert.min_price).toLocaleString()}` : null,
+    alert.max_price ? `to NGN ${Number(alert.max_price).toLocaleString()}` : null,
+  ].filter(Boolean).join(' ');
+
+  return [
+    `A tenant is looking for a ${alert.property_type} in ${location}.`,
+    budget ? `Budget: ${budget}.` : null,
+    'If you have a matching property, tap this notification and post it.',
+  ].filter(Boolean).join(' ');
+};
+
+const buildAdminRequestMessage = (alert) => {
+  const location = buildRequestLocationLabel(alert) || 'the assigned location';
+  return `A tenant property request needs sourcing attention in ${location}. Open the request queue and follow up.`;
+};
+
+const createLoggedNotification = async ({
+  alertId,
+  recipient,
+  group,
+  title,
+  message,
+  link,
+  sentBy = null,
+  force = false,
+}) => {
+  if (!recipient?.id || !alertId || !group) {
+    return { sent: false, skipped: true };
+  }
+
+  if (!force) {
+    const existing = await db.query(
+      `SELECT id
+       FROM tenant_property_request_notification_logs
+       WHERE alert_id = $1
+         AND recipient_user_id = $2
+         AND notification_group = $3
+       LIMIT 1`,
+      [alertId, recipient.id, group]
+    );
+
+    if (existing.rows.length) {
+      return { sent: false, skipped: true };
+    }
+  }
+
+  const notification = await createNotification(
+    recipient.id,
+    group,
+    title,
+    message,
+    link
+  );
+
+  if (!notification) {
+    return { sent: false, skipped: false };
+  }
+
+  await db.query(
+    `INSERT INTO tenant_property_request_notification_logs (
+       alert_id,
+       recipient_user_id,
+       recipient_role,
+       notification_group,
+       sent_by
+     )
+     VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (alert_id, recipient_user_id, notification_group)
+     DO UPDATE SET
+       send_count = tenant_property_request_notification_logs.send_count + 1,
+       last_sent_at = CURRENT_TIMESTAMP,
+       recipient_role = EXCLUDED.recipient_role,
+       sent_by = EXCLUDED.sent_by`,
+    [alertId, recipient.id, recipient.user_type || recipient.recipient_role || null, group, sentBy]
+  );
+
+  return { sent: true, skipped: false };
+};
+
+const getAlertWithState = async (alertId) => {
+  const result = await db.query(
+    `SELECT a.*, s.state_name
+     FROM tenant_property_alerts a
+     LEFT JOIN states s ON s.id = a.state_id
+     WHERE a.id = $1
+     LIMIT 1`,
+    [alertId]
+  );
+
+  return result.rows[0] || null;
+};
+
+const findLandlordsForRequest = async (alert) => {
+  const stateId = Number(alert?.state_id);
+  const stateName = String(alert?.state_name || '').trim();
+  const lgaName = String(alert?.lga_name || '').trim();
+
+  if (!stateId && !stateName) return [];
+  if (!lgaName) return [];
+
+  const lgaKeys = [lgaName.toLowerCase()];
+  const result = await db.query(
+    `SELECT DISTINCT u.id, u.full_name, u.email, u.user_type
+     FROM users u
+     LEFT JOIN properties p
+       ON (p.landlord_id = u.id OR p.user_id = u.id)
+     WHERE u.user_type = 'landlord'
+       AND u.deleted_at IS NULL
+       AND u.is_active IS DISTINCT FROM FALSE
+       AND (
+         ($1::int IS NOT NULL AND (u.preferred_state_id = $1 OR p.state_id = $1))
+         OR ($2 <> '' AND LOWER(TRIM(COALESCE(p.state, ''))) = LOWER(TRIM($2)))
+       )
+       AND (
+         LOWER(TRIM(COALESCE(u.preferred_lga_name, ''))) = ANY($3::text[])
+         OR LOWER(TRIM(COALESCE(p.lga_name, ''))) = ANY($3::text[])
+       )
+     ORDER BY u.full_name ASC`,
+    [stateId || null, stateName, lgaKeys]
+  );
+
+  return result.rows;
+};
+
+const findLgaAdminsForNotification = async ({ stateNames = [], lgaNames = [] } = {}) => {
+  const normalizedStates = normalizeListForSql(stateNames);
+  const normalizedLgas = normalizeListForSql(lgaNames);
+
+  if (!normalizedStates.length) return [];
+
+  const params = [normalizedStates];
+  const where = [
+    `user_type = 'admin'`,
+    `deleted_at IS NULL`,
+    `is_active IS DISTINCT FROM FALSE`,
+    `LOWER(TRIM(COALESCE(assigned_state, ''))) = ANY($1::text[])`,
+  ];
+
+  if (normalizedLgas.length) {
+    params.push(normalizedLgas);
+    where.push(`LOWER(TRIM(COALESCE(assigned_city, ''))) = ANY($${params.length}::text[])`);
+  }
+
+  const result = await db.query(
+    `SELECT id, full_name, email, user_type, assigned_state, assigned_city
+     FROM users
+     WHERE ${where.join(' AND ')}
+     ORDER BY assigned_state ASC, assigned_city ASC, full_name ASC`,
+    params
+  );
+
+  return result.rows;
+};
+
+const assertCanSendRequestNotification = ({ actor, alert, target, adminScope }) => {
+  const actorRole = String(actor?.user_type || '').trim().toLowerCase();
+  const actorState = normalizeState(actor?.assigned_state);
+  const actorLga = normalizeState(actor?.assigned_city);
+  const alertState = normalizeState(alert?.state_name);
+  const alertLga = normalizeState(alert?.lga_name);
+  const superRoles = ['super_admin', 'super_support_admin'];
+  const stateRoles = ['state_admin', 'state_financial_admin', 'state_support_admin'];
+
+  if (superRoles.includes(actorRole)) return;
+
+  if (stateRoles.includes(actorRole)) {
+    if (!actorState || actorState !== alertState) {
+      const error = new Error('This request is outside your assigned state');
+      error.statusCode = 403;
+      throw error;
+    }
+    return;
+  }
+
+  if (actorRole === 'admin') {
+    if (target !== 'landlords' || adminScope === 'all_state_lgas') {
+      const error = new Error('LGA Admin can only notify landlords in the assigned LGA');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    if (!actorState || actorState !== alertState || (actorLga && actorLga !== alertLga)) {
+      const error = new Error('This request is outside your assigned LGA');
+      error.statusCode = 403;
+      throw error;
+    }
+    return;
+  }
+
+  const error = new Error('Admin access required to send property request notifications');
+  error.statusCode = 403;
+  throw error;
+};
+
+const notifyLandlordsForRequest = async ({ alert, actorId = null, force = false } = {}) => {
+  const recipients = await findLandlordsForRequest(alert);
+  const title = 'Tenant property request in your LGA';
+  const message = buildLandlordRequestMessage(alert);
+  const link = `/add-property?request_id=${alert.id}`;
+  const stats = { matched: recipients.length, sent: 0, skipped: 0, failed: 0 };
+
+  for (const recipient of recipients) {
+    const result = await createLoggedNotification({
+      alertId: alert.id,
+      recipient,
+      group: 'tenant_property_request_landlord',
+      title,
+      message,
+      link,
+      sentBy: actorId,
+      force,
+    });
+
+    if (result.sent) stats.sent += 1;
+    else if (result.skipped) stats.skipped += 1;
+    else stats.failed += 1;
+  }
+
+  return stats;
+};
+
+const notifyLgaAdminsForRequest = async ({
+  alert,
+  actorId = null,
+  force = false,
+  stateNames = [],
+  lgaNames = [],
+} = {}) => {
+  const recipients = await findLgaAdminsForNotification({
+    stateNames: stateNames.length ? stateNames : [alert.state_name],
+    lgaNames,
+  });
+  const title = 'Tenant property request needs LGA sourcing';
+  const message = buildAdminRequestMessage(alert);
+  const link = '/admin?tab=property_requests';
+  const stats = { matched: recipients.length, sent: 0, skipped: 0, failed: 0 };
+
+  for (const recipient of recipients) {
+    const result = await createLoggedNotification({
+      alertId: alert.id,
+      recipient,
+      group: 'tenant_property_request_lga_admin',
+      title,
+      message,
+      link,
+      sentBy: actorId,
+      force,
+    });
+
+    if (result.sent) stats.sent += 1;
+    else if (result.skipped) stats.skipped += 1;
+    else stats.failed += 1;
+  }
+
+  return stats;
+};
+
 const getAdminAssignedState = async (adminId) => {
   const result = await db.query(
     `SELECT assigned_state, assigned_city, user_type
@@ -706,6 +999,29 @@ exports.reviewTenantPropertyRequest = async ({
     });
   }
 
+  try {
+    if (assignedAdmin?.id) {
+      await createNotification(
+        assignedAdmin.id,
+        'tenant_property_request_assignment',
+        'New tenant property request assigned',
+        buildAdminRequestMessage(alert),
+        '/admin?tab=property_requests'
+      );
+    }
+
+    await notifyLandlordsForRequest({
+      alert: {
+        ...alert,
+        ...result.rows[0],
+      },
+      actorId: reviewer.id,
+      force: false,
+    });
+  } catch (notificationError) {
+    console.error('Property request approval notification failed:', notificationError.message);
+  }
+
   return mapAlertRow(result.rows[0]);
 };
 
@@ -811,6 +1127,83 @@ exports.updateTenantPropertyRequestStateAction = async ({
   }
 
   return mapAlertRow(result.rows[0]);
+};
+
+exports.resendTenantPropertyRequestNotifications = async ({
+  alertId,
+  actor,
+  target = 'landlords',
+  adminScope = 'request_lga',
+  stateNames = [],
+  lgaNames = [],
+  force = true,
+}) => {
+  await ensureAlertSchema();
+
+  const normalizedTarget = String(target || 'landlords').trim().toLowerCase();
+  const normalizedAdminScope = String(adminScope || 'request_lga').trim().toLowerCase();
+  const alert = await getAlertWithState(alertId);
+
+  if (!alert) {
+    const error = new Error('Property request not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!['landlords', 'lga_admins'].includes(normalizedTarget)) {
+    const error = new Error('Unsupported notification target');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  assertCanSendRequestNotification({
+    actor,
+    alert,
+    target: normalizedTarget,
+    adminScope: normalizedAdminScope,
+  });
+
+  if (normalizedTarget === 'landlords') {
+    return {
+      target: normalizedTarget,
+      ...(await notifyLandlordsForRequest({
+        alert,
+        actorId: actor?.id || null,
+        force,
+      })),
+    };
+  }
+
+  const actorRole = String(actor?.user_type || '').trim().toLowerCase();
+  let resolvedStateNames = normalizeList(stateNames);
+  let resolvedLgaNames = normalizeList(lgaNames);
+
+  if (actorRole === 'state_admin' || actorRole === 'state_financial_admin' || actorRole === 'state_support_admin') {
+    resolvedStateNames = [actor.assigned_state].filter(Boolean);
+  } else if (!resolvedStateNames.length) {
+    resolvedStateNames = [alert.state_name].filter(Boolean);
+  }
+
+  if (normalizedAdminScope === 'request_lga' && !resolvedLgaNames.length) {
+    resolvedLgaNames = [alert.lga_name].filter(Boolean);
+  }
+
+  if (normalizedAdminScope === 'specific_lga' && !resolvedLgaNames.length) {
+    const error = new Error('Select at least one LGA for this notification');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    target: normalizedTarget,
+    ...(await notifyLgaAdminsForRequest({
+      alert,
+      actorId: actor?.id || null,
+      force,
+      stateNames: resolvedStateNames,
+      lgaNames: normalizedAdminScope === 'all_state_lgas' ? [] : resolvedLgaNames,
+    })),
+  };
 };
 
 exports.listAssignableAdminsForPropertyRequest = async ({ viewer, stateName = null } = {}) => {

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
@@ -13,9 +14,12 @@ import {
   FaChartLine,
 } from 'react-icons/fa';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
+import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const activeTab = new URLSearchParams(location.search).get('tab') || 'overview';
 
   const [stats, setStats] = useState({
     totalUsers: '-',
@@ -164,6 +168,15 @@ const AdminDashboard = () => {
           <CommissionWithdrawalBanner />
         </div>
 
+        {activeTab === 'property_requests' && (
+          <PropertyRequestWorkflowPanel
+            mode="state"
+            title="LGA Tenant Property Requests"
+          />
+        )}
+
+        {activeTab !== 'property_requests' && (
+          <>
         <div className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Total Users"
@@ -212,6 +225,8 @@ const AdminDashboard = () => {
             icon={<FaChartLine className="text-emerald-500" />}
           />
         </div>
+          </>
+        )}
       </div>
     </div>
   );

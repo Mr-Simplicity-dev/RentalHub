@@ -16,10 +16,10 @@ import { useAuth } from '../../hooks/useAuth';
 
 const ROLE_CONFIG = {
   lawyer: {
-    title: 'Lawyer Workspace',
-    subtitle: 'Disputes, evidence, and case-note coordination',
+    title: 'LGA Lawyer Workspace',
+    subtitle: 'Local-government legal review, disputes, evidence, and case-note coordination',
     homePath: '/lawyer',
-    dashboardLabel: 'Lawyer Dashboard',
+    dashboardLabel: 'LGA Lawyer Dashboard',
     gradient: 'from-sky-700 via-sky-600 to-cyan-600',
     softPanel: 'bg-sky-50 border-sky-200 text-sky-800',
   },
@@ -108,11 +108,11 @@ const LawyerLayout = () => {
         <div className="mt-5 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
           <p className="text-sm font-semibold">{user?.full_name || 'Lawyer'}</p>
           <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/70">
-            {String(role || 'lawyer').replace(/_/g, ' ')}
+            {role === 'lawyer' ? 'LGA Lawyer' : String(role || 'lawyer').replace(/_/g, ' ')}
           </p>
           {user?.assigned_state ? (
             <div className="mt-3 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white">
-              Scope: {user.assigned_state}
+              Scope: {user.assigned_state}{user.assigned_city ? `, ${user.assigned_city}` : ''}
             </div>
           ) : null}
         </div>

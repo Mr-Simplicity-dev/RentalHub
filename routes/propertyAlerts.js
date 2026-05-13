@@ -18,6 +18,7 @@ const {
   listAssignableAdminsForPropertyRequest,
   listTenantPropertyRequestsForAdmin,
   markTenantAlertPaymentCompleted,
+  resendTenantPropertyRequestNotifications,
   reviewTenantPropertyRequest,
   updateTenantPropertyRequestStateAction,
 } = require('../config/utils/propertyAlertService');
@@ -453,6 +454,59 @@ router.patch(
       res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Failed to update property request',
+      });
+    }
+  }
+);
+
+router.post(
+  '/admin/requests/:requestId/resend-notifications',
+  authenticate,
+  allowRoles(
+    'super_admin',
+    'super_support_admin',
+    'state_support_admin',
+    'state_admin',
+    'state_financial_admin',
+    'admin'
+  ),
+  [
+    param('requestId').isInt(),
+    body('target').isIn(['landlords', 'lga_admins']),
+    body('admin_scope').optional({ checkFalsy: true }).isIn(['request_lga', 'specific_lga', 'all_state_lgas']),
+    body('state_names').optional().isArray(),
+    body('lga_names').optional().isArray(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
+      }
+
+      const result = await resendTenantPropertyRequestNotifications({
+        alertId: Number(req.params.requestId),
+        actor: req.user,
+        target: req.body.target,
+        adminScope: req.body.admin_scope || 'request_lga',
+        stateNames: req.body.state_names || [],
+        lgaNames: req.body.lga_names || [],
+        force: true,
+      });
+
+      res.json({
+        success: true,
+        message: `Notification sent to ${result.sent} recipient${result.sent === 1 ? '' : 's'}`,
+        data: result,
+      });
+    } catch (error) {
+      console.error('Resend property request notifications error:', error);
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || 'Failed to send request notifications',
       });
     }
   }

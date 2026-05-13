@@ -10,8 +10,12 @@ const DEFAULT_MAP = {
     className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   },
   admin: {
-    label: 'ADMIN',
+    label: 'LGA ADMIN',
     className: 'bg-admin-100 text-admin-700 border-admin-200',
+  },
+  lga_financial_admin: {
+    label: 'LGA FINANCIAL ADMIN',
+    className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   },
   super_admin: {
     label: 'SUPER ADMIN',
@@ -45,8 +49,32 @@ const DEFAULT_MAP = {
     label: 'FUMIGATION ADMIN',
     className: 'bg-rose-100 text-rose-700 border-rose-200',
   },
+  lga_fumigation_admin: {
+    label: 'LGA FUMIGATION ADMIN',
+    className: 'bg-rose-100 text-rose-700 border-rose-200',
+  },
+  state_fumigation_admin: {
+    label: 'STATE FUMIGATION ADMIN',
+    className: 'bg-rose-100 text-rose-700 border-rose-200',
+  },
+  super_fumigation_admin: {
+    label: 'SUPER FUMIGATION ADMIN',
+    className: 'bg-rose-100 text-rose-700 border-rose-200',
+  },
   transportation_admin: {
     label: 'TRANSPORTATION ADMIN',
+    className: 'bg-sky-100 text-sky-700 border-sky-200',
+  },
+  lga_transportation_admin: {
+    label: 'LGA TRANSPORTATION ADMIN',
+    className: 'bg-sky-100 text-sky-700 border-sky-200',
+  },
+  state_transportation_admin: {
+    label: 'STATE TRANSPORTATION ADMIN',
+    className: 'bg-sky-100 text-sky-700 border-sky-200',
+  },
+  super_transportation_admin: {
+    label: 'SUPER TRANSPORTATION ADMIN',
     className: 'bg-sky-100 text-sky-700 border-sky-200',
   },
   agent: {
@@ -54,7 +82,7 @@ const DEFAULT_MAP = {
     className: 'bg-indigo-100 text-indigo-700 border-indigo-200',
   },
   lawyer: {
-    label: 'LAWYER',
+    label: 'LGA LAWYER',
     className: 'bg-violet-100 text-violet-700 border-violet-200',
   },
   state_lawyer: {
