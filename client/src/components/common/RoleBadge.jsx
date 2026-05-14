@@ -1,4 +1,5 @@
 import React from 'react';
+import { getRoleLabel } from '../../config/roleHierarchy';
 
 const DEFAULT_MAP = {
   tenant: {
@@ -12,6 +13,14 @@ const DEFAULT_MAP = {
   admin: {
     label: 'LGA ADMIN',
     className: 'bg-admin-100 text-admin-700 border-admin-200',
+  },
+  lga_admin: {
+    label: 'LGA ADMIN',
+    className: 'bg-admin-100 text-admin-700 border-admin-200',
+  },
+  lga_support_admin: {
+    label: 'LGA SUPPORT ADMIN',
+    className: 'bg-amber-100 text-amber-700 border-amber-200',
   },
   lga_financial_admin: {
     label: 'LGA FINANCIAL ADMIN',
@@ -46,7 +55,7 @@ const DEFAULT_MAP = {
     className: 'bg-orange-100 text-orange-700 border-orange-200',
   },
   fumigation_admin: {
-    label: 'FUMIGATION ADMIN',
+    label: 'LGA FUMIGATION ADMIN',
     className: 'bg-rose-100 text-rose-700 border-rose-200',
   },
   lga_fumigation_admin: {
@@ -62,7 +71,7 @@ const DEFAULT_MAP = {
     className: 'bg-rose-100 text-rose-700 border-rose-200',
   },
   transportation_admin: {
-    label: 'TRANSPORTATION ADMIN',
+    label: 'LGA TRANSPORTATION ADMIN',
     className: 'bg-sky-100 text-sky-700 border-sky-200',
   },
   lga_transportation_admin: {
@@ -97,9 +106,8 @@ const DEFAULT_MAP = {
 
 export default function RoleBadge({ role, className = '', compact = false }) {
   const key = String(role || '').trim().toLowerCase();
-  const fallbackLabel = key ? key.replace(/_/g, ' ').toUpperCase() : 'UNKNOWN';
   const config = DEFAULT_MAP[key] || {
-    label: fallbackLabel,
+    label: getRoleLabel(key).toUpperCase(),
     className: 'bg-gray-100 text-gray-700 border-gray-200',
   };
 

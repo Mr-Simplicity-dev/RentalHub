@@ -321,9 +321,11 @@ router.get(
     'super_admin',
     'super_support_admin',
     'state_support_admin',
+    'lga_support_admin',
     'state_admin',
     'state_financial_admin',
-    'admin'
+    'admin',
+    'lga_admin'
   ),
   async (req, res) => {
     try {
@@ -350,7 +352,7 @@ router.get(
 router.get(
   '/admin/assignable-admins',
   authenticate,
-  allowRoles('super_admin', 'super_support_admin', 'state_support_admin'),
+  allowRoles('super_admin', 'super_support_admin', 'state_support_admin', 'lga_support_admin'),
   async (req, res) => {
     try {
       const admins = await listAssignableAdminsForPropertyRequest({
@@ -375,7 +377,7 @@ router.get(
 router.patch(
   '/admin/requests/:requestId/support-review',
   authenticate,
-  allowRoles('super_admin', 'super_support_admin', 'state_support_admin'),
+  allowRoles('super_admin', 'super_support_admin', 'state_support_admin', 'lga_support_admin'),
   [
     param('requestId').isInt(),
     body('decision').isIn(['approved', 'rejected']),
@@ -421,7 +423,7 @@ router.patch(
 router.patch(
   '/admin/requests/:requestId/state-action',
   authenticate,
-  allowRoles('state_admin', 'state_financial_admin', 'admin'),
+  allowRoles('state_admin', 'state_financial_admin', 'admin', 'lga_admin'),
   [
     param('requestId').isInt(),
     body('action').isIn(['sourcing', 'lga_missing', 'fulfilled']),
@@ -466,9 +468,11 @@ router.post(
     'super_admin',
     'super_support_admin',
     'state_support_admin',
+    'lga_support_admin',
     'state_admin',
     'state_financial_admin',
-    'admin'
+    'admin',
+    'lga_admin'
   ),
   [
     param('requestId').isInt(),

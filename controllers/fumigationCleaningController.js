@@ -5,6 +5,7 @@ const db = require('../config/middleware/database');
 
 const FUMIGATION_ADMIN_ROLES = new Set([
   'admin',
+  'lga_admin',
   'super_admin',
   'state_admin',
   'state_financial_admin',
@@ -1207,7 +1208,7 @@ class FumigationCleaningController {
         });
       }
       
-      const isAdmin = ['admin', 'super_admin', 'state_admin', 'state_financial_admin', 'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin'].includes(
+      const isAdmin = ['admin', 'lga_admin', 'super_admin', 'state_admin', 'state_financial_admin', 'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin'].includes(
         req.user?.user_type
       );
       const isTenant = booking.tenant_id === req.user.id;

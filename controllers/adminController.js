@@ -103,6 +103,8 @@ const ensureAdminRoleSchema = async () => {
           'state_lawyer',
           'super_lawyer',
           'admin',
+          'lga_admin',
+          'lga_support_admin',
           'state_admin',
           'lga_financial_admin',
           'lga_transportation_admin',
@@ -118,7 +120,6 @@ const ensureAdminRoleSchema = async () => {
           'super_financial_admin',
           'super_support_admin',
           'agent',
-          'lga_admin',
           'fumigation_admin',
           'transportation_admin'
         )
@@ -1928,6 +1929,8 @@ exports.createAdmin = async (req, res) => {
 
     const allowedCreateRoles = [
       'admin',
+      'lga_admin',
+      'lga_support_admin',
       'state_admin',
       'lga_financial_admin',
       'lga_transportation_admin',
@@ -1956,6 +1959,8 @@ exports.createAdmin = async (req, res) => {
 
     const stateBoundRoles = new Set([
       'admin',
+      'lga_admin',
+      'lga_support_admin',
       'lga_financial_admin',
       'lga_transportation_admin',
       'lga_fumigation_admin',
@@ -2018,7 +2023,7 @@ exports.createAdmin = async (req, res) => {
       }
     }
 
-    if (['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(user_type) && !normalizedCity) {
+    if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(user_type) && !normalizedCity) {
       return res.status(400).json({
         success: false,
         message: 'Assigned local government is required for this LGA role',
@@ -2048,6 +2053,8 @@ exports.createAdmin = async (req, res) => {
     // Roles that require super-admin approval before the account is active
     const requiresApprovalRoles = new Set([
       'admin',
+      'lga_admin',
+      'lga_support_admin',
       'lga_financial_admin',
       'lga_transportation_admin',
       'state_transportation_admin',
@@ -2087,7 +2094,7 @@ exports.createAdmin = async (req, res) => {
         normalizedFullName,
         normalizedNin || null,
         normalizedState || null,
-        ['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(user_type) ? normalizedCity : null,
+        ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(user_type) ? normalizedCity : null,
         normalizedLawyerScope,
         pendingApproval ? 'pending' : 'approved',
       ]

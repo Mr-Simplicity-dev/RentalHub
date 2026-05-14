@@ -355,6 +355,11 @@ const Dashboard = () => {
       return;
     }
 
+    if (user.user_type === 'lga_support_admin') {
+      navigate('/admin?tab=property_requests', { replace: true });
+      return;
+    }
+
     if (user.user_type === 'super_fumigation_admin') {
       navigate('/admin/fumigation-cleaning/super', { replace: true });
       return;
@@ -385,7 +390,7 @@ const Dashboard = () => {
       return;
     }
 
-    if (['state_admin', 'state_financial_admin'].includes(user.user_type)) {
+    if (['state_admin', 'state_financial_admin', 'lga_admin'].includes(user.user_type)) {
       navigate('/admin', { replace: true });
       return;
     }

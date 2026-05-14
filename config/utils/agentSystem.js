@@ -58,6 +58,8 @@ const ensureAgentSystemSchema = async () => {
           'state_lawyer',
           'super_lawyer',
           'admin',
+          'lga_admin',
+          'lga_support_admin',
           'state_admin',
           'lga_financial_admin',
           'lga_transportation_admin',
@@ -73,7 +75,6 @@ const ensureAgentSystemSchema = async () => {
           'super_financial_admin',
           'super_support_admin',
           'agent',
-          'lga_admin',
           'fumigation_admin',
           'transportation_admin'
         )

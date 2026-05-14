@@ -6,6 +6,7 @@ const { authenticate, isTenant, isVerified } = require('../config/middleware/aut
 
 const FUMIGATION_ADMIN_ROLES = new Set([
   'admin',
+  'lga_admin',
   'super_admin',
   'state_admin',
   'state_financial_admin',

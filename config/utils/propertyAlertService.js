@@ -640,7 +640,7 @@ const findLgaAdminsForNotification = async ({ stateNames = [], lgaNames = [] } =
 
   const params = [normalizedStates];
   const where = [
-    `user_type = 'admin'`,
+    `user_type IN ('admin', 'lga_admin', 'lga_support_admin')`,
     `deleted_at IS NULL`,
     `is_active IS DISTINCT FROM FALSE`,
     `LOWER(TRIM(COALESCE(assigned_state, ''))) = ANY($1::text[])`,
@@ -670,6 +670,7 @@ const assertCanSendRequestNotification = ({ actor, alert, target, adminScope }) 
   const alertLga = normalizeState(alert?.lga_name);
   const superRoles = ['super_admin', 'super_support_admin'];
   const stateRoles = ['state_admin', 'state_financial_admin', 'state_support_admin'];
+  const lgaRoles = ['admin', 'lga_admin', 'lga_support_admin'];
 
   if (superRoles.includes(actorRole)) return;
 
@@ -682,9 +683,9 @@ const assertCanSendRequestNotification = ({ actor, alert, target, adminScope }) 
     return;
   }
 
-  if (actorRole === 'admin') {
+  if (lgaRoles.includes(actorRole)) {
     if (target !== 'landlords' || adminScope === 'all_state_lgas') {
-      const error = new Error('LGA Admin can only notify landlords in the assigned LGA');
+      const error = new Error('LGA roles can only notify landlords in the assigned LGA');
       error.statusCode = 403;
       throw error;
     }
@@ -786,7 +787,7 @@ const findAutoAssignableStateAdmin = async (stateName, lgaName = null) => {
     `SELECT id, full_name, email, user_type, assigned_state, assigned_city
      FROM users
      WHERE is_active IS DISTINCT FROM FALSE
-       AND user_type IN ('state_admin', 'state_financial_admin', 'admin')
+       AND user_type IN ('state_admin', 'state_financial_admin', 'admin', 'lga_admin')
        AND LOWER(COALESCE(assigned_state, '')) = LOWER($1)
      ORDER BY
        CASE
@@ -822,19 +823,28 @@ exports.listTenantPropertyRequestsForAdmin = async ({
     where.push(`a.workflow_status = $${params.length}`);
   }
 
-  if (viewerRole === 'state_support_admin') {
+  if (viewerRole === 'lga_support_admin') {
+    const assignedState = normalizeState(viewer.assigned_state);
+    const assignedLga = normalizeState(viewer.assigned_city);
+    if (!assignedState || !assignedLga) return [];
+    params.push(assignedState);
+    where.push(`LOWER(COALESCE(s.state_name, '')) = $${params.length}`);
+    params.push(assignedLga);
+    where.push(`LOWER(COALESCE(a.lga_name, '')) = $${params.length}`);
+    where.push(`a.workflow_status IN ('pending_support_review', 'approved_assigned', 'sourcing', 'lga_coverage_missing', 'fulfilled', 'rejected')`);
+  } else if (viewerRole === 'state_support_admin') {
     const assignedState = normalizeState(viewer.assigned_state);
     if (!assignedState) return [];
     params.push(assignedState);
     where.push(`LOWER(COALESCE(s.state_name, '')) = $${params.length}`);
     where.push(`a.workflow_status IN ('pending_support_review', 'approved_assigned', 'sourcing', 'lga_coverage_missing', 'fulfilled', 'rejected')`);
-  } else if (['state_admin', 'state_financial_admin', 'admin'].includes(viewerRole)) {
+  } else if (['state_admin', 'state_financial_admin', 'admin', 'lga_admin'].includes(viewerRole)) {
     const assignedState = normalizeState(viewer.assigned_state);
     if (!assignedState) return [];
     params.push(assignedState);
     where.push(`LOWER(COALESCE(s.state_name, '')) = $${params.length}`);
 
-    if (viewerRole === 'admin' && viewer.assigned_city) {
+    if (['admin', 'lga_admin'].includes(viewerRole) && viewer.assigned_city) {
       params.push(String(viewer.assigned_city).trim().toLowerCase());
       where.push(`LOWER(COALESCE(a.lga_name, '')) = $${params.length}`);
     }
@@ -917,7 +927,20 @@ exports.reviewTenantPropertyRequest = async ({
   }
 
   const reviewerRole = String(reviewer?.user_type || '').trim().toLowerCase();
-  if (reviewerRole === 'state_support_admin') {
+  if (reviewerRole === 'lga_support_admin') {
+    const assignedState = normalizeState(reviewer.assigned_state);
+    const assignedLga = normalizeState(reviewer.assigned_city);
+    if (
+      !assignedState ||
+      !assignedLga ||
+      assignedState !== normalizeState(alert.state_name) ||
+      assignedLga !== normalizeState(alert.lga_name)
+    ) {
+      const error = new Error('This request is outside your assigned LGA');
+      error.statusCode = 403;
+      throw error;
+    }
+  } else if (reviewerRole === 'state_support_admin') {
     const assignedState = normalizeState(reviewer.assigned_state);
     if (!assignedState || assignedState !== normalizeState(alert.state_name)) {
       const error = new Error('This request is outside your assigned state');
@@ -953,7 +976,7 @@ exports.reviewTenantPropertyRequest = async ({
        FROM users
        WHERE id = $1
          AND is_active IS DISTINCT FROM FALSE
-         AND user_type IN ('state_admin', 'state_financial_admin', 'admin')
+         AND user_type IN ('state_admin', 'state_financial_admin', 'admin', 'lga_admin')
        LIMIT 1`,
       [assignedAdminId]
     );
@@ -961,6 +984,15 @@ exports.reviewTenantPropertyRequest = async ({
 
     if (!assignedAdmin || normalizeState(assignedAdmin.assigned_state) !== normalizeState(alert.state_name)) {
       const error = new Error('Assigned admin must belong to the requested state');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (
+      reviewerRole === 'lga_support_admin' &&
+      normalizeState(assignedAdmin.assigned_city) !== normalizeState(alert.lga_name)
+    ) {
+      const error = new Error('Assigned admin must belong to the requested LGA');
       error.statusCode = 400;
       throw error;
     }
@@ -1076,7 +1108,7 @@ exports.updateTenantPropertyRequestStateAction = async ({
   }
 
   const actorRole = String(actor?.user_type || '').trim().toLowerCase();
-  if (!['state_admin', 'state_financial_admin', 'admin'].includes(actorRole)) {
+  if (!['state_admin', 'state_financial_admin', 'admin', 'lga_admin'].includes(actorRole)) {
     const error = new Error('State admin access required');
     error.statusCode = 403;
     throw error;
@@ -1088,7 +1120,7 @@ exports.updateTenantPropertyRequestStateAction = async ({
     throw error;
   }
 
-  if (actorRole === 'admin' && actor.assigned_city && normalizeState(actor.assigned_city) !== normalizeState(alert.lga_name)) {
+  if (['admin', 'lga_admin'].includes(actorRole) && actor.assigned_city && normalizeState(actor.assigned_city) !== normalizeState(alert.lga_name)) {
     const error = new Error('This request is outside your assigned LGA');
     error.statusCode = 403;
     throw error;
@@ -1213,12 +1245,20 @@ exports.listAssignableAdminsForPropertyRequest = async ({ viewer, stateName = nu
   const params = [];
   const where = [
     `is_active IS DISTINCT FROM FALSE`,
-    `user_type IN ('state_admin', 'state_financial_admin', 'admin')`,
+    `user_type IN ('state_admin', 'state_financial_admin', 'admin', 'lga_admin')`,
   ];
 
   if (stateName) {
     params.push(String(stateName).trim());
     where.push(`LOWER(COALESCE(assigned_state, '')) = LOWER($${params.length})`);
+  } else if (viewerRole === 'lga_support_admin') {
+    if (!String(viewer.assigned_state || '').trim()) return [];
+    params.push(String(viewer.assigned_state || '').trim());
+    where.push(`LOWER(COALESCE(assigned_state, '')) = LOWER($${params.length})`);
+    if (viewer.assigned_city) {
+      params.push(String(viewer.assigned_city || '').trim());
+      where.push(`LOWER(COALESCE(assigned_city, '')) = LOWER($${params.length})`);
+    }
   } else if (viewerRole === 'state_support_admin') {
     params.push(String(viewer.assigned_state || '').trim());
     where.push(`LOWER(COALESCE(assigned_state, '')) = LOWER($${params.length})`);

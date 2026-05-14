@@ -96,22 +96,25 @@ const queryClient = new QueryClient();
 const FINANCIAL_ADMIN_ROLES = ['financial_admin', 'lga_financial_admin'];
 const SUPER_FINANCIAL_ADMIN_ROLES = ['super_financial_admin'];
 const STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin'];
+const LGA_SUPPORT_ADMIN_ROLES = ['lga_support_admin'];
 const STATE_SUPPORT_ADMIN_ROLES = ['state_support_admin'];
 const SUPER_SUPPORT_ADMIN_ROLES = ['super_support_admin'];
 const SUPER_ADMIN_ROLES = ['super_admin'];
 const FUMIGATION_ADMIN_ROLES = ['fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin'];
 const TRANSPORTATION_ADMIN_ROLES = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin'];
-const LGA_TRANSPORTATION_ADMIN_ROLES = ['admin', 'transportation_admin', 'lga_transportation_admin'];
+const LGA_TRANSPORTATION_ADMIN_ROLES = ['admin', 'lga_admin', 'transportation_admin', 'lga_transportation_admin'];
 const STATE_TRANSPORTATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin'];
 const SUPER_TRANSPORTATION_ADMIN_ROLES = ['super_admin', 'super_financial_admin', 'super_support_admin', 'super_transportation_admin'];
-const LGA_FUMIGATION_ADMIN_ROLES = ['admin', 'fumigation_admin', 'lga_fumigation_admin'];
+const LGA_FUMIGATION_ADMIN_ROLES = ['admin', 'lga_admin', 'fumigation_admin', 'lga_fumigation_admin'];
 const STATE_FUMIGATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_fumigation_admin'];
 const SUPER_FUMIGATION_ADMIN_ROLES = ['super_admin', 'super_fumigation_admin'];
 const ADMIN_SHELL_ROLES = [
   'admin',
+  'lga_admin',
   ...FINANCIAL_ADMIN_ROLES,
   ...SUPER_FINANCIAL_ADMIN_ROLES,
   ...STATE_ADMIN_ROLES,
+  ...LGA_SUPPORT_ADMIN_ROLES,
   ...STATE_SUPPORT_ADMIN_ROLES,
   ...SUPER_SUPPORT_ADMIN_ROLES,
   ...FUMIGATION_ADMIN_ROLES,
@@ -246,10 +249,11 @@ const LandlordRoute = ({ children }) => {
     if (user?.user_type === 'lawyer') return <Navigate to="/lawyer" />;
     if (user?.user_type === 'state_lawyer') return <Navigate to="/lawyer/state" />;
     if (user?.user_type === 'super_lawyer') return <Navigate to="/lawyer/super" />;
-    if (user?.user_type === 'admin') return <Navigate to="/admin" />;
+    if (user?.user_type === 'admin' || user?.user_type === 'lga_admin') return <Navigate to="/admin" />;
     if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/financial-dashboard" />;
     if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-financial-dashboard" />;
     if (STATE_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+    if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin?tab=property_requests" />;
     if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/state-support-dashboard" />;
     if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-support-dashboard" />;
     if (FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) {
@@ -446,6 +450,10 @@ const AdminHomeRoute = () => {
     );
   }
 
+  if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin?tab=property_requests" replace />;
+  }
+
   if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
     return <Navigate to="/admin/state-support-dashboard" replace />;
   }
@@ -474,6 +482,10 @@ const AdminWithdrawalsRoute = () => {
         <StateAdminDashboard initialTab="withdrawals" />
       </StateAdminRoute>
     );
+  }
+
+  if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin?tab=property_requests" replace />;
   }
 
   if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {

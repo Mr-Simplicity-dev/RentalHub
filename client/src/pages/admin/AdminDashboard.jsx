@@ -33,6 +33,14 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const loadStats = async () => {
+      if (user?.user_type === 'lga_support_admin') {
+        setScope({
+          assignedState: user?.assigned_state || null,
+          assignedCity: user?.assigned_city || null,
+        });
+        return;
+      }
+
       try {
         const { data } = await api.get('/admin/stats');
 
@@ -53,7 +61,7 @@ const AdminDashboard = () => {
     };
 
     loadStats();
-  }, []);
+  }, [user?.assigned_city, user?.assigned_state, user?.user_type]);
 
   const requestEscalation = async (actionType, summary) => {
     try {
@@ -83,7 +91,7 @@ const AdminDashboard = () => {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">
-            Admin Dashboard
+            {user?.user_type === 'lga_support_admin' ? 'LGA Support Dashboard' : 'Admin Dashboard'}
           </h1>
           <p className="mt-1 text-gray-600">
             Welcome, {user?.full_name || 'Administrator'}
@@ -113,7 +121,7 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {user?.user_type === 'admin' && (scope.assignedState || scope.assignedCity) && (
+        {['admin', 'lga_admin', 'lga_support_admin'].includes(user?.user_type) && (scope.assignedState || scope.assignedCity) && (
           <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
             <p className="text-sm font-semibold text-blue-900">Your Jurisdiction</p>
             <p className="mt-1 text-sm font-medium text-blue-800">
@@ -121,7 +129,7 @@ const AdminDashboard = () => {
               {scope.assignedCity ? ` — ${scope.assignedCity} Local Government` : ''}
             </p>
             <p className="mx-auto mt-2 max-w-2xl text-xs text-blue-700">
-              You are authorized to view and manage tenants, landlords, and properties only within this local government area.
+              You are authorized to work only within this local government area.
             </p>
           </div>
         )}

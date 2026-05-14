@@ -21,6 +21,18 @@ const ROLE_META = {
     duty: 'Manages users, properties, applications, and local property request sourcing inside one LGA.',
     reportsTo: 'State Admin',
   },
+  lga_admin: {
+    label: 'LGA Admin',
+    department: 'General Operations',
+    duty: 'Manages users, properties, applications, and local property request sourcing inside one LGA.',
+    reportsTo: 'State Admin',
+  },
+  lga_support_admin: {
+    label: 'LGA Support Admin',
+    department: 'Support',
+    duty: 'Handles tenant support and property request follow-up within one assigned LGA.',
+    reportsTo: 'State Support Admin',
+  },
   lga_financial_admin: {
     label: 'LGA Financial Admin',
     department: 'Finance',
@@ -82,10 +94,10 @@ const ROLE_META = {
     reportsTo: 'Super Admin',
   },
   fumigation_admin: {
-    label: 'Fumigation Admin',
+    label: 'LGA Fumigation Admin',
     department: 'Fumigation',
-    duty: 'Manages fumigation and cleaning service operations in the assigned service scope.',
-    reportsTo: 'Super Admin',
+    duty: 'Handles fumigation and cleaning operations within one assigned LGA.',
+    reportsTo: 'State Fumigation Admin',
   },
   lga_fumigation_admin: {
     label: 'LGA Fumigation Admin',
@@ -106,10 +118,10 @@ const ROLE_META = {
     reportsTo: 'Super Admin',
   },
   transportation_admin: {
-    label: 'Transportation Admin',
+    label: 'LGA Transportation Admin',
     department: 'Transportation',
-    duty: 'Manages transportation bookings, services, alerts, and operational follow-up.',
-    reportsTo: 'Super Admin',
+    duty: 'Handles transportation bookings, services, and follow-up within one LGA.',
+    reportsTo: 'State Transportation Admin',
   },
   lga_transportation_admin: {
     label: 'LGA Transportation Admin',
@@ -157,6 +169,8 @@ const getRoleBadgeClass = (role) => {
       return 'bg-red-100 text-red-700';
     case 'lga_financial_admin':
       return 'bg-emerald-100 text-emerald-700';
+    case 'lga_support_admin':
+      return 'bg-amber-100 text-amber-700';
     case 'state_admin':
     case 'state_financial_admin':
     case 'state_support_admin':
@@ -268,7 +282,7 @@ const AdminListTab = () => {
 
   const isJurisdictionRole = (role) => {
     const value = String(role || '');
-    return value === 'admin' || value === 'lga_financial_admin' || value === 'lawyer' || value.startsWith('lga_') || value.startsWith('state_');
+    return value === 'admin' || value === 'lawyer' || value.startsWith('lga_') || value.startsWith('state_');
   };
 
   const editJurisdiction = async (admin) => {
@@ -283,7 +297,7 @@ const AdminListTab = () => {
       }
 
       let normalizedCity = '';
-      if (['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(admin.user_type)) {
+      if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(admin.user_type)) {
         const lgaInput = window.prompt('Assigned Local Government (LGA)', admin.assigned_city || '');
         if (lgaInput === null) return;
         normalizedCity = String(lgaInput || '').trim();

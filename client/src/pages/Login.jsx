@@ -109,13 +109,15 @@ const Login = () => {
           navigate('/admin/super-support-dashboard');
         } else if (role === 'state_support_admin') {
           navigate('/admin/state-support-dashboard');
+        } else if (role === 'lga_support_admin') {
+          navigate('/admin?tab=property_requests');
         } else if (role === 'super_financial_admin') {
           navigate('/admin/super-financial-dashboard');
         } else if (role === 'financial_admin' || role === 'lga_financial_admin') {
           navigate('/admin/financial-dashboard');
         } else if (role === 'state_admin' || role === 'state_financial_admin') {
           navigate('/admin');
-        } else if (role === 'admin') {
+        } else if (role === 'admin' || role === 'lga_admin') {
           navigate('/admin');
         } else if (role === 'super_fumigation_admin') {
           navigate('/admin/fumigation-cleaning/super');

@@ -13,8 +13,8 @@ import {
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 
-const SUPPORT_ROLES = ['super_admin', 'super_support_admin', 'state_support_admin'];
-const STATE_ACTION_ROLES = ['state_admin', 'state_financial_admin', 'admin'];
+const SUPPORT_ROLES = ['super_admin', 'super_support_admin', 'state_support_admin', 'lga_support_admin'];
+const STATE_ACTION_ROLES = ['state_admin', 'state_financial_admin', 'admin', 'lga_admin'];
 
 const statusLabels = {
   pending_support_review: 'Pending Support Review',
@@ -205,7 +205,7 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
 
   const pendingCount = requests.filter((item) => item.workflow_status === 'pending_support_review').length;
   const lgaMissingCount = requests.filter((item) => item.workflow_status === 'lga_coverage_missing').length;
-  const canNotifyLandlords = ['admin', 'state_admin', 'state_financial_admin', 'state_support_admin', 'super_admin', 'super_support_admin'].includes(role);
+  const canNotifyLandlords = ['admin', 'lga_admin', 'lga_support_admin', 'state_admin', 'state_financial_admin', 'state_support_admin', 'super_admin', 'super_support_admin'].includes(role);
   const canNotifyLgaAdmins = ['state_admin', 'state_financial_admin', 'state_support_admin', 'super_admin', 'super_support_admin'].includes(role);
   const isSuperNotificationRole = ['super_admin', 'super_support_admin'].includes(role);
 

@@ -1,26 +1,48 @@
+const {
+  ROLE_GROUPS,
+  SUPER_SCOPED_ROLES,
+  roleIn,
+} = require('./roleHierarchy');
+
 const isStateFinancialAdmin = (userType) =>
-  ['state_financial_admin', 'state_admin'].includes(userType);
+  roleIn(userType, ['state_financial_admin', 'state_admin']);
 
 const isSuperFinancialAdmin = (userType) =>
-  ['super_financial_admin', 'financial_admin'].includes(userType);
+  roleIn(userType, ['super_financial_admin', 'financial_admin']);
 
 const isSuperAdminOrSuperFinancialAdmin = (userType) =>
-  ['super_admin', 'super_financial_admin', 'financial_admin'].includes(userType);
+  roleIn(userType, ['super_admin', 'super_financial_admin', 'financial_admin']);
 
 const isLgaAdmin = (userType) =>
-  ['admin', 'lga_admin'].includes(userType);
+  roleIn(userType, ROLE_GROUPS.lgaOperations);
 
 const isLgaFinancialAdmin = (userType) =>
-  ['lga_financial_admin'].includes(userType);
+  roleIn(userType, ROLE_GROUPS.lgaFinance);
+
+const isLgaSupportAdmin = (userType) =>
+  roleIn(userType, ROLE_GROUPS.lgaSupport);
 
 const isStateAdmin = (userType) =>
-  ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin', 'state_fumigation_admin'].includes(userType);
+  roleIn(userType, [
+    ...ROLE_GROUPS.stateOperations,
+    ...ROLE_GROUPS.stateFinance,
+    ...ROLE_GROUPS.stateSupport,
+    ...ROLE_GROUPS.stateTransportation,
+    ...ROLE_GROUPS.stateFumigation,
+  ]);
 
 const isSuperAdmin = (userType) =>
-  ['super_admin', 'super_financial_admin', 'super_support_admin', 'super_transportation_admin', 'super_fumigation_admin'].includes(userType);
+  roleIn(userType, SUPER_SCOPED_ROLES);
 
 const canMonitorLgaAdmins = (userType) =>
-  ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin', 'state_fumigation_admin', 'super_admin', 'super_financial_admin', 'super_support_admin', 'super_transportation_admin', 'super_fumigation_admin'].includes(userType);
+  roleIn(userType, [
+    ...ROLE_GROUPS.stateOperations,
+    ...ROLE_GROUPS.stateFinance,
+    ...ROLE_GROUPS.stateSupport,
+    ...ROLE_GROUPS.stateTransportation,
+    ...ROLE_GROUPS.stateFumigation,
+    ...SUPER_SCOPED_ROLES,
+  ]);
 
 module.exports = {
   isStateFinancialAdmin,
@@ -31,4 +53,5 @@ module.exports = {
   isSuperAdmin,
   canMonitorLgaAdmins,
   isLgaFinancialAdmin,
+  isLgaSupportAdmin,
 };

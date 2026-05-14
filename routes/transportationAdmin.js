@@ -5,6 +5,7 @@ const db = require('../config/middleware/database');
 
 const TRANSPORTATION_ADMIN_ROLES = new Set([
   'admin',
+  'lga_admin',
   'state_admin',
   'state_financial_admin',
   'state_support_admin',

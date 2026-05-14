@@ -46,12 +46,13 @@ const AdminLayout = () => {
   const ledgerIntegrity = user?.ledgerIntegrity ?? true;
   const isSuperSupportAdmin = role === 'super_support_admin';
   const isStateAdmin = role === 'state_admin';
-  const isCoreAdmin = role === 'admin';
+  const isCoreAdmin = ['admin', 'lga_admin'].includes(role);
   const isSuperAdmin = role === 'super_admin';
   const isFinancialAdmin = role === 'financial_admin';
   const isLgaFinancialAdmin = role === 'lga_financial_admin';
   const isSuperFinancialAdmin = role === 'super_financial_admin';
   const isStateFinancialAdmin = role === 'state_financial_admin';
+  const isLgaSupportAdmin = role === 'lga_support_admin';
   const isStateSupportAdmin = role === 'state_support_admin';
   const isFumigationAdmin = ['fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin'].includes(role);
   const isTransportationAdmin = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin'].includes(role);
@@ -63,6 +64,8 @@ const AdminLayout = () => {
     'state_transportation_admin',
     'state_fumigation_admin',
     'admin',
+    'lga_admin',
+    'lga_support_admin',
     'lga_financial_admin',
     'lga_transportation_admin',
     'lga_fumigation_admin',
@@ -184,13 +187,13 @@ const AdminLayout = () => {
         mainBg: 'bg-gradient-to-br from-state-50 via-white to-state-100/40',
         panelTitle: 'State Admin Console',
       }
-    : isStateSupportAdmin
+    : isLgaSupportAdmin || isStateSupportAdmin
     ? {
         sidebarBg: 'from-amber-700 to-amber-600',
         activeNav: 'bg-amber-600 text-white',
         hoverNav: 'text-gray-700 hover:bg-amber-50',
         mainBg: 'bg-gradient-to-br from-amber-50 via-white to-amber-100/40',
-        panelTitle: 'State Support Console',
+        panelTitle: isLgaSupportAdmin ? 'LGA Support Console' : 'State Support Console',
       }
     : isFinancialAdmin || isLgaFinancialAdmin
     ? {
@@ -715,6 +718,22 @@ const AdminLayout = () => {
                 <NavLink to="/admin/financial-dashboard?tab=audit-trail" className={() => financialNavItem('audit-trail')}>
                   <FaShieldAlt className="mr-3" />
                   Audit Trail
+                </NavLink>
+              </div>
+            </div>
+          )}
+
+          {/* LGA SUPPORT */}
+          {isLgaSupportAdmin && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                LGA Support
+              </p>
+
+              <div className="space-y-2">
+                <NavLink to="/admin?tab=property_requests" className={navItem}>
+                  <FaHeadset className="mr-3" />
+                  Property Requests
                 </NavLink>
               </div>
             </div>

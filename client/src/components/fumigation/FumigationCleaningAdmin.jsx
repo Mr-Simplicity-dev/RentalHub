@@ -25,6 +25,7 @@ import Loader from '../common/Loader';
 
 const FUMIGATION_ADMIN_ROLES = [
   'admin',
+  'lga_admin',
   'super_admin',
   'state_admin',
   'state_financial_admin',

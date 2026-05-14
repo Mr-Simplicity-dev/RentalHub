@@ -99,9 +99,12 @@ const getDashboardPathForRole = (userType) => {
     case 'financial_admin':
     case 'lga_financial_admin':
       return '/admin/financial-dashboard';
+    case 'lga_support_admin':
+      return '/admin?tab=property_requests';
     case 'state_admin':
     case 'state_financial_admin':
     case 'admin':
+    case 'lga_admin':
       return '/admin';
     case 'super_support_admin':
       return '/admin/super-support-dashboard?tab=overview';
@@ -201,6 +204,8 @@ const impersonateAdmin = async (req, res) => {
     const target = rows[0];
     const allowedRoles = new Set([
       'admin',
+      'lga_admin',
+      'lga_support_admin',
       'lga_financial_admin',
       'lga_transportation_admin',
       'state_transportation_admin',
@@ -695,7 +700,7 @@ const getAdminPerformance = async (req, res) => {
          ON v.identity_verified_by = a.id
          AND v.identity_verified = TRUE
        WHERE (
-         a.user_type IN ('super_admin', 'admin', 'lga_financial_admin', 'lga_transportation_admin',
+         a.user_type IN ('super_admin', 'admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lga_transportation_admin',
                          'state_transportation_admin', 'super_transportation_admin',
                          'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin',
                          'state_admin', 'financial_admin', 'lawyer',
@@ -828,6 +833,8 @@ const updateAdminJurisdiction = async (req, res) => {
 
     const stateBoundRoles = new Set([
       'admin',
+      'lga_admin',
+      'lga_support_admin',
       'lga_financial_admin',
       'lga_transportation_admin',
       'lga_fumigation_admin',
@@ -847,7 +854,7 @@ const updateAdminJurisdiction = async (req, res) => {
       });
     }
 
-    if (['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) && !normalizedCity) {
+    if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) && !normalizedCity) {
       return res.status(400).json({
         success: false,
         message: 'Assigned local government is required for this LGA role',
@@ -865,7 +872,7 @@ const updateAdminJurisdiction = async (req, res) => {
       [
         adminId,
         normalizedState || null,
-        ['admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) ? normalizedCity : null,
+        ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) ? normalizedCity : null,
       ]
     );
 
