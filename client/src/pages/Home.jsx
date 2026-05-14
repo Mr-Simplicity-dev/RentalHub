@@ -425,7 +425,7 @@ const Home = () => {
 
       {/* WhatsApp Floating Button (Multilingual) */}
       <a
-        href={`https://wa.me/2347067012884?text=${encodeURIComponent(
+        href={`https://wa.me/2348030601238?text=${encodeURIComponent(
           t('home.whatsapp_message')
         )}`}
         target="_blank"

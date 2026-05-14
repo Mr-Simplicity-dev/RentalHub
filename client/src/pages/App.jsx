@@ -55,7 +55,7 @@ import Pricing from './Pricing';
 import LandlordGuide from './LandlordGuide';
 import VerifyEmail from './VerifyEmail';
 import VerifyPhone from './VerifyPhone';
-import VerifyEmailToken from './pages/VerifyEmail';
+import VerifyEmailToken from './VerifyEmail';
 import SuperAdminDashboard from './SuperAdminDashboard';
 import AdminUserDetail from './admin/AdminUserDetail';
 import AdminPropertyDetail from './admin/AdminPropertyDetail';
