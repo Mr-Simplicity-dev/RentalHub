@@ -20,6 +20,14 @@ const AdminDashboard = () => {
   const { user } = useAuth();
   const location = useLocation();
   const activeTab = new URLSearchParams(location.search).get('tab') || 'overview';
+  const role = String(user?.user_type || '').trim().toLowerCase();
+  const isLgaOperationsAdmin = ['admin', 'lga_admin'].includes(role);
+  const isLgaSupportAdmin = role === 'lga_support_admin';
+  const dashboardTitle = isLgaSupportAdmin
+    ? 'LGA Support Dashboard'
+    : isLgaOperationsAdmin
+    ? 'LGA Admin Dashboard'
+    : 'Admin Dashboard';
 
   const [stats, setStats] = useState({
     totalUsers: '-',
@@ -33,7 +41,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const loadStats = async () => {
-      if (user?.user_type === 'lga_support_admin') {
+      if (role === 'lga_support_admin') {
         setScope({
           assignedState: user?.assigned_state || null,
           assignedCity: user?.assigned_city || null,
@@ -61,7 +69,7 @@ const AdminDashboard = () => {
     };
 
     loadStats();
-  }, [user?.assigned_city, user?.assigned_state, user?.user_type]);
+  }, [role, user?.assigned_city, user?.assigned_state]);
 
   const requestEscalation = async (actionType, summary) => {
     try {
@@ -87,11 +95,11 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-admin-50 via-white to-admin-100/40 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-admin-50 via-white to-admin-100/40 p-4 sm:p-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">
-            {user?.user_type === 'lga_support_admin' ? 'LGA Support Dashboard' : 'Admin Dashboard'}
+            {dashboardTitle}
           </h1>
           <p className="mt-1 text-gray-600">
             Welcome, {user?.full_name || 'Administrator'}
@@ -121,12 +129,12 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {['admin', 'lga_admin', 'lga_support_admin'].includes(user?.user_type) && (scope.assignedState || scope.assignedCity) && (
+        {['admin', 'lga_admin', 'lga_support_admin'].includes(role) && (scope.assignedState || scope.assignedCity) && (
           <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
             <p className="text-sm font-semibold text-blue-900">Your Jurisdiction</p>
             <p className="mt-1 text-sm font-medium text-blue-800">
               {scope.assignedState}
-              {scope.assignedCity ? ` — ${scope.assignedCity} Local Government` : ''}
+              {scope.assignedCity ? ` - ${scope.assignedCity} Local Government` : ''}
             </p>
             <p className="mx-auto mt-2 max-w-2xl text-xs text-blue-700">
               You are authorized to work only within this local government area.
@@ -134,7 +142,7 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {user?.user_type === 'admin' && (
+        {isLgaOperationsAdmin && (
           <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm font-semibold text-amber-900">
               Sensitive Actions Require Super Admin Review

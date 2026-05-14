@@ -217,20 +217,20 @@ const Home = () => {
 
             <form 
               onSubmit={handleSearch} 
-              className="flex max-w-2xl mx-auto animate-fadeIn delay-200"
+              className="mx-auto flex w-full max-w-2xl flex-col gap-3 animate-fadeIn delay-200 sm:flex-row sm:gap-0"
             >
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('home.search_placeholder')}
-                className="flex-1 px-6 py-4 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-300"
+                className="min-w-0 flex-1 rounded-lg px-6 py-4 text-gray-900 transition-all duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 sm:rounded-l-lg sm:rounded-r-none"
               />
               <button
                 type="submit"
-                className="bg-primary-700 hover:bg-primary-800 px-8 py-4 rounded-r-lg font-semibold transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg flex items-center"
+                className="flex w-full items-center justify-center rounded-lg bg-primary-700 px-8 py-4 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-800 hover:shadow-lg sm:w-auto sm:rounded-l-none sm:rounded-r-lg"
               >
-                <FaSearch className="inline mr-2" />
+                <FaSearch className="mr-2 shrink-0" />
                 {t('home.search')}
               </button>
             </form>
@@ -406,16 +406,16 @@ const Home = () => {
           <p className="text-xl mb-8 text-primary-100 animate-fadeIn delay-100">
             {t('home.cta_text')}
           </p>
-          <div className="flex justify-center space-x-4 animate-fadeIn delay-200">
+          <div className="flex flex-col justify-center gap-3 animate-fadeIn delay-200 sm:flex-row sm:gap-4">
             <Link 
               to="/register" 
-              className="bg-white text-primary-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
+              className="w-full rounded-lg bg-white px-8 py-3 font-semibold text-primary-600 transition-all duration-300 hover:-translate-y-0.5 hover:bg-gray-100 hover:shadow-lg sm:w-auto"
             >
               {t('home.get_started')}
             </Link>
             <Link 
               to="/properties" 
-              className="border-2 border-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
+              className="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:w-auto"
             >
               {t('home.browse')}
                         </Link>

@@ -6,7 +6,7 @@ import BackToDashboard from '../components/common/BackToDashboard';
 
 const roleLabel = (role) => {
   if (role === 'super_admin') return 'Super Admin';
-  if (role === 'admin') return 'Admin';
+  if (role === 'admin' || role === 'lga_admin') return 'LGA Admin';
   if (role === 'landlord') return 'Landlord';
   if (role === 'tenant') return 'Tenant';
   return role || 'User';
@@ -48,20 +48,22 @@ const Messages = () => {
     message_type: 'general',
   });
 
-  const canCompose = ['admin', 'super_admin'].includes(user?.user_type);
-  const canUseEscalation = user?.user_type === 'admin';
-  const canViewEscalations = ['admin', 'super_admin'].includes(user?.user_type);
+  const userRole = String(user?.user_type || '').trim().toLowerCase();
+  const isLgaAdmin = ['admin', 'lga_admin'].includes(userRole);
+  const canCompose = isLgaAdmin || userRole === 'super_admin';
+  const canUseEscalation = isLgaAdmin;
+  const canViewEscalations = isLgaAdmin || userRole === 'super_admin';
 
   const roleOptions = useMemo(() => {
-    if (!user || !canCompose) return [];
-    if (user.user_type === 'super_admin') {
-      return ['', 'admin', 'tenant', 'landlord'];
+    if (!userRole || !canCompose) return [];
+    if (userRole === 'super_admin') {
+      return ['', 'admin', 'lga_admin', 'tenant', 'landlord'];
     }
-    if (user.user_type === 'admin') {
+    if (isLgaAdmin) {
       return ['', 'tenant', 'landlord', 'super_admin'];
     }
     return [];
-  }, [user, canCompose]);
+  }, [canCompose, isLgaAdmin, userRole]);
 
   /* ---------------- LOADERS ---------------- */
 

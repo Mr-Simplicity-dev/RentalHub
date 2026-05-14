@@ -186,6 +186,8 @@ const releaseDeletedUserIdentityConflicts = async ({ email, phone, nin }) => {
 };
 
 const STATE_ADMIN_ROLES = new Set(['state_admin', 'state_financial_admin']);
+const LGA_ADMIN_ROLES = new Set(['admin', 'lga_admin']);
+const isLgaAdminRole = (role) => LGA_ADMIN_ROLES.has(String(role || '').trim().toLowerCase());
 
 const getRequesterStateScope = async (user) => {
   const requesterRole = user?.user_type || user?.userType;
@@ -206,13 +208,13 @@ const getRequesterStateScope = async (user) => {
 };
 
 // Returns { assignedState, assignedCity } for all scoped roles.
-// - admin role: scoped by both assigned_state (state) AND assigned_city (LGA)
+// - admin / lga_admin roles: scoped by both assigned_state (state) AND assigned_city (LGA)
 // - state_admin / state_financial_admin: scoped by assigned_state only
 // - all other roles: no scope restriction (both null)
 const getRequesterScope = async (user) => {
   const role = user?.user_type || user?.userType;
 
-  if (role === 'admin') {
+  if (isLgaAdminRole(role)) {
     const result = await db.query(
       `SELECT assigned_state, assigned_city
        FROM users
@@ -244,7 +246,7 @@ exports.getStats = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -397,7 +399,7 @@ exports.getAllUsers = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -544,7 +546,7 @@ exports.getPendingVerifications = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -668,7 +670,7 @@ exports.approveVerification = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -766,7 +768,7 @@ exports.rejectVerification = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -868,7 +870,7 @@ exports.getAllProperties = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -962,7 +964,7 @@ exports.getPendingProperties = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -1026,7 +1028,7 @@ exports.approveProperty = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -1128,7 +1130,7 @@ exports.rejectProperty = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -1228,7 +1230,7 @@ exports.getAllApplications = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -1417,7 +1419,7 @@ exports.getUserById = async (req, res) => {
       return res.status(403).json({ success: false, message: 'State admin account is missing assigned_state' });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({ success: false, message: 'Admin account is missing assigned state or local government' });
     }
 
@@ -1616,7 +1618,7 @@ exports.getPropertyById = async (req, res) => {
       return res.status(403).json({ success: false, message: 'State admin account is missing assigned_state' });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({ success: false, message: 'Admin account is missing assigned state or local government' });
     }
 
@@ -1667,7 +1669,7 @@ exports.getApplicationById = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -1727,7 +1729,7 @@ exports.approveApplication = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',
@@ -1802,7 +1804,7 @@ exports.rejectApplication = async (req, res) => {
       });
     }
 
-    if (req.user?.user_type === 'admin' && (!assignedState || !assignedCity)) {
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
       return res.status(403).json({
         success: false,
         message: 'Admin account is missing assigned state or local government',

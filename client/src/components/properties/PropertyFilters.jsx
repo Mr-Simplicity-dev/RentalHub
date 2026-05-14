@@ -83,16 +83,16 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
   };
 
 return (
-  <div className="card mb-6">
+  <div className="card mb-6 w-full max-w-full overflow-hidden">
     <div className="text-center mb-4">
       <h3 className="text-lg font-semibold">Filter Properties</h3>
     </div>
 
-    <form onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <form onSubmit={handleSubmit} className="w-full">
+      <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
 
         {/* State */}
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             State
           </label>
@@ -112,7 +112,7 @@ return (
         </div>
 
         {/* City */}
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             City/Area
           </label>
@@ -127,7 +127,7 @@ return (
         </div>
 
         {/* Property Type */}
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Property Type
           </label>
@@ -147,7 +147,7 @@ return (
         </div>
 
         {/* Bedrooms */}
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Min. Bedrooms
           </label>
@@ -167,7 +167,7 @@ return (
         </div>
 
         {/* Min Price */}
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Min. Price (₦)
           </label>
@@ -182,7 +182,7 @@ return (
         </div>
 
         {/* Max Price */}
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Max. Price (₦)
           </label>
@@ -197,7 +197,7 @@ return (
         </div>
 
         {/* Bathrooms */}
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Min. Bathrooms
           </label>
@@ -216,16 +216,16 @@ return (
         </div>
 
         {/* Buttons */}
-        <div className="flex items-end space-x-2">
-          <button type="submit" className="btn btn-primary flex-1">
-            <FaSearch className="inline mr-2" />
+        <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-end">
+          <button type="submit" className="btn btn-primary w-full sm:flex-1">
+            <FaSearch className="mr-2 shrink-0" />
             Search
           </button>
 
           <button
             type="button"
             onClick={handleReset}
-            className="btn btn-secondary"
+            className="btn btn-secondary w-full sm:w-auto"
           >
             Reset
           </button>

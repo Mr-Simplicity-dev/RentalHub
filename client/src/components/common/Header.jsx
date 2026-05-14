@@ -42,7 +42,7 @@ const Header = () => {
     if (role === 'super_support_admin') return '/admin/super-support-dashboard';
     if (role === 'state_support_admin') return '/admin/state-support-dashboard';
     if (role === 'lga_support_admin') return '/admin?tab=property_requests';
-    if (role === 'state_admin' || role === 'state_financial_admin' || role === 'lga_admin') return '/admin';
+    if (role === 'state_admin' || role === 'state_financial_admin' || role === 'admin' || role === 'lga_admin') return '/admin';
     if (role === 'super_financial_admin') return '/admin/super-financial-dashboard';
     if (role === 'financial_admin' || role === 'lga_financial_admin') return '/admin/financial-dashboard';
     if (role === 'super_fumigation_admin') return '/admin/fumigation-cleaning/super';
@@ -101,7 +101,7 @@ const Header = () => {
         // Ignore badge fetch errors.
       }
 
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'lga_admin') {
         try {
           const adminStatsRes = await api.get('/admin/stats');
           next.pendingVerifications = Number(adminStatsRes.data?.data?.pendingVerifications || 0);

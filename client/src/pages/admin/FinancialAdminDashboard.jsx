@@ -106,7 +106,7 @@ const FinancialAdminDashboard = () => {
         setProfile(me);
 
         if (!['financial_admin', 'lga_financial_admin'].includes(me.user_type)) {
-          navigate('/admin/dashboard');
+          navigate('/admin');
           return;
         }
 

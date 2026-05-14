@@ -4,6 +4,7 @@ const { sendMessageNotification } = require('../config/utils/emailService');
 
 let messageSchemaReady = false;
 const ESCALATION_TICKET_STATUSES = ['approval_pending', 'under_review', 'approved', 'rejected'];
+const isLgaAdminRole = (role) => ['admin', 'lga_admin'].includes(String(role || '').trim().toLowerCase());
 
 const ensureMessageSchema = async () => {
   if (messageSchemaReady) return;
@@ -38,11 +39,12 @@ const ensureMessageSchema = async () => {
 
 const getEscalationForActor = async (messageId, actorId, actorRole) => {
   const role = String(actorRole || '').toLowerCase();
-  if (!['admin', 'super_admin'].includes(role)) {
+  const isActorLgaAdmin = isLgaAdminRole(role);
+  if (!isActorLgaAdmin && role !== 'super_admin') {
     return null;
   }
 
-  const query = role === 'admin'
+  const query = isActorLgaAdmin
     ? `SELECT id, sender_id, receiver_id, message_type
        FROM messages
        WHERE id = $1 AND message_type = 'escalation' AND sender_id = $2`
@@ -57,11 +59,11 @@ const getEscalationForActor = async (messageId, actorId, actorRole) => {
 const canSendMessage = (senderRole, receiverRole, messageType) => {
   // Super admin can send to admins, tenants, and landlords.
   if (senderRole === 'super_admin') {
-    return ['admin', 'tenant', 'landlord'].includes(receiverRole);
+    return ['admin', 'lga_admin', 'tenant', 'landlord'].includes(receiverRole);
   }
 
   // Admin can message tenants/landlords and can escalate to super admin.
-  if (senderRole === 'admin') {
+  if (isLgaAdminRole(senderRole)) {
     if (messageType === 'escalation') return receiverRole === 'super_admin';
     return ['tenant', 'landlord'].includes(receiverRole);
   }
@@ -118,7 +120,7 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-    if (messageType === 'escalation' && senderRole !== 'admin') {
+    if (messageType === 'escalation' && !isLgaAdminRole(senderRole)) {
       return res.status(403).json({
         success: false,
         message: 'Only admins can send escalation messages',
@@ -541,14 +543,14 @@ exports.getEligibleRecipients = async (req, res) => {
 
     const { role = '', q = '' } = req.query;
     const userId = req.user.id;
-    const userRole = req.user.user_type;
+    const userRole = String(req.user.user_type || '').trim().toLowerCase();
     const requestedRole = String(role || '').trim().toLowerCase();
     const search = String(q || '').trim();
 
     let allowedRoles = [];
     if (userRole === 'super_admin') {
-      allowedRoles = ['admin', 'tenant', 'landlord'];
-    } else if (userRole === 'admin') {
+      allowedRoles = ['admin', 'lga_admin', 'tenant', 'landlord'];
+    } else if (isLgaAdminRole(userRole)) {
       allowedRoles = ['tenant', 'landlord', 'super_admin'];
     } else if (['tenant', 'landlord'].includes(userRole)) {
       // Receive-only roles do not get sender recipient list.
@@ -591,6 +593,7 @@ exports.getEligibleRecipients = async (req, res) => {
          CASE u.user_type
            WHEN 'super_admin' THEN 1
            WHEN 'admin' THEN 2
+           WHEN 'lga_admin' THEN 2
            WHEN 'landlord' THEN 3
            WHEN 'tenant' THEN 4
            ELSE 5
@@ -619,9 +622,9 @@ exports.getEscalations = async (req, res) => {
     await ensureMessageSchema();
 
     const userId = req.user.id;
-    const userRole = req.user.user_type;
+    const userRole = String(req.user.user_type || '').trim().toLowerCase();
 
-    if (!['admin', 'super_admin'].includes(userRole)) {
+    if (!isLgaAdminRole(userRole) && userRole !== 'super_admin') {
       return res.status(403).json({
         success: false,
         message: 'Access denied',
@@ -631,7 +634,7 @@ exports.getEscalations = async (req, res) => {
     let query = '';
     let params = [];
 
-    if (userRole === 'admin') {
+    if (isLgaAdminRole(userRole)) {
       query = `
         SELECT m.id, m.subject, m.message_text, m.is_read, m.created_at,
                s.id AS sender_id, s.full_name AS sender_name, s.user_type AS sender_role,

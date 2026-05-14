@@ -33,6 +33,8 @@ import {
   FaExchangeAlt,
   FaBan,
   FaUserShield,
+  FaBars,
+  FaTimes,
 } from 'react-icons/fa';
 
 const AdminLayout = () => {
@@ -88,6 +90,11 @@ const AdminLayout = () => {
     pendingSupportQueue: 0,
     pendingWithdrawals: 0,
   });
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (!user?.id) return undefined;
@@ -236,7 +243,7 @@ const AdminLayout = () => {
         activeNav: 'bg-admin-600 text-white',
         hoverNav: 'text-gray-700 hover:bg-admin-50',
         mainBg: 'bg-gradient-to-br from-admin-50 via-white to-admin-100/40',
-        panelTitle: 'Admin Portal',
+        panelTitle: isCoreAdmin ? 'LGA Admin Console' : 'Admin Portal',
       };
 
   const handleLogout = () => {
@@ -293,22 +300,46 @@ const AdminLayout = () => {
     }`;
 
   return (
-    <div className={`min-h-screen flex ${roleTheme.mainBg}`}>
+    <div className={`min-h-screen ${roleTheme.mainBg} lg:flex`}>
+      {mobileSidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close admin menu"
+          className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white/95 shadow-lg flex flex-col backdrop-blur">
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col overflow-y-auto bg-white/95 shadow-xl backdrop-blur transition-transform duration-300 lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:w-64 lg:max-w-none lg:translate-x-0 ${
+          mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
 
-        <div className="px-6 py-5 border-b">
-          <h2 className="text-xl font-bold text-gray-900">{roleTheme.panelTitle}</h2>
-          <p className="text-xs text-gray-500 mt-1">
-            {user?.full_name || 'Administrator'}
-          </p>
-          <RoleBadge role={role} className="mt-2" />
-          {isStateScopedAdmin && (
-            <div className="mt-2 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-              Scope: {assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}
+        <div className="border-b px-5 py-4 sm:px-6 sm:py-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="truncate text-xl font-bold text-gray-900">{roleTheme.panelTitle}</h2>
+              <p className="mt-1 truncate text-xs text-gray-500">
+                {user?.full_name || 'Administrator'}
+              </p>
+              <RoleBadge role={role} className="mt-2" />
+              {isStateScopedAdmin && (
+                <div className="mt-2 inline-flex max-w-full items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                  <span className="truncate">Scope: {assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>
+                </div>
+              )}
             </div>
-          )}
+            <button
+              type="button"
+              aria-label="Close admin menu"
+              className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden"
+              onClick={() => setMobileSidebarOpen(false)}
+            >
+              <FaTimes />
+            </button>
+          </div>
 
                               {/* SUPER SUPPORT */}
           {isSuperSupportAdmin && (
@@ -862,14 +893,34 @@ const AdminLayout = () => {
 
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 p-6 overflow-y-auto animate-fadeIn">
-        {isStateScopedAdmin && (
-          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-800">
-            You are viewing scoped admin data for <span className="font-semibold">{assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>.
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-gray-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur lg:hidden">
+          <button
+            type="button"
+            aria-label="Open admin menu"
+            className="rounded-lg border border-gray-200 bg-white p-2 text-gray-700 shadow-sm hover:bg-gray-50"
+            onClick={() => setMobileSidebarOpen(true)}
+          >
+            <FaBars />
+          </button>
+          <div className="min-w-0 flex-1 text-center">
+            <p className="truncate text-sm font-semibold text-gray-900">{roleTheme.panelTitle}</p>
+            <p className="truncate text-xs text-gray-500">
+              {assignedLgaLabel || assignedStateLabel || user?.full_name || 'Administrator'}
+            </p>
           </div>
-        )}
-        <Outlet />
-      </main>
+          <RoleBadge role={role} compact className="shrink-0" />
+        </header>
+
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 animate-fadeIn sm:p-6 lg:overflow-y-auto">
+          {isStateScopedAdmin && (
+            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-800">
+              You are viewing scoped admin data for <span className="font-semibold">{assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>.
+            </div>
+          )}
+          <Outlet />
+        </main>
+      </div>
 
     </div>
   );

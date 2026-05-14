@@ -513,6 +513,11 @@ function Layout({ children }) {
   const isVerificationPage =
     location.pathname.startsWith('/verify-email') ||
     location.pathname.startsWith('/verify-phone');
+  const isDashboardShell =
+    location.pathname.startsWith('/admin') ||
+    location.pathname.startsWith('/super-admin') ||
+    location.pathname.startsWith('/lawyer');
+  const showPublicHeaderFooter = !isVerificationPage && !isDashboardShell;
 
   // Handle RTL/LTR automatically
   useEffect(() => {
@@ -521,9 +526,10 @@ function Layout({ children }) {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isVerificationPage && <Header />}
+      {showPublicHeaderFooter && <Header />}
 
       {/* Global Language Switcher */}
+      {!isDashboardShell && (
       <div className="flex justify-end px-4 py-2 border-b bg-white">
         <select
           onChange={(e) => {
@@ -540,10 +546,11 @@ function Layout({ children }) {
           <option value="zh">中文</option>
         </select>
       </div>
+      )}
 
       <main className="flex-grow animate-fadeIn">{children}</main>
 
-      {!isVerificationPage && <Footer />}
+      {showPublicHeaderFooter && <Footer />}
     </div>
   );
 }
@@ -722,7 +729,7 @@ function App() {
                 <Route path="applications/:id" element={<AdminApplicationDetail />} />
                 <Route path="super-financial-dashboard" element={<SuperFinancialAdminRoute><SuperFinancialAdminDashboard /></SuperFinancialAdminRoute>} />
                 <Route path="financial-dashboard" element={<FinancialAdminRoute><FinancialAdminDashboard /></FinancialAdminRoute>} />
-                <Route path="state-dashboard" element={<StateAdminRoute><AdminDashboard /></StateAdminRoute>} />
+                <Route path="state-dashboard" element={<StateAdminRoute><Navigate to="/admin" replace /></StateAdminRoute>} />
                 <Route path="withdrawals" element={<AdminWithdrawalsRoute />} />
                 <Route path="state-support-dashboard" element={<StateSupportAdminRoute><StateSupportAdminDashboard /></StateSupportAdminRoute>} />
                 <Route path="super-support-dashboard" element={<SuperSupportAdminRoute><SuperSupportAdminDashboard /></SuperSupportAdminRoute>} />

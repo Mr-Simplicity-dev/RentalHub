@@ -5,7 +5,7 @@ const db = require('./config/middleware/database');
 async function createAdmin(userType) {
   const email = 'admin@usayddomain.com';
   const phone = '07067012884';
-  const fullName = 'Super Admin';
+  const fullName = 'Super Admin';  
   const nin = '00000000000';
   const password = 'Admin@12345'; // change after first login
 

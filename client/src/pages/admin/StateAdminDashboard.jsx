@@ -185,7 +185,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       };
 
       const userRole = String(user.user_type || '').toLowerCase();
-      const isLocalAdmin = userRole === 'admin';
+      const isLocalAdmin = userRole === 'admin' || userRole === 'lga_admin';
       const isActive = user.is_active !== false;
 
       existing.total_users_count += 1;
