@@ -136,14 +136,46 @@ const attachUserFromToken = (req) => {
   }
 };
 
+const isMaintenanceBypassRoute = (req) => {
+  const path = req.path || '';
+
+  const allowedExactRoutes = [
+    '/auth/login',
+    '/auth/me',
+    '/auth/refresh',
+  ];
+
+  if (allowedExactRoutes.includes(path)) {
+    return true;
+  }
+
+  // Allow super admin feature flag endpoints so super admin can turn maintenance off again.
+  if (
+    path.includes('/feature-flags') ||
+    path.includes('/system/flags') ||
+    path.includes('/admin/flags') ||
+    path.includes('/super-admin/flags')
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
 const enforceFlags = async (req, res, next) => {
   try {
     attachUserFromToken(req);
 
     const flags = await getFeatureFlagsMap();
 
-    if (flags.maintenance_mode && req.user?.user_type !== 'super_admin') {
-      return res.status(503).json({ message: 'System under maintenance come back in view hours' });
+    if (
+      flags.maintenance_mode &&
+      req.user?.user_type !== 'super_admin' &&
+      !isMaintenanceBypassRoute(req)
+    ) {
+      return res.status(503).json({
+        message: 'System under maintenance. Please come back in a few hours.',
+      });
     }
 
     const isDirectRegistrationRequest =
