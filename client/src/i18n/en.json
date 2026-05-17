@@ -17,14 +17,14 @@
 
   "home": {
     "hero_title": "Find Your Perfect Home in Nigeria",
-    "hero_subtitle": "Browse thousands of verified properties across all 36 states + FCT",
+    "hero_subtitle": "Browse thousands of verified properties in all 36 states + FCT",
     "search_placeholder": "Search by location, property type...",
     "search": "Search",
 
     "features": {
       "verified": {
         "title": "Verified Properties",
-        "text": "All properties and landlords are verified with NIN for your safety"
+        "text": "All properties and landlords are verified for safety"
       },
       "wide": {
         "title": "Wide Selection",
@@ -32,7 +32,7 @@
       },
       "easy": {
         "title": "Easy Process",
-        "text": "Simple application and payment process, all online"
+        "text": "Simple application and payment processes, all online"
       }
     },
 
@@ -50,7 +50,7 @@
   },
 
   "footer": {
-    "about": "Nigeria's trusted platform for finding and listing rental properties. Connecting landlords and tenants across all 36 states + FCT.",
+    "about": "Nigeria's most trusted platform for finding and listing rental properties. Connecting landlords and tenants across all 36 states + FCT.",
     "quick_links": "Quick Links",
     "browse": "Browse Properties",
     "about_us": "About Us",
@@ -130,12 +130,12 @@
     "tenant_subtitle": "Find your perfect home",
     "landlord_subtitle": "Manage your properties",
 
-    "verify_title": "Complete Your Verification",
-    "verify_text": "Please complete your identity verification to access all features.",
+    "verify_title": "Complete Verification",
+    "verify_text": "Please complete identity verification to access all features.",
     "verify_action": "Complete Verification",
 
     "subscribe_title": "Subscribe to Access Properties",
-    "subscribe_text": "Subscribe to view full property details and contact landlords.",
+    "subscribe_text": "Subscribe to view full property details.",
     "subscribe_action": "View Plans",
 
     "saved": "Saved Properties",
@@ -157,7 +157,7 @@
     "activity_generic": "Activity",
 
     "qa_browse": "Browse Properties",
-    "qa_browse_desc": "Find your perfect home",
+    "qa_browse_desc": "Find a perfect home",
     "qa_apps": "My Applications",
     "qa_apps_desc": "Track your applications",
     "qa_messages": "Messages",
@@ -180,13 +180,13 @@
   "role": "Role",
 
   "verify_title": "Identity Verification",
-  "verified": "Your identity has been verified ✔",
-  "verify_text": "Upload your passport photograph for identity verification.",
+  "verified": "Success ✔",
+  "verify_text": "Upload a passport photograph for verification.",
 
   "select_image": "Please select an image",
   "upload": "Submit",
   "uploading": "Uploading...",
-  "upload_success": "Document uploaded. Awaiting admin verification.",
+  "upload_success": "Document uploaded. Awaiting verification.",
   "upload_failed": "Upload failed"
 },
 
