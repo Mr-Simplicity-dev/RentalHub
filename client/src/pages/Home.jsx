@@ -217,22 +217,22 @@ const Home = () => {
 
             <form 
               onSubmit={handleSearch} 
-              className="mx-auto flex w-full max-w-2xl flex-col gap-2 animate-fadeIn delay-200 sm:flex-row sm:gap-0"
+              className="mx-auto flex w-full max-w-lg flex-col gap-2 animate-fadeIn delay-200 md:max-w-2xl md:flex-row md:gap-0"
             >
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('home.search_placeholder')}
-                className="min-w-0 flex-1 rounded-lg px-4 py-3 text-gray-900 transition-all duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 sm:rounded-l-lg sm:rounded-r-none sm:px-6 sm:py-4"
+                className="min-w-0 flex-1 rounded-lg px-3.5 py-2.5 text-sm text-gray-900 transition-all duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 md:rounded-l-lg md:rounded-r-none md:px-6 md:py-4 md:text-base"
               />
               <button
                 type="submit"
                 aria-label={t('home.search')}
-                className="flex h-12 w-12 items-center justify-center self-center rounded-full bg-primary-700 px-0 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-800 hover:shadow-lg sm:h-auto sm:w-auto sm:self-stretch sm:rounded-l-none sm:rounded-r-lg sm:px-8 sm:py-4"
+                className="flex h-11 w-11 items-center justify-center self-center rounded-full bg-primary-700 px-0 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-800 hover:shadow-lg md:h-auto md:w-auto md:self-stretch md:rounded-l-none md:rounded-r-lg md:px-6 md:py-4 md:text-base lg:px-8"
               >
-                <FaSearch className="shrink-0 sm:mr-2" />
-                <span className="sr-only sm:not-sr-only">{t('home.search')}</span>
+                <FaSearch className="shrink-0 md:mr-2" />
+                <span className="sr-only md:not-sr-only">{t('home.search')}</span>
               </button>
             </form>
             <div className="mt-4 animate-fadeIn delay-300">
