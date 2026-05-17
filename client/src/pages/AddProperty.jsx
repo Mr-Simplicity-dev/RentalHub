@@ -304,12 +304,12 @@ const AddProperty = () => {
       {step === 3 && (
         <div className="card space-y-6 text-center">
           <h2 className="text-xl font-semibold">{t('add_property.verify_title')}</h2>
-          <div className="flex justify-center space-x-2">
+          <div className="flex flex-wrap justify-center gap-2">
             {code.map((value, index) => <input key={index} id={`otp-${index}`} value={value} onChange={(e) => handleCodeChange(index, e.target.value)} maxLength="1" className="h-12 w-12 rounded border text-center text-xl" />)}
           </div>
-          <div className="flex space-x-3">
-            <button onClick={() => setStep(2)} className="btn btn-secondary flex-1">{t('add_property.back')}</button>
-            <button onClick={submitProperty} disabled={loading} className="btn btn-primary flex-1">{loading ? t('add_property.submitting') : t('add_property.publish')}</button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button onClick={() => setStep(2)} className="btn btn-secondary w-full sm:flex-1">{t('add_property.back')}</button>
+            <button onClick={submitProperty} disabled={loading} className="btn btn-primary w-full sm:flex-1">{loading ? t('add_property.submitting') : t('add_property.publish')}</button>
           </div>
         </div>
       )}

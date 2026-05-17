@@ -708,17 +708,17 @@ const PropertyDetail = () => {
             </p>
           </div>
 
-          <div className="flex space-x-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <button
               onClick={submitApplication}
               disabled={submittingApplication}
-              className="btn btn-primary flex-1"
+              className="btn btn-primary w-full sm:flex-1"
             >
               {submittingApplication ? 'Submitting...' : 'Submit Application'}
             </button>
             <button
               onClick={() => setShowApplicationModal(false)}
-              className="btn btn-secondary"
+              className="btn btn-secondary w-full sm:w-auto"
             >
               Cancel
             </button>

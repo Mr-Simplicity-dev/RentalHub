@@ -312,9 +312,7 @@ const AdminLayout = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col overflow-y-auto bg-white/95 shadow-xl backdrop-blur transition-transform duration-300 lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:w-64 lg:max-w-none lg:translate-x-0 ${
-          mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={`${mobileSidebarOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw]' : 'hidden'} flex-col overflow-y-auto bg-white/95 shadow-xl backdrop-blur lg:sticky lg:top-0 lg:z-0 lg:flex lg:h-screen lg:w-64 lg:max-w-none lg:shadow-lg`}
       >
 
         <div className="border-b px-5 py-4 sm:px-6 sm:py-5">

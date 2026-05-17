@@ -66,16 +66,16 @@ const FumigationCleaningDashboardButton = ({ userType, propertyId, propertyTitle
           Book Fumigation/Cleaning
         </button>
         
-        <div className="flex space-x-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button
             onClick={() => navigate('/fumigation-cleaning/catalog')}
-            className="btn btn-outline flex-1 py-2 text-sm"
+            className="btn btn-outline w-full py-2 text-sm sm:flex-1"
           >
             View Services
           </button>
           <button
             onClick={() => navigate('/fumigation-cleaning/bookings')}
-            className="btn btn-outline flex-1 py-2 text-sm"
+            className="btn btn-outline w-full py-2 text-sm sm:flex-1"
           >
             My Bookings
           </button>
@@ -83,12 +83,12 @@ const FumigationCleaningDashboardButton = ({ userType, propertyId, propertyTitle
       </div>
       
       <div className="mt-4 pt-3 border-t border-gray-200">
-        <div className="flex items-center text-xs text-gray-600">
-          <div className="flex-1">
+        <div className="flex flex-col gap-2 text-xs text-gray-600 sm:flex-row sm:items-center">
+          <div className="sm:flex-1">
             <span className="font-medium">Benefits:</span>
             <span className="ml-1">Certified teams • Safe chemicals • Guaranteed results</span>
           </div>
-          <div className="text-green-600 font-medium">
+          <div className="font-medium text-green-600">
             From ₦15,000
           </div>
         </div>

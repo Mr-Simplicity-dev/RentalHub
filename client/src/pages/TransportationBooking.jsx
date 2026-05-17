@@ -473,18 +473,18 @@ const TransportationBooking = () => {
                   </div>
                 )}
                 
-                <div className="flex space-x-4">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <button
                     type="button"
                     onClick={() => navigate('/dashboard')}
-                    className="btn btn-gray flex-1"
+                    className="btn btn-gray w-full sm:flex-1"
                     disabled={creatingBooking}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="btn btn-primary flex-1"
+                    className="btn btn-primary w-full sm:flex-1"
                     disabled={creatingBooking || !priceCalculation || calculatingPrice}
                   >
                     {creatingBooking ? (

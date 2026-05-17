@@ -183,7 +183,7 @@ const PropertyCard = ({
         </div>
 
         {/* Features */}
-        <div className="flex items-center space-x-5 text-gray-500 text-sm mb-4">
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-gray-500">
           <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg">
             <FaBed className="text-primary-500" />
             <span className="font-medium">{property.bedrooms}</span>
@@ -201,7 +201,7 @@ const PropertyCard = ({
         </div>
 
         {/* Price */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+        <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-2xl font-bold text-primary-600">
               {formatCurrency(property.rent_amount)}

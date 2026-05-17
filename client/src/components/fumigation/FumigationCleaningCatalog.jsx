@@ -321,16 +321,16 @@ const FumigationCleaningCatalog = () => {
                 </div>
                 
                 {/* Action Buttons */}
-                <div className="flex space-x-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <button
                     onClick={() => handleBookService(service.id)}
-                    className="btn btn-primary flex-1"
+                    className="btn btn-primary w-full sm:flex-1"
                   >
                     Book Now
                   </button>
                   <button
                     onClick={() => toggleServiceDetails(service.id)}
-                    className="btn btn-outline"
+                    className="btn btn-outline w-full sm:w-auto"
                   >
                     {expandedService === service.id ? 'Less' : 'Details'}
                   </button>
@@ -563,7 +563,7 @@ const FumigationCleaningCatalog = () => {
           <p className="text-gray-600">
             Need help choosing the right service? Contact our support team:
           </p>
-          <div className="mt-2 space-x-4">
+          <div className="mt-2 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-4">
             <span className="text-blue-600 font-medium">📞 +234 800 123 4567</span>
             <span className="text-blue-600 font-medium">✉️ cleaning@rentalhub.com</span>
           </div>

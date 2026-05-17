@@ -19,7 +19,7 @@ const ReportDrawer = ({ report, closeDrawer, updateReport }) => {
   if (!report) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex">
+    <div className="fixed inset-0 z-50 flex justify-end">
 
       {/* BACKDROP */}
 
@@ -30,7 +30,7 @@ const ReportDrawer = ({ report, closeDrawer, updateReport }) => {
 
       {/* DRAWER */}
 
-      <div className="w-[460px] bg-white shadow-2xl overflow-y-auto animate-slideInRight">
+      <div className="w-full max-w-[460px] bg-white shadow-2xl overflow-y-auto animate-slideInRight">
 
         {/* HEADER */}
 

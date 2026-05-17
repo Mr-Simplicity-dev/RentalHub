@@ -259,15 +259,15 @@ const Header = () => {
         </div>
       )}
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16 md:h-20">
+        <div className="flex items-center justify-between gap-2 h-16 md:h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-3 group">
+          <Link to="/" className="flex min-w-0 items-center gap-2 group sm:gap-3">
             <img
               src="/logo192.png"
               alt="RentalHub NG"
-              className="h-10 md:h-12 lg:h-14 object-contain transition-transform duration-300 group-hover:scale-105"
+              className="h-9 shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 md:h-12 lg:h-14"
             />
-            <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
+            <span className="hidden truncate bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-xl font-bold text-transparent sm:block md:text-2xl">
               RentalHub NG
             </span>
           </Link>
@@ -285,7 +285,7 @@ const Header = () => {
           </nav>
 
           {/* Right side */}
-          <div className="flex items-center space-x-2 md:space-x-4">
+          <div className="flex shrink-0 items-center gap-1.5 md:gap-4">
             {isAuthenticated ? (
               <>
                 <Link to="/messages" className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
@@ -311,7 +311,7 @@ const Header = () => {
                   </button>
 
                   {showNotifications && (
-                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-elevated-lg border border-gray-100 py-2 animate-scaleIn origin-top-right max-h-[70vh] flex flex-col">
+                    <div className="fixed left-4 right-4 top-20 z-50 flex max-h-[70vh] w-auto origin-top-right animate-scaleIn flex-col rounded-2xl border border-gray-100 bg-white py-2 shadow-elevated-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
                       <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
                         <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
                         {notifUnreadCount > 0 && (
@@ -532,7 +532,7 @@ const Header = () => {
                 </div>
               </>
             ) : (
-              <div className="flex items-center space-x-3">
+              <div className="hidden items-center gap-2 sm:flex md:gap-3">
                 <Link to="/login" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-xl transition-all duration-200">
                   {t('header.login')}
                 </Link>
@@ -570,6 +570,12 @@ const Header = () => {
             )}
             {isAuthenticated && (
               <MobileNavLink to={roleDashboardPath} label={t('header.dashboard')} />
+            )}
+            {!isAuthenticated && (
+              <>
+                <MobileNavLink to="/login" label={t('header.login')} />
+                <MobileNavLink to="/register" label={t('header.register')} />
+              </>
             )}
           </div>
         </div>

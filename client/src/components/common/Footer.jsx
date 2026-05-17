@@ -113,7 +113,7 @@ const Footer = () => {
 
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-400">&copy; 2024 RentalHub NG. {t('footer.rights')}</p>
-          <div className="flex space-x-6 text-sm">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm md:justify-end">
             <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors duration-200">
               {t('footer.privacy')}
             </Link>
@@ -136,8 +136,8 @@ const FooterLink = ({ to, label }) => (
 
 const FooterContact = ({ href, enabled, children }) => {
   const className = enabled
-    ? 'flex items-start gap-2 hover:text-white transition-colors duration-200'
-    : 'flex items-start gap-2';
+    ? 'flex min-w-0 items-start gap-2 break-words hover:text-white transition-colors duration-200'
+    : 'flex min-w-0 items-start gap-2 break-words';
 
   if (!enabled) {
     return <span className={className}>{children}</span>;
