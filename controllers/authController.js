@@ -60,7 +60,7 @@ const LAWYER_INVITE_EXPIRY_HOURS = 72;
 const LAWYER_INVITE_EXPIRY_MS = LAWYER_INVITE_EXPIRY_HOURS * 60 * 60 * 1000;
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-const TENANT_REGISTRATION_FEE_NGN = 2500;
+const TENANT_REGISTRATION_FEE_NGN = 3000;
 const LANDLORD_REGISTRATION_FEE_NGN = 5000;
 const FRONTEND_URL = getFrontendUrl();
 const REGISTRATION_PRICING_TARGETS = {
@@ -167,7 +167,7 @@ const ensureTenantRegistrationPaymentSchema = async () => {
       email VARCHAR(255) NOT NULL,
       phone VARCHAR(20) NOT NULL,
       full_name VARCHAR(255) NOT NULL,
-      amount DECIMAL(12, 2) NOT NULL DEFAULT 2500,
+      amount DECIMAL(12, 2) NOT NULL DEFAULT 3000,
       currency VARCHAR(10) NOT NULL DEFAULT 'NGN',
       payment_method VARCHAR(50) NOT NULL DEFAULT 'paystack',
       transaction_reference VARCHAR(255) NOT NULL UNIQUE,

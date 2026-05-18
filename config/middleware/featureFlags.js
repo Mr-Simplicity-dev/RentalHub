@@ -35,7 +35,7 @@ const DEFAULT_FEATURE_FLAGS = [
   {
     key: 'tenant_registration_payment',
     enabled: false,
-    description: 'Require N2,500 payment before tenant account creation.',
+    description: 'Require ₦3,000 payment before tenant account creation.',
   },
   {
     key: 'landlord_registration_payment',

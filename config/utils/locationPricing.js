@@ -5,7 +5,7 @@ const PRICING_TARGETS = {
   tenant_registration: {
     key: 'tenant_registration',
     label: 'Tenant Registration',
-    base_amount: 2500,
+    base_amount: 3000,
   },
   landlord_registration: {
     key: 'landlord_registration',

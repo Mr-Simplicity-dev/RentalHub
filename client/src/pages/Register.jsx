@@ -55,8 +55,8 @@ const Register = () => {
     landlord_registration_payment: false,
   });
   const [registrationPricing, setRegistrationPricing] = useState({
-    amount: 2500,
-    base_amount: 2500,
+    amount: 3000,
+    base_amount: 3000,
     location_required: false,
     location_complete: false,
     rule_scope: 'base',
@@ -127,7 +127,7 @@ const Register = () => {
     (item) => String(item.id) === String(formData.state_id)
   );
   const availableLgas = selectedStateOption?.lgas || [];
-    const baseAmount = registrationPricing.amount || (formData.user_type === 'tenant' ? 2500 : 5000);
+    const baseAmount = registrationPricing.amount || (formData.user_type === 'tenant' ? 3000 : 5000);
     const displayedRegistrationAmount = (requiresRegistrationPayment ? baseAmount : 0) + (requiresLawyerPayment ? LAWYER_ACCESS_FEE : 0) + (requiresAgentPayment ? AGENT_ACCESS_FEE : 0);
   const registrationLocationBrowseUrl = formData.state_id
     ? `/properties?state_id=${encodeURIComponent(formData.state_id)}${
@@ -173,8 +173,8 @@ const Register = () => {
 
         setRegistrationPricing(
           data.pricing || {
-            amount: formData.user_type === 'tenant' ? 2500 : 5000,
-            base_amount: formData.user_type === 'tenant' ? 2500 : 5000,
+            amount: formData.user_type === 'tenant' ? 3000 : 5000,
+            base_amount: formData.user_type === 'tenant' ? 3000 : 5000,
             location_required:
               data?.[`${formData.user_type}_registration_payment`] === true,
             location_complete: false,
@@ -191,8 +191,8 @@ const Register = () => {
           }));
 
           setRegistrationPricing({
-            amount: formData.user_type === 'tenant' ? 2500 : 5000,
-            base_amount: formData.user_type === 'tenant' ? 2500 : 5000,
+            amount: formData.user_type === 'tenant' ? 3000 : 5000,
+            base_amount: formData.user_type === 'tenant' ? 3000 : 5000,
             location_required: false,
             location_complete: false,
             rule_scope: 'base',
@@ -798,41 +798,6 @@ return (
             </div>
           )}
 
-                                        {requiresRegistrationPayment && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-left text-sm text-blue-800">
-              {formData.user_type === "tenant" ? "Tenant" : "Landlord"} account creation
-              requires a registration payment of ₦
-              {baseAmount.toLocaleString()} before the account is created
-              for this location.
-              {!registrationPricing.location_complete && (
-                <div className="mt-2 text-xs text-blue-700">
-                  Select your state and local government area to confirm the exact fee.
-                </div>
-              )}
-            </div>
-          )}
-          {requiresLawyerPayment && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-800">
-              You selected RentalHub NG lawyers. A lawyer access fee of ₦
-              {LAWYER_ACCESS_FEE.toLocaleString()} applies to unlock full lawyer contact details in your selected state and local government area.
-              {!registrationPricing.location_complete && (
-                <div className="mt-2 text-xs text-amber-700">
-                  Select your state and local government area to confirm.
-                </div>
-              )}
-            </div>
-                    )}
-          {requiresAgentPayment && (
-            <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-left text-sm text-purple-800">
-              You selected RentalHub NG agents. An agent access fee of N
-              {AGENT_ACCESS_FEE.toLocaleString()} applies to auto-assign a platform agent for your area.
-              {!registrationPricing.location_complete && (
-                <div className="mt-2 text-xs text-purple-700">
-                  Select your state and local government area to confirm.
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <AnimatePresence mode="wait">
@@ -1463,7 +1428,7 @@ return (
                 )}
                 {requiresAgentPayment && (
                   <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-800">
-                    You selected RentalHub NG agents. An agent access fee of N
+                    You selected RentalHub NG agents. An agent access fee of ₦
                     {AGENT_ACCESS_FEE.toLocaleString()} applies to auto-assign a platform agent for your area.
                     {!registrationPricing.location_complete && (
                       <div className="mt-2 text-xs text-purple-700">

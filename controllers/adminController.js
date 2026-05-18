@@ -263,7 +263,7 @@ exports.getStats = async (req, res) => {
       if (assignedCity) scopeParams.push(assignedCity);
 
       // State filter: $1; LGA filter (admin only): $2
-      const stateSql = `LOWER(TRIM(sp.state)) = LOWER(TRIM($1))`;
+      const stateSql = `LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($1))`;
       const lgaSql = assignedCity
         ? ` AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($2))`
         : '';
@@ -283,6 +283,7 @@ exports.getStats = async (req, res) => {
              EXISTS (
                SELECT 1
                FROM properties sp
+               JOIN states sp_st ON sp_st.id = sp.state_id
                WHERE (sp.user_id = u.id OR sp.landlord_id = u.id)
                  AND ${stateSql}${lgaSql}
              )
@@ -290,6 +291,7 @@ exports.getStats = async (req, res) => {
                SELECT 1
                FROM applications sa
                JOIN properties sp ON sp.id = sa.property_id
+               JOIN states sp_st ON sp_st.id = sp.state_id
                WHERE sa.tenant_id = u.id
                  AND ${stateSql}${lgaSql}
              )
@@ -299,8 +301,9 @@ exports.getStats = async (req, res) => {
 
       totalProperties = await db.query(
         `SELECT COUNT(*)
-         FROM properties
-         WHERE LOWER(TRIM(state)) = LOWER(TRIM($1))${propLgaSql}`,
+         FROM properties p
+         JOIN states s ON s.id = p.state_id
+         WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))${propLgaSql}`,
         scopeParams
       );
 
@@ -308,7 +311,8 @@ exports.getStats = async (req, res) => {
         `SELECT COUNT(*)
          FROM applications a
          JOIN properties p ON p.id = a.property_id
-         WHERE LOWER(TRIM(p.state)) = LOWER(TRIM($1))${joinedLgaSql}`,
+         JOIN states s ON s.id = p.state_id
+         WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))${joinedLgaSql}`,
         scopeParams
       );
 
@@ -322,6 +326,7 @@ exports.getStats = async (req, res) => {
              EXISTS (
                SELECT 1
                FROM properties sp
+               JOIN states sp_st ON sp_st.id = sp.state_id
                WHERE (sp.user_id = u.id OR sp.landlord_id = u.id)
                  AND ${stateSql}${lgaSql}
              )
@@ -329,6 +334,7 @@ exports.getStats = async (req, res) => {
                SELECT 1
                FROM applications sa
                JOIN properties sp ON sp.id = sa.property_id
+               JOIN states sp_st ON sp_st.id = sp.state_id
                WHERE sa.tenant_id = u.id
                  AND ${stateSql}${lgaSql}
              )
@@ -445,8 +451,9 @@ exports.getAllUsers = async (req, res) => {
           SELECT 1
           FROM applications sa
           JOIN properties sp ON sp.id = sa.property_id
+          JOIN states sp_st ON sp_st.id = sp.state_id
           WHERE sa.tenant_id = u.id
-            AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${i}))
+            AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${i}))
         )
       )`);
       params.push(assignedState);
@@ -472,8 +479,9 @@ exports.getAllUsers = async (req, res) => {
         const fromClause = `
         FROM users u
         LEFT JOIN LATERAL (
-          SELECT p.state, p.lga_name
+          SELECT s.state_name AS state, p.lga_name
           FROM properties p
+          LEFT JOIN states s ON s.id = p.state_id
           WHERE p.landlord_id = u.id
           ORDER BY p.created_at DESC
           LIMIT 1
@@ -580,15 +588,17 @@ exports.getPendingVerifications = async (req, res) => {
         EXISTS (
           SELECT 1
           FROM properties sp
+          JOIN states sp_st ON sp_st.id = sp.state_id
           WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
-            AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${i}))
+            AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${i}))
         )
         OR EXISTS (
           SELECT 1
           FROM applications sa
           JOIN properties sp ON sp.id = sa.property_id
+          JOIN states sp_st ON sp_st.id = sp.state_id
           WHERE sa.tenant_id = users.id
-            AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${i}))
+            AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${i}))
         )
       )`);
       params.push(assignedState);
@@ -688,15 +698,17 @@ exports.approveVerification = async (req, res) => {
            EXISTS (
              SELECT 1
              FROM properties sp
+             JOIN states sp_st ON sp_st.id = sp.state_id
              WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
-               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+               AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
            OR EXISTS (
              SELECT 1
              FROM applications sa
              JOIN properties sp ON sp.id = sa.property_id
+             JOIN states sp_st ON sp_st.id = sp.state_id
              WHERE sa.tenant_id = users.id
-               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+               AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
          )`;
     }
@@ -786,15 +798,17 @@ exports.rejectVerification = async (req, res) => {
            EXISTS (
              SELECT 1
              FROM properties sp
+             JOIN states sp_st ON sp_st.id = sp.state_id
              WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
-               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+               AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
            OR EXISTS (
              SELECT 1
              FROM applications sa
              JOIN properties sp ON sp.id = sa.property_id
+             JOIN states sp_st ON sp_st.id = sp.state_id
              WHERE sa.tenant_id = users.id
-               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+               AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
          )`;
     }
@@ -892,7 +906,7 @@ exports.getAllProperties = async (req, res) => {
     }
 
     if (assignedState) {
-      where.push(`LOWER(TRIM(p.state)) = LOWER(TRIM($${i++}))`);
+      where.push(`LOWER(TRIM(s.state_name)) = LOWER(TRIM($${i++}))`);
       params.push(assignedState);
     }
 
@@ -907,6 +921,7 @@ exports.getAllProperties = async (req, res) => {
       SELECT COUNT(*)
       FROM properties p
       LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN states s ON s.id = p.state_id
       ${whereClause}
     `;
     const countResult = await db.query(countQuery, params);
@@ -922,10 +937,11 @@ exports.getAllProperties = async (req, res) => {
         p.featured,
         p.created_at,
         p.city,
-        p.state,
+        s.state_name AS state,
         u.full_name AS landlord_name
       FROM properties p
       LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN states s ON s.id = p.state_id
       ${whereClause}
       ORDER BY p.created_at DESC
       LIMIT $${i++} OFFSET $${i++}
@@ -976,7 +992,7 @@ exports.getPendingProperties = async (req, res) => {
     const extraClauses = [];
 
     if (assignedState) {
-      extraClauses.push(`AND LOWER(TRIM(p.state)) = LOWER(TRIM($${i++}))`);
+      extraClauses.push(`AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${i++}))`);
       params.push(assignedState);
     }
 
@@ -1039,7 +1055,9 @@ exports.approveProperty = async (req, res) => {
     const extraClauses = [];
 
     if (assignedState) {
-      extraClauses.push(`AND LOWER(TRIM(state)) = LOWER(TRIM($${queryParams.length + 1}))`);
+      extraClauses.push(`AND state_id IN (
+        SELECT id FROM states WHERE LOWER(TRIM(state_name)) = LOWER(TRIM($${queryParams.length + 1}))
+      )`);
       queryParams.push(assignedState);
     }
 
@@ -1141,7 +1159,9 @@ exports.rejectProperty = async (req, res) => {
     const extraClauses = [];
 
     if (assignedState) {
-      extraClauses.push(`AND LOWER(TRIM(state)) = LOWER(TRIM($${queryParams.length + 1}))`);
+      extraClauses.push(`AND state_id IN (
+        SELECT id FROM states WHERE LOWER(TRIM(state_name)) = LOWER(TRIM($${queryParams.length + 1}))
+      )`);
       queryParams.push(assignedState);
     }
 
@@ -1252,7 +1272,7 @@ exports.getAllApplications = async (req, res) => {
     }
 
     if (assignedState) {
-      where.push(`LOWER(TRIM(p.state)) = LOWER(TRIM($${i++}))`);
+      where.push(`LOWER(TRIM(s.state_name)) = LOWER(TRIM($${i++}))`);
       params.push(assignedState);
     }
 
@@ -1434,15 +1454,17 @@ exports.getUserById = async (req, res) => {
            EXISTS (
              SELECT 1
              FROM properties sp
+             JOIN states sp_st ON sp_st.id = sp.state_id
              WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
-               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+               AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
            OR EXISTS (
              SELECT 1
              FROM applications sa
              JOIN properties sp ON sp.id = sa.property_id
+             JOIN states sp_st ON sp_st.id = sp.state_id
              WHERE sa.tenant_id = users.id
-               AND LOWER(TRIM(sp.state)) = LOWER(TRIM($${stateIdx}))
+               AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
            )
          )`;
     }
@@ -1626,7 +1648,7 @@ exports.getPropertyById = async (req, res) => {
     const extraClauses = [];
 
     if (assignedState) {
-      extraClauses.push(`AND LOWER(TRIM(p.state)) = LOWER(TRIM($${queryParams.length + 1}))`);
+      extraClauses.push(`AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${queryParams.length + 1}))`);
       queryParams.push(assignedState);
     }
 
@@ -1641,6 +1663,7 @@ exports.getPropertyById = async (req, res) => {
       `SELECT p.*, u.full_name AS landlord_name, u.email AS landlord_email
        FROM properties p
        LEFT JOIN users u ON p.user_id = u.id
+       LEFT JOIN states s ON s.id = p.state_id
        WHERE p.id = $1
          ${stateClause}`,
       queryParams
@@ -1680,7 +1703,7 @@ exports.getApplicationById = async (req, res) => {
     const extraClauses = [];
 
     if (assignedState) {
-      extraClauses.push(`AND LOWER(TRIM(p.state)) = LOWER(TRIM($${queryParams.length + 1}))`);
+      extraClauses.push(`AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${queryParams.length + 1}))`);
       queryParams.push(assignedState);
     }
 
@@ -1700,6 +1723,7 @@ exports.getApplicationById = async (req, res) => {
        FROM applications a
        JOIN users t ON a.tenant_id = t.id
        JOIN properties p ON a.property_id = p.id
+       LEFT JOIN states s ON s.id = p.state_id
        LEFT JOIN users l ON p.user_id = l.id
        WHERE a.id = $1
          ${stateClause}`,
@@ -1746,7 +1770,7 @@ exports.approveApplication = async (req, res) => {
            SELECT 1
            FROM properties p
            WHERE p.id = applications.property_id
-             AND LOWER(TRIM(p.state)) = LOWER(TRIM($${stateIdx}))
+             AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${stateIdx}))
          )`;
     }
 
@@ -1821,7 +1845,7 @@ exports.rejectApplication = async (req, res) => {
            SELECT 1
            FROM properties p
            WHERE p.id = applications.property_id
-             AND LOWER(TRIM(p.state)) = LOWER(TRIM($${stateIdx}))
+             AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${stateIdx}))
          )`;
     }
 

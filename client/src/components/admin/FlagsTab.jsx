@@ -7,7 +7,7 @@ const FLAG_META = {
   },
   tenant_registration_payment: {
     label: "Tenant Registration Payment",
-    description: "Require tenant registration payment before account creation. Base fee is N2,500 and location pricing rules can override it.",
+    description: "Require tenant registration payment before account creation. Base fee is ₦3,000 and location pricing rules can override it.",
   },
   landlord_registration_payment: {
     label: "Landlord Registration Payment",

@@ -125,14 +125,15 @@ router.get('/dashboard', async (req, res) => {
         SELECT 
           p.id,
           p.title,
-          p.state,
+          s.state_name AS state,
           p.city,
           COUNT(tb.id) as booking_count,
           COALESCE(SUM(tb.total_price), 0) as total_revenue
         FROM transportation_bookings tb
         JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         WHERE tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
-        GROUP BY p.id, p.title, p.state, p.city
+        GROUP BY p.id, p.title, s.state_name AS state, p.city
         ORDER BY booking_count DESC
         LIMIT 10
       `),
@@ -203,7 +204,7 @@ router.get('/bookings', async (req, res) => {
         ts.service_type,
         ts.provider_name,
         p.title as property_title,
-        p.state as property_state,
+        s.state_name as property_state,
         p.city as property_city,
         u.full_name as tenant_name,
         u.email as tenant_email,
@@ -358,7 +359,7 @@ router.get('/bookings/:bookingId', async (req, res) => {
         ts.description as service_description,
         p.title as property_title,
         p.full_address as property_address,
-        p.state as property_state,
+        s.state_name as property_state,
         p.city as property_city,
         u.full_name as tenant_name,
         u.email as tenant_email,
@@ -1017,7 +1018,7 @@ router.get('/analytics', async (req, res) => {
         SELECT 
           p.id,
           p.title,
-          p.state,
+          s.state_name AS state,
           p.city,
           COUNT(tb.id) as booking_count,
           COALESCE(SUM(tb.total_price), 0) as total_revenue,
@@ -1026,7 +1027,7 @@ router.get('/analytics', async (req, res) => {
         LEFT JOIN transportation_bookings tb 
           ON p.id = tb.property_id
           AND tb.created_at BETWEEN $1 AND $2
-        GROUP BY p.id, p.title, p.state, p.city
+        GROUP BY p.id, p.title, s.state_name AS state, p.city
         HAVING COUNT(tb.id) > 0
         ORDER BY booking_count DESC
         LIMIT 20
@@ -1239,14 +1240,15 @@ router.get('/revenue', async (req, res) => {
     // Get revenue by state
     const stateRevenue = await db.query(`
       SELECT 
-        p.state,
+        s.state_name AS state,
         COUNT(tb.id) as booking_count,
         COALESCE(SUM(tb.total_price), 0) as total_revenue,
         COUNT(DISTINCT tb.tenant_id) as unique_tenants
       FROM transportation_bookings tb
       JOIN properties p ON tb.property_id = p.id
+      LEFT JOIN states s ON s.id = p.state_id
       ${tbDateFilter}
-      GROUP BY p.state
+      GROUP BY s.state_name
       ORDER BY total_revenue DESC
     `, params);
     
@@ -1308,7 +1310,7 @@ router.get('/report', async (req, res) => {
             ts.service_name,
             ts.service_type,
             p.title as property_title,
-            p.state as property_state,
+            s.state_name as property_state,
             p.city as property_city,
             u.full_name as tenant_name,
             u.email as tenant_email
@@ -1337,7 +1339,7 @@ router.get('/report', async (req, res) => {
         db.query(`
           SELECT 
             p.title,
-            p.state,
+            s.state_name AS state,
             p.city,
             COUNT(tb.id) as booking_count,
             COALESCE(SUM(tb.total_price), 0) as total_revenue,
@@ -1345,7 +1347,7 @@ router.get('/report', async (req, res) => {
           FROM properties p
           LEFT JOIN transportation_bookings tb ON p.id = tb.property_id
             AND tb.created_at BETWEEN $1 AND $2
-          GROUP BY p.title, p.state, p.city
+          GROUP BY p.title, s.state_name AS state, p.city
           HAVING COUNT(tb.id) > 0
           ORDER BY booking_count DESC
         `, [start_date, end_date])
@@ -1395,16 +1397,17 @@ router.get('/report', async (req, res) => {
         
         db.query(`
           SELECT 
-            p.state,
+            s.state_name AS state,
             COUNT(tb.id) as booking_count,
             COALESCE(SUM(tb.total_price), 0) as total_revenue,
             AVG(tb.total_price) as avg_price,
             COUNT(DISTINCT tb.tenant_id) as unique_tenants
           FROM transportation_bookings tb
           JOIN properties p ON tb.property_id = p.id
+          LEFT JOIN states s ON s.id = p.state_id
           WHERE tb.created_at BETWEEN $1 AND $2
             AND tb.payment_status = 'completed'
-          GROUP BY p.state
+          GROUP BY s.state_name
           ORDER BY total_revenue DESC
         `, [start_date, end_date])
       ]);
@@ -1658,7 +1661,8 @@ router.get('/state-admin/dashboard', async (req, res) => {
           COUNT(DISTINCT tb.service_id) as services_used
         FROM transportation_bookings tb
         JOIN properties p ON tb.property_id = p.id
-        WHERE p.state = $1
+        LEFT JOIN states s ON s.id = p.state_id
+        WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
           AND tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
           ${admin.assigned_city ? 'AND p.city = $2' : ''}
       `, admin.assigned_city ? [admin.assigned_state, admin.assigned_city] : [admin.assigned_state]),
@@ -1676,8 +1680,9 @@ router.get('/state-admin/dashboard', async (req, res) => {
         FROM transportation_bookings tb
         JOIN transportation_services ts ON tb.service_id = ts.id
         JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         JOIN users u ON tb.tenant_id = u.id
-        WHERE p.state = $1
+        WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
           ${admin.assigned_city ? 'AND p.city = $2' : ''}
         ORDER BY tb.created_at DESC
         LIMIT 10
@@ -1694,8 +1699,9 @@ router.get('/state-admin/dashboard', async (req, res) => {
         FROM transportation_services ts
         LEFT JOIN transportation_bookings tb ON ts.id = tb.service_id
         LEFT JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         WHERE ts.is_active = TRUE
-          AND (p.state = $1 OR p.state IS NULL)
+          AND (LOWER(TRIM(s.state_name)) = LOWER(TRIM($1)) OR p.state_id IS NULL)
           ${admin.assigned_city ? 'AND (p.city = $2 OR p.city IS NULL)' : ''}
           AND tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
         GROUP BY ts.id, ts.service_name, ts.service_type
@@ -1711,8 +1717,9 @@ router.get('/state-admin/dashboard', async (req, res) => {
         FROM transportation_alerts ta
         LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
         LEFT JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         LEFT JOIN transportation_services ts ON ta.related_service_id = ts.id
-        WHERE p.state = $1
+        WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
           ${admin.assigned_city ? 'AND p.city = $2' : ''}
           AND ta.is_resolved = FALSE
         ORDER BY ta.created_at DESC
@@ -1794,15 +1801,17 @@ router.get('/state-admin/bookings', async (req, res) => {
       FROM transportation_bookings tb
       JOIN transportation_services ts ON tb.service_id = ts.id
       JOIN properties p ON tb.property_id = p.id
+      LEFT JOIN states s ON s.id = p.state_id
       JOIN users u ON tb.tenant_id = u.id
-      WHERE p.state = $1
+      WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
     `;
     
     let countQuery = `
       SELECT COUNT(*) as total
       FROM transportation_bookings tb
       JOIN properties p ON tb.property_id = p.id
-      WHERE p.state = $1
+      LEFT JOIN states s ON s.id = p.state_id
+      WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
     `;
     
     const params = [admin.assigned_state];
@@ -1982,8 +1991,8 @@ router.get('/state-admin/bookings', async (req, res) => {
       const offset = (page - 1) * limit;
       
       const stateBookingCondition = admin.assigned_city
-        ? `(p.state = $1 AND p.city = $2)`
-        : `(p.state = $1)`;
+        ? `(LOWER(TRIM(s.state_name)) = LOWER(TRIM($1)) AND p.city = $2)`
+        : `(LOWER(TRIM(s.state_name)) = LOWER(TRIM($1)))`;
 
       let query = `
         SELECT 
@@ -2002,6 +2011,7 @@ router.get('/state-admin/bookings', async (req, res) => {
         LEFT JOIN transportation_bookings tb ON ts.id = tb.service_id
           AND tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
         LEFT JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         WHERE 1=1
       `;
       
@@ -2120,7 +2130,8 @@ router.get('/state-admin/bookings', async (req, res) => {
             COUNT(DISTINCT tb.property_id) as unique_properties
           FROM transportation_bookings tb
           JOIN properties p ON tb.property_id = p.id
-          WHERE p.state = $1
+          LEFT JOIN states s ON s.id = p.state_id
+          WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
             AND tb.created_at >= CURRENT_DATE - INTERVAL '${period}'
         `, [admin.assigned_state]),
         
@@ -2132,7 +2143,8 @@ router.get('/state-admin/bookings', async (req, res) => {
             COALESCE(SUM(tb.total_price), 0) as daily_revenue
           FROM transportation_bookings tb
           JOIN properties p ON tb.property_id = p.id
-          WHERE p.state = $1
+          LEFT JOIN states s ON s.id = p.state_id
+          WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
             AND tb.created_at >= CURRENT_DATE - INTERVAL '7 days'
             AND tb.payment_status = 'completed'
           GROUP BY DATE(tb.created_at)
@@ -2150,7 +2162,8 @@ router.get('/state-admin/bookings', async (req, res) => {
           FROM transportation_bookings tb
           JOIN transportation_services ts ON tb.service_id = ts.id
           JOIN properties p ON tb.property_id = p.id
-          WHERE p.state = $1
+          LEFT JOIN states s ON s.id = p.state_id
+          WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
             AND tb.created_at >= CURRENT_DATE - INTERVAL '${period}'
           GROUP BY ts.service_type, ts.service_name
           ORDER BY booking_count DESC
@@ -2167,7 +2180,8 @@ router.get('/state-admin/bookings', async (req, res) => {
             COALESCE(SUM(tb.total_price), 0) as total_revenue
           FROM transportation_bookings tb
           JOIN properties p ON tb.property_id = p.id
-          WHERE p.state = $1
+          LEFT JOIN states s ON s.id = p.state_id
+          WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
             AND tb.created_at >= CURRENT_DATE - INTERVAL '${period}'
           GROUP BY p.id, p.title, p.city, p.area
           ORDER BY booking_count DESC
@@ -2234,13 +2248,14 @@ router.get('/state-admin/bookings', async (req, res) => {
           ta.*,
           tb.id as booking_id,
           ts.service_name,
-          p.state,
+          s.state_name AS state,
           p.city
         FROM transportation_alerts ta
         LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
         LEFT JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         LEFT JOIN transportation_services ts ON ta.related_service_id = ts.id
-        WHERE p.state = $1
+        WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
       `;
       
       let countQuery = `
@@ -2248,7 +2263,8 @@ router.get('/state-admin/bookings', async (req, res) => {
         FROM transportation_alerts ta
         LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
         LEFT JOIN properties p ON tb.property_id = p.id
-        WHERE p.state = $1
+        LEFT JOIN states s ON s.id = p.state_id
+        WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
       `;
       
       const params = [admin.assigned_state];
@@ -2350,7 +2366,8 @@ router.get('/state-admin/bookings', async (req, res) => {
         FROM transportation_alerts ta
         LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
         LEFT JOIN properties p ON tb.property_id = p.id
-        WHERE ta.id = $1 AND p.state = $2
+        LEFT JOIN states s ON s.id = p.state_id
+        WHERE ta.id = $1 AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($2))
       `, [alertId, admin.assigned_state]);
       
       if (alertCheck.rows.length === 0) {
@@ -2461,17 +2478,17 @@ router.get('/super-admin/dashboard', async (req, res) => {
       // Regional statistics (if applicable)
       oversight.region ? db.query(`
         SELECT 
-          p.state,
+          s.state_name AS state,
           COUNT(tb.id) as booking_count,
           COALESCE(SUM(tb.total_price), 0) as state_revenue,
           COUNT(DISTINCT tb.tenant_id) as unique_tenants,
           COUNT(DISTINCT tb.property_id) as unique_properties
         FROM transportation_bookings tb
         JOIN properties p ON tb.property_id = p.id
-        JOIN states s ON p.state = s.state_name
+        JOIN states s ON s.id = p.state_id
         WHERE tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
           AND s.region = $1
-        GROUP BY p.state
+        GROUP BY s.state_name
         ORDER BY booking_count DESC
       `, [oversight.region]) : Promise.resolve({ rows: [] }),
       
@@ -2485,8 +2502,9 @@ router.get('/super-admin/dashboard', async (req, res) => {
           COUNT(DISTINCT tb.property_id) as unique_properties
         FROM transportation_bookings tb
         JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         WHERE tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
-          AND p.state = $1
+          AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
         GROUP BY p.city
         ORDER BY booking_count DESC
       `, [oversight.state]) : Promise.resolve({ rows: [] }),
@@ -2504,11 +2522,12 @@ router.get('/super-admin/dashboard', async (req, res) => {
           ta.*,
           tb.id as booking_id,
           ts.service_name,
-          p.state,
+          s.state_name AS state,
           p.city
         FROM transportation_alerts ta
         LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
         LEFT JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         LEFT JOIN transportation_services ts ON ta.related_service_id = ts.id
         WHERE ta.alert_level IN ('warning', 'critical')
           AND ta.is_resolved = FALSE
@@ -2944,13 +2963,14 @@ router.get('/super-admin/dashboard', async (req, res) => {
           ta.*,
           tb.id as booking_id,
           ts.service_name,
-          p.state,
+          s.state_name AS state,
           p.city,
           u.full_name as admin_name,
           u2.full_name as resolved_by_name
         FROM transportation_alerts ta
         LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
         LEFT JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         LEFT JOIN transportation_services ts ON ta.related_service_id = ts.id
         LEFT JOIN users u ON ta.admin_id = u.id
         LEFT JOIN users u2 ON ta.resolved_by = u2.id
@@ -2962,6 +2982,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
         FROM transportation_alerts ta
         LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
         LEFT JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         WHERE 1=1
       `;
       
@@ -3010,8 +3031,8 @@ router.get('/super-admin/dashboard', async (req, res) => {
       }
       
       if (state) {
-        query += ` AND p.state = $${paramCount}`;
-        countQuery += ` AND p.state = $${paramCount}`;
+        query += ` AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${paramCount}))`;
+        countQuery += ` AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${paramCount}))`;
         params.push(state);
         countParams.push(state);
         paramCount++;
@@ -3224,7 +3245,8 @@ router.get('/super-admin/dashboard', async (req, res) => {
           FROM transportation_bookings tb
           ${include_states.length > 0 ? 
             `JOIN properties p ON tb.property_id = p.id
-             WHERE p.state = ANY($1) AND ` : 
+            LEFT JOIN states s ON s.id = p.state_id
+             WHERE s.state_name = ANY($1) AND ` : 
             'WHERE '}
           tb.created_at >= ${reportStartDate}
             AND tb.created_at <= ${reportEndDate}
@@ -3251,7 +3273,8 @@ router.get('/super-admin/dashboard', async (req, res) => {
           JOIN transportation_services ts ON tb.service_id = ts.id
           ${include_states.length > 0 ? 
             `JOIN properties p ON tb.property_id = p.id
-             WHERE p.state = ANY($1) AND ` : 
+            LEFT JOIN states s ON s.id = p.state_id
+             WHERE s.state_name = ANY($1) AND ` : 
             'WHERE '}
           tb.created_at >= ${reportStartDate}
             AND tb.created_at <= ${reportEndDate}
@@ -3276,7 +3299,8 @@ router.get('/super-admin/dashboard', async (req, res) => {
           ${include_states.length > 0 ? 
             `LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
              LEFT JOIN properties p ON tb.property_id = p.id
-             WHERE p.state = ANY($1) AND ` : 
+             LEFT JOIN states s ON s.id = p.state_id
+             WHERE s.state_name = ANY($1) AND ` : 
             'WHERE '}
           ta.created_at >= ${reportStartDate}
             AND ta.created_at <= ${reportEndDate}
@@ -3378,7 +3402,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
           ta.*,
           tb.id as booking_id,
           ts.service_name,
-          p.state,
+          s.state_name AS state,
           p.city,
           u.full_name as admin_name,
           u2.full_name as resolved_by_name
@@ -3408,7 +3432,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
         `, [adminId]);
         
         if (adminResult.rows.length > 0 && adminResult.rows[0].assigned_state) {
-          query += ` AND p.state = $${paramCount}`;
+          query += ` AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${paramCount}))`;
           countQuery += ` AND EXISTS (
             SELECT 1 FROM transportation_bookings tb2
             JOIN properties p2 ON tb2.property_id = p2.id
@@ -3596,7 +3620,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       
       // Check if user has permission to resolve this alert
       const alertCheck = await db.query(`
-        SELECT ta.*, p.state
+        SELECT ta.*, s.state_name AS state
         FROM transportation_alerts ta
         LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
         LEFT JOIN properties p ON tb.property_id = p.id
@@ -4042,7 +4066,8 @@ router.get('/super-admin/dashboard', async (req, res) => {
               AVG(EXTRACT(EPOCH FROM (tb.completed_at - tb.started_at))) as avg_completion_time_seconds
             FROM transportation_bookings tb
             JOIN properties p ON tb.property_id = p.id
-            WHERE p.state = $1
+            LEFT JOIN states s ON s.id = p.state_id
+            WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
               AND tb.created_at >= CURRENT_DATE - INTERVAL '${days} days'
             GROUP BY DATE(tb.created_at)
             ORDER BY health_date DESC
@@ -4752,7 +4777,8 @@ router.get('/super-admin/dashboard', async (req, res) => {
         `, [adminId]);
         
         if (adminResult.rows.length > 0 && adminResult.rows[0].assigned_state) {
-          stateFilter = 'JOIN properties p ON tb.property_id = p.id WHERE p.state = $1';
+          stateFilter = 'JOIN properties p ON tb.property_id = p.id WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))';
+          LEFT JOIN states s ON s.id = p.state_id
           params.push(adminResult.rows[0].assigned_state);
         }
       }
