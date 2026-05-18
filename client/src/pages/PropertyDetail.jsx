@@ -446,7 +446,7 @@ const PropertyDetail = () => {
             </div>
 
             {/* Features */}
-            <div className="grid grid-cols-3 gap-4 mb-6 pb-6 border-b">
+            <div className="mb-6 grid grid-cols-1 gap-4 border-b pb-6 sm:grid-cols-3">
               <div className="text-center">
                 <FaBed className="text-2xl text-gray-600 mx-auto mb-2" />
                 <div className="font-semibold">{property.bedrooms}</div>

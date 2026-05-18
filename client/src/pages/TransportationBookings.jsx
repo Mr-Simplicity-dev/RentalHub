@@ -171,10 +171,10 @@ const TransportationBookings = () => {
               </p>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
               <Link
                 to="/transportation/book"
-                className="btn btn-primary flex items-center"
+                className="btn btn-primary flex w-full items-center justify-center sm:w-auto"
               >
                 <FaPlus className="mr-2" />
                 New Booking

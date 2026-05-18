@@ -208,8 +208,8 @@ export default function RentSavingsWithdrawals() {
       )}
 
       {/* Filters */}
-      <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 flex-1 min-w-[200px]">
+      <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:flex-1">
           <FaSearch className="text-gray-400 text-xs" />
           <input
             type="text"
@@ -220,12 +220,12 @@ export default function RentSavingsWithdrawals() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <FaFilter className="text-gray-400 text-xs" />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="input text-sm py-2 pr-8 min-w-[140px]"
+            className="input w-full py-2 pr-8 text-sm sm:min-w-[140px]"
           >
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>

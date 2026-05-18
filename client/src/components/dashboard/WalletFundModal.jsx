@@ -48,7 +48,7 @@ export default function WalletFundModal({
 
           <div>
             <p className="text-sm font-medium text-gray-700 mb-2">Select or enter amount</p>
-            <div className="grid grid-cols-4 gap-2 mb-3">
+            <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {presetAmounts.map((amt) => (
                 <button
                   key={amt}

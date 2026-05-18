@@ -813,7 +813,7 @@ return (
           )}
           {requiresLawyerPayment && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-800">
-              You selected RentalHub NG lawyers. A lawyer access fee of N
+              You selected RentalHub NG lawyers. A lawyer access fee of ₦
               {LAWYER_ACCESS_FEE.toLocaleString()} applies to unlock full lawyer contact details in your selected state and local government area.
               {!registrationPricing.location_complete && (
                 <div className="mt-2 text-xs text-amber-700">
@@ -1452,7 +1452,7 @@ return (
                 )}
                                 {requiresLawyerPayment && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    You selected RentalHub NG lawyers. A lawyer access fee of N
+                    You selected RentalHub NG lawyers. A lawyer access fee of ₦
                     {LAWYER_ACCESS_FEE.toLocaleString()} applies to unlock full lawyer contact details in your selected state and local government area.
                     {!registrationPricing.location_complete && (
                       <div className="mt-2 text-xs text-amber-700">
@@ -1588,7 +1588,7 @@ return (
                                         {loading
                       ? 'Processing...'
                       : requiresPayment
-                      ? `Pay ?${displayedRegistrationAmount.toLocaleString()}`
+                      ? `Pay ₦${displayedRegistrationAmount.toLocaleString()}`
                       : 'Create Account'}
                   </button>
                 </div>

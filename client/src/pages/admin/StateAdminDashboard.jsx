@@ -330,7 +330,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="hidden shrink-0 sm:flex sm:items-center">
             <div className="bg-state-50 p-3 rounded-lg">
               <FaMapMarkerAlt className="h-6 w-6 text-state-600" />
             </div>
@@ -744,10 +744,10 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
 
           {activeTab === 'transactions' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">All Transactions</h3>
-                <div className="flex space-x-2">
-                  <select className="border rounded px-3 py-1 text-sm">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <select className="rounded border px-3 py-1 text-sm">
                     <option>All Types</option>
                     <option>rent_payment</option>
                     <option>tenant_subscription</option>
@@ -756,12 +756,12 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                   </select>
                   <input
                     type="date"
-                    className="border rounded px-3 py-1 text-sm"
+                    className="rounded border px-3 py-1 text-sm"
                     placeholder="Start Date"
                   />
                   <input
                     type="date"
-                    className="border rounded px-3 py-1 text-sm"
+                    className="rounded border px-3 py-1 text-sm"
                     placeholder="End Date"
                   />
                 </div>
@@ -836,10 +836,10 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
 
           {activeTab === 'users' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">Managed Users</h3>
-                <div className="flex space-x-2">
-                  <select className="border rounded px-3 py-1 text-sm">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <select className="rounded border px-3 py-1 text-sm">
                     <option>All Types</option>
                     <option>tenant</option>
                     <option>landlord</option>
@@ -909,7 +909,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
 
           {activeTab === 'withdrawals' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">Withdrawal History</h3>
                 <button
                   onClick={() => {

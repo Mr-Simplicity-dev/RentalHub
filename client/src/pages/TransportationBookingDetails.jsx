@@ -192,10 +192,10 @@ const TransportationBookingDetails = () => {
               </p>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
               <button
                 onClick={handlePrintReceipt}
-                className="btn btn-outline flex items-center print:hidden"
+                className="btn btn-outline flex w-full items-center justify-center print:hidden sm:w-auto"
               >
                 <FaPrint className="mr-2" />
                 Print Receipt
@@ -204,7 +204,7 @@ const TransportationBookingDetails = () => {
               {booking.payment_status === 'pending' && booking.booking_status !== 'cancelled' && (
                 <button
                   onClick={handlePayNow}
-                  className="btn btn-primary print:hidden"
+                  className="btn btn-primary w-full print:hidden sm:w-auto"
                 >
                   Pay Now
                 </button>
@@ -213,7 +213,7 @@ const TransportationBookingDetails = () => {
               {booking.booking_status === 'pending' && booking.payment_status === 'pending' && (
                 <button
                   onClick={handleCancelBooking}
-                  className="btn btn-gray print:hidden"
+                  className="btn btn-gray w-full print:hidden sm:w-auto"
                 >
                   Cancel Booking
                 </button>

@@ -254,7 +254,7 @@ const LivePropertyPhotoCapture = ({
             <div className="pointer-events-none absolute inset-0 border-[10px] border-black/10" />
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <button
               type="button"
               onClick={switchCamera}

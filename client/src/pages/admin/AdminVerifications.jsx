@@ -98,14 +98,14 @@ const AdminVerifications = () => {
         {users.map((u) => {
           const docType = (u.identity_document_type || 'nin').toLowerCase();
           return (
-            <div key={u.id} className="card flex items-center justify-between">
-              <div className="flex items-start space-x-4">
-                <div className="text-3xl text-primary-600">
+            <div key={u.id} className="card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-4">
+                <div className="shrink-0 text-3xl text-primary-600">
                   <FaIdCard />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold text-gray-900">{u.full_name}</h3>
-                  <p className="text-sm text-gray-600">{u.email}</p>
+                  <p className="break-words text-sm text-gray-600">{u.email}</p>
                   <p className="text-xs text-gray-500 mt-1">
                     ID Type: {docType.toUpperCase()} | Role: {u.user_type}
                   </p>
@@ -134,11 +134,11 @@ const AdminVerifications = () => {
                 </div>
               </div>
 
-              <div className="flex space-x-2">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <button
                   onClick={() => approveUser(u.id)}
                   disabled={processingId === u.id}
-                  className="btn btn-primary flex items-center"
+                  className="btn btn-primary flex w-full items-center justify-center sm:w-auto"
                 >
                   <FaCheckCircle className="mr-2" />
                   Approve
@@ -147,7 +147,7 @@ const AdminVerifications = () => {
                 <button
                   onClick={() => rejectUser(u.id)}
                   disabled={processingId === u.id}
-                  className="btn btn-secondary flex items-center text-red-600 border-red-200 hover:bg-red-50"
+                  className="btn btn-secondary flex w-full items-center justify-center border-red-200 text-red-600 hover:bg-red-50 sm:w-auto"
                 >
                   <FaTimesCircle className="mr-2" />
                   Reject

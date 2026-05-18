@@ -280,7 +280,7 @@ const FumigationCleaningBookingDetails = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Booking Details
               </h1>
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                 <div className="text-gray-600">
                   Booking ID: <span className="font-mono font-semibold">FC-{booking.id.toString().padStart(6, '0')}</span>
                 </div>
@@ -293,11 +293,11 @@ const FumigationCleaningBookingDetails = () => {
               </div>
             </div>
             
-            <div className="mt-4 md:mt-0 flex space-x-2">
+            <div className="mt-4 flex w-full flex-col gap-2 md:mt-0 md:w-auto md:flex-row">
               {booking.booking_status === 'pending' && booking.payment_status === 'completed' && (
                 <button
                   onClick={() => setShowCancelModal(true)}
-                  className="btn btn-red"
+                  className="btn btn-red w-full md:w-auto"
                 >
                   <FaTimesCircle className="mr-2" />
                   Cancel Booking
@@ -307,7 +307,7 @@ const FumigationCleaningBookingDetails = () => {
               {booking.booking_status === 'pending' && booking.payment_status === 'pending' && (
                 <button
                   onClick={() => navigate(`/fumigation-cleaning/payment/${bookingId}`)}
-                  className="btn btn-primary"
+                  className="btn btn-primary w-full md:w-auto"
                 >
                   <FaMoneyBillWave className="mr-2" />
                   Complete Payment
@@ -316,7 +316,7 @@ const FumigationCleaningBookingDetails = () => {
               
               <button
                 onClick={() => window.print()}
-                className="btn btn-outline"
+                className="btn btn-outline w-full md:w-auto"
               >
                 <FaPrint className="mr-2" />
                 Print
@@ -439,25 +439,25 @@ const FumigationCleaningBookingDetails = () => {
                   Assigned Provider
                 </h2>
                 
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-blue-100">
                     <FaUser className="text-blue-600 text-2xl" />
                   </div>
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-gray-900">{provider.company_name}</h3>
                     <p className="text-gray-600">{provider.contact_person}</p>
-                    <div className="flex items-center space-x-4 mt-2">
-                      <div className="flex items-center text-sm text-gray-500">
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+                      <div className="flex min-w-0 items-center text-sm text-gray-500">
                         <FaPhone className="mr-1" />
                         {provider.phone_number}
                       </div>
-                      <div className="flex items-center text-sm text-gray-500">
-                        <FaEnvelope className="mr-1" />
-                        {provider.email}
+                      <div className="flex min-w-0 items-center text-sm text-gray-500">
+                        <FaEnvelope className="mr-1 shrink-0" />
+                        <span className="break-words">{provider.email}</span>
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right">
                     <div className="text-sm text-gray-600">Rating</div>
                     <div className="flex items-center">
                       {renderStars(provider.average_rating || 4.5)}
@@ -819,17 +819,17 @@ const FumigationCleaningBookingDetails = () => {
                 </div>
               </div>
               
-              <div className="flex space-x-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={() => setShowCancelModal(false)}
-                  className="btn btn-gray flex-1"
+                  className="btn btn-gray w-full sm:flex-1"
                   disabled={cancelling}
                 >
                   Go Back
                 </button>
                 <button
                   onClick={handleCancelBooking}
-                  className="btn btn-red flex-1"
+                  className="btn btn-red w-full sm:flex-1"
                   disabled={cancelling || !cancellationReason.trim()}
                 >
                   {cancelling ? (

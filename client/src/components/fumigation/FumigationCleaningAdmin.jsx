@@ -457,21 +457,21 @@ const FumigationCleaningAdmin = ({
           </div>
           
           {/* Export Actions */}
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-gray-600">
               Showing {filteredBookings.length} of {bookings.length} bookings
             </div>
-            <div className="space-x-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={() => handleExportData('CSV')}
-                className="btn btn-outline flex items-center"
+                className="btn btn-outline flex w-full items-center justify-center sm:w-auto"
               >
                 <FaDownload className="mr-2" />
                 Export CSV
               </button>
               <button
                 onClick={() => handleExportData('PDF')}
-                className="btn btn-outline flex items-center"
+                className="btn btn-outline flex w-full items-center justify-center sm:w-auto"
               >
                 <FaPrint className="mr-2" />
                 Export PDF
@@ -815,10 +815,10 @@ const FumigationCleaningAdmin = ({
                   </div>
                 </div>
                 
-                <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+                <div className="flex flex-col justify-end gap-3 border-t border-gray-200 pt-6 sm:flex-row">
                   <button
                     onClick={() => setShowBookingDetails(false)}
-                    className="btn btn-gray"
+                    className="btn btn-gray w-full sm:w-auto"
                   >
                     Close
                   </button>
@@ -828,7 +828,7 @@ const FumigationCleaningAdmin = ({
                         setShowBookingDetails(false);
                         handleAssignProvider(selectedBooking);
                       }}
-                      className="btn btn-primary"
+                      className="btn btn-primary w-full sm:w-auto"
                     >
                       Assign Provider
                     </button>
@@ -918,20 +918,20 @@ const FumigationCleaningAdmin = ({
                   )}
                 </div>
                 
-                <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+                <div className="flex flex-col justify-end gap-3 border-t border-gray-200 pt-6 sm:flex-row">
                   <button
                     onClick={() => {
                       setShowAssignProvider(false);
                       setSelectedProvider(null);
                     }}
-                    className="btn btn-gray"
+                    className="btn btn-gray w-full sm:w-auto"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleAssignProviderSubmit}
                     disabled={!selectedProvider}
-                    className="btn btn-primary"
+                    className="btn btn-primary w-full sm:w-auto"
                   >
                     Assign Provider
                   </button>

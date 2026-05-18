@@ -774,11 +774,11 @@ const Properties = () => {
               nextLabel={t('properties.next')}
               pageCount={Math.ceil(pagination.total / pagination.limit)}
               onPageChange={handlePageChange}
-              containerClassName="flex space-x-2"
-              pageClassName="px-4 py-2 border rounded hover:bg-gray-100"
+              containerClassName="flex max-w-full flex-wrap justify-center gap-2"
+              pageClassName="px-3 py-2 sm:px-4 border rounded hover:bg-gray-100"
               activeClassName="bg-primary-600 text-white hover:bg-primary-700"
-              previousClassName="px-4 py-2 border rounded hover:bg-gray-100"
-              nextClassName="px-4 py-2 border rounded hover:bg-gray-100"
+              previousClassName="px-3 py-2 sm:px-4 border rounded hover:bg-gray-100"
+              nextClassName="px-3 py-2 sm:px-4 border rounded hover:bg-gray-100"
               disabledClassName="opacity-50 cursor-not-allowed"
             />
           </div>

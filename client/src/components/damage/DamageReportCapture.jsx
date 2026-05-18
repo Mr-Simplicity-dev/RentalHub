@@ -497,7 +497,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
             {/* Severity */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Severity *</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {SEVERITY_LEVELS.map(({ value, label, description }) => (
                   <button
                     key={value}
@@ -519,7 +519,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
             {/* Depth */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Depth</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {DEPTH_LEVELS.map(({ value, label, description }) => (
                   <button
                     key={value}
@@ -567,7 +567,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
             {/* Urgency */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Urgency</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {URGENCY_LEVELS.map(({ value, label, description }) => (
                   <button
                     key={value}

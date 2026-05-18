@@ -427,7 +427,7 @@ const FinancialAdminDashboard = () => {
                 </div>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="hidden shrink-0 sm:flex sm:items-center">
               <div className="bg-blue-50 p-3 rounded-lg">
                 <FaShieldAlt className="h-6 w-6 text-blue-600" />
               </div>
@@ -672,10 +672,10 @@ const FinancialAdminDashboard = () => {
 
             {activeTab === 'transactions' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">All Transactions</h3>
-                  <div className="flex space-x-2">
-                    <select className="border rounded px-3 py-1 text-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <select className="rounded border px-3 py-1 text-sm">
                       <option>All Types</option>
                       <option>rent_payment</option>
                       <option>tenant_subscription</option>
@@ -684,12 +684,12 @@ const FinancialAdminDashboard = () => {
                     </select>
                     <input
                       type="date"
-                      className="border rounded px-3 py-1 text-sm"
+                      className="rounded border px-3 py-1 text-sm"
                       placeholder="Start Date"
                     />
                     <input
                       type="date"
-                      className="border rounded px-3 py-1 text-sm"
+                      className="rounded border px-3 py-1 text-sm"
                       placeholder="End Date"
                     />
                   </div>
@@ -770,10 +770,10 @@ const FinancialAdminDashboard = () => {
 
             {activeTab === 'state-admins' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">State Admin Performance</h3>
-                  <div className="flex space-x-2">
-                    <select className="border rounded px-3 py-1 text-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <select className="rounded border px-3 py-1 text-sm">
                       <option>All States</option>
                       <option>Lagos</option>
                       <option>Abuja</option>
@@ -854,7 +854,7 @@ const FinancialAdminDashboard = () => {
 
             {activeTab === 'frozen-funds' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">Frozen Funds</h3>
                   <Button onClick={openFreezeDialog} variant="danger" size="small">
                     Freeze Funds
@@ -926,7 +926,7 @@ const FinancialAdminDashboard = () => {
 
             {activeTab === 'withdrawals' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">Withdrawal History</h3>
                   <button
                     onClick={() => {
@@ -1013,10 +1013,10 @@ const FinancialAdminDashboard = () => {
 
             {activeTab === 'audit-trail' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">Transaction Audit Trail</h3>
-                  <div className="flex space-x-2">
-                    <select className="border rounded px-3 py-1 text-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <select className="rounded border px-3 py-1 text-sm">
                       <option>All Actions</option>
                       <option>funds_frozen</option>
                       <option>commission_earned</option>
@@ -1024,7 +1024,7 @@ const FinancialAdminDashboard = () => {
                     </select>
                     <input
                       type="date"
-                      className="border rounded px-3 py-1 text-sm"
+                      className="rounded border px-3 py-1 text-sm"
                       placeholder="Start Date"
                     />
                     <input

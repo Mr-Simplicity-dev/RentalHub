@@ -1999,7 +1999,7 @@ const Dashboard = () => {
                         {selectedRefund === rr.id ? (
                           <div className="border-t pt-3 space-y-3">
                             <p className="text-sm font-semibold text-gray-700">How much would you like to refund?</p>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                               {[
                                 { value: 'full', label: 'Full Refund' },
                                 { value: 'partial_months', label: 'By Months' },
@@ -2177,7 +2177,7 @@ const LandlordPropertyFeeModal = ({
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
             <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
               <p className="text-xs text-gray-500">Properties</p>
               <p className="text-xl font-bold text-gray-900">{propertyCount}</p>
@@ -2333,9 +2333,9 @@ const ActivityItem = ({ activity }) => {
   };
 
   return (
-    <div className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="mt-1">{getActivityIcon()}</div>
-      <div className="flex-1">
+    <div className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50">
+      <div className="mt-1 shrink-0">{getActivityIcon()}</div>
+      <div className="min-w-0 flex-1">
         <p className="text-gray-900">{getActivityText()}</p>
         <p className="text-sm text-gray-500">
           {getTimeAgo(activity.activity_date)}

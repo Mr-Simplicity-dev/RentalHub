@@ -21,25 +21,25 @@ const FumigationCleaningDashboardButton = ({ userType, propertyId, propertyTitle
 
   return (
     <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center">
-          <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-lg flex items-center justify-center mr-3">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center">
+          <div className="mr-3 flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-green-500 to-blue-500">
             <FaSprayCan className="text-white text-xl" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="font-bold text-gray-900">Fumigation & Cleaning Services</h3>
             <p className="text-sm text-gray-600">
               Professional pest control and cleaning for your property
             </p>
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right">
           <div className="text-xs text-gray-500 mb-1">Available for</div>
           <div className="font-semibold text-green-600">Tenants Only</div>
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="bg-white border border-gray-200 rounded p-2 text-center">
           <FaSprayCan className="text-red-500 mx-auto mb-1" />
           <div className="text-xs font-medium">Fumigation</div>
