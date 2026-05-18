@@ -1,9 +1,12 @@
 const cron = require("node-cron");
 const {
   checkExpiredSubscriptions,
-  checkExpiredListings
+  checkExpiredListings,
+  checkExpiredTenancyReminders
 } = require("../config/utils/paymentUtils");
 const { expireProperties } = require("../config/utils/propertyUtils");
+
+const CRON_TIMEZONE = process.env.CRON_TIMEZONE || "Africa/Lagos";
 
 // =====================================================
 //               START PAYMENT JOBS
@@ -20,6 +23,16 @@ exports.startPaymentJobs = () => {
     console.log("Running expired listings check...");
     await checkExpiredListings();
   });
+
+  const tenancyReminderCron = process.env.TENANCY_EXPIRY_REMINDER_CRON || "0 7 * * *";
+
+  // Check expired tenancy periods daily and email tenant/landlord once.
+  cron.schedule(tenancyReminderCron, async () => {
+    console.log("Running expired tenancy reminder check...");
+    await checkExpiredTenancyReminders({
+      limit: process.env.TENANCY_EXPIRY_REMINDER_BATCH_LIMIT || 50,
+    });
+  }, { timezone: CRON_TIMEZONE });
 
   console.log("✅ Payment cron jobs started");
 };
