@@ -1386,6 +1386,16 @@ exports.initializeRegistrationPayment = async (req, res) => {
       lgaName: req.body.lga_name,
       strictLocation: true,
     });
+
+    const LAWYER_ACCESS_FEE_NGN = 2000;
+    const useRentalHubLawyers =
+      req.body.use_rentalhub_lawyers === true ||
+      req.body.use_rentalhub_lawyers === 'true';
+    if (useRentalHubLawyers) {
+      registrationPricing.amount = Number(registrationPricing.amount || 0) + LAWYER_ACCESS_FEE_NGN;
+      registrationPricing.lawyer_access_fee = LAWYER_ACCESS_FEE_NGN;
+    }
+
     const preparedRegistrationWithLocation = withPreparedRegistrationLocation(
       preparedRegistration,
       registrationPricing.location
@@ -1445,6 +1455,9 @@ exports.initializeRegistrationPayment = async (req, res) => {
           phone: preparedRegistration.phone,
           state_id: registrationPricing.location?.state_id || null,
           lga_name: registrationPricing.location?.lga_name || null,
+          use_rentalhub_lawyers: useRentalHubLawyers,
+          lawyer_access_fee: useRentalHubLawyers ? LAWYER_ACCESS_FEE_NGN : 0,
+          total_amount: registrationPricing.amount,
         }
       },
       {
