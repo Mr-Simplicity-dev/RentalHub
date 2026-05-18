@@ -146,7 +146,7 @@ const Home = () => {
   };
 
   return (
-    <div className="overflow-hidden">
+    <div className="w-full max-w-full overflow-x-hidden">
       {showAppPrompt && (
         <section className="bg-white border border-soft shadow-card rounded-xl2 p-4 m-4 animate-slideInRight transform transition-all duration-300 hover:shadow-cardHover">
           <div className="container mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -202,34 +202,34 @@ const Home = () => {
       {/* Hero Section */}
       <section 
         ref={heroRef}
-        className={`bg-gradient-to-r from-primary-600 to-primary-800 text-white py-20 transition-all duration-1000 ${
+        className={`w-full max-w-full overflow-x-hidden bg-gradient-to-r from-primary-600 to-primary-800 text-white py-16 transition-all duration-1000 sm:py-20 ${
           heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}
       >
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 animate-fadeIn">
+        <div className="container mx-auto w-full max-w-full px-4">
+          <div className="mx-auto w-full max-w-3xl text-center">
+            <h1 className="mb-6 max-w-full break-words text-3xl font-bold leading-tight animate-fadeIn sm:text-4xl md:text-5xl">
               {t('home.hero_title')}
             </h1>
-            <p className="text-xl mb-8 text-primary-100 animate-fadeIn delay-100">
+            <p className="mx-auto mb-8 max-w-full text-base leading-7 text-primary-100 animate-fadeIn delay-100 sm:text-xl">
               {t('home.hero_subtitle')}
             </p>
 
             <form 
               onSubmit={handleSearch} 
-              className="mx-auto flex w-full max-w-lg flex-col gap-2 animate-fadeIn delay-200 md:max-w-2xl md:flex-row md:gap-0"
+              className="mx-auto flex w-full max-w-full min-w-0 flex-col gap-2 animate-fadeIn delay-200 sm:max-w-lg md:max-w-2xl md:flex-row md:gap-0"
             >
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('home.search_placeholder')}
-                className="min-w-0 flex-1 rounded-lg px-3.5 py-2.5 text-sm text-gray-900 transition-all duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 md:rounded-l-lg md:rounded-r-none md:px-6 md:py-4 md:text-base"
+                className="w-full min-w-0 max-w-full flex-1 rounded-lg px-3.5 py-2.5 text-sm text-gray-900 transition-all duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 md:rounded-l-lg md:rounded-r-none md:px-6 md:py-4 md:text-base"
               />
               <button
                 type="submit"
                 aria-label={t('home.search')}
-                className="flex h-11 w-11 items-center justify-center self-center rounded-full bg-primary-700 px-0 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-800 hover:shadow-lg md:h-auto md:w-auto md:self-stretch md:rounded-l-none md:rounded-r-lg md:px-6 md:py-4 md:text-base lg:px-8"
+                className="flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-full bg-primary-700 px-0 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-800 hover:shadow-lg md:h-auto md:w-auto md:self-stretch md:rounded-l-none md:rounded-r-lg md:px-6 md:py-4 md:text-base lg:px-8"
               >
                 <FaSearch className="shrink-0 md:mr-2" />
                 <span className="sr-only md:not-sr-only">{t('home.search')}</span>
