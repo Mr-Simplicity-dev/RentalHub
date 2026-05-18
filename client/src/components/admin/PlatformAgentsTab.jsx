@@ -4,7 +4,6 @@ import api from '../../services/api';
 import PaginationControls from './PaginationControls';
 
 const ENTRIES_PAGE_SIZE = 8;
-const MANUAL_PAGE_SIZE = 8;
 
 const initialManualForm = {
   full_name: '',
@@ -20,7 +19,6 @@ const PlatformAgentsTab = () => {
   const [entries, setEntries] = useState([]);
   const [manualForm, setManualForm] = useState(initialManualForm);
   const [entriesPage, setEntriesPage] = useState(1);
-  const [manualPage, setManualPage] = useState(1);
 
   const loadData = async () => {
     try {
@@ -28,7 +26,6 @@ const PlatformAgentsTab = () => {
       const res = await api.get('/super/platform-agents');
       setEntries(res.data?.data?.entries || []);
       setEntriesPage(1);
-      setManualPage(1);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to load platform agents');
     } finally {

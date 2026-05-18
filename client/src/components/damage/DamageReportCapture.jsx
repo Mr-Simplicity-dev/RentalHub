@@ -142,6 +142,45 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
     setCameraActive(false);
   }, []);
 
+  const autoFillDamageForm = useCallback((analysis) => {
+    if (!analysis) return;
+    setDamageForm((prev) => ({
+      ...prev,
+      damage_type: analysis.damage_type || prev.damage_type,
+      severity: analysis.severity || prev.severity,
+      depth_level: analysis.depth_level || prev.depth_level,
+      width_cm: analysis.estimated_width_cm ? String(analysis.estimated_width_cm) : prev.width_cm,
+      height_cm: analysis.estimated_height_cm ? String(analysis.estimated_height_cm) : prev.height_cm,
+      urgency: analysis.urgency || prev.urgency,
+      description: analysis.description || prev.description,
+    }));
+  }, []);
+
+  const analyzeDamagePhoto = useCallback(async (file) => {
+    setAnalyzingDamage(true);
+    setAnalysisError('');
+    setAiResult(null);
+
+    try {
+      const fd = new FormData();
+      fd.append('photos', file);
+      const res = await propertyService.analyzeDamagePhoto(fd);
+      const analysis = res?.data?.ai_analysis;
+
+      if (analysis && !analysis.error) {
+        setAiResult(analysis);
+        autoFillDamageForm(analysis);
+      } else {
+        setAnalysisError('AI analysis unavailable. You can complete the report manually.');
+      }
+    } catch (error) {
+      console.error('AI analysis failed:', error);
+      setAnalysisError('AI analysis failed. You can still complete the report manually.');
+    } finally {
+      setAnalyzingDamage(false);
+    }
+  }, [autoFillDamageForm]);
+
   const capturePhoto = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -174,62 +213,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
       'image/jpeg',
       0.92
     );
-  }, [stopCamera, cleanupPreview]);
-
-  const analyzeDamagePhoto = useCallback(async (file) => {
-    setAnalyzingDamage(true);
-    setAnalysisError('');
-    setAiResult(null);
-
-    try {
-      const fd = new FormData();
-      fd.append('photos', file);
-      const res = await propertyService.analyzeDamagePhoto(fd);
-      const analysis = res?.data?.ai_analysis;
-
-      if (analysis && !analysis.error) {
-        setAiResult(analysis);
-        autoFillDamageForm(analysis);
-      } else {
-        setAnalysisError('⚠️ AI analysis unavailable. You can complete the report manually.');
-      }
-    } catch (error) {
-      console.error('AI analysis failed:', error);
-      setAnalysisError('⚠️ AI analysis failed. You can still complete the report manually.');
-    } finally {
-      setAnalyzingDamage(false);
-    }
-  }, [autoFillDamageForm]);
-
-  const autoFillDamageForm = useCallback((analysis) => {
-    if (!analysis) return;
-    setDamageForm((prev) => ({
-      ...prev,
-      damage_type: analysis.damage_type || prev.damage_type,
-      severity: analysis.severity || prev.severity,
-      depth_level: analysis.depth_level || prev.depth_level,
-      width_cm: analysis.estimated_width_cm ? String(analysis.estimated_width_cm) : prev.width_cm,
-      height_cm: analysis.estimated_height_cm ? String(analysis.estimated_height_cm) : prev.height_cm,
-      urgency: analysis.urgency || prev.urgency,
-      description: analysis.description || prev.description,
-    }));
-  }, []);
-
-  const proceedToReview = useCallback(() => {
-    if (!damageForm.room_location.trim()) {
-      toast.error('Room location is required');
-      return;
-    }
-    if (!damageForm.damage_type) {
-      toast.error('Damage type is required');
-      return;
-    }
-    if (!damageForm.severity) {
-      toast.error('Severity level is required');
-      return;
-    }
-    setStage('review');
-  }, [damageForm]);
+  }, [stopCamera, cleanupPreview, analyzeDamagePhoto]);
 
   const saveDamageReport = useCallback(async () => {
     if (!capturedPhoto || !damageForm.room_location) {
@@ -607,8 +591,8 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
               </button>
               <button
                 type="button"
-                onClick={proceedToReview}
-                disabled={!damageForm.room_location || !damageForm.damage_type || !damageForm.severity}
+                onClick={saveDamageReport}
+                disabled={saving || !damageForm.room_location || !damageForm.damage_type || !damageForm.severity}
                 className="btn btn-primary flex-1 disabled:opacity-50"
               >
                 ✅ Confirm & Save

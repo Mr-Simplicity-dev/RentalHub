@@ -7,12 +7,10 @@ import {
   FaMoneyBillWave,
   FaHistory,
   FaWallet,
-  FaCalendarAlt,
   FaPercent,
   FaPlay,
   FaPause,
   FaArrowRight,
-  FaCheck,
   FaClock,
   FaBan,
 } from 'react-icons/fa';
@@ -78,8 +76,8 @@ export default function RentSavingsModal({ isOpen, onClose, user, properties }) 
       const { data } = await api.get('/rent-savings/plans');
       if (data.success) {
         setPlans(data.data);
-        if (data.data.length > 0 && !selectedPlanId) {
-          setSelectedPlanId(data.data[0].id);
+        if (data.data.length > 0) {
+          setSelectedPlanId((current) => current || data.data[0].id);
         }
       }
     } catch (error) {
@@ -87,7 +85,7 @@ export default function RentSavingsModal({ isOpen, onClose, user, properties }) 
     } finally {
       setLoading(false);
     }
-  }, [selectedPlanId]);
+  }, []);
 
   const loadPlanDetails = async (planId) => {
     try {
@@ -125,7 +123,7 @@ export default function RentSavingsModal({ isOpen, onClose, user, properties }) 
   // ── Effects ─────────────────────────────────────────────
   useEffect(() => {
     if (isOpen && user) loadPlans();
-  }, [isOpen, user]);
+  }, [isOpen, user, loadPlans]);
 
   useEffect(() => {
     if (selectedPlanId) {
@@ -748,7 +746,7 @@ function ContributeTab({
     if (monthlyAmount > 0 && !contributeAmount) {
       setContributeAmount(String(monthlyAmount));
     }
-  }, [monthlyAmount]);
+  }, [monthlyAmount, contributeAmount, setContributeAmount]);
 
   // Plan not active
   if (!plan.is_active || plan.status !== 'active') {

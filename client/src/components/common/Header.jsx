@@ -698,7 +698,73 @@ return (
 
                 {showNotifications && (
                   <div className="fixed left-2 right-2 top-20 z-50 flex max-h-[70vh] w-auto max-w-[calc(100vw-16px)] origin-top-right animate-scaleIn flex-col rounded-2xl border border-gray-100 bg-white py-2 shadow-elevated-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
-                    {/* Existing notification content remains unchanged */}
+                    <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
+                      <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                      {notifUnreadCount > 0 && (
+                        <button
+                          onClick={markAllNotifsAsRead}
+                          className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-8 text-center">
+                          <FaBell className="mx-auto mb-2 text-2xl text-gray-300" />
+                          <p className="text-sm text-gray-500">No notifications yet</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            className={`cursor-pointer border-b border-gray-50 px-4 py-3 transition-colors hover:bg-gray-50 ${
+                              !notif.is_read ? 'bg-primary-50/40' : ''
+                            }`}
+                            onClick={() => {
+                              setSelectedNotification(notif);
+                              if (!notif.is_read) markNotifAsRead(notif.id);
+                            }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-gray-900">{notif.title}</p>
+                                <p className="mt-0.5 truncate text-xs text-gray-600">{notif.message}</p>
+                                <p className="mt-1 text-[10px] text-gray-400">
+                                  {new Date(notif.created_at).toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </p>
+                              </div>
+                              {!notif.is_read && (
+                                <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary-500" />
+                              )}
+                            </div>
+
+                            {notif.link && (
+                              <div className="mt-2 flex justify-end">
+                                <Link
+                                  to={notif.link}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowNotifications(false);
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700"
+                                >
+                                  <FaIdCard className="text-[10px]" />
+                                  Take Action
+                                </Link>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -743,10 +809,149 @@ return (
 
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-56 max-w-[90vw] bg-white rounded-2xl shadow-elevated-lg border border-gray-100 py-2 animate-scaleIn origin-top-right">
-                    {/* Existing dropdown content remains unchanged */}
+                    <div className="border-b border-gray-100 px-4 py-3">
+                      <p className="truncate text-sm font-semibold text-gray-900">{user?.full_name}</p>
+                      <p className="truncate text-xs text-gray-500">
+                        {user?.email?.replace(/^(.)(.*)(@.*)$/, (_, first, middle, domain) =>
+                          `${first}${'*'.repeat(Math.min(middle.length, 4))}${domain}`
+                        )}
+                      </p>
+                    </div>
+
+                    <Link
+                      to={roleDashboardPath}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <FaTachometerAlt className="text-xs text-primary-500" />
+                      <span className="flex-1">{t('header.dashboard')}</span>
+                      {headerAttentionCount > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          {headerAttentionCount}
+                        </span>
+                      )}
+                    </Link>
+
+                    <Link
+                      to="/profile"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <FaUser className="text-xs text-primary-500" />
+                      <span>{t('header.profile')}</span>
+                    </Link>
+
+                    <Link
+                      to="/applications"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <FaFileAlt className="text-xs text-primary-500" />
+                      <span>{t('header.applications')}</span>
+                    </Link>
+
+                    <Link
+                      to="/verification-status"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <FaIdCard className="text-xs text-primary-500" />
+                      <span>Verification</span>
+                    </Link>
+
+                    <div className="mt-1 border-t border-gray-100 pt-1">
+                      <button
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 transition-colors duration-150 hover:bg-red-50"
+                      >
+                        <FaSignOutAlt className="text-xs" />
+                        <span>{t('header.logout')}</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
+
+              {selectedNotification && (
+                <div
+                  className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
+                  onClick={() => setSelectedNotification(null)}
+                >
+                  <div
+                    className="w-full max-w-lg animate-scaleIn rounded-2xl border border-gray-100 bg-white shadow-elevated-lg"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                      <h3 className="min-w-0 pr-3 text-base font-semibold text-gray-900">
+                        {selectedNotification.title}
+                      </h3>
+                      <button
+                        onClick={() => setSelectedNotification(null)}
+                        className="text-xl leading-none text-gray-400 hover:text-gray-600"
+                        aria-label="Close notification"
+                      >
+                        &times;
+                      </button>
+                    </div>
+
+                    <div className="px-6 py-4">
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                        {selectedNotification.message}
+                      </p>
+                      <p className="mt-4 text-xs text-gray-400">
+                        {new Date(selectedNotification.created_at).toLocaleDateString(undefined, {
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+
+                    {selectedNotification.link && (
+                      <div className="flex justify-center border-t border-gray-100 px-6 py-4">
+                        <Link
+                          to={selectedNotification.link}
+                          onClick={() => {
+                            setSelectedNotification(null);
+                            setShowNotifications(false);
+                          }}
+                          className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                        >
+                          <FaIdCard className="text-xs" />
+                          Take Action
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {showAvatarPopup && user?.passport_photo_url && (
+                <div
+                  className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+                  onClick={() => setShowAvatarPopup(false)}
+                >
+                  <div
+                    className="relative w-full max-w-xl animate-scaleIn"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => setShowAvatarPopup(false)}
+                      className="absolute -right-3 -top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white text-lg leading-none text-gray-600 shadow-md hover:text-gray-800"
+                      aria-label="Close avatar preview"
+                    >
+                      &times;
+                    </button>
+                    <img
+                      src={user.passport_photo_url}
+                      alt="Profile"
+                      className="h-auto w-full rounded-2xl border-4 border-white shadow-2xl"
+                    />
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             /* FIXED */

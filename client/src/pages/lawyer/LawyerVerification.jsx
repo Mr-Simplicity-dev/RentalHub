@@ -69,7 +69,7 @@ const LawyerVerification = ({ children }) => {
   const [livenessError, setLivenessError] = useState('');
   const [livenessChecks, setLivenessChecks] = useState(DEFAULT_LIVENESS);
   const [faceBox, setFaceBox] = useState(null);
-  const [_faceMeshReady, setFaceMeshReady] = useState(false);
+  const [, setFaceMeshReady] = useState(false);
   const [liveCaptureToken, setLiveCaptureToken] = useState('');
   const [verificationComplete, setVerificationComplete] = useState(false);
   const [fraudAlert, setFraudAlert] = useState(null);

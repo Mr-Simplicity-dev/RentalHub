@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { FaRuler, FaExclamationTriangle } from 'react-icons/fa';
 import api from '../../services/api';
 import Loader from '../common/Loader';
@@ -7,11 +7,7 @@ const DamageReportCard = ({ propertyId }) => {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadReport();
-  }, [propertyId]);
-
-  const loadReport = async () => {
+  const loadReport = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/properties/${propertyId}/damage-report/latest-published`);
@@ -24,7 +20,11 @@ const DamageReportCard = ({ propertyId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [propertyId]);
+
+  useEffect(() => {
+    loadReport();
+  }, [loadReport]);
 
   if (loading) {
     return <Loader />;
@@ -173,7 +173,7 @@ const DamageReportCard = ({ propertyId }) => {
               <div key={idx} className="rounded-lg overflow-hidden bg-gray-200">
                 <img
                   src={photo}
-                  alt={`Photo ${idx + 1}`}
+                  alt={`Damage report ${idx + 1}`}
                   className="h-32 w-full object-cover hover:opacity-80 transition-opacity"
                   onError={(e) => (e.target.src = '/images/broken-image.png')}
                 />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 
@@ -12,21 +12,21 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
     priority: 'normal'
   });
 
-  // Load potential users to dispute against
-  useEffect(() => {
-    if (isOpen && propertyId) {
-      loadUsers();
-    }
-  }, [isOpen, propertyId]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const res = await api.get(`/properties/${propertyId}/users`);
       setUsers(res.data.data || []);
     } catch (err) {
       console.error('Failed to load users:', err);
     }
-  };
+  }, [propertyId]);
+
+  // Load potential users to dispute against
+  useEffect(() => {
+    if (isOpen && propertyId) {
+      loadUsers();
+    }
+  }, [isOpen, propertyId, loadUsers]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { FaUser } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
@@ -21,12 +21,7 @@ const AdminAgentManagement = () => {
     },
   });
 
-  useEffect(() => {
-    loadAssignments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
-
-  const loadAssignments = async () => {
+  const loadAssignments = useCallback(async () => {
     try {
       setLoading(true);
       const query = new URLSearchParams(filters);
@@ -41,7 +36,11 @@ const AdminAgentManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    loadAssignments();
+  }, [loadAssignments]);
 
   const handleAssign = async (e) => {
     e.preventDefault();
