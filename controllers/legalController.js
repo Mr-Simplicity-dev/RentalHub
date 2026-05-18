@@ -84,11 +84,12 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
        d.property_id AS dispute_property_id,
        d.status AS dispute_status,
        u.assigned_state AS lawyer_assigned_state,
-       p.state AS property_state
+       s.state_name AS property_state
      FROM legal_authorizations la
      JOIN disputes d ON d.id = $2
      JOIN users u ON u.id = la.lawyer_user_id
      JOIN properties p ON p.id = d.property_id
+     LEFT JOIN states s ON s.id = p.state_id
      WHERE la.lawyer_user_id = $1
        AND la.status = 'active'
        AND (
@@ -507,6 +508,7 @@ exports.getAuthorizedProperties = async (req, res) => {
          granter.email AS assigned_by_email,
          lawyer.assigned_state AS lawyer_assigned_state
        FROM properties p
+       LEFT JOIN states s ON s.id = p.state_id
        JOIN legal_authorizations la
          ON (
            la.property_id = p.id
@@ -526,7 +528,7 @@ exports.getAuthorizedProperties = async (req, res) => {
        WHERE la.lawyer_user_id = $1
          AND la.status = 'active'
          AND lawyer.assigned_state IS NOT NULL
-         AND LOWER(lawyer.assigned_state) = LOWER(p.state)
+         AND LOWER(lawyer.assigned_state) = LOWER(s.state_name)
        ORDER BY p.id, p.created_at DESC, la.id DESC`,
       [lawyerId]
     );

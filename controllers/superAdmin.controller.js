@@ -764,8 +764,9 @@ const getAdminStateUsers = async (req, res) => {
              AND EXISTS (
                SELECT 1
                FROM properties p
+               LEFT JOIN states s ON s.id = p.state_id
                WHERE (p.user_id = u.id OR p.landlord_id = u.id)
-                 AND LOWER(TRIM(p.state)) = LOWER(TRIM($1))
+                 AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
              )
            )
            OR
@@ -775,8 +776,9 @@ const getAdminStateUsers = async (req, res) => {
                SELECT 1
                FROM applications a
                JOIN properties p ON p.id = a.property_id
+               LEFT JOIN states s ON s.id = p.state_id
                WHERE a.tenant_id = u.id
-                 AND LOWER(TRIM(p.state)) = LOWER(TRIM($1))
+                 AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
              )
            )
          )

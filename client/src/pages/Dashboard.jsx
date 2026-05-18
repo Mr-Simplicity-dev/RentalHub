@@ -155,6 +155,8 @@ const Dashboard = () => {
 
   // Rent Savings state (tenant only)
   const [showRentSavingsModal, setShowRentSavingsModal] = useState(false);
+  const [showRentSavingsAgreementModal, setShowRentSavingsAgreementModal] = useState(false);
+  const [rentSavingsAgreementAccepted, setRentSavingsAgreementAccepted] = useState(false);
   const [tenantProperties, setTenantProperties] = useState([]);
   const [paidPropertyLocations, setPaidPropertyLocations] = useState([]);
   const [rentSavingsStats, setRentSavingsStats] = useState(null);
@@ -867,6 +869,17 @@ const Dashboard = () => {
     loadRentSavingsData();
   };
 
+  const openRentSavingsAgreement = () => {
+    setRentSavingsAgreementAccepted(false);
+    setShowRentSavingsAgreementModal(true);
+  };
+
+  const acceptRentSavingsAgreement = () => {
+    if (!rentSavingsAgreementAccepted) return;
+    setShowRentSavingsAgreementModal(false);
+    setShowRentSavingsModal(true);
+  };
+
     // Show popup modal when lawyer invite is newly accepted
   const [showLawyerAcceptedPopup, setShowLawyerAcceptedPopup] = useState(false);
 
@@ -1136,7 +1149,7 @@ const Dashboard = () => {
                 icon={<FaPiggyBank className="text-emerald-500" />}
                 title="Rent Savings"
                 value={getRentSavingsValue()}
-                onClick={() => setShowRentSavingsModal(true)}
+                onClick={openRentSavingsAgreement}
               />
               <StatCard
                 icon={<FaMoneyBillWave className="text-orange-500" />}
@@ -1403,7 +1416,7 @@ const Dashboard = () => {
               </p>
               {landlordPropertyFee?.reserve_required && Number(landlordPropertyFee?.amount_due || 0) > 0 && (
                 <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  {(landlordPropertyFee.fee_label || 'Landlord Property Charges')} reserve: N{Number(landlordPropertyFee.amount_due || 0).toLocaleString()} is due on{' '}
+                  {(landlordPropertyFee.fee_label || 'Landlord Property Charges')} reserve: ₦{Number(landlordPropertyFee.amount_due || 0).toLocaleString()} is due on{' '}
                   {new Date(landlordPropertyFee.due_at).toLocaleDateString()} for{' '}
                   {landlordPropertyFee.property_count} posted propert{Number(landlordPropertyFee.property_count) === 1 ? 'y' : 'ies'}.
                   You cannot withdraw the reserved portion.
@@ -1487,7 +1500,7 @@ const Dashboard = () => {
                 title="Rent Savings"
                 description="Save toward rent, contribute monthly, and manage withdrawals"
                 icon={<FaPiggyBank />}
-                onClick={() => setShowRentSavingsModal(true)}
+                onClick={openRentSavingsAgreement}
               />
             </>
           ) : (
@@ -1883,6 +1896,84 @@ const Dashboard = () => {
         }}
       />
 
+      {showRentSavingsAgreementModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setShowRentSavingsAgreementModal(false)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                  <FaPiggyBank className="text-xl" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Rent Savings Agreement</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  Please read and accept these terms before opening a rent savings plan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRentSavingsAgreementModal(false)}
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Close rent savings agreement"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-5 max-h-[45vh] space-y-3 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-700">
+              <p>
+                Rent Savings helps you set aside money toward rent for a selected property. It is a savings support feature, not a loan or investment product.
+              </p>
+              <p>
+                You agree that any setup fee, contribution fee, maturity commission, or early withdrawal charge shown inside the rent savings flow may be deducted before your net savings or payout is calculated.
+              </p>
+              <p>
+                Contributions, missed-month catch-up payments, withdrawals, and early withdrawal requests must follow the rules displayed in the rent savings dashboard at the time you submit them.
+              </p>
+              <p>
+                You are responsible for confirming the property, due date, monthly rent amount, bank details, and withdrawal information before submitting any request.
+              </p>
+              <p>
+                By continuing, you authorize RentalHub NG to process rent savings transactions and related fees according to the displayed plan terms.
+              </p>
+            </div>
+
+            <label className="mt-5 flex items-start gap-3 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={rentSavingsAgreementAccepted}
+                onChange={(e) => setRentSavingsAgreementAccepted(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>I have read and agree to the Rent Savings terms.</span>
+            </label>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setShowRentSavingsAgreementModal(false)}
+                className="btn w-full sm:flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={acceptRentSavingsAgreement}
+                disabled={!rentSavingsAgreementAccepted}
+                className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed sm:flex-1"
+              >
+                Agree and Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <RentSavingsModal
         isOpen={showRentSavingsModal}
         onClose={closeRentSavingsModal}
@@ -2187,13 +2278,13 @@ const LandlordPropertyFeeModal = ({
               <p className="text-xl font-bold text-gray-900">
                 {feeItems.length > 1
                   ? feeItems.length
-                  : `N${Number(feeItems[0]?.fee_per_property || feeStatus?.fee_per_property || 0).toLocaleString()}`}
+                  : `₦${Number(feeItems[0]?.fee_per_property || feeStatus?.fee_per_property || 0).toLocaleString()}`}
               </p>
             </div>
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
               <p className="text-xs text-amber-700">Total Due</p>
               <p className="text-xl font-bold text-amber-900">
-                N{amountDue.toLocaleString()}
+                ₦{amountDue.toLocaleString()}
               </p>
             </div>
           </div>
@@ -2210,11 +2301,11 @@ const LandlordPropertyFeeModal = ({
                       {fee.fee_label || fee.label || 'Property Charge'}
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
-                      N{Number(fee.fee_per_property || 0).toLocaleString()} per property, {fee.cadence || 'scheduled'}
+                      ₦{Number(fee.fee_per_property || 0).toLocaleString()} per property, {fee.cadence || 'scheduled'}
                     </p>
                   </div>
                   <p className="text-sm font-bold text-gray-900">
-                    N{Number(fee.amount_due || 0).toLocaleString()}
+                    ₦{Number(fee.amount_due || 0).toLocaleString()}
                   </p>
                 </div>
                 <p className="mt-2 text-xs text-gray-600">

@@ -133,7 +133,7 @@ exports.getDisputeDetails = async (req, res) => {
       `SELECT
          d.*,
          p.title AS property_title,
-         p.state,
+         s.state_name AS state,
          p.city,
          p.area,
          p.full_address,
@@ -148,6 +148,7 @@ exports.getDisputeDetails = async (req, res) => {
          summary_author.full_name AS lawyer_summary_by_name
        FROM disputes d
        LEFT JOIN properties p ON p.id = d.property_id
+       LEFT JOIN states s ON s.id = p.state_id
        LEFT JOIN users opener ON opener.id = d.opened_by
        LEFT JOIN users against_user ON against_user.id = d.against_user
        LEFT JOIN users resolver ON resolver.id = d.resolved_by
@@ -584,10 +585,11 @@ exports.getEvidence = async (req, res) => {
     // Check if lawyer has an active authorization covering this dispute's property
     if (userType === 'lawyer') {
       const lawyerCheck = await db.query(
-        `SELECT la.id, u.assigned_state AS lawyer_assigned_state, p.state AS property_state
+        `SELECT la.id, u.assigned_state AS lawyer_assigned_state, s.state_name AS property_state
          FROM legal_authorizations la
          JOIN users u ON u.id = la.lawyer_user_id
          JOIN properties p ON p.id = $2
+         LEFT JOIN states s ON s.id = p.state_id
          WHERE la.lawyer_user_id = $1
            AND la.status = 'active'
            AND (
@@ -639,10 +641,11 @@ exports.verifyEvidenceIntegrity = async (req, res) => {
     if (!isPrivileged && !isParticipant) {
       if (userType === 'lawyer') {
         const lawyerCheck = await db.query(
-          `SELECT la.id, u.assigned_state AS lawyer_assigned_state, p.state AS property_state
+          `SELECT la.id, u.assigned_state AS lawyer_assigned_state, s.state_name AS property_state
            FROM legal_authorizations la
            JOIN users u ON u.id = la.lawyer_user_id
            JOIN properties p ON p.id = $2
+           LEFT JOIN states s ON s.id = p.state_id
            WHERE la.lawyer_user_id = $1
              AND la.status = 'active'
              AND (

@@ -31,7 +31,7 @@ exports.getAllTransactions = async (req, res) => {
         u.phone as user_phone,
         u.user_type,
         prop.title as property_title,
-        prop.state as property_state,
+        prop_state.state_name as property_state,
         prop.city as property_city,
         prop.area as property_area,
         admin.full_name as admin_name,
@@ -45,6 +45,7 @@ exports.getAllTransactions = async (req, res) => {
       FROM payments p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN properties prop ON p.property_id = prop.id
+      LEFT JOIN states prop_state ON prop_state.id = prop.state_id
       LEFT JOIN admin_commissions ac ON p.id = ac.payment_id
       LEFT JOIN users admin ON ac.admin_id = admin.id
       LEFT JOIN frozen_funds ff ON p.user_id = ff.user_id AND ff.status = 'frozen'
@@ -55,6 +56,7 @@ exports.getAllTransactions = async (req, res) => {
       SELECT COUNT(*) as total
       FROM payments p
       LEFT JOIN properties prop ON p.property_id = prop.id
+      LEFT JOIN states prop_state ON prop_state.id = prop.state_id
       WHERE 1=1
     `;
     
@@ -64,8 +66,8 @@ exports.getAllTransactions = async (req, res) => {
     
     // Apply filters
     if (state) {
-      query += ` AND prop.state = $${paramCount}`;
-      countQuery += ` AND prop.state = $${paramCount}`;
+      query += ` AND LOWER(TRIM(prop_state.state_name)) = LOWER(TRIM($${paramCount}))`;
+      countQuery += ` AND LOWER(TRIM(prop_state.state_name)) = LOWER(TRIM($${paramCount}))`;
       params.push(state);
       countParams.push(state);
       paramCount++;
@@ -520,16 +522,17 @@ exports.getRealTimeStats = async (req, res) => {
     // Top performing states
     const topStatesQuery = `
       SELECT 
-        prop.state,
+        prop_state.state_name AS state,
         COUNT(p.id) as transaction_count,
         SUM(p.amount) as total_amount,
         COUNT(DISTINCT p.user_id) as unique_users
       FROM payments p
       LEFT JOIN properties prop ON p.property_id = prop.id
+      LEFT JOIN states prop_state ON prop_state.id = prop.state_id
       WHERE p.payment_status = 'completed'
         AND p.created_at >= CURRENT_DATE - INTERVAL '30 days'
-        AND prop.state IS NOT NULL
-      GROUP BY prop.state
+        AND prop_state.state_name IS NOT NULL
+      GROUP BY prop_state.state_name
       ORDER BY total_amount DESC
       LIMIT 10
     `;

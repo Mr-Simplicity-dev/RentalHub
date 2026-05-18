@@ -52,7 +52,7 @@ router.get('/transactions',
           u.email as user_email,
           u.phone as user_phone,
           prop.title as property_title,
-          prop.state as property_state,
+          prop_state.state_name as property_state,
           prop.city as property_city,
           prop.area as property_area,
           ac.amount as commission_amount,
@@ -61,8 +61,9 @@ router.get('/transactions',
         FROM payments p
         JOIN users u ON p.user_id = u.id
         LEFT JOIN properties prop ON p.property_id = prop.id
+        LEFT JOIN states prop_state ON prop_state.id = prop.state_id
         LEFT JOIN admin_commissions ac ON p.id = ac.payment_id AND ac.admin_id = $1
-        WHERE prop.state = $2
+        WHERE LOWER(TRIM(prop_state.state_name)) = LOWER(TRIM($2))
           AND p.payment_status = 'completed'
       `;
       
@@ -70,7 +71,8 @@ router.get('/transactions',
         SELECT COUNT(*) as total
         FROM payments p
         LEFT JOIN properties prop ON p.property_id = prop.id
-        WHERE prop.state = $1
+        LEFT JOIN states prop_state ON prop_state.id = prop.state_id
+        WHERE LOWER(TRIM(prop_state.state_name)) = LOWER(TRIM($1))
           AND p.payment_status = 'completed'
       `;
       

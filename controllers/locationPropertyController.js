@@ -35,7 +35,7 @@ exports.getPropertiesByState = async (req, res) => {
     
     // State filter (required for state admin)
     if (state) {
-      whereConditions.push(`p.state = $${paramCount}`);
+      whereConditions.push(`LOWER(TRIM(s.state_name)) = LOWER(TRIM($${paramCount}))`);
       params.push(state);
       paramCount++;
     }
@@ -89,7 +89,7 @@ exports.getPropertiesByState = async (req, res) => {
       SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
         p.rent_amount, p.payment_frequency, p.city, p.area,
-        p.state, p.featured, p.created_at,
+        s.state_name AS state, p.featured, p.created_at,
         u.full_name as landlord_name,
         u.email as landlord_email,
         u.phone as landlord_phone,
@@ -101,6 +101,7 @@ exports.getPropertiesByState = async (req, res) => {
         (SELECT COUNT(*) FROM applications WHERE property_id = p.id) AS application_count
       FROM properties p
       JOIN users u ON p.landlord_id = u.id
+      LEFT JOIN states s ON s.id = p.state_id
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY p.featured DESC, p.${sortField} ${sortDirection}
       LIMIT $${paramCount} OFFSET $${paramCount + 1}
@@ -163,7 +164,7 @@ exports.getStateStatistics = async (req, res) => {
     
     let query = `
       SELECT 
-        p.state,
+        s.state_name AS state,
         COUNT(p.id) as total_properties,
         SUM(CASE WHEN p.is_available = TRUE THEN 1 ELSE 0 END) as available_properties,
         SUM(CASE WHEN p.featured = TRUE THEN 1 ELSE 0 END) as featured_properties,
@@ -172,6 +173,7 @@ exports.getStateStatistics = async (req, res) => {
         SUM(p.rent_amount) as total_rent_value,
         COUNT(DISTINCT p.city) as unique_cities
       FROM properties p
+      LEFT JOIN states s ON s.id = p.state_id
       WHERE p.is_verified = TRUE
     `;
     
@@ -179,7 +181,7 @@ exports.getStateStatistics = async (req, res) => {
     let paramCount = 1;
     
     if (state) {
-      query += ` AND p.state = $${paramCount}`;
+      query += ` AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${paramCount}))`;
       params.push(state);
       paramCount++;
     }
@@ -196,14 +198,14 @@ exports.getStateStatistics = async (req, res) => {
       paramCount++;
     }
     
-    query += ` GROUP BY p.state ORDER BY total_properties DESC`;
+    query += ` GROUP BY s.state_name ORDER BY total_properties DESC`;
     
     const result = await db.query(query, params);
     
     // Get transaction statistics by state
     const transactionQuery = `
       SELECT 
-        prop.state,
+        prop_state.state_name AS state,
         COUNT(p.id) as total_transactions,
         SUM(p.amount) as total_amount,
         COUNT(DISTINCT p.user_id) as unique_users,
@@ -211,6 +213,7 @@ exports.getStateStatistics = async (req, res) => {
         p.payment_type
       FROM payments p
       LEFT JOIN properties prop ON p.property_id = prop.id
+      LEFT JOIN states prop_state ON prop_state.id = prop.state_id
       WHERE p.payment_status = 'completed'
     `;
     
@@ -218,7 +221,7 @@ exports.getStateStatistics = async (req, res) => {
     let transactionParamCount = 1;
     
     if (state) {
-      transactionQuery += ` AND prop.state = $${transactionParamCount}`;
+      transactionQuery += ` AND LOWER(TRIM(prop_state.state_name)) = LOWER(TRIM($${transactionParamCount}))`;
       transactionParams.push(state);
       transactionParamCount++;
     }
@@ -235,7 +238,7 @@ exports.getStateStatistics = async (req, res) => {
       transactionParamCount++;
     }
     
-    transactionQuery += ` GROUP BY prop.state, p.payment_type ORDER BY total_amount DESC`;
+    transactionQuery += ` GROUP BY prop_state.state_name, p.payment_type ORDER BY total_amount DESC`;
     
     const transactionResult = await db.query(transactionQuery, transactionParams);
     

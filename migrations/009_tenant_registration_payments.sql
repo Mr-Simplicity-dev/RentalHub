@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS tenant_registration_payments (
   email VARCHAR(255) NOT NULL,
   phone VARCHAR(20) NOT NULL,
   full_name VARCHAR(255) NOT NULL,
-  amount DECIMAL(12, 2) NOT NULL DEFAULT 2500,
+  amount DECIMAL(12, 2) NOT NULL DEFAULT 3000,
   currency VARCHAR(10) NOT NULL DEFAULT 'NGN',
   payment_method VARCHAR(50) NOT NULL DEFAULT 'paystack',
   transaction_reference VARCHAR(255) NOT NULL UNIQUE,

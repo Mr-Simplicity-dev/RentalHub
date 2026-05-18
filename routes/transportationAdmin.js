@@ -133,7 +133,7 @@ router.get('/dashboard', async (req, res) => {
         JOIN properties p ON tb.property_id = p.id
         LEFT JOIN states s ON s.id = p.state_id
         WHERE tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
-        GROUP BY p.id, p.title, s.state_name AS state, p.city
+        GROUP BY p.id, p.title, s.state_name, p.city
         ORDER BY booking_count DESC
         LIMIT 10
       `),
@@ -1024,10 +1024,11 @@ router.get('/analytics', async (req, res) => {
           COALESCE(SUM(tb.total_price), 0) as total_revenue,
           COUNT(DISTINCT tb.tenant_id) as unique_tenants
         FROM properties p
+        LEFT JOIN states s ON s.id = p.state_id
         LEFT JOIN transportation_bookings tb 
           ON p.id = tb.property_id
           AND tb.created_at BETWEEN $1 AND $2
-        GROUP BY p.id, p.title, s.state_name AS state, p.city
+        GROUP BY p.id, p.title, s.state_name, p.city
         HAVING COUNT(tb.id) > 0
         ORDER BY booking_count DESC
         LIMIT 20
@@ -1345,9 +1346,10 @@ router.get('/report', async (req, res) => {
             COALESCE(SUM(tb.total_price), 0) as total_revenue,
             COUNT(DISTINCT tb.tenant_id) as unique_tenants
           FROM properties p
+          LEFT JOIN states s ON s.id = p.state_id
           LEFT JOIN transportation_bookings tb ON p.id = tb.property_id
             AND tb.created_at BETWEEN $1 AND $2
-          GROUP BY p.title, s.state_name AS state, p.city
+          GROUP BY p.title, s.state_name, p.city
           HAVING COUNT(tb.id) > 0
           ORDER BY booking_count DESC
         `, [start_date, end_date])
@@ -4767,7 +4769,8 @@ router.get('/super-admin/dashboard', async (req, res) => {
       const adminId = req.user.id;
       const adminType = req.user.user_type;
       
-      let stateFilter = '';
+      let stateJoin = '';
+      let stateScopeSql = '';
       const params = [];
       
       // State admins get state-specific statistics
@@ -4777,8 +4780,8 @@ router.get('/super-admin/dashboard', async (req, res) => {
         `, [adminId]);
         
         if (adminResult.rows.length > 0 && adminResult.rows[0].assigned_state) {
-          stateFilter = 'JOIN properties p ON tb.property_id = p.id WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))';
-          LEFT JOIN states s ON s.id = p.state_id
+          stateJoin = 'JOIN properties p ON tb.property_id = p.id LEFT JOIN states s ON s.id = p.state_id';
+          stateScopeSql = 'AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))';
           params.push(adminResult.rows[0].assigned_state);
         }
       }
@@ -4791,9 +4794,9 @@ router.get('/super-admin/dashboard', async (req, res) => {
             COALESCE(SUM(total_price), 0) as revenue,
             COUNT(DISTINCT tenant_id) as unique_tenants
           FROM transportation_bookings tb
-          ${stateFilter}
-          AND DATE(tb.created_at) = CURRENT_DATE
-          ${params.length > 0 ? 'AND ' + stateFilter.split('WHERE ')[1] : ''}
+          ${stateJoin}
+          WHERE DATE(tb.created_at) = CURRENT_DATE
+          ${stateScopeSql}
         `, params),
         
         // Weekly statistics
@@ -4804,9 +4807,9 @@ router.get('/super-admin/dashboard', async (req, res) => {
             COUNT(DISTINCT tenant_id) as unique_tenants,
             COUNT(DISTINCT service_id) as services_used
           FROM transportation_bookings tb
-          ${stateFilter}
-          AND tb.created_at >= CURRENT_DATE - INTERVAL '7 days'
-          ${params.length > 0 ? 'AND ' + stateFilter.split('WHERE ')[1] : ''}
+          ${stateJoin}
+          WHERE tb.created_at >= CURRENT_DATE - INTERVAL '7 days'
+          ${stateScopeSql}
         `, params),
         
         // Monthly statistics
@@ -4817,9 +4820,9 @@ router.get('/super-admin/dashboard', async (req, res) => {
             COUNT(DISTINCT tenant_id) as unique_tenants,
             COUNT(DISTINCT property_id) as properties_used
           FROM transportation_bookings tb
-          ${stateFilter}
-          AND tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
-          ${params.length > 0 ? 'AND ' + stateFilter.split('WHERE ')[1] : ''}
+          ${stateJoin}
+          WHERE tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
+          ${stateScopeSql}
         `, params),
         
         // Yearly statistics
@@ -4830,9 +4833,9 @@ router.get('/super-admin/dashboard', async (req, res) => {
             COUNT(DISTINCT tenant_id) as unique_tenants,
             COUNT(DISTINCT service_id) as total_services_used
           FROM transportation_bookings tb
-          ${stateFilter}
-          AND tb.created_at >= CURRENT_DATE - INTERVAL '365 days'
-          ${params.length > 0 ? 'AND ' + stateFilter.split('WHERE ')[1] : ''}
+          ${stateJoin}
+          WHERE tb.created_at >= CURRENT_DATE - INTERVAL '365 days'
+          ${stateScopeSql}
         `, params)
       ]);
       

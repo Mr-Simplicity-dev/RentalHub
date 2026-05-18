@@ -36,7 +36,7 @@ const statusClass = (status) => {
 
 const formatCurrency = (amount) => {
   if (amount === null || amount === undefined || amount === '') return '-';
-  return `N${Number(amount).toLocaleString()}`;
+  return `₦${Number(amount).toLocaleString()}`;
 };
 
 const formatDate = (value) => {

@@ -219,7 +219,7 @@ const Properties = () => {
     (item) => String(item.id) === String(requestForm.state_id)
   );
   const availableRequestLgas = selectedRequestState?.lgas || [];
-  const alertRequestFeeLabel = `N${Number(
+  const alertRequestFeeLabel = `₦${Number(
     alertPricing.amount || 5000
   ).toLocaleString()}`;
 
@@ -523,7 +523,7 @@ const Properties = () => {
         .filter(Boolean)
         .join(', ')
     : '';
-  const locationAccessFeeLabel = `N${Number(
+  const locationAccessFeeLabel = `₦${Number(
     locationAccessRequirement?.amount || 10000
   ).toLocaleString()}`;
 

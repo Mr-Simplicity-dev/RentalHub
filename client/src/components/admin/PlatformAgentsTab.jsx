@@ -248,9 +248,9 @@ const PlatformAgentsTab = () => {
             registration, an entry is automatically created here and linked to the assigned agent user.
           </p>
           <p>
-            <strong>Agent access fee (N5,000):</strong> When a landlord uses RentalHub NG agents, a one-time
-            N5,000 fee is charged. N2,800 goes to the assigned agent, N500 to the landlord's lawyer (if any),
-            N800 to the super admin, N100 to the state admin, and the remainder to the super admin.
+            <strong>Agent access fee (₦5,000):</strong> When a landlord uses RentalHub NG agents, a one-time
+            ₦5,000 fee is charged. ₦2,800 goes to the assigned agent, ₦500 to the landlord's lawyer (if any),
+            ₦800 to the super admin, ₦100 to the state admin, and the remainder to the super admin.
           </p>
         </div>
       </div>

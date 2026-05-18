@@ -476,8 +476,9 @@ exports.getStateAdminDashboard = async (req, res) => {
       FROM payments p
       JOIN users u ON p.user_id = u.id
       LEFT JOIN properties prop ON p.property_id = prop.id
+      LEFT JOIN states prop_state ON prop_state.id = prop.state_id
       LEFT JOIN admin_commissions ac ON p.id = ac.payment_id AND ac.admin_id = $1
-      WHERE prop.state = $2
+      WHERE LOWER(TRIM(prop_state.state_name)) = LOWER(TRIM($2))
         AND p.created_at >= CURRENT_DATE - INTERVAL '7 days'
         AND p.payment_status = 'completed'
       ORDER BY p.created_at DESC

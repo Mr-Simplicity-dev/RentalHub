@@ -75,9 +75,9 @@ export default function WalletWithdrawModal({
                 <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
                   <FaExclamationTriangle className="mt-0.5 shrink-0" />
                   <span>
-                    {(propertyFeeReserve.fee_label || 'Landlord Property Charges')} reserve: N{Number(propertyFeeReserve.amount_due || 0).toLocaleString()} is due on{' '}
+                    {(propertyFeeReserve.fee_label || 'Landlord Property Charges')} reserve: ₦{Number(propertyFeeReserve.amount_due || 0).toLocaleString()} is due on{' '}
                     {new Date(propertyFeeReserve.due_at).toLocaleDateString()}. You can withdraw up to{' '}
-                    N{Number(propertyFeeReserve.available_after_reserve || 0).toLocaleString()} while this reserve is active.
+                    ₦{Number(propertyFeeReserve.available_after_reserve || 0).toLocaleString()} while this reserve is active.
                   </span>
                 </div>
               )}

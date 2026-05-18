@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 
 const currency = (amount) =>
   Number.isFinite(Number(amount))
-    ? `N${Math.round(Number(amount)).toLocaleString('en-NG')}`
+    ? `₦${Math.round(Number(amount)).toLocaleString('en-NG')}`
     : 'N/A';
 
 const PropertyCard = ({ property }) => (

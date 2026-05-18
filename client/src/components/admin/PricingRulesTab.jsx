@@ -189,7 +189,7 @@ const PricingRulesTab = () => {
                 {target.label}
               </p>
               <p className="mt-1 text-sm text-gray-600">
-                Base fee: N{Number(target.base_amount || 0).toLocaleString()}
+                Base fee: ₦{Number(target.base_amount || 0).toLocaleString()}
               </p>
             </div>
           ))}
@@ -365,7 +365,7 @@ const PricingRulesTab = () => {
                     <td className="p-3">{target?.label || rule.applies_to}</td>
                     <td className="p-3">{rule.state_name}</td>
                     <td className="p-3">{rule.lga_name || 'Whole state'}</td>
-                    <td className="p-3">N{Number(rule.amount || 0).toLocaleString()}</td>
+                    <td className="p-3">₦{Number(rule.amount || 0).toLocaleString()}</td>
                     <td className="p-3">
                       <span
                         className={`rounded-full px-2 py-1 text-xs ${

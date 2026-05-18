@@ -11,11 +11,11 @@ const FLAG_META = {
   },
   landlord_registration_payment: {
     label: "Landlord Registration Payment",
-    description: "Require landlord registration payment before account creation. Base fee is N5,000 and location pricing rules can override it.",
+    description: "Require landlord registration payment before account creation. Base fee is ₦5,000 and location pricing rules can override it.",
   },
   property_alert_payment: {
     label: "Property Alert Payment",
-    description: 'Require payment before processing "Notify me when available" requests. Base fee is N5,000 and location pricing rules can override it.',
+    description: 'Require payment before processing "Notify me when available" requests. Base fee is ₦5,000 and location pricing rules can override it.',
   },
   ads_enabled: {
     label: "Ad Spaces",
@@ -23,7 +23,7 @@ const FLAG_META = {
   },
   tenant_landlord_referrals: {
     label: "Tenant & Landlord Referrals",
-    description: "Allow tenants and landlords to share invite links and earn N1,000 subscription credit for each successful registration.",
+    description: "Allow tenants and landlords to share invite links and earn ₦1,000 subscription credit for each successful registration.",
   },
   nin_number: {
     label: "NIN Requirement",
