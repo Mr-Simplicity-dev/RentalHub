@@ -691,7 +691,10 @@ const validateAndPrepareRegistration = async (payload) => {
       full_name: cleanFullName,
       cleanLawyerEmail,
             useRentalhubLawyers: use_rentalhub_lawyers === true || use_rentalhub_lawyers === 'true',
-      useRentalhubAgents: use_rentalhub_agents === true || use_rentalhub_agents === 'true',
+      // Agents are only available for landlords — ignore the flag for tenants
+      useRentalhubAgents:
+        user_type === 'landlord' &&
+        (use_rentalhub_agents === true || use_rentalhub_agents === 'true'),
         user_type,
       cleanNIN,
       ninVerified,
@@ -1411,9 +1414,11 @@ exports.initializeRegistrationPayment = async (req, res) => {
       req.body.use_rentalhub_lawyers === true ||
       req.body.use_rentalhub_lawyers === 'true';
 
+    // Agents are only available for landlords, not tenants
     const useRentalHubAgents =
-      req.body.use_rentalhub_agents === true ||
-      req.body.use_rentalhub_agents === 'true';
+      preparedRegistration.user_type === 'landlord' &&
+      (req.body.use_rentalhub_agents === true ||
+       req.body.use_rentalhub_agents === 'true');
 
     // Preserve the pure base amount before adding on fees
     const baseAmount = Number(registrationPricing.amount || 0);
@@ -1462,9 +1467,8 @@ exports.initializeRegistrationPayment = async (req, res) => {
           state_id: registrationPricing.location?.state_id || null,
           lga_name: registrationPricing.location?.lga_name || null,
           password_hash: passwordHash,
-          // Store the base fee separately so createUserFromPreparedRegistration
-          // can record only the base as general_platform_fee (add-on fees get
-          // their own dedicated payment records inside that function).
+          // Store base fee so createUserFromPreparedRegistration records only
+          // the base as general_platform_fee (add-ons get their own records).
           base_registration_amount: baseAmount,
         }),
         verificationMeta ? JSON.stringify(verificationMeta) : null
