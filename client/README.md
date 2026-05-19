@@ -192,7 +192,7 @@ The tenant dashboard now shows:
 1. Run the migration:
 ```bash
 # Apply the transportation schema
-psql -d your_database -f migrations/013_transportation_services.sql
+psql -d your_database -f migrations/013_lawyer_case_notes.sql
 ```
 
 2. Restart the server:

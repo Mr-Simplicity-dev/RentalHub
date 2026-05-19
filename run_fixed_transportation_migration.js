@@ -15,10 +15,10 @@ async function runFixedTransportationMigration() {
   const client = await pool.connect();
   
   try {
-    console.log('Starting fixed transportation admin monitoring migration...');
+    console.log('Starting transportation admin monitoring migration...');
     
-    // Read the fixed migration file
-    const migrationPath = path.join(__dirname, 'migrations', '032_transportation_admin_monitoring_fixed.sql');
+    // Read the canonical migration file
+    const migrationPath = path.join(__dirname, 'migrations', '032_transportation_admin_monitoring.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
     
     // Run the migration
@@ -26,7 +26,7 @@ async function runFixedTransportationMigration() {
     await client.query(migrationSQL);
     await client.query('COMMIT');
     
-    console.log('Fixed transportation admin monitoring migration completed successfully!');
+    console.log('Transportation admin monitoring migration completed successfully!');
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Migration failed:', error.message);

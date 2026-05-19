@@ -115,9 +115,10 @@ SELECT
   COUNT(DISTINCT ts.id) as available_services
 FROM state_admin_transportation_jurisdiction saj
 JOIN users u ON saj.state_admin_id = u.id
+LEFT JOIN states state_lookup ON state_lookup.name = saj.state
 LEFT JOIN properties p ON (
-  (saj.city IS NULL AND p.state = saj.state) OR
-  (saj.city IS NOT NULL AND p.state = saj.state AND p.city = saj.city)
+  p.state_id = state_lookup.id
+  AND (saj.city IS NULL OR p.city = saj.city)
 )
 LEFT JOIN transportation_bookings tb ON p.id = tb.property_id
 LEFT JOIN transportation_services ts ON ts.is_active = TRUE
@@ -141,7 +142,7 @@ SELECT
   u.full_name as super_admin_name,
   u.email as super_admin_email,
   COUNT(DISTINCT CASE WHEN sao.oversight_level = 'national' THEN tb.id 
-                      WHEN sao.oversight_level = 'state' AND p.state = sao.state THEN tb.id
+                      WHEN sao.oversight_level = 'state' AND booking_state.name = sao.state THEN tb.id
                  END) as oversight_bookings,
   COUNT(DISTINCT CASE WHEN sao.oversight_level = 'national' THEN ts.id 
                       WHEN sao.oversight_level = 'state' THEN ts.id
@@ -153,6 +154,7 @@ FROM super_admin_transportation_oversight sao
 JOIN users u ON sao.super_admin_id = u.id
 LEFT JOIN transportation_bookings tb ON 1=1
 LEFT JOIN properties p ON tb.property_id = p.id
+LEFT JOIN states booking_state ON booking_state.id = p.state_id
 LEFT JOIN transportation_services ts ON ts.is_active = TRUE
 LEFT JOIN state_admin_transportation_jurisdiction saj ON 1=1
 WHERE u.user_type IN ('super_admin', 'super_financial_admin', 'super_support_admin')

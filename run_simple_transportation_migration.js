@@ -15,12 +15,12 @@ async function runSimpleTransportationMigration() {
   const client = await pool.connect();
 
   try {
-    console.log('Starting simplified transportation admin monitoring migration...');
+    console.log('Starting transportation admin monitoring migration...');
 
     const migrationPath = path.join(
       __dirname,
       'migrations',
-      '032_transportation_admin_monitoring_simple.sql'
+      '032_transportation_admin_monitoring.sql'
     );
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
 
@@ -28,7 +28,7 @@ async function runSimpleTransportationMigration() {
     await client.query(migrationSQL);
     await client.query('COMMIT');
 
-    console.log('Simplified transportation admin monitoring migration completed successfully!');
+    console.log('Transportation admin monitoring migration completed successfully!');
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Migration failed:', error.message);

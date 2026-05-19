@@ -11,7 +11,9 @@ const runMigrations = async () => {
       process.exit(0);
     }
 
-    const files = fs.readdirSync(migrationsPath).sort();
+    const files = fs.readdirSync(migrationsPath)
+      .filter((file) => file.endsWith('.sql') && fs.statSync(path.join(migrationsPath, file)).isFile())
+      .sort();
 
     for (const file of files) {
       const migrationName = file;

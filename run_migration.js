@@ -15,10 +15,10 @@ async function runMigration() {
   const client = await pool.connect();
   
   try {
-    console.log('Starting transportation migration...');
+    console.log('Starting merged lawyer/transportation migration...');
     
     // Read the migration file
-    const migrationPath = path.join(__dirname, 'migrations', '013_transportation_services.sql');
+    const migrationPath = path.join(__dirname, 'migrations', '013_lawyer_case_notes.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
     
     // Run the migration
@@ -26,7 +26,7 @@ async function runMigration() {
     await client.query(migrationSQL);
     await client.query('COMMIT');
     
-    console.log('Transportation migration completed successfully!');
+    console.log('Merged lawyer/transportation migration completed successfully!');
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Migration failed:', error.message);

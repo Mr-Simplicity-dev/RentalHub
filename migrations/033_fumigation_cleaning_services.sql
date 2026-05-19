@@ -253,10 +253,57 @@ CREATE TABLE IF NOT EXISTS safety_compliance_records (
 );
 
 -- ============================================
--- INSERT SAMPLE DATA
+-- INDEXES AND UPDATED_AT TRIGGERS
 -- ============================================
 
--- Insert Service Categories (if not exists)
+CREATE INDEX IF NOT EXISTS idx_fc_bookings_tenant ON fumigation_cleaning_bookings(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_fc_bookings_property ON fumigation_cleaning_bookings(property_id);
+CREATE INDEX IF NOT EXISTS idx_fc_bookings_service ON fumigation_cleaning_bookings(service_id);
+CREATE INDEX IF NOT EXISTS idx_fc_bookings_status ON fumigation_cleaning_bookings(booking_status);
+CREATE INDEX IF NOT EXISTS idx_fc_bookings_payment_status ON fumigation_cleaning_bookings(payment_status);
+CREATE INDEX IF NOT EXISTS idx_fc_bookings_date ON fumigation_cleaning_bookings(booking_date);
+CREATE INDEX IF NOT EXISTS idx_fc_services_category ON fumigation_cleaning_services(category_id);
+CREATE INDEX IF NOT EXISTS idx_fc_services_active ON fumigation_cleaning_services(is_active);
+CREATE INDEX IF NOT EXISTS idx_service_addons_service ON service_addons(service_id);
+CREATE INDEX IF NOT EXISTS idx_providers_active ON service_providers(is_active);
+CREATE INDEX IF NOT EXISTS idx_booking_provider ON booking_provider_assignments(booking_id, provider_id);
+CREATE INDEX IF NOT EXISTS idx_payments_booking ON fumigation_payments(booking_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_booking ON service_reviews(booking_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_service ON service_reviews(service_id);
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_fc_categories_updated_at ON fumigation_cleaning_categories;
+DROP TRIGGER IF EXISTS update_fc_services_updated_at ON fumigation_cleaning_services;
+DROP TRIGGER IF EXISTS update_fc_bookings_updated_at ON fumigation_cleaning_bookings;
+DROP TRIGGER IF EXISTS update_service_reviews_updated_at ON service_reviews;
+
+CREATE TRIGGER update_fc_categories_updated_at
+    BEFORE UPDATE ON fumigation_cleaning_categories
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_fc_services_updated_at
+    BEFORE UPDATE ON fumigation_cleaning_services
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_fc_bookings_updated_at
+    BEFORE UPDATE ON fumigation_cleaning_bookings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_service_reviews_updated_at
+    BEFORE UPDATE ON service_reviews
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SEED DATA
+-- ============================================
+
 INSERT INTO fumigation_cleaning_categories (category_name, category_type, description, icon_url) VALUES
     ('General Fumigation', 'fumigation', 'Complete pest elimination for all types of properties', '/icons/fumigation.png'),
     ('Deep Cleaning', 'cleaning', 'Thorough cleaning for move-in/move-out situations', '/icons/cleaning.png'),
@@ -266,64 +313,72 @@ INSERT INTO fumigation_cleaning_categories (category_name, category_type, descri
     ('Disinfection Services', 'cleaning', 'Medical-grade disinfection for health safety', '/icons/disinfection.png')
 ON CONFLICT (category_name) DO NOTHING;
 
--- Insert Fumigation Services (if not exists)
 INSERT INTO fumigation_cleaning_services (
     category_id, service_name, service_description, property_type, property_size,
     base_price, price_per_sqm, min_price, max_price, duration_hours, team_size,
     equipment_included, chemicals_used, certifications_required, safety_guidelines
-) VALUES
-    -- General Fumigation Services
-    ((SELECT id FROM fumigation_cleaning_categories WHERE category_name = 'General Fumigation'), 
-     'Basic Apartment Fumigation', 'Complete pest control for small apartments', 'apartment', 'small',
-     15000.00, 200.00, 15000.00, 25000.00, 3.0, 2,
-     '["Fogging Machine", "Sprayers", "Protective Gear"]',
-     '["Pyrethroid-based insecticide", "IGR (Insect Growth Regulator)"]',
-     '["NAFDAC Certified", "Environmental Safety Certified"]',
-     'Vacate property for 4 hours after treatment. Keep pets away for 24 hours.'
-    ),
-    ((SELECT id FROM fumigation_cleaning_categories WHERE category_name = 'General Fumigation'), 
-     'Premium House Fumigation', 'Comprehensive fumigation for large houses', 'house', 'large',
-     35000.00, 250.00, 35000.00, 60000.00, 6.0, 3,
-     '["Industrial Fogger", "Spray Systems", "Full PPE"]',
-     '["Professional-grade insecticide", "Residual Spray", "Bait Stations"]',
-     '["NAFDAC Certified", "LASEPA Approved", "Safety Certified"]',
-     'Property must be vacant for 6 hours. No re-entry for 24 hours for sensitive individuals.'
-    ),
-    
-    -- Deep Cleaning Services
-    ((SELECT id FROM fumigation_cleaning_categories WHERE category_name = 'Deep Cleaning'), 
-     'Move-In Deep Clean', 'Complete cleaning for new tenants', 'apartment', 'medium',
-     20000.00, 150.00, 20000.00, 35000.00, 5.0, 3,
-     '["Industrial Vacuum", "Steam Cleaner", "Scrubbers"]',
-     '["Eco-friendly cleaners", "Disinfectants", "Degreasers"]',
-     '["Cleaning Certification", "Safety Trained"]',
-     'Provide access to all areas. Remove personal items from surfaces.'
-    ),
-    ((SELECT id FROM fumigation_cleaning_categories WHERE category_name = 'Deep Cleaning'), 
-     'Move-Out Cleaning', 'Professional cleaning for property handover', 'house', 'large',
-     30000.00, 200.00, 30000.00, 50000.00, 8.0, 4,
-     '["Pressure Washer", "Window Cleaning Kit", "Floor Polisher"]',
-     '["Heavy-duty cleaners", "Stain Removers", "Sanitizers"]',
-     '["Professional Cleaning License", "Insurance Certified"]',
-     'All personal items must be removed. Provide electricity and water access.'
-    )
-ON CONFLICT (service_name) DO NOTHING;
+)
+SELECT
+    category.id,
+    seed.service_name,
+    seed.service_description,
+    seed.property_type,
+    seed.property_size,
+    seed.base_price,
+    seed.price_per_sqm,
+    seed.min_price,
+    seed.max_price,
+    seed.duration_hours,
+    seed.team_size,
+    seed.equipment_included::jsonb,
+    seed.chemicals_used::jsonb,
+    seed.certifications_required::jsonb,
+    seed.safety_guidelines
+FROM (VALUES
+    ('General Fumigation', 'Basic Apartment Fumigation', 'Complete pest control for small apartments', 'apartment', 'small', 15000.00, 200.00, 15000.00, 25000.00, 3.0, 2, '["Fogging Machine", "Sprayers", "Protective Gear"]', '["Pyrethroid-based insecticide", "IGR (Insect Growth Regulator)"]', '["NAFDAC Certified", "Environmental Safety Certified"]', 'Vacate property for 4 hours after treatment. Keep pets away for 24 hours.'),
+    ('General Fumigation', 'Premium House Fumigation', 'Comprehensive fumigation for large houses', 'house', 'large', 35000.00, 250.00, 35000.00, 60000.00, 6.0, 3, '["Industrial Fogger", "Spray Systems", "Full PPE"]', '["Professional-grade insecticide", "Residual Spray", "Bait Stations"]', '["NAFDAC Certified", "LASEPA Approved", "Safety Certified"]', 'Property must be vacant for 6 hours. No re-entry for 24 hours for sensitive individuals.'),
+    ('Deep Cleaning', 'Move-In Deep Clean', 'Complete cleaning for new tenants', 'apartment', 'medium', 20000.00, 150.00, 20000.00, 35000.00, 5.0, 3, '["Industrial Vacuum", "Steam Cleaner", "Scrubbers"]', '["Eco-friendly cleaners", "Disinfectants", "Degreasers"]', '["Cleaning Certification", "Safety Trained"]', 'Provide access to all areas. Remove personal items from surfaces.'),
+    ('Deep Cleaning', 'Move-Out Cleaning', 'Professional cleaning for property handover', 'house', 'large', 30000.00, 200.00, 30000.00, 50000.00, 8.0, 4, '["Pressure Washer", "Window Cleaning Kit", "Floor Polisher"]', '["Heavy-duty cleaners", "Stain Removers", "Sanitizers"]', '["Professional Cleaning License", "Insurance Certified"]', 'All personal items must be removed. Provide electricity and water access.')
+) AS seed(category_name, service_name, service_description, property_type, property_size, base_price, price_per_sqm, min_price, max_price, duration_hours, team_size, equipment_included, chemicals_used, certifications_required, safety_guidelines)
+JOIN fumigation_cleaning_categories category ON category.category_name = seed.category_name
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM fumigation_cleaning_services existing
+    WHERE existing.service_name = seed.service_name
+);
 
--- Insert Service Add-ons (if not exists)
-INSERT INTO service_addons (service_id, addon_name, addon_description, addon_price, duration_addition_hours) VALUES
-    ((SELECT id FROM fumigation_cleaning_services WHERE service_name = 'Basic Apartment Fumigation'), 
-     'Extended Warranty', '6-month pest-free guarantee extension', 5000.00, 0),
-    ((SELECT id FROM fumigation_cleaning_services WHERE service_name = 'Basic Apartment Fumigation'), 
-     'Follow-up Inspection', 'Post-service inspection after 2 weeks', 3000.00, 1.0),
-    ((SELECT id FROM fumigation_cleaning_services WHERE service_name = 'Move-In Deep Clean'), 
-     'Carpet Protection', 'Stain protection treatment', 8000.00, 0.5),
-    ((SELECT id FROM fumigation_cleaning_services WHERE service_name = 'Move-In Deep Clean'), 
-     'Odor Elimination', 'Professional odor removal treatment', 6000.00, 1.0)
-ON CONFLICT (service_id, addon_name) DO NOTHING;
+INSERT INTO service_addons (service_id, addon_name, addon_description, addon_price, duration_addition_hours)
+SELECT
+    service.id,
+    seed.addon_name,
+    seed.addon_description,
+    seed.addon_price,
+    seed.duration_addition_hours
+FROM (VALUES
+    ('Basic Apartment Fumigation', 'Extended Warranty', '6-month pest-free guarantee extension', 5000.00, 0),
+    ('Basic Apartment Fumigation', 'Follow-up Inspection', 'Post-service inspection after 2 weeks', 3000.00, 1.0),
+    ('Move-In Deep Clean', 'Carpet Protection', 'Stain protection treatment', 8000.00, 0.5),
+    ('Move-In Deep Clean', 'Odor Elimination', 'Professional odor removal treatment', 6000.00, 1.0)
+) AS seed(service_name, addon_name, addon_description, addon_price, duration_addition_hours)
+JOIN fumigation_cleaning_services service ON service.service_name = seed.service_name
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM service_addons existing
+    WHERE existing.service_id = service.id
+      AND existing.addon_name = seed.addon_name
+);
 
--- Insert Service Providers (if not exists)
 INSERT INTO service_providers (
-    company_name, contact_person, contact_phone, contact_email, 
+    company_name, contact_person, contact_phone, contact_email,
     license_number, certifications, service_areas, services_offered
-) VALUES
-    ('CleanPro Services Ltd', 'John Adekunle', '+2348012345678', 'info@
+)
+SELECT *
+FROM (VALUES
+    ('CleanPro Services Ltd', 'John Adekunle', '+2348012345678', 'info@cleanpro.ng', 'LAG/CLN/2023/001', '["ISO Certified", "NAFDAC Approved", "LASEPA Licensed"]'::jsonb, '["LA", "OG", "OY"]'::jsonb, '[1, 2, 3, 4]'::jsonb),
+    ('PestFree Nigeria', 'Chinwe Okoro', '+2348023456789', 'operations@pestfree.ng', 'ABJ/FUM/2023/002', '["Environmental Safety Certified", "NAFDAC Registered"]'::jsonb, '["FCT", "NA", "PL"]'::jsonb, '[1, 5]'::jsonb)
+) AS seed(company_name, contact_person, contact_phone, contact_email, license_number, certifications, service_areas, services_offered)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM service_providers existing
+    WHERE existing.company_name = seed.company_name
+);
