@@ -218,6 +218,18 @@ const Header = () => {
     navigate('/login');
   };
 
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
+
+  const handleRegisterNavigation = (event) => {
+    event.preventDefault();
+    setMobileMenuOpen(false);
+    setShowUserMenu(false);
+    setShowNotifications(false);
+    navigate(`/register?restart=${Date.now()}`);
+  };
+
   const stopImpersonation = () => {
     const originalSession = getImpersonationOriginalSession();
     if (!originalSession?.token || !originalSession?.user) {
@@ -588,7 +600,7 @@ const Header = () => {
 
 return (
   <header
-    className={`sticky top-0 z-50 w-full overflow-x-hidden transition-all duration-500 ${
+    className={`sticky top-0 z-50 w-full transition-all duration-500 ${
       scrolled
         ? 'bg-white/90 backdrop-blur-xl shadow-sm border-b border-gray-100/50'
         : 'bg-white shadow-sm'
@@ -616,7 +628,7 @@ return (
     )}
 
     {/* FIXED */}
-    <div className="container mx-auto w-full max-w-full overflow-x-hidden px-3 sm:px-4">
+    <div className="container mx-auto w-full max-w-full px-3 sm:px-4">
       {/* FIXED */}
       <div className="flex w-full min-w-0 items-center justify-between gap-2 h-16 md:h-20">
 
@@ -808,7 +820,7 @@ return (
                 </button>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-56 max-w-[90vw] bg-white rounded-2xl shadow-elevated-lg border border-gray-100 py-2 animate-scaleIn origin-top-right">
+                  <div className="absolute right-0 z-50 mt-2 w-56 max-w-[90vw] bg-white rounded-2xl shadow-elevated-lg border border-gray-100 py-2 animate-scaleIn origin-top-right">
                     <div className="border-b border-gray-100 px-4 py-3">
                       <p className="truncate text-sm font-semibold text-gray-900">{user?.full_name}</p>
                       <p className="truncate text-xs text-gray-500">
@@ -965,6 +977,7 @@ return (
 
               <Link
                 to="/register"
+                onClick={handleRegisterNavigation}
                 className="px-4 md:px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 whitespace-nowrap"
               >
                 {t('header.register')}
@@ -999,11 +1012,13 @@ return (
           <MobileNavLink
             to="/properties"
             label={t('header.browse')}
+            onClick={closeMobileMenu}
           />
 
           <MobileNavLink
             to="/verify-case"
             label="Verify Evidence"
+            onClick={closeMobileMenu}
           />
 
           {isAuthenticated &&
@@ -1011,6 +1026,7 @@ return (
               <MobileNavLink
                 to="/my-properties"
                 label={t('header.my_properties')}
+                onClick={closeMobileMenu}
               />
             )}
 
@@ -1019,6 +1035,7 @@ return (
               <MobileNavLink
                 to="/saved-properties"
                 label={t('header.saved')}
+                onClick={closeMobileMenu}
               />
             )}
 
@@ -1026,6 +1043,7 @@ return (
             <MobileNavLink
               to={roleDashboardPath}
               label={t('header.dashboard')}
+              onClick={closeMobileMenu}
             />
           )}
 
@@ -1034,11 +1052,13 @@ return (
               <MobileNavLink
                 to="/login"
                 label={t('header.login')}
+                onClick={closeMobileMenu}
               />
 
               <MobileNavLink
                 to="/register"
                 label={t('header.register')}
+                onClick={handleRegisterNavigation}
               />
             </>
           )}
@@ -1055,8 +1075,8 @@ const NavLink = ({ to, label }) => (
   </Link>
 );
 
-const MobileNavLink = ({ to, label }) => (
-  <Link to={to} className="px-4 py-3 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
+const MobileNavLink = ({ to, label, onClick }) => (
+  <Link to={to} onClick={onClick} className="px-4 py-3 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
     {label}
   </Link>
 );

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
@@ -26,6 +26,8 @@ import {
   FaWallet,
   FaHeadset,
   FaUserShield,
+  FaUserCircle,
+  FaChevronDown,
   FaBars,
   FaTimes,
 } from 'react-icons/fa';
@@ -84,10 +86,24 @@ const AdminLayout = () => {
     pendingWithdrawals: 0,
   });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
 
   useEffect(() => {
     setMobileSidebarOpen(false);
+    setProfileMenuOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return undefined;
@@ -240,6 +256,7 @@ const AdminLayout = () => {
       };
 
   const handleLogout = () => {
+    setProfileMenuOpen(false);
     logout();
     navigate('/login');
   };
@@ -384,7 +401,14 @@ const AdminLayout = () => {
           )}
         </div>
 
-                <nav className="flex-1 p-4 space-y-6">
+                <nav
+                  className="flex-1 p-4 space-y-6"
+                  onClick={(event) => {
+                    if (event.target.closest('a')) {
+                      setMobileSidebarOpen(false);
+                    }
+                  }}
+                >
 
           {/* SUPER ADMIN */}
           {isSuperAdmin && (
@@ -472,6 +496,11 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin?tab=flags" className={() => superAdminNavItem('flags')}>
                   <FaShieldAlt className="mr-3" />
                   Flags
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=registration_access" className={() => superAdminNavItem('registration_access')}>
+                  <FaMapMarkerAlt className="mr-3" />
+                  Registration Access
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=fraud" className={() => superAdminNavItem('fraud')}>
@@ -885,6 +914,77 @@ const AdminLayout = () => {
 
       {/* MAIN CONTENT */}
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 hidden items-center justify-between gap-4 border-b border-gray-200 bg-white/95 px-6 py-3 shadow-sm backdrop-blur lg:flex">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900">{roleTheme.panelTitle}</p>
+            <p className="mt-0.5 truncate text-xs text-gray-500">
+              {assignedLgaLabel || assignedStateLabel || 'Platform dashboard'}
+            </p>
+          </div>
+
+          <div className="relative shrink-0" ref={profileMenuRef}>
+            <button
+              type="button"
+              onClick={() => setProfileMenuOpen((open) => !open)}
+              className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left shadow-sm transition hover:bg-gray-50"
+              aria-expanded={profileMenuOpen}
+              aria-haspopup="menu"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white">
+                {user?.full_name?.charAt(0)?.toUpperCase() || <FaUserCircle />}
+              </span>
+              <span className="min-w-0">
+                <span className="block max-w-[180px] truncate text-sm font-semibold text-gray-900">
+                  {user?.full_name || 'Administrator'}
+                </span>
+                <span className="block max-w-[180px] truncate text-xs text-gray-500">
+                  {user?.email || roleTheme.panelTitle}
+                </span>
+              </span>
+              <FaChevronDown
+                className={`text-xs text-gray-500 transition-transform ${
+                  profileMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {profileMenuOpen && (
+              <div
+                className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-gray-100 bg-white py-2 shadow-xl"
+                role="menu"
+              >
+                <div className="border-b border-gray-100 px-4 py-3">
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {user?.full_name || 'Administrator'}
+                  </p>
+                  <p className="truncate text-xs text-gray-500">{user?.email}</p>
+                  <RoleBadge role={role} className="mt-2" />
+                </div>
+
+                <NavLink
+                  to="/profile"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50 hover:text-gray-900"
+                  onClick={() => setProfileMenuOpen(false)}
+                  role="menuitem"
+                >
+                  <FaUserCircle className="text-xs text-gray-500" />
+                  Profile
+                </NavLink>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-2.5 text-left text-sm text-red-600 transition hover:bg-red-50"
+                  role="menuitem"
+                >
+                  <FaSignOutAlt className="text-xs" />
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </header>
+
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-gray-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur lg:hidden">
           <button
             type="button"

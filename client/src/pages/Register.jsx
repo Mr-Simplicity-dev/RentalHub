@@ -12,6 +12,57 @@ const AGENT_ACCESS_FEE = 5000; // Fee for using RentalHub NG agents during regis
 const TENANT_REGISTRATION_FEE = 3000;
 const LANDLORD_REGISTRATION_FEE = 5000;
 
+const buildInitialRegistrationForm = (referralCode = '') => ({
+  user_type: 'tenant',
+  full_name: '',
+  email: '',
+  lawyer_email: '',
+  use_rentalhub_lawyers: false,
+  use_rentalhub_agents: false,
+  phone: '',
+  add_agent: false,
+  agent_full_name: '',
+  agent_email: '',
+  agent_phone: '',
+  password: '',
+  confirm_password: '',
+  is_foreigner: false,
+  nin: '',
+  international_passport_number: '',
+  nationality: '',
+  state_id: '',
+  lga_name: '',
+  referral_code: referralCode,
+});
+
+const initialRegistrationFlags = {
+  loaded: false,
+  allow_registration: true,
+  registration_allowed: true,
+  registration_global_allowed: true,
+  registration_master_enabled: true,
+  registration_location_restricted: false,
+  registration_access_message: null,
+  nin_number: true,
+  passport_number: true,
+  tenant_registration_payment: false,
+  landlord_registration_payment: false,
+};
+
+const buildInitialRegistrationPricing = (userType = 'tenant') => {
+  const amount = userType === 'landlord'
+    ? LANDLORD_REGISTRATION_FEE
+    : TENANT_REGISTRATION_FEE;
+
+  return {
+    amount,
+    base_amount: amount,
+    location_required: false,
+    location_complete: false,
+    rule_scope: 'base',
+  };
+};
+
 const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString()}`;
 
 const Register = () => {
@@ -26,50 +77,16 @@ const Register = () => {
     searchParams.get('invite') ||
     ''
   ).trim().replace(/\s+/g, '').toUpperCase();
-  const [formData, setFormData] = useState({
-    user_type: 'tenant',
-    full_name: '',
-    email: '',
-    lawyer_email: '',
-    use_rentalhub_lawyers: false,
-    use_rentalhub_agents: false,
-    phone: '',
-    add_agent: false,
-    agent_full_name: '',
-    agent_email: '',
-    agent_phone: '',
-    password: '',
-    confirm_password: '',
-    is_foreigner: false,
-    nin: '',
-    international_passport_number: '',
-    nationality: '',
-    state_id: '',
-    lga_name: '',
-    referral_code: referralCode,
-  });
+  const restartToken = searchParams.get('restart') || '';
+  const [formData, setFormData] = useState(() =>
+    buildInitialRegistrationForm(referralCode)
+  );
   const [loading, setLoading] = useState(false);
   const [locationOptions, setLocationOptions] = useState([]);
-  const [registrationFlags, setRegistrationFlags] = useState({
-    loaded: false,
-    allow_registration: true,
-    registration_allowed: true,
-    registration_global_allowed: true,
-    registration_master_enabled: true,
-    registration_location_restricted: false,
-    registration_access_message: null,
-    nin_number: true,
-    passport_number: true,
-    tenant_registration_payment: false,
-    landlord_registration_payment: false,
-  });
-  const [registrationPricing, setRegistrationPricing] = useState({
-    amount: 3000,
-    base_amount: 3000,
-    location_required: false,
-    location_complete: false,
-    rule_scope: 'base',
-  });
+  const [registrationFlags, setRegistrationFlags] = useState(initialRegistrationFlags);
+  const [registrationPricing, setRegistrationPricing] = useState(() =>
+    buildInitialRegistrationPricing('tenant')
+  );
   const [locationPreviewProperties, setLocationPreviewProperties] = useState([]);
   const [locationPreviewLoading, setLocationPreviewLoading] = useState(false);
   const [locationPreviewNote, setLocationPreviewNote] = useState('');
@@ -582,6 +599,26 @@ const Register = () => {
 const [step, setStep] = useState(1);
 const [errors, setErrors] = useState({});
 const [termsAccepted, setTermsAccepted] = useState(false);
+
+useEffect(() => {
+  if (!restartToken || registrationReference) {
+    return;
+  }
+
+  setFormData(buildInitialRegistrationForm(referralCode));
+  setRegistrationFlags(initialRegistrationFlags);
+  setRegistrationPricing(buildInitialRegistrationPricing('tenant'));
+  setLocationPreviewProperties([]);
+  setLocationPreviewLoading(false);
+  setLocationPreviewNote('');
+  setShowPassword(false);
+  setShowConfirmPassword(false);
+  setShowRegistrationFeeModal(true);
+  setStep(1);
+  setErrors({});
+  setTermsAccepted(false);
+}, [restartToken, registrationReference, referralCode]);
+
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const referralCodePattern = /^[A-Za-z0-9_-]+$/;
 const passportPattern = /^[A-Za-z0-9]{6,20}$/;

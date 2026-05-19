@@ -121,11 +121,11 @@ const FlagsTab = ({ flags, toggleFlag }) => {
     return (
       <div
         key={f.key}
-        className={`flex items-center justify-between border border-soft rounded-lg px-4 py-3 transition ${
-          nested ? "ml-6 border-l-4 border-l-indigo-200" : ""
+        className={`flex flex-col gap-3 border border-soft rounded-lg px-4 py-3 transition sm:flex-row sm:items-center sm:justify-between ${
+          nested ? "border-l-4 border-l-indigo-300 bg-white sm:ml-6" : ""
         } ${inactive ? "bg-gray-50 opacity-70" : "hover:bg-gray-50"}`}
       >
-        <div>
+        <div className="min-w-0">
           <p className="font-medium">{meta?.label || f.key}</p>
 
           <p className="text-xs text-gray-400">{f.key}</p>
@@ -141,7 +141,7 @@ const FlagsTab = ({ flags, toggleFlag }) => {
           )}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-center gap-4">
           <span
             className={`px-2 py-1 text-xs rounded-full ${
               effectiveEnabled
@@ -207,15 +207,28 @@ const FlagsTab = ({ flags, toggleFlag }) => {
               </p>
             </div>
 
-            {renderFlagRow(parentFlag)}
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
+              {renderFlagRow(parentFlag)}
 
-            <div className="space-y-3">
-              {childFlags.map((flag) =>
-                renderFlagRow(flag, {
-                  nested: true,
-                  inactive: !registrationMasterEnabled,
-                })
-              )}
+              <div className="mt-3 border-t border-indigo-100 pt-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1 sm:pl-6">
+                  <p className="text-sm font-semibold text-indigo-900">
+                    Tenant and landlord switches under Allow Registration
+                  </p>
+                  <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-indigo-700">
+                    {registrationMasterEnabled ? "Master on" : "Master off"}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {childFlags.map((flag) =>
+                    renderFlagRow(flag, {
+                      nested: true,
+                      inactive: !registrationMasterEnabled,
+                    })
+                  )}
+                </div>
+              </div>
             </div>
 
             {otherRegistrationFlags.length > 0 && (
