@@ -291,6 +291,31 @@ router.post('/pricing-rules', authenticate, requireSuperAdmin, superCtrl.createP
 router.patch('/pricing-rules/:ruleId', authenticate, requireSuperAdmin, superCtrl.updatePricingRule);
 router.delete('/pricing-rules/:ruleId', authenticate, requireSuperAdmin, superCtrl.removePricingRule);
 
+router.get(
+  '/registration-access-rules',
+  authenticate,
+  requireSuperAdmin,
+  superCtrl.getRegistrationAccessRules
+);
+router.post(
+  '/registration-access-rules',
+  authenticate,
+  requireSuperAdmin,
+  superCtrl.createRegistrationAccessRuleHandler
+);
+router.patch(
+  '/registration-access-rules/:ruleId',
+  authenticate,
+  requireSuperAdmin,
+  superCtrl.updateRegistrationAccessRuleHandler
+);
+router.delete(
+  '/registration-access-rules/:ruleId',
+  authenticate,
+  requireSuperAdmin,
+  superCtrl.removeRegistrationAccessRule
+);
+
 router.get('/fraud', authenticate, requireSuperAdmin, superCtrl.getFraudFlags);
 router.patch('/fraud/:id/resolve', authenticate, requireSuperAdmin, superCtrl.resolveFraudFlag);
 

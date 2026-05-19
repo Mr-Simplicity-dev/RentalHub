@@ -14,6 +14,13 @@ const {
   updateLocationPricingRule,
 } = require('../config/utils/locationPricing');
 const {
+  createRegistrationAccessRule,
+  deleteRegistrationAccessRule,
+  getRegistrationAccessTargets,
+  listRegistrationAccessRules,
+  updateRegistrationAccessRule,
+} = require('../config/utils/registrationAccess');
+const {
   PLATFORM_LAWYER_RECRUITMENT_BROADCAST_TYPE,
   PLATFORM_LAWYER_INVITE_EXPIRY_HOURS,
   createPlatformLawyerInvite,
@@ -2177,6 +2184,119 @@ const removePricingRule = async (req, res) => {
   }
 };
 
+const getRegistrationAccessRules = async (req, res) => {
+  try {
+    const [rules, locations] = await Promise.all([
+      listRegistrationAccessRules(),
+      getLocationOptions(),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        rules,
+        targets: getRegistrationAccessTargets(),
+        locations,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Failed to load registration access rules' });
+  }
+};
+
+const createRegistrationAccessRuleHandler = async (req, res) => {
+  try {
+    const rule = await createRegistrationAccessRule({
+      appliesTo: req.body.applies_to,
+      stateId: req.body.state_id,
+      lgaName: req.body.lga_name,
+      isActive: req.body.is_active !== false,
+    });
+
+    await logAction(
+      req.user.id,
+      'CREATE_REGISTRATION_ACCESS_RULE',
+      'registration_access_rule',
+      rule.id
+    );
+
+    res.status(201).json({
+      success: true,
+      data: rule,
+    });
+  } catch (error) {
+    console.error(error);
+
+    if (error.code === '23505') {
+      return res.status(409).json({
+        message:
+          'A registration access rule already exists for that role and location',
+      });
+    }
+
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to create registration access rule',
+    });
+  }
+};
+
+const updateRegistrationAccessRuleHandler = async (req, res) => {
+  try {
+    const rule = await updateRegistrationAccessRule(req.params.ruleId, {
+      appliesTo: req.body.applies_to,
+      stateId: req.body.state_id,
+      lgaName: req.body.lga_name,
+      isActive: req.body.is_active !== false,
+    });
+
+    await logAction(
+      req.user.id,
+      'UPDATE_REGISTRATION_ACCESS_RULE',
+      'registration_access_rule',
+      rule.id
+    );
+
+    res.json({
+      success: true,
+      data: rule,
+    });
+  } catch (error) {
+    console.error(error);
+
+    if (error.code === '23505') {
+      return res.status(409).json({
+        message:
+          'A registration access rule already exists for that role and location',
+      });
+    }
+
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to update registration access rule',
+    });
+  }
+};
+
+const removeRegistrationAccessRule = async (req, res) => {
+  try {
+    await deleteRegistrationAccessRule(req.params.ruleId);
+
+    await logAction(
+      req.user.id,
+      'DELETE_REGISTRATION_ACCESS_RULE',
+      'registration_access_rule',
+      req.params.ruleId
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to delete registration access rule',
+    });
+  }
+};
+
 // fraud
 const getFraudFlags = async (req, res) => {
   try {
@@ -2549,6 +2669,10 @@ module.exports = {
   createPricingRule,
   updatePricingRule,
   removePricingRule,
+  getRegistrationAccessRules,
+  createRegistrationAccessRuleHandler,
+  updateRegistrationAccessRuleHandler,
+  removeRegistrationAccessRule,
   getFraudFlags,
   resolveFraudFlag,
   getLawyerActivities,

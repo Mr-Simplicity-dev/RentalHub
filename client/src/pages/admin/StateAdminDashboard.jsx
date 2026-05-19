@@ -24,6 +24,7 @@ import Button from '../../components/common/Button';
 import useRetryableAction from '../../hooks/useRetryableAction';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
+import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 
 const StateAdminDashboard = ({ initialTab = 'overview' }) => {
   const navigate = useNavigate();
@@ -375,10 +376,13 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       </div>
 
       {activeTab === 'property_requests' && (
-        <PropertyRequestWorkflowPanel
-          mode="state"
-          title="Assigned Tenant Property Requests"
-        />
+        <div className="space-y-6">
+          <PropertyRequestWorkflowPanel
+            mode="state"
+            title="Assigned Tenant Property Requests"
+          />
+          <TenancyWorkflowPanel title="State Tenancy Grace and Refund Enablement" />
+        </div>
       )}
 
       {/* Stats Cards */}

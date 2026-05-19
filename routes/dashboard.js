@@ -6,6 +6,7 @@ const { authenticate, isTenant, isLandlord } = require("../config/middleware/aut
 let tenantDashboardSchemaReady = false;
 let lawyerInviteDashboardSchemaReady = false;
 let propertyLocationColumnsReady = false;
+let tenancyWorkflowDashboardSchemaReady = false;
 
 const ensureTenantDashboardSchema = async () => {
   if (tenantDashboardSchemaReady) return;
@@ -64,6 +65,67 @@ const ensurePropertyLocationColumns = async () => {
   propertyLocationColumnsReady = true;
 };
 
+const ensureTenancyWorkflowDashboardSchema = async () => {
+  if (tenancyWorkflowDashboardSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS refund_requests (
+      id SERIAL PRIMARY KEY,
+      payment_id INTEGER NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+      tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      landlord_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+      amount DECIMAL(12,2) NOT NULL,
+      reason VARCHAR(100) NOT NULL,
+      details TEXT,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at TIMESTAMP,
+      refunded_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      landlord_note TEXT,
+      refund_type VARCHAR(20) NOT NULL DEFAULT 'full',
+      refund_months INTEGER,
+      approved_amount NUMERIC(12,2)
+    );
+
+    CREATE TABLE IF NOT EXISTS tenancy_adjustment_requests (
+      id SERIAL PRIMARY KEY,
+      request_type VARCHAR(30) NOT NULL DEFAULT 'grace_period',
+      payment_id INTEGER NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+      tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      landlord_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+      tenancy_expires_at TIMESTAMP,
+      requested_duration_days INTEGER,
+      requested_duration_months INTEGER,
+      approved_duration_days INTEGER,
+      approved_duration_months INTEGER,
+      tenant_note TEXT,
+      landlord_note TEXT,
+      admin_note TEXT,
+      feature_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      enabled_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      enabled_at TIMESTAMP,
+      status VARCHAR(30) NOT NULL DEFAULT 'pending_admin_review',
+      grace_ends_at TIMESTAMP,
+      requested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at TIMESTAMP,
+      landlord_reviewed_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    ALTER TABLE refund_requests
+      ADD COLUMN IF NOT EXISTS request_category VARCHAR(40) NOT NULL DEFAULT 'standard_refund',
+      ADD COLUMN IF NOT EXISTS refund_due_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS feature_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+  `);
+
+  tenancyWorkflowDashboardSchemaReady = true;
+};
+
 // =====================================================
 //                 TENANT DASHBOARD STATS
 // =====================================================
@@ -72,6 +134,7 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
   try {
     await ensureTenantDashboardSchema();
     await ensureLawyerInviteDashboardSchema();
+    await ensureTenancyWorkflowDashboardSchema();
     const userId = req.user.id;
 
     const stats = await db.query(
@@ -86,6 +149,29 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
         ) AS saved_properties_count,
         (SELECT COUNT(*) FROM applications WHERE tenant_id = $1) AS total_applications,
         (SELECT COUNT(*) FROM tenant_property_unlocks WHERE tenant_id = $1) AS unlocked_properties_count,
+        (SELECT COUNT(*) FROM refund_requests WHERE tenant_id = $1) AS refund_requests_count,
+        (
+          SELECT COUNT(*)
+          FROM tenancy_adjustment_requests
+          WHERE tenant_id = $1
+            AND request_type = 'grace_period'
+        ) AS grace_period_requests_count,
+        (
+          SELECT MIN(refund_due_at)
+          FROM refund_requests
+          WHERE tenant_id = $1
+            AND request_category = 'early_exit_refund'
+            AND status IN ('pending', 'approved')
+            AND refund_due_at IS NOT NULL
+        ) AS next_refund_due_at,
+        (
+          SELECT MIN(grace_ends_at)
+          FROM tenancy_adjustment_requests
+          WHERE tenant_id = $1
+            AND request_type = 'grace_period'
+            AND status = 'landlord_approved'
+            AND grace_ends_at IS NOT NULL
+        ) AS next_grace_ends_at,
         (SELECT COUNT(*) FROM messages WHERE receiver_id = $1 AND is_read = FALSE) AS unread_messages,
         (SELECT subscription_expires_at FROM users WHERE id = $1) AS subscription_expires_at,
         (
@@ -261,6 +347,7 @@ router.get("/tenant/paid-property-locations", authenticate, isTenant, async (req
 router.get("/landlord/stats", authenticate, isLandlord, async (req, res) => {
   try {
     await ensureLawyerInviteDashboardSchema();
+    await ensureTenancyWorkflowDashboardSchema();
     const userId = req.user.id;
 
     const stats = await db.query(
@@ -270,6 +357,41 @@ router.get("/landlord/stats", authenticate, isLandlord, async (req, res) => {
         (SELECT COUNT(*) FROM properties WHERE landlord_id = $1 AND featured = TRUE) AS featured_properties,
         (SELECT COUNT(*) FROM applications a JOIN properties p ON a.property_id = p.id WHERE p.landlord_id = $1) AS total_applications,
         (SELECT COUNT(*) FROM applications a JOIN properties p ON a.property_id = p.id WHERE p.landlord_id = $1 AND a.status = 'pending') AS pending_applications,
+        (
+          SELECT COUNT(*)
+          FROM refund_requests rr
+          WHERE rr.landlord_id = $1
+            AND rr.status = 'pending'
+            AND (
+              rr.request_category <> 'early_exit_refund'
+              OR rr.feature_enabled = TRUE
+            )
+        ) AS pending_refunds_count,
+        (
+          SELECT COUNT(*)
+          FROM tenancy_adjustment_requests tar
+          WHERE tar.landlord_id = $1
+            AND tar.request_type = 'grace_period'
+            AND tar.status = 'enabled'
+            AND tar.feature_enabled = TRUE
+        ) AS pending_grace_period_count,
+        (
+          SELECT MIN(refund_due_at)
+          FROM refund_requests rr
+          WHERE rr.landlord_id = $1
+            AND rr.request_category = 'early_exit_refund'
+            AND rr.feature_enabled = TRUE
+            AND rr.status IN ('pending', 'approved')
+            AND rr.refund_due_at IS NOT NULL
+        ) AS next_refund_due_at,
+        (
+          SELECT MIN(grace_ends_at)
+          FROM tenancy_adjustment_requests tar
+          WHERE tar.landlord_id = $1
+            AND tar.request_type = 'grace_period'
+            AND tar.status = 'landlord_approved'
+            AND tar.grace_ends_at IS NOT NULL
+        ) AS next_grace_ends_at,
         (SELECT COUNT(*) FROM messages WHERE receiver_id = $1 AND is_read = FALSE) AS unread_messages,
         (SELECT subscription_expires_at FROM users WHERE id = $1) AS subscription_expires_at,
         (SELECT SUM(amount) FROM payments WHERE user_id = $1 AND payment_type = 'landlord_listing' AND payment_status = 'completed') AS total_spent,

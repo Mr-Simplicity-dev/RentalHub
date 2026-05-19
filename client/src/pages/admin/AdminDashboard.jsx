@@ -15,6 +15,7 @@ import {
 } from 'react-icons/fa';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
+import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -185,10 +186,13 @@ const AdminDashboard = () => {
         </div>
 
         {activeTab === 'property_requests' && (
-          <PropertyRequestWorkflowPanel
-            mode="state"
-            title="LGA Tenant Property Requests"
-          />
+          <div className="space-y-6">
+            <PropertyRequestWorkflowPanel
+              mode="state"
+              title="LGA Tenant Property Requests"
+            />
+            <TenancyWorkflowPanel title="LGA Tenancy Grace and Refund Enablement" />
+          </div>
         )}
 
         {activeTab !== 'property_requests' && (

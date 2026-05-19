@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 const db = require('./database');
+const {
+  evaluateRegistrationAccess,
+  isGlobalRegistrationEnabled,
+} = require('../utils/registrationAccess');
 
 const DEFAULT_FEATURE_FLAGS = [
   {
@@ -15,7 +19,17 @@ const DEFAULT_FEATURE_FLAGS = [
   {
     key: 'allow_registration',
     enabled: true,
-    description: 'Allow new tenants and landlords to register.',
+    description: 'Master switch for all registration. When off, tenant and landlord registration are disabled.',
+  },
+  {
+    key: 'allow_tenant_registration',
+    enabled: true,
+    description: 'Allow tenant registration when the master registration switch is on.',
+  },
+  {
+    key: 'allow_landlord_registration',
+    enabled: true,
+    description: 'Allow landlord registration when the master registration switch is on.',
   },
   {
     key: 'maintenance_mode',
@@ -96,7 +110,32 @@ const ensureFeatureFlagsTable = async (options = {}) => {
 
   if (shouldSyncDefaults) {
     await syncDefaultFeatureFlags();
+    await migrateLegacyRegistrationFlags();
   }
+};
+
+const migrateLegacyRegistrationFlags = async () => {
+  await db.query(`
+    INSERT INTO feature_flags (key, enabled, description)
+    SELECT
+      'allow_tenant_registration',
+      enabled,
+      'Allow new tenants to register.'
+    FROM feature_flags
+    WHERE key = 'allow_registration'
+    ON CONFLICT (key) DO NOTHING
+  `);
+
+  await db.query(`
+    INSERT INTO feature_flags (key, enabled, description)
+    SELECT
+      'allow_landlord_registration',
+      enabled,
+      'Allow new landlords to register.'
+    FROM feature_flags
+    WHERE key = 'allow_registration'
+    ON CONFLICT (key) DO NOTHING
+  `);
 };
 
 const getFeatureFlagsMap = async () => {
@@ -187,8 +226,44 @@ const enforceFlags = async (req, res, next) => {
         req.path === '/auth/register/tenant-payment'
       );
 
-    if (!flags.allow_registration && (isDirectRegistrationRequest || isRegistrationPaymentInitRequest)) {
-      return res.status(403).json({ message: 'Registration disabled' });
+    if (isDirectRegistrationRequest || isRegistrationPaymentInitRequest) {
+      const body = req.body || {};
+      const registrationUserType = String(body.user_type || '').trim().toLowerCase();
+
+      if (!['tenant', 'landlord'].includes(registrationUserType)) {
+        return res.status(400).json({ message: 'Registration user type must be tenant or landlord' });
+      }
+
+      if (!flags.allow_registration) {
+        return res.status(403).json({ message: 'Registration disabled' });
+      }
+
+      if (!isGlobalRegistrationEnabled(flags, registrationUserType)) {
+        return res.status(403).json({
+          message:
+            registrationUserType === 'tenant'
+              ? 'Tenant registration disabled'
+              : 'Landlord registration disabled',
+        });
+      }
+
+      try {
+        const access = await evaluateRegistrationAccess({
+          userType: registrationUserType,
+          flags,
+          stateId: body.state_id,
+          lgaName: body.lga_name,
+        });
+
+        if (!access.allowed) {
+          return res.status(403).json({
+            message: access.message || 'Registration disabled for this location',
+          });
+        }
+      } catch (error) {
+        console.error('Registration access evaluation error:', error);
+        return res.status(500).json({ message: 'Failed to validate registration access' });
+      }
     }
 
     if (!flags.allow_property_posting && req.path.includes('/properties') && req.method === 'POST') {

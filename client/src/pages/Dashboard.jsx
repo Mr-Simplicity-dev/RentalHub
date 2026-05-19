@@ -109,6 +109,49 @@ const buildGoogleMapsUrl = (property = {}) => {
 const canOpenPropertyMap = (property = {}) =>
   property.rent_paid === true || property.payment_type === 'rent_payment';
 
+const EARLY_EXIT_REFUND_REASONS = new Set([
+  'relocation_transfer_migration',
+  'transfer_relocation',
+  'moved_out_early_agreement',
+]);
+
+const isEarlyExitRefundReason = (reason) => EARLY_EXIT_REFUND_REASONS.has(String(reason || '').trim());
+
+const formatDurationParts = (days = 0, months = 0) => {
+  const parts = [];
+  if (Number(months) > 0) {
+    parts.push(`${Number(months)} ${Number(months) === 1 ? 'month' : 'months'}`);
+  }
+  if (Number(days) > 0) {
+    parts.push(`${Number(days)} ${Number(days) === 1 ? 'day' : 'days'}`);
+  }
+  return parts.length ? parts.join(' and ') : 'Requested time';
+};
+
+const getCountdownInfo = (dateValue, futurePrefix, pastPrefix = 'Overdue by') => {
+  if (!dateValue) return null;
+  const target = new Date(dateValue);
+  if (Number.isNaN(target.getTime())) return null;
+
+  const now = new Date();
+  const diffMs = target.getTime() - now.getTime();
+  const absDays = Math.max(0, Math.ceil(Math.abs(diffMs) / (1000 * 60 * 60 * 24)));
+
+  if (diffMs < 0) {
+    return {
+      label: `${pastPrefix} ${absDays || 1}d`,
+      className: 'bg-red-100 text-red-700 border-red-200',
+    };
+  }
+
+  return {
+    label: `${futurePrefix} ${Math.max(1, absDays)}d`,
+    className: absDays <= 3
+      ? 'bg-amber-100 text-amber-700 border-amber-200'
+      : 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  };
+};
+
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -129,8 +172,29 @@ const Dashboard = () => {
   const [refundView, setRefundView] = useState('form'); // 'form' | 'history' | 'success'
   const [eligiblePayments, setEligiblePayments] = useState([]);
   const [myRefundRequests, setMyRefundRequests] = useState([]);
-  const [refundForm, setRefundForm] = useState({ payment_id: '', reason: '', details: '' });
+  const [refundForm, setRefundForm] = useState({
+    payment_id: '',
+    reason: '',
+    details: '',
+    requested_move_out_date: '',
+    requested_refund_months: '',
+    requested_refund_amount: '',
+    refund_due_days: '',
+  });
   const [refundLoading, setRefundLoading] = useState(false);
+
+  // Tenant-requested expired-rent grace period state
+  const [showGraceModal, setShowGraceModal] = useState(false);
+  const [graceView, setGraceView] = useState('form');
+  const [eligibleGracePayments, setEligibleGracePayments] = useState([]);
+  const [myGraceRequests, setMyGraceRequests] = useState([]);
+  const [graceForm, setGraceForm] = useState({
+    payment_id: '',
+    requested_duration_days: '',
+    requested_duration_months: '',
+    tenant_note: '',
+  });
+  const [graceLoading, setGraceLoading] = useState(false);
 
   // Withdrawal state (tenant + landlord)
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -169,6 +233,19 @@ const Dashboard = () => {
   const [approveForm, setApproveForm] = useState({ refund_type: 'full', refund_months: '', approved_amount: '', landlord_note: '' });
   const [rejectNote, setRejectNote] = useState('');
   const [refundActionLoading, setRefundActionLoading] = useState(false);
+
+  // Landlord tenant-requested grace period review state
+  const [showLandlordGraceModal, setShowLandlordGraceModal] = useState(false);
+  const [landlordGraceRequests, setLandlordGraceRequests] = useState([]);
+  const [landlordGraceFilter, setLandlordGraceFilter] = useState('enabled');
+  const [selectedGraceRequest, setSelectedGraceRequest] = useState(null);
+  const [graceApproveForm, setGraceApproveForm] = useState({
+    approved_duration_days: '',
+    approved_duration_months: '',
+    landlord_note: '',
+  });
+  const [graceRejectNote, setGraceRejectNote] = useState('');
+  const [graceActionLoading, setGraceActionLoading] = useState(false);
 
   const hasSubmittedVerification = !!user?.passport_photo_url;
   const verificationReviewStatus =
@@ -775,7 +852,15 @@ const Dashboard = () => {
 
   // Refund helpers
   const openRefundModal = async () => {
-    setRefundForm({ payment_id: '', reason: '', details: '' });
+    setRefundForm({
+      payment_id: '',
+      reason: '',
+      details: '',
+      requested_move_out_date: '',
+      requested_refund_months: '',
+      requested_refund_amount: '',
+      refund_due_days: '',
+    });
     setRefundView('form');
     setShowRefundModal(true);
     try {
@@ -793,13 +878,28 @@ const Dashboard = () => {
   const handleRefundSubmit = async (e) => {
     e.preventDefault();
     if (!refundForm.payment_id || !refundForm.reason) return;
+    const isEarlyExit = isEarlyExitRefundReason(refundForm.reason);
+    if (isEarlyExit && (!refundForm.requested_move_out_date || !refundForm.refund_due_days)) {
+      toast.error('Enter move-out date and refund deadline days for relocation refunds.');
+      return;
+    }
     setRefundLoading(true);
     try {
-      const res = await api.post('/payments/refund/request', {
+      const payload = {
         payment_id: refundForm.payment_id,
         reason: refundForm.reason,
         details: refundForm.details,
-      });
+      };
+
+      if (isEarlyExit) {
+        payload.request_category = 'early_exit_refund';
+        payload.requested_move_out_date = refundForm.requested_move_out_date;
+        payload.requested_refund_months = refundForm.requested_refund_months || undefined;
+        payload.requested_refund_amount = refundForm.requested_refund_amount || undefined;
+        payload.refund_due_days = refundForm.refund_due_days;
+      }
+
+      const res = await api.post('/payments/refund/request', payload);
       if (res.data?.success) {
         setRefundView('success');
         loadDashboardData();
@@ -814,12 +914,128 @@ const Dashboard = () => {
     }
   };
 
+  const openGraceModal = async () => {
+    setGraceForm({
+      payment_id: '',
+      requested_duration_days: '',
+      requested_duration_months: '',
+      tenant_note: '',
+    });
+    setGraceView('form');
+    setShowGraceModal(true);
+
+    try {
+      const [eligibleRes, historyRes] = await Promise.all([
+        api.get('/payments/tenancy-adjustments/grace/eligible'),
+        api.get('/payments/tenancy-adjustments/grace/my-requests'),
+      ]);
+      if (eligibleRes.data?.success) setEligibleGracePayments(eligibleRes.data.data || []);
+      if (historyRes.data?.success) setMyGraceRequests(historyRes.data.data || []);
+    } catch (err) {
+      console.error('Failed to load grace period data', err);
+      toast.error(err.response?.data?.message || 'Failed to load grace period requests');
+    }
+  };
+
+  const handleGraceSubmit = async (e) => {
+    e.preventDefault();
+    if (!graceForm.payment_id) return;
+    if (!graceForm.requested_duration_days && !graceForm.requested_duration_months) {
+      toast.error('Request at least one day or one month.');
+      return;
+    }
+
+    setGraceLoading(true);
+    try {
+      const res = await api.post('/payments/tenancy-adjustments/grace/request', {
+        payment_id: graceForm.payment_id,
+        requested_duration_days: graceForm.requested_duration_days || undefined,
+        requested_duration_months: graceForm.requested_duration_months || undefined,
+        tenant_note: graceForm.tenant_note,
+      });
+
+      if (res.data?.success) {
+        toast.success('Grace period request submitted for admin/support enablement');
+        setGraceView('history');
+        await Promise.all([
+          loadDashboardData(),
+          api.get('/payments/tenancy-adjustments/grace/my-requests').then((historyRes) => {
+            if (historyRes.data?.success) setMyGraceRequests(historyRes.data.data || []);
+          }),
+        ]);
+      } else {
+        toast.error(res.data?.message || 'Failed to submit grace period request');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit grace period request');
+    } finally {
+      setGraceLoading(false);
+    }
+  };
+
+  const openLandlordGraceModal = async (filter = 'enabled') => {
+    setLandlordGraceFilter(filter);
+    setSelectedGraceRequest(null);
+    setShowLandlordGraceModal(true);
+
+    try {
+      const res = await api.get(`/payments/tenancy-adjustments/grace/landlord?status=${filter}`);
+      if (res.data?.success) setLandlordGraceRequests(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to load landlord grace period requests', err);
+      toast.error(err.response?.data?.message || 'Failed to load grace period requests');
+    }
+  };
+
+  const handleGraceResponse = async (requestId, action) => {
+    if (action === 'reject' && !graceRejectNote.trim()) {
+      toast.error('Enter a reason for rejecting this grace period request.');
+      return;
+    }
+
+    setGraceActionLoading(true);
+    try {
+      const payload = action === 'approve'
+        ? {
+            action,
+            approved_duration_days: graceApproveForm.approved_duration_days || undefined,
+            approved_duration_months: graceApproveForm.approved_duration_months || undefined,
+            landlord_note: graceApproveForm.landlord_note,
+          }
+        : {
+            action,
+            landlord_note: graceRejectNote,
+          };
+
+      const res = await api.put(`/payments/tenancy-adjustments/grace/${requestId}/respond`, payload);
+      if (res.data?.success) {
+        toast.success(action === 'approve' ? 'Grace period approved' : 'Grace period rejected');
+        setSelectedGraceRequest(null);
+        setGraceRejectNote('');
+        setGraceApproveForm({ approved_duration_days: '', approved_duration_months: '', landlord_note: '' });
+        openLandlordGraceModal(landlordGraceFilter);
+        loadDashboardData();
+      } else {
+        toast.error(res.data?.message || 'Failed to respond to grace period request');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to respond to grace period request');
+    } finally {
+      setGraceActionLoading(false);
+    }
+  };
+
   const refundStatusBadge = (status) => {
     const map = {
       pending:  'bg-yellow-100 text-yellow-800',
       approved: 'bg-blue-100 text-blue-800',
       rejected: 'bg-red-100 text-red-800',
       refunded: 'bg-green-100 text-green-800',
+      pending_admin_review: 'bg-yellow-100 text-yellow-800',
+      enabled: 'bg-blue-100 text-blue-800',
+      landlord_approved: 'bg-green-100 text-green-800',
+      landlord_rejected: 'bg-red-100 text-red-800',
+      expired: 'bg-gray-100 text-gray-700',
     };
     return map[status] || 'bg-gray-100 text-gray-700';
   };
@@ -998,6 +1214,10 @@ const Dashboard = () => {
         rent_paid: false,
       }];
   const hasActivePropertyLocation = propertyLocationCards.some(canOpenPropertyMap);
+  const refundCountdown = getCountdownInfo(stats?.next_refund_due_at, 'Refund due in');
+  const graceCountdown = getCountdownInfo(stats?.next_grace_ends_at, 'Grace ends in', 'Grace expired by');
+  const tenantGraceStatValue = stats?.grace_period_requests_count || 0;
+  const landlordPendingGraceValue = stats?.pending_grace_period_count || 0;
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -1156,6 +1376,16 @@ const Dashboard = () => {
                 title="Refund Requests"
                 value={stats?.refund_requests_count || 0}
                 onClick={openRefundModal}
+                note={refundCountdown?.label}
+                noteClass={refundCountdown?.className}
+              />
+              <StatCard
+                icon={<FaClock className="text-indigo-500" />}
+                title="Grace Requests"
+                value={tenantGraceStatValue}
+                onClick={openGraceModal}
+                note={graceCountdown?.label}
+                noteClass={graceCountdown?.className}
               />
               <StatCard
                 icon={<FaWallet className="text-teal-500" />}
@@ -1195,6 +1425,16 @@ const Dashboard = () => {
                 title="Refund Requests"
                 value={stats?.pending_refunds_count || 0}
                 onClick={() => openLandlordRefundModal('pending')}
+                note={refundCountdown?.label}
+                noteClass={refundCountdown?.className}
+              />
+              <StatCard
+                icon={<FaClock className="text-indigo-500" />}
+                title="Grace Requests"
+                value={landlordPendingGraceValue}
+                onClick={() => openLandlordGraceModal('enabled')}
+                note={graceCountdown?.label}
+                noteClass={graceCountdown?.className}
               />
               <StatCard
                 icon={<FaPiggyBank className="text-teal-500" />}
@@ -1483,6 +1723,16 @@ const Dashboard = () => {
                 description="Request a refund on any rent payment you made to a landlord"
                 icon={<FaUndo />}
                 onClick={openRefundModal}
+                note={refundCountdown?.label}
+                noteClass={refundCountdown?.className}
+              />
+              <QuickActionCard
+                title="Request Grace Period"
+                description="Ask for extra days or months after rent expiry"
+                icon={<FaClock />}
+                onClick={openGraceModal}
+                note={graceCountdown?.label}
+                noteClass={graceCountdown?.className}
               />
               <QuickActionCard
                 title="Withdraw Funds"
@@ -1528,6 +1778,16 @@ const Dashboard = () => {
                 description="Review and approve or reject tenant refund requests"
                 icon={<FaUndo />}
                 onClick={() => openLandlordRefundModal('pending')}
+                note={refundCountdown?.label}
+                noteClass={refundCountdown?.className}
+              />
+              <QuickActionCard
+                title="Grace Requests"
+                description="Review tenant-requested grace periods after admin enablement"
+                icon={<FaClock />}
+                onClick={() => openLandlordGraceModal('enabled')}
+                note={graceCountdown?.label}
+                noteClass={graceCountdown?.className}
               />
               <QuickActionCard
                 title="Withdraw Funds"
@@ -1620,6 +1880,22 @@ const Dashboard = () => {
                           <span className="text-gray-600">Requested</span>
                           <span className="text-gray-700">{new Date(rr.requested_at).toLocaleDateString()}</span>
                         </div>
+                        {rr.request_category === 'early_exit_refund' && (
+                          <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+                            <p className="font-semibold">Relocation refund</p>
+                            {rr.requested_move_out_date && (
+                              <p>Move-out date: {new Date(rr.requested_move_out_date).toLocaleDateString()}</p>
+                            )}
+                            {rr.refund_due_at && (
+                              <p className="font-bold">
+                                {getCountdownInfo(rr.refund_due_at, 'Refund due in')?.label || 'Refund deadline set'}
+                              </p>
+                            )}
+                            {!rr.feature_enabled && rr.status === 'pending' && (
+                              <p>Waiting for LGA/state/super admin support enablement.</p>
+                            )}
+                          </div>
+                        )}
                         <ApprovalTimeline
                           steps={[
                             { key: 'requested', label: 'Requested' },
@@ -1689,11 +1965,66 @@ const Dashboard = () => {
                           <option value="landlord_cancelled_agreement">Landlord cancelled the agreement</option>
                           <option value="property_uninhabitable">Property found to be uninhabitable</option>
                           <option value="duplicate_payment">I was charged twice</option>
+                          <option value="relocation_transfer_migration">Relocation, transfer, migration or unforeseen circumstances</option>
                           <option value="moved_out_early_agreement">Moved out early by mutual agreement</option>
                           <option value="landlord_unresponsive">Landlord became unresponsive</option>
                           <option value="other">Other</option>
                         </select>
                       </div>
+                      {isEarlyExitRefundReason(refundForm.reason) && (
+                        <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                          <div>
+                            <p className="text-sm font-semibold text-indigo-900">Relocation refund details</p>
+                            <p className="mt-1 text-xs text-indigo-700">
+                              This request is first reviewed by the assigned LGA/state/super admin support hierarchy before your landlord can respond.
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Move-out date *</label>
+                              <input
+                                type="date"
+                                value={refundForm.requested_move_out_date}
+                                onChange={(e) => setRefundForm(p => ({ ...p, requested_move_out_date: e.target.value }))}
+                                className="input w-full"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Days for landlord to refund *</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={refundForm.refund_due_days}
+                                onChange={(e) => setRefundForm(p => ({ ...p, refund_due_days: e.target.value }))}
+                                className="input w-full"
+                                placeholder="e.g. 14"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Requested refund months</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={refundForm.requested_refund_months}
+                                onChange={(e) => setRefundForm(p => ({ ...p, requested_refund_months: e.target.value }))}
+                                className="input w-full"
+                                placeholder="Optional"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Requested refund amount</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={refundForm.requested_refund_amount}
+                                onChange={(e) => setRefundForm(p => ({ ...p, requested_refund_amount: e.target.value }))}
+                                className="input w-full"
+                                placeholder="Optional"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Additional Details <span className="text-gray-400">(optional)</span>
@@ -1717,10 +2048,172 @@ const Dashboard = () => {
                         <button type="button" onClick={() => setShowRefundModal(false)} className="btn w-full">Cancel</button>
                         <button
                           type="submit"
-                          disabled={refundLoading || !refundForm.payment_id || !refundForm.reason}
+                          disabled={
+                            refundLoading ||
+                            !refundForm.payment_id ||
+                            !refundForm.reason ||
+                            (isEarlyExitRefundReason(refundForm.reason) && (!refundForm.requested_move_out_date || !refundForm.refund_due_days))
+                          }
                           className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {refundLoading ? 'Submitting...' : 'Submit Request'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GRACE PERIOD REQUEST MODAL (tenant only) */}
+      {showGraceModal && user?.user_type === 'tenant' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
+              <div className="flex items-center gap-3">
+                <FaClock className="text-indigo-500 text-2xl" />
+                <h2 className="text-lg font-bold text-gray-800">
+                  {graceView === 'history' ? 'My Grace Requests' : 'Request Grace Period'}
+                </h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setGraceView(v => v === 'history' ? 'form' : 'history')}
+                  className="text-sm text-indigo-600 hover:underline"
+                >
+                  {graceView === 'history' ? 'New Request' : 'View History'}
+                </button>
+                <button onClick={() => setShowGraceModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <FaTimes className="text-xl" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              {graceView === 'history' && (
+                <div className="space-y-3">
+                  {myGraceRequests.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">You have no grace period requests yet.</p>
+                  ) : (
+                    myGraceRequests.map((request) => {
+                      const countdown = getCountdownInfo(request.grace_ends_at, 'Grace ends in', 'Grace expired by');
+                      return (
+                        <div key={request.id} className="border rounded-xl p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-semibold text-gray-800 text-sm">{request.property_title}</p>
+                              <p className="text-xs text-gray-500">{request.property_address}</p>
+                            </div>
+                            <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize ${refundStatusBadge(request.status)}`}>
+                              {String(request.status || '').replace(/_/g, ' ')}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700">
+                            Requested: <strong>{formatDurationParts(request.requested_duration_days, request.requested_duration_months)}</strong>
+                          </p>
+                          {request.grace_ends_at && (
+                            <div className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${countdown?.className || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                              {countdown?.label || `Grace ends ${new Date(request.grace_ends_at).toLocaleDateString()}`}
+                            </div>
+                          )}
+                          {request.landlord_note && (
+                            <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700">
+                              <strong>Landlord note:</strong> {request.landlord_note}
+                            </p>
+                          )}
+                          {request.admin_note && (
+                            <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+                              <strong>Admin/support note:</strong> {request.admin_note}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {graceView === 'form' && (
+                <form onSubmit={handleGraceSubmit} className="space-y-5">
+                  {eligibleGracePayments.length === 0 ? (
+                    <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-4 text-sm text-yellow-800">
+                      <FaExclamationTriangle className="mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-semibold">No expired rent payment found</p>
+                        <p className="mt-1">
+                          Grace period requests are available only after a completed rent period has expired and no active grace request exists.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Expired Rent Payment *</label>
+                        <select
+                          required
+                          value={graceForm.payment_id}
+                          onChange={(e) => setGraceForm(p => ({ ...p, payment_id: e.target.value }))}
+                          className="input w-full"
+                        >
+                          <option value="">-- Choose expired rent --</option>
+                          {eligibleGracePayments.map((payment) => (
+                            <option key={payment.payment_id} value={payment.payment_id}>
+                              {payment.property_title} ({new Date(payment.tenancy_expires_at).toLocaleDateString()})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Requested months</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={graceForm.requested_duration_months}
+                            onChange={(e) => setGraceForm(p => ({ ...p, requested_duration_months: e.target.value }))}
+                            className="input w-full"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Requested days</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={graceForm.requested_duration_days}
+                            onChange={(e) => setGraceForm(p => ({ ...p, requested_duration_days: e.target.value }))}
+                            className="input w-full"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Reason / message to landlord</label>
+                        <textarea
+                          rows={3}
+                          value={graceForm.tenant_note}
+                          onChange={(e) => setGraceForm(p => ({ ...p, tenant_note: e.target.value }))}
+                          className="input w-full resize-none"
+                          placeholder="Explain why you are requesting extra time..."
+                        />
+                      </div>
+                      <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700">
+                        <FaExclamationTriangle className="mt-0.5 shrink-0" />
+                        <span>
+                          This is a tenant request. The assigned LGA/state/super admin support hierarchy must enable it before your landlord can approve or reject it.
+                        </span>
+                      </div>
+                      <div className="flex gap-3 pt-1">
+                        <button type="button" onClick={() => setShowGraceModal(false)} className="btn w-full">Cancel</button>
+                        <button
+                          type="submit"
+                          disabled={graceLoading || !graceForm.payment_id || (!graceForm.requested_duration_days && !graceForm.requested_duration_months)}
+                          className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {graceLoading ? 'Submitting...' : 'Submit Grace Request'}
                         </button>
                       </div>
                     </>
@@ -2224,6 +2717,187 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* LANDLORD GRACE PERIOD REVIEW MODAL */}
+      {showLandlordGraceModal && user?.user_type === 'landlord' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
+              <div className="flex items-center gap-3">
+                <FaClock className="text-indigo-500 text-2xl" />
+                <h2 className="text-lg font-bold text-gray-800">Tenant Grace Requests</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <select
+                  value={landlordGraceFilter}
+                  onChange={e => openLandlordGraceModal(e.target.value)}
+                  className="input text-sm py-1"
+                >
+                  <option value="enabled">Enabled</option>
+                  <option value="landlord_approved">Approved</option>
+                  <option value="landlord_rejected">Rejected</option>
+                </select>
+                <button onClick={() => { setShowLandlordGraceModal(false); setSelectedGraceRequest(null); }} className="text-gray-400 hover:text-gray-600">
+                  <FaTimes className="text-xl" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {landlordGraceRequests.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">No {landlordGraceFilter.replace(/_/g, ' ')} grace period requests.</p>
+              ) : (
+                landlordGraceRequests.map(request => {
+                  const countdown = getCountdownInfo(request.grace_ends_at, 'Grace ends in', 'Grace expired by');
+                  return (
+                    <div key={request.id} className="border rounded-xl p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-gray-800">{request.property_title}</p>
+                          <p className="text-xs text-gray-500">{request.property_address}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Tenant: <strong>{request.tenant_name}</strong> - {request.tenant_phone}</p>
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize shrink-0 ${refundStatusBadge(request.status)}`}>
+                          {String(request.status || '').replace(/_/g, ' ')}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                        <div className="bg-gray-50 rounded-lg px-3 py-2">
+                          <p className="text-xs text-gray-500">Tenant requested</p>
+                          <p className="font-bold text-gray-800">
+                            {formatDurationParts(request.requested_duration_days, request.requested_duration_months)}
+                          </p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg px-3 py-2">
+                          <p className="text-xs text-gray-500">Rent expired</p>
+                          <p className="font-medium text-gray-700">
+                            {request.tenancy_expires_at ? new Date(request.tenancy_expires_at).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {request.tenant_note && (
+                        <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                          <strong>Tenant note:</strong> {request.tenant_note}
+                        </p>
+                      )}
+
+                      {request.grace_ends_at && (
+                        <div className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${countdown?.className || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                          {countdown?.label || `Grace ends ${new Date(request.grace_ends_at).toLocaleDateString()}`}
+                        </div>
+                      )}
+
+                      {request.status === 'enabled' && (
+                        <>
+                          {selectedGraceRequest === request.id ? (
+                            <div className="border-t pt-3 space-y-3">
+                              <p className="text-sm font-semibold text-gray-700">Approve tenant-requested grace period</p>
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">Approved months</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={request.requested_duration_months || undefined}
+                                    value={graceApproveForm.approved_duration_months}
+                                    onChange={e => setGraceApproveForm(p => ({ ...p, approved_duration_months: e.target.value }))}
+                                    className="input w-full text-sm"
+                                    placeholder={request.requested_duration_months || '0'}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">Approved days</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={request.requested_duration_days || undefined}
+                                    value={graceApproveForm.approved_duration_days}
+                                    onChange={e => setGraceApproveForm(p => ({ ...p, approved_duration_days: e.target.value }))}
+                                    className="input w-full text-sm"
+                                    placeholder={request.requested_duration_days || '0'}
+                                  />
+                                </div>
+                              </div>
+                              <textarea
+                                rows={2}
+                                value={graceApproveForm.landlord_note}
+                                onChange={e => setGraceApproveForm(p => ({ ...p, landlord_note: e.target.value }))}
+                                className="input w-full resize-none text-sm"
+                                placeholder="Optional note to tenant..."
+                              />
+                              <div className="flex gap-2">
+                                <button type="button" onClick={() => setSelectedGraceRequest(null)} className="btn w-full text-sm">Cancel</button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleGraceResponse(request.id, 'approve')}
+                                  disabled={graceActionLoading}
+                                  className="btn btn-primary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                  <FaThumbsUp /> {graceActionLoading ? 'Processing...' : 'Approve Grace'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedGraceRequest(request.id);
+                                  setGraceApproveForm({
+                                    approved_duration_days: request.requested_duration_days || '',
+                                    approved_duration_months: request.requested_duration_months || '',
+                                    landlord_note: '',
+                                  });
+                                }}
+                                className="flex-1 flex items-center justify-center gap-2 bg-green-50 border border-green-300 text-green-700 rounded-lg py-2 text-sm font-medium hover:bg-green-100 transition"
+                              >
+                                <FaThumbsUp /> Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedGraceRequest(`reject_${request.id}`)}
+                                className="flex-1 flex items-center justify-center gap-2 bg-red-50 border border-red-300 text-red-700 rounded-lg py-2 text-sm font-medium hover:bg-red-100 transition"
+                              >
+                                <FaThumbsDown /> Reject
+                              </button>
+                            </div>
+                          )}
+
+                          {selectedGraceRequest === `reject_${request.id}` && (
+                            <div className="border-t pt-3 space-y-2">
+                              <p className="text-sm font-semibold text-red-700">Reason for rejection *</p>
+                              <textarea
+                                rows={2}
+                                value={graceRejectNote}
+                                onChange={e => setGraceRejectNote(e.target.value)}
+                                className="input w-full resize-none text-sm border-red-300"
+                                placeholder="Explain why you are rejecting this tenant request..."
+                              />
+                              <div className="flex gap-2">
+                                <button type="button" onClick={() => { setSelectedGraceRequest(null); setGraceRejectNote(''); }} className="btn w-full text-sm">Cancel</button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleGraceResponse(request.id, 'reject')}
+                                  disabled={graceActionLoading}
+                                  className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-lg py-2 text-sm font-medium transition disabled:opacity-50"
+                                >
+                                  <FaThumbsDown /> {graceActionLoading ? 'Processing...' : 'Confirm Reject'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2367,12 +3041,17 @@ const LandlordPropertyFeeModal = ({
 };
 
 // Stat Card Component
-const StatCard = ({ icon, title, value, onClick }) => (
+const StatCard = ({ icon, title, value, onClick, note, noteClass = 'bg-gray-100 text-gray-700 border-gray-200' }) => (
   <div onClick={onClick} className="card cursor-pointer">
     <div className="flex items-center justify-between">
       <div>
         <p className="text-gray-600 text-sm mb-1">{title}</p>
         <p className="text-3xl font-bold text-gray-900">{value}</p>
+        {note && (
+          <p className={`mt-3 inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${noteClass}`}>
+            {note}
+          </p>
+        )}
       </div>
       <div className="text-4xl">{icon}</div>
     </div>
@@ -2437,11 +3116,16 @@ const ActivityItem = ({ activity }) => {
 };
 
 // Quick Action Card Component
-const QuickActionCard = ({ title, description, icon, onClick }) => (
+const QuickActionCard = ({ title, description, icon, onClick, note, noteClass = 'bg-gray-100 text-gray-700 border-gray-200' }) => (
   <div onClick={onClick} className="card cursor-pointer text-center">
     <div className="text-4xl text-primary-600 mb-3">{icon}</div>
     <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>
     <p className="text-sm text-gray-600">{description}</p>
+    {note && (
+      <p className={`mt-3 inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${noteClass}`}>
+        {note}
+      </p>
+    )}
   </div>
 );
 

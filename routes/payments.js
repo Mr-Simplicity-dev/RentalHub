@@ -278,6 +278,54 @@ router.get('/refund/admin/all',
   refundController.adminGetAllRefundRequests
 );
 
+router.put('/refund/admin/:refundId/review',
+  authenticate,
+  refundController.adminReviewRelocationRefund
+);
+
+// Tenant: expired rent grace period requests
+router.get('/tenancy-adjustments/grace/eligible',
+  authenticate,
+  isTenant,
+  refundController.getEligibleGracePeriodPayments
+);
+
+router.post('/tenancy-adjustments/grace/request',
+  authenticate,
+  isTenant,
+  refundController.submitGracePeriodRequest
+);
+
+router.get('/tenancy-adjustments/grace/my-requests',
+  authenticate,
+  isTenant,
+  refundController.getTenantGracePeriodRequests
+);
+
+// Landlord: review hierarchy-admin-enabled tenant grace period requests
+router.get('/tenancy-adjustments/grace/landlord',
+  authenticate,
+  isLandlord,
+  refundController.getLandlordGracePeriodRequests
+);
+
+router.put('/tenancy-adjustments/grace/:requestId/respond',
+  authenticate,
+  isLandlord,
+  refundController.respondGracePeriodRequest
+);
+
+// LGA/state/super admin/support hierarchy: enable or reject tenant-requested grace periods
+router.get('/tenancy-adjustments/admin',
+  authenticate,
+  refundController.adminGetTenancyAdjustmentRequests
+);
+
+router.put('/tenancy-adjustments/admin/:requestId/review',
+  authenticate,
+  refundController.adminReviewTenancyAdjustmentRequest
+);
+
 // ============ WALLET FUNDING (PAYSTACK) ============
 
 // Both tenant and landlord: initialize wallet top-up via Paystack

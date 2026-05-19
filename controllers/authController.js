@@ -9,6 +9,12 @@ const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
 const { getLocationPricingQuote } = require('../config/utils/locationPricing');
 const {
+  assertRegistrationAllowed,
+  evaluateRegistrationAccess,
+  isGlobalRegistrationEnabled,
+  isRegistrationMasterEnabled,
+} = require('../config/utils/registrationAccess');
+const {
   validateNIN,
   verifyNINWithNIMC,
   validateInternationalPassport,
@@ -1313,6 +1319,13 @@ exports.register = async (req, res) => {
       lgaName: req.body.lga_name,
       strictLocation: false,
     });
+    await assertRegistrationAllowed({
+      userType: preparedRegistration.user_type,
+      flags,
+      stateId: req.body.state_id,
+      lgaName: req.body.lga_name,
+    });
+
     const preparedRegistrationWithLocation = withPreparedRegistrationLocation(
       preparedRegistration,
       registrationPricing.location
@@ -1390,6 +1403,13 @@ exports.initializeRegistrationPayment = async (req, res) => {
       plainPassword,
       verificationMeta
     } = await validateAndPrepareRegistration(req.body);
+
+    await assertRegistrationAllowed({
+      userType: preparedRegistration.user_type,
+      flags,
+      stateId: req.body.state_id,
+      lgaName: req.body.lga_name,
+    });
 
     const registrationPricing = await buildRegistrationPricingQuote({
       userType: preparedRegistration.user_type,
@@ -1772,8 +1792,16 @@ exports.getRegistrationFlags = async (req, res) => {
     const flags = await getFeatureFlagsMap();
     const userType = String(req.query.user_type || '').trim();
     let pricing = null;
+    let registrationAccess = null;
 
     if (['tenant', 'landlord'].includes(userType)) {
+      registrationAccess = await evaluateRegistrationAccess({
+        userType,
+        flags,
+        stateId: req.query.state_id,
+        lgaName: req.query.lga_name,
+      });
+
       pricing = await buildRegistrationPricingQuote({
         userType,
         flags,
@@ -1783,10 +1811,30 @@ exports.getRegistrationFlags = async (req, res) => {
       });
     }
 
+    const registrationMasterEnabled = isRegistrationMasterEnabled(flags);
+    const allowTenantRegistration = isGlobalRegistrationEnabled(flags, 'tenant');
+    const allowLandlordRegistration = isGlobalRegistrationEnabled(flags, 'landlord');
+    const registrationAllowed = registrationAccess?.allowed === true;
+    const anyRoleRegistrationEnabled =
+      allowTenantRegistration || allowLandlordRegistration;
+
     res.json({
       success: true,
       data: {
-        allow_registration: flags.allow_registration !== false,
+        allow_registration: registrationMasterEnabled,
+        allow_tenant_registration: allowTenantRegistration,
+        allow_landlord_registration: allowLandlordRegistration,
+        registration_allowed: ['tenant', 'landlord'].includes(userType)
+          ? registrationAllowed
+          : anyRoleRegistrationEnabled,
+        registration_global_allowed: ['tenant', 'landlord'].includes(userType)
+          ? isGlobalRegistrationEnabled(flags, userType)
+          : anyRoleRegistrationEnabled,
+        registration_master_enabled: registrationMasterEnabled,
+        registration_location_restricted:
+          registrationAccess?.location_restricted === true,
+        registration_access_scope: registrationAccess?.rule_scope || null,
+        registration_access_message: registrationAccess?.message || null,
         nin_number: flags.nin_number !== false,
         passport_number: flags.passport_number !== false,
         tenant_registration_payment: flags.tenant_registration_payment === true,

@@ -16,6 +16,7 @@ import AdSpacesTab from "../components/admin/AdSpacesTab";
 import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
 import PricingRulesTab from "../components/admin/PricingRulesTab";
+import RegistrationAccessRulesTab from "../components/admin/RegistrationAccessRulesTab";
 import PaginationControls from "../components/admin/PaginationControls";
 import ModerationOverview from "../components/admin/ModerationOverview";
 import LiveModerationQueue from "../components/admin/LiveModerationQueue";
@@ -27,6 +28,7 @@ import PlatformAgentsTab from "../components/admin/PlatformAgentsTab";
 import LawyerActivityMonitor from "../components/admin/LawyerActivityMonitor";
 import InputDialog from "../components/common/InputDialog";
 import PropertyRequestWorkflowPanel from "../components/admin/PropertyRequestWorkflowPanel";
+import TenancyWorkflowPanel from "../components/admin/TenancyWorkflowPanel";
 
 const tabs = [
   "overview",
@@ -44,6 +46,7 @@ const tabs = [
   "broadcast",
   "ad_spaces",
   "pricing",
+  "registration_access",
   "flags",
   "fraud",
   "admin",
@@ -989,10 +992,13 @@ export default function SuperAdminDashboard() {
       )}
 
       {tab === "property_requests" && (
-        <PropertyRequestWorkflowPanel
-          mode="support"
-          title="National Tenant Property Requests"
-        />
+        <div className="space-y-6">
+          <PropertyRequestWorkflowPanel
+            mode="support"
+            title="National Tenant Property Requests"
+          />
+          <TenancyWorkflowPanel title="National Tenancy Grace and Refund Enablement" />
+        </div>
       )}
 
       {tab === "analytics" && (
@@ -1046,6 +1052,10 @@ export default function SuperAdminDashboard() {
 
       {tab === "pricing" && (
         <PricingRulesTab />
+      )}
+
+      {tab === "registration_access" && (
+        <RegistrationAccessRulesTab />
       )}
 
       {tab === "lawyer_invites" && (

@@ -53,6 +53,11 @@ const Register = () => {
   const [registrationFlags, setRegistrationFlags] = useState({
     loaded: false,
     allow_registration: true,
+    registration_allowed: true,
+    registration_global_allowed: true,
+    registration_master_enabled: true,
+    registration_location_restricted: false,
+    registration_access_message: null,
     nin_number: true,
     passport_number: true,
     tenant_registration_payment: false,
@@ -160,7 +165,13 @@ const Register = () => {
 
         setRegistrationFlags({
           loaded: true,
-          allow_registration: data.allow_registration !== false,
+          allow_registration: data.registration_allowed !== false,
+          registration_allowed: data.registration_allowed !== false,
+          registration_global_allowed: data.registration_global_allowed !== false,
+          registration_master_enabled: data.registration_master_enabled !== false,
+          registration_location_restricted:
+            data.registration_location_restricted === true,
+          registration_access_message: data.registration_access_message || null,
           nin_number: data.nin_number !== false,
           passport_number: data.passport_number !== false,
           tenant_registration_payment: data.tenant_registration_payment === true,
@@ -384,8 +395,25 @@ const Register = () => {
  const handleSubmit = async (e) => {
   e.preventDefault();
 
- if (!registrationFlags.allow_registration) {
+ if (!registrationFlags.registration_master_enabled) {
     toast.error("Registration is currently disabled");
+    return;
+  }
+
+  if (!registrationFlags.registration_global_allowed) {
+    toast.error(
+      formData.user_type === "landlord"
+        ? "Landlord registration is currently disabled"
+        : "Tenant registration is currently disabled"
+    );
+    return;
+  }
+
+  if (!registrationFlags.registration_allowed) {
+    toast.error(
+      registrationFlags.registration_access_message ||
+        "Registration is not available for the selected location"
+    );
     return;
   }
 
@@ -739,9 +767,13 @@ const isStepFourComplete =
 const submitDisabled =
   loading ||
   !registrationFlags.loaded ||
-  !registrationFlags.allow_registration ||
+  !registrationFlags.registration_allowed ||
   (requiresPayment && !registrationPricing.location_complete) ||
   !isStepFourComplete;
+
+const canContinueAccountTypeStep =
+  registrationFlags.registration_master_enabled &&
+  registrationFlags.registration_global_allowed;
 
 
 const inputClass = (field) =>
@@ -883,11 +915,29 @@ return (
                 <h2 className="text-xl font-semibold text-center">Account Type</h2>
 
                 {/* Registration disabled banner */}
-                {!registrationFlags.allow_registration && (
+                {!registrationFlags.registration_master_enabled && (
                   <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     Registration is currently disabled by the platform administrator.
                   </div>
                 )}
+
+                {registrationFlags.registration_master_enabled &&
+                  !registrationFlags.registration_global_allowed && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {formData.user_type === "landlord"
+                      ? "Landlord registration is currently disabled by the platform administrator."
+                      : "Tenant registration is currently disabled by the platform administrator."}
+                  </div>
+                )}
+
+                {registrationFlags.registration_global_allowed &&
+                  registrationFlags.registration_location_restricted &&
+                  !registrationFlags.registration_allowed &&
+                  registrationFlags.registration_access_message && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      {registrationFlags.registration_access_message}
+                    </div>
+                  )}
 
                 {/* User type */}
                 <div>
@@ -963,7 +1013,7 @@ return (
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  disabled={!registrationFlags.allow_registration}
+                  disabled={!canContinueAccountTypeStep}
                   className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Continue
@@ -1351,6 +1401,14 @@ return (
                         : 'Choose your registration location now. It will prefill your property posting flow after signup, and you can still change it later per listing.'}
                     </p>
                   </div>
+
+                  {registrationFlags.registration_location_restricted &&
+                    !registrationFlags.registration_allowed &&
+                    registrationFlags.registration_access_message && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        {registrationFlags.registration_access_message}
+                      </div>
+                    )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

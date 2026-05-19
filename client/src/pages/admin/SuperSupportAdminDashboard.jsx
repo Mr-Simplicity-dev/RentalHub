@@ -24,6 +24,7 @@ import { useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
+import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 
 // Utility functions
 const badgeClass = (status) => {
@@ -429,10 +430,13 @@ const SuperSupportAdminDashboard = () => {
       )}
 
       {activeTab === 'property_requests' && (
-        <PropertyRequestWorkflowPanel
-          mode="support"
-          title="Tenant Property Request Review"
-        />
+        <div className="space-y-6">
+          <PropertyRequestWorkflowPanel
+            mode="support"
+            title="Tenant Property Request Review"
+          />
+          <TenancyWorkflowPanel title="Super Support Tenancy Grace and Refund Enablement" />
+        </div>
       )}
 
      {/* Migration Queue Tab */}
