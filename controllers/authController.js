@@ -985,6 +985,15 @@ const createUserFromPreparedRegistration = async ({
         throw error;
       }
 
+      // Record only the base registration fee here. Add-on fees (lawyer
+      // access ₦2,000 and agent access ₦5,000) are recorded separately
+      // below so they are not double-counted in the payments ledger.
+      const storedPayloadForBase = tenantRegistrationPayment.registration_payload || {};
+      const basePlatformFeeAmount =
+        Number(storedPayloadForBase.base_registration_amount) ||
+        Number(tenantRegistrationPayment.amount) ||
+        0;
+
       await client.query(
         `INSERT INTO payments (
            user_id,
@@ -1000,7 +1009,7 @@ const createUserFromPreparedRegistration = async ({
          VALUES ($1, 'general_platform_fee', $2, $3, $4, $5, 'completed', $6, $7)`,
         [
           newUser.id,
-          tenantRegistrationPayment.amount,
+          basePlatformFeeAmount,
           tenantRegistrationPayment.currency,
           tenantRegistrationPayment.payment_method,
           tenantRegistrationPayment.transaction_reference,
@@ -1387,26 +1396,43 @@ exports.initializeRegistrationPayment = async (req, res) => {
       strictLocation: true,
     });
 
-    const LAWYER_ACCESS_FEE_NGN = 2000;
-    const useRentalHubLawyers =
-      req.body.use_rentalhub_lawyers === true ||
-      req.body.use_rentalhub_lawyers === 'true';
-    if (useRentalHubLawyers) {
-      registrationPricing.amount = Number(registrationPricing.amount || 0) + LAWYER_ACCESS_FEE_NGN;
-      registrationPricing.lawyer_access_fee = LAWYER_ACCESS_FEE_NGN;
-    }
-
-    const preparedRegistrationWithLocation = withPreparedRegistrationLocation(
-      preparedRegistration,
-      registrationPricing.location
-    );
-
     if (!registrationPricing.enabled) {
       return res.status(400).json({
         success: false,
         message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment is currently disabled`
       });
     }
+
+    // ── Add optional add-on fees to the base registration amount ──────────
+    const LAWYER_ACCESS_FEE_NGN = 2000;
+    const AGENT_ACCESS_FEE_NGN  = 5000;
+
+    const useRentalHubLawyers =
+      req.body.use_rentalhub_lawyers === true ||
+      req.body.use_rentalhub_lawyers === 'true';
+
+    const useRentalHubAgents =
+      req.body.use_rentalhub_agents === true ||
+      req.body.use_rentalhub_agents === 'true';
+
+    // Preserve the pure base amount before adding on fees
+    const baseAmount = Number(registrationPricing.amount || 0);
+
+    if (useRentalHubLawyers) {
+      registrationPricing.amount = baseAmount + LAWYER_ACCESS_FEE_NGN;
+      registrationPricing.lawyer_access_fee = LAWYER_ACCESS_FEE_NGN;
+    }
+
+    if (useRentalHubAgents) {
+      registrationPricing.amount = Number(registrationPricing.amount || 0) + AGENT_ACCESS_FEE_NGN;
+      registrationPricing.agent_access_fee = AGENT_ACCESS_FEE_NGN;
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
+    const preparedRegistrationWithLocation = withPreparedRegistrationLocation(
+      preparedRegistration,
+      registrationPricing.location
+    );
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(plainPassword, salt);
@@ -1435,7 +1461,11 @@ exports.initializeRegistrationPayment = async (req, res) => {
           ...preparedRegistrationWithLocation,
           state_id: registrationPricing.location?.state_id || null,
           lga_name: registrationPricing.location?.lga_name || null,
-          password_hash: passwordHash
+          password_hash: passwordHash,
+          // Store the base fee separately so createUserFromPreparedRegistration
+          // can record only the base as general_platform_fee (add-on fees get
+          // their own dedicated payment records inside that function).
+          base_registration_amount: baseAmount,
         }),
         verificationMeta ? JSON.stringify(verificationMeta) : null
       ]
@@ -1457,6 +1487,8 @@ exports.initializeRegistrationPayment = async (req, res) => {
           lga_name: registrationPricing.location?.lga_name || null,
           use_rentalhub_lawyers: useRentalHubLawyers,
           lawyer_access_fee: useRentalHubLawyers ? LAWYER_ACCESS_FEE_NGN : 0,
+          use_rentalhub_agents: useRentalHubAgents,
+          agent_access_fee: useRentalHubAgents ? AGENT_ACCESS_FEE_NGN : 0,
           total_amount: registrationPricing.amount,
         }
       },
@@ -1473,7 +1505,9 @@ exports.initializeRegistrationPayment = async (req, res) => {
       message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment initialized`,
       data: {
         amount: registrationPricing.amount,
-        base_amount: registrationPricing.base_amount,
+        base_amount: baseAmount,
+        lawyer_access_fee: useRentalHubLawyers ? LAWYER_ACCESS_FEE_NGN : 0,
+        agent_access_fee: useRentalHubAgents ? AGENT_ACCESS_FEE_NGN : 0,
         rule_scope: registrationPricing.rule_scope,
         reference,
         authorization_url: paystackResponse.data.data.authorization_url,
