@@ -78,6 +78,7 @@ const locations = require('./data/nigeriaLocations');
 const slugify = require('./utils/slugify');
 const { pingGoogle } = require('./utils/pingGoogle');
 const { generateAIContent } = require('./utils/aiContentGenerator');
+const configureRealtimeSocket = require('./config/utils/realtimeSocket');
 const { generateTitles } = require('./config/utils/pageGenerator');
 const { generateKeywords } = require('./config/utils/keywordGenerator');
 const { saveRanking } = require('./config/utils/rankChecker');
@@ -514,3 +515,4 @@ const io = new Server(server, {
 });
 
 global.io = io;
+global.realtime = configureRealtimeSocket(io);

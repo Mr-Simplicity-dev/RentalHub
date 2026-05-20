@@ -5,11 +5,13 @@ import { propertyService } from '../services/propertyService';
 import { applicationService } from '../services/applicationService';
 import { paymentService } from '../services/paymentService';
 import { useAuth } from '../hooks/useAuth';
+import { useSocket } from '../hooks/useSocket';
 import { toast } from 'react-toastify';
 import Loader from '../components/common/Loader';
 import Modal from '../components/common/Modal';
 import DisputeCreationModal from '../components/DisputeCreationModal';
 import { DamageReportCard } from '../components/damage';
+import OnlineStatusBadge from '../components/calls/OnlineStatusBadge';
 import {
   FaBed,
   FaBath,
@@ -20,6 +22,7 @@ import {
   FaPhone,
   FaEnvelope,
   FaCheckCircle,
+  FaVideo,
 } from 'react-icons/fa';
 import { formatCurrency, formatDate } from '../utils/helpers';
 
@@ -30,6 +33,7 @@ const PropertyDetail = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { connected: realtimeConnected, startCall } = useSocket();
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
@@ -190,6 +194,36 @@ const PropertyDetail = () => {
     }
 
     setShowApplicationModal(true);
+  };
+
+  const handleCallLandlord = async (callType = 'audio') => {
+    if (!isAuthenticated) {
+      toast.error('Please login to call the landlord');
+      navigate('/login');
+      return;
+    }
+
+    if (user?.user_type !== 'tenant') {
+      toast.error('Only tenants can request property calls');
+      return;
+    }
+
+    if (!hasFullAccess) {
+      toast.error('Unlock this property before calling the landlord');
+      return;
+    }
+
+    if (!property?.landlord_id) {
+      toast.error('Landlord account is unavailable for calls');
+      return;
+    }
+
+    await startCall({
+      receiverId: property.landlord_id,
+      callType,
+      propertyId: property.id,
+      propertyTitle: property.title,
+    });
   };
 
   const handleUnlockPayment = useCallback(async () => {
@@ -540,6 +574,9 @@ const PropertyDetail = () => {
                       <FaCheckCircle className="text-green-500 ml-2" />
                     )}
                   </div>
+                  <div className="mt-2">
+                    <OnlineStatusBadge userId={property.landlord_id} />
+                  </div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-600">Phone</div>
@@ -574,6 +611,37 @@ const PropertyDetail = () => {
                     {property.landlord_email}
                   </a>
                 </div>
+                {isAuthenticated && user?.user_type === 'tenant' && (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCallLandlord('audio')}
+                      disabled={!realtimeConnected}
+                      className="btn btn-primary w-full"
+                    >
+                      <FaPhone className="mr-2" />
+                      {realtimeConnected ? 'Audio Call' : 'Connecting...'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCallLandlord('video')}
+                      disabled={!realtimeConnected}
+                      className="btn btn-primary w-full"
+                    >
+                      <FaVideo className="mr-2" />
+                      {realtimeConnected ? 'Video Call' : 'Connecting...'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCallLandlord('virtual_tour')}
+                      disabled={!realtimeConnected}
+                      className="btn btn-primary w-full sm:col-span-2"
+                    >
+                      <FaVideo className="mr-2" />
+                      {realtimeConnected ? 'Start Virtual Tour' : 'Connecting...'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

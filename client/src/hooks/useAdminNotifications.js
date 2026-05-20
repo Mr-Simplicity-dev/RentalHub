@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
-
-const socket = io(process.env.REACT_APP_API_URL);
+import { useSocket } from "./useSocket";
 
 export default function useAdminNotifications() {
 
   const [notifications, setNotifications] = useState([]);
+  const { socket } = useSocket();
 
   useEffect(() => {
+    if (!socket) return undefined;
 
     socket.on("admin_notification", (data) => {
 
@@ -20,7 +20,7 @@ export default function useAdminNotifications() {
 
     return () => socket.off("admin_notification");
 
-  }, []);
+  }, [socket]);
 
   return notifications;
 }

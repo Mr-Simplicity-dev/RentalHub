@@ -7,6 +7,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import i18n from '../i18n';
 
 import { AuthProvider } from '../context/AuthContext';
+import { SocketProvider } from '../context/SocketContext';
 import { useAuth } from '../hooks/useAuth';
 
 import Header from '../components/common/Header';
@@ -560,8 +561,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Router>
-          <Layout>
-            <Routes>
+          <SocketProvider>
+            <Layout>
+              <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
@@ -747,10 +749,11 @@ function App() {
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Layout>
+              </Routes>
+            </Layout>
 
-          <ToastContainer position="top-right" autoClose={3000} />
+            <ToastContainer position="top-right" autoClose={3000} />
+          </SocketProvider>
         </Router>
       </AuthProvider>
     </QueryClientProvider>

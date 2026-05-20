@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import api from "../../services/api";
 import { toast } from "react-toastify";
+import OnlineStatusBadge from "../calls/OnlineStatusBadge";
 
 const UsersTab = ({
   users,
@@ -40,7 +41,7 @@ const UsersTab = ({
   };
 
   const visibleUsers = users.filter((u) =>
-    ["tenant", "landlord"].includes(u.user_type)
+    ["tenant", "landlord", "agent"].includes(u.user_type)
   );
 
   const toggleUser = (id) => {
@@ -118,6 +119,7 @@ const UsersTab = ({
               <th className="p-3 text-left">Name</th>
               <th className="p-3 text-left">Email</th>
               <th className="p-3 text-left">Role</th>
+              <th className="p-3 text-left">Online</th>
               <th className="p-3 text-left">Active</th>
               <th className="p-3 text-left">Verified</th>
               <th className="p-3 text-left">Verified By</th>
@@ -136,7 +138,7 @@ const UsersTab = ({
             {visibleUsers.length === 0 && (
               <tr>
                 <td
-                  colSpan="9"
+                  colSpan="10"
                   className="text-center py-10 text-gray-500"
                 >
                   No users found
@@ -175,6 +177,10 @@ const UsersTab = ({
 
                 <td className="p-3 capitalize">
                   {u.user_type}
+                </td>
+
+                <td className="p-3">
+                  <OnlineStatusBadge userId={u.id} />
                 </td>
 
                 <td className="p-3">
