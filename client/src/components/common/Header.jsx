@@ -1017,7 +1017,7 @@ return (
 
           <MobileNavLink
             to="/verify-case"
-            label={t('header.verify_evidence')}
+            label={t('Verify Evidence')}
             onClick={closeMobileMenu}
           />
 
