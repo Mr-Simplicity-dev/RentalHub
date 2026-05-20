@@ -80,6 +80,7 @@ const ensureAdSpacesSchema = async () => {
       cta_label VARCHAR(80),
       background_color VARCHAR(20) DEFAULT '#ffffff',
       text_color VARCHAR(20) DEFAULT '#111827',
+      sharing_enabled BOOLEAN NOT NULL DEFAULT FALSE,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       sort_order INTEGER NOT NULL DEFAULT 0,
       starts_at TIMESTAMP,
@@ -91,6 +92,9 @@ const ensureAdSpacesSchema = async () => {
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    ALTER TABLE ad_spaces
+      ADD COLUMN IF NOT EXISTS sharing_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 
     ALTER TABLE ad_spaces
       DROP CONSTRAINT IF EXISTS chk_ad_spaces_placement;
@@ -210,6 +214,7 @@ const normalizeAdPayload = (payload) => {
     cta_label: normalizeText(payload.cta_label, 'CTA label', 80),
     background_color: normalizeColor(payload.background_color, '#ffffff'),
     text_color: normalizeColor(payload.text_color, '#111827'),
+    sharing_enabled: normalizeBoolean(payload.sharing_enabled, false),
     is_active: normalizeBoolean(payload.is_active, true),
     sort_order: sortOrder,
     starts_at: startsAt,
@@ -260,7 +265,7 @@ const listPublicAds = async (req, res) => {
 
     const { rows } = await db.query(
       `SELECT id, placement, title, description, sponsor_name, image_url,
-              target_url, cta_label, background_color, text_color
+              target_url, cta_label, background_color, text_color, sharing_enabled
        FROM ad_spaces
        WHERE ${where.join(' AND ')}
        ORDER BY sort_order ASC, created_at DESC
@@ -344,10 +349,10 @@ const createAd = async (req, res) => {
     const { rows } = await db.query(
       `INSERT INTO ad_spaces (
          placement, title, description, sponsor_name, image_url, target_url,
-         cta_label, background_color, text_color, is_active, sort_order,
+         cta_label, background_color, text_color, sharing_enabled, is_active, sort_order,
          starts_at, ends_at, created_by, updated_by
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15)
        RETURNING *`,
       [
         ad.placement,
@@ -359,6 +364,7 @@ const createAd = async (req, res) => {
         ad.cta_label,
         ad.background_color,
         ad.text_color,
+        ad.sharing_enabled,
         ad.is_active,
         ad.sort_order,
         ad.starts_at,
@@ -403,11 +409,12 @@ const updateAd = async (req, res) => {
            cta_label = $8,
            background_color = $9,
            text_color = $10,
-           is_active = $11,
-           sort_order = $12,
-           starts_at = $13,
-           ends_at = $14,
-           updated_by = $15,
+           sharing_enabled = $11,
+           is_active = $12,
+           sort_order = $13,
+           starts_at = $14,
+           ends_at = $15,
+           updated_by = $16,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
        RETURNING *`,
@@ -422,6 +429,7 @@ const updateAd = async (req, res) => {
         ad.cta_label,
         ad.background_color,
         ad.text_color,
+        ad.sharing_enabled,
         ad.is_active,
         ad.sort_order,
         ad.starts_at,

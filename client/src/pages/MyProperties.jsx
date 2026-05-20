@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { propertyService } from '../services/propertyService';
 import Loader from '../components/common/Loader';
 import { Link } from 'react-router-dom';
@@ -13,11 +13,7 @@ const MyProperties = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await propertyService.getMyProperties();
@@ -27,7 +23,11 @@ const MyProperties = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (loading) return <Loader />;
 

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS ad_spaces (
     cta_label VARCHAR(80),
     background_color VARCHAR(20) DEFAULT '#ffffff',
     text_color VARCHAR(20) DEFAULT '#111827',
+    sharing_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     starts_at TIMESTAMP,

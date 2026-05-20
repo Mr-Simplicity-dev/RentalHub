@@ -1,5 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  FaCopy,
+  FaFacebookF,
+  FaShareAlt,
+  FaTelegramPlane,
+  FaWhatsapp,
+} from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 
 const isExternalUrl = (url) => /^https?:\/\//i.test(String(url || ''));
@@ -17,6 +26,170 @@ const normalizeLimit = (value) => {
   return Math.min(Math.max(Math.floor(numeric), 1), 10);
 };
 
+const copyTextToClipboard = async (text) => {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'readonly');
+  textarea.style.position = 'absolute';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+};
+
+const getShareUrl = (targetUrl) => {
+  if (typeof window === 'undefined') return targetUrl || '';
+  if (isExternalUrl(targetUrl)) return targetUrl;
+  if (isInternalUrl(targetUrl)) return `${window.location.origin}${targetUrl}`;
+  return window.location.href;
+};
+
+const AdShareButton = ({ ad, targetUrl }) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  const shareUrl = useMemo(() => getShareUrl(targetUrl), [targetUrl]);
+  const shareTitle = ad?.title || t('ads.default_share_title');
+  const shareText = ad?.description
+    ? `${t('ads.share_text', { title: shareTitle })} ${ad.description}`
+    : t('ads.share_text', { title: shareTitle });
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handleOutsideClick = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [open]);
+
+  const handleNativeShare = async () => {
+    if (typeof navigator === 'undefined' || !navigator.share) return;
+
+    try {
+      await navigator.share({
+        title: shareTitle,
+        text: shareText,
+        url: shareUrl,
+      });
+      setOpen(false);
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        toast.error(t('ads.share_failed'));
+      }
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await copyTextToClipboard(shareUrl);
+      toast.success(t('ads.link_copied'));
+      setOpen(false);
+    } catch {
+      toast.error(t('ads.copy_failed'));
+    }
+  };
+
+  const shareTargets = [
+    {
+      label: 'WhatsApp',
+      href: `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`,
+      icon: <FaWhatsapp className="text-green-600" />,
+    },
+    {
+      label: 'Facebook',
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+      icon: <FaFacebookF className="text-blue-600" />,
+    },
+    {
+      label: 'Telegram',
+      href: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`,
+      icon: <FaTelegramPlane className="text-sky-500" />,
+    },
+    {
+      label: 'X',
+      href: `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`,
+      icon: <span className="font-semibold text-gray-900">X</span>,
+    },
+  ];
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute right-3 top-3 z-10"
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-gray-700 shadow-md ring-1 ring-black/5 transition hover:bg-white hover:text-primary-700"
+        aria-label={t('ads.share_ad')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <FaShareAlt className="text-sm" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-11 w-56 rounded-xl border border-gray-200 bg-white p-2 text-gray-700 shadow-xl">
+          <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            {t('ads.share_ad')}
+          </div>
+
+          {typeof navigator !== 'undefined' && navigator.share && (
+            <button
+              type="button"
+              onClick={handleNativeShare}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-gray-50"
+            >
+              <FaShareAlt className="text-gray-600" />
+              {t('ads.share_device')}
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-gray-50"
+          >
+            <FaCopy className="text-gray-600" />
+            {t('ads.copy_link')}
+          </button>
+
+          {shareTargets.map((target) => (
+            <a
+              key={target.label}
+              href={target.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition hover:bg-gray-50"
+            >
+              {target.icon}
+              {t('ads.share_on', { platform: target.label })}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdSpace = ({
   placement,
   className = '',
@@ -25,6 +198,7 @@ const AdSpace = ({
   variant = 'cards',
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [ads, setAds] = useState([]);
   const requestLimit = useMemo(() => normalizeLimit(limit), [limit]);
   const isMarquee = variant === 'marquee';
@@ -91,7 +265,7 @@ const AdSpace = ({
       }
     };
 
-    const ctaLabel = hasTarget ? (ad.cta_label || 'Click to open') : '';
+    const ctaLabel = hasTarget ? (ad.cta_label || t('ads.default_cta')) : '';
     const clickableClass = hasTarget ? 'cursor-pointer' : '';
 
     const handleActivate = (event) => {
@@ -136,7 +310,7 @@ const AdSpace = ({
 
           <div className={`flex flex-1 flex-col justify-center gap-3 ${isMarquee ? 'min-h-[112px] p-4 md:p-5' : 'min-h-[140px] p-5 md:p-6'}`}>
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide opacity-75">
-              <span>Sponsored</span>
+              <span>{t('ads.sponsored')}</span>
               {ad.sponsor_name && (
                 <>
                   <span aria-hidden="true">/</span>
@@ -166,11 +340,7 @@ const AdSpace = ({
       </div>
     );
 
-    if (!hasTarget) {
-      return card;
-    }
-
-    return (
+    const linkedCard = hasTarget ? (
       <a
         href={targetUrl}
         target={external ? '_blank' : undefined}
@@ -182,6 +352,17 @@ const AdSpace = ({
       >
         {card}
       </a>
+    ) : card;
+
+    if (!ad.sharing_enabled || duplicate) {
+      return linkedCard;
+    }
+
+    return (
+      <div className="relative h-full">
+        {linkedCard}
+        <AdShareButton ad={ad} targetUrl={targetUrl} />
+      </div>
     );
   };
 

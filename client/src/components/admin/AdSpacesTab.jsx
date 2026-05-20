@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
-import { FaEdit, FaExternalLinkAlt, FaPlus, FaTrash, FaUpload } from 'react-icons/fa';
+import { FaEdit, FaExternalLinkAlt, FaPlus, FaShareAlt, FaTrash, FaUpload } from 'react-icons/fa';
 import api from '../../services/api';
 
 const fallbackPlacements = [
@@ -22,6 +22,7 @@ const emptyForm = {
   cta_label: 'Learn more',
   background_color: '#ffffff',
   text_color: '#111827',
+  sharing_enabled: false,
   is_active: true,
   sort_order: '0',
   starts_at: '',
@@ -137,6 +138,7 @@ const AdSpacesTab = () => {
     cta_label: form.cta_label,
     background_color: form.background_color,
     text_color: form.text_color,
+    sharing_enabled: form.sharing_enabled,
     is_active: form.is_active,
     sort_order: Number(form.sort_order || 0),
     starts_at: form.starts_at || null,
@@ -189,6 +191,7 @@ const AdSpacesTab = () => {
       cta_label: ad.cta_label || '',
       background_color: ad.background_color || '#ffffff',
       text_color: ad.text_color || '#111827',
+      sharing_enabled: ad.sharing_enabled === true,
       is_active: ad.is_active === true,
       sort_order: String(ad.sort_order || 0),
       starts_at: toDatetimeLocal(ad.starts_at),
@@ -425,16 +428,29 @@ const AdSpacesTab = () => {
           </div>
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-            <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-              <input
-                name="is_active"
-                type="checkbox"
-                checked={form.is_active}
-                onChange={handleChange}
-                className="h-4 w-4 rounded border-gray-300 text-primary-600"
-              />
-              Active
-            </label>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  name="is_active"
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600"
+                />
+                Active
+              </label>
+
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  name="sharing_enabled"
+                  type="checkbox"
+                  checked={form.sharing_enabled}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600"
+                />
+                Enable ad sharing
+              </label>
+            </div>
 
             <button
               type="submit"
@@ -475,6 +491,12 @@ const AdSpacesTab = () => {
               {form.cta_label && (
                 <span className="mt-3 inline-flex rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white">
                   {form.cta_label}
+                </span>
+              )}
+              {form.sharing_enabled && (
+                <span className="mt-3 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white/80 px-3 py-2 text-xs font-semibold text-gray-700">
+                  <FaShareAlt className="text-gray-500" />
+                  Sharing enabled
                 </span>
               )}
             </div>
@@ -534,6 +556,7 @@ const AdSpacesTab = () => {
                   <span>Ends: {formatDate(ad.ends_at)}</span>
                   <span>Impressions: {Number(ad.impression_count || 0).toLocaleString()}</span>
                   <span>Clicks: {Number(ad.click_count || 0).toLocaleString()}</span>
+                  <span>Sharing: {ad.sharing_enabled ? 'Enabled' : 'Disabled'}</span>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">

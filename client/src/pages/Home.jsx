@@ -240,14 +240,14 @@ const Home = () => {
                 to="/lawyers"
                 className="underline text-primary-100 hover:text-white text-sm transition-colors duration-300 inline-block hover:scale-105"
               >
-                {t('Can\'t find your preferred property type? Submit a request on the properties page.')}
+                {t('home.legal_support_link')}
               </Link>
               <div className="mt-2">
                 <Link
                   to="/properties?request=1#tenant-request"
                   className="underline text-primary-100 hover:text-white text-sm transition-colors duration-300 inline-block hover:scale-105"
                 >
-                  {t('Can\'t find your preferred property type? Submit a request on the properties page.')}
+                  {t('home.property_request_link')}
                 </Link>
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
@@ -255,13 +255,13 @@ const Home = () => {
                   to="/lawyers"
                   className="inline-block bg-white text-primary-700 px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  {t('Use RentalHub NG Lawyers')}
+                  {t('home.use_lawyers')}
                 </Link>
                 <Link
                   to="/verify-case"
                   className="inline-block border border-white px-5 py-2 rounded-lg font-semibold text-white hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  {t('Verify Dispute Evidence')}
+                  {t('home.verify_dispute_evidence')}
                 </Link>
               </div>
               <div className="mt-3 flex justify-center">
@@ -269,7 +269,7 @@ const Home = () => {
                   to="/properties?request=1#tenant-request"
                   className="inline-block border border-white px-5 py-2 rounded-lg font-semibold text-white hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  {t('Submit Request')}
+                  {t('home.submit_request')}
                 </Link>
               </div>
             </div>
