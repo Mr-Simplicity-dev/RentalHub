@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { FaChevronDown } from 'react-icons/fa';
 
 import i18n from '../i18n';
 
@@ -93,6 +94,13 @@ import AgentWithdrawalPage from './agent/AgentWithdrawalPage';
 import VerificationStatus from './VerificationStatus';
 
 const queryClient = new QueryClient();
+const LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'ru', label: 'Русский' },
+  { value: 'fr', label: 'Français' },
+  { value: 'ar', label: 'العربية' },
+  { value: 'zh', label: '中文' },
+];
 
 const FINANCIAL_ADMIN_ROLES = ['financial_admin', 'lga_financial_admin'];
 const SUPER_FINANCIAL_ADMIN_ROLES = ['super_financial_admin'];
@@ -510,6 +518,7 @@ const AdminWithdrawalsRoute = () => {
 
 function Layout({ children }) {
   const location = useLocation();
+  const [activeLanguage, setActiveLanguage] = useState(i18n.language?.split('-')[0] || 'en');
 
   const isVerificationPage =
     location.pathname.startsWith('/verify-email') ||
@@ -520,9 +529,20 @@ function Layout({ children }) {
     location.pathname.startsWith('/lawyer');
   const showPublicHeaderFooter = !isVerificationPage && !isDashboardShell;
 
-  // Handle RTL/LTR automatically
   useEffect(() => {
-    document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
+    const handleLanguageChange = (language = i18n.language) => {
+      const normalizedLanguage = language?.split('-')[0] || 'en';
+      setActiveLanguage(normalizedLanguage);
+      document.documentElement.lang = normalizedLanguage;
+      document.documentElement.dir = normalizedLanguage === 'ar' ? 'rtl' : 'ltr';
+    };
+
+    handleLanguageChange();
+    i18n.on('languageChanged', handleLanguageChange);
+
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange);
+    };
   }, []);
 
   return (
@@ -531,22 +551,31 @@ function Layout({ children }) {
 
       {/* Global Language Switcher */}
       {!isDashboardShell && (
-      <div className="flex justify-end px-4 py-2 border-b bg-white">
-        <select
-          onChange={(e) => {
-            i18n.changeLanguage(e.target.value);
-            document.documentElement.dir = e.target.value === 'ar' ? 'rtl' : 'ltr';
-          }}
-          defaultValue={i18n.language || 'en'}
-          className="border rounded px-2 py-1 text-sm"
-        >
-          <option value="en">English</option>
-          <option value="ru">Russia</option>
-          <option value="fr">Français</option>
-          <option value="ar">العربية</option>
-          <option value="zh">中文</option>
-        </select>
-      </div>
+        <div className="flex justify-end border-b bg-white px-4 py-2">
+          <label className="relative block w-full max-w-[11rem] sm:max-w-[12rem]" dir="ltr">
+            <span className="sr-only">{i18n.t('language.select')}</span>
+            <select
+              onChange={(e) => {
+                const nextLanguage = e.target.value;
+                setActiveLanguage(nextLanguage);
+                i18n.changeLanguage(nextLanguage);
+              }}
+              value={activeLanguage}
+              aria-label={i18n.t('language.select')}
+              className="w-full appearance-none rounded-lg border border-gray-300 bg-white py-1.5 pl-3 pr-10 text-sm leading-5 text-gray-700 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-200"
+            >
+              {LANGUAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <FaChevronDown
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500"
+              aria-hidden="true"
+            />
+          </label>
+        </div>
       )}
 
       <main className="flex-grow animate-fadeIn">{children}</main>

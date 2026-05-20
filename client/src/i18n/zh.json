@@ -15,6 +15,11 @@
     "failed": "登录失败"
   },
 
+  "language": {
+    "label": "语言",
+    "select": "选择语言"
+  },
+
   "home": {
     "hero_title": "在尼日利亚找到您的理想之家",
     "hero_subtitle": "浏览覆盖全部 36 个州 + 首都的数千套已验证房源",

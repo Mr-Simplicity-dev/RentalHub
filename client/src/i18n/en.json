@@ -15,6 +15,11 @@
     "failed": "Login failed"
   },
 
+  "language": {
+    "label": "Language",
+    "select": "Select language"
+  },
+
   "home": {
     "hero_title": "Find Your Perfect Home in Nigeria",
     "hero_subtitle": "Browse thousands of verified properties in all 36 states + FCT",

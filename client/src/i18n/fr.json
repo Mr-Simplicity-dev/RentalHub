@@ -15,6 +15,11 @@
     "failed": "Échec de la connexion"
   },
 
+  "language": {
+    "label": "Langue",
+    "select": "Choisir la langue"
+  },
+
   "home": {
     "hero_title": "Trouvez la maison parfaite au Nigeria",
     "hero_subtitle": "Parcourez des milliers de biens vérifiés dans les 36 États + la capitale",
