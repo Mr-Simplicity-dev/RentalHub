@@ -25,6 +25,7 @@ import {
   FaVideo,
 } from 'react-icons/fa';
 import { formatCurrency, formatDate } from '../utils/helpers';
+import { useTranslation } from 'react-i18next';
 
 const PropertyDetail = () => {
   const POST_VERIFY_REDIRECT_KEY = 'pending_unlock_redirect';
@@ -32,6 +33,7 @@ const PropertyDetail = () => {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const { connected: realtimeConnected, startCall } = useSocket();
   const [property, setProperty] = useState(null);
@@ -76,12 +78,12 @@ const PropertyDetail = () => {
         setProperty(response.data);
       }
     } catch (error) {
-      toast.error('Failed to load property details');
+      toast.error(t('property_detail.load_failed'));
       console.error('Error loading property:', error);
     } finally {
       setLoading(false);
     }
-  }, [id, isAuthenticated, user?.user_type]);
+  }, [id, isAuthenticated, t, user?.user_type]);
 
   useEffect(() => {
     loadProperty();
@@ -105,7 +107,7 @@ const PropertyDetail = () => {
       try {
         const result = await paymentService.verifyPropertyUnlock(reference);
         if (result.success) {
-          toast.success('Property unlocked successfully');
+          toast.success(t('property_detail.unlock_success'));
           setHasFullAccess(true);
           localStorage.removeItem(POST_VERIFY_REDIRECT_KEY);
           setSearchParams({}, { replace: true });
@@ -117,7 +119,7 @@ const PropertyDetail = () => {
     };
 
     verifyUnlock();
-  }, [searchParams, setSearchParams, isAuthenticated, user?.user_type, loadProperty]);
+  }, [searchParams, setSearchParams, isAuthenticated, t, user?.user_type, loadProperty]);
 
   useEffect(() => {
     const shouldOpenApplication =
@@ -150,7 +152,7 @@ const PropertyDetail = () => {
 
   const handleSave = async () => {
     if (!isAuthenticated) {
-      toast.error('Please login to save properties');
+      toast.error(t('property_detail.login_save'));
       navigate('/login');
       return;
     }
@@ -159,20 +161,20 @@ const PropertyDetail = () => {
       if (isSaved) {
         await propertyService.unsaveProperty(id);
         setIsSaved(false);
-        toast.success('Property removed from favorites');
+        toast.success(t('properties.removed_favorite'));
       } else {
         await propertyService.saveProperty(id);
         setIsSaved(true);
-        toast.success('Property saved to favorites');
+        toast.success(t('properties.saved_favorite'));
       }
     } catch (error) {
-      toast.error('Failed to save property');
+      toast.error(t('properties.save_failed'));
     }
   };
 
   const handleApply = () => {
     if (!isAuthenticated) {
-      toast.error('Please login to apply');
+      toast.error(t('property_detail.login_apply'));
       navigate('/login');
       return;
     }
@@ -228,18 +230,18 @@ const PropertyDetail = () => {
 
   const handleUnlockPayment = useCallback(async () => {
     if (!isAuthenticated) {
-      toast.error('Please login to unlock full details');
+      toast.error(t('property_detail.login_unlock'));
       navigate('/login');
       return;
     }
 
     if (user?.user_type !== 'tenant') {
-      toast.error('Only tenants can unlock property details');
+      toast.error(t('property_detail.only_tenants_unlock'));
       return;
     }
 
     if (!user?.identity_verified) {
-      toast.error('Please complete identity verification first');
+      toast.error(t('property_detail.verify_first'));
       const redirectPath = `/properties/${id}?autounlock=1`;
       localStorage.setItem(POST_VERIFY_REDIRECT_KEY, redirectPath);
       navigate(`/profile?next=${encodeURIComponent(redirectPath)}`);
@@ -256,7 +258,7 @@ const PropertyDetail = () => {
     try {
       const result = await paymentService.initializePropertyUnlock(Number(id), 'paystack');
       if (!result.success) {
-        toast.error(result.message || 'Failed to start unlock payment');
+        toast.error(result.message || t('property_detail.unlock_start_failed'));
         return;
       }
 
@@ -273,13 +275,13 @@ const PropertyDetail = () => {
         return;
       }
 
-      toast.info(result.message || 'Complete payment with provided details');
+      toast.info(result.message || t('property_detail.complete_payment'));
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to initialize unlock payment');
+      toast.error(error.response?.data?.message || t('property_detail.unlock_start_failed'));
     } finally {
       setUnlocking(false);
     }
-  }, [id, isAuthenticated, navigate, user?.identity_verified, user?.user_type, loadProperty, searchParams, setSearchParams]);
+  }, [id, isAuthenticated, navigate, t, user?.identity_verified, user?.user_type, loadProperty, searchParams, setSearchParams]);
 
   useEffect(() => {
     const shouldAutoUnlock =
@@ -318,7 +320,7 @@ const PropertyDetail = () => {
         navigate('/applications');
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to submit application');
+      toast.error(error.response?.data?.message || t('property_detail.submit_failed'));
     } finally {
       setSubmittingApplication(false);
     }
@@ -331,7 +333,7 @@ const PropertyDetail = () => {
   if (!property) {
     return (
       <div className="container mx-auto px-4 py-12 text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Property not found</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('property_detail.not_found')}</h1>
       </div>
     );
   }
@@ -420,23 +422,23 @@ const PropertyDetail = () => {
           </>
         ) : (
           <div className="md:col-span-2 h-96 bg-gray-200 rounded-lg flex items-center justify-center">
-            <p className="text-gray-500">No photos available</p>
+            <p className="text-gray-500">{t('property_detail.no_photos')}</p>
           </div>
         )}
       </div>
 
       {!hasFullAccess && (
         <div className="card mb-6 border border-yellow-200 bg-yellow-50">
-          <h3 className="text-lg font-semibold mb-2">Pay to unlock full property details</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('property_detail.unlock_title')}</h3>
           <p className="text-sm text-gray-700 mb-3">
-            Full details (full address, landlord contact, and premium media) are available after one-time payment for this property.
+            {t('property_detail.unlock_text')}
           </p>
           <button
             onClick={handleUnlockPayment}
             disabled={unlocking}
             className="btn btn-primary"
           >
-            {unlocking ? 'Processing...' : isAuthenticated ? 'Pay to Unlock Details' : 'Login to Continue'}
+            {unlocking ? t('common.processing') : isAuthenticated ? t('property_detail.pay_unlock_details') : t('property_detail.login_continue')}
           </button>
         </div>
       )}
@@ -475,7 +477,12 @@ const PropertyDetail = () => {
                 {formatCurrency(property.rent_amount)}
               </div>
               <div className="text-gray-600">
-                per {property.payment_frequency === 'yearly' ? 'year' : 'month'}
+                {t('property_detail.per_period', {
+                  period:
+                    property.payment_frequency === 'yearly'
+                      ? t('property_detail.year')
+                      : t('property_detail.month'),
+                })}
               </div>
             </div>
 
@@ -484,33 +491,33 @@ const PropertyDetail = () => {
               <div className="text-center">
                 <FaBed className="text-2xl text-gray-600 mx-auto mb-2" />
                 <div className="font-semibold">{property.bedrooms}</div>
-                <div className="text-sm text-gray-600">Bedrooms</div>
+                <div className="text-sm text-gray-600">{t('property_detail.bedrooms')}</div>
               </div>
               <div className="text-center">
                 <FaBath className="text-2xl text-gray-600 mx-auto mb-2" />
                 <div className="font-semibold">{property.bathrooms}</div>
-                <div className="text-sm text-gray-600">Bathrooms</div>
+                <div className="text-sm text-gray-600">{t('property_detail.bathrooms')}</div>
               </div>
               <div className="text-center">
                 <FaStar className="text-2xl text-yellow-500 mx-auto mb-2" />
                 <div className="font-semibold">
                   {property.avg_rating ? parseFloat(property.avg_rating).toFixed(1) : 'N/A'}
                 </div>
-                <div className="text-sm text-gray-600">Rating</div>
+                <div className="text-sm text-gray-600">{t('property_detail.rating')}</div>
               </div>
             </div>
 
             {/* Description */}
             {hasFullAccess ? (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-3">Description</h2>
+                <h2 className="text-xl font-semibold mb-3">{t('property_detail.description')}</h2>
                 <p className="text-gray-700 whitespace-pre-line">{property.description}</p>
               </div>
             ) : (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-3">Description</h2>
+                <h2 className="text-xl font-semibold mb-3">{t('property_detail.description')}</h2>
                 <p className="text-gray-500">
-                  Subscribe to view the full property description.
+                  {t('property_detail.subscribe_description')}
                 </p>
               </div>
             )}
@@ -518,7 +525,7 @@ const PropertyDetail = () => {
             {/* Amenities */}
             {hasFullAccess && property.amenities && property.amenities.length > 0 && (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-3">Amenities</h2>
+                <h2 className="text-xl font-semibold mb-3">{t('property_detail.amenities')}</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {property.amenities.map((amenity, index) => (
                     <div key={index} className="flex items-center">
@@ -533,7 +540,7 @@ const PropertyDetail = () => {
             {/* Property Video - unlocked details only */}
             {hasFullAccess && property.video_url && (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-3">Video Tour</h2>
+                <h2 className="text-xl font-semibold mb-3">{t('property_detail.video_tour')}</h2>
                 <video
                   controls
                   className="w-full rounded-lg"
@@ -545,7 +552,7 @@ const PropertyDetail = () => {
             {/* Full Address - unlocked details only */}
             {hasFullAccess && property.full_address && (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-3">Full Address</h2>
+                <h2 className="text-xl font-semibold mb-3">{t('property_detail.full_address')}</h2>
                 <p className="text-gray-700">{property.full_address}</p>
               </div>
             )}
@@ -564,10 +571,10 @@ const PropertyDetail = () => {
           {/* Contact Card */}
           {hasFullAccess && property.landlord_name ? (
             <div className="card mb-6">
-              <h3 className="text-lg font-semibold mb-4">Contact Landlord</h3>
+              <h3 className="text-lg font-semibold mb-4">{t('property_detail.contact_landlord')}</h3>
               <div className="space-y-3">
                 <div>
-                  <div className="text-sm text-gray-600">Name</div>
+                  <div className="text-sm text-gray-600">{t('property_detail.name')}</div>
                   <div className="font-semibold flex items-center">
                     {property.landlord_name}
                     {property.landlord_verified && (
@@ -579,7 +586,7 @@ const PropertyDetail = () => {
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600">Phone</div>
+                  <div className="text-sm text-gray-600">{t('property_detail.phone')}</div>
                   <a
                     href={`tel:${property.landlord_phone}`}
                     className="font-semibold text-primary-600 hover:text-primary-700 flex items-center"
@@ -590,19 +597,19 @@ const PropertyDetail = () => {
                 </div>
                 {landlordWhatsappLink && (
                   <div>
-                    <div className="text-sm text-gray-600">WhatsApp</div>
+                    <div className="text-sm text-gray-600">{t('property_detail.whatsapp')}</div>
                     <a
                       href={landlordWhatsappLink}
                       target="_blank"
                       rel="noreferrer"
                       className="font-semibold text-green-600 hover:text-green-700"
                     >
-                      Chat on WhatsApp
+                      {t('property_detail.chat_whatsapp')}
                     </a>
                   </div>
                 )}
                 <div>
-                  <div className="text-sm text-gray-600">Email</div>
+                  <div className="text-sm text-gray-600">{t('property_detail.email')}</div>
                   <a
                     href={`mailto:${property.landlord_email}`}
                     className="font-semibold text-primary-600 hover:text-primary-700 flex items-center"
@@ -620,7 +627,7 @@ const PropertyDetail = () => {
                       className="btn btn-primary w-full"
                     >
                       <FaPhone className="mr-2" />
-                      {realtimeConnected ? 'Audio Call' : 'Connecting...'}
+                      {realtimeConnected ? t('property_detail.audio_call') : t('common.connecting')}
                     </button>
                     <button
                       type="button"
@@ -629,7 +636,7 @@ const PropertyDetail = () => {
                       className="btn btn-primary w-full"
                     >
                       <FaVideo className="mr-2" />
-                      {realtimeConnected ? 'Video Call' : 'Connecting...'}
+                      {realtimeConnected ? t('property_detail.video_call') : t('common.connecting')}
                     </button>
                     <button
                       type="button"
@@ -638,7 +645,7 @@ const PropertyDetail = () => {
                       className="btn btn-primary w-full sm:col-span-2"
                     >
                       <FaVideo className="mr-2" />
-                      {realtimeConnected ? 'Start Virtual Tour' : 'Connecting...'}
+                      {realtimeConnected ? t('property_detail.start_virtual_tour') : t('common.connecting')}
                     </button>
                   </div>
                 )}
@@ -646,16 +653,16 @@ const PropertyDetail = () => {
             </div>
           ) : (
             <div className="card mb-6 bg-yellow-50 border border-yellow-200">
-              <h3 className="text-lg font-semibold mb-2">Subscribe to View Contact</h3>
+              <h3 className="text-lg font-semibold mb-2">{t('property_detail.subscribe_contact_title')}</h3>
               <p className="text-sm text-gray-700 mb-4">
-                Make one-time payment to access landlord contact information and full property details for this property
+                {t('property_detail.subscribe_contact_text')}
               </p>
               <button
                 onClick={handleUnlockPayment}
                 disabled={unlocking}
                 className="btn btn-primary w-full"
               >
-                {unlocking ? 'Processing...' : 'Pay to Unlock'}
+                {unlocking ? t('common.processing') : t('property_detail.pay_to_unlock')}
               </button>
             </div>
           )}
@@ -666,7 +673,7 @@ const PropertyDetail = () => {
               onClick={handleApply}
               className="btn btn-primary w-full mb-6 py-3 text-lg"
             >
-              Apply for This Property
+              {t('property_detail.apply_property')}
             </button>
           )}
 
@@ -678,33 +685,33 @@ const PropertyDetail = () => {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
-            Report Dispute
+            {t('property_detail.report_dispute')}
           </button>
 
           {/* Property Info */}
           <div className="card">
-            <h3 className="text-lg font-semibold mb-4">Property Information</h3>
+            <h3 className="text-lg font-semibold mb-4">{t('property_detail.property_information')}</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Property Type</span>
+                <span className="text-gray-600">{t('property_detail.property_type')}</span>
                 <span className="font-semibold capitalize">{property.property_type}</span>
               </div>
               {property.caution_deposit && (
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Caution Deposit</span>
+                  <span className="text-gray-600">{t('property_detail.caution_deposit')}</span>
                   <span className="font-semibold">
                     {formatCurrency(property.caution_deposit)}
                   </span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-gray-600">Listed On</span>
+                <span className="text-gray-600">{t('property_detail.listed_on')}</span>
                 <span className="font-semibold">{formatDate(property.created_at)}</span>
               </div>
               {property.review_count > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Reviews</span>
-                  <span className="font-semibold">{property.review_count} reviews</span>
+                  <span className="text-gray-600">{t('property_detail.reviews')}</span>
+                  <span className="font-semibold">{t('property_detail.review_count', { count: property.review_count })}</span>
                 </div>
               )}
             </div>
@@ -716,13 +723,13 @@ const PropertyDetail = () => {
       <Modal
         isOpen={showApplicationModal}
         onClose={() => setShowApplicationModal(false)}
-        title="Apply for Property"
+        title={t('property_detail.apply_modal_title')}
         size="medium"
       >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Message to Landlord (Optional)
+              {t('property_detail.message_landlord')}
             </label>
             <textarea
               value={applicationData.message}
@@ -731,13 +738,13 @@ const PropertyDetail = () => {
               }
               rows="4"
               className="input"
-              placeholder="Introduce yourself and explain why you're interested in this property..."
+              placeholder={t('property_detail.message_placeholder')}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Proposed Rent (Optional)
+              {t('property_detail.proposed_rent')}
             </label>
             <input
               type="number"
@@ -747,16 +754,18 @@ const PropertyDetail = () => {
                 setApplicationData({ ...applicationData, proposed_rent: e.target.value })
               }
               className="input"
-              placeholder={`Leave blank to accept listed rent of ${formatCurrency(property.rent_amount)}`}
+              placeholder={t('property_detail.proposed_rent_placeholder', {
+                amount: formatCurrency(property.rent_amount),
+              })}
             />
             <p className="mt-1 text-xs text-gray-500">
-              Enter a different amount only if you want to negotiate rent with the landlord.
+              {t('property_detail.proposed_rent_hint')}
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Preferred Move-in Date (Optional)
+              {t('property_detail.move_in_date')}
             </label>
             <input
               type="date"
@@ -771,8 +780,7 @@ const PropertyDetail = () => {
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800">
-              <strong>Note:</strong> Your verified NIN and contact information will be shared
-              with the landlord upon application submission.
+              <strong>{t('common.note')}:</strong> {t('property_detail.application_note')}
             </p>
           </div>
 
@@ -782,13 +790,13 @@ const PropertyDetail = () => {
               disabled={submittingApplication}
               className="btn btn-primary w-full sm:flex-1"
             >
-              {submittingApplication ? 'Submitting...' : 'Submit Application'}
+              {submittingApplication ? t('common.submitting') : t('property_detail.submit_application')}
             </button>
             <button
               onClick={() => setShowApplicationModal(false)}
               className="btn btn-secondary w-full sm:w-auto"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>

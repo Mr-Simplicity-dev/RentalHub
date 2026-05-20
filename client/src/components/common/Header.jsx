@@ -652,7 +652,7 @@ return (
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-1">
           <NavLink to="/properties" label={t('header.browse')} />
-          <NavLink to="/verify-case" label="Verify Evidence" />
+          <NavLink to="/verify-case" label={t('header.verify_evidence')} />
 
           {isAuthenticated &&
             ['landlord', 'agent'].includes(user?.user_type) && (
@@ -698,7 +698,7 @@ return (
                     setShowNotifications(!showNotifications)
                   }
                   className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
-                  aria-label="Notifications"
+                  aria-label={t('header.notifications')}
                 >
                   <FaBell className="text-lg" />
 
@@ -711,13 +711,13 @@ return (
                 {showNotifications && (
                   <div className="fixed left-2 right-2 top-20 z-50 flex max-h-[70vh] w-auto max-w-[calc(100vw-16px)] origin-top-right animate-scaleIn flex-col rounded-2xl border border-gray-100 bg-white py-2 shadow-elevated-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
                     <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
-                      <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                      <h3 className="text-sm font-semibold text-gray-900">{t('header.notifications')}</h3>
                       {notifUnreadCount > 0 && (
                         <button
                           onClick={markAllNotifsAsRead}
                           className="text-xs font-medium text-primary-600 hover:text-primary-700"
                         >
-                          Mark all as read
+                          {t('header.mark_all_read')}
                         </button>
                       )}
                     </div>
@@ -726,7 +726,7 @@ return (
                       {notifications.length === 0 ? (
                         <div className="px-4 py-8 text-center">
                           <FaBell className="mx-auto mb-2 text-2xl text-gray-300" />
-                          <p className="text-sm text-gray-500">No notifications yet</p>
+                          <p className="text-sm text-gray-500">{t('header.no_notifications')}</p>
                         </div>
                       ) : (
                         notifications.map((notif) => (
@@ -769,7 +769,7 @@ return (
                                   className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700"
                                 >
                                   <FaIdCard className="text-[10px]" />
-                                  Take Action
+                                  {t('header.take_action')}
                                 </Link>
                               </div>
                             )}
@@ -868,7 +868,7 @@ return (
                       onClick={() => setShowUserMenu(false)}
                     >
                       <FaIdCard className="text-xs text-primary-500" />
-                      <span>Verification</span>
+                      <span>{t('header.verification')}</span>
                     </Link>
 
                     <div className="mt-1 border-t border-gray-100 pt-1">
@@ -932,7 +932,7 @@ return (
                           className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
                         >
                           <FaIdCard className="text-xs" />
-                          Take Action
+                          {t('header.take_action')}
                         </Link>
                       </div>
                     )}
@@ -989,7 +989,7 @@ return (
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 shrink-0"
-            aria-label="Toggle mobile menu"
+            aria-label={t('header.toggle_mobile_menu')}
           >
             {mobileMenuOpen ? (
               <FaTimes className="text-lg" />
@@ -1017,7 +1017,7 @@ return (
 
           <MobileNavLink
             to="/verify-case"
-            label="Verify Evidence"
+            label={t('header.verify_evidence')}
             onClick={closeMobileMenu}
           />
 

@@ -5,9 +5,11 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 import BackToDashboard from '../components/common/BackToDashboard';
+import { useTranslation } from 'react-i18next';
 
 const MyProperties = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,7 +23,7 @@ const MyProperties = () => {
       const res = await propertyService.getMyProperties();
       if (res.success) setItems(res.data);
     } catch {
-      toast.error('Failed to load properties');
+      toast.error(t('my_properties.load_failed'));
     } finally {
       setLoading(false);
     }
@@ -35,11 +37,11 @@ const MyProperties = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h1 className="text-2xl font-bold">
-          {isAgent ? 'Managed Properties' : 'My Properties'}
+          {isAgent ? t('my_properties.managed_title') : t('my_properties.title')}
         </h1>
         <div className="flex flex-col gap-2 sm:flex-row">
           <BackToDashboard />
-          <Link to="/add-property" className="btn btn-primary">Add Property</Link>
+          <Link to="/add-property" className="btn btn-primary">{t('my_properties.add_property')}</Link>
         </div>
       </div>
 
@@ -52,16 +54,16 @@ const MyProperties = () => {
             </div>
             <span className="text-sm capitalize">
               {p.is_verified
-                ? (p.is_available ? 'available' : 'unavailable')
-                : 'pending verification'}
+                ? (p.is_available ? t('my_properties.available') : t('my_properties.unavailable'))
+                : t('my_properties.pending_verification')}
             </span>
           </div>
         ))}
         {items.length === 0 && (
           <div className="card text-center py-10 text-gray-500">
             {isAgent
-              ? 'No properties are currently available under your assigned landlord.'
-              : 'You have not listed any properties yet.'}
+              ? t('my_properties.empty_agent')
+              : t('my_properties.empty')}
           </div>
         )}
       </div>

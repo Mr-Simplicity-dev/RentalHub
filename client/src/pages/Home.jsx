@@ -155,9 +155,9 @@ const Home = () => {
                 <FaMobileAlt />
               </div>
               <div>
-                <p className="font-semibold text-gray-900">Click Here to Get the RentalHub mobile app</p>
+                <p className="font-semibold text-gray-900">{t('home.app_prompt_title')}</p>
                 <p className="text-sm text-gray-600">
-                  Faster search alerts, instant chats, and case updates directly on your phone.
+                  {t('home.app_prompt_text')}
                 </p>
               </div>
             </div>
@@ -170,7 +170,7 @@ const Home = () => {
                   rel="noopener noreferrer"
                   className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  Download Android
+                  {t('home.download_android')}
                 </a>
               )}
 
@@ -181,7 +181,7 @@ const Home = () => {
                   rel="noopener noreferrer"
                   className="border border-soft px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  Download iPhone
+                  {t('home.download_iphone')}
                 </a>
               )}
 
@@ -189,8 +189,8 @@ const Home = () => {
                 type="button"
                 onClick={dismissAppPrompt}
                 className="p-2 text-gray-500 hover:text-gray-700 transition-all duration-300 transform hover:scale-110"
-                aria-label="Close app download notification"
-                title="Close"
+                aria-label={t('home.close_app_prompt')}
+                title={t('common.close')}
               >
                 <FaTimes />
               </button>
@@ -240,14 +240,14 @@ const Home = () => {
                 to="/lawyers"
                 className="underline text-primary-100 hover:text-white text-sm transition-colors duration-300 inline-block hover:scale-105"
               >
-                Need legal support? Explore RentalHub NG lawyers and unlock full contact details after payment.
+                {t('home.legal_support_link')}
               </Link>
               <div className="mt-2">
                 <Link
                   to="/properties?request=1#tenant-request"
                   className="underline text-primary-100 hover:text-white text-sm transition-colors duration-300 inline-block hover:scale-105"
                 >
-                  Can't find your preferred property type? Submit a request on the properties page.
+                  {t('home.property_request_link')}
                 </Link>
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
@@ -255,13 +255,13 @@ const Home = () => {
                   to="/lawyers"
                   className="inline-block bg-white text-primary-700 px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  Use RentalHub NG Lawyers
+                  {t('home.use_lawyers')}
                 </Link>
                 <Link
                   to="/verify-case"
                   className="inline-block border border-white px-5 py-2 rounded-lg font-semibold text-white hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  Verify Dispute Evidence
+                  {t('home.verify_dispute_evidence')}
                 </Link>
               </div>
               <div className="mt-3 flex justify-center">
@@ -269,7 +269,7 @@ const Home = () => {
                   to="/properties?request=1#tenant-request"
                   className="inline-block border border-white px-5 py-2 rounded-lg font-semibold text-white hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  Submit Request
+                  {t('home.submit_request')}
                 </Link>
               </div>
             </div>

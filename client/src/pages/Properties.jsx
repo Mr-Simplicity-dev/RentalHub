@@ -414,7 +414,7 @@ const Properties = () => {
     const location = locationAccessRequirement?.location;
 
     if (!location?.state_id) {
-      toast.error('Select a valid location before paying');
+      toast.error(t('properties.select_valid_location'));
       return;
     }
 
@@ -426,7 +426,7 @@ const Properties = () => {
       });
 
       if (res.payment_required === false) {
-        toast.success(res.message || 'You already have access to this location');
+        toast.success(res.message || t('properties.already_have_access'));
         setLocationAccessRequirement(null);
         loadProperties(filters, 1);
         return;
@@ -437,31 +437,31 @@ const Properties = () => {
         return;
       }
 
-      toast.error(res.message || 'Unable to start location access payment');
+      toast.error(res.message || t('properties.location_access_start_failed'));
     } catch (error) {
       toast.error(
-        error.response?.data?.message || 'Failed to start location access payment'
+        error.response?.data?.message || t('properties.location_access_start_failed')
       );
     } finally {
       setLocationAccessLoading(false);
     }
-  }, [filters, loadProperties, locationAccessRequirement]);
+  }, [filters, loadProperties, locationAccessRequirement, t]);
 
   const submitTenantRequest = useCallback(async (e) => {
     e.preventDefault();
 
     if (!requestForm.full_name || !requestForm.email || !requestForm.property_type) {
-      toast.error('Name, email and property type are required');
+      toast.error(t('properties.request_required'));
       return;
     }
 
     if (alertPaymentEnabled && !requestForm.state_id) {
-      toast.error('Select your preferred state to calculate the request fee');
+      toast.error(t('properties.request_state_required'));
       return;
     }
 
     if (alertPaymentEnabled && !requestForm.lga_name) {
-      toast.error('Select your preferred local government area to calculate the request fee');
+      toast.error(t('properties.request_lga_required'));
       return;
     }
 
@@ -491,21 +491,21 @@ const Properties = () => {
       if (res.success) {
         toast.success(
           res.message ||
-            'Request submitted successfully. Support admin will review it before the state team starts sourcing.'
+            t('properties.request_success')
         );
         resetRequestOptionalFields();
         return;
       }
 
-      toast.error(res.message || 'Unable to submit notification request');
+      toast.error(res.message || t('properties.request_submit_failed'));
     } catch (error) {
       toast.error(
-        error.response?.data?.message || 'Failed to submit notification request'
+        error.response?.data?.message || t('properties.request_submit_failed')
       );
     } finally {
       setRequestLoading(false);
     }
-  }, [alertPaymentEnabled, requestForm, resetRequestOptionalFields]);
+  }, [alertPaymentEnabled, requestForm, resetRequestOptionalFields, t]);
 
   const locationAccessLocationLabel = locationAccessRequirement?.location
     ? [
@@ -514,7 +514,7 @@ const Properties = () => {
       ]
         .filter(Boolean)
         .join(', ')
-    : 'this location';
+    : t('properties.this_location');
   const locationAccessHomeLabel = locationAccessRequirement?.home_location
     ? [
         locationAccessRequirement.home_location.lga_name,
@@ -531,7 +531,7 @@ const Properties = () => {
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="container mx-auto px-4">
         <h1 className="text-3xl font-bold mb-6 text-center">
-          {filters.featured ? 'Featured Properties' : t('properties.title')}
+          {filters.featured ? t('properties.featured_title') : t('properties.title')}
         </h1>
 
         <AdSpace placement="properties_top" className="mb-6" />
@@ -547,23 +547,26 @@ const Properties = () => {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-amber-700">
-                  Location access required
+                  {t('properties.location_access_required')}
                 </p>
                 <h2 className="mt-1 text-xl font-bold text-gray-900">
-                  Pay {locationAccessFeeLabel} to browse {locationAccessLocationLabel}
+                  {t('properties.pay_to_browse', {
+                    amount: locationAccessFeeLabel,
+                    location: locationAccessLocationLabel,
+                  })}
                 </h2>
                 <p className="mt-2 text-sm text-gray-700">
                   {locationAccessRequirement.message ||
-                    'Your tenant account can browse properties in your registered state and LGA. Pay once to unlock this selected location.'}
+                    t('properties.location_access_text')}
                 </p>
                 {locationAccessHomeLabel && (
                   <p className="mt-1 text-xs text-gray-600">
-                    Your registered location: {locationAccessHomeLabel}
+                    {t('properties.registered_location', { location: locationAccessHomeLabel })}
                   </p>
                 )}
                 {locationAccessRequirement.access_days && (
                   <p className="mt-1 text-xs text-gray-600">
-                    Access lasts for {locationAccessRequirement.access_days} days after payment.
+                    {t('properties.access_lasts', { days: locationAccessRequirement.access_days })}
                   </p>
                 )}
               </div>
@@ -575,8 +578,8 @@ const Properties = () => {
                 disabled={locationAccessLoading}
               >
                 {locationAccessLoading
-                  ? 'Processing...'
-                  : `Pay ${locationAccessFeeLabel}`}
+                  ? t('common.processing')
+                  : t('properties.pay_amount', { amount: locationAccessFeeLabel })}
               </button>
             </div>
           </div>
@@ -591,7 +594,7 @@ const Properties = () => {
           </p>
           {filters.featured && !loading && (
             <p className="mt-2 text-sm text-primary-700">
-              Showing featured listings ordered by creation date.
+              {t('properties.featured_note')}
             </p>
           )}
           {resultNote && (
@@ -610,8 +613,8 @@ const Properties = () => {
             }}
           >
             {showRequestForm
-              ? 'Hide request form'
-              : "Can't find your preferred property? Submit a request"}
+              ? t('properties.hide_request_form')
+              : t('properties.show_request_form')}
           </button>
         </div>
 
@@ -628,19 +631,18 @@ const Properties = () => {
         {(showRequestForm || (!loading && properties.length === 0)) && (
           <div id="tenant-request" ref={requestSectionRef} className="card mt-8">
             <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
-              Not finding what you need?
+              {t('properties.request_title')}
             </h2>
             <p className="text-gray-600 mb-4">
-              Submit your request and we will notify you by email and WhatsApp once a matching property is available.
-              A support admin reviews each request before it is assigned to the state team.
+              {t('properties.request_intro')}
             </p>
             <p className={`text-sm mb-4 ${alertPaymentEnabled ? 'text-primary-700' : 'text-green-700'}`}>
               {alertPaymentEnabled
-                ? `A one-time ${alertRequestFeeLabel} payment or more is required before the request is processed.`
-                : 'Requests are currently submitted immediately without payment.'}
+                ? t('properties.request_fee_text', { amount: alertRequestFeeLabel })
+                : t('properties.request_free_text')}
               {alertPaymentEnabled && !alertPricing.location_complete && (
                 <span className="block mt-1 text-xs text-primary-700">
-                  Select both state and local government area to confirm the exact fee.
+                  {t('properties.request_select_location_fee')}
                 </span>
               )}
             </p>
@@ -649,7 +651,7 @@ const Properties = () => {
               <input
                 name="full_name"
                 className="input"
-                placeholder="Full name"
+                placeholder={t('properties.request_full_name')}
                 value={requestForm.full_name}
                 onChange={handleRequestChange}
               />
@@ -657,14 +659,14 @@ const Properties = () => {
                 name="email"
                 type="email"
                 className="input"
-                placeholder="Email address"
+                placeholder={t('properties.request_email')}
                 value={requestForm.email}
                 onChange={handleRequestChange}
               />
               <input
                 name="phone"
                 className="input"
-                placeholder="WhatsApp phone (e.g. +234...)"
+                placeholder={t('properties.request_phone')}
                 value={requestForm.phone}
                 onChange={handleRequestChange}
               />
@@ -674,14 +676,14 @@ const Properties = () => {
                 value={requestForm.property_type}
                 onChange={handleRequestChange}
               >
-                <option value="">Property type</option>
-                <option value="apartment">Apartment</option>
-                <option value="house">House</option>
-                <option value="duplex">Duplex</option>
-                <option value="studio">Studio</option>
-                <option value="bungalow">Bungalow</option>
-                <option value="flat">Flat</option>
-                <option value="room">Room</option>
+                <option value="">{t('properties.request_property_type')}</option>
+                <option value="apartment">{t('property_types.apartment')}</option>
+                <option value="house">{t('property_types.house')}</option>
+                <option value="duplex">{t('property_types.duplex')}</option>
+                <option value="studio">{t('property_types.studio')}</option>
+                <option value="bungalow">{t('property_types.bungalow')}</option>
+                <option value="flat">{t('property_types.flat')}</option>
+                <option value="room">{t('property_types.room')}</option>
               </select>
               <select
                 name="state_id"
@@ -689,7 +691,7 @@ const Properties = () => {
                 value={requestForm.state_id}
                 onChange={handleRequestChange}
               >
-                <option value="">Preferred state</option>
+                <option value="">{t('properties.request_state')}</option>
                 {locationOptions.map((state) => (
                   <option key={state.id} value={state.id}>
                     {state.state_name}
@@ -703,7 +705,7 @@ const Properties = () => {
                 onChange={handleRequestChange}
                 disabled={!requestForm.state_id}
               >
-                <option value="">Preferred local government area</option>
+                <option value="">{t('properties.request_lga')}</option>
                 {availableRequestLgas.map((lga) => (
                   <option key={lga} value={lga}>
                     {lga}
@@ -713,7 +715,7 @@ const Properties = () => {
               <input
                 name="location"
                 className="input"
-                placeholder="Preferred location (city/area)"
+                placeholder={t('properties.request_location')}
                 value={requestForm.location}
                 onChange={handleRequestChange}
               />
@@ -721,7 +723,7 @@ const Properties = () => {
                 name="min_price"
                 type="number"
                 className="input"
-                placeholder="Min budget (NGN)"
+                placeholder={t('properties.request_min_budget')}
                 value={requestForm.min_price}
                 onChange={handleRequestChange}
               />
@@ -729,7 +731,7 @@ const Properties = () => {
                 name="max_price"
                 type="number"
                 className="input"
-                placeholder="Max budget (NGN)"
+                placeholder={t('properties.request_max_budget')}
                 value={requestForm.max_price}
                 onChange={handleRequestChange}
               />
@@ -737,7 +739,7 @@ const Properties = () => {
                 name="bedrooms"
                 type="number"
                 className="input"
-                placeholder="Minimum bedrooms"
+                placeholder={t('properties.request_min_bedrooms')}
                 value={requestForm.bedrooms}
                 onChange={handleRequestChange}
               />
@@ -745,7 +747,7 @@ const Properties = () => {
                 name="bathrooms"
                 type="number"
                 className="input"
-                placeholder="Minimum bathrooms"
+                placeholder={t('properties.request_min_bathrooms')}
                 value={requestForm.bathrooms}
                 onChange={handleRequestChange}
               />
@@ -756,11 +758,11 @@ const Properties = () => {
               >
                 {requestLoading
                   ? (alertRequestReference
-                    ? 'Confirming payment and submitting request...'
-                    : (alertPaymentEnabled ? 'Redirecting to payment...' : 'Submitting request...'))
+                    ? t('properties.confirming_request_payment')
+                    : (alertPaymentEnabled ? t('properties.redirecting_payment') : t('properties.submitting_request')))
                   : (alertPaymentEnabled
-                    ? `Pay ${alertRequestFeeLabel} to Notify Me`
-                    : 'Notify me when available')}
+                    ? t('properties.pay_to_notify', { amount: alertRequestFeeLabel })
+                    : t('properties.notify_me'))}
               </button>
             </form>
           </div>

@@ -629,7 +629,7 @@ const Profile = () => {
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="rounded-xl border border-teal-200 bg-teal-50 px-6 py-2">
-          <h1 className="text-2xl font-bold text-teal-700">My Profile</h1>
+          <h1 className="text-2xl font-bold text-teal-700">{t('profile.title')}</h1>
         </div>
         <BackToDashboard />
       </div>
@@ -667,10 +667,10 @@ const Profile = () => {
               <span className="ml-2">{user?.phone}</span>
             )}
           </div>
-          <div><strong>NIN:</strong> <span className="ml-2">{user?.nin || 'Not provided'}</span></div>
+          <div><strong>{t('profile.nin')}:</strong> <span className="ml-2">{user?.nin || t('profile.not_provided')}</span></div>
           <div><strong>{t('profile.role')}:</strong> <span className="ml-2">{user?.user_type}</span></div>
           {editingProfile && (
-            <p className="text-xs text-gray-500">Email, NIN, and role cannot be edited here.</p>
+            <p className="text-xs text-gray-500">{t('profile.locked_fields')}</p>
           )}
         </div>
 
@@ -683,7 +683,7 @@ const Profile = () => {
                 onClick={handleProfileSave}
                 disabled={savingProfile}
               >
-                {savingProfile ? 'Saving...' : 'Save Changes'}
+                {savingProfile ? t('common.saving') : t('profile.save_changes')}
               </button>
               <button
                 type="button"
@@ -697,7 +697,7 @@ const Profile = () => {
                 }}
                 disabled={savingProfile}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </>
           ) : (
@@ -706,7 +706,7 @@ const Profile = () => {
               className="btn btn-secondary w-full sm:w-72"
               onClick={() => setEditingProfile(true)}
             >
-              Edit Information
+              {t('profile.edit_information')}
             </button>
           )}
         </div>
@@ -717,7 +717,7 @@ const Profile = () => {
 
         {user?.identity_verification_status === 'rejected' && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            Your last verification review was rejected. Capture and upload a new live passport photo to submit again.
+            {t('profile.rejected_text')}
           </div>
         )}
 
@@ -728,12 +728,12 @@ const Profile = () => {
         ) : (
           <>
             <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <h3 className="text-base font-semibold text-gray-900 mb-2">Live Passport Capture</h3>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">{t('profile.live_capture_title')}</h3>
               <p className="text-sm text-gray-700">{t('profile.verify_text')}</p>
               <div className="mt-3 text-sm text-gray-600 space-y-1">
-                <p>1. Start camera and complete all liveness checks.</p>
-                <p>2. Capture a clear face photo inside the frame.</p>
-                <p>3. Upload after capture. File upload is disabled.</p>
+                <p>{t('profile.live_step_1')}</p>
+                <p>{t('profile.live_step_2')}</p>
+                <p>{t('profile.live_step_3')}</p>
               </div>
             </div>
 
@@ -746,7 +746,7 @@ const Profile = () => {
                     className="btn btn-secondary w-full sm:w-72"
                     type="button"
                   >
-                    {cameraLoading ? 'Opening camera...' : 'Capture'}
+                    {cameraLoading ? t('profile.opening_camera') : t('profile.capture')}
                   </button>
                 ) : (
                   <button
@@ -754,7 +754,7 @@ const Profile = () => {
                     className="btn btn-secondary w-full sm:w-72"
                     type="button"
                   >
-                    Open Live Camera
+                    {t('profile.open_live_camera')}
                   </button>
                 )}
               </div>
@@ -766,14 +766,14 @@ const Profile = () => {
 
             {passportPreview && (
               <div className="mb-5 rounded-xl border border-gray-200 p-4 bg-white">
-                <p className="text-sm font-medium text-gray-700 mb-3">Captured passport preview</p>
+                <p className="text-sm font-medium text-gray-700 mb-3">{t('profile.captured_preview')}</p>
                 <img
                   src={passportPreview}
                   alt="Passport preview"
                   className="w-full max-w-xs rounded-lg border mx-auto"
                 />
                 <div className="mt-3 text-xs text-gray-500 text-center">
-                  Ensure your face is sharp and fully visible before uploading.
+                  {t('profile.preview_hint')}
                 </div>
               </div>
             )}
@@ -797,8 +797,8 @@ const Profile = () => {
         <div className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-2 sm:p-4">
           <div className="w-full max-w-md rounded-2xl border border-white/20 bg-zinc-950 p-3 sm:p-4">
             <div className="mb-3 text-center">
-              <h3 className="text-white font-semibold text-lg">Live Passport Capture</h3>
-              <p className="text-zinc-300 text-sm">Keep your face inside the guide and complete all checks.</p>
+              <h3 className="text-white font-semibold text-lg">{t('profile.live_capture_title')}</h3>
+              <p className="text-zinc-300 text-sm">{t('profile.camera_guide')}</p>
             </div>
 
             <div className="relative h-[34vh] sm:h-[42vh] overflow-hidden rounded-xl border border-white/20 bg-black">
