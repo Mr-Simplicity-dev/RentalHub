@@ -36,9 +36,23 @@ const financeOpsLimiter = buildLimiter({
   message: 'Too many financial operations. Please wait and retry.',
 });
 
+const sensitiveActionLimiter = buildLimiter({
+  windowMs: Number(process.env.SENSITIVE_ACTION_WINDOW_MS) || 10 * 60 * 1000,
+  max: Number(process.env.SENSITIVE_ACTION_MAX) || 12,
+  message: 'Too many sensitive requests. Please wait and retry.',
+});
+
+const criticalFinanceOpsLimiter = buildLimiter({
+  windowMs: Number(process.env.CRITICAL_FINANCE_OPS_WINDOW_MS) || 10 * 60 * 1000,
+  max: Number(process.env.CRITICAL_FINANCE_OPS_MAX) || 10,
+  message: 'Too many high-risk financial requests. Please wait and retry.',
+});
+
 module.exports = {
   authSensitiveLimiter,
   paymentOpsLimiter,
   verificationOpsLimiter,
   financeOpsLimiter,
+  sensitiveActionLimiter,
+  criticalFinanceOpsLimiter,
 };

@@ -6,6 +6,12 @@ const normalizeUrl = (url) => String(url).trim().replace(/\/+$/, '');
 const isConfiguredUrl = (url) =>
   typeof url === 'string' && url.trim() && url.trim() !== '...';
 
+const isSecureProductionOrigin = (url) => {
+  if (process.env.NODE_ENV !== 'production') return true;
+  if (process.env.ALLOW_INSECURE_CORS_ORIGINS === 'true') return true;
+  return normalizeUrl(url).startsWith('https://');
+};
+
 const getConfiguredFrontendUrl = () => {
   const configuredUrl =
     process.env.NODE_ENV === 'production'
@@ -40,15 +46,17 @@ const getAllowedFrontendOrigins = () =>
   Array.from(
     new Set(
       [
-        LOCAL_FRONTEND_URL,
-        'http://127.0.0.1:3000',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'http://localhost:4173',
-        'http://127.0.0.1:4173',
-        'http://rentalhub.com.ng',
+        ...(process.env.NODE_ENV === 'production'
+          ? []
+          : [
+              LOCAL_FRONTEND_URL,
+              'http://127.0.0.1:3000',
+              'http://localhost:5173',
+              'http://127.0.0.1:5173',
+              'http://localhost:4173',
+              'http://127.0.0.1:4173',
+            ]),
         'https://rentalhub.com.ng',
-        'http://www.rentalhub.com.ng',
         'https://www.rentalhub.com.ng',
         process.env.FRONTEND_URL,
         process.env.PRODUCTION_FRONTEND_URL,
@@ -56,6 +64,7 @@ const getAllowedFrontendOrigins = () =>
       ]
         .filter(isConfiguredUrl)
         .map(normalizeUrl)
+        .filter(isSecureProductionOrigin)
     )
   );
 

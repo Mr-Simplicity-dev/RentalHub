@@ -297,7 +297,23 @@ app.use(
   })
 );
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const publicUploadStaticOptions = {
+  dotfiles: 'deny',
+  index: false,
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+  },
+};
+
+app.use(
+  '/uploads/passports',
+  express.static(path.join(__dirname, 'uploads', 'passports'), publicUploadStaticOptions)
+);
+app.use(
+  '/uploads/ad-spaces',
+  express.static(path.join(__dirname, 'uploads', 'ad-spaces'), publicUploadStaticOptions)
+);
 
 const limiter = rateLimit({
   windowMs: apiRateLimitWindowMs,
@@ -432,7 +448,7 @@ app.use('/api/disputes', disputeRoutes);
 app.use('/api/legal', legalRoutes);
 app.use('/api/compliance', complianceRoutes);
 app.use('/api/export', exportRoutes);
-app.use('/api/financial-admin', financialAdminRoutes);
+app.use('/api/financial-admin', financeOpsLimiter, financialAdminRoutes);
 app.use('/api/state-admin', stateAdminRoutes);
 
 app.use('/evidence', verificationOpsLimiter, verificationRoutes);
@@ -446,9 +462,15 @@ app.use('/api/rent-savings', rentSavingsRoutes);
 app.use((err, req, res, next) => {
   console.error('UNHANDLED ERROR:', err);
 
-  res.status(err.status || 500).json({
+  const statusCode = err.status || err.statusCode || 500;
+  const safeMessage =
+    isProduction && statusCode >= 500
+      ? 'Internal Server Error'
+      : err.message || 'Internal Server Error';
+
+  res.status(statusCode).json({
     success: false,
-    message: err.message || 'Internal Server Error',
+    message: safeMessage,
   });
 });
 

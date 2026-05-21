@@ -221,7 +221,6 @@ const configureRealtimeSocket = (io) => {
     try {
       const token =
         socket.handshake.auth?.token ||
-        socket.handshake.query?.token ||
         String(socket.handshake.headers?.authorization || '').replace(/^Bearer\s+/i, '');
 
       if (!token) {

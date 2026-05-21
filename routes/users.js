@@ -7,6 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { sensitiveActionLimiter } = require('../config/middleware/securityRateLimiters');
 
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, '..', 'uploads', 'passports');
@@ -188,7 +189,7 @@ router.get('/commission-password/status', authenticate, async (req, res) => {
 });
 
 // Set commission balance password for the first time
-router.post('/commission-password/setup', authenticate, async (req, res) => {
+router.post('/commission-password/setup', authenticate, sensitiveActionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
     const { login_password, commission_password } = req.body || {};
@@ -240,7 +241,7 @@ router.post('/commission-password/setup', authenticate, async (req, res) => {
 });
 
 // Verify commission balance password for reveal actions
-router.post('/commission-password/verify', authenticate, async (req, res) => {
+router.post('/commission-password/verify', authenticate, sensitiveActionLimiter, async (req, res) => {
   try {
     const { commission_password } = req.body || {};
     if (!commission_password) {
@@ -284,7 +285,7 @@ router.post('/commission-password/verify', authenticate, async (req, res) => {
 });
 
 // Change commission balance password when the current commission password is known
-router.put('/commission-password/change', authenticate, async (req, res) => {
+router.put('/commission-password/change', authenticate, sensitiveActionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
     const {
@@ -343,7 +344,7 @@ router.put('/commission-password/change', authenticate, async (req, res) => {
 });
 
 // Reset forgotten commission balance password with the normal login password
-router.post('/commission-password/reset', authenticate, async (req, res) => {
+router.post('/commission-password/reset', authenticate, sensitiveActionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
     const { login_password, new_commission_password } = req.body || {};
@@ -475,7 +476,7 @@ router.put('/profile', authenticate, async (req, res) => {
 });
 
 // Change password
-router.put('/change-password', authenticate, async (req, res) => {
+router.put('/change-password', authenticate, sensitiveActionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
     const { current_password, new_password } = req.body;
@@ -664,7 +665,7 @@ router.delete('/account', authenticate, async (req, res) => {
 });
 
 // Verify current user's password for sensitive actions
-router.post('/verify-password', authenticate, async (req, res) => {
+router.post('/verify-password', authenticate, sensitiveActionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
     const { password } = req.body || {};

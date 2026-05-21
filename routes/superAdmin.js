@@ -7,6 +7,7 @@ const audit = require('../config/middleware/auditMiddleware');
 const db = require('../config/middleware/database');
 const bcrypt = require('bcryptjs');
 const commissionService = require('../services/commissionService');
+const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 
 const router = express.Router();
 
@@ -184,7 +185,7 @@ router.patch('/sfa-permissions/:sfaId', authenticate, requireSuperAdmin, async (
 // ================== SUPER ADMIN DIRECT WITHDRAWAL ==================
 
 // POST /super/withdraw/direct  (super_admin only — instant Paystack payout)
-router.post('/withdraw/direct', authenticate, requireSuperAdmin, async (req, res) => {
+router.post('/withdraw/direct', authenticate, requireSuperAdmin, criticalFinanceOpsLimiter, async (req, res) => {
   try {
     const { amount, bank_name, bank_code, account_number, account_name, password } = req.body;
 
@@ -229,7 +230,7 @@ router.post('/withdraw/direct', authenticate, requireSuperAdmin, async (req, res
     });
   } catch (err) {
     console.error('Super admin direct withdrawal error:', err);
-    res.status(400).json({ success: false, message: err.message || 'Withdrawal failed' });
+    res.status(400).json({ success: false, message: 'Withdrawal failed. Please verify the details and try again.' });
   }
 });
 

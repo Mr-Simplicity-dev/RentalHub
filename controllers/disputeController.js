@@ -11,6 +11,64 @@ const { ensureLawyerCaseNotesSchema } = require('../config/utils/legalSchema');
 const { getPropertyDisputeParticipants } = require('../config/utils/propertyDisputeParticipants');
 const { statesMatch } = require('../config/utils/stateScope');
 
+const DISPUTE_UPLOAD_DIR = path.resolve(__dirname, '..', 'uploads', 'disputes');
+
+const removeUploadedFile = (filePath) => {
+  if (!filePath) return;
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    // Best effort cleanup only.
+  }
+};
+
+const resolveEvidenceFilePath = (storedPath) => {
+  const candidate = path.isAbsolute(storedPath)
+    ? path.resolve(storedPath)
+    : path.resolve(__dirname, '..', storedPath);
+
+  const rootWithSeparator = `${DISPUTE_UPLOAD_DIR}${path.sep}`;
+  if (candidate !== DISPUTE_UPLOAD_DIR && !candidate.startsWith(rootWithSeparator)) {
+    return null;
+  }
+
+  return candidate;
+};
+
+const isValidEvidenceSignature = (buffer, mimeType) => {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 4) return false;
+
+  if (mimeType === 'application/pdf') {
+    return buffer.slice(0, 4).toString('ascii') === '%PDF';
+  }
+
+  if (mimeType === 'image/png') {
+    return (
+      buffer.length >= 8 &&
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47 &&
+      buffer[4] === 0x0d &&
+      buffer[5] === 0x0a &&
+      buffer[6] === 0x1a &&
+      buffer[7] === 0x0a
+    );
+  }
+
+  if (mimeType === 'image/jpeg') {
+    return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+
+  return false;
+};
+
+const sanitizeEvidenceRow = (row) => {
+  if (!row) return row;
+  const { file_path, ...safeRow } = row;
+  return safeRow;
+};
+
 // Create dispute
 exports.createDispute = async (req, res) => {
   try {
@@ -320,7 +378,7 @@ exports.getDisputeDetails = async (req, res) => {
       data: {
         dispute,
         messages: messagesResult.rows,
-        evidence: evidenceResult.rows,
+        evidence: (evidenceResult.rows || []).map(sanitizeEvidenceRow),
         case_notes: caseNotesResult.rows,
         audit_logs: auditResult.rows,
         authorized_lawyers: lawyerResult.rows,
@@ -361,7 +419,7 @@ exports.listDisputeEvidence = async (req, res) => {
 
     return res.json({
       success: true,
-      data: result.rows,
+      data: (result.rows || []).map(sanitizeEvidenceRow),
     });
   } catch (error) {
     console.error('List dispute evidence error:', error);
@@ -423,7 +481,7 @@ exports.addDisputeMessage = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: result.rows[0]
+      data: sanitizeEvidenceRow(result.rows[0])
     });
 
   } catch (error) {
@@ -501,6 +559,7 @@ exports.uploadEvidence = async (req, res) => {
     );
 
     if (disputeCheck.rows.length === 0) {
+      removeUploadedFile(req.file.path);
       return res.status(404).json({
         success: false,
         message: 'Dispute not found'
@@ -508,6 +567,7 @@ exports.uploadEvidence = async (req, res) => {
     }
 
     if (disputeCheck.rows[0].is_legally_sealed) {
+      removeUploadedFile(req.file.path);
       return res.status(403).json({
         success: false,
         message: 'This dispute is legally sealed. Evidence cannot be added.'
@@ -516,6 +576,14 @@ exports.uploadEvidence = async (req, res) => {
 
     // Generate SHA256 hash
     const fileBuffer = fs.readFileSync(req.file.path);
+
+    if (!isValidEvidenceSignature(fileBuffer, req.file.mimetype)) {
+      removeUploadedFile(req.file.path);
+      return res.status(400).json({
+        success: false,
+        message: 'Uploaded evidence file type could not be verified'
+      });
+    }
 
     const hash = crypto
       .createHash('sha256')
@@ -612,7 +680,13 @@ exports.getEvidence = async (req, res) => {
     }
   }
 
-  res.sendFile(require('path').resolve(evidence.file_path));
+  const evidencePath = resolveEvidenceFilePath(evidence.file_path);
+  if (!evidencePath || !fs.existsSync(evidencePath)) {
+    return res.status(404).json({ success: false, message: 'Evidence file not found' });
+  }
+
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.sendFile(evidencePath);
 };
 
 
@@ -668,7 +742,15 @@ exports.verifyEvidenceIntegrity = async (req, res) => {
       }
     }
 
-    const fileBuffer = fs.readFileSync(evidence.file_path);
+    const evidencePath = resolveEvidenceFilePath(evidence.file_path);
+    if (!evidencePath || !fs.existsSync(evidencePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Evidence file not found'
+      });
+    }
+
+    const fileBuffer = fs.readFileSync(evidencePath);
     const currentHash = crypto
       .createHash('sha256')
       .update(fileBuffer)

@@ -13,6 +13,7 @@ const {
   isStateFinancialAdmin,
   isSuperAdminOrSuperFinancialAdmin: isSuperOrFinancialRole,
 } = require('../config/utils/roleScopes.js work on it');
+const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 
 /**
  * All admin roles that earn commissions and can request withdrawals.
@@ -89,6 +90,7 @@ router.get('/audit-trail',
  */
 router.post('/funds/freeze',
   requireFinancialAdmin,
+  criticalFinanceOpsLimiter,
   [
     body('user_id').isInt().withMessage('User ID is required'),
     body('amount').isFloat({ min: 0 }).withMessage('Amount must be a positive number'),
@@ -112,6 +114,7 @@ router.get('/funds/frozen',
  */
 router.post('/state-admins/create',
   requireSuperAdminOrSuperFinancialAdmin,
+  criticalFinanceOpsLimiter,
   [
     body('full_name').notEmpty().withMessage('Full name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -129,6 +132,7 @@ router.post('/state-admins/create',
  */
 router.post('/super-financial-admins/create',
   requireSuperAdmin,
+  criticalFinanceOpsLimiter,
   [
     body('full_name').notEmpty().withMessage('Full name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -151,6 +155,7 @@ router.get('/state-admins',
  */
 router.post('/state-admins/funds/manage',
   requireSuperAdminOrSuperFinancialAdmin,
+  criticalFinanceOpsLimiter,
   [
     body('admin_id').isInt().withMessage('Admin ID is required'),
     body('action').isIn(['freeze', 'unfreeze']).withMessage('Action must be "freeze" or "unfreeze"'),
@@ -164,6 +169,7 @@ router.post('/state-admins/funds/manage',
  */
 router.put('/state-admins/commission-rate',
   requireSuperAdminOrSuperFinancialAdmin,
+  criticalFinanceOpsLimiter,
   [
     body('admin_id').isInt().withMessage('Admin ID is required'),
     body('commission_rate').isFloat({ min: 0.01, max: 0.20 }).withMessage('Commission rate must be between 1% and 20%')
@@ -199,6 +205,7 @@ const canRequestAdminWithdrawal = (userType) =>
  * Request personal commission withdrawal (eligible admin roles)
  */
 router.post('/withdraw/request',
+  criticalFinanceOpsLimiter,
   (req, res, next) => {
     if (!canRequestAdminWithdrawal(req.user.user_type)) {
       return res.status(403).json({
@@ -236,7 +243,7 @@ router.post('/withdraw/request',
       console.error('Withdrawal request error:', error);
       res.status(400).json({
         success: false,
-        message: error.message
+        message: 'Withdrawal request could not be completed. Please verify the details and try again.'
       });
     }
   }
@@ -403,6 +410,7 @@ router.get('/withdrawals/pending',
  */
 router.post('/withdrawals/:withdrawalId/approve',
   requireSuperAdminOrSuperFinancialAdmin,
+  criticalFinanceOpsLimiter,
   [
     body('admin_note').optional()
   ],
@@ -522,6 +530,7 @@ router.post('/withdrawals/:withdrawalId/approve',
  */
 router.post('/withdrawals/:withdrawalId/reject',
   requireSuperAdminOrSuperFinancialAdmin,
+  criticalFinanceOpsLimiter,
   [
     body('admin_note').notEmpty().withMessage('Rejection reason is required')
   ],

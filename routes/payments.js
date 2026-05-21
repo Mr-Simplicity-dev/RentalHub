@@ -5,6 +5,8 @@ const paymentController = require('../controllers/paymentController');
 const refundController  = require('../controllers/refundController');
 const landlordPropertyFeeController = require('../controllers/landlordPropertyFeeController');
 const { authenticate, isTenant, isLandlord, isVerified } = require('../config/middleware/auth');
+const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
+const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 
 // ============ TENANT SUBSCRIPTION PAYMENTS ============
 
@@ -199,12 +201,15 @@ router.get('/banks',
 // Force refresh bank cache (admin only)
 router.post('/banks/refresh',
   authenticate,
+  requireAdminOrSuperAdmin,
+  criticalFinanceOpsLimiter,
   paymentController.refreshBankCache
 );
 
 // Verify bank account for withdrawals
 router.post('/verify-account',
   authenticate,
+  criticalFinanceOpsLimiter,
   [
     body('bank_code').optional({ checkFalsy: true }).trim().isLength({ min: 2 }).withMessage('Bank code is invalid'),
     body('bank_name').optional({ checkFalsy: true }).trim().isLength({ min: 2 }).withMessage('Bank name is invalid'),
@@ -262,6 +267,7 @@ router.get('/refund/landlord',
 router.put('/refund/:refundId/approve',
   authenticate,
   isLandlord,
+  criticalFinanceOpsLimiter,
   refundController.approveRefundRequest
 );
 
@@ -280,6 +286,7 @@ router.get('/refund/admin/all',
 
 router.put('/refund/admin/:refundId/review',
   authenticate,
+  criticalFinanceOpsLimiter,
   refundController.adminReviewRelocationRefund
 );
 
@@ -359,6 +366,7 @@ router.get('/wallet/landlord-balance',
 // Tenant + Landlord: request a withdrawal to bank account
 router.post('/wallet/withdraw',
   authenticate,
+  criticalFinanceOpsLimiter,
   refundController.requestWithdrawal
 );
 
@@ -376,11 +384,13 @@ router.get('/wallet/withdrawals/pending',
 
 router.post('/wallet/withdrawals/:withdrawalId/approve',
   authenticate,
+  criticalFinanceOpsLimiter,
   refundController.approveWalletWithdrawal
 );
 
 router.post('/wallet/withdrawals/:withdrawalId/reject',
   authenticate,
+  criticalFinanceOpsLimiter,
   refundController.rejectWalletWithdrawal
 );
 

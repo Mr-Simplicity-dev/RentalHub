@@ -2068,7 +2068,7 @@ exports.approveWalletWithdrawal = async (req, res) => {
     res.json({ success: true, message: 'Withdrawal approved and payout initiated', data: result.rows[0] });
   } catch (error) {
     console.error('Approve wallet withdrawal error:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to approve wallet withdrawal' });
+    res.status(500).json({ success: false, message: 'Failed to approve wallet withdrawal' });
   }
 };
 

@@ -3,6 +3,7 @@ const AgentWithdrawalController = require('../controllers/agentWithdrawalControl
 const { authenticate } = require('../config/middleware/auth');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const validateRequest = require('../config/middleware/validateRequest');
+const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 const {
 	withdrawalCreateValidators,
 	withdrawalQueryValidators,
@@ -21,6 +22,7 @@ router.use(authenticate);
 // Create withdrawal request
 router.post(
 	'/agents/:agentId/withdrawal-requests',
+	criticalFinanceOpsLimiter,
 	withdrawalCreateValidators,
 	validateRequest,
 	AgentWithdrawalController.createWithdrawalRequest
@@ -43,15 +45,15 @@ router.get(
 );
 
 // Approve withdrawal (admin only)
-router.post('/withdrawals/:withdrawalId/approve', requireAdminOrSuperAdmin, AgentWithdrawalController.approveWithdrawal);
+router.post('/withdrawals/:withdrawalId/approve', requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, AgentWithdrawalController.approveWithdrawal);
 
 // Reject withdrawal (admin only)
-router.post('/withdrawals/:withdrawalId/reject', requireAdminOrSuperAdmin, AgentWithdrawalController.rejectWithdrawal);
+router.post('/withdrawals/:withdrawalId/reject', requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, AgentWithdrawalController.rejectWithdrawal);
 
 // Mark as processing (admin only)
-router.post('/withdrawals/:withdrawalId/mark-processing', requireAdminOrSuperAdmin, AgentWithdrawalController.markAsProcessing);
+router.post('/withdrawals/:withdrawalId/mark-processing', requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, AgentWithdrawalController.markAsProcessing);
 
 // Mark as completed (admin only)
-router.post('/withdrawals/:withdrawalId/mark-completed', requireAdminOrSuperAdmin, AgentWithdrawalController.markAsCompleted);
+router.post('/withdrawals/:withdrawalId/mark-completed', requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, AgentWithdrawalController.markAsCompleted);
 
 module.exports = router;
