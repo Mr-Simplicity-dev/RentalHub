@@ -95,11 +95,11 @@ import VerificationStatus from './VerificationStatus';
 
 const queryClient = new QueryClient();
 const LANGUAGE_OPTIONS = [
-  { value: 'en', label: 'English' },
-  { value: 'ru', label: 'Русский' },
-  { value: 'fr', label: 'Français' },
-  { value: 'ar', label: 'العربية' },
-  { value: 'zh', label: '中文' },
+  { value: 'en', label: 'English', shortLabel: 'EN' },
+  { value: 'ru', label: 'Русский', shortLabel: 'RU' },
+  { value: 'fr', label: 'Français', shortLabel: 'FR' },
+  { value: 'ar', label: 'العربية', shortLabel: 'AR' },
+  { value: 'zh', label: '中文', shortLabel: 'ZH' },
 ];
 
 const FINANCIAL_ADMIN_ROLES = ['financial_admin', 'lga_financial_admin'];
@@ -545,21 +545,43 @@ function Layout({ children }) {
     };
   }, []);
 
+  const handleLanguageSelect = (event) => {
+    const nextLanguage = event.target.value;
+    setActiveLanguage(nextLanguage);
+    i18n.changeLanguage(nextLanguage);
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       {showPublicHeaderFooter && <Header />}
 
       {/* Global Language Switcher */}
       {!isDashboardShell && (
-        <div className="flex justify-end border-b bg-white px-4 py-2">
-          <label className="relative block w-full max-w-[11rem] sm:max-w-[12rem]" dir="ltr">
+        <div className="flex justify-end border-b bg-white px-3 py-1.5 sm:px-4 sm:py-2">
+          <label className="relative block w-[4.75rem] sm:hidden" dir="ltr">
             <span className="sr-only">{i18n.t('language.select')}</span>
             <select
-              onChange={(e) => {
-                const nextLanguage = e.target.value;
-                setActiveLanguage(nextLanguage);
-                i18n.changeLanguage(nextLanguage);
-              }}
+              onChange={handleLanguageSelect}
+              value={activeLanguage}
+              aria-label={i18n.t('language.select')}
+              className="h-8 w-full appearance-none rounded-md border border-gray-300 bg-white py-1 pl-2 pr-7 text-xs font-semibold leading-5 text-gray-700 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-200"
+            >
+              {LANGUAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value} title={option.label}>
+                  {option.shortLabel}
+                </option>
+              ))}
+            </select>
+            <FaChevronDown
+              className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500"
+              aria-hidden="true"
+            />
+          </label>
+
+          <label className="relative hidden w-full max-w-[12rem] sm:block" dir="ltr">
+            <span className="sr-only">{i18n.t('language.select')}</span>
+            <select
+              onChange={handleLanguageSelect}
               value={activeLanguage}
               aria-label={i18n.t('language.select')}
               className="w-full appearance-none rounded-lg border border-gray-300 bg-white py-1.5 pl-3 pr-10 text-sm leading-5 text-gray-700 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-200"
