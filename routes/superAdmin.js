@@ -2,6 +2,7 @@ const express = require('express');
 const { authenticate, requireSuperAdmin } = require('../config/middleware/auth');
 const superCtrl = require('../controllers/superAdmin.controller');
 const adCtrl = require('../controllers/adController');
+const platformRatingCtrl = require('../controllers/platformRatingController');
 const audit = require('../config/middleware/auditMiddleware');
 const db = require('../config/middleware/database');
 const bcrypt = require('bcryptjs');
@@ -269,6 +270,13 @@ router.post('/ad-spaces/image', authenticate, requireSuperAdmin, adCtrl.uploadAd
 router.post('/ad-spaces', authenticate, requireSuperAdmin, adCtrl.createAd);
 router.patch('/ad-spaces/:id', authenticate, requireSuperAdmin, adCtrl.updateAd);
 router.delete('/ad-spaces/:id', authenticate, requireSuperAdmin, adCtrl.deleteAd);
+
+router.get('/platform-ratings', authenticate, requireSuperAdmin, platformRatingCtrl.adminListRatings);
+router.patch('/platform-ratings/settings', authenticate, requireSuperAdmin, platformRatingCtrl.adminUpdateSettings);
+router.patch('/platform-ratings/:ratingId/moderate', authenticate, requireSuperAdmin, platformRatingCtrl.adminModerateRating);
+router.post('/platform-ratings/rules', authenticate, requireSuperAdmin, platformRatingCtrl.adminCreateRule);
+router.patch('/platform-ratings/rules/:ruleId', authenticate, requireSuperAdmin, platformRatingCtrl.adminUpdateRule);
+router.delete('/platform-ratings/rules/:ruleId', authenticate, requireSuperAdmin, platformRatingCtrl.adminDeleteRule);
 
 router.get('/platform-lawyers', authenticate, requireSuperAdmin, superCtrl.getPlatformLawyerManagementData);
 router.get('/lawyer-activities', authenticate, requireSuperAdmin, superCtrl.getLawyerActivities);

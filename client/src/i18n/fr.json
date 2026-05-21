@@ -46,6 +46,66 @@
     "share_on": "Partager sur {{platform}}"
   },
 
+  "platform_ratings": {
+    "verified_experience": "Expérience vérifiée",
+    "close_prompt": "Fermer la demande d’avis",
+    "rate_stars": "Noter {{count}} étoiles",
+    "optional_note": "Note facultative sur votre expérience",
+    "public_name": "Nom public",
+    "first_name_only": "Prénom seulement",
+    "initials_only": "Initiales seulement",
+    "role_location": "Rôle + lieu",
+    "allow_image": "Autoriser l’image approuvée si le Super Admin active les images",
+    "privacy_note": "Votre nom complet n’est pas affiché par défaut. Le Super Admin vérifie les avis avant toute notification publique.",
+    "skip": "Ignorer",
+    "submitting": "Envoi...",
+    "submit": "Envoyer l’avis",
+    "choose_stars": "Choisissez d’abord une note en étoiles",
+    "submitted": "Merci. Votre avis a été envoyé pour vérification.",
+    "submit_failed": "Échec de l’envoi de l’avis",
+    "dismiss_notification": "Fermer la notification d’avis",
+    "star_rating": "Note de {{count}} étoile(s)",
+    "flyin_message": "{{name}} a noté RentalHub NG avec {{stars}} étoile(s) après avoir {{context}}.",
+    "verified_in": "Expérience vérifiée à {{location}}",
+    "this_service": "ce service",
+    "contexts": {
+      "property_secured": "obtenu un logement",
+      "property_listed": "publié un bien",
+      "property_rented": "loué un bien",
+      "legal_support": "utilisé l’assistance juridique",
+      "fumigation_cleaning": "utilisé la fumigation/le nettoyage",
+      "transportation": "utilisé l’assistance transport",
+      "virtual_tour": "terminé une visite virtuelle",
+      "dispute_support": "utilisé l’assistance litige",
+      "admin_support": "reçu l’assistance du support",
+      "platform": "utilisé RentalHub NG"
+    },
+    "prompt_titles": {
+      "property_secured": "Notez votre expérience de location RentalHub NG",
+      "property_listed": "Notez votre expérience de publication",
+      "property_rented": "Notez votre expérience de location réussie",
+      "legal_support": "Notez l’assistance juridique RentalHub NG",
+      "fumigation_cleaning": "Notez l’assistance fumigation/nettoyage RentalHub NG",
+      "transportation": "Notez l’assistance transport RentalHub NG",
+      "virtual_tour": "Notez votre visite virtuelle RentalHub NG",
+      "dispute_support": "Notez l’assistance litige RentalHub NG",
+      "admin_support": "Notez le support RentalHub NG",
+      "platform": "Notez RentalHub NG"
+    },
+    "prompt_details": {
+      "property_secured": "Vous avez obtenu {{source}} via RentalHub NG.",
+      "property_listed": "Vous avez publié {{source}} sur RentalHub NG.",
+      "property_rented": "{{source}} a été loué via RentalHub NG.",
+      "legal_support": "Dites-nous comment l’assistance juridique vous a aidé.",
+      "fumigation_cleaning": "Dites-nous comment votre service s’est passé.",
+      "transportation": "Dites-nous comment l’assistance transport s’est passée.",
+      "virtual_tour": "Dites-nous comment la visite virtuelle vous a aidé.",
+      "dispute_support": "Dites-nous comment l’assistance litige vous a aidé.",
+      "admin_support": "Dites-nous comment le support vous a aidé.",
+      "platform": "Parlez-nous de votre expérience RentalHub NG."
+    }
+  },
+
   "home": {
     "hero_title": "Trouvez la maison parfaite au Nigeria",
     "hero_subtitle": "Parcourez des milliers de biens vérifiés dans les 36 États + la capitale",

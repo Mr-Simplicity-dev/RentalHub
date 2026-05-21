@@ -46,6 +46,66 @@
     "share_on": "Поделиться в {{platform}}"
   },
 
+  "platform_ratings": {
+    "verified_experience": "Проверенный опыт",
+    "close_prompt": "Закрыть запрос оценки",
+    "rate_stars": "Поставить {{count}} звезд",
+    "optional_note": "Необязательный комментарий о вашем опыте",
+    "public_name": "Публичное имя",
+    "first_name_only": "Только имя",
+    "initials_only": "Только инициалы",
+    "role_location": "Роль + локация",
+    "allow_image": "Разрешить одобренное фото, если Super Admin включит изображения",
+    "privacy_note": "Ваше полное имя по умолчанию не показывается. Super Admin проверяет оценки перед публичным показом.",
+    "skip": "Пропустить",
+    "submitting": "Отправка...",
+    "submit": "Отправить оценку",
+    "choose_stars": "Сначала выберите звездную оценку",
+    "submitted": "Спасибо. Ваша оценка отправлена на проверку.",
+    "submit_failed": "Не удалось отправить оценку",
+    "dismiss_notification": "Закрыть уведомление об оценке",
+    "star_rating": "Оценка {{count}} звезд",
+    "flyin_message": "{{name}} оценил(а) RentalHub NG на {{stars}} звезд после того, как {{context}}.",
+    "verified_in": "Проверенный опыт в {{location}}",
+    "this_service": "эта услуга",
+    "contexts": {
+      "property_secured": "арендовал(а) жилье",
+      "property_listed": "разместил(а) объект",
+      "property_rented": "сдал(а) объект в аренду",
+      "legal_support": "воспользовался(лась) юридической поддержкой",
+      "fumigation_cleaning": "воспользовался(лась) фумигацией/уборкой",
+      "transportation": "воспользовался(лась) транспортной поддержкой",
+      "virtual_tour": "завершил(а) виртуальный тур",
+      "dispute_support": "воспользовался(лась) поддержкой по спору",
+      "admin_support": "получил(а) поддержку администрации",
+      "platform": "использовал(а) RentalHub NG"
+    },
+    "prompt_titles": {
+      "property_secured": "Оцените ваш опыт аренды с RentalHub NG",
+      "property_listed": "Оцените опыт размещения объекта",
+      "property_rented": "Оцените успешный опыт сдачи объекта",
+      "legal_support": "Оцените юридическую поддержку RentalHub NG",
+      "fumigation_cleaning": "Оцените поддержку фумигации/уборки RentalHub NG",
+      "transportation": "Оцените транспортную поддержку RentalHub NG",
+      "virtual_tour": "Оцените виртуальный тур RentalHub NG",
+      "dispute_support": "Оцените поддержку по спору RentalHub NG",
+      "admin_support": "Оцените поддержку RentalHub NG",
+      "platform": "Оцените RentalHub NG"
+    },
+    "prompt_details": {
+      "property_secured": "Вы арендовали {{source}} через RentalHub NG.",
+      "property_listed": "Вы разместили {{source}} на RentalHub NG.",
+      "property_rented": "{{source}} был(а) сдан(а) через RentalHub NG.",
+      "legal_support": "Расскажите, как вам помогла юридическая поддержка.",
+      "fumigation_cleaning": "Расскажите, как прошла услуга.",
+      "transportation": "Расскажите, как прошла транспортная поддержка.",
+      "virtual_tour": "Расскажите, как виртуальный тур вам помог.",
+      "dispute_support": "Расскажите, как поддержка по спору вам помогла.",
+      "admin_support": "Расскажите, как поддержка вам помогла.",
+      "platform": "Расскажите о вашем опыте с RentalHub NG."
+    }
+  },
+
   "home": {
     "hero_title": "Найдите идеальный дом в Нигерии",
     "hero_subtitle": "Просматривайте тысячи проверенных объектов во всех 36 штатах + FCT",

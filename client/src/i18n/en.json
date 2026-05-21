@@ -46,6 +46,66 @@
     "share_on": "Share on {{platform}}"
   },
 
+  "platform_ratings": {
+    "verified_experience": "Verified experience",
+    "close_prompt": "Close rating prompt",
+    "rate_stars": "Rate {{count}} stars",
+    "optional_note": "Optional note about your experience",
+    "public_name": "Public name",
+    "first_name_only": "First name only",
+    "initials_only": "Initials only",
+    "role_location": "Role + location",
+    "allow_image": "Allow approved image if Super Admin enables images",
+    "privacy_note": "Your full name is not shown by default. Super Admin reviews ratings before any public fly-in appears.",
+    "skip": "Skip",
+    "submitting": "Submitting...",
+    "submit": "Submit rating",
+    "choose_stars": "Choose a star rating first",
+    "submitted": "Thank you. Your rating has been submitted for review.",
+    "submit_failed": "Failed to submit rating",
+    "dismiss_notification": "Dismiss rating notification",
+    "star_rating": "{{count}} star rating",
+    "flyin_message": "{{name}} rated RentalHub NG with a {{stars}}-star review after they {{context}}.",
+    "verified_in": "Verified experience in {{location}}",
+    "this_service": "this service",
+    "contexts": {
+      "property_secured": "secured a property",
+      "property_listed": "listed a property",
+      "property_rented": "rented out a property",
+      "legal_support": "used legal support",
+      "fumigation_cleaning": "used fumigation/cleaning",
+      "transportation": "used transportation support",
+      "virtual_tour": "completed a virtual tour",
+      "dispute_support": "used dispute support",
+      "admin_support": "received admin support",
+      "platform": "used RentalHub NG"
+    },
+    "prompt_titles": {
+      "property_secured": "Rate your RentalHub NG rental experience",
+      "property_listed": "Rate your property listing experience",
+      "property_rented": "Rate your successful rental experience",
+      "legal_support": "Rate RentalHub NG legal support",
+      "fumigation_cleaning": "Rate RentalHub NG fumigation/cleaning support",
+      "transportation": "Rate RentalHub NG transportation support",
+      "virtual_tour": "Rate your RentalHub NG virtual tour",
+      "dispute_support": "Rate RentalHub NG dispute support",
+      "admin_support": "Rate RentalHub NG support",
+      "platform": "Rate RentalHub NG"
+    },
+    "prompt_details": {
+      "property_secured": "You secured {{source}} through RentalHub NG.",
+      "property_listed": "You listed {{source}} on RentalHub NG.",
+      "property_rented": "{{source}} was rented through RentalHub NG.",
+      "legal_support": "Tell us how the legal support experience helped you.",
+      "fumigation_cleaning": "Tell us how your service experience went.",
+      "transportation": "Tell us how your transportation support went.",
+      "virtual_tour": "Tell us how the virtual property tour helped you.",
+      "dispute_support": "Tell us how dispute support helped you.",
+      "admin_support": "Tell us how support helped you.",
+      "platform": "Tell us about your RentalHub NG experience."
+    }
+  },
+
   "home": {
     "hero_title": "Find Your Perfect Home in Nigeria",
     "hero_subtitle": "Browse thousands of verified properties in all 36 states + FCT",

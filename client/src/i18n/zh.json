@@ -46,6 +46,66 @@
     "share_on": "分享到 {{platform}}"
   },
 
+  "platform_ratings": {
+    "verified_experience": "已验证体验",
+    "close_prompt": "关闭评分提示",
+    "rate_stars": "评分 {{count}} 星",
+    "optional_note": "关于您体验的可选备注",
+    "public_name": "公开名称",
+    "first_name_only": "仅显示名字",
+    "initials_only": "仅显示首字母",
+    "role_location": "角色 + 地点",
+    "allow_image": "如果超级管理员启用图片，允许显示已批准的图片",
+    "privacy_note": "默认不会显示您的全名。任何公开弹出评分都会先由超级管理员审核。",
+    "skip": "跳过",
+    "submitting": "正在提交...",
+    "submit": "提交评分",
+    "choose_stars": "请先选择星级评分",
+    "submitted": "谢谢。您的评分已提交审核。",
+    "submit_failed": "评分提交失败",
+    "dismiss_notification": "关闭评分通知",
+    "star_rating": "{{count}} 星评分",
+    "flyin_message": "{{name}} 在 {{context}} 后给 RentalHub NG {{stars}} 星评价。",
+    "verified_in": "{{location}} 的已验证体验",
+    "this_service": "此服务",
+    "contexts": {
+      "property_secured": "成功租到房源",
+      "property_listed": "发布了房源",
+      "property_rented": "成功出租房源",
+      "legal_support": "使用了法律支持",
+      "fumigation_cleaning": "使用了熏蒸/清洁服务",
+      "transportation": "使用了运输支持",
+      "virtual_tour": "完成了虚拟看房",
+      "dispute_support": "使用了纠纷支持",
+      "admin_support": "获得了客服支持",
+      "platform": "使用了 RentalHub NG"
+    },
+    "prompt_titles": {
+      "property_secured": "评价您的 RentalHub NG 租房体验",
+      "property_listed": "评价您的房源发布体验",
+      "property_rented": "评价您的成功出租体验",
+      "legal_support": "评价 RentalHub NG 法律支持",
+      "fumigation_cleaning": "评价 RentalHub NG 熏蒸/清洁支持",
+      "transportation": "评价 RentalHub NG 运输支持",
+      "virtual_tour": "评价您的 RentalHub NG 虚拟看房",
+      "dispute_support": "评价 RentalHub NG 纠纷支持",
+      "admin_support": "评价 RentalHub NG 客服支持",
+      "platform": "评价 RentalHub NG"
+    },
+    "prompt_details": {
+      "property_secured": "您通过 RentalHub NG 成功租到 {{source}}。",
+      "property_listed": "您在 RentalHub NG 发布了 {{source}}。",
+      "property_rented": "{{source}} 已通过 RentalHub NG 成功出租。",
+      "legal_support": "请告诉我们法律支持如何帮助了您。",
+      "fumigation_cleaning": "请告诉我们您的服务体验如何。",
+      "transportation": "请告诉我们运输支持体验如何。",
+      "virtual_tour": "请告诉我们虚拟看房如何帮助了您。",
+      "dispute_support": "请告诉我们纠纷支持如何帮助了您。",
+      "admin_support": "请告诉我们客服支持如何帮助了您。",
+      "platform": "请告诉我们您的 RentalHub NG 体验。"
+    }
+  },
+
   "home": {
     "hero_title": "在尼日利亚找到理想之家",
     "hero_subtitle": "浏览覆盖全部 36 个州和首都区的数千套已验证房源",

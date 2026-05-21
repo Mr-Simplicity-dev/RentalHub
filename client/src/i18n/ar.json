@@ -46,6 +46,66 @@
     "share_on": "مشاركة على {{platform}}"
   },
 
+  "platform_ratings": {
+    "verified_experience": "تجربة موثقة",
+    "close_prompt": "إغلاق طلب التقييم",
+    "rate_stars": "تقييم {{count}} نجوم",
+    "optional_note": "ملاحظة اختيارية عن تجربتك",
+    "public_name": "الاسم الظاهر",
+    "first_name_only": "الاسم الأول فقط",
+    "initials_only": "الأحرف الأولى فقط",
+    "role_location": "الدور + الموقع",
+    "allow_image": "السماح بعرض صورة معتمدة إذا فعّلها المشرف العام",
+    "privacy_note": "لا يظهر اسمك الكامل افتراضياً. يراجع المشرف العام التقييمات قبل ظهور أي إشعار عام.",
+    "skip": "تخطي",
+    "submitting": "جارٍ الإرسال...",
+    "submit": "إرسال التقييم",
+    "choose_stars": "اختر تقييم النجوم أولاً",
+    "submitted": "شكراً لك. تم إرسال تقييمك للمراجعة.",
+    "submit_failed": "تعذر إرسال التقييم",
+    "dismiss_notification": "إغلاق إشعار التقييم",
+    "star_rating": "تقييم {{count}} نجوم",
+    "flyin_message": "{{name}} قيّم RentalHub NG بـ {{stars}} نجوم بعد أن {{context}}.",
+    "verified_in": "تجربة موثقة في {{location}}",
+    "this_service": "هذه الخدمة",
+    "contexts": {
+      "property_secured": "حصل على عقار للإيجار",
+      "property_listed": "أدرج عقاراً",
+      "property_rented": "أجّر عقاراً",
+      "legal_support": "استخدم الدعم القانوني",
+      "fumigation_cleaning": "استخدم خدمة التعقيم/التنظيف",
+      "transportation": "استخدم دعم النقل",
+      "virtual_tour": "أكمل جولة افتراضية",
+      "dispute_support": "استخدم دعم النزاعات",
+      "admin_support": "تلقى دعم الإدارة",
+      "platform": "استخدم RentalHub NG"
+    },
+    "prompt_titles": {
+      "property_secured": "قيّم تجربة الإيجار عبر RentalHub NG",
+      "property_listed": "قيّم تجربة إدراج العقار",
+      "property_rented": "قيّم تجربة التأجير الناجحة",
+      "legal_support": "قيّم الدعم القانوني من RentalHub NG",
+      "fumigation_cleaning": "قيّم دعم التعقيم/التنظيف من RentalHub NG",
+      "transportation": "قيّم دعم النقل من RentalHub NG",
+      "virtual_tour": "قيّم جولتك الافتراضية عبر RentalHub NG",
+      "dispute_support": "قيّم دعم النزاعات من RentalHub NG",
+      "admin_support": "قيّم دعم RentalHub NG",
+      "platform": "قيّم RentalHub NG"
+    },
+    "prompt_details": {
+      "property_secured": "لقد حصلت على {{source}} عبر RentalHub NG.",
+      "property_listed": "لقد أدرجت {{source}} على RentalHub NG.",
+      "property_rented": "تم تأجير {{source}} عبر RentalHub NG.",
+      "legal_support": "أخبرنا كيف ساعدك الدعم القانوني.",
+      "fumigation_cleaning": "أخبرنا كيف كانت تجربة الخدمة.",
+      "transportation": "أخبرنا كيف كانت تجربة دعم النقل.",
+      "virtual_tour": "أخبرنا كيف ساعدتك الجولة الافتراضية.",
+      "dispute_support": "أخبرنا كيف ساعدك دعم النزاعات.",
+      "admin_support": "أخبرنا كيف ساعدك الدعم.",
+      "platform": "أخبرنا عن تجربتك مع RentalHub NG."
+    }
+  },
+
   "home": {
     "hero_title": "اعثر على منزلك المثالي في نيجيريا",
     "hero_subtitle": "تصفح آلاف العقارات الموثوقة في جميع الولايات الـ 36 + العاصمة",

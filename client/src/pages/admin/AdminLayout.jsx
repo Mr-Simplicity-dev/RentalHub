@@ -23,6 +23,7 @@ import {
   FaExclamationTriangle,
   FaBroadcastTower,
   FaClipboardList,
+  FaStar,
   FaWallet,
   FaHeadset,
   FaUserShield,
@@ -486,6 +487,11 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin?tab=ad_spaces" className={() => superAdminNavItem('ad_spaces')}>
                   <FaBroadcastTower className="mr-3" />
                   Ad Spaces
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=platform_ratings" className={() => superAdminNavItem('platform_ratings')}>
+                  <FaStar className="mr-3" />
+                  Service Ratings
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=pricing" className={() => superAdminNavItem('pricing')}>
