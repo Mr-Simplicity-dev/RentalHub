@@ -55,6 +55,7 @@ const AdShareButton = ({ ad, targetUrl }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
   const shareUrl = useMemo(() => getShareUrl(targetUrl), [targetUrl]);
+  const canUseNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   const shareTitle = ad?.title || t('ads.default_share_title');
   const shareText = ad?.description
     ? `${t('ads.share_text', { title: shareTitle })} ${ad.description}`
@@ -76,8 +77,13 @@ const AdShareButton = ({ ad, targetUrl }) => {
     };
   }, [open]);
 
+  const shouldUseNativeShareFirst = () => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  };
+
   const handleNativeShare = async () => {
-    if (typeof navigator === 'undefined' || !navigator.share) return;
+    if (!canUseNativeShare) return false;
 
     try {
       await navigator.share({
@@ -86,11 +92,23 @@ const AdShareButton = ({ ad, targetUrl }) => {
         url: shareUrl,
       });
       setOpen(false);
+      return true;
     } catch (error) {
       if (error?.name !== 'AbortError') {
         toast.error(t('ads.share_failed'));
+        return false;
       }
+      return true;
     }
+  };
+
+  const handlePrimaryShare = async () => {
+    if (canUseNativeShare && shouldUseNativeShareFirst()) {
+      const handled = await handleNativeShare();
+      if (handled) return;
+    }
+
+    setOpen((prev) => !prev);
   };
 
   const handleCopyLink = async () => {
@@ -136,8 +154,8 @@ const AdShareButton = ({ ad, targetUrl }) => {
     >
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-gray-700 shadow-md ring-1 ring-black/5 transition hover:bg-white hover:text-primary-700"
+        onClick={handlePrimaryShare}
+        className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-gray-700 shadow-md ring-1 ring-black/5 transition hover:bg-white hover:text-primary-700 sm:h-9 sm:w-9"
         aria-label={t('ads.share_ad')}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -146,16 +164,16 @@ const AdShareButton = ({ ad, targetUrl }) => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 w-56 rounded-xl border border-gray-200 bg-white p-2 text-gray-700 shadow-xl">
+        <div className="absolute right-0 top-12 w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-2 text-gray-700 shadow-xl sm:top-11">
           <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
             {t('ads.share_ad')}
           </div>
 
-          {typeof navigator !== 'undefined' && navigator.share && (
+          {canUseNativeShare && (
             <button
               type="button"
               onClick={handleNativeShare}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-gray-50"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition hover:bg-gray-50 sm:py-2"
             >
               <FaShareAlt className="text-gray-600" />
               {t('ads.share_device')}
@@ -165,7 +183,7 @@ const AdShareButton = ({ ad, targetUrl }) => {
           <button
             type="button"
             onClick={handleCopyLink}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-gray-50"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition hover:bg-gray-50 sm:py-2"
           >
             <FaCopy className="text-gray-600" />
             {t('ads.copy_link')}
@@ -178,7 +196,7 @@ const AdShareButton = ({ ad, targetUrl }) => {
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition hover:bg-gray-50"
+              className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition hover:bg-gray-50 sm:py-2"
             >
               {target.icon}
               {t('ads.share_on', { platform: target.label })}
