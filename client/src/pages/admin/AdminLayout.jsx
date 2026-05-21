@@ -278,13 +278,23 @@ const AdminLayout = () => {
         : roleTheme.hoverNav
     }`;
 
-    const superAdminNavItem = (tab) =>
-    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+    const isSuperAdminNavActive = (tab) =>
       (location.pathname === '/super-admin' && superAdminTab === tab) ||
       (location.pathname === '/super-admin/transportation' && tab === 'transportation') ||
-      (location.pathname === '/super-admin/fumigation-cleaning' && tab === 'fumigation-cleaning')
+      (location.pathname === '/super-admin/fumigation-cleaning' && tab === 'fumigation-cleaning');
+
+    const superAdminNavItem = (tab) =>
+    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+      isSuperAdminNavActive(tab)
         ? roleTheme.activeNav
         : roleTheme.hoverNav
+    }`;
+
+    const superAdminFeaturedNavItem = (tab) =>
+    `flex items-center px-4 py-3 rounded-lg border transition-colors ${
+      isSuperAdminNavActive(tab)
+        ? `${roleTheme.activeNav} border-transparent`
+        : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
     }`;
     const superFinancialPanel = new URLSearchParams(location.search).get('panel') || 'overview';
   const superFinancialNavItem = (panel) =>
@@ -489,9 +499,12 @@ const AdminLayout = () => {
                   Ad Spaces
                 </NavLink>
 
-                <NavLink to="/super-admin?tab=platform_ratings" className={() => superAdminNavItem('platform_ratings')}>
+                <NavLink to="/super-admin?tab=platform_ratings" className={() => superAdminFeaturedNavItem('platform_ratings')}>
                   <FaStar className="mr-3" />
                   Service Ratings
+                  <span className="ml-auto rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-900">
+                    Trust
+                  </span>
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=pricing" className={() => superAdminNavItem('pricing')}>

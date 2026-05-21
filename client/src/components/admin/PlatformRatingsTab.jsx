@@ -66,6 +66,19 @@ const PlatformRatingsTab = () => {
     [roles]
   );
 
+  const ratingStats = useMemo(() => {
+    const pending = ratings.filter((rating) => rating.status === 'pending').length;
+    const approved = ratings.filter((rating) => rating.status === 'approved').length;
+    const hidden = ratings.filter((rating) => rating.status === 'hidden').length;
+
+    return [
+      { label: 'Total Ratings', value: ratings.length, tone: 'border-slate-200 bg-white text-slate-900' },
+      { label: 'Pending Review', value: pending, tone: 'border-amber-200 bg-amber-50 text-amber-900' },
+      { label: 'Public Approved', value: approved, tone: 'border-emerald-200 bg-emerald-50 text-emerald-900' },
+      { label: 'Hidden / Rules', value: `${hidden} / ${rules.length}`, tone: 'border-sky-200 bg-sky-50 text-sky-900' },
+    ];
+  }, [ratings, rules]);
+
   const loadRatings = async () => {
     try {
       setLoading(true);
@@ -152,22 +165,54 @@ const PlatformRatingsTab = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <section className="rounded-xl2 border border-soft bg-white p-5 shadow-card">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 text-white shadow-lg">
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-200">
+                <FaStar className="text-amber-300" />
+                Public Trust Control
+              </p>
+              <h3 className="mt-4 text-2xl font-semibold text-white">Verified Service Ratings</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Approve real tenant and landlord ratings, control live fly-ins, decide whether approved user images appear,
+                and apply state or LGA rules before ratings are shown publicly.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={loadRatings}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-amber-100 sm:w-auto"
+            >
+              <FaSync className="mr-2 text-xs" />
+              Refresh
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {ratingStats.map((stat) => (
+          <div key={stat.label} className={`rounded-2xl border p-4 shadow-sm ${stat.tone}`}>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-70">{stat.label}</p>
+            <p className="mt-2 text-2xl font-bold">{stat.value}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Verified Service Ratings</h3>
-            <p className="mt-1 max-w-3xl text-sm text-gray-500">
-              Approve real tenant and landlord ratings, control live fly-ins, and apply location rules before ratings appear publicly.
+            <h4 className="font-semibold">How this panel works</h4>
+            <p className="mt-1 max-w-3xl">
+              Users only receive rating prompts after a verified service event, such as securing a property,
+              posting or renting out a property, or completing a paid platform service.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={loadRatings}
-            className="btn btn-secondary w-full justify-center sm:w-auto"
-          >
-            <FaSync className="mr-2 text-xs" />
-            Refresh
-          </button>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-800">
+            Location toggle enabled
+          </span>
         </div>
       </section>
 

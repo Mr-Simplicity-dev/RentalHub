@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaStar } from "react-icons/fa";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../services/api";
@@ -53,6 +53,54 @@ const tabs = [
   "fraud",
   "admin",
   "pending_approvals",
+];
+
+const tabLabels = {
+  overview: "Overview",
+  users: "Users",
+  verifications: "Verifications",
+  lawyer_invites: "Lawyer Invites",
+  platform_lawyers: "Platform Lawyers",
+  platform_agents: "Platform Agents",
+  lawyer_activity: "Lawyer Activity",
+  properties: "Properties",
+  property_requests: "Property Requests",
+  analytics: "Analytics",
+  reports: "Reports",
+  logs: "Logs",
+  broadcast: "Broadcast",
+  ad_spaces: "Ad Spaces",
+  platform_ratings: "Service Ratings",
+  pricing: "Pricing",
+  registration_access: "Registration Access",
+  flags: "Flags",
+  fraud: "Fraud",
+  admin: "Admin",
+  pending_approvals: "Pending Approvals",
+};
+
+const featuredControlTabs = [
+  {
+    name: "platform_ratings",
+    label: "Service Ratings",
+    detail: "Moderate public ratings, live fly-ins, images, and location rules.",
+    featured: true,
+  },
+  {
+    name: "registration_access",
+    label: "Registration Access",
+    detail: "Control tenant and landlord registration by state and LGA.",
+  },
+  {
+    name: "ad_spaces",
+    label: "Ad Spaces",
+    detail: "Manage advert placement, sharing, and public visibility.",
+  },
+  {
+    name: "flags",
+    label: "Flags",
+    detail: "Switch platform-wide operational controls on or off.",
+  },
 ];
 
 const PAGE_LIMITS = {
@@ -916,13 +964,61 @@ export default function SuperAdminDashboard() {
               >
                 Open Analytics
               </button>
+              <button
+                type="button"
+                onClick={() => loadTab('platform_ratings')}
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-amber-400 px-3 py-1.5 text-sm font-semibold text-slate-950 shadow-sm hover:bg-amber-300"
+              >
+                <FaStar className="text-xs" />
+                Service Ratings
+              </button>
             </div>
           </div>
         </section>
 
-        <div className="mb-4 text-sm text-slate-600">
-          Active section: <span className="font-semibold text-slate-800">{String(tab || '').replace(/_/g, ' ')}</span>
-        </div>
+        <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Super Admin Shortcuts
+              </p>
+              <h2 className="mt-1 text-base font-semibold text-slate-900">
+                Active section: {tabLabels[tab] || String(tab || '').replace(/_/g, ' ')}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                The new ratings controls are available below as Service Ratings.
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[560px] lg:grid-cols-4">
+              {featuredControlTabs.map((item) => {
+                const isActive = tab === item.name;
+                return (
+                  <button
+                    key={item.name}
+                    type="button"
+                    onClick={() => loadTab(item.name)}
+                    className={`min-h-[92px] rounded-xl border p-3 text-left transition ${
+                      isActive
+                        ? 'border-amber-300 bg-amber-50 text-amber-900 shadow-sm'
+                        : item.featured
+                        ? 'border-slate-200 bg-slate-900 text-white hover:border-amber-300 hover:bg-slate-800'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      {item.featured && <FaStar className={isActive ? 'text-amber-500' : 'text-amber-300'} />}
+                      {item.label}
+                    </span>
+                    <span className={`mt-2 block text-xs leading-5 ${isActive ? 'text-amber-800' : item.featured ? 'text-slate-200' : 'text-slate-500'}`}>
+                      {item.detail}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
       <AdminNotifications />
 
