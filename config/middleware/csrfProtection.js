@@ -1,24 +1,15 @@
 const crypto = require('crypto');
+const {
+  AUTH_COOKIE_NAME,
+  CSRF_COOKIE_NAME,
+  parseCookies,
+} = require('../utils/authCookies');
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-const parseCookies = (cookieHeader = '') => {
-  return String(cookieHeader || '')
-    .split(';')
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .reduce((acc, part) => {
-      const index = part.indexOf('=');
-      if (index === -1) return acc;
-      const key = part.slice(0, index).trim();
-      const value = part.slice(index + 1).trim();
-      acc[key] = decodeURIComponent(value || '');
-      return acc;
-    }, {});
-};
-
 const maybeCookieAuth = (cookies) => {
   return Boolean(
+    cookies[AUTH_COOKIE_NAME] ||
     cookies.auth_token ||
     cookies.access_token ||
     cookies.session ||
@@ -34,12 +25,12 @@ const csrfProtection = (req, res, next) => {
     return next();
   }
 
-  const existingCsrfCookie = cookies.csrf_token;
+  const existingCsrfCookie = cookies[CSRF_COOKIE_NAME];
 
   if (!existingCsrfCookie) {
     const token = crypto.randomBytes(24).toString('hex');
     const secureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-    res.append('Set-Cookie', `csrf_token=${token}; Path=/; SameSite=Lax; HttpOnly=false${secureFlag}`);
+    res.append('Set-Cookie', `${CSRF_COOKIE_NAME}=${token}; Path=/; SameSite=Lax${secureFlag}`);
 
     if (SAFE_METHODS.has(req.method)) {
       return next();

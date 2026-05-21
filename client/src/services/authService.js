@@ -15,7 +15,11 @@ export const authService = {
     if (response.data.success) {
       const { token, user } = response.data.data;
       setAuthSession(token, user);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      if (token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      } else {
+        delete api.defaults.headers.common['Authorization'];
+      }
     }
     return response.data;
   },
@@ -26,13 +30,18 @@ export const authService = {
     if (response.data.success) {
       const { token, user } = response.data.data;
       setAuthSession(token, user);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      if (token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      } else {
+        delete api.defaults.headers.common['Authorization'];
+      }
     }
     return response.data;
   },
 
   // Logout (NO redirect here)
   logout: () => {
+    api.post('/auth/logout').catch(() => {});
     clearAuthSession();
     delete api.defaults.headers.common['Authorization'];
   },
@@ -77,7 +86,7 @@ export const authService = {
   // Check if authenticated
   isAuthenticated: () => {
     const token = getAuthToken();
-    if (!token) return false;
+    if (!token) return Boolean(getAuthUser());
 
     try {
       const decoded = jwtDecode(token);

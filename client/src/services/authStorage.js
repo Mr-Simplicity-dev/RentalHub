@@ -18,7 +18,11 @@ export const setAuthSession = (token, user) => {
   const local = getLocalStorage();
 
   if (session) {
-    session.setItem(TOKEN_KEY, token);
+    if (token) {
+      session.setItem(TOKEN_KEY, token);
+    } else {
+      session.removeItem(TOKEN_KEY);
+    }
     session.setItem(USER_KEY, JSON.stringify(user));
   }
 

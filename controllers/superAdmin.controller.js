@@ -35,6 +35,10 @@ const {
 const {
   ensureLawyerCaseNotesSchema,
 } = require('../config/utils/legalSchema');
+const {
+  setAuthCookies,
+  shouldReturnTokenInBody,
+} = require('../config/utils/authCookies');
 
 let verificationAuditSchemaReady = false;
 let userSuspensionSchemaReady = false;
@@ -263,27 +267,36 @@ const impersonateAdmin = async (req, res) => {
 
     await logAction(req.user.id, `IMPERSONATE_ADMIN_${String(target.user_type || '').toUpperCase()}`, 'user', target.id);
 
+    const csrfToken = setAuthCookies(res, impersonationToken, {
+      maxAge: 2 * 60 * 60 * 1000,
+    });
+    const responseData = {
+      user: {
+        id: target.id,
+        email: target.email,
+        full_name: target.full_name,
+        user_type: target.user_type,
+        assigned_state: target.assigned_state,
+        assigned_city: target.assigned_city,
+        email_verified: target.email_verified,
+        phone_verified: target.phone_verified,
+        identity_verified: target.identity_verified,
+        identity_verification_status: target.identity_verification_status,
+        subscription_active: target.subscription_active,
+        subscription_expires_at: target.subscription_expires_at,
+      },
+      csrf_token: csrfToken,
+      redirect_path: getDashboardPathForRole(target.user_type),
+    };
+
+    if (shouldReturnTokenInBody()) {
+      responseData.token = impersonationToken;
+    }
+
     return res.json({
       success: true,
       message: `Now impersonating ${target.full_name}`,
-      data: {
-        token: impersonationToken,
-        user: {
-          id: target.id,
-          email: target.email,
-          full_name: target.full_name,
-          user_type: target.user_type,
-          assigned_state: target.assigned_state,
-          assigned_city: target.assigned_city,
-          email_verified: target.email_verified,
-          phone_verified: target.phone_verified,
-          identity_verified: target.identity_verified,
-          identity_verification_status: target.identity_verification_status,
-          subscription_active: target.subscription_active,
-          subscription_expires_at: target.subscription_expires_at,
-        },
-        redirect_path: getDashboardPathForRole(target.user_type),
-      },
+      data: responseData,
     });
   } catch (error) {
     console.error('Impersonation error:', error);

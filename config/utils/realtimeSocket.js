@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../middleware/database');
 const { logAction } = require('./auditLogger');
+const { getSocketAuthToken } = require('./authCookies');
 
 const CALL_ALLOWED_ROLES = new Set(['tenant', 'landlord', 'agent']);
 const CALL_TYPES = new Set(['audio', 'video', 'virtual_tour']);
@@ -219,9 +220,7 @@ const logVirtualTourAudit = async (call, action, actorId) => {
 const configureRealtimeSocket = (io) => {
   io.use(async (socket, next) => {
     try {
-      const token =
-        socket.handshake.auth?.token ||
-        String(socket.handshake.headers?.authorization || '').replace(/^Bearer\s+/i, '');
+      const token = getSocketAuthToken(socket);
 
       if (!token) {
         return next(new Error('Authentication token required'));

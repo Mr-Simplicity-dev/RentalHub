@@ -51,6 +51,12 @@ const {
   creditReferralRewardForRegistration,
   normalizeReferralCode,
 } = require('../services/referralService');
+const {
+  clearAuthCookies,
+  getAuthTokenFromRequest,
+  setAuthCookies,
+  shouldReturnTokenInBody,
+} = require('../config/utils/authCookies');
 
 // Store OTP codes temporarily (use Redis in production)
 const otpStore = new Map();
@@ -426,6 +432,24 @@ const generateToken = (userId, userType) => {
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
+};
+
+const attachAuthSession = (res, data) => {
+  if (!data?.token) return data;
+
+  const csrfToken = setAuthCookies(res, data.token);
+  if (shouldReturnTokenInBody()) {
+    return {
+      ...data,
+      csrf_token: csrfToken,
+    };
+  }
+
+  const { token, ...safeData } = data;
+  return {
+    ...safeData,
+    csrf_token: csrfToken,
+  };
 };
 
 const assertUniqueUserFields = async (executor, {
@@ -1358,15 +1382,15 @@ exports.register = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Registration successful! Please verify your email and phone.',
-      data
+      data: attachAuthSession(res, data)
     });
 
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(error.statusCode || 500).json({
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
       success: false,
-      message: error.message || 'Registration failed',
-      error: error.message
+      message: statusCode >= 500 ? 'Registration failed' : error.message || 'Registration failed'
     });
   }
 };
@@ -1674,13 +1698,14 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Registration completed successfully',
-      data
+      data: attachAuthSession(res, data)
     });
   } catch (error) {
     console.error('Registration completion error:', error);
-    res.status(error.statusCode || 500).json({
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
       success: false,
-      message: error.message || 'Failed to complete registration'
+      message: statusCode >= 500 ? 'Failed to complete registration' : error.message || 'Failed to complete registration'
     });
   }
 };
@@ -1771,18 +1796,17 @@ exports.login = async (req, res) => {
     res.json({
       success: true,
       message: 'Login successful',
-      data: {
+      data: attachAuthSession(res, {
         user,
         token
-      }
+      })
     });
 
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Login failed',
-      error: error.message
+      message: 'Login failed'
     });
   }
 };
@@ -3393,8 +3417,7 @@ exports.getCurrentUser = async (req, res) => {
     console.error('GET /auth/me ERROR:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get user profile',
-      error: error.message
+      message: 'Failed to get user profile'
     });
   }
 };
@@ -3403,7 +3426,7 @@ exports.getCurrentUser = async (req, res) => {
 // REFRESH TOKEN
 exports.refreshToken = async (req, res) => {
   try {
-    const { token } = req.body;
+    const token = req.body?.token || getAuthTokenFromRequest(req);
 
     if (!token) {
       return res.status(401).json({
@@ -3414,11 +3437,18 @@ exports.refreshToken = async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const newToken = generateToken(decoded.userId, decoded.userType);
+    const csrfToken = setAuthCookies(res, newToken);
 
-    res.json({
+    const payload = {
       success: true,
-      token: newToken
-    });
+      csrf_token: csrfToken
+    };
+
+    if (shouldReturnTokenInBody()) {
+      payload.token = newToken;
+    }
+
+    res.json(payload);
 
   } catch (error) {
     res.status(401).json({
@@ -3430,8 +3460,7 @@ exports.refreshToken = async (req, res) => {
 
 // LOGOUT
 exports.logout = async (req, res) => {
-  // In a stateless JWT system, logout is handled client-side
-  // For enhanced security, implement token blacklisting with Redis
+  clearAuthCookies(res);
   res.json({
     success: true,
     message: 'Logged out successfully'

@@ -4,6 +4,7 @@ const {
   evaluateRegistrationAccess,
   isGlobalRegistrationEnabled,
 } = require('../utils/registrationAccess');
+const { getAuthTokenFromRequest } = require('../utils/authCookies');
 
 const DEFAULT_FEATURE_FLAGS = [
   {
@@ -156,10 +157,7 @@ const getFeatureFlagsMap = async () => {
 const attachUserFromToken = (req) => {
   if (req.user?.user_type) return;
 
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7)
-    : null;
+  const token = getAuthTokenFromRequest(req);
 
   if (!token || !process.env.JWT_SECRET) return;
 

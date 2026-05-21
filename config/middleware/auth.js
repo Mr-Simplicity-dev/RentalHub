@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('./database');
+const { getAuthTokenFromRequest } = require('../utils/authCookies');
 
 let userSuspensionSchemaReady = false;
 
@@ -21,9 +22,7 @@ const authenticate = async (req, res, next) => {
   try {
     await ensureUserSuspensionSchema();
 
-    const authHeader = req.headers.authorization;
-
-    const token = authHeader?.split(' ')[1];
+    const token = getAuthTokenFromRequest(req);
 
     if (!token) {
       return res.status(401).json({
@@ -80,6 +79,7 @@ const authenticate = async (req, res, next) => {
       });
     }
 
+    req.auth = decoded;
     req.user = currentUser;
     next();
   } catch (error) {
@@ -95,8 +95,7 @@ const optionalAuthenticate = async (req, res, next) => {
   try {
     await ensureUserSuspensionSchema();
 
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(' ')[1];
+    const token = getAuthTokenFromRequest(req);
 
     if (!token) {
       return next();
@@ -127,6 +126,7 @@ const optionalAuthenticate = async (req, res, next) => {
       !currentUser.deleted_at &&
       currentUser.is_active !== false
     ) {
+      req.auth = decoded;
       req.user = currentUser;
     }
 

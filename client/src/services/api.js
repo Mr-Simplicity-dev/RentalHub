@@ -3,9 +3,22 @@ import { clearAuthSession, getAuthToken } from './authStorage';
 
 // Use relative /api so React proxy handles routing in development
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
+
+const getCookieValue = (name) => {
+  if (typeof document === 'undefined') return '';
+  const cookies = document.cookie ? document.cookie.split(';') : [];
+  const prefix = `${name}=`;
+  const match = cookies
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith(prefix));
+
+  return match ? decodeURIComponent(match.slice(prefix.length)) : '';
+};
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -18,6 +31,13 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    const method = String(config.method || 'get').toLowerCase();
+    const csrfToken = getCookieValue('csrf_token');
+    if (csrfToken && MUTATING_METHODS.has(method)) {
+      config.headers['X-CSRF-Token'] = csrfToken;
+    }
+
     if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
       if (typeof config.headers?.delete === 'function') {
         config.headers.delete('Content-Type');
