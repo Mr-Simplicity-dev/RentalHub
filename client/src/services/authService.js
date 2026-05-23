@@ -39,11 +39,17 @@ export const authService = {
     return response.data;
   },
 
-  // Logout (NO redirect here)
-  logout: () => {
-    api.post('/auth/logout').catch(() => {});
+  clearLocalSession: () => {
     clearAuthSession();
     delete api.defaults.headers.common['Authorization'];
+  },
+
+  // Logout (NO redirect here)
+  logout: ({ remote = true } = {}) => {
+    if (remote) {
+      api.post('/auth/logout').catch(() => {});
+    }
+    authService.clearLocalSession();
   },
 
   // Get current user

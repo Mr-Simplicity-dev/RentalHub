@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 import { authService } from '../services/authService';
 import { setAuthUser } from '../services/authStorage';
 
@@ -10,18 +10,9 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-  const initAuth = async () => {
-    try {
-      if (!authService.isAuthenticated()) {
-        // No valid token → ensure clean state
-        authService.logout();
-        setUser(null);
-        setIsAuthenticated(false);
-        return;
-      }
-
-      // Token exists – try to load real user from server
+    const initAuth = async () => {
       try {
+        // Server-first check supports HttpOnly cookie auth after page refresh.
         const response = await authService.getCurrentUser();
         if (response.success) {
           setUser(response.data);
@@ -29,25 +20,17 @@ export const AuthProvider = ({ children }) => {
         } else {
           throw new Error('Invalid session');
         }
-      } catch (err) {
-        // If token is invalid or request fails, force logout
-        authService.logout();
+      } catch (error) {
+        authService.clearLocalSession();
         setUser(null);
         setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Auth initialization error:', error);
-      authService.logout();
-      setUser(null);
-      setIsAuthenticated(false);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  initAuth();
-}, []);
-
+    initAuth();
+  }, []);
 
   const login = async (email, password) => {
     const response = await authService.login(email, password);
