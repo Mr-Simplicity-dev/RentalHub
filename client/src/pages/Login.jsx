@@ -168,7 +168,7 @@ const Login = () => {
         
         {/* LOGO */}
         <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl shadow-xl border border-white/20">
-          <img src="/logo.png" alt="RentPro" className="w-12 h-12" />
+          <img src="/logo192.png" alt="RentPro" className="w-12 h-12" />
         </div>
 
         {/* BRAND */}
