@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FaBuilding,
@@ -10,8 +10,105 @@ import {
   FaCheckCircle,
   FaPhoneAlt,
   FaEnvelope,
+  FaShareAlt,
+  FaWhatsapp,
+  FaFacebook,
+  FaTwitter,
+  FaLink,
 } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'react-toastify';
+
+/* ──────────────────────────────────────────────────────────────
+   ShareButton — opens a floating share sheet with social options
+   ────────────────────────────────────────────────────────────── */
+const ShareButton = ({ section, title, description }) => {
+  const [open, setOpen] = useState(false);
+  const pageUrl = typeof window !== 'undefined' ? window.location.href : 'https://rentalhub.com.ng/about';
+  const shareText = `${title}\n\n${description}\n\n${pageUrl}`;
+  const encodedText = encodeURIComponent(shareText);
+  const encodedUrl = encodeURIComponent(pageUrl);
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(pageUrl);
+      toast.success('Link copied to clipboard');
+    } catch {
+      toast.error('Could not copy link');
+    }
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative inline-block">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-primary-600 hover:border-primary-300 transition-all duration-200 shadow-sm"
+        title={`Share ${section}`}
+      >
+        <FaShareAlt className="text-[10px]" />
+        Share
+      </button>
+
+      {open && (
+        <>
+          {/* backdrop */}
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+
+          {/* sheet */}
+          <div className="absolute right-0 z-50 mt-2 w-52 origin-top-right animate-scaleIn rounded-xl border border-gray-100 bg-white py-2 shadow-elevated-lg">
+            <div className="px-4 pb-2 mb-1 border-b border-gray-100">
+              <p className="text-xs font-semibold text-gray-700">Share {section}</p>
+            </div>
+
+            <a
+              href={`https://wa.me/?text=${encodedText}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors"
+              onClick={() => setOpen(false)}
+            >
+              <FaWhatsapp className="text-lg text-green-600" />
+              WhatsApp
+            </a>
+
+            <a
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+              onClick={() => setOpen(false)}
+            >
+              <FaFacebook className="text-lg text-blue-600" />
+              Facebook
+            </a>
+
+            <a
+              href={`https://twitter.com/intent/tweet?text=${encodedText}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700 transition-colors"
+              onClick={() => setOpen(false)}
+            >
+              <FaTwitter className="text-lg text-sky-500" />
+              Twitter / X
+            </a>
+
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <FaLink className="text-lg text-gray-500" />
+              Copy Link
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 const stats = [
   { label: 'Properties Listed', value: '10,000+' },
@@ -128,6 +225,11 @@ const AboutUs = () => {
                 <FaUsers />
                 Join RentalHub NG
               </Link>
+              <ShareButton
+                section="About Us"
+                title="RentalHub NG — Nigeria's Most Trusted Property Platform"
+                description="Nigeria's most trusted property technology platform — connecting tenants, landlords, agents, and legal professionals across all 36 states and the Federal Capital Territory."
+              />
             </div>
           </div>
         </div>
@@ -146,9 +248,16 @@ const AboutUs = () => {
           <div className="grid md:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
             <div>
               <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Our Mission</span>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-3 mb-6">
-                Transforming Nigeria's Rental Landscape
-              </h2>
+              <div className="flex items-center justify-between gap-4 mt-3 mb-6">
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+                  Transforming Nigeria's Rental Landscape
+                </h2>
+                <ShareButton
+                  section="Our Mission"
+                  title="RentalHub NG Mission — Transforming Nigeria's Rental Landscape"
+                  description="At RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free experience when finding a home."
+                />
+              </div>
               <p className="text-gray-600 leading-relaxed mb-4">
                 At RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free
                 experience when finding a home. Our mission is to eliminate the friction,
@@ -200,9 +309,14 @@ const AboutUs = () => {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto">
             {stats.map((stat, idx) => (
-              <div key={idx} className="text-center text-white">
+              <div key={idx} className="text-center text-white group">
                 <div className="text-3xl md:text-4xl font-extrabold mb-2">{stat.value}</div>
-                <div className="text-primary-200 text-sm md:text-base font-medium">{stat.label}</div>
+                <div className="text-primary-200 text-sm md:text-base font-medium mb-2">{stat.label}</div>
+                <ShareButton
+                  section={stat.label}
+                  title={`RentalHub NG — ${stat.value} ${stat.label}`}
+                  description={`RentalHub NG has ${stat.value} ${stat.label.toLowerCase()}. Join Nigeria's most trusted property platform.`}
+                />
               </div>
             ))}
           </div>
@@ -214,9 +328,16 @@ const AboutUs = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Our Journey</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-3 mb-4">
-              From Vision to Reality
-            </h2>
+            <div className="flex items-center justify-center gap-4 mt-3 mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+                From Vision to Reality
+              </h2>
+              <ShareButton
+                section="Our Journey"
+                title="RentalHub NG Journey — From Vision to Reality"
+                description="See how RentalHub NG grew from a vision into Nigeria's most trusted property marketplace since 2020."
+              />
+            </div>
             <p className="text-gray-600">
               Every great platform starts with a simple idea. Here is the story of how RentalHub NG
               grew from a vision into Nigeria's most trusted property marketplace.
@@ -246,7 +367,12 @@ const AboutUs = () => {
                   <span className="inline-block px-4 py-1.5 bg-primary-100 text-primary-800 font-bold text-sm rounded-full mb-3">
                     {milestone.year}
                   </span>
-                  <p className="text-gray-700 text-base leading-relaxed">{milestone.event}</p>
+                  <p className="text-gray-700 text-base leading-relaxed mb-3">{milestone.event}</p>
+                  <ShareButton
+                    section={`Milestone ${milestone.year}`}
+                    title={`RentalHub NG in ${milestone.year}: ${milestone.event}`}
+                    description={`${milestone.event} — Part of the RentalHub NG journey.`}
+                  />
                 </div>
               </div>
             ))}
@@ -259,9 +385,16 @@ const AboutUs = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">What We Stand For</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-3 mb-4">
-              Our Core Values
-            </h2>
+            <div className="flex items-center justify-center gap-4 mt-3 mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+                Our Core Values
+              </h2>
+              <ShareButton
+                section="Our Core Values"
+                title="RentalHub NG Core Values"
+                description="Trust, transparency, community, nationwide reach, integrity, and innovation — the principles guiding RentalHub NG."
+              />
+            </div>
             <p className="text-gray-600">
               These principles guide every decision we make and every feature we build.
             </p>
@@ -271,10 +404,17 @@ const AboutUs = () => {
             {values.map((value, idx) => (
               <div
                 key={idx}
-                className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border border-gray-100"
+                className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border border-gray-100 group"
               >
-                <div className="w-14 h-14 rounded-xl bg-primary-50 flex items-center justify-center mb-5">
-                  {value.icon}
+                <div className="flex items-start justify-between mb-5">
+                  <div className="w-14 h-14 rounded-xl bg-primary-50 flex items-center justify-center">
+                    {value.icon}
+                  </div>
+                  <ShareButton
+                    section={value.title}
+                    title={`RentalHub NG — ${value.title}`}
+                    description={value.desc}
+                  />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">{value.title}</h3>
                 <p className="text-gray-600 leading-relaxed">{value.desc}</p>
@@ -289,9 +429,16 @@ const AboutUs = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Why Choose Us</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-3 mb-4">
-              What Makes RentalHub NG Different
-            </h2>
+            <div className="flex items-center justify-center gap-4 mt-3 mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+                What Makes RentalHub NG Different
+              </h2>
+              <ShareButton
+                section="Why Choose Us"
+                title="Why Choose RentalHub NG"
+                description="Verified ecosystem, legal support, full-service marketplace, and nationwide coverage — see what makes RentalHub NG different."
+              />
+            </div>
             <p className="text-gray-600">
               We don't just list properties — we build an end-to-end ecosystem for secure, transparent
               property transactions.
@@ -299,12 +446,19 @@ const AboutUs = () => {
           </div>
 
           <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-10">
-            <div className="flex gap-5">
+            <div className="flex gap-5 group">
               <div className="shrink-0 w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
                 <FaShieldAlt className="text-xl text-primary-600" />
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Verified Ecosystem</h3>
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Verified Ecosystem</h3>
+                  <ShareButton
+                    section="Verified Ecosystem"
+                    title="RentalHub NG — Verified Ecosystem"
+                    description="Every landlord, tenant, and property goes through identity verification. Our NIN-linked verification ensures only genuine participants on the platform."
+                  />
+                </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   Every landlord, tenant, and property goes through identity verification.
                   Our NIN-linked verification ensures only genuine participants on the platform.
@@ -312,12 +466,19 @@ const AboutUs = () => {
               </div>
             </div>
 
-            <div className="flex gap-5">
+            <div className="flex gap-5 group">
               <div className="shrink-0 w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
                 <FaBalanceScale className="text-xl text-primary-600" />
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Legal Support & Dispute Resolution</h3>
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Legal Support & Dispute Resolution</h3>
+                  <ShareButton
+                    section="Legal Support"
+                    title="RentalHub NG — Legal Support & Dispute Resolution"
+                    description="Access to qualified lawyers, evidence verification, and structured dispute resolution processes to protect all parties."
+                  />
+                </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   Access to qualified lawyers, evidence verification, and structured dispute
                   resolution processes to protect all parties.
@@ -325,12 +486,19 @@ const AboutUs = () => {
               </div>
             </div>
 
-            <div className="flex gap-5">
+            <div className="flex gap-5 group">
               <div className="shrink-0 w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
                 <FaBuilding className="text-xl text-primary-600" />
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Full-Service Marketplace</h3>
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Full-Service Marketplace</h3>
+                  <ShareButton
+                    section="Full-Service Marketplace"
+                    title="RentalHub NG — Full-Service Marketplace"
+                    description="Beyond rentals, we offer fumigation/cleaning services, transportation support, and virtual property tours — all in one platform."
+                  />
+                </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   Beyond rentals, we offer fumigation/cleaning services, transportation support,
                   and virtual property tours — all in one platform.
@@ -338,12 +506,19 @@ const AboutUs = () => {
               </div>
             </div>
 
-            <div className="flex gap-5">
+            <div className="flex gap-5 group">
               <div className="shrink-0 w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
                 <FaUsers className="text-xl text-primary-600" />
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Nationwide Coverage</h3>
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Nationwide Coverage</h3>
+                  <ShareButton
+                    section="Nationwide Coverage"
+                    title="RentalHub NG — Nationwide Coverage"
+                    description="From Lagos to Maiduguri, Calabar to Sokoto — our platform serves all 36 states and the FCT with localized admin support."
+                  />
+                </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   From Lagos to Maiduguri, Calabar to Sokoto — our platform serves all 36 states
                   and the FCT with localized admin support.
@@ -359,9 +534,16 @@ const AboutUs = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Leadership</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-3 mb-4">
-              Meet Our Team
-            </h2>
+            <div className="flex items-center justify-center gap-4 mt-3 mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+                Meet Our Team
+              </h2>
+              <ShareButton
+                section="Leadership Team"
+                title="RentalHub NG Leadership Team"
+                description="Meet the passionate professionals dedicated to transforming the Nigerian property experience at RentalHub NG."
+              />
+            </div>
             <p className="text-gray-600">
               Passionate professionals dedicated to transforming the Nigerian property experience.
             </p>
@@ -371,8 +553,15 @@ const AboutUs = () => {
             {teamMembers.map((member, idx) => (
               <div
                 key={idx}
-                className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 text-center group"
+                className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 text-center group relative"
               >
+                <div className="absolute top-3 right-3">
+                  <ShareButton
+                    section={member.name}
+                    title={`RentalHub NG — ${member.name}, ${member.role}`}
+                    description={`${member.bio} Learn more about the RentalHub NG leadership team.`}
+                  />
+                </div>
                 <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white text-2xl font-bold shadow-md group-hover:scale-110 transition-transform duration-300">
                   {member.name.split(' ').map(n => n[0]).join('')}
                 </div>
@@ -409,8 +598,13 @@ const AboutUs = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-primary-500 text-white font-semibold rounded-xl shadow-lg hover:bg-primary-400 hover:scale-105 transition-all duration-300"
               >
                 <FaUsers />
-                Create Free Account
+                Create Account
               </Link>
+              <ShareButton
+                section="Call to Action"
+                title="Join 50,000+ Nigerians on RentalHub NG"
+                description="Find your perfect home on RentalHub NG — Nigeria's most trusted property platform with verified properties across all 36 states + FCT."
+              />
             </div>
           </div>
         </div>
@@ -426,6 +620,13 @@ const AboutUs = () => {
             <p className="text-gray-600 mb-12 max-w-2xl mx-auto">
               Have questions, feedback, or partnership ideas? We would love to hear from you.
             </p>
+            <div className="flex justify-center mb-10">
+              <ShareButton
+                section="Contact"
+                title="Contact RentalHub NG"
+                description="Have questions, feedback, or partnership ideas? Contact RentalHub NG at support@rentalhub.com.ng or call +234 803 060 1238."
+              />
+            </div>
             <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
               <a
                 href="mailto:support@rentalhub.com.ng"
