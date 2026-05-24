@@ -55,6 +55,7 @@ import Terms from './Terms';
 import Privacy from './Privacy';
 import Faq from './Faq';
 import HowItWorks from './HowItWorks';
+import AboutUs from './AboutUs';
 import Pricing from './Pricing';
 import LandlordGuide from './LandlordGuide';
 import VerifyEmail from './VerifyEmail';
@@ -620,6 +621,7 @@ function App() {
               <Route path="/verify-phone" element={<VerifyPhone />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
+                            <Route path="/about" element={<AboutUs />} />
               <Route path="/faq" element={<Faq />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/pricing" element={<Pricing />} />

@@ -650,8 +650,9 @@ return (
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-1">
+                <nav className="hidden md:flex items-center space-x-1">
           <NavLink to="/properties" label={t('header.browse')} />
+          <NavLink to="/about" label={t('footer.about_us')} />
           <NavLink to="/verify-case" label={t('header.verify_evidence')} />
 
           {isAuthenticated &&
@@ -1009,9 +1010,15 @@ return (
         }`}
       >
         <div className="flex flex-col space-y-1 border-t border-gray-100 pt-3">
-          <MobileNavLink
+                    <MobileNavLink
             to="/properties"
             label={t('header.browse')}
+            onClick={closeMobileMenu}
+          />
+
+          <MobileNavLink
+            to="/about"
+            label={t('footer.about_us')}
             onClick={closeMobileMenu}
           />
 
