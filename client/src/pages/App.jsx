@@ -56,6 +56,7 @@ import Privacy from './Privacy';
 import Faq from './Faq';
 import HowItWorks from './HowItWorks';
 import AboutUs from './AboutUs';
+import ListProperty from './ListProperty';
 import Pricing from './Pricing';
 import LandlordGuide from './LandlordGuide';
 import VerifyEmail from './VerifyEmail';
@@ -621,7 +622,8 @@ function App() {
               <Route path="/verify-phone" element={<VerifyPhone />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
-                            <Route path="/about" element={<AboutUs />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/list-property" element={<ListProperty />} />
               <Route path="/faq" element={<Faq />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/pricing" element={<Pricing />} />
