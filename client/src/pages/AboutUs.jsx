@@ -175,11 +175,11 @@ const teamMembers = [
 
 const milestones = [
   { year: '2020', event: 'RentalHub NG was founded with a vision to transform the Nigerian rental market.' },
-  { year: '2021', event: 'Launched property listing platform, onboarding landlords across Lagos and Abuja.' },
-  { year: '2022', event: 'Expanded to all 36 states + FCT; introduced identity verification for landlords and tenants.' },
-  { year: '2023', event: 'Launched legal support services, dispute resolution, and fumigation/cleaning marketplace.' },
-  { year: '2024', event: 'Introduced transportation services, evidence verification, and virtual property tours.' },
-  { year: '2025', event: 'Reached 50,000+ active users; launched mobile app with real-time chat and notifications.' },
+  { year: '2021', event: 'Launched property listing framework to ackwonledge onboarding landlords across Lagos and Abuja by creating a platform.' },
+  { year: '2022', event: 'Expanded the framework to all 36 states + FCT; introduced identity verification for landlords and tenants.' },
+  { year: '2023', event: 'Launched legal framework support services, dispute resolution, and fumigation/cleaning marketplace.' },
+  { year: '2024', event: 'Introduced Rental Platform, transportation services, evidence verification, and virtual property tours.' },
+  { year: '2025', event: 'Harnessed and reaching 50,000+ active users; launched mobile app with real-time chat and notifications.' },
 ];
 
 const AboutUs = () => {
@@ -456,12 +456,12 @@ const AboutUs = () => {
                   <ShareButton
                     section="Verified Ecosystem"
                     title="RentalHub NG — Verified Ecosystem"
-                    description="Every landlord, tenant, and property goes through identity verification. Our NIN-linked verification ensures only genuine participants on the platform."
+                    description="Every landlord, tenant, and property goes through identity verification. Our superb verification system ensures only genuine participants on the platform."
                   />
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   Every landlord, tenant, and property goes through identity verification.
-                  Our NIN-linked verification ensures only genuine participants on the platform.
+                  Our superb verification system ensures only genuine participants on the platform.
                 </p>
               </div>
             </div>
