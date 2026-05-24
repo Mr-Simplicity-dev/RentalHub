@@ -726,9 +726,11 @@ const Faq = () => {
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
               Get In Touch
             </h2>
+
             <p className="text-gray-600 mb-12 max-w-2xl mx-auto">
               Have a question that is not covered here? Our support team is always happy to help.
             </p>
+
             <div className="flex justify-center mb-10">
               <ShareButton
                 section="Contact"
@@ -736,34 +738,45 @@ const Faq = () => {
                 description="Have questions about RentalHub NG? Contact us at support@rentalhub.com.ng or call +234 803 060 1238."
               />
             </div>
-            <a
-  href="mailto:support@rentalhub.com.ng"
-  className="flex items-center gap-4 p-6 rounded-2xl bg-gray-50 hover:bg-primary-50 border border-gray-100 hover:border-primary-200 transition-all duration-300 group"
->
-  <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">
-    <FaEnvelope className="text-xl text-primary-600" />
-  </div>
-  <div className="text-left">
-    <p className="text-sm text-gray-500">Email us</p>
-    <p className="text-gray-900 font-semibold">support@rentalhub.com.ng</p>
-  </div>
-</a>
-<a
-  href="tel:+2348030601238"
-  className="flex items-center gap-4 p-6 rounded-2xl bg-gray-50 hover:bg-primary-50 border border-gray-100 hover:border-primary-200 transition-all duration-300 group"
->
-  <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">
-    <FaPhoneAlt className="text-xl text-primary-600" />
-  </div>
-  <div className="text-left">
-    <p className="text-sm text-gray-500">Call us</p>
-    <p className="text-gray-900 font-semibold">+234 803 060 1238</p>
-  </div>
-</a>
-</div>
-</div>
-</section>
-</div>
-);
+
+            <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+              <a
+                href="mailto:support@rentalhub.com.ng"
+                className="flex items-center gap-4 p-6 rounded-2xl bg-gray-50 hover:bg-primary-50 border border-gray-100 hover:border-primary-200 transition-all duration-300 group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">
+                  <FaEnvelope className="text-xl text-primary-600" />
+                </div>
+
+                <div className="text-left">
+                  <p className="text-sm text-gray-500">Email us</p>
+                  <p className="text-gray-900 font-semibold">
+                    support@rentalhub.com.ng
+                  </p>
+                </div>
+              </a>
+
+              <a
+                href="tel:+2348030601238"
+                className="flex items-center gap-4 p-6 rounded-2xl bg-gray-50 hover:bg-primary-50 border border-gray-100 hover:border-primary-200 transition-all duration-300 group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">
+                  <FaPhoneAlt className="text-xl text-primary-600" />
+                </div>
+
+                <div className="text-left">
+                  <p className="text-sm text-gray-500">Call us</p>
+                  <p className="text-gray-900 font-semibold">
+                    +234 803 060 1238
+                  </p>
+                </div>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+};
 
 export default Faq;
