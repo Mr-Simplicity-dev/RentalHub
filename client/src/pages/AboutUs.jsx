@@ -152,9 +152,9 @@ const values = [
 
 const teamMembers = [
   {
-    name: 'Adebayo Ogunlesi',
+    name: 'Zubair Onimisi',
     role: 'Founder & CEO',
-    bio: 'With over 15 years in real estate and technology, Adebayo leads RentalHub NG with a vision to revolutionize property access in Nigeria.',
+    bio: 'With over 15 years in real estate and technology, Zubair leads RentalHub NG with a vision to revolutionize property access in Nigeria.',
   },
   {
     name: 'Chioma Eze',
