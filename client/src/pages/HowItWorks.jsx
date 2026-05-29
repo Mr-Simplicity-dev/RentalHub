@@ -5,7 +5,6 @@ import {
   FaSearch,
   FaLock,
   FaHeart,
-  FaHome,
   FaCamera,
   FaCreditCard,
   FaComments,
@@ -25,7 +24,6 @@ import {
   FaPhoneAlt,
   FaEnvelope,
 } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
 /* ──────────────────────────────────────────────────────────────
@@ -266,7 +264,6 @@ const faqs = [
    Page Component
    ────────────────────────────────────────────────────────────── */
 const HowItWorks = () => {
-  const { t } = useTranslation();
   const [openFaq, setOpenFaq] = useState(null);
 
   useEffect(() => {

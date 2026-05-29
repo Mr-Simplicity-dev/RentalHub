@@ -6,12 +6,10 @@ import {
   FaUserCheck,
   FaFileContract,
   FaMoneyBillWave,
-  FaShieldAlt,
   FaStar,
   FaArrowRight,
   FaUsers,
   FaHome,
-  FaCreditCard,
   FaComments,
   FaSyncAlt,
   FaPhoneAlt,
@@ -21,9 +19,7 @@ import {
   FaFacebook,
   FaTwitter,
   FaLink,
-  FaCheckCircle,
 } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
 /* ──────────────────────────────────────────────────────────────
@@ -392,7 +388,6 @@ const stats = [
    Page Component
    ────────────────────────────────────────────────────────────── */
 const Faq = () => {
-  const { t } = useTranslation();
   const [activeCategory, setActiveCategory] = useState('general');
   const [openFaq, setOpenFaq] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');

@@ -18,9 +18,7 @@ import {
   FaSpinner,
   FaTimes,
   FaUser,
-  FaUserFriends,
   FaVideo,
-  FaVideoSlash,
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
@@ -33,6 +31,11 @@ const QUESTION_TIME_LIMIT_SECONDS = 30;
 const FACE_DETECTION_INTERVAL_MS = 800;
 const MIN_FACE_CONFIDENCE = 0.65;
 const CONSECUTIVE_FACE_VIOLATIONS = 3;
+const FACE_API_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+const TINY_FACE_DETECTOR_MODEL_URLS = [
+  'https://cdn.jsdelivr.net/npm/@xkeshi/face-api.js-models@0.0.1/models/tiny_face_detector',
+  'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model',
+];
 
 // ============================================================
 // face-api.js Global References (loaded from CDN)
@@ -40,40 +43,61 @@ const CONSECUTIVE_FACE_VIOLATIONS = 3;
 let faceApiLoaded = false;
 let faceApiLoading = null;
 
+const loadTinyFaceDetectorModel = async () => {
+  for (const modelUrl of TINY_FACE_DETECTOR_MODEL_URLS) {
+    try {
+      await window.faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
+      return true;
+    } catch (error) {
+      console.warn(`TinyFaceDetector model failed from ${modelUrl}`, error);
+    }
+  }
+  return false;
+};
+
 const loadFaceApi = () => {
   if (faceApiLoaded) return Promise.resolve(true);
   if (faceApiLoading) return faceApiLoading;
 
   faceApiLoading = new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      resolve(false);
+      return;
+    }
+
+    const markFaceApiReady = async () => {
+      if (!window.faceapi?.nets?.tinyFaceDetector || !window.faceapi?.TinyFaceDetectorOptions) {
+        console.warn('face-api.js loaded without TinyFaceDetector support');
+        faceApiLoading = null;
+        resolve(false);
+        return;
+      }
+
+      const modelReady = await loadTinyFaceDetectorModel();
+      faceApiLoaded = modelReady;
+      if (!modelReady) faceApiLoading = null;
+      resolve(modelReady);
+    };
+
     // Check if already available
     if (typeof window !== 'undefined' && window.faceapi) {
-      faceApiLoaded = true;
-      resolve(true);
+      markFaceApiReady();
       return;
     }
 
     // Load face-api.js script dynamically from CDN
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+    const existingScript = document.querySelector(`script[src="${FACE_API_SCRIPT_URL}"]`);
+    const script = existingScript || document.createElement('script');
+    script.src = FACE_API_SCRIPT_URL;
     script.async = true;
-    script.onload = async () => {
-      try {
-        // Load tiny face detector model from CDN
-        await window.faceapi.nets.tinyFaceDetector.loadFromUri(
-          'https://cdn.jsdelivr.net/npm/@xkeshi/face-api.js-models@0.0.1/models/tiny_face_detector'
-        );
-        faceApiLoaded = true;
-        resolve(true);
-      } catch (err) {
-        console.warn('face-api.js models failed to load, falling back to motion detection', err);
-        resolve(false);
-      }
-    };
+    script.dataset.rentalhubFaceApi = 'true';
+    script.onload = markFaceApiReady;
     script.onerror = () => {
       console.warn('face-api.js CDN unavailable, falling back to motion detection');
+      faceApiLoading = null;
       resolve(false);
     };
-    document.head.appendChild(script);
+    if (!existingScript) document.head.appendChild(script);
   });
 
   return faceApiLoading;

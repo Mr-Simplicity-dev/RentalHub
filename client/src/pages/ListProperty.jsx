@@ -23,7 +23,6 @@ import {
   FaCheckDouble,
   FaBalanceScale,
 } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 
@@ -286,7 +285,6 @@ const faqs = [
    Page Component
    ────────────────────────────────────────────────────────────── */
 const ListProperty = () => {
-  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState(null);

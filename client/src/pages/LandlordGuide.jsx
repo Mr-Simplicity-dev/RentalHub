@@ -12,7 +12,6 @@ import {
   FaFileContract,
   FaChartLine,
   FaUsers,
-  FaTachometerAlt,
   FaMoneyBillWave,
   FaBalanceScale,
   FaPhoneAlt,
@@ -30,7 +29,6 @@ import {
   FaBullhorn,
   FaHandshake,
 } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
 /* ──────────────────────────────────────────────────────────────
@@ -303,7 +301,6 @@ const faqs = [
    Page Component
    ────────────────────────────────────────────────────────────── */
 const LandlordGuide = () => {
-  const { t } = useTranslation();
   const [openFaq, setOpenFaq] = useState(null);
 
   useEffect(() => {

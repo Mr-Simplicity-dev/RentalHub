@@ -6,7 +6,6 @@ import {
   FaCheckCircle,
   FaCheckDouble,
   FaArrowRight,
-  FaMoneyBillWave,
   FaUsers,
   FaBuilding,
   FaShieldAlt,
@@ -18,7 +17,6 @@ import {
   FaTwitter,
   FaLink,
 } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
 /* ──────────────────────────────────────────────────────────────
@@ -276,7 +274,6 @@ const faqs = [
    Page Component
    ────────────────────────────────────────────────────────────── */
 const Pricing = () => {
-  const { t } = useTranslation();
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState(null);
 

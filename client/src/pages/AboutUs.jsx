@@ -16,7 +16,6 @@ import {
   FaTwitter,
   FaLink,
 } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
 /* ──────────────────────────────────────────────────────────────
@@ -183,7 +182,6 @@ const milestones = [
 ];
 
 const AboutUs = () => {
-  const { t } = useTranslation();
 
   useEffect(() => {
     window.scrollTo(0, 0);

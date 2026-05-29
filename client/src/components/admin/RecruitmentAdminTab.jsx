@@ -1,13 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
-  FaBell,
   FaBriefcase,
   FaCalendarAlt,
   FaCheckCircle,
   FaDownload,
   FaEnvelope,
-  FaExclamationTriangle,
   FaMapMarkerAlt,
   FaPaperPlane,
   FaPlus,
@@ -710,3 +708,163 @@ export default function RecruitmentAdminTab() {
                         Approve
                       </button>
                       <button type="button" onClick={() => updateApplicant(applicant.id, 'reject')} className="rounded-lg bg-red-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-red-700 transition-colors">
+                        Reject
+                      </button>
+                      <button type="button" onClick={() => setInterviewDate(applicant)} className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-indigo-700 transition-colors">
+                        Interview
+                      </button>
+                      <button type="button" onClick={() => downloadBlob(`/recruitment/admin/reports/applicant/${applicant.id}`, `applicant-${applicant.id}.pdf`)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                        PDF
+                      </button>
+                      <button type="button" onClick={() => downloadBlob(`/recruitment/admin/documents/download/${applicant.id}`, `documents-${applicant.id}.zip`)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                        ZIP
+                      </button>
+                    </div>
+                  </td>
+                </motion.tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <span>Showing {applicants.length} of {pagination.total || 0}</span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={pagination.page <= 1}
+              onClick={() => loadApplicants(pagination.page - 1)}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="rounded-lg bg-slate-100 px-3 py-1.5">
+              Page {pagination.page || 1} / {pagination.totalPages || 1}
+            </span>
+            <button
+              type="button"
+              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => loadApplicants(pagination.page + 1)}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </motion.section>
+
+      <AnimatePresence>
+        {triggerModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 12 }}
+              className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">Trigger Interview</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Activate interview access for shortlisted candidates. You can scope it by cycle, role, or date.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setTriggerModal(false)} className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-600">
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <AdminSelect
+                  label="Cycle"
+                  value={triggerForm.cycle_id}
+                  onChange={(value) => setTriggerForm((prev) => ({ ...prev, cycle_id: value }))}
+                >
+                  <option value="">All active cycles</option>
+                  {cycles.map((cycle) => (
+                    <option key={cycle.id} value={cycle.id}>{cycle.title}</option>
+                  ))}
+                </AdminSelect>
+                <AdminSelect
+                  label="Role"
+                  value={triggerForm.role_id}
+                  onChange={(value) => setTriggerForm((prev) => ({ ...prev, role_id: value }))}
+                >
+                  <option value="">All roles</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>{role.title}</option>
+                  ))}
+                </AdminSelect>
+                <AdminInput
+                  label="Interview Date"
+                  type="datetime-local"
+                  value={triggerForm.interview_date}
+                  onChange={(value) => setTriggerForm((prev) => ({ ...prev, interview_date: value }))}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={triggerInterview}
+                disabled={triggering}
+                className="btn btn-primary mt-5 w-full"
+              >
+                {triggering ? <><FaSpinner className="mr-2 animate-spin" /> Triggering...</> : <><FaPaperPlane className="mr-2" /> Trigger Interview</>}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function MetricCard({ icon, label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
+          <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
+        </div>
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminInput({ label, value, onChange, type = 'text', ...props }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-semibold text-slate-700">{label}</span>
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="input w-full" {...props} />
+    </label>
+  );
+}
+
+function AdminSelect({ label, value, onChange, children, ...props }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-semibold text-slate-700">{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="input w-full" {...props}>
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function FilterInput({ icon, ...props }) {
+  return (
+    <label className="relative block">
+      {icon && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span>}
+      <input {...props} className={`input w-full ${icon ? 'pl-9' : ''}`} />
+    </label>
+  );
+}
