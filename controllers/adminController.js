@@ -119,6 +119,7 @@ const ensureAdminRoleSchema = async () => {
           'financial_admin',
           'super_financial_admin',
           'super_support_admin',
+          'recruitment_admin',
           'agent',
           'fumigation_admin',
           'transportation_admin'
@@ -1969,6 +1970,7 @@ exports.createAdmin = async (req, res) => {
       'state_support_admin',
       'super_financial_admin',
       'super_support_admin',
+      'recruitment_admin',
       'lawyer',
       'state_lawyer',
       'super_lawyer',
@@ -2094,6 +2096,7 @@ exports.createAdmin = async (req, res) => {
       'state_financial_admin',
       'state_support_admin',
       'super_support_admin',
+      'recruitment_admin',
       'super_lawyer',
       'state_lawyer',
       'lawyer',

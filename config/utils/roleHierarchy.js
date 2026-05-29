@@ -5,6 +5,7 @@ const ROLE_GROUPS = {
   lgaSupport: ['lga_support_admin'],
   stateSupport: ['state_support_admin'],
   superSupport: ['super_support_admin'],
+  recruitment: ['recruitment_admin'],
   lgaFinance: ['lga_financial_admin'],
   platformFinance: ['financial_admin'],
   stateFinance: ['state_financial_admin'],
@@ -56,7 +57,8 @@ const ADMIN_ROLES = unique(all(
   LGA_SCOPED_ROLES,
   STATE_SCOPED_ROLES,
   SUPER_SCOPED_ROLES,
-  ROLE_GROUPS.platformFinance
+  ROLE_GROUPS.platformFinance,
+  ROLE_GROUPS.recruitment
 ));
 
 const ALL_USER_TYPES = unique([

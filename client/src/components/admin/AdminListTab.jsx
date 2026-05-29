@@ -75,6 +75,12 @@ const ROLE_META = {
     duty: 'Oversees support across states, escalations, audit trails, and delayed requests.',
     reportsTo: 'Super Admin',
   },
+  recruitment_admin: {
+    label: 'Recruitment Admin',
+    department: 'Recruitment',
+    duty: 'Manages career cycles, roles, application fees, applicants, interviews, and recruitment exports.',
+    reportsTo: 'Super Admin',
+  },
   lawyer: {
     label: 'LGA Lawyer',
     department: 'Legal',
@@ -180,6 +186,8 @@ const getRoleBadgeClass = (role) => {
       return 'bg-emerald-100 text-emerald-700';
     case 'lawyer':
       return 'bg-violet-100 text-violet-700';
+    case 'recruitment_admin':
+      return 'bg-purple-100 text-purple-700';
     case 'fumigation_admin':
     case 'lga_fumigation_admin':
     case 'state_fumigation_admin':

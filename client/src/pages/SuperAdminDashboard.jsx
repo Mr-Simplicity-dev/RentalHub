@@ -30,6 +30,7 @@ import LawyerActivityMonitor from "../components/admin/LawyerActivityMonitor";
 import InputDialog from "../components/common/InputDialog";
 import PropertyRequestWorkflowPanel from "../components/admin/PropertyRequestWorkflowPanel";
 import TenancyWorkflowPanel from "../components/admin/TenancyWorkflowPanel";
+import RecruitmentAdminTab from "../components/admin/RecruitmentAdminTab";
 
 const tabs = [
   "overview",
@@ -47,6 +48,7 @@ const tabs = [
   "broadcast",
   "ad_spaces",
   "platform_ratings",
+  "recruitment",
   "pricing",
   "registration_access",
   "flags",
@@ -71,6 +73,7 @@ const tabLabels = {
   broadcast: "Broadcast",
   ad_spaces: "Ad Spaces",
   platform_ratings: "Service Ratings",
+  recruitment: "Recruitment",
   pricing: "Pricing",
   registration_access: "Registration Access",
   flags: "Flags",
@@ -85,6 +88,11 @@ const featuredControlTabs = [
     label: "Service Ratings",
     detail: "Moderate public ratings, live fly-ins, images, and location rules.",
     featured: true,
+  },
+  {
+    name: "recruitment",
+    label: "Recruitment",
+    detail: "Open careers, manage cycles, roles, fees, locations, applicants, and interviews.",
   },
   {
     name: "registration_access",
@@ -1146,6 +1154,10 @@ export default function SuperAdminDashboard() {
 
       {tab === "platform_ratings" && (
         <PlatformRatingsTab />
+      )}
+
+      {tab === "recruitment" && (
+        <RecruitmentAdminTab />
       )}
 
       {tab === "flags" && (

@@ -127,7 +127,7 @@ const CreateAdminTab = () => {
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(' ');
 
-      setMessage(`✅ ${response.data?.message || `${createdRoleLabel} created successfully`}`);
+      setMessage(`Success: ${response.data?.message || `${createdRoleLabel} created successfully`}`);
 
       setFormData({
         email: "",
@@ -143,7 +143,7 @@ const CreateAdminTab = () => {
 
     } catch (err) {
       setMessage(
-        err.response?.data?.message || "❌ Failed to create admin"
+        err.response?.data?.message || "Failed to create admin"
       );
     } finally {
       setLoading(false);
@@ -220,6 +220,9 @@ const CreateAdminTab = () => {
             <option value="lga_support_admin">LGA Support Admin</option>
             <option value="state_support_admin">State Support Admin</option>
             <option value="super_support_admin">Super Support Admin</option>
+          </optgroup>
+          <optgroup label="Recruitment">
+            <option value="recruitment_admin">Recruitment Admin</option>
           </optgroup>
           <optgroup label="Finance">
             <option value="lga_financial_admin">LGA Financial Admin</option>

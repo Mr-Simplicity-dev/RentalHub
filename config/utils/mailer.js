@@ -75,12 +75,13 @@ const sendWithTimeout = async (payload) => {
   ]);
 };
 
-exports.sendEmail = async ({ to, subject, html }) => {
+exports.sendEmail = async ({ to, subject, html, attachments }) => {
   const primaryPayload = {
     from: FROM,
     to,
     subject,
     html,
+    ...(attachments ? { attachments } : {}),
     ...(REPLY_TO ? { replyTo: REPLY_TO } : {}),
   };
 

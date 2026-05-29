@@ -52,6 +52,7 @@ const AdminLayout = () => {
   const isStateFinancialAdmin = role === 'state_financial_admin';
   const isLgaSupportAdmin = role === 'lga_support_admin';
   const isStateSupportAdmin = role === 'state_support_admin';
+  const isRecruitmentAdmin = role === 'recruitment_admin';
   const isFumigationAdmin = ['fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin'].includes(role);
   const isTransportationAdmin = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin'].includes(role);
   const isStateScopedAdmin = [
@@ -247,6 +248,14 @@ const AdminLayout = () => {
           : role === 'super_transportation_admin'
           ? 'Super Transportation Console'
           : 'Transportation Admin',
+      }
+    : isRecruitmentAdmin
+    ? {
+        sidebarBg: 'from-violet-700 to-violet-600',
+        activeNav: 'bg-violet-600 text-white',
+        hoverNav: 'text-gray-700 hover:bg-violet-50',
+        mainBg: 'bg-gradient-to-br from-violet-50 via-white to-violet-100/40',
+        panelTitle: 'Recruitment Admin Console',
       }
     : {
         sidebarBg: 'from-admin-700 to-admin-600',
@@ -507,6 +516,11 @@ const AdminLayout = () => {
                   </span>
                 </NavLink>
 
+                <NavLink to="/super-admin?tab=recruitment" className={() => superAdminNavItem('recruitment')}>
+                  <FaUserShield className="mr-3" />
+                  Recruitment
+                </NavLink>
+
                 <NavLink to="/super-admin?tab=pricing" className={() => superAdminNavItem('pricing')}>
                   <FaMoneyBill className="mr-3" />
                   Pricing
@@ -541,6 +555,21 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin/fumigation-cleaning" className={() => superAdminNavItem('fumigation-cleaning')}>
                   <FaSprayCan className="mr-3" />
                   Fumigation
+                </NavLink>
+              </div>
+            </div>
+          )}
+
+          {isRecruitmentAdmin && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Recruitment
+              </p>
+
+              <div className="space-y-2">
+                <NavLink to="/admin/recruitment" className={navItem}>
+                  <FaUserShield className="mr-3" />
+                  Recruitment Dashboard
                 </NavLink>
               </div>
             </div>

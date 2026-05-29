@@ -29,6 +29,7 @@ const propertyUtilsRoutes = require('./routes/propertyUtils');
 const propertyAlertsRoutes = require('./routes/propertyAlerts');
 const adRoutes = require('./routes/ads');
 const platformRatingRoutes = require('./routes/platformRatings');
+const recruitmentRoutes = require('./routes/recruitment');
 const referralRoutes = require('./routes/referrals');
 const smsDeliveryRoutes = require('./routes/smsDelivery');
 const appLinksRoutes = require('./routes/appLinks');
@@ -441,6 +442,7 @@ app.use('/api/property-utils', propertyUtilsRoutes);
 app.use('/api/property-alerts', propertyAlertsRoutes);
 app.use('/api/ads', adRoutes);
 app.use('/api/platform-ratings', platformRatingRoutes);
+app.use('/api/recruitment', recruitmentRoutes);
 app.use('/api/referrals', referralRoutes);
 
 app.use('/api/disputes', disputesRoutes);

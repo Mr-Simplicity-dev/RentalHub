@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaEnvelope, FaFacebook, FaInstagram, FaLinkedin, FaPhoneAlt, FaTwitter } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import api from '../../services/api';
 
 const Footer = () => {
   const { t } = useTranslation();
   const [mobileContactLinksEnabled, setMobileContactLinksEnabled] = useState(false);
+  const [careerLinkVisible, setCareerLinkVisible] = useState(false);
 
   useEffect(() => {
     const detectMobilePhone = () => {
@@ -29,6 +31,22 @@ const Footer = () => {
     window.addEventListener('resize', updateContactMode);
 
     return () => window.removeEventListener('resize', updateContactMode);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    api.get('/recruitment/status')
+      .then((res) => {
+        if (active) setCareerLinkVisible(Boolean(res.data?.data?.is_active));
+      })
+      .catch(() => {
+        if (active) setCareerLinkVisible(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return (
@@ -65,6 +83,7 @@ const Footer = () => {
               <li><FooterLink to="/about" label={t('footer.about_us')} /></li>
               <li><FooterLink to="/how-it-works" label={t('footer.how')} /></li>
               <li><FooterLink to="/faq" label={t('footer.faq')} /></li>
+              {careerLinkVisible && <li><FooterLink to="/careers" label="Career" /></li>}
             </ul>
           </div>
 

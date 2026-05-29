@@ -40,6 +40,7 @@ const Header = () => {
     if (role === 'tenant') return '/tenant/dashboard';
     if (role === 'super_admin') return '/super-admin';
     if (role === 'super_support_admin') return '/admin/super-support-dashboard';
+    if (role === 'recruitment_admin') return '/admin/recruitment';
     if (role === 'state_support_admin') return '/admin/state-support-dashboard';
     if (role === 'lga_support_admin') return '/admin?tab=property_requests';
     if (role === 'state_admin' || role === 'state_financial_admin' || role === 'admin' || role === 'lga_admin') return '/admin';

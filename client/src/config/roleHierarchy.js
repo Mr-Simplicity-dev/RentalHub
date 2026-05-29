@@ -56,6 +56,12 @@ export const ROLE_META = {
     tier: 'Super',
     reportsTo: 'Super Admin',
   },
+  recruitment_admin: {
+    label: 'Recruitment Admin',
+    department: 'Recruitment',
+    tier: 'Platform',
+    reportsTo: 'Super Admin',
+  },
   lga_financial_admin: {
     label: 'LGA Financial Admin',
     department: 'Finance',
@@ -155,6 +161,7 @@ export const ROLE_GROUPS = {
   lgaSupport: ['lga_support_admin'],
   stateSupport: ['state_support_admin'],
   superSupport: ['super_support_admin'],
+  recruitment: ['recruitment_admin'],
   lgaFinance: ['lga_financial_admin'],
   platformFinance: ['financial_admin'],
   stateFinance: ['state_financial_admin'],
@@ -196,6 +203,7 @@ export const ADMIN_SHELL_ROLES = [
   ...ROLE_GROUPS.lgaSupport,
   ...ROLE_GROUPS.stateSupport,
   ...ROLE_GROUPS.superSupport,
+  ...ROLE_GROUPS.recruitment,
   ...ROLE_GROUPS.lgaFinance,
   ...ROLE_GROUPS.platformFinance,
   ...ROLE_GROUPS.stateFinance,
