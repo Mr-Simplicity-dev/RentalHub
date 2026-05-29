@@ -224,6 +224,10 @@ const Dashboard = () => {
   const [tenantProperties, setTenantProperties] = useState([]);
   const [paidPropertyLocations, setPaidPropertyLocations] = useState([]);
   const [rentSavingsStats, setRentSavingsStats] = useState(null);
+  const [showInspectionModal, setShowInspectionModal] = useState(false);
+  const [propertyInspectionOptions, setPropertyInspectionOptions] = useState([]);
+  const [inspectionForm, setInspectionForm] = useState({ application_id: '', tenant_note: '' });
+  const [inspectionLoading, setInspectionLoading] = useState(false);
 
   // Landlord refund management state
   const [showLandlordRefundModal, setShowLandlordRefundModal] = useState(false);
@@ -324,6 +328,29 @@ const Dashboard = () => {
     }
   }, [user]);
 
+  const loadPropertyInspectionData = useCallback(async () => {
+    if (user?.user_type !== 'tenant') return;
+
+    try {
+      const res = await api.get('/payments/inspection/eligible');
+      const options = res.data?.success ? (res.data.data || []) : [];
+      setPropertyInspectionOptions(options);
+      setInspectionForm((prev) => {
+        const stillAvailable = options.some(
+          (item) => String(item.application_id) === String(prev.application_id)
+        );
+
+        return {
+          ...prev,
+          application_id: stillAvailable ? prev.application_id : (options[0]?.application_id || ''),
+        };
+      });
+    } catch (error) {
+      console.error('Error loading property inspection options:', error);
+      setPropertyInspectionOptions([]);
+    }
+  }, [user]);
+
   const loadLandlordPropertyFeeStatus = useCallback(async () => {
     if (user?.user_type !== 'landlord') return;
 
@@ -393,6 +420,7 @@ const Dashboard = () => {
         await loadTransportationData();
         await loadRentSavingsData();
         await loadPaidPropertyLocations();
+        await loadPropertyInspectionData();
       } else if (user.user_type === 'landlord') {
         await loadLandlordPropertyFeeStatus();
       }
@@ -404,7 +432,7 @@ const Dashboard = () => {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, [loadLandlordPropertyFeeStatus, loadPaidPropertyLocations, loadRentSavingsData, loadTransportationData, user]);
+  }, [loadLandlordPropertyFeeStatus, loadPaidPropertyLocations, loadPropertyInspectionData, loadRentSavingsData, loadTransportationData, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -491,6 +519,46 @@ const Dashboard = () => {
 
     loadDashboardData(true);
   }, [user, navigate, loadDashboardData]);
+
+  useEffect(() => {
+    if (!user || user.user_type !== 'tenant') return undefined;
+
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get('inspection_reference');
+    if (!reference) return undefined;
+
+    let cancelled = false;
+
+    const verifyInspectionPayment = async () => {
+      setInspectionLoading(true);
+      try {
+        const res = await api.get(`/payments/inspection/verify/${reference}`);
+        if (!cancelled && res.data?.success) {
+          toast.success(res.data.message || 'Property inspection request activated');
+          await loadPropertyInspectionData();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(error.response?.data?.message || 'Could not verify inspection payment');
+        }
+      } finally {
+        params.delete('inspection_reference');
+        const nextSearch = params.toString();
+        window.history.replaceState(
+          {},
+          '',
+          `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`
+        );
+        if (!cancelled) setInspectionLoading(false);
+      }
+    };
+
+    verifyInspectionPayment();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadPropertyInspectionData, user]);
 
   // Silent background refresh every 60 seconds + on window focus
   useEffect(() => {
@@ -713,6 +781,45 @@ const Dashboard = () => {
       toast.error(err.response?.data?.message || 'Failed to initialize payment');
     } finally {
       setFundLoading(false);
+    }
+  };
+
+  const openInspectionModal = async () => {
+    setShowInspectionModal(true);
+    await loadPropertyInspectionData();
+  };
+
+  const handleInspectionPayment = async (e) => {
+    e.preventDefault();
+
+    if (!inspectionForm.application_id) {
+      toast.info('Apply for a property first before requesting RentalHub NG inspection.');
+      return;
+    }
+
+    setInspectionLoading(true);
+    try {
+      const res = await api.post('/payments/inspection/initialize', {
+        application_id: inspectionForm.application_id,
+        tenant_note: inspectionForm.tenant_note,
+      });
+
+      if (res.data?.data?.already_requested) {
+        toast.info(res.data.message || 'Inspection request already activated for this property');
+        await loadPropertyInspectionData();
+        return;
+      }
+
+      if (res.data?.success && res.data.data?.authorization_url) {
+        window.location.href = res.data.data.authorization_url;
+        return;
+      }
+
+      toast.error(res.data?.message || 'Failed to initialize inspection payment');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to initialize inspection payment');
+    } finally {
+      setInspectionLoading(false);
     }
   };
 
@@ -1214,6 +1321,12 @@ const Dashboard = () => {
         rent_paid: false,
       }];
   const hasActivePropertyLocation = propertyLocationCards.some(canOpenPropertyMap);
+  const hasPropertyInspectionOptions = propertyInspectionOptions.length > 0;
+  const inspectionFeeAmount = Number(propertyInspectionOptions[0]?.inspection_amount || 10000);
+  const selectedInspectionOption =
+    propertyInspectionOptions.find(
+      (item) => String(item.application_id) === String(inspectionForm.application_id)
+    ) || propertyInspectionOptions[0] || null;
   const refundCountdown = getCountdownInfo(stats?.next_refund_due_at, 'Refund due in');
   const graceCountdown = getCountdownInfo(stats?.next_grace_ends_at, 'Grace ends in', 'Grace expired by');
   const tenantGraceStatValue = stats?.grace_period_requests_count || 0;
@@ -1719,6 +1832,27 @@ const Dashboard = () => {
                 onClick={() => navigate('/fumigation-cleaning/catalog')}
               />
               <QuickActionCard
+                title="Inspection Fee"
+                description={
+                  hasPropertyInspectionOptions
+                    ? 'Let RentalHub NG inspect an applied property against the landlord description'
+                    : 'Activated after you apply for a property'
+                }
+                icon={<FaUserCheck />}
+                onClick={openInspectionModal}
+                note={
+                  hasPropertyInspectionOptions
+                    ? `₦${inspectionFeeAmount.toLocaleString()}`
+                    : 'Apply first'
+                }
+                noteClass={
+                  hasPropertyInspectionOptions
+                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                    : 'bg-gray-100 text-gray-600 border-gray-200'
+                }
+                disabled={!hasPropertyInspectionOptions}
+              />
+              <QuickActionCard
                 title="Request a Refund"
                 description="Request a refund on any rent payment you made to a landlord"
                 icon={<FaUndo />}
@@ -1811,6 +1945,151 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+
+      {/* PROPERTY INSPECTION FEE MODAL (tenant only) */}
+      {showInspectionModal && user?.user_type === 'tenant' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b px-5 py-5 sm:px-6">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-emerald-100 p-3 text-emerald-700">
+                  <FaUserCheck className="text-xl" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Inspection Fee</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    RentalHub NG can inspect a property you applied for and confirm it matches the landlord's description.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInspectionModal(false)}
+                className="shrink-0 text-gray-400 hover:text-gray-600"
+                aria-label="Close inspection fee modal"
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+
+            <div className="px-5 py-5 sm:px-6">
+              {!hasPropertyInspectionOptions ? (
+                <div className="space-y-4 text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                    <FaLock className="text-xl" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900">Apply for a property first</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      This inspection card becomes active after you submit a property application.
+                      Once active, you can pay ₦10,000 for RentalHub NG to inspect the property on your behalf.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowInspectionModal(false);
+                      navigate('/properties');
+                    }}
+                    className="btn btn-primary w-full sm:w-auto"
+                  >
+                    Browse Properties
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleInspectionPayment} className="space-y-5">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    <p className="font-semibold">Inspection fee: ₦{inspectionFeeAmount.toLocaleString()}</p>
+                    <p className="mt-1">
+                      Use this when your schedule is tight and you want RentalHub NG to verify the property condition,
+                      location, and advertised details before you continue.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Select Applied Property
+                    </label>
+                    <select
+                      value={inspectionForm.application_id}
+                      onChange={(e) => setInspectionForm((prev) => ({ ...prev, application_id: e.target.value }))}
+                      className="input w-full"
+                      required
+                    >
+                      {propertyInspectionOptions.map((item) => (
+                        <option key={item.application_id} value={item.application_id}>
+                          {item.property_title} - {item.area || item.city || 'Location'} ({item.application_status})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedInspectionOption && (
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-900">{selectedInspectionOption.property_title}</p>
+                          <p className="mt-1">
+                            {[selectedInspectionOption.area, selectedInspectionOption.city, selectedInspectionOption.state_name]
+                              .filter(Boolean)
+                              .join(', ') || selectedInspectionOption.full_address || 'Property location'}
+                          </p>
+                        </div>
+                        {selectedInspectionOption.inspection_status && (
+                          <span className="w-fit rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-xs font-semibold capitalize text-emerald-700">
+                            {String(selectedInspectionOption.inspection_status).replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Note for inspection team <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={inspectionForm.tenant_note}
+                      onChange={(e) => setInspectionForm((prev) => ({ ...prev, tenant_note: e.target.value }))}
+                      className="input w-full resize-none"
+                      maxLength={1000}
+                      placeholder="Mention what you want the inspection team to pay close attention to..."
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => setShowInspectionModal(false)}
+                      className="btn w-full"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={
+                        inspectionLoading ||
+                        !inspectionForm.application_id ||
+                        (selectedInspectionOption?.inspection_status &&
+                          selectedInspectionOption.inspection_status !== 'pending_payment')
+                      }
+                      className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {inspectionLoading
+                        ? 'Processing...'
+                        : selectedInspectionOption?.inspection_status &&
+                            selectedInspectionOption.inspection_status !== 'pending_payment'
+                          ? 'Inspection Activated'
+                          : `Pay ₦${inspectionFeeAmount.toLocaleString()}`}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* REFUND REQUEST MODAL (tenant only) */}
       {showRefundModal && user?.user_type === 'tenant' && (
@@ -3116,8 +3395,22 @@ const ActivityItem = ({ activity }) => {
 };
 
 // Quick Action Card Component
-const QuickActionCard = ({ title, description, icon, onClick, note, noteClass = 'bg-gray-100 text-gray-700 border-gray-200' }) => (
-  <div onClick={onClick} className="card cursor-pointer text-center">
+const QuickActionCard = ({
+  title,
+  description,
+  icon,
+  onClick,
+  note,
+  noteClass = 'bg-gray-100 text-gray-700 border-gray-200',
+  disabled = false,
+}) => (
+  <div
+    onClick={onClick}
+    className={`card cursor-pointer text-center transition ${
+      disabled ? 'border-gray-200 bg-gray-50 opacity-80' : 'hover:-translate-y-0.5'
+    }`}
+    aria-disabled={disabled}
+  >
     <div className="text-4xl text-primary-600 mb-3">{icon}</div>
     <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>
     <p className="text-sm text-gray-600">{description}</p>

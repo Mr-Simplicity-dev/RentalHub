@@ -12,6 +12,7 @@
     "@testing-library/user-event": "^13.5.0",
     "ajv": "^8.20.0",
     "ajv-keywords": "^5.1.0",
+    "face-api.js": "^0.22.2",
     "framer-motion": "^10.18.0",
     "i18next": "^25.8.0",
     "qrcode.react": "^4.2.0",

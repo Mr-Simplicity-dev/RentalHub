@@ -36,6 +36,7 @@ const MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN = 200;
 const TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_BASE_AMOUNT_NGN = 5000;
 const TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_TARGET = 'tenant_multiple_property_subscription';
 const TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_PAYMENT_TYPE = 'tenant_multiple_property_subscription';
+const PROPERTY_INSPECTION_FEE_NGN = Number(process.env.PROPERTY_INSPECTION_FEE_NGN || 10000);
 const SUBSCRIPTION_PRICING_TARGETS = {
   tenant: 'tenant_monthly_subscription',
   landlord: 'landlord_monthly_subscription',
@@ -46,6 +47,7 @@ const SUBSCRIPTION_PAYMENT_TYPES = {
 };
 
 let propertyUnlockSchemaReady = false;
+let propertyInspectionSchemaReady = false;
 let walletLedgerSchemaReady = false;
 let internalSubscriptionSchemaReady = false;
 let bankCache = {
@@ -96,6 +98,83 @@ const ensureWalletLedgerSchema = async () => {
   walletLedgerSchemaReady = true;
 };
 
+const ensurePropertyInspectionSchema = async () => {
+  if (propertyInspectionSchemaReady) return;
+
+  await db.query(`
+    DO $$
+    DECLARE
+      existing_check_name TEXT;
+    BEGIN
+      SELECT c.conname
+        INTO existing_check_name
+      FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+      WHERE t.relname = 'payments'
+        AND c.contype = 'c'
+        AND pg_get_constraintdef(c.oid) ILIKE '%payment_type%';
+
+      IF existing_check_name IS NOT NULL THEN
+        EXECUTE format('ALTER TABLE payments DROP CONSTRAINT %I', existing_check_name);
+      END IF;
+    END $$;
+
+    ALTER TABLE payments
+      ADD CONSTRAINT payments_payment_type_check
+      CHECK (
+        payment_type IN (
+          'tenant_subscription',
+          'tenant_multiple_property_subscription',
+          'landlord_subscription',
+          'landlord_listing',
+          'rent_payment',
+          'property_unlock',
+          'property_inspection_fee',
+          'general_platform_fee',
+          'registration_fee',
+          'wallet_funding',
+          'tenant_property_alert',
+          'tenant_location_access',
+          'evidence_verification',
+          'lawyer_directory_unlock',
+          'lawyer_access_fee',
+          'agent_access_fee',
+          'transportation_booking'
+        )
+      );
+
+    CREATE TABLE IF NOT EXISTS property_inspection_requests (
+      id SERIAL PRIMARY KEY,
+      tenant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+      application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+      payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+      amount NUMERIC(12,2) NOT NULL DEFAULT 10000,
+      status VARCHAR(30) NOT NULL DEFAULT 'pending_payment',
+      tenant_note TEXT,
+      inspection_summary TEXT,
+      assigned_admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      requested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      paid_at TIMESTAMP,
+      completed_at TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT property_inspection_requests_status_check
+        CHECK (status IN ('pending_payment', 'paid', 'assigned', 'inspecting', 'completed', 'cancelled'))
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_property_inspection_requests_application
+      ON property_inspection_requests(application_id);
+
+    CREATE INDEX IF NOT EXISTS idx_property_inspection_requests_tenant
+      ON property_inspection_requests(tenant_id, status, requested_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_property_inspection_requests_property
+      ON property_inspection_requests(property_id);
+  `);
+
+  propertyInspectionSchemaReady = true;
+};
+
 const ensureInternalSubscriptionSchema = async () => {
   if (internalSubscriptionSchemaReady) return;
 
@@ -116,6 +195,7 @@ const ensureInternalSubscriptionSchema = async () => {
           'landlord_listing',
           'rent_payment',
           'property_unlock',
+          'property_inspection_fee',
           'general_platform_fee',
           'registration_fee',
           'wallet_funding',
@@ -1675,6 +1755,314 @@ exports.getPropertyUnlockStatus = async (req, res) => {
   }
 };
 
+exports.getPropertyInspectionOptions = async (req, res) => {
+  try {
+    await ensurePropertyInspectionSchema();
+
+    const userId = req.user.id;
+    const result = await db.query(
+      `SELECT
+         a.id AS application_id,
+         a.status AS application_status,
+         a.created_at AS applied_at,
+         p.id AS property_id,
+         p.title AS property_title,
+         p.rent_amount,
+         p.payment_frequency,
+         p.city,
+         p.area,
+         p.lga_name,
+         p.full_address,
+         s.state_name,
+         pir.id AS inspection_request_id,
+         pir.status AS inspection_status,
+         COALESCE(pir.amount, $2::numeric) AS inspection_amount,
+         pir.tenant_note AS inspection_note,
+         pir.requested_at AS inspection_requested_at,
+         pir.paid_at AS inspection_paid_at,
+         pay.transaction_reference AS inspection_reference,
+         pay.payment_status AS inspection_payment_status
+       FROM applications a
+       JOIN properties p ON p.id = a.property_id
+       LEFT JOIN states s ON s.id = p.state_id
+       LEFT JOIN property_inspection_requests pir
+         ON pir.application_id = a.id AND pir.tenant_id = a.tenant_id
+       LEFT JOIN payments pay ON pay.id = pir.payment_id
+       WHERE a.tenant_id = $1
+         AND a.status <> 'withdrawn'
+       ORDER BY a.created_at DESC`,
+      [userId, PROPERTY_INSPECTION_FEE_NGN]
+    );
+
+    return res.json({
+      success: true,
+      data: result.rows,
+      meta: {
+        amount: PROPERTY_INSPECTION_FEE_NGN,
+        currency: 'NGN',
+      },
+    });
+  } catch (error) {
+    console.error('Property inspection options error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load property inspection options',
+    });
+  }
+};
+
+exports.initializePropertyInspectionPayment = async (req, res) => {
+  try {
+    await ensurePropertyInspectionSchema();
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    if (!PAYSTACK_SECRET_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment service is not configured',
+      });
+    }
+
+    const userId = req.user.id;
+    const applicationId = Number(req.body.application_id);
+    const tenantNote = String(req.body.tenant_note || '').trim() || null;
+
+    const applicationResult = await db.query(
+      `SELECT
+         a.id AS application_id,
+         a.status AS application_status,
+         p.id AS property_id,
+         p.title AS property_title,
+         p.full_address,
+         p.city,
+         p.area,
+         p.lga_name,
+         s.state_name,
+         u.email,
+         u.full_name
+       FROM applications a
+       JOIN properties p ON p.id = a.property_id
+       LEFT JOIN states s ON s.id = p.state_id
+       JOIN users u ON u.id = a.tenant_id
+       WHERE a.id = $1
+         AND a.tenant_id = $2
+         AND a.status <> 'withdrawn'`,
+      [applicationId, userId]
+    );
+
+    if (!applicationResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Apply for the property first before requesting RentalHub NG inspection',
+      });
+    }
+
+    const application = applicationResult.rows[0];
+
+    const existingResult = await db.query(
+      `SELECT pir.*, pay.transaction_reference, pay.payment_status
+       FROM property_inspection_requests pir
+       LEFT JOIN payments pay ON pay.id = pir.payment_id
+       WHERE pir.application_id = $1
+         AND pir.tenant_id = $2`,
+      [applicationId, userId]
+    );
+    const existing = existingResult.rows[0];
+
+    if (existing && existing.status !== 'pending_payment') {
+      return res.json({
+        success: true,
+        message: 'Inspection request already activated for this property',
+        data: {
+          already_requested: true,
+          status: existing.status,
+          reference: existing.transaction_reference,
+          amount: existing.amount,
+        },
+      });
+    }
+
+    const paymentResult = await db.query(
+      `INSERT INTO payments (
+         user_id, payment_type, amount, currency,
+         property_id, payment_method, payment_status
+       )
+       VALUES ($1, 'property_inspection_fee', $2, 'NGN', $3, 'paystack', 'pending')
+       RETURNING id`,
+      [userId, PROPERTY_INSPECTION_FEE_NGN, application.property_id]
+    );
+    const paymentId = paymentResult.rows[0].id;
+    const reference = `INSPECTION_${userId}_${applicationId}_${paymentId}_${Date.now()}`;
+
+    await db.query(
+      'UPDATE payments SET transaction_reference = $1 WHERE id = $2',
+      [reference, paymentId]
+    );
+
+    await db.query(
+      `INSERT INTO property_inspection_requests (
+         tenant_id, property_id, application_id, payment_id, amount, status, tenant_note
+       )
+       VALUES ($1, $2, $3, $4, $5, 'pending_payment', $6)
+       ON CONFLICT (application_id)
+       DO UPDATE SET
+         payment_id = EXCLUDED.payment_id,
+         amount = EXCLUDED.amount,
+         status = 'pending_payment',
+         tenant_note = EXCLUDED.tenant_note,
+         updated_at = CURRENT_TIMESTAMP`,
+      [
+        userId,
+        application.property_id,
+        applicationId,
+        paymentId,
+        PROPERTY_INSPECTION_FEE_NGN,
+        tenantNote,
+      ]
+    );
+
+    const paystackResponse = await axios.post(
+      `${PAYSTACK_BASE_URL}/transaction/initialize`,
+      {
+        email: application.email,
+        amount: PROPERTY_INSPECTION_FEE_NGN * 100,
+        reference,
+        callback_url: `${FRONTEND_URL}/tenant/dashboard?inspection_reference=${encodeURIComponent(reference)}`,
+        metadata: {
+          payment_id: paymentId,
+          user_id: userId,
+          property_id: application.property_id,
+          application_id: applicationId,
+          payment_type: 'property_inspection_fee',
+          full_name: application.full_name,
+          property_title: application.property_title,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Property inspection payment initialized',
+      data: {
+        payment_id: paymentId,
+        property_id: application.property_id,
+        application_id: applicationId,
+        amount: PROPERTY_INSPECTION_FEE_NGN,
+        authorization_url: paystackResponse.data.data.authorization_url,
+        access_code: paystackResponse.data.data.access_code,
+        reference: paystackResponse.data.data.reference,
+      },
+    });
+  } catch (error) {
+    console.error('Property inspection initialization error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to initialize property inspection payment',
+      error: error.message,
+    });
+  }
+};
+
+exports.verifyPropertyInspectionPayment = async (req, res) => {
+  try {
+    await ensurePropertyInspectionSchema();
+
+    const { reference } = req.params;
+    const userId = req.user.id;
+
+    const paymentResult = await db.query(
+      `SELECT *
+       FROM payments
+       WHERE transaction_reference = $1
+         AND user_id = $2
+         AND payment_type = 'property_inspection_fee'`,
+      [reference, userId]
+    );
+
+    if (!paymentResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Property inspection payment not found',
+      });
+    }
+
+    const payment = paymentResult.rows[0];
+    let transaction = payment.gateway_response || null;
+
+    if (payment.payment_status !== 'completed') {
+      if (!PAYSTACK_SECRET_KEY) {
+        return res.status(500).json({
+          success: false,
+          message: 'Payment service is not configured',
+        });
+      }
+
+      const paystackResponse = await axios.get(
+        `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
+        { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } }
+      );
+
+      transaction = paystackResponse.data.data;
+      if (transaction.status !== 'success') {
+        return res.status(402).json({
+          success: false,
+          message: 'Payment not completed yet',
+          status: transaction.status,
+        });
+      }
+
+      await db.query(
+        `UPDATE payments
+         SET payment_status = 'completed',
+             completed_at = CURRENT_TIMESTAMP,
+             gateway_response = $1
+         WHERE id = $2`,
+        [JSON.stringify(transaction), payment.id]
+      );
+    }
+
+    await db.query(
+      `UPDATE property_inspection_requests
+       SET status = CASE
+             WHEN status = 'pending_payment' THEN 'paid'
+             ELSE status
+           END,
+           paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE payment_id = $1
+         AND tenant_id = $2`,
+      [payment.id, userId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Property inspection request activated',
+      data: {
+        property_id: payment.property_id,
+        amount: payment.amount,
+        reference,
+        gateway_status: transaction?.status || 'completed',
+      },
+    });
+  } catch (error) {
+    console.error('Property inspection verification error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify property inspection payment',
+    });
+  }
+};
+
 exports.getTenantLocationAccessQuote = async (req, res) => {
   try {
     const { state_id, lga_name } = req.query;
@@ -3000,6 +3388,20 @@ exports.retryPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
     const user = userResult.rows[0];
+    let inspectionRequest = null;
+
+    if (payment.payment_type === 'property_inspection_fee') {
+      await ensurePropertyInspectionSchema();
+      const inspectionResult = await db.query(
+        `SELECT application_id
+         FROM property_inspection_requests
+         WHERE payment_id = $1
+           AND tenant_id = $2
+         LIMIT 1`,
+        [payment.id, userId]
+      );
+      inspectionRequest = inspectionResult.rows[0] || null;
+    }
 
     // Create a new payment record for this retry attempt
     const newPaymentResult = await db.query(
@@ -3019,22 +3421,37 @@ exports.retryPayment = async (req, res) => {
     const newPaymentId = newPaymentResult.rows[0].id;
 
         // Determine callback URL and reference prefix based on payment type
-    const CALLBACK_MAP = {
-      rent_payment:       `${FRONTEND_URL}/payment/verify-rent`,
-      tenant_subscription:`${FRONTEND_URL}/payment/verify-subscription`,
-      property_unlock:    `${FRONTEND_URL}/properties/${payment.property_id || ''}`,
-      wallet_funding:     `${FRONTEND_URL}/payment/verify-wallet-funding`,
-      landlord_listing:   `${FRONTEND_URL}/payment/verify-listing`,
-    };
     const REF_PREFIX_MAP = {
       rent_payment:       'RETRY_RENT',
       tenant_subscription:'RETRY_SUB',
       property_unlock:    'RETRY_UNLOCK',
       wallet_funding:     'RETRY_WALLET',
       landlord_listing:   'RETRY_LIST',
+      property_inspection_fee: 'RETRY_INSPECTION',
+    };
+    const refPrefix = REF_PREFIX_MAP[payment.payment_type] || 'RETRY';
+    const retryReference = `${refPrefix}_${newPaymentId}_${Date.now()}`;
+    const CALLBACK_MAP = {
+      rent_payment:       `${FRONTEND_URL}/payment/verify-rent`,
+      tenant_subscription:`${FRONTEND_URL}/payment/verify-subscription`,
+      property_unlock:    `${FRONTEND_URL}/properties/${payment.property_id || ''}`,
+      wallet_funding:     `${FRONTEND_URL}/payment/verify-wallet-funding`,
+      landlord_listing:   `${FRONTEND_URL}/payment/verify-listing`,
+      property_inspection_fee: `${FRONTEND_URL}/tenant/dashboard?inspection_reference=${encodeURIComponent(retryReference)}`,
     };
     const callbackUrl = CALLBACK_MAP[payment.payment_type] || `${FRONTEND_URL}/payment/verify-rent`;
-    const refPrefix = REF_PREFIX_MAP[payment.payment_type] || 'RETRY';
+
+    if (inspectionRequest?.application_id) {
+      await db.query(
+        `UPDATE property_inspection_requests
+         SET payment_id = $1,
+             status = 'pending_payment',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE application_id = $2
+           AND tenant_id = $3`,
+        [newPaymentId, inspectionRequest.application_id, userId]
+      );
+    }
 
     // Initialize Paystack transaction
     const paystackResponse = await axios.post(
@@ -3042,13 +3459,14 @@ exports.retryPayment = async (req, res) => {
       {
         email: user.email,
         amount: Number(payment.amount) * 100,
-        reference: `${refPrefix}_${newPaymentId}_${Date.now()}`,
+        reference: retryReference,
         callback_url: callbackUrl,
         metadata: {
           payment_id: newPaymentId,
           original_payment_id: payment.id,
           user_id: userId,
           property_id: payment.property_id,
+          application_id: inspectionRequest?.application_id || null,
           payment_type: payment.payment_type,
           tenant_name: user.full_name,
           property_title: payment.property_title,
@@ -3199,6 +3617,27 @@ async function handleSuccessfulPayment(data) {
            transaction_reference = EXCLUDED.transaction_reference,
            unlocked_at = CURRENT_TIMESTAMP`,
         [metadata.user_id, metadata.property_id, paymentId, reference]
+      );
+    }
+
+    if (metadata.payment_type === 'property_inspection_fee') {
+      await ensurePropertyInspectionSchema();
+
+      await db.query(
+        `UPDATE property_inspection_requests
+         SET status = CASE
+               WHEN status = 'pending_payment' THEN 'paid'
+               ELSE status
+             END,
+             paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE payment_id = $1
+            OR (
+              tenant_id = $2
+              AND application_id = $3
+              AND status = 'pending_payment'
+            )`,
+        [paymentId, metadata.user_id, metadata.application_id]
       );
     }
 

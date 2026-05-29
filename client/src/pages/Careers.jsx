@@ -5,16 +5,79 @@ import {
   FaBriefcase,
   FaCalendarAlt,
   FaCheck,
+  FaCheckCircle,
   FaCopy,
   FaDownload,
+  FaExclamationTriangle,
   FaFileUpload,
+  FaHourglassHalf,
   FaLock,
   FaMicrophone,
+  FaMicrophoneAlt,
+  FaShieldAlt,
+  FaSpinner,
   FaTimes,
+  FaUser,
+  FaUserFriends,
   FaVideo,
+  FaVideoSlash,
 } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+
+// ============================================================
+// Interview Constants
+// ============================================================
+const QUESTION_TIME_LIMIT_SECONDS = 30;
+const FACE_DETECTION_INTERVAL_MS = 800;
+const MIN_FACE_CONFIDENCE = 0.65;
+const CONSECUTIVE_FACE_VIOLATIONS = 3;
+
+// ============================================================
+// face-api.js Global References (loaded from CDN)
+// ============================================================
+let faceApiLoaded = false;
+let faceApiLoading = null;
+
+const loadFaceApi = () => {
+  if (faceApiLoaded) return Promise.resolve(true);
+  if (faceApiLoading) return faceApiLoading;
+
+  faceApiLoading = new Promise((resolve) => {
+    // Check if already available
+    if (typeof window !== 'undefined' && window.faceapi) {
+      faceApiLoaded = true;
+      resolve(true);
+      return;
+    }
+
+    // Load face-api.js script dynamically from CDN
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+    script.async = true;
+    script.onload = async () => {
+      try {
+        // Load tiny face detector model from CDN
+        await window.faceapi.nets.tinyFaceDetector.loadFromUri(
+          'https://cdn.jsdelivr.net/npm/@xkeshi/face-api.js-models@0.0.1/models/tiny_face_detector'
+        );
+        faceApiLoaded = true;
+        resolve(true);
+      } catch (err) {
+        console.warn('face-api.js models failed to load, falling back to motion detection', err);
+        resolve(false);
+      }
+    };
+    script.onerror = () => {
+      console.warn('face-api.js CDN unavailable, falling back to motion detection');
+      resolve(false);
+    };
+    document.head.appendChild(script);
+  });
+
+  return faceApiLoading;
+};
 
 const EMPTY_FORM = {
   role_id: '',
@@ -84,21 +147,29 @@ export default function Careers() {
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  // ─── Interview State ───────────────────────────────────────
   const [phoneCheck, setPhoneCheck] = useState('');
   const [interviewMode, setInterviewMode] = useState(false);
   const [interviewQuestions, setInterviewQuestions] = useState([]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [spokenAnswer, setSpokenAnswer] = useState('');
   const [interviewLocked, setInterviewLocked] = useState(false);
+  const [questionTimeLeft, setQuestionTimeLeft] = useState(QUESTION_TIME_LIMIT_SECONDS);
+  const [faceDetectionReady, setFaceDetectionReady] = useState(false);
+  const [faceStatus, setFaceStatus] = useState({ faces: 0, status: 'idle' }); // idle | monitoring | violation | locked
+  const [interviewStarting, setInterviewStarting] = useState(false);
 
+  // ─── Refs ──────────────────────────────────────────────────
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
-  const motionCanvasRef = useRef(null);
-  const lastFrameRef = useRef(null);
-  const violationCountRef = useRef(0);
-  const motionTimerRef = useRef(null);
+  const faceCanvasRef = useRef(null);
+  const faceDetectionTimerRef = useRef(null);
+  const questionTimerRef = useRef(null);
+  const consecutiveNoFaceRef = useRef(0);
+  const consecutiveMultiFaceRef = useRef(0);
+  const interviewLockedRef = useRef(false);
 
   const selectedRole = useMemo(
     () => roles.find((role) => String(role.id) === String(form.role_id)),
@@ -202,6 +273,10 @@ export default function Careers() {
   }, [isAuthenticated, loadMyApplication, searchParams, setSearchParams]);
 
   useEffect(() => {
+    // Pre-load face-api models in the background
+    loadFaceApi().then((ready) => {
+      if (ready) setFaceDetectionReady(true);
+    });
     return () => {
       stopInterviewMedia();
     };
@@ -309,40 +384,89 @@ export default function Careers() {
     toast.success('Access code copied');
   };
 
-  const detectMotion = async () => {
+  // ─── Face Detection ──────────────────────────────────────
+  const detectFaceWithApi = async () => {
     const video = videoRef.current;
-    if (!video || video.readyState < 2 || interviewLocked) return;
-    const canvas = motionCanvasRef.current || document.createElement('canvas');
-    motionCanvasRef.current = canvas;
-    canvas.width = 96;
-    canvas.height = 72;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const frame = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    if (!video || video.readyState < 2 || interviewLockedRef.current) return;
 
-    if (lastFrameRef.current) {
-      let diff = 0;
-      for (let i = 0; i < frame.length; i += 16) {
-        diff += Math.abs(frame[i] - lastFrameRef.current[i]);
+    try {
+      if (typeof window === 'undefined' || !window.faceapi || !window.faceapi.detectAllFaces) {
+        // Fall back to basic motion detection
+        return;
       }
-      const score = diff / (frame.length / 16);
-      if (score > 42) {
-        violationCountRef.current += 1;
+
+      const detections = await window.faceapi
+        .detectAllFaces(video, new window.faceapi.TinyFaceDetectorOptions({
+          inputSize: 224,
+          scoreThreshold: MIN_FACE_CONFIDENCE,
+        }));
+
+      const faceCount = detections.length;
+
+      // Multiple faces → other person in frame → disqualify
+      if (faceCount > 1) {
+        consecutiveMultiFaceRef.current += 1;
+        consecutiveNoFaceRef.current = 0;
+        if (consecutiveMultiFaceRef.current >= 2) {
+          setFaceStatus({ faces: faceCount, status: 'violation' });
+          await reportInterviewViolation('multiple_faces', `Detected ${faceCount} faces in frame`);
+          return;
+        }
       } else {
-        violationCountRef.current = Math.max(violationCountRef.current - 1, 0);
+        consecutiveMultiFaceRef.current = 0;
       }
 
-      if (violationCountRef.current >= 5) {
-        await reportInterviewViolation('unusual_movement', `Motion score exceeded safety threshold (${Math.round(score)})`);
+      // Zero faces → candidate left frame
+      if (faceCount === 0) {
+        consecutiveNoFaceRef.current += 1;
+        if (consecutiveNoFaceRef.current >= CONSECUTIVE_FACE_VIOLATIONS) {
+          setFaceStatus({ faces: 0, status: 'violation' });
+          await reportInterviewViolation('candidate_left_frame', 'No face detected for multiple frames');
+          return;
+        }
+      } else {
+        consecutiveNoFaceRef.current = 0;
       }
+
+      setFaceStatus({ faces: faceCount, status: faceCount === 1 ? 'monitoring' : 'warning' });
+    } catch (err) {
+      // Silently skip detection errors (e.g., model not loaded yet)
     }
-
-    lastFrameRef.current = frame;
   };
 
+  // ─── Question Timer ─────────────────────────────────────
+  const startQuestionTimer = useCallback(() => {
+    if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+
+    setQuestionTimeLeft(QUESTION_TIME_LIMIT_SECONDS);
+
+    questionTimerRef.current = setInterval(() => {
+      setQuestionTimeLeft((prev) => {
+        if (prev <= 1) {
+          // Time's up - auto-skip
+          clearInterval(questionTimerRef.current);
+          questionTimerRef.current = null;
+          // Submit empty answer to trigger next question
+          submitEmptyAnswer();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [questionIndex, interviewQuestions]);
+
+  // ─── Report Violation ──────────────────────────────────
   const reportInterviewViolation = async (type, details) => {
-    if (interviewLocked) return;
+    if (interviewLockedRef.current) return;
+    interviewLockedRef.current = true;
     setInterviewLocked(true);
+    setFaceStatus((prev) => ({ ...prev, status: 'locked' }));
+
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current);
+      questionTimerRef.current = null;
+    }
+
     try {
       await api.post('/recruitment/interview/violation', {
         violation_type: type,
@@ -357,10 +481,16 @@ export default function Careers() {
     }
   };
 
+  // ─── Stop Media ────────────────────────────────────────
   const stopInterviewMedia = () => {
-    if (motionTimerRef.current) {
-      clearInterval(motionTimerRef.current);
-      motionTimerRef.current = null;
+    if (faceDetectionTimerRef.current) {
+      clearInterval(faceDetectionTimerRef.current);
+      faceDetectionTimerRef.current = null;
+    }
+
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current);
+      questionTimerRef.current = null;
     }
 
     if (recorderRef.current && recorderRef.current.state !== 'inactive') {
@@ -376,6 +506,7 @@ export default function Careers() {
     recorderRef.current = null;
   };
 
+  // ─── Start Interview ───────────────────────────────────
   const startInterview = async () => {
     if (!application) return;
     if (normalize(phoneCheck) !== normalize(application.phone_number)) {
@@ -383,6 +514,7 @@ export default function Careers() {
       return;
     }
 
+    setInterviewStarting(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
@@ -400,22 +532,71 @@ export default function Careers() {
       };
       recorder.start(1000);
 
+      // Wait for video to be ready
+      await new Promise((resolve) => {
+        const check = () => {
+          if (videoRef.current?.readyState >= 2) resolve();
+          else setTimeout(check, 200);
+        };
+        check();
+      });
+
+      // Load face-api
+      const faceReady = await loadFaceApi();
+      setFaceDetectionReady(faceReady);
+
+      if (faceReady) {
+        setFaceStatus({ faces: 0, status: 'monitoring' });
+        // Start face detection
+        faceDetectionTimerRef.current = setInterval(detectFaceWithApi, FACE_DETECTION_INTERVAL_MS);
+      } else {
+        setFaceStatus({ faces: 0, status: 'idle' });
+      }
+
       const res = await api.get('/recruitment/interview/start');
       setInterviewQuestions(res.data?.data?.questions || []);
       setQuestionIndex(0);
       setInterviewMode(true);
+      interviewLockedRef.current = false;
       setInterviewLocked(false);
-      violationCountRef.current = 0;
-      motionTimerRef.current = setInterval(detectMotion, 1200);
+      consecutiveNoFaceRef.current = 0;
+      consecutiveMultiFaceRef.current = 0;
     } catch (error) {
       toast.error(error.response?.data?.message || error.message || 'Camera and microphone permission is required');
       stopInterviewMedia();
+    } finally {
+      setInterviewStarting(false);
     }
   };
 
+  // ─── Submit Answer (with empty timeout) ─────────────────
+  const submitEmptyAnswer = useCallback(async () => {
+    const question = interviewQuestions[questionIndex];
+    if (!question || interviewLockedRef.current) return;
+    try {
+      await api.post('/recruitment/interview/answer', {
+        question_id: question.id,
+        answer: 'X', // X marks timed-out/unanswered
+      });
+      if (questionIndex + 1 >= interviewQuestions.length) {
+        await completeInterview();
+      } else {
+        setQuestionIndex((prev) => prev + 1);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to submit answer');
+    }
+  }, [questionIndex, interviewQuestions]);
+
   const submitInterviewAnswer = async (answer) => {
     const question = interviewQuestions[questionIndex];
-    if (!question || interviewLocked) return;
+    if (!question || interviewLockedRef.current) return;
+
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current);
+      questionTimerRef.current = null;
+    }
+
     try {
       await api.post('/recruitment/interview/answer', {
         question_id: question.id,
@@ -432,6 +613,17 @@ export default function Careers() {
     }
   };
 
+  // ─── Start timer when question changes ─────────────────
+  useEffect(() => {
+    if (interviewMode && !interviewLocked && interviewQuestions.length > 0) {
+      startQuestionTimer();
+    }
+    return () => {
+      if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+    };
+  }, [questionIndex, interviewMode, interviewLocked, interviewQuestions.length, startQuestionTimer]);
+
+  // ─── Speech Recognition ────────────────────────────────
   const listenForAnswer = () => {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Recognition) {
@@ -454,10 +646,11 @@ export default function Careers() {
     recognition.start();
   };
 
+  // ─── Complete Interview ────────────────────────────────
   const completeInterview = async () => {
     try {
       await api.post('/recruitment/interview/complete');
-      toast.success('Interview completed');
+      toast.success('Interview completed successfully');
       stopInterviewMedia();
       await new Promise((resolve) => setTimeout(resolve, 500));
       await uploadRecording();
@@ -474,7 +667,7 @@ export default function Careers() {
     const blob = new Blob(chunks, { type: 'video/webm' });
     const formData = new FormData();
     formData.append('recording', blob, `recruitment-interview-${Date.now()}.webm`);
-    formData.append('violation_log', interviewLocked ? 'Interview locked by motion monitor' : '');
+    formData.append('violation_log', interviewLocked ? 'Interview locked by proctoring' : '');
     try {
       await api.post('/recruitment/interview/recording', formData);
     } catch (error) {
@@ -483,38 +676,64 @@ export default function Careers() {
   };
 
   const renderClosed = () => (
-    <section className="mx-auto flex min-h-[58vh] max-w-3xl items-center px-4 py-12">
-      <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-          <FaLock />
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="mx-auto flex min-h-[58vh] max-w-3xl items-center px-4 py-12"
+    >
+      <div className="w-full rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-sm p-8 text-center shadow-elevated-lg sm:p-12">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-400 shadow-inner">
+          <FaLock className="text-2xl" />
         </div>
-        <h1 className="text-2xl font-bold text-slate-900">Recruitment is currently closed</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Career applications are not open right now. When Super Admin reopens recruitment, the Career link will appear in the footer.
+        <h1 className="text-3xl font-black text-slate-900">Recruitment is currently closed</h1>
+        <p className="mt-3 max-w-lg mx-auto text-base leading-7 text-slate-500">
+          Career applications are not open right now. When the recruitment cycle reopens, the Career link will appear in the footer and you'll be able to apply.
         </p>
+        <div className="mt-8 flex justify-center gap-3">
+          <Link to="/" className="btn btn-secondary">
+            Back to Home
+          </Link>
+        </div>
       </div>
-    </section>
+    </motion.section>
   );
 
   const renderLoginPrompt = () => (
-    <section className="mx-auto flex min-h-[58vh] max-w-3xl items-center px-4 py-12">
-      <div className="w-full rounded-2xl border border-blue-100 bg-white p-6 text-center shadow-sm sm:p-8">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-          <FaBriefcase />
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="mx-auto flex min-h-[58vh] max-w-3xl items-center px-4 py-12"
+    >
+      <div className="w-full rounded-3xl border border-primary-200/50 bg-gradient-to-br from-white to-primary-50/30 p-8 text-center shadow-elevated-lg sm:p-12">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/20">
+          <FaBriefcase className="text-2xl" />
         </div>
-        <h1 className="text-2xl font-bold text-slate-900">Sign in to apply</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Recruitment uses your existing RentalHub NG account. There is no separate career registration.
+        <h1 className="text-3xl font-black text-slate-900">Sign in to apply</h1>
+        <p className="mt-3 max-w-lg mx-auto text-base leading-7 text-slate-500">
+          Recruitment uses your existing RentalHub NG account. There is no separate career registration — just sign in and complete your application.
         </p>
-        <Link to="/login" className="mt-5 inline-flex rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
-          Login to continue
-        </Link>
+        <div className="mt-8 flex justify-center gap-3">
+          <Link to="/login" className="btn btn-primary px-8 py-3 text-base">
+            Sign in to continue
+          </Link>
+          <Link to="/register" className="btn btn-secondary px-8 py-3 text-base">
+            Create Account
+          </Link>
+        </div>
       </div>
-    </section>
+    </motion.section>
   );
 
   const renderApplicationForm = () => (
-    <form onSubmit={startApplication} className="grid gap-4 lg:grid-cols-2">
+    <motion.form
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.1 }}
+      onSubmit={startApplication}
+      className="grid gap-5 lg:grid-cols-2"
+    >
       <SelectField label="Role Applying For" name="role_id" value={form.role_id} onChange={handleFormChange} required>
         <option value="">Select role</option>
         {roles.map((role) => (
@@ -525,16 +744,19 @@ export default function Careers() {
       </SelectField>
 
       <SelectField label="Application Track" name="application_track" value={form.application_track} onChange={handleFormChange}>
-        <option value="standard">Standard - written application</option>
-        <option value="premium">Premium - platform CV and digital tools</option>
+        <option value="standard">Standard - Written application</option>
+        <option value="premium">Premium - Platform CV &amp; digital tools</option>
       </SelectField>
 
+      <div className="lg:col-span-2 border-b border-slate-100 pb-1">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Personal Information</h3>
+      </div>
       <InputField label="Full Name" name="full_name" value={form.full_name} onChange={handleFormChange} required />
       <InputField label="Phone Number" name="phone_number" value={form.phone_number} onChange={handleFormChange} required />
       <InputField label="Email Address" type="email" name="email_address" value={form.email_address} onChange={handleFormChange} required />
       <InputField label="Date of Birth" type="date" name="date_of_birth" value={form.date_of_birth} onChange={handleFormChange} />
 
-      <SelectField label="State" name="state_name" value={form.state_name} onChange={handleFormChange} required>
+      <SelectField label="State of Residence" name="state_name" value={form.state_name} onChange={handleFormChange} required>
         <option value="">Select state</option>
         {states.map((state) => (
           <option key={state.name || state.displayName} value={state.displayName || state.name}>
@@ -550,31 +772,46 @@ export default function Careers() {
         ))}
       </SelectField>
 
-      <InputField label="Area / Locality" name="area_locality" value={form.area_locality} onChange={handleFormChange} placeholder="Kutunku, Phase 1, Gwarinpa, Ikeja" required />
-      <InputField label="Years of Experience" type="number" name="years_of_experience" value={form.years_of_experience} onChange={handleFormChange} min="0" />
+      <InputField label="Area / Locality" name="area_locality" value={form.area_locality} onChange={handleFormChange} placeholder="e.g. Kutunku, Phase 1, Gwarinpa, Ikeja" required />
+
+      <div className="lg:col-span-2 border-b border-slate-100 pb-1 mt-2">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Professional Background</h3>
+      </div>
       <InputField label="Highest Education Level" name="highest_education" value={form.highest_education} onChange={handleFormChange} required />
+      <InputField label="Years of Experience" type="number" name="years_of_experience" value={form.years_of_experience} onChange={handleFormChange} min="0" />
       <InputField label="Current Employment Status" name="current_employment_status" value={form.current_employment_status} onChange={handleFormChange} />
 
       <TextAreaField label="Residential Address" name="residential_address" value={form.residential_address} onChange={handleFormChange} required />
       <TextAreaField label="Skills / Qualifications" name="skills_qualifications" value={form.skills_qualifications} onChange={handleFormChange} />
       <TextAreaField label="Why are you suitable for this role?" name="suitability_reason" value={form.suitability_reason} onChange={handleFormChange} required className="lg:col-span-2" />
 
-      <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 lg:col-span-2">
-        <p className="text-sm font-semibold text-blue-900">Application Access Fee</p>
-        <p className="mt-1 text-2xl font-bold text-blue-950">{formatCurrency(effectiveFee || 5000)}</p>
-        <p className="mt-1 text-sm text-blue-800">
-          On successful payment, your access code is shown on screen and also sent by email/SMS.
-        </p>
+      <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-primary-50 to-blue-50 border border-primary-200/50 p-5">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm">
+            <FaBriefcase className="text-sm" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-primary-900">Application Access Fee</p>
+            <p className="mt-1 text-3xl font-black text-primary-950">{formatCurrency(effectiveFee || 5000)}</p>
+            <p className="mt-1 text-sm text-primary-700">
+              On successful payment, your <strong>access code</strong> is shown on screen and also sent by email/SMS.
+            </p>
+          </div>
+        </div>
       </div>
 
       <button
         type="submit"
         disabled={submitting || roles.length === 0}
-        className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 lg:col-span-2"
+        className="btn btn-primary w-full py-3.5 text-base lg:col-span-2"
       >
-        {submitting ? 'Saving...' : 'Proceed to Payment'}
+        {submitting ? (
+          <><FaSpinner className="animate-spin mr-2" /> Saving...</>
+        ) : (
+          'Proceed to Payment'
+        )}
       </button>
-    </form>
+    </motion.form>
   );
 
   const renderDashboard = () => {
@@ -584,82 +821,117 @@ export default function Careers() {
     const canJoinInterview = application?.status === 'shortlisted' && application?.interview_activated;
 
     return (
-      <div className="space-y-6">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="space-y-6"
+      >
+        {/* Header Card */}
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Applicant Dashboard</p>
               <h1 className="mt-1 text-2xl font-bold text-slate-900">{application.reference_number || 'Draft application'}</h1>
-              <p className="mt-2 text-sm text-slate-600">
-                {application.role_title} - {application.state_name}, {application.lga_name}, {application.area_locality}
+              <p className="mt-2 text-sm text-slate-500">
+                <FaBriefcase className="inline mr-1.5 text-primary-500" />
+                {application.role_title} &mdash; {application.state_name}, {application.lga_name}, {application.area_locality}
               </p>
             </div>
-            <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold capitalize ${STATUS_STYLES[application.status] || 'bg-slate-100 text-slate-700'}`}>
+            <span className={`inline-flex w-fit rounded-full px-4 py-1.5 text-xs font-semibold capitalize shadow-sm ${STATUS_STYLES[application.status] || 'bg-slate-100 text-slate-700'}`}>
               {String(application.status || 'draft').replace(/_/g, ' ')}
             </span>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <InfoTile label="Payment" value={application.payment_status} />
-            <InfoTile label="Track" value={application.application_track} />
-            <InfoTile label="Fee" value={formatCurrency(application.application_fee)} />
-            <InfoTile label="Interview" value={formatDateTime(application.interview_date)} />
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <InfoTile icon={<FaCheckCircle />} label="Payment" value={application.payment_status} color="emerald" />
+            <InfoTile icon={<FaBriefcase />} label="Track" value={application.application_track} color="blue" />
+            <InfoTile icon={<FaCalendarAlt />} label="Fee" value={formatCurrency(application.application_fee)} color="amber" />
+            <InfoTile icon={<FaCalendarAlt />} label="Interview" value={formatDateTime(application.interview_date)} color="indigo" />
           </div>
         </section>
 
+        {/* Access Code Banner */}
         {visibleAccessCode && !application.access_code_used && (
-          <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-            <p className="text-sm font-semibold text-emerald-900">Your Access Code</p>
+          <motion.section
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50 p-6 shadow-elevated"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <FaCheckCircle className="text-emerald-600" />
+              <p className="text-sm font-semibold text-emerald-900">Your Access Code</p>
+            </div>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="rounded-xl bg-white px-4 py-3 text-2xl font-black tracking-[0.16em] text-emerald-900 shadow-sm">
+              <div className="rounded-xl bg-white px-5 py-3.5 text-2xl font-black tracking-[0.2em] text-emerald-900 shadow-inner border border-emerald-100">
                 {visibleAccessCode}
               </div>
-              <button type="button" onClick={copyAccessCode} className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-800">
-                <FaCopy /> Copy
+              <button type="button" onClick={copyAccessCode} className="btn inline-flex items-center justify-center gap-2 bg-emerald-700 text-white hover:bg-emerald-800 shadow-md">
+                <FaCopy /> Copy Code
               </button>
+            </div>
+          </motion.section>
+        )}
+
+        {/* Payment Required */}
+        {application.payment_status !== 'paid' && (
+          <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-6 shadow-elevated">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-600 text-white shadow-sm">
+                <FaBriefcase className="text-sm" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-900">Application Access Fee Required</p>
+                <p className="mt-1 text-sm text-amber-800">
+                  Pay {formatCurrency(application.application_fee)} to receive your access code and unlock document upload.
+                </p>
+                <button type="button" onClick={initiatePayment} disabled={paymentBusy} className="btn mt-4 bg-amber-600 text-white hover:bg-amber-700 shadow-md">
+                  {paymentBusy ? <><FaSpinner className="animate-spin mr-2" /> Opening payment...</> : 'Pay Application Access Fee'}
+                </button>
+              </div>
             </div>
           </section>
         )}
 
-        {application.payment_status !== 'paid' && (
-          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-            <p className="text-sm font-semibold text-amber-900">Application Access Fee required</p>
-            <p className="mt-1 text-sm text-amber-800">Pay {formatCurrency(application.application_fee)} to receive your access code and unlock document upload.</p>
-            <button type="button" onClick={initiatePayment} disabled={paymentBusy} className="mt-4 rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50">
-              {paymentBusy ? 'Opening payment...' : 'Pay Application Access Fee'}
-            </button>
-          </section>
-        )}
-
+        {/* Verify Access Code */}
         {application.payment_status === 'paid' && !application.access_code_used && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="text-sm font-semibold text-slate-900">Unlock document upload</p>
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated">
+            <p className="text-sm font-semibold text-slate-900">Unlock Document Upload</p>
+            <p className="mt-1 text-xs text-slate-500">Enter the access code you received via email/SMS after payment.</p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <input
                 value={accessCodeInput}
                 onChange={(event) => setAccessCodeInput(event.target.value.toUpperCase())}
-                className="input w-full"
+                className="input w-full sm:max-w-xs font-mono tracking-widest"
                 placeholder="RH-CR-8X7K9"
               />
-              <button type="button" onClick={verifyAccessCode} className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-                Verify Code
+              <button type="button" onClick={verifyAccessCode} className="btn bg-slate-900 text-white hover:bg-slate-800">
+                <FaCheck /> Verify Code
               </button>
             </div>
           </section>
         )}
 
+        {/* Document Upload */}
         {canUpload && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <FaFileUpload className="text-blue-600" />
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 text-primary-600">
+                <FaFileUpload />
+              </div>
               <h2 className="text-lg font-bold text-slate-900">Required Documents</h2>
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <p className="text-xs text-slate-500 mb-4">Upload all required documents below. Accepted formats: PDF, DOC, DOCX, JPG, PNG.</p>
+            <div className="grid gap-4 md:grid-cols-2">
               {DOCUMENT_FIELDS.map((field) => (
-                <label key={field.name} className="rounded-xl border border-slate-200 p-4">
+                <label key={field.name} className="rounded-xl border border-slate-200 p-4 hover:border-primary-200 transition-colors cursor-pointer">
                   <span className="flex items-center justify-between text-sm font-semibold text-slate-800">
                     {field.label}
-                    {field.required && <span className="text-xs text-red-500">Required</span>}
+                    {field.required && <span className="badge-danger text-[10px] px-2 py-0.5">Required</span>}
                   </span>
                   <input
                     type="file"
@@ -667,163 +939,411 @@ export default function Careers() {
                     multiple={field.multiple}
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     onChange={handleDocumentChange}
-                    className="mt-3 block w-full text-sm"
+                    className="mt-3 block w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
                   />
                   {docsByType.has(field.name === 'certificates' ? 'certificate' : field.name) && (
                     <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                      <FaCheck /> Uploaded
+                      <FaCheckCircle /> Uploaded
                     </span>
                   )}
                 </label>
               ))}
             </div>
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <button type="button" onClick={uploadDocuments} disabled={uploading} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
-                {uploading ? 'Uploading...' : 'Upload Documents'}
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button type="button" onClick={uploadDocuments} disabled={uploading} className="btn btn-primary">
+                {uploading ? <><FaSpinner className="animate-spin mr-2" /> Uploading...</> : 'Upload Documents'}
               </button>
-              <button type="button" onClick={submitApplication} disabled={isSubmitted} className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
-                {isSubmitted ? 'Application Submitted' : 'Submit Application'}
+              <button type="button" onClick={submitApplication} disabled={isSubmitted} className={`btn ${isSubmitted ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
+                {isSubmitted ? <><FaCheckCircle className="mr-2" /> Application Submitted</> : 'Submit Application'}
               </button>
             </div>
-          </section>
+          </motion.section>
         )}
 
+        {/* Submitted Documents */}
         {application.documents?.length > 0 && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated">
             <h2 className="text-lg font-bold text-slate-900">Submitted Documents</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {application.documents.map((doc) => (
-                <a key={doc.id} href={`/api/recruitment/documents/download/${doc.id}`} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
-                  <span className="truncate">{doc.document_type}: {doc.file_name}</span>
-                  <FaDownload className="ml-2 shrink-0 text-slate-500" />
+                <a
+                  key={doc.id}
+                  href={`/api/recruitment/documents/download/${doc.id}`}
+                  className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm hover:border-primary-200 hover:bg-primary-50/30 transition-all group"
+                >
+                  <span className="truncate font-medium text-slate-700 group-hover:text-primary-700">
+                    {doc.document_type}: {doc.file_name}
+                  </span>
+                  <FaDownload className="ml-2 shrink-0 text-slate-400 group-hover:text-primary-600" />
                 </a>
               ))}
             </div>
           </section>
         )}
 
+        {/* Rejected Status */}
         {application.status === 'rejected' && (
-          <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">
-            <p className="font-semibold">Not Shortlisted</p>
-            <p className="mt-1 text-sm">Your application was not selected for this recruitment cycle.</p>
-          </section>
-        )}
-
-        {canJoinInterview && (
-          <section className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-indigo-950">
-              <FaCalendarAlt /> Online Interview
-            </h2>
-            <p className="mt-2 text-sm text-indigo-800">Scheduled for {formatDateTime(application.interview_date)}. Enter your application phone number before joining.</p>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <input
-                value={phoneCheck}
-                onChange={(event) => setPhoneCheck(event.target.value)}
-                className="input w-full"
-                placeholder="Confirm phone number"
-              />
-              <button type="button" onClick={startInterview} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-800">
-                <FaVideo /> Join Interview
-              </button>
+          <section className="rounded-3xl border border-red-200 bg-gradient-to-br from-red-50 to-rose-50 p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white">
+                <FaTimes />
+              </div>
+              <div>
+                <p className="font-semibold text-red-900">Not Shortlisted</p>
+                <p className="mt-1 text-sm text-red-700">Your application was not selected for this recruitment cycle. Thank you for your interest.</p>
+              </div>
             </div>
           </section>
         )}
 
-        {interviewMode && renderInterviewRoom()}
-      </div>
+        {/* Interview Invitation */}
+        {canJoinInterview && (
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50 p-6 shadow-elevated"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/20">
+                <FaVideo className="text-lg" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-bold text-indigo-950">Online Interview Scheduled</h2>
+                <p className="mt-1 text-sm text-indigo-800">
+                  <FaCalendarAlt className="inline mr-1.5" />
+                  {formatDateTime(application.interview_date)}
+                </p>
+                <p className="mt-2 text-sm text-indigo-700">
+                  Confirm your application phone number below to join your proctored interview.
+                  Face detection monitoring will be active during the session.
+                </p>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <input
+                    value={phoneCheck}
+                    onChange={(event) => setPhoneCheck(event.target.value)}
+                    className="input w-full sm:max-w-xs"
+                    placeholder="Confirm phone number"
+                  />
+                  <button
+                    type="button"
+                    onClick={startInterview}
+                    disabled={interviewStarting}
+                    className="btn bg-gradient-to-r from-indigo-700 to-indigo-600 text-white hover:from-indigo-800 hover:to-indigo-700 shadow-lg shadow-indigo-500/20"
+                  >
+                    {interviewStarting ? (
+                      <><FaSpinner className="animate-spin mr-2" /> Starting...</>
+                    ) : (
+                      <><FaVideo className="mr-2" /> Join Interview</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {/* Interview Room Overlay */}
+        <AnimatePresence>
+          {interviewMode && renderInterviewRoom()}
+        </AnimatePresence>
+      </motion.div>
     );
   };
 
   const renderInterviewRoom = () => {
     const question = interviewQuestions[questionIndex];
+
+    const getFaceStatusBadge = () => {
+      if (!faceDetectionReady) {
+        return { icon: <FaShieldAlt />, text: 'Basic monitoring', color: 'bg-amber-500/20 text-amber-300' };
+      }
+      switch (faceStatus.status) {
+        case 'monitoring':
+          return { icon: <FaUser />, text: faceStatus.faces === 1 ? '1 face detected ✓' : 'No face detected', color: faceStatus.faces === 1 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300' };
+        case 'warning':
+          return { icon: <FaExclamationTriangle />, text: `Attention: ${faceStatus.faces || 0} faces`, color: 'bg-amber-500/20 text-amber-300' };
+        case 'violation':
+          return { icon: <FaTimes />, text: 'Violation detected', color: 'bg-red-500/20 text-red-300' };
+        case 'locked':
+          return { icon: <FaLock />, text: 'Interview locked', color: 'bg-red-500/20 text-red-300 animate-pulse' };
+        default:
+          return { icon: <FaShieldAlt />, text: 'Monitoring inactive', color: 'bg-slate-500/20 text-slate-300' };
+      }
+    };
+
+    const faceBadge = getFaceStatusBadge();
+
+    const timerPercentage = (questionTimeLeft / QUESTION_TIME_LIMIT_SECONDS) * 100;
+    const timerColor = questionTimeLeft <= 5 ? 'bg-red-500' : questionTimeLeft <= 10 ? 'bg-amber-500' : 'bg-emerald-500';
+
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 px-4 py-6 text-white">
-        <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <section className="rounded-2xl border border-white/10 bg-white/10 p-4">
-            <div className="relative overflow-hidden rounded-xl bg-black">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className="fixed inset-0 z-50 overflow-y-auto bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-4 py-6"
+      >
+        {/* Top Navigation Bar */}
+        <div className="mx-auto mb-4 flex max-w-6xl items-center justify-between">
+          <div className="flex items-center gap-3 text-sm">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-xs font-bold text-white">
+              RH
+            </span>
+            <span className="text-white/60 hidden sm:inline">Proctored Interview</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${faceBadge.color}`}>
+              {faceBadge.icon} {faceBadge.text}
+            </span>
+          </div>
+        </div>
+
+        <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
+          {/* Video Panel */}
+          <section className="rounded-3xl border border-white/10 bg-white/[0.06] backdrop-blur-sm p-4 shadow-elevated-lg">
+            <div className="relative overflow-hidden rounded-2xl bg-black shadow-xl">
               <video ref={videoRef} autoPlay muted playsInline className="aspect-video w-full object-cover" />
-              {interviewLocked && (
-                <div className="absolute inset-0 flex items-center justify-center bg-red-950/85 text-center">
-                  <div>
-                    <FaTimes className="mx-auto mb-2 text-3xl" />
-                    <p className="font-bold">Interview locked</p>
-                  </div>
+
+              {/* Face Detection Overlay Canvas */}
+              <canvas ref={faceCanvasRef} className="absolute inset-0 pointer-events-none" />
+
+              {/* Timer Bar at bottom of video */}
+              {!interviewLocked && (
+                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/10">
+                  <motion.div
+                    className={`h-full ${timerColor} transition-colors duration-500`}
+                    initial={{ width: '100%' }}
+                    animate={{ width: `${Math.max(timerPercentage, 0)}%` }}
+                    transition={{ duration: 0.3 }}
+                  />
                 </div>
               )}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-200">
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-3 py-1"><FaVideo /> Camera active</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-3 py-1"><FaMicrophone /> Microphone active</span>
-              <span className="rounded-full bg-amber-500/20 px-3 py-1">Motion monitoring active</span>
+
+              {/* Locked Overlay */}
+              {interviewLocked && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="absolute inset-0 flex items-center justify-center bg-red-950/85 backdrop-blur-sm text-center"
+                >
+                  <div>
+                    <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/30">
+                      <FaTimes className="text-3xl text-red-400" />
+                    </div>
+                    <p className="text-xl font-bold text-white">Interview Locked</p>
+                    <p className="mt-2 text-sm text-red-200">A proctoring violation was detected.</p>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Timer Countdown Badge */}
+              {!interviewLocked && (
+                <div className={`absolute top-3 right-3 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow-lg ${
+                  questionTimeLeft <= 5
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : questionTimeLeft <= 10
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-white/20 text-white backdrop-blur-sm'
+                }`}>
+                  <FaHourglassHalf />
+                  {questionTimeLeft}s
+                </div>
+              )}
+
+              {/* Proctoring Status */}
+              <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[10px] font-medium text-emerald-300 backdrop-blur-sm border border-emerald-500/10">
+                  <FaVideo /> Camera
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2.5 py-1 text-[10px] font-medium text-blue-300 backdrop-blur-sm border border-blue-500/10">
+                  <FaMicrophoneAlt /> Audio
+                </span>
+                {faceDetectionReady ? (
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium backdrop-blur-sm border ${
+                    faceStatus.faces === 1 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/10' : 'bg-amber-500/20 text-amber-300 border-amber-500/10'
+                  }`}>
+                    <FaUser /> Face
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/20 px-2.5 py-1 text-[10px] font-medium text-slate-300 backdrop-blur-sm border border-slate-500/10">
+                    <FaShieldAlt /> Motion
+                  </span>
+                )}
+              </div>
             </div>
           </section>
 
-          <aside className="rounded-2xl border border-white/10 bg-white p-4 text-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              Question {Math.min(questionIndex + 1, interviewQuestions.length)} of {interviewQuestions.length}
-            </p>
+          {/* Questions Panel */}
+          <aside className="rounded-3xl border border-slate-200/10 bg-white p-5 shadow-elevated-lg">
+            {/* Progress */}
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Question {Math.min(questionIndex + 1, interviewQuestions.length)} of {interviewQuestions.length}
+              </p>
+              <span className="text-xs font-bold text-slate-400">
+                {Math.round(((questionIndex) / interviewQuestions.length) * 100)}%
+              </span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-primary-500 to-indigo-500"
+                initial={{ width: 0 }}
+                animate={{ width: `${((questionIndex) / interviewQuestions.length) * 100}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+
+            {/* Question */}
             {question ? (
-              <>
-                <h2 className="mt-2 text-lg font-bold leading-7">{question.question}</h2>
-                <div className="mt-4 space-y-2">
+              <motion.div
+                key={question.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <h2 className="mt-4 text-lg font-bold leading-7 text-slate-900">{question.question}</h2>
+
+                {/* Options */}
+                <div className="mt-5 space-y-2.5">
                   {['A', 'B', 'C', 'D'].map((option) => (
                     <button
                       key={option}
                       type="button"
                       onClick={() => submitInterviewAnswer(option)}
                       disabled={interviewLocked}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm hover:bg-slate-50 disabled:opacity-50"
+                      className="group w-full rounded-xl border-2 border-slate-100 px-4 py-3 text-left text-sm font-medium text-slate-700 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span className="font-bold">{option}.</span> {question[`option_${option.toLowerCase()}`]}
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-600 group-hover:bg-primary-200 group-hover:text-primary-800 mr-2.5 transition-colors">
+                        {option}
+                      </span>
+                      {question[`option_${option.toLowerCase()}`]}
                     </button>
                   ))}
                 </div>
-                <button type="button" onClick={listenForAnswer} disabled={interviewLocked} className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
-                  Say A, B, C, or D
+
+                {/* Voice Answer */}
+                <button
+                  type="button"
+                  onClick={listenForAnswer}
+                  disabled={interviewLocked}
+                  className="btn mt-5 w-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
+                >
+                  <FaMicrophone className="mr-2" /> Say A, B, C, or D
                 </button>
-                {spokenAnswer && <p className="mt-2 text-center text-sm text-emerald-700">Captured answer: {spokenAnswer}</p>}
-              </>
+
+                {spokenAnswer && (
+                  <motion.p
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-3 text-center text-sm font-semibold text-emerald-700 bg-emerald-50 rounded-lg py-2"
+                  >
+                    Captured answer: {spokenAnswer}
+                  </motion.p>
+                )}
+              </motion.div>
             ) : (
-              <p className="mt-4 text-sm text-slate-600">Loading questions...</p>
+              <div className="mt-8 flex flex-col items-center justify-center text-slate-400">
+                <FaSpinner className="animate-spin text-2xl mb-2" />
+                <p className="text-sm">Loading questions...</p>
+              </div>
             )}
+
+            {/* Proctoring Rules */}
+            <div className="mt-6 rounded-xl border border-amber-100 bg-amber-50/50 p-3">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-800">
+                <FaShieldAlt /> Proctoring Rules
+              </p>
+              <ul className="mt-2 space-y-1 text-[11px] text-amber-700">
+                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> Keep your face visible in the camera</li>
+                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> No other person should enter the frame</li>
+                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> You have {QUESTION_TIME_LIMIT_SECONDS}s per question</li>
+              </ul>
+            </div>
           </aside>
         </div>
-      </div>
+      </motion.div>
     );
   };
 
+  // ─── Loading State ────────────────────────────────────────
   if (statusLoading || authLoading) {
-    return <div className="flex min-h-[50vh] items-center justify-center text-slate-500">Loading careers...</div>;
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-100">
+          <FaSpinner className="animate-spin text-xl text-primary-600" />
+        </div>
+        <p className="text-sm font-medium text-slate-400">Loading careers portal...</p>
+      </div>
+    );
   }
 
   if (!isActive) return renderClosed();
   if (!isAuthenticated) return renderLoginPrompt();
 
   return (
-    <div className="bg-slate-50">
-      <section className="mx-auto max-w-6xl px-4 py-8 sm:py-10">
-        <div className="mb-6 rounded-2xl bg-slate-950 p-5 text-white shadow-sm sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">RentalHub NG Careers</p>
-          <h1 className="mt-2 text-2xl font-black sm:text-3xl">Recruitment Applicant Portal</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      <section className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+        {/* Hero Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-8 rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-6 text-white shadow-elevated-lg sm:p-8"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">RentalHub NG Careers</p>
+          <h1 className="mt-3 text-3xl font-black sm:text-4xl">Recruitment Portal</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
             Apply with your existing RentalHub NG login. Pay the Application Access Fee, unlock your document upload with the access code, and track your application from draft to final decision.
           </p>
-        </div>
-
-        {paymentBusy && (
-          <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800">
-            Verifying payment. Please wait...
-          </div>
-        )}
-
-        {application ? renderDashboard() : (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-slate-900">Career Application Form</h2>
-              <p className="mt-1 text-sm text-slate-600">All fields are stored for admin PDF reports, including your free-text area/locality.</p>
+          {application && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur-sm">
+                <FaBriefcase className="text-blue-300" /> {application.role_title || 'No role'}
+              </span>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize backdrop-blur-sm ${STATUS_STYLES[application.status] || 'bg-white/10 text-white'}`}>
+                {String(application.status || 'draft').replace(/_/g, ' ')}
+              </span>
             </div>
-            {renderApplicationForm()}
-          </section>
+          )}
+        </motion.div>
+
+        {/* Payment Busy Notice */}
+        <AnimatePresence>
+          {paymentBusy && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-6 overflow-hidden rounded-2xl border border-primary-200 bg-gradient-to-r from-primary-50 to-blue-50 px-5 py-4"
+            >
+              <div className="flex items-center gap-3">
+                <FaSpinner className="animate-spin text-primary-600" />
+                <p className="text-sm font-semibold text-primary-800">Verifying payment. Please wait...</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Content */}
+        {application ? renderDashboard() : (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+          >
+            <section className="rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-sm p-6 shadow-elevated sm:p-8">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-slate-900">Career Application Form</h2>
+                <p className="mt-1.5 text-sm text-slate-500">
+                  Fill in your details below. All fields are stored for admin review.
+                </p>
+              </div>
+              {renderApplicationForm()}
+            </section>
+          </motion.div>
         )}
       </section>
     </div>
@@ -859,11 +1379,24 @@ function TextAreaField({ label, className = '', ...props }) {
   );
 }
 
-function InfoTile({ label, value }) {
+function InfoTile({ icon, label, value, color = 'blue' }) {
+  const colorMap = {
+    emerald: { bg: 'bg-emerald-50', icon: 'text-emerald-600', border: 'border-emerald-100' },
+    blue: { bg: 'bg-blue-50', icon: 'text-blue-600', border: 'border-blue-100' },
+    amber: { bg: 'bg-amber-50', icon: 'text-amber-600', border: 'border-amber-100' },
+    indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', border: 'border-indigo-100' },
+  };
+  const c = colorMap[color] || colorMap.blue;
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-      <p className="mt-1 break-words text-sm font-bold capitalize text-slate-900">{String(value || '-').replace(/_/g, ' ')}</p>
+    <div className={`rounded-xl border ${c.border} ${c.bg} p-3.5 transition-all hover:shadow-sm`}>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</p>
+        {icon && <span className={`${c.icon} text-xs`}>{icon}</span>}
+      </div>
+      <p className="break-words text-sm font-bold capitalize text-slate-900">
+        {String(value || '-').replace(/_/g, ' ')}
+      </p>
     </div>
   );
 }

@@ -190,6 +190,34 @@ router.post('/landlord-property-fee/agree',
 // Get user payment history
 router.get('/history', authenticate, paymentController.getPaymentHistory);
 
+// ============ PROPERTY INSPECTION FEE ============
+
+router.get(
+  '/inspection/eligible',
+  authenticate,
+  isTenant,
+  paymentController.getPropertyInspectionOptions
+);
+
+router.post(
+  '/inspection/initialize',
+  authenticate,
+  isTenant,
+  isVerified,
+  [
+    body('application_id').isInt({ min: 1 }).withMessage('application_id is required'),
+    body('tenant_note').optional({ checkFalsy: true }).trim().isLength({ max: 1000 }),
+  ],
+  paymentController.initializePropertyInspectionPayment
+);
+
+router.get(
+  '/inspection/verify/:reference',
+  authenticate,
+  isTenant,
+  paymentController.verifyPropertyInspectionPayment
+);
+
 // ============ BANK ACCOUNT VERIFICATION ============
 
 // Get list of Nigerian banks (cached)

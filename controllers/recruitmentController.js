@@ -53,18 +53,6 @@ const isAdmin = async (userId) => {
 };
 
 // ==================== PUBLIC ROUTES ====================
-
-exports.getRecruitmentStatus = async (req, res) => {
-  try {
-    const result = await db.query('SELECT is_active FROM recruitment_settings ORDER BY id DESC LIMIT 1');
-    const isActive = result.rows[0]?.is_active || false;
-    res.json({ success: true, data: { is_active: isActive } });
-  } catch (err) {
-    console.error('getRecruitmentStatus error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
 exports.getActiveCycles = async (req, res) => {
   try {
     const result = await db.query(
@@ -144,78 +132,6 @@ exports.getLGAs = async (req, res) => {
 };
 
 // ==================== AUTHENTICATED ROUTES ====================
-
-exports.createApplication = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    
-    // Check if recruitment is active
-    const settingsResult = await db.query(
-      'SELECT is_active FROM recruitment_settings ORDER BY id DESC LIMIT 1'
-    );
-    if (!settingsResult.rows[0]?.is_active) {
-      return res.status(403).json({ success: false, message: 'Recruitment is currently closed' });
-    }
-    
-    // Check if already has an active application
-    const existing = await db.query(
-      `SELECT id FROM recruitment_applications 
-       WHERE user_id = $1 AND status NOT IN ('rejected', 'disqualified')`,
-      [userId]
-    );
-    if (existing.rows.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'You already have an active application' 
-      });
-    }
-    
-    const {
-      role_id, full_name, phone_number, email_address,
-      state_name, lga_name, area_locality, residential_address,
-      date_of_birth, highest_education, years_of_experience,
-      current_employment_status, skills_qualifications, suitability_reason,
-      application_track
-    } = req.body;
-    
-    // Get role details for fee
-    const roleResult = await db.query('SELECT * FROM recruitment_roles WHERE id = $1 AND is_active = TRUE', [role_id]);
-    if (!roleResult.rows.length) {
-      return res.status(404).json({ success: false, message: 'Role not found or inactive' });
-    }
-    
-    const role = roleResult.rows[0];
-    const fee = application_track === 'premium' ? parseFloat(role.premium_fee) : parseFloat(role.application_fee);
-    const cycleId = role.cycle_id;
-    
-    const refNumber = generateReferenceNumber();
-    
-    const result = await db.query(
-      `INSERT INTO recruitment_applications (
-        user_id, cycle_id, role_id, full_name, phone_number, email_address,
-        state_name, lga_name, area_locality, residential_address, date_of_birth,
-        highest_education, years_of_experience, current_employment_status,
-        skills_qualifications, suitability_reason, application_fee,
-        application_track, reference_number, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'draft')
-      RETURNING *`,
-      [userId, cycleId, role_id, full_name, phone_number, email_address,
-       state_name, lga_name, area_locality, residential_address, date_of_birth,
-       highest_education, years_of_experience, current_employment_status,
-       skills_qualifications, suitability_reason, fee,
-       application_track || 'standard', refNumber]
-    );
-    
-    res.status(201).json({ 
-      success: true, 
-      data: result.rows[0],
-      message: 'Application created. Proceed to payment.'
-    });
-  } catch (err) {
-    console.error('createApplication error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
 
 exports.updateApplication = async (req, res) => {
   try {
@@ -324,58 +240,6 @@ exports.getMyApplications = async (req, res) => {
 
 // ==================== PAYMENT ====================
 
-exports.initiatePayment = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { application_id } = req.body;
-    
-    const app = await db.query(
-      'SELECT * FROM recruitment_applications WHERE id = $1 AND user_id = $2',
-      [application_id, userId]
-    );
-    if (!app.rows.length) {
-      return res.status(404).json({ success: false, message: 'Application not found' });
-    }
-    
-    const application = app.rows[0];
-    if (application.payment_status === 'paid') {
-      return res.status(400).json({ success: false, message: 'Already paid' });
-    }
-    
-    const amount = parseFloat(application.application_fee);
-    const email = application.email_address || req.user.email;
-    
-    // Initiate payment via Paystack
-    const paymentResult = await initiatePaystackPayment({
-      email,
-      amount: Math.round(amount * 100), // in kobo
-      reference: `RH-CR-${application.id}-${Date.now()}`,
-      metadata: {
-        application_id: application.id,
-        user_id: userId,
-        type: 'recruitment_fee'
-      }
-    });
-    
-    if (!paymentResult.success) {
-      return res.status(400).json({ success: false, message: paymentResult.message || 'Payment initiation failed' });
-    }
-    
-    res.json({
-      success: true,
-      data: {
-        authorization_url: paymentResult.data.authorization_url,
-        reference: paymentResult.data.reference,
-        access_code: paymentResult.data.access_code
-      }
-    });
-  } catch (err) {
-    console.error('initiatePayment error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-// ==================== ACCESS CODE ====================
 
 exports.verifyAccessCode = async (req, res) => {
   try {
@@ -801,27 +665,6 @@ exports.completeInterview = async (req, res) => {
 
 // ==================== ADMIN ROUTES ====================
 
-exports.toggleRecruitment = async (req, res) => {
-  try {
-    if (!(await isRecruitmentAdmin(req.user.id))) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
-    
-    const { is_active } = req.body;
-    
-    await db.query(
-      'UPDATE recruitment_settings SET is_active = $1, updated_by = $2, updated_at = NOW() WHERE id = (SELECT id FROM recruitment_settings ORDER BY id DESC LIMIT 1)',
-      [is_active, req.user.id]
-    );
-    
-    res.json({ success: true, message: `Recruitment ${is_active ? 'activated' : 'deactivated'}` });
-  } catch (err) {
-    console.error('toggleRecruitment error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-// Cycles CRUD
 exports.createCycle = async (req, res) => {
   try {
     if (!(await isRecruitmentAdmin(req.user.id))) {
@@ -948,8 +791,8 @@ exports.updateRole = async (req, res) => {
            is_active = COALESCE($6, is_active),
            updated_at = NOW()
        WHERE id = $7 RETURNING *`,
-      [title, type, description, application_fee, premium_fee, is_active, id]
- );
+            [title, type, description, application_fee, premium_fee, is_active, id]
+    );
     
     if (!result.rows.length) {
       return res.status(404).json({ success: false, message: 'Role not found' });
@@ -2404,17 +2247,79 @@ exports.triggerInterview = async (req, res) => {
            interview_activated = TRUE,
            updated_at = NOW()
        WHERE ${where.join(' AND ')}
-       RETURNING id, email_address, full_name, interview_date`,
+       RETURNING id, user_id, email_address, phone_number, full_name, interview_date`,
       params
     );
 
+    const frontendUrl = getFrontendUrl();
+    const dashboardUrl = `${frontendUrl}/careers`;
+
     for (const applicant of result.rows) {
-      if (!applicant.email_address) continue;
-      sendEmail({
-        to: applicant.email_address,
-        subject: 'RentalHub NG Recruitment Interview Activated',
-        html: `<p>Hello ${applicant.full_name || 'Applicant'}, your recruitment interview has been activated. Sign in and open your applicant dashboard on the interview date.</p>`,
-      }).catch((error) => console.error('Interview email failed:', error.message));
+      const interviewDateStr = applicant.interview_date
+        ? new Date(applicant.interview_date).toLocaleDateString('en-NG', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : 'To be announced';
+
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #0ea5e9, #2563eb); padding: 30px; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">RentalHub NG</h1>
+            <p style="color: #bfdbfe; margin: 8px 0 0;">Interview Invitation</p>
+          </div>
+          <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-radius: 0 0 12px 12px;">
+            <h2 style="color: #1e293b; margin: 0 0 16px;">Interview Activated</h2>
+            <p style="color: #475569; line-height: 1.6;">Hello <strong>${applicant.full_name || 'Applicant'}</strong>,</p>
+            <p style="color: #475569; line-height: 1.6;">Your recruitment interview has been activated for the RentalHub NG recruitment process.</p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0 0 8px;"><strong>Interview Date:</strong> ${interviewDateStr}</p>
+              <p style="margin: 0;"><strong>Portal:</strong> <a href="${dashboardUrl}" style="color: #2563eb;">${dashboardUrl}</a></p>
+            </div>
+            <p style="color: #475569; line-height: 1.6;">
+              Please sign in to your applicant dashboard on the scheduled date to join the proctored interview.
+              You will need your camera and microphone ready. The interview includes face detection monitoring.
+            </p>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">
+              This is an automated message from RentalHub NG. Do not reply to this email.
+            </p>
+          </div>
+        </div>
+      `;
+
+      // Send email notification
+      if (applicant.email_address) {
+        sendEmail({
+          to: applicant.email_address,
+          subject: 'RentalHub NG - Interview Invitation',
+          html: emailHtml,
+        }).catch((error) => console.error('Interview email failed:', error.message));
+      }
+
+      // Send SMS notification
+      if (applicant.phone_number) {
+        const smsMessage = `RentalHub NG: Your interview has been activated for ${interviewDateStr}. Sign in at ${dashboardUrl} to join the proctored interview.`;
+        sendSMS(applicant.phone_number, smsMessage)
+          .catch((error) => console.error('Interview SMS failed:', error.message));
+      }
+
+      // Create in-app notification
+      try {
+        const { createNotification } = require('../config/utils/notificationService');
+        await createNotification(
+          applicant.user_id,
+          'interview_activated',
+          'Interview Activated',
+          `Your interview has been scheduled for ${interviewDateStr}. Please sign in on the scheduled date to join.`,
+          '/careers'
+        );
+      } catch (notifErr) {
+        console.error('Interview notification error:', notifErr.message);
+      }
     }
 
     res.json({ success: true, data: { updated: result.rowCount }, message: `${result.rowCount} interviews activated` });

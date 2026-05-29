@@ -50,6 +50,7 @@ const ensureLawyerDirectoryUnlockSchema = async () => {
           'landlord_listing',
           'rent_payment',
           'property_unlock',
+          'property_inspection_fee',
           'general_platform_fee',
           'registration_fee',
           'wallet_funding',

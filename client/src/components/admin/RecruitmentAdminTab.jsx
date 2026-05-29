@@ -1,17 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
+  FaBell,
   FaBriefcase,
   FaCalendarAlt,
+  FaCheckCircle,
   FaDownload,
   FaEnvelope,
+  FaExclamationTriangle,
   FaMapMarkerAlt,
+  FaPaperPlane,
   FaPlus,
   FaSearch,
+  FaSortAmountDown,
+  FaSpinner,
   FaToggleOff,
   FaToggleOn,
   FaUsers,
+  FaVideo,
 } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
 
 const EMPTY_CYCLE = {
@@ -59,9 +67,33 @@ const formatCurrency = (value) =>
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '-');
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : '-');
 
+const statusBadge = (status) => {
+  const styles = {
+    draft: 'bg-slate-100 text-slate-700 border-slate-200',
+    submitted: 'bg-blue-100 text-blue-700 border-blue-200',
+    under_review: 'bg-amber-100 text-amber-700 border-amber-200',
+    shortlisted: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    approved: 'bg-green-100 text-green-700 border-green-200',
+    rejected: 'bg-red-100 text-red-700 border-red-200',
+    disqualified: 'bg-red-100 text-red-700 border-red-200',
+  };
+  return styles[status] || 'bg-slate-100 text-slate-700 border-slate-200';
+};
+
+const paymentBadge = (status) => {
+  const styles = {
+    paid: 'badge-success',
+    pending: 'badge-warning',
+    failed: 'badge-danger',
+    refunded: 'bg-purple-100 text-purple-700',
+  };
+  return styles[status] || 'badge bg-slate-100 text-slate-700';
+};
+
 export default function RecruitmentAdminTab() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [triggering, setTriggering] = useState(false);
   const [status, setStatus] = useState({ is_active: false });
   const [cycles, setCycles] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -77,6 +109,8 @@ export default function RecruitmentAdminTab() {
   const [locationForm, setLocationForm] = useState(EMPTY_LOCATION);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [triggerModal, setTriggerModal] = useState(false);
+  const [triggerForm, setTriggerForm] = useState({ cycle_id: '', role_id: '', interview_date: '' });
 
   const activeLocations = useMemo(
     () => locations.filter((location) => location.is_active),
@@ -257,6 +291,27 @@ export default function RecruitmentAdminTab() {
     });
   };
 
+  const triggerInterview = async () => {
+    setTriggering(true);
+    try {
+      const body = {};
+      if (triggerForm.interview_date) body.interview_date = triggerForm.interview_date;
+      if (triggerForm.cycle_id) body.cycle_id = triggerForm.cycle_id;
+      if (triggerForm.role_id) body.role_id = triggerForm.role_id;
+
+      const res = await api.post('/recruitment/admin/interviews/trigger', body);
+      toast.success(res.data?.message || 'Interviews triggered successfully');
+      setTriggerModal(false);
+      setTriggerForm({ cycle_id: '', role_id: '', interview_date: '' });
+      await loadApplicants(pagination.page);
+      await loadCore();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to trigger interviews');
+    } finally {
+      setTriggering(false);
+    }
+  };
+
   const downloadBlob = async (path, filename, params = {}) => {
     try {
       const res = await api.get(path, { params, responseType: 'blob' });
@@ -295,113 +350,159 @@ export default function RecruitmentAdminTab() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm">
+      {/* ─── Header ─────────────────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-6 text-white shadow-elevated-lg"
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">
               Recruitment Control
             </p>
-            <h2 className="mt-1 text-2xl font-black">Career Module</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+            <h2 className="mt-2 text-3xl font-black">Career Module</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
               Manage recruitment cycles, role fees, location activation, applicants, document exports, and interview activation.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={toggleRecruitment}
-            disabled={saving}
-            className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold shadow-sm transition ${
-              status.is_active
-                ? 'bg-emerald-400 text-slate-950 hover:bg-emerald-300'
-                : 'bg-slate-100 text-slate-900 hover:bg-white'
-            } disabled:opacity-50`}
-          >
-            {status.is_active ? <FaToggleOn /> : <FaToggleOff />}
-            {status.is_active ? 'Recruitment Open' : 'Recruitment Closed'}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            {/* Trigger Interview Button */}
+            <button
+              type="button"
+              onClick={() => setTriggerModal(true)}
+              disabled={loading || !status.is_active}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-indigo-600 transition-all disabled:opacity-50"
+            >
+              <FaVideo /> Trigger Interview
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleRecruitment}
+              disabled={saving}
+              className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold shadow-sm transition ${
+                status.is_active
+                  ? 'bg-emerald-400 text-slate-950 hover:bg-emerald-300'
+                  : 'bg-slate-100 text-slate-900 hover:bg-white'
+              } disabled:opacity-50`}
+            >
+              {status.is_active ? <FaToggleOn /> : <FaToggleOff />}
+              {status.is_active ? 'Recruitment Open' : 'Recruitment Closed'}
+            </button>
+          </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={<FaUsers />} label="Total Applicants" value={analytics?.total_applicants || 0} />
-        <MetricCard icon={<FaBriefcase />} label="Fees Collected" value={formatCurrency(analytics?.total_fees_collected || 0)} />
-        <MetricCard icon={<FaCalendarAlt />} label="Interview Completed" value={analytics?.interview?.completed || 0} />
-        <MetricCard icon={<FaMapMarkerAlt />} label="Active Locations" value={activeLocations.length} />
-      </section>
+      {/* ─── Metric Cards ───────────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+      >
+        <MetricCard icon={<FaUsers />} label="Total Applicants" value={analytics?.total_applicants || 0} color="blue" />
+        <MetricCard icon={<FaBriefcase />} label="Fees Collected" value={formatCurrency(analytics?.total_fees_collected || 0)} color="emerald" />
+        <MetricCard icon={<FaCheckCircle />} label="Interview Completed" value={analytics?.interview?.completed || 0} color="indigo" />
+        <MetricCard icon={<FaMapMarkerAlt />} label="Active Locations" value={activeLocations.length} color="amber" />
+      </motion.section>
 
+      {/* ─── Loading ────────────────────────────────────── */}
       {loading && (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-          Loading recruitment dashboard...
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <FaSpinner className="animate-spin text-primary-500" />
+          <p className="text-sm font-medium text-slate-500">Loading recruitment dashboard...</p>
         </div>
       )}
 
-      <section className="grid gap-5 xl:grid-cols-3">
-        <form onSubmit={createCycle} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-            <FaCalendarAlt className="text-blue-600" /> Manage Cycles
-          </h3>
-          <div className="mt-4 space-y-3">
-            <AdminInput label="Cycle Title" value={cycleForm.title} onChange={(value) => setCycleForm((prev) => ({ ...prev, title: value }))} required />
-            <AdminInput label="Open Date" type="date" value={cycleForm.open_date} onChange={(value) => setCycleForm((prev) => ({ ...prev, open_date: value }))} required />
-            <AdminInput label="Close Date" type="date" value={cycleForm.close_date} onChange={(value) => setCycleForm((prev) => ({ ...prev, close_date: value }))} required />
-            <AdminInput label="Extension Date" type="date" value={cycleForm.extension_date} onChange={(value) => setCycleForm((prev) => ({ ...prev, extension_date: value }))} />
-            <button type="submit" disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
-              <FaPlus /> Create Cycle
-            </button>
+      {/* ─── Management Forms ───────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid gap-5 xl:grid-cols-3"
+      >
+        {/* Cycles */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-elevated">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+              <FaCalendarAlt />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">Manage Cycles</h3>
           </div>
+          <form onSubmit={createCycle} className="space-y-3">
+            <AdminInput label="Cycle Title" value={cycleForm.title} onChange={(v) => setCycleForm((p) => ({ ...p, title: v }))} required />
+            <div className="grid grid-cols-2 gap-3">
+              <AdminInput label="Open Date" type="date" value={cycleForm.open_date} onChange={(v) => setCycleForm((p) => ({ ...p, open_date: v }))} required />
+              <AdminInput label="Close Date" type="date" value={cycleForm.close_date} onChange={(v) => setCycleForm((p) => ({ ...p, close_date: v }))} required />
+            </div>
+            <AdminInput label="Extension Date (optional)" type="date" value={cycleForm.extension_date} onChange={(v) => setCycleForm((p) => ({ ...p, extension_date: v }))} />
+            <button type="submit" disabled={saving} className="btn btn-primary w-full">
+              {saving ? <><FaSpinner className="animate-spin mr-2" /> Creating...</> : <><FaPlus className="mr-2" /> Create Cycle</>}
+            </button>
+          </form>
           <div className="mt-4 max-h-56 space-y-2 overflow-y-auto pr-1">
             {cycles.map((cycle) => (
-              <div key={cycle.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div key={cycle.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm">
                 <p className="font-semibold text-slate-900">{cycle.title}</p>
                 <p className="text-xs text-slate-500">{formatDate(cycle.open_date)} - {formatDate(cycle.extension_date || cycle.close_date)}</p>
               </div>
             ))}
+            {cycles.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No cycles yet</p>}
           </div>
-        </form>
+        </div>
 
-        <form onSubmit={createRole} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-            <FaBriefcase className="text-emerald-600" /> Manage Roles
-          </h3>
-          <div className="mt-4 space-y-3">
-            <AdminSelect label="Cycle" value={roleForm.cycle_id} onChange={(value) => setRoleForm((prev) => ({ ...prev, cycle_id: value }))} required>
+        {/* Roles */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-elevated">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <FaBriefcase />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">Manage Roles</h3>
+          </div>
+          <form onSubmit={createRole} className="space-y-3">
+            <AdminSelect label="Cycle" value={roleForm.cycle_id} onChange={(v) => setRoleForm((p) => ({ ...p, cycle_id: v }))} required>
               <option value="">Select cycle</option>
               {cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.title}</option>)}
             </AdminSelect>
-            <AdminInput label="Position Title" value={roleForm.title} onChange={(value) => setRoleForm((prev) => ({ ...prev, title: value }))} required />
-            <AdminSelect label="Type" value={roleForm.type} onChange={(value) => setRoleForm((prev) => ({ ...prev, type: value }))}>
+            <AdminInput label="Position Title" value={roleForm.title} onChange={(v) => setRoleForm((p) => ({ ...p, title: v }))} required />
+            <AdminSelect label="Type" value={roleForm.type} onChange={(v) => setRoleForm((p) => ({ ...p, type: v }))}>
               <option value="Administrative">Administrative</option>
               <option value="Technical">Technical</option>
             </AdminSelect>
             <div className="grid grid-cols-2 gap-3">
-              <AdminInput label="Standard Fee" type="number" value={roleForm.application_fee} onChange={(value) => setRoleForm((prev) => ({ ...prev, application_fee: value }))} />
-              <AdminInput label="Premium Fee" type="number" value={roleForm.premium_fee} onChange={(value) => setRoleForm((prev) => ({ ...prev, premium_fee: value }))} />
+              <AdminInput label="Standard Fee (₦)" type="number" value={roleForm.application_fee} onChange={(v) => setRoleForm((p) => ({ ...p, application_fee: v }))} />
+              <AdminInput label="Premium Fee (₦)" type="number" value={roleForm.premium_fee} onChange={(v) => setRoleForm((p) => ({ ...p, premium_fee: v }))} />
             </div>
             <label className="block">
               <span className="mb-1 block text-sm font-semibold text-slate-700">Description</span>
               <textarea
                 value={roleForm.description}
-                onChange={(event) => setRoleForm((prev) => ({ ...prev, description: event.target.value }))}
-                rows={3}
-                className="input w-full"
+                onChange={(e) => setRoleForm((p) => ({ ...p, description: e.target.value }))}
+                rows={2}
+                className="input w-full resize-none"
               />
             </label>
-            <button type="submit" disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
-              <FaPlus /> Create Role
+            <button type="submit" disabled={saving} className="btn w-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-md">
+              {saving ? <><FaSpinner className="animate-spin mr-2" /> Creating...</> : <><FaPlus className="mr-2" /> Create Role</>}
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
 
-        <form onSubmit={toggleLocation} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-            <FaMapMarkerAlt className="text-amber-600" /> Location Activation
-          </h3>
-          <div className="mt-4 space-y-3">
+        {/* Locations */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-elevated">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+              <FaMapMarkerAlt />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">Location Activation</h3>
+          </div>
+          <form onSubmit={toggleLocation} className="space-y-3">
             <AdminSelect
               label="State"
               value={locationForm.state_name}
-              onChange={(value) => setLocationForm((prev) => ({ ...prev, state_name: value, lga_name: '' }))}
+              onChange={(v) => setLocationForm((p) => ({ ...p, state_name: v, lga_name: '' }))}
               required
             >
               <option value="">Select state</option>
@@ -414,7 +515,7 @@ export default function RecruitmentAdminTab() {
             <AdminSelect
               label="LGA"
               value={locationForm.lga_name}
-              onChange={(value) => setLocationForm((prev) => ({ ...prev, lga_name: value }))}
+              onChange={(v) => setLocationForm((p) => ({ ...p, lga_name: v }))}
               disabled={!locationForm.state_name}
             >
               <option value="">All LGAs in selected state</option>
@@ -423,217 +524,189 @@ export default function RecruitmentAdminTab() {
             <AdminSelect
               label="Status"
               value={locationForm.is_active ? 'true' : 'false'}
-              onChange={(value) => setLocationForm((prev) => ({ ...prev, is_active: value === 'true' }))}
+              onChange={(v) => setLocationForm((p) => ({ ...p, is_active: v === 'true' }))}
             >
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </AdminSelect>
-            <button type="submit" disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50">
-              Save Location
+            <button type="submit" disabled={saving} className="btn w-full bg-amber-600 text-white hover:bg-amber-700 shadow-md">
+              {saving ? <><FaSpinner className="animate-spin mr-2" /> Saving...</> : 'Save Location'}
             </button>
-          </div>
+          </form>
           <div className="mt-4 max-h-56 space-y-2 overflow-y-auto pr-1">
             {activeLocations.slice(0, 12).map((location) => (
-              <div key={location.id} className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+              <div key={location.id} className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 flex items-center gap-2">
+                <FaCheckCircle className="text-[10px] text-emerald-600" />
                 {location.state_name} / {location.lga_name === '__ALL__' ? 'All LGAs' : location.lga_name}
               </div>
             ))}
+            {activeLocations.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No active locations</p>}
           </div>
-        </form>
-      </section>
+        </div>
+      </motion.section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      {/* ─── Applicant List ─────────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated"
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-              <FaUsers className="text-blue-600" /> Applicant List
-            </h3>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                <FaUsers />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Applicant List</h3>
+              {pagination.total > 0 && (
+                <span className="badge bg-blue-100 text-blue-700 text-xs">{pagination.total} total</span>
+              )}
+            </div>
             <p className="mt-1 text-sm text-slate-500">
               Filter by state, LGA, area, role, payment status, or application status. Area supports values like Kutunku, Phase 1, Gwarinpa, or Ikeja.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => downloadBlob('/recruitment/admin/reports/area', 'recruitment-area-report.pdf', filters)} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-              <FaDownload /> PDF Report
+            <button type="button" onClick={() => downloadBlob('/recruitment/admin/reports/area', 'recruitment-area-report.pdf', filters)} className="btn btn-secondary text-xs px-3 py-2">
+              <FaDownload className="mr-1.5" /> PDF Report
             </button>
-            <button type="button" onClick={() => downloadBlob('/recruitment/admin/documents/bulk-download', 'recruitment-documents.zip', filters)} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-              <FaDownload /> Documents ZIP
+            <button type="button" onClick={() => downloadBlob('/recruitment/admin/documents/bulk-download', 'recruitment-documents.zip', filters)} className="btn btn-secondary text-xs px-3 py-2">
+              <FaDownload className="mr-1.5" /> Documents ZIP
             </button>
-            <button type="button" onClick={emailExport} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-              <FaEnvelope /> Send to Email
+            <button type="button" onClick={emailExport} className="btn btn-secondary text-xs px-3 py-2">
+              <FaEnvelope className="mr-1.5" /> Send to Email
             </button>
           </div>
         </div>
 
+        {/* Filters */}
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
           <FilterInput name="search" value={filters.search} onChange={handleFilterChange} placeholder="Search name, email, ref" icon={<FaSearch />} />
           <FilterInput name="state" value={filters.state} onChange={handleFilterChange} placeholder="State" />
           <FilterInput name="lga" value={filters.lga} onChange={handleFilterChange} placeholder="LGA" />
           <FilterInput name="area" value={filters.area} onChange={handleFilterChange} placeholder="Area / locality" />
-          <select name="role_id" value={filters.role_id} onChange={handleFilterChange} className="input w-full">
+          <select name="role_id" value={filters.role_id} onChange={handleFilterChange} className="input w-full text-sm">
             <option value="">All roles</option>
             {roles.map((role) => <option key={role.id} value={role.id}>{role.title}</option>)}
           </select>
-          <select name="status" value={filters.status} onChange={handleFilterChange} className="input w-full">
+          <select name="status" value={filters.status} onChange={handleFilterChange} className="input w-full text-sm">
             {statusOptions.map((item) => <option key={item || 'all'} value={item}>{item ? item.replace(/_/g, ' ') : 'All status'}</option>)}
           </select>
-          <select name="payment_status" value={filters.payment_status} onChange={handleFilterChange} className="input w-full">
+          <select name="payment_status" value={filters.payment_status} onChange={handleFilterChange} className="input w-full text-sm">
             {paymentOptions.map((item) => <option key={item || 'all'} value={item}>{item ? item.replace(/_/g, ' ') : 'All payments'}</option>)}
           </select>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={() => loadApplicants(1)} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-            Apply Filters
+          <button type="button" onClick={() => loadApplicants(1)} className="btn bg-slate-900 text-white hover:bg-slate-800 text-sm">
+            <FaSearch className="mr-1.5" /> Apply Filters
           </button>
-          <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+          <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className="btn btn-secondary text-sm">
             Reset
           </button>
-          <button type="button" onClick={() => bulkProcess('under_review')} className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
-            Bulk Review
-          </button>
-          <button type="button" onClick={() => bulkProcess('shortlisted')} className="rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
-            Bulk Shortlist
-          </button>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button type="button" onClick={() => bulkProcess('under_review')} disabled={!selectedIds.length} className="btn border border-blue-200 text-blue-700 hover:bg-blue-50 text-sm disabled:opacity-50">
+              <FaSortAmountDown className="mr-1.5" /> Bulk Review ({selectedIds.length})
+            </button>
+            <button type="button" onClick={() => bulkProcess('shortlisted')} disabled={!selectedIds.length} className="btn border border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-sm disabled:opacity-50">
+              <FaCheckCircle className="mr-1.5" /> Bulk Shortlist ({selectedIds.length})
+            </button>
+          </div>
         </div>
 
-        <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200">
+        {/* Table */}
+        <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
           <table className="min-w-[1100px] w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-gradient-to-r from-slate-50 to-white">
               <tr>
-                <th className="px-3 py-3">Select</th>
-                <th className="px-3 py-3">Applicant</th>
-                <th className="px-3 py-3">Role</th>
-                <th className="px-3 py-3">Location</th>
-                <th className="px-3 py-3">Payment</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3">Interview</th>
-                <th className="px-3 py-3 text-right">Actions</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.length === applicants.length && applicants.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(applicants.map((a) => a.id));
+                      else setSelectedIds([]);
+                    }}
+                    className="rounded border-slate-300"
+                  />
+                </th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Applicant</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Role</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Location</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Payment</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Status</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Interview</th>
+                <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {applicants.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="px-3 py-10 text-center text-slate-500">
-                    No applicants match this filter.
+                  <td colSpan="8" className="px-4 py-16 text-center">
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <FaUsers className="text-2xl opacity-40" />
+                      <p className="text-sm font-medium">No applicants match this filter.</p>
+                    </div>
                   </td>
                 </tr>
               )}
 
-              {applicants.map((applicant) => (
-                <tr key={applicant.id} className="align-top">
-                  <td className="px-3 py-3">
+              {applicants.map((applicant, idx) => (
+                <motion.tr
+                  key={applicant.id}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.02 }}
+                  className="hover:bg-slate-50/50 transition-colors align-top"
+                >
+                  <td className="px-4 py-3">
                     <input
                       type="checkbox"
                       checked={selectedIds.includes(applicant.id)}
-                      onChange={(event) => handleSelected(applicant.id, event.target.checked)}
+                      onChange={(e) => handleSelected(applicant.id, e.target.checked)}
+                      className="rounded border-slate-300"
                     />
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-4 py-3">
                     <p className="font-semibold text-slate-900">{applicant.full_name}</p>
-                    <p className="text-xs text-slate-500">{applicant.reference_number}</p>
-                    <p className="text-xs text-slate-500">{applicant.email_address}</p>
+                    <p className="text-[11px] text-slate-400 font-mono">{applicant.reference_number}</p>
+                    <p className="text-xs text-slate-500 truncate max-w-[180px]">{applicant.email_address}</p>
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-4 py-3">
                     <p className="font-medium text-slate-800">{applicant.role_title}</p>
-                    <p className="text-xs text-slate-500">{applicant.application_track} - {formatCurrency(applicant.application_fee)}</p>
+                    <p className="text-[11px] text-slate-500">{applicant.application_track} &middot; {formatCurrency(applicant.application_fee)}</p>
                   </td>
-                  <td className="px-3 py-3">
-                    <p className="text-slate-800">{applicant.state_name}</p>
-                    <p className="text-xs text-slate-500">{applicant.lga_name}</p>
-                    <p className="text-xs font-semibold text-slate-700">{applicant.area_locality}</p>
+                  <td className="px-4 py-3">
+                    <p className="text-slate-800 text-xs">{applicant.state_name}</p>
+                    <p className="text-[11px] text-slate-500">{applicant.lga_name}</p>
+                    <p className="text-[11px] font-semibold text-slate-600">{applicant.area_locality}</p>
                   </td>
-                  <td className="px-3 py-3 capitalize">{applicant.payment_status}</td>
-                  <td className="px-3 py-3 capitalize">{String(applicant.status || '').replace(/_/g, ' ')}</td>
-                  <td className="px-3 py-3 text-xs">{formatDateTime(applicant.interview_date)}</td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <button type="button" onClick={() => updateApplicant(applicant.id, 'shortlist')} className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white">
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${paymentBadge(applicant.payment_status)}`}>
+                      {applicant.payment_status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${statusBadge(applicant.status)}`}>
+                      {String(applicant.status || '').replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs text-slate-600">
+                      {applicant.interview_date ? (
+                        <>{formatDateTime(applicant.interview_date)}</>
+                      ) : (
+                        <span className="text-slate-400">Not set</span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <button type="button" onClick={() => updateApplicant(applicant.id, 'shortlist')} className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-emerald-700 transition-colors">
                         Shortlist
                       </button>
-                      <button type="button" onClick={() => updateApplicant(applicant.id, 'approve')} className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white">
+                      <button type="button" onClick={() => updateApplicant(applicant.id, 'approve')} className="rounded-lg bg-blue-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-blue-700 transition-colors">
                         Approve
                       </button>
-                      <button type="button" onClick={() => updateApplicant(applicant.id, 'reject')} className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white">
-                        Reject
-                      </button>
-                      <button type="button" onClick={() => setInterviewDate(applicant)} className="rounded bg-indigo-600 px-2 py-1 text-xs font-semibold text-white">
-                        Interview
-                      </button>
-                      <button type="button" onClick={() => downloadBlob(`/recruitment/admin/reports/applicant/${applicant.id}`, `applicant-${applicant.id}.pdf`)} className="rounded border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">
-                        PDF
-                      </button>
-                      <button type="button" onClick={() => downloadBlob(`/recruitment/admin/documents/download/${applicant.id}`, `documents-${applicant.id}.zip`)} className="rounded border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">
-                        ZIP
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <span>Showing {applicants.length} of {pagination.total || 0}</span>
-          <div className="flex gap-2">
-            <button type="button" disabled={pagination.page <= 1} onClick={() => loadApplicants(pagination.page - 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-50">
-              Previous
-            </button>
-            <span className="rounded-lg bg-slate-100 px-3 py-1.5">
-              Page {pagination.page || 1} / {pagination.totalPages || 1}
-            </span>
-            <button type="button" disabled={pagination.page >= pagination.totalPages} onClick={() => loadApplicants(pagination.page + 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-50">
-              Next
-            </button>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function MetricCard({ icon, label, value }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-          <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
-        </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminInput({ label, value, onChange, type = 'text', ...props }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-semibold text-slate-700">{label}</span>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="input w-full" {...props} />
-    </label>
-  );
-}
-
-function AdminSelect({ label, value, onChange, children, ...props }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-semibold text-slate-700">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="input w-full" {...props}>
-        {children}
-      </select>
-    </label>
-  );
-}
-
-function FilterInput({ icon, ...props }) {
-  return (
-    <label className="relative block">
-      {icon && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span>}
-      <input {...props} className={`input w-full ${icon ? 'pl-9' : ''}`} />
-    </label>
-  );
-}
+                      <button type="button" onClick={() => updateApplicant(applicant.id, 'reject')} className="rounded-lg bg-red-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-red-700 transition-colors">
