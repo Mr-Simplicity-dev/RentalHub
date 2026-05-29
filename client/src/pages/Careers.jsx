@@ -68,7 +68,7 @@ const formatDateTime = (value) => {
 const normalize = (value) => String(value || '').trim();
 
 export default function Careers() {
-  const { isAuthenticated, user, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusLoading, setStatusLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
