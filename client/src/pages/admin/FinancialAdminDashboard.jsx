@@ -51,7 +51,7 @@ const FinancialAdminDashboard = () => {
     async (inputs) => {
 
 
-      await api.post('/api/financial-admin/funds/freeze', {
+      await api.post('/financial-admin/funds/freeze', {
         user_id: Number(inputs.user_id),
         amount: parseFloat(inputs.amount),
         reason: String(inputs.reason || '').trim(),
@@ -74,7 +74,7 @@ const FinancialAdminDashboard = () => {
 
   const personalWithdrawAction = useRetryableAction(
     async (inputs) => {
-      await api.post('/api/financial-admin/withdraw/request', {
+      await api.post('/financial-admin/withdraw/request', {
         amount: parseFloat(inputs.amount),
         bank_name: String(inputs.bank_name || '').trim(),
         bank_code: String(inputs.bank_code || '').trim(),
@@ -172,8 +172,8 @@ const FinancialAdminDashboard = () => {
   const fetchLgaFinanceData = async () => {
     try {
       const [withdrawableRes, withdrawalsRes] = await Promise.all([
-        api.get('/api/financial-admin/commissions/withdrawable'),
-        api.get('/api/financial-admin/withdrawals/history'),
+                api.get('/financial-admin/commissions/withdrawable'),
+        api.get('/financial-admin/withdrawals/history'),
       ]);
 
       setWithdrawableSnapshot(withdrawableRes.data?.data || {
