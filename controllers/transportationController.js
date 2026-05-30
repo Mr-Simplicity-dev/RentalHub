@@ -278,34 +278,65 @@ class TransportationController {
         });
       }
       
-      // Initialize payment - this is a simplified version
-      // In production, you would integrate with your actual payment system
-      const paymentData = {
-        amount: booking.total_price,
-        email: req.user.email,
-        metadata: {
-          payment_type: 'transportation_booking',
-          booking_id: bookingId,
-          tenant_id: tenantId,
-          property_id: booking.property_id,
-          service_id: booking.service_id
-        }
-      };
-      
-      // Simplified payment initialization
-      // You should replace this with your actual payment gateway integration
+            // Initialize payment with Paystack
+      const axios = require('axios');
+      const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+      const PAYSTACK_BASE_URL = 'https://api.paystack.co';
+      const reference = `TRANSPORT_${Date.now()}_${bookingId}`;
+
       let paymentResult;
       if (payment_method === 'paystack') {
-        // For now, return a mock payment URL
-        // In production, integrate with your Paystack implementation
-        paymentResult = {
-          success: true,
-          data: {
-            authorization_url: `/api/transportation/mock-payment/${bookingId}`,
-            reference: `TRANSPORT_${Date.now()}_${bookingId}`,
-            access_code: `transport_${bookingId}_${Date.now()}`
+        if (PAYSTACK_SECRET_KEY) {
+          try {
+            const paystackResponse = await axios.post(
+              `${PAYSTACK_BASE_URL}/transaction/initialize`,
+              {
+                email: req.user.email,
+                amount: Math.round(booking.total_price * 100),
+                reference,
+                metadata: {
+                  payment_type: 'transportation_booking',
+                  booking_id: bookingId,
+                  tenant_id: tenantId,
+                  property_id: booking.property_id,
+                  service_id: booking.service_id
+                },
+                callback_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/transportation/payment/callback`
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+
+            paymentResult = {
+              success: true,
+              data: {
+                authorization_url: paystackResponse.data.data.authorization_url,
+                reference: paystackResponse.data.data.reference,
+                access_code: paystackResponse.data.data.access_code
+              }
+            };
+          } catch (paystackError) {
+            console.error('Paystack initialization error:', paystackError.response?.data || paystackError.message);
+            return res.status(502).json({
+              success: false,
+              message: paystackError.response?.data?.message || 'Payment gateway error'
+            });
           }
-        };
+        } else {
+          console.warn('PAYSTACK_SECRET_KEY not configured; returning mock payment');
+          paymentResult = {
+            success: true,
+            data: {
+              authorization_url: `/api/transportation/mock-payment/${bookingId}`,
+              reference,
+              access_code: `transport_${bookingId}_${Date.now()}`
+            }
+          };
+        }
       } else {
         return res.status(400).json({
           success: false,
@@ -422,12 +453,44 @@ class TransportationController {
         });
       }
       
-      // For now, simulate successful payment verification
-      // In production, integrate with your actual payment verification
-      const mockPaymentId = Date.now();
+            // Verify payment with Paystack
+      const axios = require('axios');
+      const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+      const PAYSTACK_BASE_URL = 'https://api.paystack.co';
+
+      if (PAYSTACK_SECRET_KEY) {
+        try {
+          const verifyResponse = await axios.get(
+            `${PAYSTACK_BASE_URL}/transaction/verify/${encodeURIComponent(reference)}`,
+            {
+              headers: {
+                Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          if (verifyResponse.data.data.status !== 'success') {
+            return res.status(400).json({
+              success: false,
+              message: 'Payment verification failed: ' + verifyResponse.data.data.status
+            });
+          }
+        } catch (verifyError) {
+          console.error('Paystack verification error:', verifyError.response?.data || verifyError.message);
+          return res.status(502).json({
+            success: false,
+            message: verifyError.response?.data?.message || 'Payment verification gateway error'
+          });
+        }
+      } else {
+        console.warn('PAYSTACK_SECRET_KEY not configured; skipping Paystack verification');
+      }
+
+      const paymentId = PAYSTACK_SECRET_KEY ? reference : Date.now();
       
       // Update booking payment status
-      await TransportationService.updatePaymentStatus(bookingId, 'completed', mockPaymentId);
+      await TransportationService.updatePaymentStatus(bookingId, 'completed', paymentId);
       
       // Get updated booking
       const updatedBooking = await TransportationService.getBookingById(bookingId);

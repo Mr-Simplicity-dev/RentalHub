@@ -49,6 +49,8 @@ const FinancialAdminDashboard = () => {
 
   const freezeFundsAction = useRetryableAction(
     async (inputs) => {
+
+
       await api.post('/api/financial-admin/funds/freeze', {
         user_id: Number(inputs.user_id),
         amount: parseFloat(inputs.amount),
@@ -101,7 +103,8 @@ const FinancialAdminDashboard = () => {
   useEffect(() => {
     const initializeDashboard = async () => {
       try {
-        const response = await api.get('/api/users/me');
+
+        const response = await api.get('/users/me');
         const me = response.data.data;
         setProfile(me);
 
@@ -147,11 +150,11 @@ const FinancialAdminDashboard = () => {
       setLoading(true);
       
       const [statsRes, transactionsRes, frozenRes, adminsRes, withdrawalsRes] = await Promise.all([
-        api.get(`/api/financial-admin/stats/realtime`),
-        api.get(`/api/financial-admin/transactions?limit=10&page=1`),
-        api.get('/api/financial-admin/funds/frozen'),
-        api.get('/api/financial-admin/performance/state-admins'),
-        api.get('/api/financial-admin/withdrawals/history')
+                api.get(`/financial-admin/stats/realtime`),
+        api.get(`/financial-admin/transactions?limit=10&page=1`),
+        api.get('/financial-admin/funds/frozen'),
+        api.get('/financial-admin/performance/state-admins'),
+        api.get('/financial-admin/withdrawals/history')
       ]);
 
       setStats(statsRes.data.data);
@@ -168,8 +171,6 @@ const FinancialAdminDashboard = () => {
 
   const fetchLgaFinanceData = async () => {
     try {
-      setLoading(true);
-
       const [withdrawableRes, withdrawalsRes] = await Promise.all([
         api.get('/api/financial-admin/commissions/withdrawable'),
         api.get('/api/financial-admin/withdrawals/history'),

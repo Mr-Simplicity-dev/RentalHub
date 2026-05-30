@@ -21,26 +21,93 @@ const isFumigationAdminUser = (user) =>
 // ---------------------------------------------------------------------------
 // PaymentService — inline mock (replace body with real implementation later)
 // ---------------------------------------------------------------------------
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const PAYSTACK_BASE_URL = 'https://api.paystack.co';
+
 const PaymentService = {
   initializePayment: async (paymentData, paymentMethod) => {
-    console.log('Mock payment initialization:', { paymentData, paymentMethod });
-    return {
-      authorization_url: `https://paystack.com/pay/${paymentData.reference}`,
-      reference: paymentData.reference
-    };
+    if (!PAYSTACK_SECRET_KEY) {
+      console.warn('PAYSTACK_SECRET_KEY not configured; returning mock payment');
+      return {
+        authorization_url: `https://paystack.com/pay/${paymentData.reference}`,
+        reference: paymentData.reference
+      };
+    }
+
+    try {
+      const axios = require('axios');
+      const response = await axios.post(
+        `${PAYSTACK_BASE_URL}/transaction/initialize`,
+        {
+          email: paymentData.email,
+          amount: Math.round(paymentData.amount * 100), // Paystack expects amount in kobo
+          reference: paymentData.reference,
+          metadata: paymentData.metadata || {},
+          callback_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/fumigation-cleaning/payment/callback`
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      return {
+        authorization_url: response.data.data.authorization_url,
+        reference: response.data.data.reference,
+        access_code: response.data.data.access_code
+      };
+    } catch (error) {
+      console.error('Paystack initialization error:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || 'Failed to initialize payment with Paystack');
+    }
   },
 
   verifyPayment: async (reference) => {
-    console.log('Mock payment verification:', reference);
-    return {
-      success: true,
-      data: {
-        status: 'success',
-        reference,
-        amount: 10000,
-        currency: 'NGN'
-      }
-    };
+    if (!PAYSTACK_SECRET_KEY) {
+      console.warn('PAYSTACK_SECRET_KEY not configured; returning mock verification');
+      return {
+        success: true,
+        data: {
+          status: 'success',
+          reference,
+          amount: 10000,
+          currency: 'NGN'
+        }
+      };
+    }
+
+    try {
+      const axios = require('axios');
+      const response = await axios.get(
+        `${PAYSTACK_BASE_URL}/transaction/verify/${encodeURIComponent(reference)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      return {
+        success: response.data.data.status === 'success',
+        data: {
+          status: response.data.data.status,
+          reference: response.data.data.reference,
+          amount: response.data.data.amount / 100, // Convert from kobo to main unit
+          currency: response.data.data.currency,
+          paid_at: response.data.data.paid_at,
+          channel: response.data.data.channel
+        }
+      };
+    } catch (error) {
+      console.error('Paystack verification error:', error.response?.data || error.message);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to verify payment with Paystack'
+      };
+    }
   }
 };
 
@@ -1124,7 +1191,46 @@ class FumigationCleaningController {
     }
   }
 
-  // ============ SAFETY COMPLIANCE ENDPOINTS ============
+  // Get provider by ID (authenticated users)
+  async getProviderById(req, res) {
+    try {
+      const { providerId } = req.params;
+
+      const result = await db.query(
+        `SELECT
+           sp.*,
+           COALESCE(AVG(sr.overall_rating), 0) AS avg_rating,
+           COUNT(sr.id)::INT AS total_reviews
+         FROM service_providers sp
+         LEFT JOIN service_reviews sr ON sp.id = sr.provider_id
+         WHERE sp.id = $1 AND sp.is_active = TRUE
+         GROUP BY sp.id`,
+        [providerId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Provider not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: result.rows[0],
+        message: 'Provider retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error getting provider by ID:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve provider',
+        error: error.message
+      });
+    }
+  }
+
+    // ============ SAFETY COMPLIANCE ENDPOINTS ============
 
   // Submit safety compliance record
   async submitSafetyCompliance(req, res) {

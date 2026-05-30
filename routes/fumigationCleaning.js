@@ -215,6 +215,12 @@ router.get('/admin/providers',
   fumigationCleaningController.getProviders
 );
 
+// Get provider by ID
+router.get('/providers/:providerId',
+  authenticate,
+  fumigationCleaningController.getProviderById
+);
+
 // Update booking status (admin)
 router.put('/admin/bookings/:bookingId/status',
   authenticate,

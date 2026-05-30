@@ -259,13 +259,8 @@ const FumigationCleaningWizard = () => {
       if (!formData.service_id || !formData.booking_date) return;
       
       try {
-        const response = await api.get('/fumigation-cleaning/admin/bookings/available-providers', {
-          params: {
-            serviceId: formData.service_id,
-            date: formData.booking_date,
-            timeSlot: formData.preferred_time_slot
-          }
-        });
+                const response = await 
+api.get('/fumigation-cleaning/admin/providers');
         
         if (response.data?.success) {
           setProviders(response.data.data || []);

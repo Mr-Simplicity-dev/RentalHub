@@ -62,11 +62,11 @@ const SuperFinancialAdminDashboard = () => {
     const boot = async () => {
       try {
         const [statsRes, transactionsRes, frozenRes, performanceRes, withdrawalsRes] = await Promise.all([
-          api.get('/api/financial-admin/stats/realtime'),
-          api.get('/api/financial-admin/transactions?limit=20&page=1'),
-          api.get('/api/financial-admin/funds/frozen'),
-          api.get('/api/financial-admin/performance/state-admins'),
-          api.get('/api/financial-admin/withdrawals/history')
+          api.get('/financial-admin/stats/realtime'),
+          api.get('/financial-admin/transactions?limit=20&page=1'),
+          api.get('/financial-admin/funds/frozen'),
+          api.get('/financial-admin/performance/state-admins'),
+          api.get('/financial-admin/withdrawals/history')
         ]);
 
         if (!active) return;
@@ -233,7 +233,7 @@ const SuperFinancialAdminDashboard = () => {
   const submitPersonalWithdrawal = async (formData) => {
     try {
       setSubmittingPersonalWithdraw(true);
-      await api.post('/api/financial-admin/withdraw/request', {
+      await api.post('/financial-admin/withdraw/request', {
         amount: parseFloat(formData.amount),
         bank_name: String(formData.bank_name || '').trim(),
         bank_code: String(formData.bank_code || '').trim(),
@@ -651,3 +651,4 @@ const SuperFinancialAdminDashboard = () => {
 };
 
 export default SuperFinancialAdminDashboard;
+     

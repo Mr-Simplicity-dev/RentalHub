@@ -14,12 +14,13 @@ exports.canLawyerAccessProperty = async (req, res, next) => {
       });
     }
 
-    const result = await db.query(
-      `SELECT p.state AS property_state,
+        const result = await db.query(
+      `SELECT COALESCE(s.state_name, '') AS property_state,
               u.assigned_state AS lawyer_assigned_state
        FROM legal_authorizations la
        JOIN users u ON u.id = la.lawyer_user_id
        JOIN properties p ON p.id = $1
+       LEFT JOIN states s ON s.id = p.state_id
        WHERE la.lawyer_user_id = $2
          AND la.status = 'active'
          AND (

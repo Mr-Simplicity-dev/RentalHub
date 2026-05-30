@@ -16,10 +16,10 @@ export default function RentSavingsSetupFees() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form state
+    // Form state
   const [showForm, setShowForm]  = useState(false);
   const [editId, setEditId]      = useState(null);
-  const [formData, setFormData]  = useState({ state_id: '', lga_id: '', setup_fee: '' });
+  const [formData, setFormData]  = useState({ state_id: '', state_name: '', lga_id: '', setup_fee: '' });
 
   // Locations data for dropdowns
   const [states, setStates]      = useState([]);
@@ -40,27 +40,16 @@ export default function RentSavingsSetupFees() {
     }
   }, []);
 
-  const loadLocations = useCallback(async () => {
+        const loadLocations = useCallback(async () => {
     setLocationsLoading(true);
     try {
-      // Fetch states - these are locations where type = 'state' or parent_id IS NULL
-      const { data } = await api.get('/locations?type=state');
-      if (data.success) {
-        setStates(data.data || []);
+      // Fetch states from the property-utils location-options endpoint
+      const { data } = await api.get('/property-utils/location-options');
+      if (data.success && Array.isArray(data.data)) {
+        setStates(data.data);
       }
     } catch (error) {
       console.error('Failed to load locations:', error);
-      // Fallback: try the /api/locations endpoint
-      try {
-        const { data } = await api.get('/locations');
-        if (data.success || Array.isArray(data)) {
-          const locs = Array.isArray(data) ? data : (data.data || []);
-          const stateLocs = locs.filter(l => !l.parent_id || l.type === 'state');
-          setStates(stateLocs);
-        }
-      } catch (err2) {
-        console.error('Fallback location load failed:', err2);
-      }
     } finally {
       setLocationsLoading(false);
     }
@@ -68,22 +57,35 @@ export default function RentSavingsSetupFees() {
 
   useEffect(() => { loadFees(); loadLocations(); }, []);
 
-  // Load LGAs when state changes
+    // Track selected state_name when state_id changes
   useEffect(() => {
-    if (!formData.state_id) { setLgas([]); return; }
+    if (!formData.state_id) {
+      setFormData(prev => ({ ...prev, state_name: '' }));
+      setLgas([]);
+      return;
+    }
+    const selectedState = states.find(s => String(s.id) === String(formData.state_id));
+    const stateName = selectedState?.state_name || selectedState?.name || '';
+    setFormData(prev => ({ ...prev, state_name: stateName }));
+    if (!stateName) { setLgas([]); return; }
     const loadLgas = async () => {
       try {
-        // Fetch LGAs for the selected state
-        const { data } = await api.get(`/locations/${formData.state_id}/lgas`);
-        if (data.success) setLgas(data.data || []);
-        else setLgas([]);
+        // Fetch LGAs for the selected state via recruitment locations endpoint
+        const { data } = await api.get(`/recruitment/locations/lgas/${encodeURIComponent(stateName)}`);
+        if (data.success) {
+          // Map LGA strings to objects with id and name properties
+          const lgaList = (data.data || []).map((lga, index) =>
+            typeof lga === 'string' ? { id: index + 1, name: lga } : lga
+          );
+          setLgas(lgaList);
+        } else setLgas([]);
       } catch (error) {
         console.error('Failed to load LGAs:', error);
         setLgas([]);
       }
     };
     loadLgas();
-  }, [formData.state_id]);
+  }, [formData.state_id, states]);
 
   // ── Handlers ─────────────────────────────────────────
   const openCreate = () => {
@@ -275,9 +277,9 @@ export default function RentSavingsSetupFees() {
                   disabled={locationsLoading}
                 >
                   <option value="">— Select State —</option>
-                  {states.map(s => (
+                                    {states.map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.name || `State #${s.id}`}
+                      {s.state_name || s.name || `State #${s.id}`}
                     </option>
                   ))}
                 </select>
