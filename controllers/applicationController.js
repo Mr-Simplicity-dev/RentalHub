@@ -4,6 +4,7 @@ const {
   sendApplicationNotification,
   sendApplicationStatusUpdate,
 } = require('../config/utils/emailService');
+const { decryptNIN } = require('../config/utils/ninEncryption');
 
 let applicationNegotiationSchemaReady = false;
 
@@ -153,7 +154,14 @@ const getApplicationForLandlord = async (applicationId, userId) => {
     [applicationId, userId]
   );
 
-  return result.rows[0] || null;
+  const row = result.rows[0] || null;
+
+  // Decrypt tenant NIN before returning to landlord
+  if (row && row.tenant_nin) {
+    row.tenant_nin = decryptNIN(row.tenant_nin);
+  }
+
+  return row;
 };
 
 const getNegotiationHistory = async (applicationId) => {

@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const { body, query } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 const { sensitiveActionLimiter } = require('../config/middleware/securityRateLimiters');
+const { decryptNIN } = require('../config/utils/ninEncryption');
 
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, '..', 'uploads', 'passports');
@@ -837,11 +838,17 @@ router.post('/upload-passport', authenticate, upload.single('passport'), async (
       [userId]
     );
 
+    const userData = userResult.rows[0];
+    // Decrypt NIN before returning to the user
+    if (userData && userData.nin) {
+      userData.nin = decryptNIN(userData.nin);
+    }
+
     res.json({
       success: true,
       message: 'Passport uploaded successfully',
       url: relativePath,
-      user: userResult.rows[0]
+      user: userData
     });
 
   } catch (error) {
