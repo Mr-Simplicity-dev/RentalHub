@@ -88,6 +88,14 @@ const ensureRegistrationLocationSchema = async () => {
 
   await db.query(`
     ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS nin VARCHAR(11),
+    ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS nin_verified BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS identity_verified BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS passport_photo_url VARCHAR(500),
+    ADD COLUMN IF NOT EXISTS subscription_active BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP,
     ADD COLUMN IF NOT EXISTS preferred_state_id INTEGER REFERENCES states(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS preferred_lga_name VARCHAR(120);
   `);
@@ -127,6 +135,8 @@ const ensureUserSuspensionSchema = async () => {
 
   await db.query(`
     ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
     ADD COLUMN IF NOT EXISTS account_suspended_reason TEXT,
     ADD COLUMN IF NOT EXISTS account_suspended_at TIMESTAMP,
     ADD COLUMN IF NOT EXISTS account_suspended_by INTEGER REFERENCES users(id) ON DELETE SET NULL;

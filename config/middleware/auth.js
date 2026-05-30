@@ -9,6 +9,8 @@ const ensureUserSuspensionSchema = async () => {
 
   await db.query(`
     ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
     ADD COLUMN IF NOT EXISTS account_suspended_reason TEXT,
     ADD COLUMN IF NOT EXISTS account_suspended_at TIMESTAMP,
     ADD COLUMN IF NOT EXISTS account_suspended_by INTEGER REFERENCES users(id) ON DELETE SET NULL;

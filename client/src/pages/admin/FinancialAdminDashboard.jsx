@@ -104,7 +104,7 @@ const FinancialAdminDashboard = () => {
     const initializeDashboard = async () => {
       try {
 
-        const response = await api.get('/users/me');
+        const response = await api.get('/auth/me');
         const me = response.data.data;
         setProfile(me);
 
