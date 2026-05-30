@@ -36,6 +36,7 @@ const TINY_FACE_DETECTOR_MODEL_URLS = [
   'https://cdn.jsdelivr.net/npm/@xkeshi/face-api.js-models@0.0.1/models/tiny_face_detector',
   'https://cdn.jsdelivr.net/gh/vladmandic/face-api/model',
 ];
+const CAREERS_DRAFT_STORAGE_KEY = 'rentalhub_careers_application_draft';
 
 // ============================================================
 // face-api.js Global References (loaded from CDN)
@@ -164,6 +165,17 @@ const formatDateTime = (value) => {
 
 const normalize = (value) => String(value || '').trim();
 
+const buildInterviewFingerprint = () => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return '';
+  return [
+    navigator.userAgent,
+    navigator.language,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    `${window.screen?.width || 0}x${window.screen?.height || 0}x${window.screen?.colorDepth || 0}`,
+    String(navigator.hardwareConcurrency || ''),
+  ].join('|').slice(0, 300);
+};
+
 export default function Careers() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -183,6 +195,7 @@ export default function Careers() {
   const [cvModal, setCvModal] = useState(false);
   const [cvForm, setCvForm] = useState(EMPTY_CV_FORM);
   const [generatingCv, setGeneratingCv] = useState(false);
+  const [draftSaving, setDraftSaving] = useState(false);
 
   // ─── Interview State ───────────────────────────────────────
   const [phoneCheck, setPhoneCheck] = useState('');
@@ -195,6 +208,8 @@ export default function Careers() {
   const [faceDetectionReady, setFaceDetectionReady] = useState(false);
   const [faceStatus, setFaceStatus] = useState({ faces: 0, status: 'idle' }); // idle | monitoring | violation | locked
   const [interviewStarting, setInterviewStarting] = useState(false);
+  const [interviewStartupStep, setInterviewStartupStep] = useState('');
+  const [interviewChallengeToken, setInterviewChallengeToken] = useState('');
   const [interviewResult, setInterviewResult] = useState(null);
 
   // ─── Refs ──────────────────────────────────────────────────
@@ -205,6 +220,9 @@ export default function Careers() {
   const faceCanvasRef = useRef(null);
   const faceDetectionTimerRef = useRef(null);
   const questionTimerRef = useRef(null);
+  const interviewPingTimerRef = useRef(null);
+  const verifiedPaymentReferenceRef = useRef('');
+  const interviewFingerprintRef = useRef('');
   const consecutiveNoFaceRef = useRef(0);
   const consecutiveMultiFaceRef = useRef(0);
   const interviewLockedRef = useRef(false);
@@ -265,6 +283,41 @@ export default function Careers() {
   }, [loadMyApplication]);
 
   useEffect(() => {
+    if (application || typeof window === 'undefined') return;
+    try {
+      const savedDraft = JSON.parse(window.localStorage.getItem(CAREERS_DRAFT_STORAGE_KEY) || 'null');
+      if (savedDraft && typeof savedDraft === 'object') {
+        setForm((prev) => ({ ...prev, ...savedDraft }));
+      }
+    } catch {
+      // Ignore malformed local draft data.
+    }
+  }, [application]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const timer = setInterval(async () => {
+      if (application?.id && application.status === 'draft') {
+        setDraftSaving(true);
+        try {
+          await api.put(`/recruitment/applications/${application.id}`, form);
+        } catch (error) {
+          console.error('Recruitment draft autosave failed:', error);
+        } finally {
+          setDraftSaving(false);
+        }
+        return;
+      }
+
+      if (!application) {
+        window.localStorage.setItem(CAREERS_DRAFT_STORAGE_KEY, JSON.stringify(form));
+      }
+    }, 30000);
+
+    return () => clearInterval(timer);
+  }, [application, form]);
+
+  useEffect(() => {
     if (!form.state_name) {
       setLgas([]);
       return;
@@ -287,6 +340,8 @@ export default function Careers() {
   useEffect(() => {
     const reference = searchParams.get('payment_reference');
     if (!reference || !isAuthenticated) return;
+    if (verifiedPaymentReferenceRef.current === reference) return;
+    verifiedPaymentReferenceRef.current = reference;
 
     const verify = async () => {
       setPaymentBusy(true);
@@ -298,9 +353,11 @@ export default function Careers() {
           toast.success('Payment confirmed. Your access code is ready.');
         }
         await loadMyApplication();
-        searchParams.delete('payment_reference');
-        setSearchParams(searchParams, { replace: true });
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('payment_reference');
+        setSearchParams(nextParams, { replace: true });
       } catch (error) {
+        verifiedPaymentReferenceRef.current = '';
         toast.error(error.response?.data?.message || 'Payment verification failed');
       } finally {
         setPaymentBusy(false);
@@ -325,6 +382,7 @@ export default function Careers() {
     try {
       const res = await api.post('/recruitment/apply', form);
       setApplication(res.data?.data || null);
+      window.localStorage?.removeItem(CAREERS_DRAFT_STORAGE_KEY);
       toast.success(res.data?.message || 'Application started');
       await loadMyApplication();
     } catch (error) {
@@ -524,10 +582,17 @@ export default function Careers() {
       questionTimerRef.current = null;
     }
 
+    if (interviewPingTimerRef.current) {
+      clearInterval(interviewPingTimerRef.current);
+      interviewPingTimerRef.current = null;
+    }
+
     try {
       await api.post('/recruitment/interview/violation', {
         violation_type: type,
         details,
+        challenge_token: interviewChallengeToken,
+        fingerprint: interviewFingerprintRef.current,
       });
       toast.error('Interview locked due to detected violation');
     } catch (error) {
@@ -582,10 +647,14 @@ export default function Careers() {
     }
 
     setInterviewStarting(true);
+    setInterviewStartupStep('Requesting camera and microphone permission...');
     try {
+      const fingerprint = buildInterviewFingerprint();
+      interviewFingerprintRef.current = fingerprint;
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
+      setInterviewStartupStep('Preparing secure interview recording...');
 
       const recorderOptions = MediaRecorder.isTypeSupported?.('video/webm')
         ? { mimeType: 'video/webm' }
@@ -600,6 +669,7 @@ export default function Careers() {
       recorder.start(1000);
 
       // Wait for video to be ready
+      setInterviewStartupStep('Checking camera readiness...');
       await new Promise((resolve) => {
         const check = () => {
           if (videoRef.current?.readyState >= 2) resolve();
@@ -609,6 +679,7 @@ export default function Careers() {
       });
 
       // Load face-api
+      setInterviewStartupStep('Loading face monitoring model...');
       const faceReady = await loadFaceApi();
       setFaceDetectionReady(faceReady);
 
@@ -620,10 +691,13 @@ export default function Careers() {
         setFaceStatus({ faces: 0, status: 'idle' });
       }
 
+      setInterviewStartupStep('Fetching your assigned questions...');
       const res = await api.post('/recruitment/interview/start', {
         phone_number: phoneCheck,
+        fingerprint,
       });
       setInterviewQuestions(res.data?.data?.questions || []);
+      setInterviewChallengeToken(res.data?.data?.challenge_token || '');
       setQuestionIndex(0);
       setInterviewMode(true);
       setInterviewResult(null);
@@ -636,6 +710,7 @@ export default function Careers() {
       stopInterviewMedia();
     } finally {
       setInterviewStarting(false);
+      setInterviewStartupStep('');
     }
   };
 
@@ -663,6 +738,7 @@ export default function Careers() {
       await new Promise((resolve) => setTimeout(resolve, 500));
       await uploadRecording();
       setInterviewMode(false);
+      setInterviewChallengeToken('');
       await loadMyApplication();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to complete interview');
@@ -676,6 +752,8 @@ export default function Careers() {
       await api.post('/recruitment/interview/answer', {
         question_id: question.id,
         answer: 'X', // X marks timed-out/unanswered
+        challenge_token: interviewChallengeToken,
+        fingerprint: interviewFingerprintRef.current,
       });
       if (questionIndex + 1 >= interviewQuestions.length) {
         await completeInterview();
@@ -685,7 +763,7 @@ export default function Careers() {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit answer');
     }
-  }, [completeInterview, questionIndex, interviewQuestions]);
+  }, [completeInterview, questionIndex, interviewQuestions, interviewChallengeToken]);
 
   const startQuestionTimer = useCallback(() => {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
@@ -718,6 +796,8 @@ export default function Careers() {
       await api.post('/recruitment/interview/answer', {
         question_id: question.id,
         answer: answer.toUpperCase(),
+        challenge_token: interviewChallengeToken,
+        fingerprint: interviewFingerprintRef.current,
       });
       setSpokenAnswer('');
       if (questionIndex + 1 >= interviewQuestions.length) {
@@ -739,6 +819,31 @@ export default function Careers() {
       if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     };
   }, [questionIndex, interviewMode, interviewLocked, interviewQuestions.length, startQuestionTimer]);
+
+  useEffect(() => {
+    if (!interviewMode || !interviewChallengeToken || interviewLocked) return undefined;
+
+    const sendPing = async () => {
+      try {
+        await api.post('/recruitment/interview/ping', {
+          challenge_token: interviewChallengeToken,
+          fingerprint: interviewFingerprintRef.current,
+        });
+      } catch (error) {
+        console.error('Interview heartbeat failed:', error);
+      }
+    };
+
+    sendPing();
+    interviewPingTimerRef.current = setInterval(sendPing, 20000);
+
+    return () => {
+      if (interviewPingTimerRef.current) {
+        clearInterval(interviewPingTimerRef.current);
+        interviewPingTimerRef.current = null;
+      }
+    };
+  }, [interviewMode, interviewChallengeToken, interviewLocked]);
 
   // ─── Speech Recognition ────────────────────────────────
   const listenForAnswer = () => {
@@ -926,6 +1031,11 @@ export default function Careers() {
                 <FaBriefcase className="inline mr-1.5 text-primary-500" />
                 {application.role_title} &mdash; {application.state_name}, {application.lga_name}, {application.area_locality}
               </p>
+              {draftSaving && (
+                <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
+                  <FaSpinner className="animate-spin" /> Saving draft...
+                </p>
+              )}
             </div>
             <span className={`inline-flex w-fit rounded-full px-4 py-1.5 text-xs font-semibold capitalize shadow-sm ${STATUS_STYLES[application.status] || 'bg-slate-100 text-slate-700'}`}>
               {String(application.status || 'draft').replace(/_/g, ' ')}
@@ -1166,6 +1276,11 @@ export default function Careers() {
                     )}
                   </button>
                 </div>
+                {interviewStarting && interviewStartupStep && (
+                  <p className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 text-xs font-semibold text-indigo-800">
+                    <FaSpinner className="animate-spin" /> {interviewStartupStep}
+                  </p>
+                )}
               </div>
             </div>
           </motion.section>

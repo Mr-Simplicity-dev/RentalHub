@@ -7,6 +7,7 @@ const { sendEmail } = require('../config/utils/mailer');
 const RECRUITMENT_EMAIL = process.env.RECRUITMENT_EMAIL || 'recruitment@rentalhub.com.ng';
 const RECRUITMENT_CLOSURE_CRON = process.env.RECRUITMENT_CLOSURE_CRON || '15 0 * * *';
 const MAX_EMAIL_ATTACHMENT_BYTES = Number(process.env.RECRUITMENT_MAX_EMAIL_ATTACHMENT_BYTES || 18 * 1024 * 1024);
+const STALE_PAYMENT_HOURS = Number(process.env.RECRUITMENT_STALE_PAYMENT_HOURS || 24);
 
 const safeFileSegment = (value) =>
   String(value || 'file')
@@ -185,12 +186,36 @@ const runRecruitmentClosureJob = async () => {
   }
 };
 
+const cleanupStaleRecruitmentPayments = async () => {
+  const result = await db.query(
+    `UPDATE recruitment_applications
+     SET payment_reference = NULL,
+         updated_at = NOW(),
+         admin_notes = CONCAT_WS(E'\n', admin_notes, $2)
+     WHERE payment_status = 'pending'
+       AND payment_reference IS NOT NULL
+       AND updated_at < NOW() - ($1::int * INTERVAL '1 hour')
+     RETURNING id`,
+    [STALE_PAYMENT_HOURS, `Stale recruitment payment reference cleared after ${STALE_PAYMENT_HOURS} hours.`]
+  );
+
+  if (result.rowCount) {
+    console.log(`Cleared ${result.rowCount} stale recruitment payment reference(s)`);
+  }
+};
+
 const startRecruitmentJobs = () => {
-  cron.schedule(RECRUITMENT_CLOSURE_CRON, runRecruitmentClosureJob);
+  const runJobs = async () => {
+    await cleanupStaleRecruitmentPayments();
+    await runRecruitmentClosureJob();
+  };
+
+  cron.schedule(RECRUITMENT_CLOSURE_CRON, runJobs);
   console.log(`Recruitment closure scheduler started (${RECRUITMENT_CLOSURE_CRON})`);
 };
 
 module.exports = {
+  cleanupStaleRecruitmentPayments,
   runRecruitmentClosureJob,
   startRecruitmentJobs,
 };

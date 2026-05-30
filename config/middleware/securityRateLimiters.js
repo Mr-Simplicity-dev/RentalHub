@@ -48,6 +48,24 @@ const criticalFinanceOpsLimiter = buildLimiter({
   message: 'Too many high-risk financial requests. Please wait and retry.',
 });
 
+const recruitmentApplyLimiter = buildLimiter({
+  windowMs: Number(process.env.RECRUITMENT_APPLY_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RECRUITMENT_APPLY_MAX) || 20,
+  message: 'Too many recruitment application requests. Please wait and retry.',
+});
+
+const recruitmentPaymentLimiter = buildLimiter({
+  windowMs: Number(process.env.RECRUITMENT_PAYMENT_WINDOW_MS) || 10 * 60 * 1000,
+  max: Number(process.env.RECRUITMENT_PAYMENT_MAX) || 20,
+  message: 'Too many recruitment payment requests. Please wait and retry.',
+});
+
+const recruitmentInterviewLimiter = buildLimiter({
+  windowMs: Number(process.env.RECRUITMENT_INTERVIEW_WINDOW_MS) || 60 * 1000,
+  max: Number(process.env.RECRUITMENT_INTERVIEW_MAX) || 120,
+  message: 'Too many recruitment interview requests. Please slow down.',
+});
+
 module.exports = {
   authSensitiveLimiter,
   paymentOpsLimiter,
@@ -55,4 +73,7 @@ module.exports = {
   financeOpsLimiter,
   sensitiveActionLimiter,
   criticalFinanceOpsLimiter,
+  recruitmentApplyLimiter,
+  recruitmentPaymentLimiter,
+  recruitmentInterviewLimiter,
 };

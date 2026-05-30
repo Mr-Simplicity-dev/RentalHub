@@ -1,5 +1,6 @@
 const db = require('../config/middleware/database');
 const crypto = require('crypto');
+const net = require('net');
 const PDFDocument = require('pdfkit');
 const archiver = require('archiver');
 const path = require('path');
@@ -61,7 +62,7 @@ exports.getActiveCycles = async (req, res) => {
       `SELECT * FROM recruitment_cycles 
        WHERE is_active = TRUE 
        AND open_date <= CURRENT_DATE 
-       AND close_date >= CURRENT_DATE 
+       AND COALESCE(extension_date, close_date) >= CURRENT_DATE
        ORDER BY open_date DESC`
     );
     res.json({ success: true, data: result.rows });
@@ -84,7 +85,7 @@ exports.getActiveRoles = async (req, res) => {
       query = `SELECT r.* FROM recruitment_roles r
                JOIN recruitment_cycles c ON r.cycle_id = c.id
                WHERE r.is_active = TRUE AND c.is_active = TRUE 
-               AND c.open_date <= CURRENT_DATE AND c.close_date >= CURRENT_DATE
+               AND c.open_date <= CURRENT_DATE AND COALESCE(c.extension_date, c.close_date) >= CURRENT_DATE
                ORDER BY r.title`;
       params = [];
     }
@@ -270,16 +271,16 @@ exports.verifyAccessCode = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid access code' });
     }
     
-    // Check expiry (based on cycle close date)
+    // Check expiry in the database timezone (based on cycle close/extension date)
     const cycleResult = await db.query(
-      'SELECT close_date FROM recruitment_cycles WHERE id = $1',
+      `SELECT id
+       FROM recruitment_cycles
+       WHERE id = $1
+         AND COALESCE(extension_date, close_date) >= CURRENT_DATE`,
       [application.cycle_id]
     );
-    if (cycleResult.rows.length) {
-      const closeDate = new Date(cycleResult.rows[0].close_date);
-      if (new Date() > closeDate) {
-        return res.status(400).json({ success: false, message: 'Access code has expired' });
-      }
+    if (!cycleResult.rows.length) {
+      return res.status(400).json({ success: false, message: 'Access code has expired' });
     }
     
     // Mark as used
@@ -584,6 +585,8 @@ exports.startInterview = async (req, res) => {
   try {
     const userId = req.user.id;
     const submittedPhone = normalizePhoneForCheck(req.body?.phone_number || req.query?.phone_number);
+    const fingerprint = normalizeText(req.body?.fingerprint || req.query?.fingerprint).slice(0, 300);
+    const userAgent = normalizeText(req.headers['user-agent']).slice(0, 500);
 
     if (!submittedPhone) {
       return res.status(400).json({
@@ -593,9 +596,15 @@ exports.startInterview = async (req, res) => {
     }
     
     const app = await db.query(
-      `SELECT a.*, c.close_date FROM recruitment_applications a
+      `SELECT a.*, c.close_date, c.extension_date
+       FROM recruitment_applications a
        JOIN recruitment_cycles c ON a.cycle_id = c.id
-       WHERE a.user_id = $1 AND a.status = 'shortlisted' AND a.interview_activated = TRUE`,
+       WHERE a.user_id = $1
+         AND a.status = 'shortlisted'
+         AND a.interview_activated = TRUE
+         AND COALESCE(c.extension_date, c.close_date) >= CURRENT_DATE
+       ORDER BY a.interview_date NULLS LAST, a.created_at DESC
+       LIMIT 1`,
       [userId]
     );
     
@@ -627,47 +636,68 @@ exports.startInterview = async (req, res) => {
       }
     }
     
-    // Select 50 random questions
-    const questions = await db.query(
-      `SELECT id, question, option_a, option_b, option_c, option_d, category 
-       FROM recruitment_questions WHERE is_active = TRUE 
-       ORDER BY RANDOM() LIMIT 50`
+    let questions = await db.query(
+      `SELECT q.id, q.question, q.option_a, q.option_b, q.option_c, q.option_d, q.category, ia.question_order
+       FROM recruitment_interview_assignments ia
+       JOIN recruitment_questions q ON q.id = ia.question_id
+       WHERE ia.application_id = $1
+       ORDER BY ia.question_order`,
+      [application.id]
     );
-    
+
     if (questions.rows.length < 50) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Not enough questions in the pool. Contact support.' 
+      await db.query('DELETE FROM recruitment_interview_assignments WHERE application_id = $1', [application.id]);
+      questions = await db.query(
+        `SELECT id, question, option_a, option_b, option_c, option_d, category
+         FROM recruitment_questions
+         WHERE is_active = TRUE
+         ORDER BY RANDOM()
+         LIMIT 50`
+      );
+
+      if (questions.rows.length < 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'Not enough questions in the pool. Contact support.',
+        });
+      }
+
+      const values = [];
+      const valueParams = [];
+      questions.rows.forEach((q, index) => {
+        const offset = index * 2;
+        valueParams.push(`($${offset + 1}, $${offset + 2}, ${index + 1})`);
+        values.push(application.id, q.id);
       });
+
+      await db.query(
+        `INSERT INTO recruitment_interview_assignments (application_id, question_id, question_order)
+         VALUES ${valueParams.join(', ')}`,
+        values
+      );
     }
-    
-    // Assign questions to applicant
-    const values = [];
-    const valueParams = [];
-    questions.rows.forEach((q, index) => {
-      const offset = index * 2;
-      valueParams.push(`($${offset + 1}, $${offset + 2}, ${index + 1})`);
-      values.push(application.id, q.id);
-    });
-    
-    await db.query(
-      `INSERT INTO recruitment_interview_assignments (application_id, question_id, question_order)
-       VALUES ${valueParams.join(', ')}
-       ON CONFLICT (application_id, question_id) DO NOTHING`,
-      values
-    );
+
+    const challengeToken = crypto.randomBytes(32).toString('hex');
     
     // Mark interview as started
     await db.query(
-      `UPDATE recruitment_applications SET interview_started_at = NOW(), interview_completed = FALSE, updated_at = NOW()
+      `UPDATE recruitment_applications
+       SET interview_started_at = COALESCE(interview_started_at, NOW()),
+           interview_completed = FALSE,
+           interview_fingerprint = COALESCE(NULLIF($2, ''), interview_fingerprint),
+           interview_user_agent = COALESCE(NULLIF($3, ''), interview_user_agent),
+           interview_challenge_token = $4,
+           interview_last_ping_at = NOW(),
+           updated_at = NOW()
        WHERE id = $1`,
-      [application.id]
+      [application.id, fingerprint, userAgent, challengeToken]
     );
     
     res.json({
       success: true,
       data: {
         total_questions: questions.rows.length,
+        challenge_token: challengeToken,
         questions: questions.rows.map(q => ({
           id: q.id,
           question: q.question,
@@ -688,22 +718,52 @@ exports.startInterview = async (req, res) => {
 exports.submitAnswer = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { question_id, answer } = req.body;
+    const { question_id, answer, challenge_token, fingerprint } = req.body;
+    const normalizedAnswer = String(answer || '').trim().toUpperCase().slice(0, 1);
     
-    if (!question_id || !answer) {
+    if (!question_id || !normalizedAnswer) {
       return res.status(400).json({ success: false, message: 'Question ID and answer required' });
+    }
+
+    if (!['A', 'B', 'C', 'D', 'X'].includes(normalizedAnswer)) {
+      return res.status(400).json({ success: false, message: 'Answer must be A, B, C, D, or X for timeout' });
     }
     
     // Get application
     const appResult = await db.query(
-      'SELECT id FROM recruitment_applications WHERE user_id = $1 AND interview_started_at IS NOT NULL AND interview_completed = FALSE',
+      `SELECT id, interview_started_at, interview_challenge_token, interview_fingerprint,
+              interview_user_agent, interview_security_log
+       FROM recruitment_applications
+       WHERE user_id = $1
+         AND interview_started_at IS NOT NULL
+         AND interview_completed = FALSE`,
       [userId]
     );
     if (!appResult.rows.length) {
       return res.status(403).json({ success: false, message: 'No active interview found' });
     }
     
-    const applicationId = appResult.rows[0].id;
+    const application = appResult.rows[0];
+    const applicationId = application.id;
+
+    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
+      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
+    }
+
+    if (
+      application.interview_fingerprint &&
+      fingerprint &&
+      normalizeText(fingerprint) !== normalizeText(application.interview_fingerprint)
+    ) {
+      await db.query(
+        `UPDATE recruitment_applications
+         SET interview_security_log = $2,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [applicationId, appendSecurityLog(application.interview_security_log, 'Browser fingerprint changed during interview')]
+      );
+      return res.status(403).json({ success: false, message: 'Interview browser fingerprint changed' });
+    }
     
     // Check for violations
     const violationCheck = await db.query(
@@ -717,23 +777,65 @@ exports.submitAnswer = async (req, res) => {
       });
     }
     
-    // Get correct answer
-    const qResult = await db.query('SELECT correct_answer FROM recruitment_questions WHERE id = $1', [question_id]);
-    if (!qResult.rows.length) {
-      return res.status(404).json({ success: false, message: 'Question not found' });
+    const assignmentResult = await db.query(
+      `SELECT ia.*, q.correct_answer
+       FROM recruitment_interview_assignments ia
+       JOIN recruitment_questions q ON q.id = ia.question_id
+       WHERE ia.application_id = $1
+       ORDER BY ia.question_order`,
+      [applicationId]
+    );
+
+    const assignments = assignmentResult.rows;
+    const nextAssignment = assignments.find((item) => !item.answered_at);
+    if (!nextAssignment) {
+      return res.status(400).json({ success: false, message: 'All interview questions have already been answered' });
+    }
+
+    if (String(nextAssignment.question_id) !== String(question_id)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Questions must be answered in the assigned order',
+      });
     }
     
-    const correctAnswer = qResult.rows[0].correct_answer;
-    const isCorrect = answer.toUpperCase() === correctAnswer;
+    const previousAnsweredAt = assignments
+      .filter((item) => item.answered_at)
+      .map((item) => new Date(item.answered_at).getTime())
+      .sort((a, b) => b - a)[0];
+    const baselineTime = previousAnsweredAt || new Date(application.interview_started_at).getTime();
+    const elapsedSeconds = Math.max((Date.now() - baselineTime) / 1000, 0);
+    const lateAnswer = normalizedAnswer !== 'X' && elapsedSeconds > QUESTION_TIME_LIMIT_SECONDS + QUESTION_TIME_GRACE_SECONDS;
+    const tooFastAnswer = normalizedAnswer !== 'X' && elapsedSeconds < MIN_ANSWER_SECONDS;
+    const timingViolation = lateAnswer || tooFastAnswer;
+    const correctAnswer = nextAssignment.correct_answer;
+    const isCorrect = normalizedAnswer === correctAnswer;
     
     await db.query(
       `UPDATE recruitment_interview_assignments 
-       SET answer_given = $1, is_correct = $2, answered_at = NOW()
+       SET answer_given = $1,
+           is_correct = $2,
+           answered_at = NOW(),
+           answer_elapsed_seconds = $5,
+           timing_violation = $6
        WHERE application_id = $3 AND question_id = $4`,
-      [answer.toUpperCase(), isCorrect, applicationId, question_id]
+      [normalizedAnswer, isCorrect, applicationId, question_id, Math.round(elapsedSeconds), timingViolation]
     );
+
+    if (timingViolation) {
+      const reason = lateAnswer
+        ? `Late answer on question ${nextAssignment.question_order}: ${Math.round(elapsedSeconds)} seconds`
+        : `Suspiciously fast answer on question ${nextAssignment.question_order}: ${elapsedSeconds.toFixed(2)} seconds`;
+      await db.query(
+        `UPDATE recruitment_applications
+         SET interview_security_log = $2,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [applicationId, appendSecurityLog(application.interview_security_log, reason)]
+      );
+    }
     
-    res.json({ success: true, data: { is_correct: isCorrect } });
+    res.json({ success: true, data: { is_correct: isCorrect, timing_violation: timingViolation } });
   } catch (err) {
     console.error('submitAnswer error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -743,17 +845,32 @@ exports.submitAnswer = async (req, res) => {
 exports.reportViolation = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { violation_type, details } = req.body;
+    const { violation_type, details, challenge_token, fingerprint } = req.body;
     
     const appResult = await db.query(
-      'SELECT id FROM recruitment_applications WHERE user_id = $1 AND interview_started_at IS NOT NULL',
+      `SELECT id, interview_challenge_token, interview_fingerprint
+       FROM recruitment_applications
+       WHERE user_id = $1 AND interview_started_at IS NOT NULL`,
       [userId]
     );
     if (!appResult.rows.length) {
       return res.status(403).json({ success: false, message: 'No active interview found' });
     }
     
-    const applicationId = appResult.rows[0].id;
+    const application = appResult.rows[0];
+    const applicationId = application.id;
+
+    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
+      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
+    }
+
+    if (
+      application.interview_fingerprint &&
+      fingerprint &&
+      normalizeText(fingerprint) !== normalizeText(application.interview_fingerprint)
+    ) {
+      return res.status(403).json({ success: false, message: 'Interview browser fingerprint changed' });
+    }
     
     await db.query(
       `UPDATE recruitment_applications 
@@ -778,19 +895,90 @@ exports.reportViolation = async (req, res) => {
   }
 };
 
+exports.interviewPing = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { challenge_token, fingerprint } = req.body || {};
+
+    const appResult = await db.query(
+      `SELECT id, interview_challenge_token, interview_fingerprint, interview_security_log
+       FROM recruitment_applications
+       WHERE user_id = $1
+         AND interview_started_at IS NOT NULL
+         AND interview_completed = FALSE
+       ORDER BY interview_started_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (!appResult.rows.length) {
+      return res.status(403).json({ success: false, message: 'No active interview found' });
+    }
+
+    const application = appResult.rows[0];
+    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
+      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
+    }
+
+    if (
+      application.interview_fingerprint &&
+      fingerprint &&
+      normalizeText(fingerprint) !== normalizeText(application.interview_fingerprint)
+    ) {
+      await db.query(
+        `UPDATE recruitment_applications
+         SET interview_security_log = $2,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [application.id, appendSecurityLog(application.interview_security_log, 'Browser fingerprint changed on interview ping')]
+      );
+      return res.status(403).json({ success: false, message: 'Interview browser fingerprint changed' });
+    }
+
+    await db.query(
+      `UPDATE recruitment_applications
+       SET interview_last_ping_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [application.id]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('interviewPing error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 exports.completeInterview = async (req, res) => {
   try {
     const userId = req.user.id;
     
     const appResult = await db.query(
-      'SELECT id FROM recruitment_applications WHERE user_id = $1 AND interview_started_at IS NOT NULL AND interview_completed = FALSE',
+      `SELECT id, interview_last_ping_at, interview_security_log
+       FROM recruitment_applications
+       WHERE user_id = $1
+         AND interview_started_at IS NOT NULL
+         AND interview_completed = FALSE`,
       [userId]
     );
     if (!appResult.rows.length) {
       return res.status(403).json({ success: false, message: 'No active interview found' });
     }
     
-    const applicationId = appResult.rows[0].id;
+    const application = appResult.rows[0];
+    const applicationId = application.id;
+    if (
+      application.interview_last_ping_at &&
+      ((Date.now() - new Date(application.interview_last_ping_at).getTime()) / 1000) > INTERVIEW_PING_STALE_SECONDS
+    ) {
+      await db.query(
+        `UPDATE recruitment_applications
+         SET interview_security_log = $2
+         WHERE id = $1`,
+        [applicationId, appendSecurityLog(application.interview_security_log, 'Interview completed after stale heartbeat')]
+      );
+    }
     
     // Calculate score
     const answered = await db.query(
@@ -1687,6 +1875,14 @@ exports.exportApplicationsCSV = async (req, res) => {
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 const RECRUITMENT_EMAIL = process.env.RECRUITMENT_EMAIL || 'recruitment@rentalhub.com.ng';
 const ALL_LGAS = '__ALL__';
+const QUESTION_TIME_LIMIT_SECONDS = Number(process.env.RECRUITMENT_QUESTION_TIME_LIMIT_SECONDS || 30);
+const QUESTION_TIME_GRACE_SECONDS = Number(process.env.RECRUITMENT_QUESTION_GRACE_SECONDS || 12);
+const MIN_ANSWER_SECONDS = Number(process.env.RECRUITMENT_MIN_ANSWER_SECONDS || 1);
+const INTERVIEW_PING_STALE_SECONDS = Number(process.env.RECRUITMENT_INTERVIEW_PING_STALE_SECONDS || 90);
+const PAYSTACK_WEBHOOK_IP_ALLOWLIST = String(process.env.PAYSTACK_WEBHOOK_IPS || '')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
 
 const normalizeText = (value) => String(value || '').trim();
 const normalizeLower = (value) => normalizeText(value).toLowerCase();
@@ -1700,34 +1896,38 @@ const safeFileSegment = (value) =>
     .replace(/^_+|_+$/g, '')
     .slice(0, 80) || 'file';
 
+const addSqlParam = (params, value) => {
+  params.push(value);
+  return `$${params.length}`;
+};
+
 const getApplicantWhere = (query = {}) => {
   const where = [];
   const params = [];
-  const push = (sql, value) => {
-    params.push(value);
-    where.push(sql.replace('?', `$${params.length}`));
+  const addClause = (sql, ...values) => {
+    let clause = sql;
+    values.forEach((value) => {
+      const placeholder = addSqlParam(params, value);
+      clause = clause.replace('?', placeholder);
+    });
+    where.push(clause);
   };
 
-  if (query.status) push('a.status = ?', query.status);
-  if (query.payment_status) push('a.payment_status = ?', query.payment_status);
-  if (query.cycle_id) push('a.cycle_id = ?', query.cycle_id);
-  if (query.role_id) push('a.role_id = ?', query.role_id);
-  if (query.state) push('LOWER(a.state_name) = LOWER(?)', query.state);
-  if (query.lga) push('LOWER(a.lga_name) = LOWER(?)', query.lga);
-  if (query.area) push('LOWER(a.area_locality) LIKE LOWER(?)', `%${query.area}%`);
+  if (query.status) addClause('a.status = ?', query.status);
+  if (query.payment_status) addClause('a.payment_status = ?', query.payment_status);
+  if (query.cycle_id) addClause('a.cycle_id = ?', query.cycle_id);
+  if (query.role_id) addClause('a.role_id = ?', query.role_id);
+  if (query.state) addClause('a.state_name ILIKE ?', normalizeText(query.state));
+  if (query.lga) addClause('a.lga_name ILIKE ?', normalizeText(query.lga));
+  if (query.area) addClause('a.area_locality ILIKE ?', `%${normalizeText(query.area)}%`);
   if (query.search) {
-    push(
-      `(a.full_name ILIKE ? OR a.email_address ILIKE ? OR a.phone_number ILIKE ? OR a.reference_number ILIKE ?)`,
-      `%${query.search}%`
+    const searchParam = addSqlParam(params, [`%${normalizeText(query.search)}%`]);
+    where.push(
+      `(COALESCE(a.full_name, '') ILIKE ANY(${searchParam}::text[])
+        OR COALESCE(a.email_address, '') ILIKE ANY(${searchParam}::text[])
+        OR COALESCE(a.phone_number, '') ILIKE ANY(${searchParam}::text[])
+        OR COALESCE(a.reference_number, '') ILIKE ANY(${searchParam}::text[]))`
     );
-    const value = params[params.length - 1];
-    params.push(value, value, value);
-    const index = params.length - 3;
-    where[where.length - 1] = where[where.length - 1]
-      .replace(`$${index}`, `$${index}`)
-      .replace('?', `$${index + 1}`)
-      .replace('?', `$${index + 2}`)
-      .replace('?', `$${index + 3}`);
   }
 
   return {
@@ -1793,6 +1993,50 @@ const ensureUniqueAccessCode = async () => {
   return `RH-CR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 };
 
+const appendSecurityLog = (currentLog, message) =>
+  [normalizeText(currentLog), `[${new Date().toISOString()}] ${message}`]
+    .filter(Boolean)
+    .join('\n')
+    .slice(-5000);
+
+const safeJson = (value) => {
+  try {
+    return JSON.stringify(value || {});
+  } catch {
+    return '{}';
+  }
+};
+
+const getClientIp = (req) => {
+  const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return (forwardedFor || req.ip || req.socket?.remoteAddress || '')
+    .replace(/^::ffff:/, '')
+    .trim();
+};
+
+const ipToLong = (ip) => ip.split('.').reduce((acc, part) => ((acc << 8) + Number(part)), 0) >>> 0;
+
+const isIpInCidr = (ip, cidr) => {
+  const [range, bitsText] = cidr.split('/');
+  const bits = Number(bitsText);
+  if (net.isIP(ip) !== 4 || net.isIP(range) !== 4 || Number.isNaN(bits)) return false;
+  const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+  return (ipToLong(ip) & mask) === (ipToLong(range) & mask);
+};
+
+const isWebhookIpAllowed = (ip) => {
+  if (!PAYSTACK_WEBHOOK_IP_ALLOWLIST.length) return true;
+  return PAYSTACK_WEBHOOK_IP_ALLOWLIST.some((allowed) => (
+    allowed.includes('/') ? isIpInCidr(ip, allowed) : ip === allowed.replace(/^::ffff:/, '')
+  ));
+};
+
+const timingSafeEqualHex = (left, right) => {
+  const leftBuffer = Buffer.from(String(left || ''), 'hex');
+  const rightBuffer = Buffer.from(String(right || ''), 'hex');
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+};
+
 const sendAccessCodeNotice = async (application) => {
   const code = application.access_code;
   const email = application.email_address;
@@ -1816,20 +2060,59 @@ const sendAccessCodeNotice = async (application) => {
           </div>
         `,
       }).then(() => db.query(
-        'UPDATE recruitment_applications SET access_code_sent_email = TRUE WHERE id = $1',
+        `UPDATE recruitment_applications
+         SET access_code_sent_email = TRUE,
+             access_code_email_last_error = NULL
+         WHERE id = $1`,
         [application.id]
-      )).catch((error) => console.error('Recruitment access email failed:', error.message))
+      )).catch(async (error) => {
+        console.error('Recruitment access email failed:', error.message);
+        await db.query(
+          'UPDATE recruitment_applications SET access_code_email_last_error = $2 WHERE id = $1',
+          [application.id, error.message]
+        ).catch(() => {});
+      })
     );
   }
 
   if (phone) {
     tasks.push(
       sendSMS(phone, `RentalHub NG career access code: ${code}. Use it on ${dashboardUrl}. Do not share it.`)
-        .then(() => db.query(
-          'UPDATE recruitment_applications SET access_code_sent_sms = TRUE WHERE id = $1',
-          [application.id]
-        ))
-        .catch((error) => console.error('Recruitment access SMS failed:', error.message))
+        .then((result) => {
+          if (!result?.success) {
+            const errorMessage = result?.error || 'SMS provider did not accept the message';
+            return db.query(
+              `UPDATE recruitment_applications
+               SET access_code_sent_sms = FALSE,
+                   access_code_sms_status = 'failed',
+                   access_code_sms_delivery_attempt_id = COALESCE($2, access_code_sms_delivery_attempt_id),
+                   access_code_sms_last_error = $3
+               WHERE id = $1`,
+              [application.id, result?.delivery_attempt_id || null, errorMessage]
+            );
+          }
+
+          return db.query(
+            `UPDATE recruitment_applications
+             SET access_code_sent_sms = TRUE,
+                 access_code_sms_status = COALESCE($3, 'queued'),
+                 access_code_sms_delivery_attempt_id = COALESCE($2, access_code_sms_delivery_attempt_id),
+                 access_code_sms_last_error = NULL
+             WHERE id = $1`,
+            [application.id, result.delivery_attempt_id || null, result.status || result.normalized_status || 'queued']
+          );
+        })
+        .catch(async (error) => {
+          console.error('Recruitment access SMS failed:', error.message);
+          await db.query(
+            `UPDATE recruitment_applications
+             SET access_code_sent_sms = FALSE,
+                 access_code_sms_status = 'failed',
+                 access_code_sms_last_error = $2
+             WHERE id = $1`,
+            [application.id, error.message]
+          ).catch(() => {});
+        })
     );
   }
 
@@ -1837,22 +2120,57 @@ const sendAccessCodeNotice = async (application) => {
 };
 
 const markApplicationPaid = async ({ application, reference, gatewayPayload }) => {
-  const accessCode = application.access_code || await ensureUniqueAccessCode();
-  const result = await db.query(
-    `UPDATE recruitment_applications
-     SET payment_status = 'paid',
-         payment_reference = $2,
-         payment_date = COALESCE(payment_date, NOW()),
-         access_code = $3,
-         updated_at = NOW()
-     WHERE id = $1
-     RETURNING *`,
-    [application.id, reference, accessCode]
-  );
+  const client = await db.connect();
+  let paid;
+  let shouldSendNotice = false;
 
-  const paid = result.rows[0];
-  if (!application.access_code) {
-    await sendAccessCodeNotice(paid, gatewayPayload);
+  try {
+    await client.query('BEGIN');
+    const locked = await client.query(
+      'SELECT * FROM recruitment_applications WHERE id = $1 FOR UPDATE',
+      [application.id]
+    );
+
+    if (!locked.rows.length) {
+      throw new Error('Recruitment application not found while marking payment paid');
+    }
+
+    const current = locked.rows[0];
+    const accessCode = current.access_code || await ensureUniqueAccessCode();
+
+    if (current.payment_status === 'paid' && current.access_code) {
+      paid = current;
+    } else {
+      const result = await client.query(
+        `UPDATE recruitment_applications
+         SET payment_status = 'paid',
+             payment_reference = COALESCE($2, payment_reference),
+             payment_date = COALESCE(payment_date, NOW()),
+             payment_processed_at = COALESCE(payment_processed_at, NOW()),
+             payment_gateway_payload = COALESCE($4::jsonb, payment_gateway_payload),
+             access_code = $3,
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [current.id, reference, accessCode, safeJson(gatewayPayload)]
+      );
+      paid = result.rows[0];
+      shouldSendNotice = true;
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  if (
+    paid &&
+    (shouldSendNotice || !paid.access_code_sent_email || !paid.access_code_sent_sms)
+  ) {
+    await sendAccessCodeNotice(paid);
   }
   return paid;
 };
@@ -2156,7 +2474,7 @@ exports.verifyPayment = async (req, res) => {
     }
 
     const application = appResult.rows[0];
-    if (application.payment_status === 'paid') {
+    if (application.payment_status === 'paid' && application.access_code) {
       return res.json({
         success: true,
         message: 'Payment already verified',
@@ -2201,10 +2519,20 @@ exports.paystackWebhook = async (req, res) => {
   try {
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
     const signature = req.headers['x-paystack-signature'];
-    const rawBody = req.rawBody || JSON.stringify(req.body || {});
+    const rawBody = req.rawBody;
+    const clientIp = getClientIp(req);
 
     if (!secretKey) {
       return res.status(503).json({ success: false, message: 'Payment gateway is not configured' });
+    }
+
+    if (!Buffer.isBuffer(rawBody)) {
+      return res.status(400).json({ success: false, message: 'Webhook raw body is required' });
+    }
+
+    if (!isWebhookIpAllowed(clientIp)) {
+      console.warn(`Blocked recruitment Paystack webhook from non-allowlisted IP: ${clientIp}`);
+      return res.status(403).json({ success: false, message: 'Webhook source not allowed' });
     }
 
     const expectedSignature = crypto
@@ -2212,7 +2540,7 @@ exports.paystackWebhook = async (req, res) => {
       .update(rawBody)
       .digest('hex');
 
-    if (!signature || signature !== expectedSignature) {
+    if (!signature || !timingSafeEqualHex(signature, expectedSignature)) {
       return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
     }
 
@@ -2249,14 +2577,11 @@ exports.paystackWebhook = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Recruitment payment reference not found' });
     }
 
-    const application = appResult.rows[0];
-    if (application.payment_status !== 'paid') {
-      await markApplicationPaid({
-        application,
-        reference: reference || application.payment_reference,
-        gatewayPayload: transaction,
-      });
-    }
+    await markApplicationPaid({
+      application: appResult.rows[0],
+      reference: reference || appResult.rows[0].payment_reference,
+      gatewayPayload: transaction,
+    });
 
     res.json({ success: true });
   } catch (error) {
@@ -2869,27 +3194,59 @@ exports.bulkUploadQuestions = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Questions array is required' });
     }
 
-    let inserted = 0;
-    for (const item of questions) {
-      if (!item.question || !item.option_a || !item.option_b || !item.option_c || !item.option_d || !item.correct_answer) continue;
-      await db.query(
-        `INSERT INTO recruitment_questions (question, option_a, option_b, option_c, option_d, correct_answer, category, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [
-          item.question,
-          item.option_a,
-          item.option_b,
-          item.option_c,
-          item.option_d,
-          String(item.correct_answer).trim().toUpperCase().slice(0, 1),
-          item.category || 'general',
-          req.user.id,
-        ]
-      );
-      inserted += 1;
+    const invalid = [];
+    const valid = [];
+    questions.forEach((item, index) => {
+      const answer = String(item.correct_answer || '').trim().toUpperCase().slice(0, 1);
+      const missing = ['question', 'option_a', 'option_b', 'option_c', 'option_d']
+        .filter((field) => !normalizeText(item[field]));
+      if (!['A', 'B', 'C', 'D'].includes(answer)) {
+        missing.push('correct_answer');
+      }
+      if (missing.length) {
+        invalid.push({ index, missing });
+        return;
+      }
+      valid.push({ ...item, correct_answer: answer });
+    });
+
+    if (invalid.length) {
+      return res.status(400).json({
+        success: false,
+        message: `${invalid.length} question(s) have invalid or missing fields`,
+        errors: invalid,
+      });
     }
 
-    res.json({ success: true, data: { inserted } });
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      let inserted = 0;
+      for (const item of valid) {
+        await client.query(
+          `INSERT INTO recruitment_questions (question, option_a, option_b, option_c, option_d, correct_answer, category, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            normalizeText(item.question),
+            normalizeText(item.option_a),
+            normalizeText(item.option_b),
+            normalizeText(item.option_c),
+            normalizeText(item.option_d),
+            item.correct_answer,
+            normalizeText(item.category) || 'general',
+            req.user.id,
+          ]
+        );
+        inserted += 1;
+      }
+      await client.query('COMMIT');
+      res.json({ success: true, data: { inserted } });
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('bulkUploadQuestions error:', error);
     res.status(500).json({ success: false, message: 'Failed to upload questions' });

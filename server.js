@@ -346,7 +346,7 @@ app.use('/api/', limiter);
 app.use(
   express.json({
     verify: (req, _res, buf) => {
-      req.rawBody = buf.toString('utf8');
+      req.rawBody = Buffer.from(buf);
     },
   })
 );

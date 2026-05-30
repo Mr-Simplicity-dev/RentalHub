@@ -5,6 +5,11 @@ const path = require('path');
 const crypto = require('crypto');
 const recruitmentController = require('../controllers/recruitmentController');
 const { authenticate } = require('../config/middleware/auth');
+const {
+  recruitmentApplyLimiter,
+  recruitmentPaymentLimiter,
+  recruitmentInterviewLimiter,
+} = require('../config/middleware/securityRateLimiters');
 
 // Multer config for document uploads
 const storage = multer.diskStorage({
@@ -66,15 +71,15 @@ router.get('/locations/lgas/:state', recruitmentController.getLGAs);
 // ==================== AUTHENTICATED ROUTES ====================
 
 // Applicant routes
-router.post('/apply', authenticate, recruitmentController.createApplication);
+router.post('/apply', recruitmentApplyLimiter, authenticate, recruitmentController.createApplication);
 router.put('/applications/:id', authenticate, recruitmentController.updateApplication);
 router.get('/my-application', authenticate, recruitmentController.getMyApplication);
 router.get('/my-applications', authenticate, recruitmentController.getMyApplications);
 
 // Payment initiation
-router.post('/payments/initiate', authenticate, recruitmentController.initiatePayment);
+router.post('/payments/initiate', recruitmentPaymentLimiter, authenticate, recruitmentController.initiatePayment);
 router.post('/payments/verify/:reference', authenticate, recruitmentController.verifyPayment);
-router.post('/payments/webhook', recruitmentController.paystackWebhook);
+router.post('/payments/webhook', recruitmentPaymentLimiter, recruitmentController.paystackWebhook);
 
 // Access code verification
 router.post('/verify-access-code', authenticate, recruitmentController.verifyAccessCode);
@@ -98,11 +103,12 @@ router.get('/documents/download-all/:applicationId', authenticate, recruitmentCo
 router.post('/documents/generate-cv/:applicationId', authenticate, recruitmentController.generatePlatformCv);
 
 // Interview routes
-router.post('/interview/start', authenticate, recruitmentController.startInterview);
-router.get('/interview/start', authenticate, recruitmentController.startInterview);
-router.post('/interview/answer', authenticate, recruitmentController.submitAnswer);
-router.post('/interview/violation', authenticate, recruitmentController.reportViolation);
-router.post('/interview/complete', authenticate, recruitmentController.completeInterview);
+router.post('/interview/start', recruitmentInterviewLimiter, authenticate, recruitmentController.startInterview);
+router.get('/interview/start', recruitmentInterviewLimiter, authenticate, recruitmentController.startInterview);
+router.post('/interview/ping', recruitmentInterviewLimiter, authenticate, recruitmentController.interviewPing);
+router.post('/interview/answer', recruitmentInterviewLimiter, authenticate, recruitmentController.submitAnswer);
+router.post('/interview/violation', recruitmentInterviewLimiter, authenticate, recruitmentController.reportViolation);
+router.post('/interview/complete', recruitmentInterviewLimiter, authenticate, recruitmentController.completeInterview);
 router.post('/interview/recording', authenticate, recordingUpload.single('recording'), recruitmentController.uploadInterviewRecording);
 
 // ==================== ADMIN ROUTES ====================

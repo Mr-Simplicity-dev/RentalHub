@@ -6,6 +6,9 @@ const {
 } = require('../utils/authCookies');
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const CSRF_EXEMPT_PATHS = new Set([
+  '/api/recruitment/payments/webhook',
+]);
 
 const maybeCookieAuth = (cookies) => {
   return Boolean(
@@ -19,6 +22,10 @@ const maybeCookieAuth = (cookies) => {
 };
 
 const csrfProtection = (req, res, next) => {
+  if (CSRF_EXEMPT_PATHS.has(req.path)) {
+    return next();
+  }
+
   const cookies = parseCookies(req.headers.cookie);
 
   if (!maybeCookieAuth(cookies)) {
