@@ -1,14 +1,34 @@
 const db = require('../config/middleware/database');
 const crypto = require('crypto');
 const net = require('net');
-const PDFDocument = require('pdfkit');
-const archiver = require('archiver');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const { sendEmail } = require('../config/utils/mailer');
 const { sendSMS } = require('../config/utils/smsService');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+
+const optionalRequire = (moduleName, featureName) => {
+  try {
+    return require(moduleName);
+  } catch (error) {
+    if (error.code !== 'MODULE_NOT_FOUND') {
+      throw error;
+    }
+
+    console.error(`${featureName} dependency "${moduleName}" is not installed. Run npm install before using this feature.`);
+    return null;
+  }
+};
+
+const PDFDocument = optionalRequire('pdfkit', 'Recruitment PDF');
+const archiver = optionalRequire('archiver', 'Recruitment ZIP export');
+
+const sendMissingDependency = (res, featureName, packageName) =>
+  res.status(503).json({
+    success: false,
+    message: `${featureName} is temporarily unavailable because ${packageName} is not installed on the server.`,
+  });
 
 // ==================== Helper Functions ====================
 
@@ -517,6 +537,10 @@ exports.generatePlatformCv = async (req, res) => {
 
     const uploadDir = path.join(__dirname, '..', 'uploads', 'recruitment');
     fs.mkdirSync(uploadDir, { recursive: true });
+
+    if (!PDFDocument) {
+      return sendMissingDependency(res, 'CV PDF generation', 'pdfkit');
+    }
 
     const filename = `platform-cv-${application.id}-${Date.now()}.pdf`;
     const filePath = path.join(uploadDir, filename);
@@ -1466,6 +1490,10 @@ exports.bulkDownloadDocuments = async (req, res) => {
     if (!(await isRecruitmentAdmin(req.user.id))) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
+
+    if (!archiver) {
+      return sendMissingDependency(res, 'Recruitment document ZIP download', 'archiver');
+    }
     
     const { application_ids } = req.body;
     
@@ -1730,6 +1758,10 @@ exports.exportApplicationsPDF = async (req, res) => {
       params
     );
     
+    if (!PDFDocument) {
+      return sendMissingDependency(res, 'Recruitment PDF export', 'pdfkit');
+    }
+
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=recruitment_applications.pdf');
@@ -2928,6 +2960,10 @@ const appendApplicationToPdf = async (doc, application, index) => {
 };
 
 const sendApplicantsPdf = async (res, applications, filename, title) => {
+  if (!PDFDocument) {
+    return sendMissingDependency(res, 'Recruitment PDF export', 'pdfkit');
+  }
+
   const doc = new PDFDocument({ margin: 36, size: 'A4' });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -2991,6 +3027,10 @@ exports.generateAreaPdf = (req, res) =>
   generateFilteredPdf(req, res, { area: req.query.area }, `area_${safeFileSegment(req.query.area)}.pdf`, 'Recruitment Area Report');
 
 const streamDocumentsZip = async (res, docs, filename) => {
+  if (!archiver) {
+    return sendMissingDependency(res, 'Recruitment document ZIP download', 'archiver');
+  }
+
   res.attachment(filename);
   const archive = archiver('zip', { zlib: { level: 9 } });
   archive.on('error', (error) => {
