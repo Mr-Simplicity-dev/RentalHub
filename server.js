@@ -89,6 +89,9 @@ const blogRoutes = require('./routes/blogRoutes');
 const cron = require('node-cron');
 const mongoose = require('mongoose');
 
+// Enable strict query mode to suppress Mongoose deprecation warning
+mongoose.set('strictQuery', true);
+
 const Blog = require('./models/Blog');
 const locations = require('./data/nigeriaLocations');
 const slugify = require('./utils/slugify');
@@ -403,9 +406,11 @@ app.use(csrfProtection);
 
 // Add correlation ID for request tracing
 const { v4: uuidv4 } = require('uuid');
+const logger = require('./config/utils/logger');
 app.use((req, res, next) => {
   req.correlationId = req.headers['x-correlation-id'] || uuidv4();
   res.setHeader('x-correlation-id', req.correlationId);
+  req.logger = logger.child({ correlationId: req.correlationId });
   next();
 });
 
@@ -662,5 +667,6 @@ io.use(async (socket, next) => {
   }
 });
 
-global.io = io;
-global.realtime = configureRealtimeSocket(io);
+// Export io and realtime via a shared module instead of global variables
+const realtime = configureRealtimeSocket(io);
+module.exports = { io, realtime };

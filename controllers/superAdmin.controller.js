@@ -1,5 +1,6 @@
 const db = require('../config/middleware/database');
 const jwt = require('jsonwebtoken');
+const { decryptNIN } = require('../config/utils/ninEncryption');
 const {
   DEFAULT_FEATURE_FLAGS,
   ensureFeatureFlagsTable,
@@ -148,49 +149,56 @@ const getDashboardPathForRole = (userType) => {
 
 // GET /api/super/users
 const getAllUsers = async (req, res) => {
-  try {
-    await ensureVerificationAuditSchema();
+    try {
+      await ensureVerificationAuditSchema();
 
-    const { rows } = await db.query(
-      `SELECT
-         u.id,
-         u.full_name,
-         u.email,
-         u.user_type,
-         u.identity_verified,
-         u.identity_verified_at,
-         u.is_active,
-         u.created_at,
-         u.email_verified,
-         u.phone_verified,
-         u.nin_verified,
-         u.nin,
-         u.passport_photo_url,
-         u.identity_document_type,
-         u.international_passport_number,
-         u.identity_verification_status,
-         u.approval_status,
-         ${USER_VERIFICATION_STATUS_EXPR} AS identity_verification_status,
-         v.full_name AS identity_verified_by_name,
-         COALESCE(vc.total_verified, 0)::INT AS credentials_verified_count
-       FROM users u
-       LEFT JOIN users v ON v.id = u.identity_verified_by
-       LEFT JOIN LATERAL (
-         SELECT COUNT(*) AS total_verified
-         FROM users uv
-         WHERE uv.identity_verified_by = u.id
-       ) vc ON TRUE
-       WHERE u.deleted_at IS NULL
-         AND u.user_type IN ('tenant', 'landlord')
-       ORDER BY u.created_at DESC`
-    );
+      const { rows } = await db.query(
+        `SELECT
+           u.id,
+           u.full_name,
+           u.email,
+           u.user_type,
+           u.identity_verified,
+           u.identity_verified_at,
+           u.is_active,
+           u.created_at,
+           u.email_verified,
+           u.phone_verified,
+           u.nin_verified,
+           u.nin,
+           u.passport_photo_url,
+           u.identity_document_type,
+           u.international_passport_number,
+           u.identity_verification_status,
+           u.approval_status,
+           ${USER_VERIFICATION_STATUS_EXPR} AS identity_verification_status,
+           v.full_name AS identity_verified_by_name,
+           COALESCE(vc.total_verified, 0)::INT AS credentials_verified_count
+         FROM users u
+         LEFT JOIN users v ON v.id = u.identity_verified_by
+         LEFT JOIN LATERAL (
+           SELECT COUNT(*) AS total_verified
+           FROM users uv
+           WHERE uv.identity_verified_by = u.id
+         ) vc ON TRUE
+         WHERE u.deleted_at IS NULL
+           AND u.user_type IN ('tenant', 'landlord')
+         ORDER BY u.created_at DESC`
+      );
 
-    res.json({ success: true, users: rows });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Failed to load users' });
-  }
-};
+      // Decrypt NIN for each user before returning
+      for (const row of rows) {
+        if (row.nin) {
+          row.nin = decryptNIN(row.nin);
+        }
+      }
+
+      res.json({ success: true, users: rows });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Failed to load users' });
+    }
+  };
 
 const impersonateAdmin = async (req, res) => {
   try {
@@ -573,6 +581,13 @@ const getIdentityVerifications = async (req, res) => {
       LIMIT $${i++} OFFSET $${i++}
     `;
     const dataResult = await db.query(dataQuery, [...params, pageSize, offset]);
+
+    // Decrypt NIN before returning
+    for (const row of dataResult.rows) {
+      if (row.nin) {
+        row.nin = decryptNIN(row.nin);
+      }
+    }
 
     res.json({
       success: true,

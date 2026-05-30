@@ -16,6 +16,21 @@ const extractEmailAddress = (value) => {
   return (match ? match[1] : input).trim().toLowerCase();
 };
 
+// Validate EMAIL_FROM domain at startup
+const validateSenderDomain = () => {
+  const email = extractEmailAddress(FROM);
+  if (!email || !email.includes('@')) {
+    console.error('MAILER WARNING: EMAIL_FROM does not contain a valid email address. Sending will likely fail.');
+    return;
+  }
+  const domain = email.split('@')[1].toLowerCase();
+  const knownVerifiedDomains = ['rentalhub.com.ng'];
+  if (!knownVerifiedDomains.includes(domain)) {
+    console.warn(`MAILER WARNING: EMAIL_FROM domain "${domain}" is not in the known verified list. Ensure it is verified with Resend before sending.`);
+  }
+};
+validateSenderDomain();
+
 const formatProviderError = (providerError) => {
   if (!providerError) {
     return 'Email delivery failed';
