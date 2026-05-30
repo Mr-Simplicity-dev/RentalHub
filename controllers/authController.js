@@ -3350,3 +3350,170 @@ exports.getCurrentUser = async (req, res) => {
     });
   }
 };
+
+// ================= REFRESH TOKEN =================
+exports.refreshToken = async (req, res) => {
+  try {
+    const token = getAuthTokenFromRequest(req);
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided',
+      });
+    }
+
+    // Verify existing token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Generate new token
+    const newToken = generateToken(decoded.userId, decoded.userType);
+
+    res.json({
+      success: true,
+      data: attachAuthSession(res, { token: newToken }),
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid or expired token',
+    });
+  }
+};
+
+// ================= LOGOUT =================
+exports.logout = async (req, res) => {
+  try {
+    clearAuthCookies(res);
+    res.json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Logout failed',
+    });
+  }
+};
+
+// ================= FORGOT PASSWORD =================
+exports.forgotPassword = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array(),
+      });
+    }
+
+    const { email } = req.body;
+
+    // Find user by email
+    const result = await db.query(
+      `SELECT id, email, full_name FROM users WHERE email = $1 AND deleted_at IS NULL`,
+      [email]
+    );
+
+    // Always return success to prevent email enumeration
+    if (result.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: 'If that email is registered, a password reset link has been sent.',
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Generate a JWT-based reset token (self-contained, no DB column needed)
+    const resetToken = jwt.sign(
+      { userId: user.id, purpose: 'password-reset' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // Send reset email
+    const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}`;
+    await sendPasswordResetEmail(user.email, resetUrl, user.full_name);
+
+    res.json({
+      success: true,
+      message: 'If that email is registered, a password reset link has been sent.',
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process password reset request',
+    });
+  }
+};
+
+// ================= RESET PASSWORD =================
+exports.resetPassword = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array(),
+      });
+    }
+
+    const { token } = req.params;
+    const { password } = req.body;
+
+    // Verify the JWT reset token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired password reset token',
+      });
+    }
+
+    if (decoded.purpose !== 'password-reset' || !decoded.userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid password reset token',
+      });
+    }
+
+    // Verify user still exists
+    const userResult = await db.query(
+      `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [decoded.userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired password reset token',
+      });
+    }
+
+    // Hash the new password
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    // Update password
+    await db.query(
+      `UPDATE users SET password_hash = $1 WHERE id = $2`,
+      [passwordHash, decoded.userId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Password reset successful. You can now login with your new password.',
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+    });
+  }
+};
