@@ -8,6 +8,23 @@ let lawyerInviteDashboardSchemaReady = false;
 let propertyLocationColumnsReady = false;
 let tenancyWorkflowDashboardSchemaReady = false;
 
+const SUPPORT_METRIC_ROLES = new Set([
+  'super_admin',
+  'super_support_admin',
+  'state_support_admin',
+  'lga_support_admin',
+]);
+
+const requireSupportMetricsAccess = (req, res, next) => {
+  const role = String(req.user?.user_type || '').toLowerCase();
+  if (SUPPORT_METRIC_ROLES.has(role)) return next();
+
+  return res.status(403).json({
+    success: false,
+    message: 'Support admin access required',
+  });
+};
+
 const ensureTenantDashboardSchema = async () => {
   if (tenantDashboardSchemaReady) return;
 
@@ -125,6 +142,61 @@ const ensureTenancyWorkflowDashboardSchema = async () => {
 
   tenancyWorkflowDashboardSchemaReady = true;
 };
+
+// =====================================================
+//               SUPPORT DASHBOARD METRICS
+// =====================================================
+
+router.get("/metrics", authenticate, requireSupportMetricsAccess, async (req, res) => {
+  try {
+    const [users, properties, applications, payments] = await Promise.all([
+      db.query(
+        `SELECT
+           COUNT(*)::INT AS total,
+           COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE)::INT AS today,
+           COUNT(*) FILTER (WHERE is_active IS DISTINCT FROM FALSE)::INT AS active
+         FROM users`
+      ),
+      db.query(
+        `SELECT
+           COUNT(*)::INT AS total,
+           COUNT(*) FILTER (WHERE is_verified = TRUE)::INT AS verified,
+           COUNT(*) FILTER (WHERE is_available = TRUE)::INT AS available
+         FROM properties`
+      ),
+      db.query(
+        `SELECT
+           COUNT(*)::INT AS total,
+           COUNT(*) FILTER (WHERE status = 'pending')::INT AS pending,
+           COUNT(*) FILTER (WHERE status = 'approved')::INT AS approved
+         FROM applications`
+      ),
+      db.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE payment_status = 'completed')::INT AS completed_count,
+           COALESCE(SUM(amount) FILTER (WHERE payment_status = 'completed'), 0)::NUMERIC AS completed_amount
+         FROM payments`
+      ),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        users: users.rows[0] || {},
+        properties: properties.rows[0] || {},
+        applications: applications.rows[0] || {},
+        payments: payments.rows[0] || {},
+        generated_at: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Support dashboard metrics error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch dashboard metrics",
+    });
+  }
+});
 
 // =====================================================
 //                 TENANT DASHBOARD STATS

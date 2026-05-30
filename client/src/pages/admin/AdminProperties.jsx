@@ -146,7 +146,7 @@ const AdminProperties = () => {
 
                 <td className="py-3 px-4 text-gray-700">
                   {p.city || "—"}
-                  {p.state ? `, ${p.state}` : ""}
+                  {(p.state_name || p.state) ? `, ${p.state_name || p.state}` : ""}
                 </td>
 
                 <td className="py-3 px-4 font-medium">

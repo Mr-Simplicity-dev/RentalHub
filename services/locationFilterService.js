@@ -55,7 +55,7 @@ exports.filterPropertiesByAdminLocation = async (adminId, queryParams = {}) => {
     ];
     
     // Add state filter
-    whereConditions.push(`LOWER(p.state) = LOWER($${paramCount})`);
+    whereConditions.push(`LOWER(s.state_name) = LOWER($${paramCount})`);
     params.push(assigned_state);
     paramCount++;
     
@@ -124,7 +124,7 @@ exports.filterPropertiesByAdminLocation = async (adminId, queryParams = {}) => {
     const query = `
       SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
-        p.rent_amount, p.payment_frequency, p.city, p.area, p.state,
+        p.rent_amount, p.payment_frequency, p.city, p.area, s.state_name AS state,
         p.amenities, p.featured, p.created_at,
         u.full_name as landlord_name, u.email as landlord_email,
         (SELECT photo_url FROM property_photos 
@@ -135,6 +135,7 @@ exports.filterPropertiesByAdminLocation = async (adminId, queryParams = {}) => {
         (SELECT COUNT(*) FROM applications WHERE property_id = p.id) AS application_count
       FROM properties p
       JOIN users u ON p.landlord_id = u.id
+      JOIN states s ON s.id = p.state_id
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY p.featured DESC, p.${sortField} ${sortDirection}
       LIMIT $${paramCount} OFFSET $${paramCount + 1}
@@ -149,6 +150,7 @@ exports.filterPropertiesByAdminLocation = async (adminId, queryParams = {}) => {
     const countQuery = `
       SELECT COUNT(*)
       FROM properties p
+      JOIN states s ON s.id = p.state_id
       WHERE ${whereConditions.join(' AND ')}
     `;
     
@@ -214,7 +216,7 @@ exports.filterTransactionsByAdminLocation = async (adminId, queryParams = {}) =>
     let whereConditions = ['p.payment_status = \'completed\''];
     
     // Add state filter
-    whereConditions.push(`prop.state = $${paramCount}`);
+    whereConditions.push(`LOWER(prop_state.state_name) = LOWER($${paramCount})`);
     params.push(assigned_state);
     paramCount++;
     
@@ -258,7 +260,7 @@ exports.filterTransactionsByAdminLocation = async (adminId, queryParams = {}) =>
         u.email as user_email,
         u.phone as user_phone,
         prop.title as property_title,
-        prop.state as property_state,
+        prop_state.state_name as property_state,
         prop.city as property_city,
         prop.area as property_area,
         ac.amount as commission_amount,
@@ -267,6 +269,7 @@ exports.filterTransactionsByAdminLocation = async (adminId, queryParams = {}) =>
       FROM payments p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN properties prop ON p.property_id = prop.id
+      LEFT JOIN states prop_state ON prop_state.id = prop.state_id
       LEFT JOIN admin_commissions ac ON p.id = ac.payment_id AND ac.admin_id = $${paramCount}
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY p.created_at DESC
@@ -283,6 +286,7 @@ exports.filterTransactionsByAdminLocation = async (adminId, queryParams = {}) =>
       SELECT COUNT(*)
       FROM payments p
       LEFT JOIN properties prop ON p.property_id = prop.id
+      LEFT JOIN states prop_state ON prop_state.id = prop.state_id
       WHERE ${whereConditions.join(' AND ')}
     `;
     
@@ -297,6 +301,7 @@ exports.filterTransactionsByAdminLocation = async (adminId, queryParams = {}) =>
         COUNT(CASE WHEN p.payment_status = 'completed' THEN 1 END) as completed_count
       FROM payments p
       LEFT JOIN properties prop ON p.property_id = prop.id
+      LEFT JOIN states prop_state ON prop_state.id = prop.state_id
       WHERE ${whereConditions.join(' AND ')}
       GROUP BY p.payment_type
     `;
@@ -443,10 +448,11 @@ exports.getLocationStatistics = async (adminId) => {
         AVG(rent_amount) as avg_rent,
         property_type,
         COUNT(*) as type_count
-      FROM properties
-      WHERE state = $1
-        ${assigned_city ? 'AND city = $2' : ''}
-        AND is_verified = TRUE
+      FROM properties prop
+      JOIN states prop_state ON prop_state.id = prop.state_id
+      WHERE LOWER(prop_state.state_name) = LOWER($1)
+        ${assigned_city ? 'AND prop.city = $2' : ''}
+        AND prop.is_verified = TRUE
       GROUP BY property_type
     `;
     
@@ -462,7 +468,8 @@ exports.getLocationStatistics = async (adminId) => {
         COUNT(*) as type_count
       FROM payments p
       LEFT JOIN properties prop ON p.property_id = prop.id
-      WHERE prop.state = $1
+      LEFT JOIN states prop_state ON prop_state.id = prop.state_id
+      WHERE LOWER(prop_state.state_name) = LOWER($1)
         ${assigned_city ? 'AND prop.city = $2' : ''}
         AND p.payment_status = 'completed'
       GROUP BY p.payment_type

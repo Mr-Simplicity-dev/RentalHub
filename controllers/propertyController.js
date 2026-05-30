@@ -943,6 +943,49 @@ exports.getSavedProperties = async (req, res) => {
   }
 };
 
+// -----------------------------------------------------
+// Get Tenant Application Properties
+// -----------------------------------------------------
+exports.getTenantProperties = async (req, res) => {
+  try {
+    const tenantId = req.user.id;
+
+    const result = await db.query(
+      `SELECT DISTINCT ON (p.id)
+        p.id,
+        p.title,
+        COALESCE(NULLIF(TRIM(p.full_address), ''), CONCAT_WS(', ', p.area, p.city, s.state_name)) AS address,
+        p.state_id,
+        s.state_name,
+        p.lga_name,
+        p.city,
+        p.area,
+        p.rent_amount,
+        p.payment_frequency,
+        a.id AS application_id,
+        a.status AS application_status
+       FROM applications a
+       JOIN properties p ON p.id = a.property_id
+       LEFT JOIN states s ON s.id = p.state_id
+       WHERE a.tenant_id = $1
+         AND a.status IN ('pending', 'approved')
+       ORDER BY p.id, a.created_at DESC`,
+      [tenantId]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get tenant properties error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch tenant properties',
+    });
+  }
+};
+
 
 // -----------------------------------------------------
 // Add Review

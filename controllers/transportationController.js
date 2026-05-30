@@ -1,6 +1,9 @@
 const TransportationService = require('../models/Transportation');
 const { validationResult } = require('express-validator');
 
+const allowMockPayments = () =>
+  process.env.NODE_ENV !== 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true';
+
 class TransportationController {
   // Get all available transportation services
   async getAvailableServices(req, res) {
@@ -326,8 +329,8 @@ class TransportationController {
               message: paystackError.response?.data?.message || 'Payment gateway error'
             });
           }
-        } else {
-          console.warn('PAYSTACK_SECRET_KEY not configured; returning mock payment');
+        } else if (allowMockPayments()) {
+          console.warn('PAYSTACK_SECRET_KEY not configured; using explicitly enabled local mock payment');
           paymentResult = {
             success: true,
             data: {
@@ -336,6 +339,11 @@ class TransportationController {
               access_code: `transport_${bookingId}_${Date.now()}`
             }
           };
+        } else {
+          return res.status(503).json({
+            success: false,
+            message: 'Payment gateway is not configured. Please contact support.'
+          });
         }
       } else {
         return res.status(400).json({
@@ -373,6 +381,13 @@ class TransportationController {
   // Mock payment verification for testing
   async mockPaymentVerification(req, res) {
     try {
+      if (!allowMockPayments()) {
+        return res.status(404).json({
+          success: false,
+          message: 'Mock payments are disabled'
+        });
+      }
+
       const { bookingId } = req.params;
       const tenantId = req.user.id;
       
@@ -394,8 +409,6 @@ class TransportationController {
         });
       }
       
-      // Mock payment verification - always success for testing
-      // In production, verify with actual payment gateway
       const mockPaymentId = Date.now();
       
       // Update booking payment status
@@ -483,8 +496,13 @@ class TransportationController {
             message: verifyError.response?.data?.message || 'Payment verification gateway error'
           });
         }
+      } else if (allowMockPayments()) {
+        console.warn('PAYSTACK_SECRET_KEY not configured; using explicitly enabled local mock verification');
       } else {
-        console.warn('PAYSTACK_SECRET_KEY not configured; skipping Paystack verification');
+        return res.status(503).json({
+          success: false,
+          message: 'Payment gateway is not configured. Please contact support.'
+        });
       }
 
       const paymentId = PAYSTACK_SECRET_KEY ? reference : Date.now();

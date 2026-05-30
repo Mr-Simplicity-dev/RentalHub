@@ -36,6 +36,14 @@ router.get(
   propertyController.getSavedProperties
 );
 
+// Get properties the tenant has applied for
+router.get(
+  '/tenant',
+  authenticate,
+  isTenant,
+  propertyController.getTenantProperties
+);
+
 // Get full property details (requires active subscription)
 router.get(
   '/:propertyId/details',

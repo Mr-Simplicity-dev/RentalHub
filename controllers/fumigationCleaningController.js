@@ -23,15 +23,21 @@ const isFumigationAdminUser = (user) =>
 // ---------------------------------------------------------------------------
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
+const allowMockPayments = () =>
+  process.env.NODE_ENV !== 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true';
 
 const PaymentService = {
   initializePayment: async (paymentData, paymentMethod) => {
-    if (!PAYSTACK_SECRET_KEY) {
-      console.warn('PAYSTACK_SECRET_KEY not configured; returning mock payment');
+    if (!PAYSTACK_SECRET_KEY && allowMockPayments()) {
+      console.warn('PAYSTACK_SECRET_KEY not configured; using explicitly enabled local mock payment');
       return {
         authorization_url: `https://paystack.com/pay/${paymentData.reference}`,
         reference: paymentData.reference
       };
+    }
+
+    if (!PAYSTACK_SECRET_KEY) {
+      throw new Error('Payment gateway is not configured. Please contact support.');
     }
 
     try {
@@ -65,8 +71,8 @@ const PaymentService = {
   },
 
   verifyPayment: async (reference) => {
-    if (!PAYSTACK_SECRET_KEY) {
-      console.warn('PAYSTACK_SECRET_KEY not configured; returning mock verification');
+    if (!PAYSTACK_SECRET_KEY && allowMockPayments()) {
+      console.warn('PAYSTACK_SECRET_KEY not configured; using explicitly enabled local mock verification');
       return {
         success: true,
         data: {
@@ -75,6 +81,13 @@ const PaymentService = {
           amount: 10000,
           currency: 'NGN'
         }
+      };
+    }
+
+    if (!PAYSTACK_SECRET_KEY) {
+      return {
+        success: false,
+        message: 'Payment gateway is not configured. Please contact support.'
       };
     }
 

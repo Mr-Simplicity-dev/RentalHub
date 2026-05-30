@@ -344,10 +344,11 @@ exports.processPaymentCommission = async (paymentId) => {
     const paymentResult = await db.query(
       `SELECT 
         p.*,
-        prop.state as property_state,
+        prop_state.state_name as property_state,
         prop.city as property_city
        FROM payments p
        LEFT JOIN properties prop ON p.property_id = prop.id
+       LEFT JOIN states prop_state ON prop_state.id = prop.state_id
        WHERE p.id = $1 AND p.payment_status = 'completed'`,
       [paymentId]
     );
@@ -402,8 +403,9 @@ exports.calculatePerformanceBonus = async (adminId, month, year) => {
          AND p.created_at <= $3
          AND EXISTS (
            SELECT 1 FROM properties prop 
+           LEFT JOIN states prop_state ON prop_state.id = prop.state_id
            WHERE prop.id = p.property_id 
-           AND prop.state = (SELECT assigned_state FROM users WHERE id = $1)
+           AND LOWER(prop_state.state_name) = LOWER((SELECT assigned_state FROM users WHERE id = $1))
          )`,
       [adminId, startDate, endDate]
     );

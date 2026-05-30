@@ -614,12 +614,13 @@ const findLandlordsForRequest = async (alert) => {
      FROM users u
      LEFT JOIN properties p
        ON (p.landlord_id = u.id OR p.user_id = u.id)
+     LEFT JOIN states s ON s.id = p.state_id
      WHERE u.user_type = 'landlord'
        AND u.deleted_at IS NULL
        AND u.is_active IS DISTINCT FROM FALSE
        AND (
          ($1::int IS NOT NULL AND (u.preferred_state_id = $1 OR p.state_id = $1))
-         OR ($2 <> '' AND LOWER(TRIM(COALESCE(p.state, ''))) = LOWER(TRIM($2)))
+         OR ($2 <> '' AND LOWER(TRIM(COALESCE(s.state_name, ''))) = LOWER(TRIM($2)))
        )
        AND (
          LOWER(TRIM(COALESCE(u.preferred_lga_name, ''))) = ANY($3::text[])
