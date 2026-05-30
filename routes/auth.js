@@ -17,8 +17,10 @@ const registerValidators = [
     .matches(/^\+?\d{10,15}$/)
     .withMessage('Please enter a valid phone number (10-15 digits, optional +)'),
   body('password')
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters'),
+    .isLength({ min: 10 })
+    .withMessage('Password must be at least 10 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/)
+    .withMessage('Password must include uppercase, lowercase, number, and special character'),
   body('full_name')
     .trim()
     .notEmpty()
@@ -142,7 +144,10 @@ router.post(
       .trim()
       .customSanitizer(v => String(v || '').replace(/\s+/g, ''))
       .matches(/^\+?\d{10,15}$/),
-    body('password').isLength({ min: 8 }),
+    body('password')
+      .isLength({ min: 10 })
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/)
+      .withMessage('Password must be 10+ characters with uppercase, lowercase, number, and special character'),
   ],
   authController.acceptLawyerInvite
 );
@@ -161,7 +166,10 @@ router.post(
       .trim()
       .customSanitizer(v => String(v || '').replace(/\s+/g, ''))
       .matches(/^\+?\d{10,15}$/),
-    body('password').isLength({ min: 8 }),
+    body('password')
+      .isLength({ min: 10 })
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/)
+      .withMessage('Password must be 10+ characters with uppercase, lowercase, number, and special character'),
   ],
   authController.acceptPlatformLawyerInvite
 );
@@ -175,7 +183,10 @@ router.post(
       .trim()
       .customSanitizer(v => String(v || '').replace(/\s+/g, ''))
       .matches(/^\+?\d{10,15}$/),
-    body('password').isLength({ min: 8 }),
+    body('password')
+      .isLength({ min: 10 })
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/)
+      .withMessage('Password must be 10+ characters with uppercase, lowercase, number, and special character'),
   ],
   authController.acceptAgentInvite
 );
@@ -245,7 +256,10 @@ router.post(
 
 router.post(
   '/reset-password/:token',
-  [body('password').isLength({ min: 8 })],
+  [body('password')
+    .isLength({ min: 10 })
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/)
+    .withMessage('Password must be 10+ characters with uppercase, lowercase, number, and special character')],
   authController.resetPassword
 );
 

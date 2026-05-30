@@ -969,7 +969,8 @@ async function processPendingSmsFallbacks() {
 }
 
 async function sendVerificationCode(phoneNumber) {
-  const code = Math.floor(100000 + Math.random() * 900000);
+  const crypto = require('crypto');
+  const code = crypto.randomInt(100000, 999999);
   const expiresAt = Date.now() + DEFAULT_SMS_TRACKING_TTL_MS;
   const message = `Your Rental Hub NG verification code is: ${code}. Valid for 10 minutes. Do not share this code.`;
 

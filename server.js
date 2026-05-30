@@ -10,6 +10,19 @@ const { Server } = require('socket.io');
 
 dotenv.config();
 
+// ==================== STARTUP VALIDATION ====================
+const REQUIRED_ENV_VARS = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'JWT_SECRET'];
+const missingEnvVars = REQUIRED_ENV_VARS.filter(key => !process.env[key] || !process.env[key].trim());
+if (missingEnvVars.length) {
+  console.error(`FATAL: Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  process.exit(1);
+}
+
+if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+  console.error('FATAL: JWT_SECRET must be at least 32 characters long for security');
+  process.exit(1);
+}
+
 const db = require('./config/middleware/database');
 
 const authRoutes = require('./routes/auth');
@@ -151,16 +164,34 @@ const schedulePayoutRetries = () => {
   console.log(`Payout retry scheduler started (${cronExpression})`);
 };
 
-// Ensure DB is connected before cron runs
+// MongoDB connection monitoring
 mongoose.connection.on('connected', () => {
   console.log('MongoDB connected for cron jobs');
+  startMongoCronJobs();
+});
 
-  // AI blog generation
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error:', err.message);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('MongoDB disconnected — cron jobs paused');
+});
+
+const startMongoCronJobs = () => {
+  // AI blog generation (reduced from 20 to 3 per day for quality and cost)
   cron.schedule('0 1 * * *', async () => {
+    const DAILY_BUDGET_CENTS = Number(process.env.AI_BLOG_DAILY_BUDGET_CENTS) || 30;
+    const MAX_POSTS_PER_DAY = Number(process.env.AI_BLOG_MAX_POSTS_PER_DAY) || 3;
+    const postsPerDay = Math.min(MAX_POSTS_PER_DAY, Math.floor(DAILY_BUDGET_CENTS / 10));
+
+    if (postsPerDay < 1) {
+      console.log('AI blog generation skipped: DAILY_BUDGET_CENTS too low');
+      return;
+    }
+
     try {
       console.log('Generating AI blogs...');
-
-      const postsPerDay = 20;
       let created = 0;
 
       for (let i = 0; i < postsPerDay; i++) {
@@ -263,7 +294,7 @@ Start your search today and find the best home in ${location}.
       console.error('Sitemap submission failed:', err.message);
     }
   });
-});
+};
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -282,9 +313,26 @@ app.use('/', blogRoutes);
 app.use('/', adminSeoRoutes);
 app.use('/.well-known', appLinksRoutes);
 
-app.set('trust proxy', 1);
+app.set('trust proxy', Number(process.env.TRUST_PROXY_COUNT) || 2);
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdn.jsdelivr.net", "unpkg.com"],
+      imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:"],
+      connectSrc: ["'self'", "api.paystack.co"],
+      fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+      mediaSrc: ["'self'", "res.cloudinary.com", "blob:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+}));
 
 app.use(
   cors({
@@ -299,23 +347,21 @@ app.use(
   })
 );
 
-const publicUploadStaticOptions = {
+// Uploaded files are served through authenticated routes only — never via public static
+const authenticatedUploadsStaticOptions = {
   dotfiles: 'deny',
   index: false,
   setHeaders: (res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('X-RentalHub-Access', 'authenticated-route-required');
   },
 };
 
-app.use(
-  '/uploads/passports',
-  express.static(path.join(__dirname, 'uploads', 'passports'), publicUploadStaticOptions)
-);
-app.use(
-  '/uploads/ad-spaces',
-  express.static(path.join(__dirname, 'uploads', 'ad-spaces'), publicUploadStaticOptions)
-);
+// NOTE: These static directories are intentionally not mounted here.
+// File serving must go through authenticated route handlers in routes/.
+// See routes/users.js for passport uploads and routes/admin.js for ad-spaces.
 
 const limiter = rateLimit({
   windowMs: apiRateLimitWindowMs,
@@ -345,14 +391,23 @@ app.use('/api/', limiter);
 
 app.use(
   express.json({
+    limit: '10mb',
     verify: (req, _res, buf) => {
       req.rawBody = Buffer.from(buf);
     },
   })
 );
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(securityAlertMiddleware);
 app.use(csrfProtection);
+
+// Add correlation ID for request tracing
+const { v4: uuidv4 } = require('uuid');
+app.use((req, res, next) => {
+  req.correlationId = req.headers['x-correlation-id'] || uuidv4();
+  res.setHeader('x-correlation-id', req.correlationId);
+  next();
+});
 
 app.use(audit('API Request', 'system'));
 
@@ -426,55 +481,82 @@ app.get('/api/auth/verify-email', async (req, res) => {
   }
 });
 
-app.use('/api/auth', authLimiter, authSensitiveLimiter, authRoutes);
-app.use('/api/properties', propertyRoutes);
-app.use('/api/payments', paymentOpsLimiter, paymentRoutes);
-app.use('/api/applications', applicationRoutes);
-app.use('/api/messages', messageRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/super', superAdminRoutes);
-app.use('/api/transportation', transportationRoutes);
-app.use('/api/transportation-admin', transportationAdminRoutes);
-app.use('/api/fumigation-cleaning', fumigationCleaningRoutes);
-app.use('/api/property-utils', propertyUtilsRoutes);
-app.use('/api/property-alerts', propertyAlertsRoutes);
-app.use('/api/ads', adRoutes);
-app.use('/api/platform-ratings', platformRatingRoutes);
-app.use('/api/recruitment', recruitmentRoutes);
-app.use('/api/referrals', referralRoutes);
+// Build standard per-route limiter
+const buildRouteLimiter = (max, windowMinutes = 15) => rateLimit({
+  windowMs: windowMinutes * 60 * 1000,
+  max,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests for this service. Please slow down.' },
+});
 
-app.use('/api/disputes', disputesRoutes);
-app.use('/api/disputes', disputeRoutes);
-app.use('/api/legal', legalRoutes);
-app.use('/api/compliance', complianceRoutes);
-app.use('/api/export', exportRoutes);
+const adminLimiter = buildRouteLimiter(isProduction ? 200 : 500);
+const generalOpsLimiter = buildRouteLimiter(isProduction ? 500 : 2000);
+const propertyOpsLimiter = buildRouteLimiter(isProduction ? 300 : 1000);
+
+app.use('/api/auth', authLimiter, authSensitiveLimiter, authRoutes);
+app.use('/api/properties', propertyOpsLimiter, propertyRoutes);
+app.use('/api/payments', paymentOpsLimiter, paymentRoutes);
+app.use('/api/applications', generalOpsLimiter, applicationRoutes);
+app.use('/api/messages', generalOpsLimiter, messageRoutes);
+app.use('/api/users', generalOpsLimiter, userRoutes);
+app.use('/api/admin', adminLimiter, adminRoutes);
+app.use('/api/dashboard', generalOpsLimiter, dashboardRoutes);
+app.use('/api/notifications', generalOpsLimiter, notificationRoutes);
+app.use('/api/super', adminLimiter, superAdminRoutes);
+app.use('/api/transportation', generalOpsLimiter, transportationRoutes);
+app.use('/api/transportation-admin', adminLimiter, transportationAdminRoutes);
+app.use('/api/fumigation-cleaning', generalOpsLimiter, fumigationCleaningRoutes);
+app.use('/api/property-utils', generalOpsLimiter, propertyUtilsRoutes);
+app.use('/api/property-alerts', generalOpsLimiter, propertyAlertsRoutes);
+app.use('/api/ads', generalOpsLimiter, adRoutes);
+app.use('/api/platform-ratings', generalOpsLimiter, platformRatingRoutes);
+app.use('/api/recruitment', generalOpsLimiter, recruitmentRoutes);
+app.use('/api/referrals', generalOpsLimiter, referralRoutes);
+
+app.use('/api/disputes', generalOpsLimiter, disputesRoutes);
+app.use('/api/disputes', generalOpsLimiter, disputeRoutes);
+app.use('/api/legal', generalOpsLimiter, legalRoutes);
+app.use('/api/compliance', generalOpsLimiter, complianceRoutes);
+app.use('/api/export', generalOpsLimiter, exportRoutes);
 app.use('/api/financial-admin', financeOpsLimiter, financialAdminRoutes);
-app.use('/api/state-admin', stateAdminRoutes);
+app.use('/api/state-admin', adminLimiter, stateAdminRoutes);
 
 app.use('/evidence', verificationOpsLimiter, verificationRoutes);
 app.use('/api/commissions', financeOpsLimiter, agentCommissionRoutes);
-app.use('/api/admin/agents', adminAgentRoutes);
+app.use('/api/admin/agents', adminLimiter, adminAgentRoutes);
 app.use('/api/withdrawals', financeOpsLimiter, agentWithdrawalRoutes);
-app.use('/api/state-migrations', stateMigrationRoutes);
-app.use('/api', damageReportRoutes);
-app.use('/api/rent-savings', rentSavingsRoutes);
+app.use('/api/state-migrations', generalOpsLimiter, stateMigrationRoutes);
+app.use('/api', generalOpsLimiter, damageReportRoutes);
+app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
 
 app.use((err, req, res, next) => {
-  console.error('UNHANDLED ERROR:', err);
-
   const statusCode = err.status || err.statusCode || 500;
-  const safeMessage =
-    isProduction && statusCode >= 500
-      ? 'Internal Server Error'
-      : err.message || 'Internal Server Error';
+  const isServerError = statusCode >= 500;
 
-  res.status(statusCode).json({
+  if (isProduction && isServerError) {
+    console.error('UNHANDLED ERROR (correlationId:', req.correlationId || 'N/A', '):', err.message || err);
+    console.error(err.stack);
+  } else {
+    console.error(`[${req.correlationId || 'N/A'}] Route error (${statusCode}):`, err.message || err);
+  }
+
+  const safeMessage = isProduction && isServerError
+    ? 'Internal Server Error'
+    : err.message || 'Internal Server Error';
+
+  const response = {
     success: false,
     message: safeMessage,
-  });
+  };
+
+  // In development, include correlation ID for debugging
+  if (!isProduction && req.correlationId) {
+    response.correlationId = req.correlationId;
+  }
+
+  // Do NOT include stack traces in responses even in development
+  res.status(statusCode).json(response);
 });
 
 const PORT = process.env.APP_PORT || 5000;
@@ -540,6 +622,44 @@ const io = new Server(server, {
     origin: Array.from(allowedOrigins),
     credentials: true,
   },
+});
+
+// Socket.io authentication middleware
+io.use(async (socket, next) => {
+  try {
+    const { parseCookies } = require('./config/utils/authCookies');
+    const cookies = parseCookies(socket.handshake?.headers?.cookie);
+    const token = socket.handshake?.auth?.token ||
+      cookies.auth_token ||
+      String(socket.handshake?.headers?.authorization || '').replace(/^Bearer\s+/i, '');
+
+    if (!token) {
+      return next(new Error('Authentication required'));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId || decoded.id || decoded.user_id;
+
+    if (!userId) {
+      return next(new Error('Invalid token payload'));
+    }
+
+    const userResult = await db.query(
+      `SELECT id, user_type, is_active, deleted_at
+       FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+
+    if (!userResult.rows.length || userResult.rows[0].deleted_at || userResult.rows[0].is_active === false) {
+      return next(new Error('User account is not active'));
+    }
+
+    socket.userId = userId;
+    socket.userType = userResult.rows[0].user_type;
+    next();
+  } catch (err) {
+    return next(new Error('Invalid or expired token'));
+  }
 });
 
 global.io = io;
