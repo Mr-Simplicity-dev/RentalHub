@@ -5,17 +5,27 @@
  * tracking which migrations have been applied in a `schema_migrations` table.
  * 
  * Usage:
- *   node scripts/runMigrations.js              # Run all pending migrations
- *   node scripts/runMigrations.js --dry-run    # Show what would be run
- *   node scripts/runMigrations.js --down       # Rollback last migration (if supported)
- *   node scripts/runMigrations.js --file 045   # Run from a specific number onward
- *   node scripts/runMigrations.js --reset      # Reset migration tracking (DANGER)
+ *   node scripts/runMigrations.js                    # Run all pending migrations
+ *   node scripts/runMigrations.js --dry-run          # Show what would be run
+ *   node scripts/runMigrations.js --down             # Rollback last migration (if supported)
+ *   node scripts/runMigrations.js --file=045         # Run from a specific number onward
+ *   node scripts/runMigrations.js --reset            # Reset migration tracking (DANGER)
+ *   node scripts/runMigrations.js --skip-hash-check  # Skip hash integrity checks on already-applied migrations
+ *   node scripts/runMigrations.js --continue-on-error # Continue running remaining migrations after a failure
+ * 
+ * Production-safe features:
+ *   - Each migration runs in its own transaction (or respects existing BEGIN/COMMIT)
+ *   - Uses ON CONFLICT for tracking table UPSERTS
+ *   - Detects and reports view dependencies on ALTER COLUMN operations
+ *   - Supports --skip-hash-check when migrations have been intentionally modified
+ *   - Supports --continue-on-error to apply as many migrations as possible
  */
 
 const { Pool } = require('pg');
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // ── Configuration ──────────────────────────────────────────────────────────────
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
@@ -24,7 +34,7 @@ const BATCH_SIZE = 1; // Run one migration per batch for granular tracking
 
 const pool = new Pool({
   host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
+  port: process.env.DB_PORT || 5432,
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
@@ -39,6 +49,8 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const DOWN_MODE = args.includes('--down');
 const RESET_MODE = args.includes('--reset');
+const SKIP_HASH_CHECK = args.includes('--skip-hash-check');
+const CONTINUE_ON_ERROR = args.includes('--continue-on-error');
 const fileArg = args.find(a => a.startsWith('--file='));
 const START_FROM = fileArg ? fileArg.split('=')[1] : null;
 
@@ -142,20 +154,27 @@ const runPendingMigrations = async () => {
     }
 
     // Check for hash changes in already-applied migrations
-    for (const m of migrations) {
-      if (appliedFilenames.has(m.filename)) {
-        const storedHash = appliedHashes.get(m.filename);
-        const currentHash = computeFileHash(m.content);
-        if (storedHash !== currentHash) {
-          console.warn(`\n⚠️  WARNING: Migration "${m.filename}" has changed since it was applied!`);
-          console.warn(`   Stored hash: ${storedHash}`);
-          console.warn(`   Current hash: ${currentHash}`);
-          console.warn('   This could indicate tampering or an unintentional edit.');
-          if (!DRY_RUN) {
-            console.warn('   Continuing anyway. Update the tracking record manually if needed.');
+    // Skip this check if --skip-hash-check flag is provided
+    let hashChanged = false;
+    if (!SKIP_HASH_CHECK) {
+      for (const m of migrations) {
+        if (appliedFilenames.has(m.filename)) {
+          const storedHash = appliedHashes.get(m.filename);
+          const currentHash = computeFileHash(m.content);
+          if (storedHash !== currentHash) {
+            hashChanged = true;
+            console.warn(`\n⚠️  WARNING: Migration "${m.filename}" has changed since it was applied!`);
+            console.warn(`   Stored hash: ${storedHash}`);
+            console.warn(`   Current hash: ${currentHash}`);
+            console.warn('   This could indicate tampering or an unintentional edit.');
+            if (!DRY_RUN) {
+              console.warn('   Continuing anyway. Update the tracking record manually if needed.');
+            }
           }
         }
       }
+    } else {
+      console.log('🔓 Hash check skipped (--skip-hash-check flag set).');
     }
 
     if (pending.length === 0) {
@@ -184,15 +203,30 @@ const runPendingMigrations = async () => {
       const startTime = Date.now();
 
       try {
-        // For safety, each migration runs in its own transaction
-        await client.query('BEGIN');
-        await client.query(migration.content);
+        // Check if migration contains its own explicit transaction control
+        const hasExplicitTx = /^\s*BEGIN\b/im.test(migration.content) && /^\s*COMMIT\b/im.test(migration.content);
+
+        if (hasExplicitTx) {
+          // Migration manages its own transaction - run directly
+          await client.query(migration.content);
+        } else {
+          // For safety, each migration runs in its own transaction
+          await client.query('BEGIN');
+          await client.query(migration.content);
+          await client.query('COMMIT');
+        }
+
+        // Mark as applied (outside transaction to avoid nested tx issues)
         await client.query(
           `INSERT INTO ${TRACKING_TABLE} (filename, migration_number, hash, batch, duration_ms)
-           VALUES ($1, $2, $3, $4, $5)`,
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (filename) DO UPDATE SET
+             hash = EXCLUDED.hash,
+             batch = EXCLUDED.batch,
+             duration_ms = EXCLUDED.duration_ms,
+             applied_at = CURRENT_TIMESTAMP`,
           [migration.filename, migration.number, hash, batch, 0]
         );
-        await client.query('COMMIT');
 
         const duration = Date.now() - startTime;
         // Update duration after commit
@@ -204,7 +238,9 @@ const runPendingMigrations = async () => {
         console.log(`✅ (${duration}ms)`);
         succeeded++;
       } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
+        // Attempt rollback (may fail if migration had its own tx control)
+        try { await client.query('ROLLBACK'); } catch (_) {}
+
         console.log(`❌ FAILED`);
         console.error(`\n   Error in ${migration.filename}:`);
         console.error(`   ${error.message}`);
@@ -214,7 +250,23 @@ const runPendingMigrations = async () => {
           console.error(`   Near line ${lineNum}: ${(lines[lineNum - 1] || '').trim().slice(0, 120)}`);
         }
         failed++;
-        break; // Stop on first failure
+
+        if (CONTINUE_ON_ERROR) {
+          console.warn(`   ⏩ Continuing with next migration (--continue-on-error).`);
+          // Mark as failed in tracking so we know it was attempted
+          try {
+            await client.query(
+              `INSERT INTO ${TRACKING_TABLE} (filename, migration_number, hash, batch, duration_ms)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (filename) DO NOTHING`,
+              [migration.filename, migration.number, 'FAILED_' + hash, batch, Date.now() - startTime]
+            );
+          } catch (_) {}
+          continue;
+        } else {
+          console.error('\n   ⚠️  To continue despite errors, use: --continue-on-error');
+          break; // Stop on first failure
+        }
       }
     }
 

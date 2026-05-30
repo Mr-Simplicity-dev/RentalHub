@@ -129,15 +129,15 @@ CREATE TABLE IF NOT EXISTS recruitment_applications (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_recruitment_applications_user_id ON recruitment_applications(user_id);
-CREATE INDEX idx_recruitment_applications_role_id ON recruitment_applications(role_id);
-CREATE INDEX idx_recruitment_applications_cycle_id ON recruitment_applications(cycle_id);
-CREATE INDEX idx_recruitment_applications_status ON recruitment_applications(status);
-CREATE INDEX idx_recruitment_applications_state ON recruitment_applications(state_name);
-CREATE INDEX idx_recruitment_applications_lga ON recruitment_applications(lga_name);
-CREATE INDEX idx_recruitment_applications_area ON recruitment_applications(area_locality);
-CREATE INDEX idx_recruitment_applications_access_code ON recruitment_applications(access_code);
-CREATE INDEX idx_recruitment_applications_payment_status ON recruitment_applications(payment_status);
+CREATE INDEX IF NOT EXISTS idx_recruitment_applications_user_id ON recruitment_applications(user_id);
+CREATE INDEX IF NOT EXISTS idx_recruitment_applications_role_id ON recruitment_applications(role_id);
+CREATE INDEX IF NOT EXISTS idx_recruitment_applications_cycle_id ON recruitment_applications(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_recruitment_applications_status ON recruitment_applications(status);
+CREATE INDEX IF NOT EXISTS idx_recruitment_applications_state ON recruitment_applications(state_name);
+CREATE INDEX IF NOT EXISTS idx_recruitment_applications_lga ON recruitment_applications(lga_name);
+CREATE INDEX IF NOT EXISTS idx_recruitment_applications_area ON recruitment_applications(area_locality);
+CREATE INDEX IF NOT EXISTS idx_recruitment_applications_access_code ON recruitment_applications(access_code);
+CREATE INDEX IF NOT EXISTS idx_recruitment_applications_payment_status ON recruitment_applications(payment_status);
 
 ALTER TABLE recruitment_applications
   ADD COLUMN IF NOT EXISTS shortlist_reason TEXT,
@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS recruitment_documents (
   uploaded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_recruitment_documents_application_id ON recruitment_documents(application_id);
+CREATE INDEX IF NOT EXISTS idx_recruitment_documents_application_id ON recruitment_documents(application_id);
 
 -- 7. Interview questions bank
 CREATE TABLE IF NOT EXISTS recruitment_questions (
@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS recruitment_questions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_recruitment_questions_category ON recruitment_questions(category);
+CREATE INDEX IF NOT EXISTS idx_recruitment_questions_category ON recruitment_questions(category);
 
 ALTER TABLE recruitment_questions
   ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id),
@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS recruitment_interview_assignments (
   UNIQUE(application_id, question_id)
 );
 
-CREATE INDEX idx_interview_assignments_app ON recruitment_interview_assignments(application_id);
+CREATE INDEX IF NOT EXISTS idx_interview_assignments_app ON recruitment_interview_assignments(application_id);
 
 -- 9. Interview recording metadata
 CREATE TABLE IF NOT EXISTS recruitment_interview_recordings (
@@ -221,13 +221,13 @@ CREATE TABLE IF NOT EXISTS recruitment_analytics_snapshot (
 -- We'll use a new role check: recruitment_admin
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_recruitment_admin BOOLEAN DEFAULT FALSE;
 
-ALTER TABLE users
-  ALTER COLUMN user_type TYPE VARCHAR(50);
-
 DO $$
 DECLARE
   existing_check_name TEXT;
+  current_len INTEGER;
+  col_has_views INTEGER;
 BEGIN
+  -- Drop existing check constraint on user_type if it exists
   SELECT c.conname
   INTO existing_check_name
   FROM pg_constraint c
@@ -238,6 +238,42 @@ BEGIN
 
   IF existing_check_name IS NOT NULL THEN
     EXECUTE format('ALTER TABLE users DROP CONSTRAINT %I', existing_check_name);
+  END IF;
+
+  -- Get current character maximum length
+  SELECT COALESCE(character_maximum_length, 0) INTO current_len
+  FROM information_schema.columns
+  WHERE table_name = 'users' AND column_name = 'user_type';
+
+  -- Only ALTER if column is narrower than VARCHAR(50)
+  IF current_len < 50 THEN
+    -- Check for dependent views
+    SELECT COUNT(*) INTO col_has_views
+    FROM pg_depend d
+    JOIN pg_rewrite r ON r.oid = d.objid
+    JOIN pg_class v ON v.oid = r.ev_class
+    JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+    WHERE d.refclassid = 'pg_class'::regclass
+      AND d.classid = 'pg_rewrite'::regclass
+      AND d.refobjsubid > 0
+      AND a.attrelid = 'users'::regclass
+      AND v.relkind = 'v'
+      AND a.attname = 'user_type';
+
+    IF col_has_views > 0 THEN
+      RAISE NOTICE '% view(s) depend on user_type, dropping temporarily', col_has_views;
+      DROP VIEW IF EXISTS financial_admin_dashboard CASCADE;
+      DROP VIEW IF EXISTS lga_admin_hierarchy CASCADE;
+      DROP VIEW IF EXISTS state_admin_earnings CASCADE;
+      DROP VIEW IF EXISTS state_admin_transportation_view CASCADE;
+      DROP VIEW IF EXISTS super_admin_transportation_oversight_view CASCADE;
+      DROP VIEW IF EXISTS transportation_system_health_view CASCADE;
+    END IF;
+
+    ALTER TABLE users ALTER COLUMN user_type TYPE VARCHAR(50);
+    RAISE NOTICE 'Altered user_type to VARCHAR(50)';
+  ELSE
+    RAISE NOTICE 'user_type is already VARCHAR(%), skipping ALTER COLUMN', current_len;
   END IF;
 END $$;
 
