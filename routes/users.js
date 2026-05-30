@@ -7,6 +7,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { body, query } = require('express-validator');
+const validateRequest = require('../config/middleware/validateRequest');
 const { sensitiveActionLimiter } = require('../config/middleware/securityRateLimiters');
 
 // Ensure uploads directory exists
@@ -15,12 +17,18 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Only allow safe image extensions
+const ALLOWED_PASSPORT_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_PASSPORT_EXTENSIONS.has(ext)) {
+      return cb(new Error(`Invalid file extension "${ext}". Allowed: ${Array.from(ALLOWED_PASSPORT_EXTENSIONS).join(', ')}`));
+    }
     cb(null, `passport_${req.user.id}_${Date.now()}${ext}`);
   }
 });
@@ -31,6 +39,10 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) {
       return cb(new Error('Only image files are allowed'));
+    }
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_PASSPORT_EXTENSIONS.has(ext)) {
+      return cb(new Error('Invalid image file type'));
     }
     cb(null, true);
   }
@@ -421,7 +433,11 @@ router.get('/:userId', async (req, res) => {
 });
 
 // Update user profile
-router.put('/profile', authenticate, async (req, res) => {
+router.put('/profile', authenticate, [
+  body('full_name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 255 }).withMessage('Full name must be 2-255 characters'),
+  body('phone').optional({ checkFalsy: true }).trim().customSanitizer((value) => String(value || '').replace(/\s+/g, '')).matches(/^\+?\d{10,15}$/).withMessage('Phone must be 10-15 digits, optional +'),
+  validateRequest,
+], async (req, res) => {
   try {
     const userId = req.user.id;
     const { full_name, phone } = req.body;
@@ -476,24 +492,18 @@ router.put('/profile', authenticate, async (req, res) => {
 });
 
 // Change password
-router.put('/change-password', authenticate, sensitiveActionLimiter, async (req, res) => {
+router.put('/change-password', authenticate, sensitiveActionLimiter, [
+  body('current_password').notEmpty().withMessage('Current password is required'),
+  body('new_password')
+    .isLength({ min: 10 })
+    .withMessage('New password must be at least 10 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/)
+    .withMessage('New password must include uppercase, lowercase, number, and special character'),
+  validateRequest,
+], async (req, res) => {
   try {
     const userId = req.user.id;
     const { current_password, new_password } = req.body;
-
-    if (!current_password || !new_password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Current and new password required'
-      });
-    }
-
-    if (new_password.length < 8) {
-      return res.status(400).json({
-        success: false,
-        message: 'New password must be at least 8 characters'
-      });
-    }
 
     // Get current password hash
     const result = await db.query(
@@ -619,8 +629,8 @@ router.post('/verification/live-capture/session', authenticate, async (req, res)
   }
 });
 
-// Delete account
-router.delete('/account', authenticate, async (req, res) => {
+// Delete account (soft delete — no cascade data loss)
+router.delete('/account', authenticate, sensitiveActionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
     const { password } = req.body;
@@ -634,9 +644,16 @@ router.delete('/account', authenticate, async (req, res) => {
 
     // Verify password
     const result = await db.query(
-      'SELECT password_hash FROM users WHERE id = $1',
+      'SELECT password_hash, user_type FROM users WHERE id = $1',
       [userId]
     );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
 
     const user = result.rows[0];
     const isValid = await bcrypt.compare(password, user.password_hash);
@@ -648,8 +665,49 @@ router.delete('/account', authenticate, async (req, res) => {
       });
     }
 
-    // Delete user (cascade will delete related records)
-    await db.query('DELETE FROM users WHERE id = $1', [userId]);
+    // Check for active data before deletion
+    const activeDataCheck = await db.query(
+      `SELECT
+         EXISTS(SELECT 1 FROM properties WHERE landlord_id = $1 AND is_available = TRUE) AS has_active_properties,
+         EXISTS(SELECT 1 FROM tenancies WHERE tenant_id = $1 AND status = 'active') AS has_active_tenancies,
+         EXISTS(SELECT 1 FROM disputes WHERE (complainant_id = $1 OR respondent_id = $1) AND status IN ('pending', 'investigating', 'escalated')) AS has_active_disputes,
+         EXISTS(SELECT 1 FROM payments WHERE user_id = $1 AND payment_status = 'pending') AS has_pending_payments`,
+      [userId]
+    );
+    const activeWarnings = activeDataCheck.rows[0];
+
+    if (activeWarnings.has_active_properties || activeWarnings.has_active_tenancies ||
+        activeWarnings.has_active_disputes || activeWarnings.has_pending_payments) {
+      const warnings = [];
+      if (activeWarnings.has_active_properties) warnings.push('active property listings');
+      if (activeWarnings.has_active_tenancies) warnings.push('active tenancies');
+      if (activeWarnings.has_active_disputes) warnings.push('ongoing disputes');
+      if (activeWarnings.has_pending_payments) warnings.push('pending payments');
+
+      return res.status(409).json({
+        success: false,
+        message: `Cannot delete account with ${warnings.join(', ')}. Please resolve these first or contact support.`,
+        code: 'ACCOUNT_HAS_ACTIVE_DATA'
+      });
+    }
+
+    // Soft delete: mark as deleted rather than cascade-removing
+    await db.query(
+      `UPDATE users
+       SET deleted_at = CURRENT_TIMESTAMP,
+           is_active = FALSE,
+           email = CONCAT('deleted_', id, '_', email),
+           phone = CONCAT('deleted_', id, '_', phone),
+           password_hash = 'DELETED_ACCOUNT',
+           passport_photo_url = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
+
+    // Clear auth cookies
+    const { clearAuthCookies } = require('../config/utils/authCookies');
+    clearAuthCookies(res);
 
     res.json({
       success: true,
@@ -657,6 +715,7 @@ router.delete('/account', authenticate, async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Delete account error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete account'
@@ -794,5 +853,47 @@ router.post('/upload-passport', authenticate, upload.single('passport'), async (
   }
 });
 
+
+// Authenticated passport photo serving (NOT via express.static)
+router.get('/passport-photo/:filename', authenticate, async (req, res) => {
+  try {
+    const { filename } = req.params;
+
+    // Security: prevent path traversal
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(403).json({ success: false, message: 'Invalid filename' });
+    }
+
+    // Extract user ID from filename: passport_{userId}_timestamp.ext
+    const match = filename.match(/^passport_(\d+)_/);
+    if (!match) {
+      return res.status(400).json({ success: false, message: 'Invalid filename format' });
+    }
+
+    const fileOwnerId = parseInt(match[1], 10);
+
+    // Only the owner or admins can view
+    if (fileOwnerId !== req.user.id && !['admin', 'super_admin', 'state_admin', 'financial_admin'].includes(req.user.user_type)) {
+      return res.status(403).json({ success: false, message: 'You do not have permission to view this file' });
+    }
+
+    const filePath = path.join(uploadDir, filename);
+
+    // Verify the resolved path is within the upload directory
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.startsWith(path.resolve(uploadDir))) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    res.sendFile(resolvedPath);
+  } catch (error) {
+    console.error('Serve passport photo error:', error);
+    res.status(500).json({ success: false, message: 'Failed to serve file' });
+  }
+});
 
 module.exports = router;

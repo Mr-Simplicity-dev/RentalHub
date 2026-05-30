@@ -464,8 +464,12 @@ const assertUniqueUserFields = async (executor, {
   let paramIndex = 3;
 
   if (cleanNIN) {
-    duplicateConditions.push(`nin = $${paramIndex++}`);
-    duplicateParams.push(cleanNIN);
+    // NIN is stored encrypted in DB; for unique checks we use a separate hash column
+    // We check if a hash of the NIN exists in a lookup table
+    const crypto = require('crypto');
+    const ninHash = crypto.createHash('sha256').update(cleanNIN.trim()).digest('hex');
+    duplicateConditions.push(`nin_hash = $${paramIndex++}`);
+    duplicateParams.push(ninHash);
   }
 
   if (cleanPassportNumber) {
@@ -952,18 +956,36 @@ const createUserFromPreparedRegistration = async ({
   tenantRegistrationPayment
 }) => {
   await ensureTenantRegistrationPaymentSchema();
+  const crypto = require('crypto');
+  const { encryptNIN } = require('../config/utils/ninEncryption');
+
+  // Ensure the nin_hash column exists
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS nin_hash VARCHAR(64);
+    CREATE INDEX IF NOT EXISTS idx_users_nin_hash ON users(nin_hash) WHERE nin_hash IS NOT NULL;
+  `);
 
   const client = await db.connect();
 
   try {
     await client.query('BEGIN');
-
     await assertUniqueUserFields(client, {
       email: preparedRegistration.email,
       phone: preparedRegistration.phone,
       cleanNIN: preparedRegistration.cleanNIN,
       cleanPassportNumber: preparedRegistration.cleanPassportNumber
     });
+
+    // Encrypt NIN for storage — it's never stored in plaintext
+    const encryptedNIN = preparedRegistration.cleanNIN
+      ? encryptNIN(preparedRegistration.cleanNIN)
+      : null;
+
+    // Create a SHA-256 hash for duplicate checking
+    const ninHash = preparedRegistration.cleanNIN
+      ? crypto.createHash('sha256').update(preparedRegistration.cleanNIN.trim()).digest('hex')
+      : null;
 
     const result = await client.query(
       `INSERT INTO users (
@@ -973,6 +995,7 @@ const createUserFromPreparedRegistration = async ({
          password_hash,
          full_name,
          nin,
+         nin_hash,
          nin_verified,
          identity_document_type,
          international_passport_number,
@@ -980,7 +1003,7 @@ const createUserFromPreparedRegistration = async ({
          preferred_state_id,
          preferred_lga_name
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING id, email, full_name, user_type, created_at,
                  identity_document_type, nin_verified, nationality,
                  preferred_state_id, preferred_lga_name`,
@@ -990,7 +1013,8 @@ const createUserFromPreparedRegistration = async ({
         preparedRegistration.phone,
         passwordHash,
         preparedRegistration.full_name,
-        preparedRegistration.cleanNIN,
+        encryptedNIN,
+        ninHash,
         preparedRegistration.ninVerified,
         preparedRegistration.identityType,
         preparedRegistration.cleanPassportNumber,
@@ -3254,300 +3278,4 @@ exports.uploadPassport = async (req, res) => {
        SET passport_photo_url = $1,
            identity_verified = FALSE,
            identity_verified_by = NULL,
-           identity_verified_at = NULL,
-           identity_verification_status = CASE
-             WHEN (
-               CASE
-                 WHEN COALESCE(identity_document_type, 'nin') = 'passport'
-                 THEN international_passport_number IS NOT NULL
-                 ELSE nin IS NOT NULL
-               END
-             ) THEN 'pending'
-             ELSE NULL
-           END
-       WHERE id = $2`,
-      [req.file.path, userId]
-    );
-
-    // Check if user is now fully verified (email + phone + passport)
-    const result = await db.query(
-      `SELECT email_verified, phone_verified, passport_photo_url, nin, nin_verified,
-              identity_document_type, international_passport_number
-       FROM users WHERE id = $1`,
-      [userId]
-    );
-
-    const user = result.rows[0];
-    const nimcRequired = process.env.REQUIRE_NIMC_VERIFICATION === 'true';
-    const hasIdentityNumber =
-      user.identity_document_type === 'passport'
-        ? !!user.international_passport_number
-        : !!user.nin;
-    const ninCheckPassed =
-      user.identity_document_type !== 'nin' ||
-      !nimcRequired ||
-      user.nin_verified;
-
-    // If all verification steps completed, mark for admin review
-    if (
-      user.email_verified &&
-      user.phone_verified &&
-      user.passport_photo_url &&
-      hasIdentityNumber &&
-      ninCheckPassed
-    ) {
-      // In production, trigger admin notification for manual verification
-      res.json({
-        success: true,
-        message: 'Passport uploaded! Your identity is pending admin verification.',
-        passport_url: req.file.path
-      });
-    } else {
-      res.json({
-        success: true,
-        message: 'Passport uploaded successfully',
-        passport_url: req.file.path
-      });
-    }
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to upload passport photo'
-    });
-  }
-};
-
-// GET CURRENT USER
-exports.getCurrentUser = async (req, res) => {
-  try {
-    await ensureIdentitySchema();
-
-    const userId = req.user.id;
-
-    const result = await db.query(
-      `SELECT u.id, u.user_type, u.email, u.phone, u.full_name, u.nin,
-              u.identity_document_type, u.international_passport_number, u.nationality, u.nin_verified,
-              u.assigned_state, u.assigned_city,
-              u.preferred_state_id, s.state_name AS preferred_state_name,
-              u.preferred_lga_name,
-              u.passport_photo_url, u.email_verified, u.phone_verified,
-              u.identity_verified, u.identity_verification_status, u.subscription_active,
-              u.subscription_expires_at, u.created_at
-       FROM users u
-       LEFT JOIN states s ON s.id = u.preferred_state_id
-       WHERE u.id = $1`,
-      [userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    const user = result.rows[0];
-
-    if (user.user_type === 'agent') {
-      await ensureAgentSystemSchema();
-      const assignment = await getActiveAgentAssignmentByAgentId(userId);
-
-      user.agent_assignment = assignment
-        ? {
-            id: assignment.id,
-            landlord_user_id: assignment.landlord_user_id,
-            landlord_name: assignment.landlord_name,
-            landlord_email: assignment.landlord_email,
-            landlord_phone: assignment.landlord_phone,
-            can_manage_properties: assignment.can_manage_properties === true,
-            can_manage_damage_reports:
-              assignment.can_manage_damage_reports === true,
-            can_manage_disputes: assignment.can_manage_disputes === true,
-            can_manage_legal: assignment.can_manage_legal === true,
-            can_manage_finances: assignment.can_manage_finances === true,
-            status: assignment.status,
-            assigned_at: assignment.created_at,
-          }
-        : null;
-    }
-
-    if (user.user_type === 'landlord') {
-      await ensureAgentSystemSchema();
-      const [activeAssignment, pendingInvite] = await Promise.all([
-        getActiveAgentAssignmentByLandlordId(userId),
-        getPendingAgentInviteByLandlordId(userId),
-      ]);
-
-      user.active_agent_assignment = activeAssignment
-        ? {
-            id: activeAssignment.id,
-            agent_user_id: activeAssignment.agent_user_id,
-            agent_name: activeAssignment.agent_name,
-            agent_email: activeAssignment.agent_email,
-            agent_phone: activeAssignment.agent_phone,
-            can_manage_properties: activeAssignment.can_manage_properties === true,
-            can_manage_damage_reports:
-              activeAssignment.can_manage_damage_reports === true,
-            can_manage_disputes: activeAssignment.can_manage_disputes === true,
-            can_manage_legal: activeAssignment.can_manage_legal === true,
-            can_manage_finances: activeAssignment.can_manage_finances === true,
-            status: activeAssignment.status,
-            assigned_at: activeAssignment.created_at,
-          }
-        : null;
-
-      user.pending_agent_invite = pendingInvite
-        ? {
-            id: pendingInvite.id,
-            agent_full_name: pendingInvite.agent_full_name,
-            agent_email: pendingInvite.agent_email,
-            agent_phone: pendingInvite.agent_phone,
-            expires_at: pendingInvite.expires_at,
-            status: pendingInvite.status,
-          }
-        : null;
-    }
-
-    res.json({
-      success: true,
-      data: user
-    });
-
-  } catch (error) {
-    console.error('GET /auth/me ERROR:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get user profile'
-    });
-  }
-};
-
-
-// REFRESH TOKEN
-exports.refreshToken = async (req, res) => {
-  try {
-    const token = req.body?.token || getAuthTokenFromRequest(req);
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token required'
-      });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const newToken = generateToken(decoded.userId, decoded.userType);
-    const csrfToken = setAuthCookies(res, newToken);
-
-    const payload = {
-      success: true,
-      csrf_token: csrfToken
-    };
-
-    if (shouldReturnTokenInBody()) {
-      payload.token = newToken;
-    }
-
-    res.json(payload);
-
-  } catch (error) {
-    res.status(401).json({
-      success: false,
-      message: 'Invalid token'
-    });
-  }
-};
-
-// LOGOUT
-exports.logout = async (req, res) => {
-  clearAuthCookies(res);
-  res.json({
-    success: true,
-    message: 'Logged out successfully'
-  });
-};
-
-// FORGOT PASSWORD
-exports.forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    const result = await db.query(
-      'SELECT id, email FROM users WHERE email = $1',
-      [email]
-    );
-
-    if (result.rows.length === 0) {
-      // Don't reveal if email exists
-      return res.json({
-        success: true,
-        message: 'If email exists, password reset link has been sent'
-      });
-    }
-
-    const user = result.rows[0];
-
-    // Generate reset token
-    const resetToken = jwt.sign(
-      { userId: user.id, email: user.email, purpose: 'password-reset' },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
-    const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}`;
-
-    // Send password reset email
-    await sendPasswordResetEmail(email, resetUrl);
-
-    res.json({
-      success: true,
-      message: 'Password reset link sent to your email'
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to process password reset'
-    });
-  }
-};
-
-// RESET PASSWORD
-exports.resetPassword = async (req, res) => {
-  try {
-    const { token } = req.params;
-    const { password } = req.body;
-
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    if (decoded.purpose !== 'password-reset') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid reset token'
-      });
-    }
-
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    const password_hash = await bcrypt.hash(password, salt);
-
-    // Update password
-    await db.query(
-      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [password_hash, decoded.userId]
-    );
-
-    res.json({
-      success: true,
-      message: 'Password reset successful'
-    });
-
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Invalid or expired reset token'
-    });
-  }
-};
+      
