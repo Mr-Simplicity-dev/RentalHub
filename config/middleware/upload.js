@@ -6,12 +6,41 @@ const cloudinaryModule = require('multer-storage-cloudinary');
 const CloudinaryStorage =
   cloudinaryModule.CloudinaryStorage || cloudinaryModule;
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+/**
+ * Lazy-init: configure Cloudinary on first upload request
+ * instead of at module load time.
+ */
+let cloudinaryConfigured = false;
+const ensureCloudinaryConfig = () => {
+  if (cloudinaryConfigured) return;
+  const cloud_name = process.env.CLOUDINARY_CLOUD_NAME;
+  const api_key = process.env.CLOUDINARY_API_KEY;
+  const api_secret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloud_name || !api_key || !api_secret) {
+    throw new Error(
+      'Cloudinary configuration is missing. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.'
+    );
+  }
+
+  cloudinary.config({ cloud_name, api_key, api_secret });
+  cloudinaryConfigured = true;
+};
+
+// Wrap multer middleware to ensure Cloudinary config before processing
+const withCloudinaryConfig = (uploadMiddleware) => {
+  return (req, res, next) => {
+    try {
+      ensureCloudinaryConfig();
+      uploadMiddleware(req, res, next);
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  };
+};
 
 // ---------------- PASSPORT STORAGE ----------------
 
@@ -96,8 +125,9 @@ const uploadPropertyPhotos = multer({
 }).array('photos', 20);
 
 module.exports = {
-  uploadPassport,
-  uploadPropertyMedia,
-  uploadPropertyPhotos,
+  uploadPassport: withCloudinaryConfig(uploadPassport),
+  uploadPropertyMedia: withCloudinaryConfig(uploadPropertyMedia),
+  uploadPropertyPhotos: withCloudinaryConfig(uploadPropertyPhotos),
   cloudinary,
 };
+

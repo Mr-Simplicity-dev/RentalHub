@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
+const validateRequest = require('../config/middleware/validateRequest');
 const messageController = require('../controllers/messageController');
 const { authenticate } = require('../config/middleware/auth');
 
@@ -13,6 +14,7 @@ router.post('/',
     body('property_id').optional().isInt(),
     body('subject').optional().isString().trim().isLength({ min: 1, max: 180 }),
     body('message_type').optional().isIn(['general', 'escalation']),
+    validateRequest,
   ],
   messageController.sendMessage
 );
@@ -88,6 +90,7 @@ router.patch('/escalations/:messageId/ticket-status',
   authenticate,
   [
     body('ticket_status').isString().trim().notEmpty(),
+    validateRequest,
   ],
   messageController.updateEscalationTicketStatus
 );

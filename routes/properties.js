@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
+const validateRequest = require('../config/middleware/validateRequest');
 const propertyController = require('../controllers/propertyController');
 const {
   authenticate,
@@ -140,6 +141,7 @@ router.post(
     body('payment_frequency').isIn(['monthly', 'yearly']),
     body('title').trim().notEmpty(),
     body('description').trim().notEmpty(),
+    validateRequest,
   ],
   propertyController.createProperty
 );

@@ -309,11 +309,13 @@ router.put('/refund/:refundId/reject',
 // Admin: view all refund requests across the platform
 router.get('/refund/admin/all',
   authenticate,
+  requireAdminOrSuperAdmin,
   refundController.adminGetAllRefundRequests
 );
 
 router.put('/refund/admin/:refundId/review',
   authenticate,
+  requireAdminOrSuperAdmin,
   criticalFinanceOpsLimiter,
   refundController.adminReviewRelocationRefund
 );
@@ -353,11 +355,13 @@ router.put('/tenancy-adjustments/grace/:requestId/respond',
 // LGA/state/super admin/support hierarchy: enable or reject tenant-requested grace periods
 router.get('/tenancy-adjustments/admin',
   authenticate,
+  requireAdminOrSuperAdmin,
   refundController.adminGetTenancyAdjustmentRequests
 );
 
 router.put('/tenancy-adjustments/admin/:requestId/review',
   authenticate,
+  requireAdminOrSuperAdmin,
   refundController.adminReviewTenancyAdjustmentRequest
 );
 
@@ -407,17 +411,20 @@ router.get('/wallet/withdrawals',
 // Admin approvals for wallet withdrawals
 router.get('/wallet/withdrawals/pending',
   authenticate,
+  requireAdminOrSuperAdmin,
   refundController.getPendingWalletWithdrawals
 );
 
 router.post('/wallet/withdrawals/:withdrawalId/approve',
   authenticate,
+  requireAdminOrSuperAdmin,
   criticalFinanceOpsLimiter,
   refundController.approveWalletWithdrawal
 );
 
 router.post('/wallet/withdrawals/:withdrawalId/reject',
   authenticate,
+  requireAdminOrSuperAdmin,
   criticalFinanceOpsLimiter,
   refundController.rejectWalletWithdrawal
 );

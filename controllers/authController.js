@@ -3278,4 +3278,75 @@ exports.uploadPassport = async (req, res) => {
        SET passport_photo_url = $1,
            identity_verified = FALSE,
            identity_verified_by = NULL,
-      
+           identity_verified_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [req.file.path, userId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Passport uploaded successfully!',
+      data: { passport_photo_url: req.file.path },
+    });
+  } catch (error) {
+    console.error('Passport upload error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Passport upload failed',
+    });
+  }
+};
+
+// GET CURRENT USER
+const { decryptNIN } = require('../config/utils/ninEncryption');
+
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await db.query(
+      `SELECT u.id, u.email, u.full_name, u.user_type,
+              u.email_verified, u.phone_verified, u.identity_verified,
+              u.identity_verification_status, u.passport_photo_url,
+              u.subscription_active, u.subscription_expires_at,
+              u.identity_document_type, u.international_passport_number,
+              u.nationality, u.nin_verified, u.nin,
+              u.preferred_state_id, s.state_name AS preferred_state_name,
+              u.preferred_lga_name,
+              u.deleted_at,
+              u.is_active, u.account_suspended_reason,
+              COALESCE(u.approval_status, 'approved') AS approval_status,
+              u.chamber_name, u.chamber_phone
+       FROM users u
+       LEFT JOIN states s ON s.id = u.preferred_state_id
+       WHERE u.id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Decrypt NIN before returning
+    if (user.nin) {
+      user.nin = decryptNIN(user.nin);
+    }
+
+    res.json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    console.error('Get current user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user details',
+    });
+  }
+};

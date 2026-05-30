@@ -8,6 +8,8 @@ const { allowRoles } = require('../config/middleware/roleMiddleware');
 const { canAccessProperty } = require('../config/middleware/propertyAccessMiddleware');
 const { canAccessDispute } = require('../config/middleware/disputeAccessMiddleware');
 const upload = require('../config/middleware/uploadEvidence');
+const { param } = require('express-validator');
+const validateRequest = require('../config/middleware/validateRequest');
 
 /**
  * Create dispute
@@ -28,6 +30,7 @@ router.get(
   '/property/:propertyId',
   authenticate,
   canAccessProperty,
+  [param('propertyId').isInt({ min: 1 }).withMessage('propertyId must be a positive integer'), validateRequest],
   disputeController.getDisputes
 );
 
@@ -35,6 +38,7 @@ router.get(
   '/:disputeId',
   authenticate,
   canAccessDispute,
+  [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
   disputeController.getDisputeDetails
 );
 
@@ -45,6 +49,7 @@ router.post(
   '/:disputeId/messages',
   authenticate,
   canAccessDispute,
+  [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
   disputeController.addDisputeMessage
 );
 
@@ -56,6 +61,7 @@ router.patch(
   '/:disputeId/resolve',
   authenticate,
   allowRoles('admin', 'super_admin'),
+  [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
   disputeController.resolveDispute
 );
 
@@ -66,6 +72,7 @@ router.post(
   '/:disputeId/evidence',
   authenticate,
   canAccessDispute,
+  [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
   upload.single('file'),
   disputeController.uploadEvidence
 );
@@ -74,6 +81,7 @@ router.get(
   '/:disputeId/evidence',
   authenticate,
   canAccessDispute,
+  [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
   disputeController.listDisputeEvidence
 );
 
@@ -83,13 +91,16 @@ router.get(
 router.get(
   '/evidence/:evidenceId',
   authenticate,
+  [param('evidenceId').isInt({ min: 1 }).withMessage('evidenceId must be a positive integer'), validateRequest],
   disputeController.getEvidence
 );
 
 router.get(
   '/evidence/:evidenceId/verify',
   authenticate,
+  [param('evidenceId').isInt({ min: 1 }).withMessage('evidenceId must be a positive integer'), validateRequest],
   disputeController.verifyEvidenceIntegrity
 );
 
 module.exports = router;
+
