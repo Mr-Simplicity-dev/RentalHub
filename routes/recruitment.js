@@ -74,6 +74,7 @@ router.get('/my-applications', authenticate, recruitmentController.getMyApplicat
 // Payment initiation
 router.post('/payments/initiate', authenticate, recruitmentController.initiatePayment);
 router.post('/payments/verify/:reference', authenticate, recruitmentController.verifyPayment);
+router.post('/payments/webhook', recruitmentController.paystackWebhook);
 
 // Access code verification
 router.post('/verify-access-code', authenticate, recruitmentController.verifyAccessCode);
@@ -93,8 +94,11 @@ router.post('/applications/:id/submit', authenticate, recruitmentController.subm
 
 // Download own documents
 router.get('/documents/download/:docId', authenticate, recruitmentController.downloadDocument);
+router.get('/documents/download-all/:applicationId', authenticate, recruitmentController.downloadMyDocumentsZip);
+router.post('/documents/generate-cv/:applicationId', authenticate, recruitmentController.generatePlatformCv);
 
 // Interview routes
+router.post('/interview/start', authenticate, recruitmentController.startInterview);
 router.get('/interview/start', authenticate, recruitmentController.startInterview);
 router.post('/interview/answer', authenticate, recruitmentController.submitAnswer);
 router.post('/interview/violation', authenticate, recruitmentController.reportViolation);
@@ -125,6 +129,7 @@ router.post('/admin/locations/bulk-activate', authenticate, recruitmentControlle
 
 // Applicant list with filters
 router.get('/admin/applicants', authenticate, recruitmentController.getApplicants);
+router.get('/admin/applicants/:id', authenticate, recruitmentController.getApplicationDetail);
 
 // Process applications
 router.post('/admin/applicants/:id/approve', authenticate, recruitmentController.approveApplicant);

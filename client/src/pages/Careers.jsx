@@ -34,7 +34,7 @@ const CONSECUTIVE_FACE_VIOLATIONS = 3;
 const FACE_API_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
 const TINY_FACE_DETECTOR_MODEL_URLS = [
   'https://cdn.jsdelivr.net/npm/@xkeshi/face-api.js-models@0.0.1/models/tiny_face_detector',
-  'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model',
+  'https://cdn.jsdelivr.net/gh/vladmandic/face-api/model',
 ];
 
 // ============================================================
@@ -121,6 +121,16 @@ const EMPTY_FORM = {
   application_track: 'standard',
 };
 
+const EMPTY_CV_FORM = {
+  bio: '',
+  address: '',
+  phone: '',
+  email: '',
+  education: '',
+  experience: '',
+  skills: '',
+};
+
 const DOCUMENT_FIELDS = [
   { name: 'cv', label: 'CV / Resume', required: true },
   { name: 'cover_letter', label: 'Cover Letter', required: true },
@@ -170,6 +180,9 @@ export default function Careers() {
   const [submitting, setSubmitting] = useState(false);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [cvModal, setCvModal] = useState(false);
+  const [cvForm, setCvForm] = useState(EMPTY_CV_FORM);
+  const [generatingCv, setGeneratingCv] = useState(false);
 
   // ─── Interview State ───────────────────────────────────────
   const [phoneCheck, setPhoneCheck] = useState('');
@@ -182,6 +195,7 @@ export default function Careers() {
   const [faceDetectionReady, setFaceDetectionReady] = useState(false);
   const [faceStatus, setFaceStatus] = useState({ faces: 0, status: 'idle' }); // idle | monitoring | violation | locked
   const [interviewStarting, setInterviewStarting] = useState(false);
+  const [interviewResult, setInterviewResult] = useState(null);
 
   // ─── Refs ──────────────────────────────────────────────────
   const videoRef = useRef(null);
@@ -296,16 +310,6 @@ export default function Careers() {
     verify();
   }, [isAuthenticated, loadMyApplication, searchParams, setSearchParams]);
 
-  useEffect(() => {
-    // Pre-load face-api models in the background
-    loadFaceApi().then((ready) => {
-      if (ready) setFaceDetectionReady(true);
-    });
-    return () => {
-      stopInterviewMedia();
-    };
-  }, []);
-
   const handleFormChange = (event) => {
     const { name, value } = event.target;
     setForm((prev) => ({
@@ -391,6 +395,55 @@ export default function Careers() {
     }
   };
 
+  const downloadBlob = async (url, filename) => {
+    try {
+      const response = await api.get(url, { responseType: 'blob' });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to download document');
+    }
+  };
+
+  const openCvBuilder = () => {
+    setCvForm({
+      bio: '',
+      address: application?.residential_address || form.residential_address || '',
+      phone: application?.phone_number || form.phone_number || '',
+      email: application?.email_address || form.email_address || '',
+      education: application?.highest_education || form.highest_education || '',
+      experience: application?.current_employment_status || form.current_employment_status || '',
+      skills: application?.skills_qualifications || form.skills_qualifications || '',
+    });
+    setCvModal(true);
+  };
+
+  const handleCvChange = (event) => {
+    const { name, value } = event.target;
+    setCvForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const generatePlatformCv = async () => {
+    if (!application?.id) return;
+    setGeneratingCv(true);
+    try {
+      await api.post(`/recruitment/documents/generate-cv/${application.id}`, cvForm);
+      toast.success('Platform CV generated and attached');
+      setCvModal(false);
+      await loadMyApplication();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to generate platform CV');
+    } finally {
+      setGeneratingCv(false);
+    }
+  };
+
   const submitApplication = async () => {
     if (!application?.id) return;
     try {
@@ -459,26 +512,6 @@ export default function Careers() {
   };
 
   // ─── Question Timer ─────────────────────────────────────
-  const startQuestionTimer = useCallback(() => {
-    if (questionTimerRef.current) clearInterval(questionTimerRef.current);
-
-    setQuestionTimeLeft(QUESTION_TIME_LIMIT_SECONDS);
-
-    questionTimerRef.current = setInterval(() => {
-      setQuestionTimeLeft((prev) => {
-        if (prev <= 1) {
-          // Time's up - auto-skip
-          clearInterval(questionTimerRef.current);
-          questionTimerRef.current = null;
-          // Submit empty answer to trigger next question
-          submitEmptyAnswer();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [questionIndex, interviewQuestions]);
-
   // ─── Report Violation ──────────────────────────────────
   const reportInterviewViolation = async (type, details) => {
     if (interviewLockedRef.current) return;
@@ -506,7 +539,7 @@ export default function Careers() {
   };
 
   // ─── Stop Media ────────────────────────────────────────
-  const stopInterviewMedia = () => {
+  const stopInterviewMedia = useCallback(() => {
     if (faceDetectionTimerRef.current) {
       clearInterval(faceDetectionTimerRef.current);
       faceDetectionTimerRef.current = null;
@@ -528,9 +561,19 @@ export default function Careers() {
     streamRef.current?.getTracks?.().forEach((track) => track.stop());
     streamRef.current = null;
     recorderRef.current = null;
-  };
+  }, []);
 
   // ─── Start Interview ───────────────────────────────────
+  useEffect(() => {
+    // Pre-load face-api models in the background
+    loadFaceApi().then((ready) => {
+      if (ready) setFaceDetectionReady(true);
+    });
+    return () => {
+      stopInterviewMedia();
+    };
+  }, [stopInterviewMedia]);
+
   const startInterview = async () => {
     if (!application) return;
     if (normalize(phoneCheck) !== normalize(application.phone_number)) {
@@ -577,10 +620,13 @@ export default function Careers() {
         setFaceStatus({ faces: 0, status: 'idle' });
       }
 
-      const res = await api.get('/recruitment/interview/start');
+      const res = await api.post('/recruitment/interview/start', {
+        phone_number: phoneCheck,
+      });
       setInterviewQuestions(res.data?.data?.questions || []);
       setQuestionIndex(0);
       setInterviewMode(true);
+      setInterviewResult(null);
       interviewLockedRef.current = false;
       setInterviewLocked(false);
       consecutiveNoFaceRef.current = 0;
@@ -594,6 +640,35 @@ export default function Careers() {
   };
 
   // ─── Submit Answer (with empty timeout) ─────────────────
+  const uploadRecording = useCallback(async () => {
+    const chunks = recordingChunksRef.current || [];
+    if (!chunks.length) return;
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const formData = new FormData();
+    formData.append('recording', blob, `recruitment-interview-${Date.now()}.webm`);
+    formData.append('violation_log', interviewLocked ? 'Interview locked by proctoring' : '');
+    try {
+      await api.post('/recruitment/interview/recording', formData);
+    } catch (error) {
+      console.error('Interview recording upload failed:', error);
+    }
+  }, [interviewLocked]);
+
+  const completeInterview = useCallback(async () => {
+    try {
+      const res = await api.post('/recruitment/interview/complete');
+      setInterviewResult(res.data?.data || null);
+      toast.success('Interview completed successfully');
+      stopInterviewMedia();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await uploadRecording();
+      setInterviewMode(false);
+      await loadMyApplication();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to complete interview');
+    }
+  }, [loadMyApplication, stopInterviewMedia, uploadRecording]);
+
   const submitEmptyAnswer = useCallback(async () => {
     const question = interviewQuestions[questionIndex];
     if (!question || interviewLockedRef.current) return;
@@ -610,7 +685,25 @@ export default function Careers() {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit answer');
     }
-  }, [questionIndex, interviewQuestions]);
+  }, [completeInterview, questionIndex, interviewQuestions]);
+
+  const startQuestionTimer = useCallback(() => {
+    if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+
+    setQuestionTimeLeft(QUESTION_TIME_LIMIT_SECONDS);
+
+    questionTimerRef.current = setInterval(() => {
+      setQuestionTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(questionTimerRef.current);
+          questionTimerRef.current = null;
+          submitEmptyAnswer();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [submitEmptyAnswer]);
 
   const submitInterviewAnswer = async (answer) => {
     const question = interviewQuestions[questionIndex];
@@ -671,34 +764,6 @@ export default function Careers() {
   };
 
   // ─── Complete Interview ────────────────────────────────
-  const completeInterview = async () => {
-    try {
-      await api.post('/recruitment/interview/complete');
-      toast.success('Interview completed successfully');
-      stopInterviewMedia();
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await uploadRecording();
-      setInterviewMode(false);
-      await loadMyApplication();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to complete interview');
-    }
-  };
-
-  const uploadRecording = async () => {
-    const chunks = recordingChunksRef.current || [];
-    if (!chunks.length) return;
-    const blob = new Blob(chunks, { type: 'video/webm' });
-    const formData = new FormData();
-    formData.append('recording', blob, `recruitment-interview-${Date.now()}.webm`);
-    formData.append('violation_log', interviewLocked ? 'Interview locked by proctoring' : '');
-    try {
-      await api.post('/recruitment/interview/recording', formData);
-    } catch (error) {
-      console.error('Interview recording upload failed:', error);
-    }
-  };
-
   const renderClosed = () => (
     <motion.section
       initial={{ opacity: 0, y: 20 }}
@@ -950,6 +1015,19 @@ export default function Careers() {
               <h2 className="text-lg font-bold text-slate-900">Required Documents</h2>
             </div>
             <p className="text-xs text-slate-500 mb-4">Upload all required documents below. Accepted formats: PDF, DOC, DOCX, JPG, PNG.</p>
+            <div className="mb-4 rounded-2xl border border-primary-100 bg-primary-50/50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-primary-900">CV / Resume option</p>
+                  <p className="mt-1 text-xs leading-5 text-primary-700">
+                    Use the RentalHub NG CV template to generate a formatted PDF automatically, or upload your own CV below.
+                  </p>
+                </div>
+                <button type="button" onClick={openCvBuilder} className="btn shrink-0 bg-primary-700 text-white hover:bg-primary-800">
+                  Use Platform CV Template
+                </button>
+              </div>
+            </div>
             <div className="grid gap-4 md:grid-cols-2">
               {DOCUMENT_FIELDS.map((field) => (
                 <label key={field.name} className="rounded-xl border border-slate-200 p-4 hover:border-primary-200 transition-colors cursor-pointer">
@@ -987,20 +1065,47 @@ export default function Careers() {
         {/* Submitted Documents */}
         {application.documents?.length > 0 && (
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated">
-            <h2 className="text-lg font-bold text-slate-900">Submitted Documents</h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Submitted Documents</h2>
+              <button
+                type="button"
+                onClick={() => downloadBlob(`/recruitment/documents/download-all/${application.id}`, `${application.reference_number || 'recruitment'}-documents.zip`)}
+                className="btn btn-secondary justify-center text-xs"
+              >
+                <FaDownload className="mr-2" /> Download My Submitted Documents
+              </button>
+            </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {application.documents.map((doc) => (
-                <a
+                <button
                   key={doc.id}
-                  href={`/api/recruitment/documents/download/${doc.id}`}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm hover:border-primary-200 hover:bg-primary-50/30 transition-all group"
+                  type="button"
+                  onClick={() => downloadBlob(`/recruitment/documents/download/${doc.id}`, doc.file_name || `${doc.document_type}.pdf`)}
+                  className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left text-sm hover:border-primary-200 hover:bg-primary-50/30 transition-all group"
                 >
                   <span className="truncate font-medium text-slate-700 group-hover:text-primary-700">
                     {doc.document_type}: {doc.file_name}
                   </span>
                   <FaDownload className="ml-2 shrink-0 text-slate-400 group-hover:text-primary-600" />
-                </a>
+                </button>
               ))}
+            </div>
+          </section>
+        )}
+
+        {(interviewResult || application.interview_completed) && (
+          <section className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50 p-6 shadow-elevated">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                <FaCheckCircle />
+              </div>
+              <div>
+                <p className="font-bold text-emerald-950">Interview Completed</p>
+                <p className="mt-1 text-sm text-emerald-800">
+                  Score: {Math.round(interviewResult?.score ?? application.interview_score ?? 0)}%.
+                  Status: {(interviewResult?.passed ?? application.interview_passed) ? ' Passed' : ' Under admin review'}.
+                </p>
+              </div>
             </div>
           </section>
         )}
@@ -1293,6 +1398,67 @@ export default function Careers() {
   };
 
   // ─── Loading State ────────────────────────────────────────
+  const renderCvBuilderModal = () => (
+    <AnimatePresence>
+      {cvModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 px-4 py-6 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            className="w-full max-w-3xl rounded-3xl bg-white p-5 shadow-elevated-lg sm:p-6"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-500">Platform CV Template</p>
+                <h2 className="mt-1 text-xl font-black text-slate-900">Generate formatted CV PDF</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Complete the fields below and RentalHub NG will attach the generated PDF as your CV document.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCvModal(false)}
+                className="rounded-full border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                aria-label="Close CV builder"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <InputField label="Phone" name="phone" value={cvForm.phone} onChange={handleCvChange} />
+              <InputField label="Email" name="email" type="email" value={cvForm.email} onChange={handleCvChange} />
+              <InputField label="Address" name="address" value={cvForm.address} onChange={handleCvChange} className="sm:col-span-2" />
+              <TextAreaField label="Professional bio" name="bio" value={cvForm.bio} onChange={handleCvChange} className="sm:col-span-2" />
+              <TextAreaField label="Education" name="education" value={cvForm.education} onChange={handleCvChange} />
+              <TextAreaField label="Experience" name="experience" value={cvForm.experience} onChange={handleCvChange} />
+              <TextAreaField label="Skills / Qualifications" name="skills" value={cvForm.skills} onChange={handleCvChange} className="sm:col-span-2" />
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setCvModal(false)} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button type="button" onClick={generatePlatformCv} disabled={generatingCv} className="btn btn-primary">
+                {generatingCv ? (
+                  <><FaSpinner className="mr-2 animate-spin" /> Generating...</>
+                ) : (
+                  'Generate and Attach CV'
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   if (statusLoading || authLoading) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
@@ -1370,6 +1536,7 @@ export default function Careers() {
           </motion.div>
         )}
       </section>
+      {renderCvBuilderModal()}
     </div>
   );
 }

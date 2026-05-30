@@ -53,6 +53,7 @@ const rentSavingsRoutes = require('./routes/rentSavings');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 const { startRentSavingsJobs } = require('./jobs/rentSavingsJobs');
 const { startSmsDeliveryJobs } = require('./jobs/smsDeliveryJobs');
+const { startRecruitmentJobs } = require('./jobs/recruitmentJobs');
 const csrfProtection = require('./config/middleware/csrfProtection');
 const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
 const {
@@ -505,6 +506,7 @@ const startBackgroundServices = () => {
   startPropertyJobs();
   startRentSavingsJobs();
   startSmsDeliveryJobs();
+  startRecruitmentJobs();
   startScheduler();
   scheduleEvidenceIntegrityMonitoring();
   schedulePayoutRetries();

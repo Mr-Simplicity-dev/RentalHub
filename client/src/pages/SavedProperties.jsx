@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { propertyService } from '../services/propertyService';
 import PropertyList from '../components/properties/PropertyList';
 import Loader from '../components/common/Loader';
@@ -11,11 +11,7 @@ const SavedProperties = () => {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadSaved();
-  }, []);
-
-  const loadSaved = async () => {
+  const loadSaved = useCallback(async () => {
     setLoading(true);
     try {
       const res = await propertyService.getSavedProperties();
@@ -27,7 +23,11 @@ const SavedProperties = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadSaved();
+  }, [loadSaved]);
 
   if (loading) return <Loader />;
 

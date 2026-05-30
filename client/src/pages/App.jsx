@@ -649,7 +649,7 @@ function App() {
               <Route path="/faq" element={<Faq />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/pricing" element={<Pricing />} />
-              <Route path="/careers" element={<Careers />} />
+              <Route path="/careers" element={<ProtectedRoute><Careers /></ProtectedRoute>} />
               <Route path="/landlord-guide" element={<LandlordGuide />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
