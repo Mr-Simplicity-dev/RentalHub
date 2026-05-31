@@ -16,6 +16,9 @@ import {
   FaToggleOn,
   FaUsers,
   FaVideo,
+  FaEdit,
+  FaSave,
+  FaTimes,
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
@@ -109,6 +112,13 @@ export default function RecruitmentAdminTab() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [triggerModal, setTriggerModal] = useState(false);
   const [triggerForm, setTriggerForm] = useState({ cycle_id: '', role_id: '', interview_date: '' });
+
+  // Edit states
+  const [editingCycle, setEditingCycle] = useState(null);
+  const [editCycleForm, setEditCycleForm] = useState(EMPTY_CYCLE);
+  const [editingRole, setEditingRole] = useState(null);
+  const [editRoleForm, setEditRoleForm] = useState(EMPTY_ROLE);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const activeLocations = useMemo(
     () => locations.filter((location) => location.is_active),
@@ -226,6 +236,36 @@ export default function RecruitmentAdminTab() {
       toast.error(error.response?.data?.message || 'Failed to create role');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateCycle = async () => {
+    setSavingEdit(true);
+    try {
+      await api.put(`/recruitment/admin/cycles/${editingCycle.id}`, editCycleForm);
+      toast.success('Cycle updated');
+      setEditingCycle(null);
+      setEditCycleForm(EMPTY_CYCLE);
+      await loadCore();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update cycle');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const updateRole = async () => {
+    setSavingEdit(true);
+    try {
+      await api.put(`/recruitment/admin/roles/${editingRole.id}`, editRoleForm);
+      toast.success('Role updated');
+      setEditingRole(null);
+      setEditRoleForm(EMPTY_ROLE);
+      await loadCore();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update role');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -440,11 +480,50 @@ export default function RecruitmentAdminTab() {
               {saving ? <><FaSpinner className="animate-spin mr-2" /> Creating...</> : <><FaPlus className="mr-2" /> Create Cycle</>}
             </button>
           </form>
-          <div className="mt-4 max-h-56 space-y-2 overflow-y-auto pr-1">
+          <div className="mt-4 max-h-64 space-y-2 overflow-y-auto pr-1">
             {cycles.map((cycle) => (
-              <div key={cycle.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm">
-                <p className="font-semibold text-slate-900">{cycle.title}</p>
-                <p className="text-xs text-slate-500">{formatDate(cycle.open_date)} - {formatDate(cycle.extension_date || cycle.close_date)}</p>
+              <div key={cycle.id}>
+                {editingCycle?.id === cycle.id ? (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
+                    <AdminInput label="Title" value={editCycleForm.title} onChange={(v) => setEditCycleForm((p) => ({ ...p, title: v }))} />
+                    <AdminInput label="Open Date" type="date" value={editCycleForm.open_date} onChange={(v) => setEditCycleForm((p) => ({ ...p, open_date: v }))} />
+                    <AdminInput label="Close Date" type="date" value={editCycleForm.close_date} onChange={(v) => setEditCycleForm((p) => ({ ...p, close_date: v }))} />
+                    <AdminInput label="Extension Date" type="date" value={editCycleForm.extension_date} onChange={(v) => setEditCycleForm((p) => ({ ...p, extension_date: v }))} />
+                    <div className="flex gap-2">
+                      <button type="button" onClick={updateCycle} disabled={savingEdit} className="btn btn-sm bg-blue-600 text-white hover:bg-blue-700 flex-1">
+                        {savingEdit ? <><FaSpinner className="animate-spin mr-1" /> Saving</> : <><FaSave className="mr-1" /> Save</>}
+                      </button>
+                      <button type="button" onClick={() => { setEditingCycle(null); setEditCycleForm(EMPTY_CYCLE); }} className="btn btn-sm bg-slate-200 text-slate-700 hover:bg-slate-300">
+                        <FaTimes />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-900">{cycle.title}</p>
+                        <p className="text-xs text-slate-500">{formatDate(cycle.open_date)} - {formatDate(cycle.extension_date || cycle.close_date)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCycle(cycle);
+                          setEditCycleForm({
+                            title: cycle.title || '',
+                            open_date: cycle.open_date ? cycle.open_date.substring(0, 10) : '',
+                            close_date: cycle.close_date ? cycle.close_date.substring(0, 10) : '',
+                            extension_date: cycle.extension_date ? cycle.extension_date.substring(0, 10) : '',
+                          });
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                        title="Edit cycle"
+                      >
+                        <FaEdit className="text-xs" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             {cycles.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No cycles yet</p>}
@@ -486,6 +565,88 @@ export default function RecruitmentAdminTab() {
               {saving ? <><FaSpinner className="animate-spin mr-2" /> Creating...</> : <><FaPlus className="mr-2" /> Create Role</>}
             </button>
           </form>
+          {/* Roles List */}
+          <div className="mt-4 max-h-64 space-y-2 overflow-y-auto pr-1">
+            {roles.map((role) => (
+              <div key={role.id}>
+                {editingRole?.id === role.id ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+                    <AdminSelect label="Cycle" value={editRoleForm.cycle_id} onChange={(v) => setEditRoleForm((p) => ({ ...p, cycle_id: v }))}>
+                      <option value="">Select cycle</option>
+                      {cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.title}</option>)}
+                    </AdminSelect>
+                    <AdminInput label="Title" value={editRoleForm.title} onChange={(v) => setEditRoleForm((p) => ({ ...p, title: v }))} />
+                    <AdminSelect label="Type" value={editRoleForm.type} onChange={(v) => setEditRoleForm((p) => ({ ...p, type: v }))}>
+                      <option value="Administrative">Administrative</option>
+                      <option value="Technical">Technical</option>
+                    </AdminSelect>
+                    <div className="grid grid-cols-2 gap-2">
+                      <AdminInput label="Standard Fee (₦)" type="number" value={editRoleForm.application_fee} onChange={(v) => setEditRoleForm((p) => ({ ...p, application_fee: v }))} />
+                      <AdminInput label="Premium Fee (₦)" type="number" value={editRoleForm.premium_fee} onChange={(v) => setEditRoleForm((p) => ({ ...p, premium_fee: v }))} />
+                    </div>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-slate-700">Description</span>
+                      <textarea
+                        value={editRoleForm.description}
+                        onChange={(e) => setEditRoleForm((p) => ({ ...p, description: e.target.value }))}
+                        rows={2}
+                        className="input w-full resize-none text-sm"
+                      />
+                    </label>
+                    <AdminSelect label="Active" value={editRoleForm.is_active ? 'true' : 'false'} onChange={(v) => setEditRoleForm((p) => ({ ...p, is_active: v === 'true' }))}>
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </AdminSelect>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={updateRole} disabled={savingEdit} className="btn btn-sm bg-emerald-600 text-white hover:bg-emerald-700 flex-1">
+                        {savingEdit ? <><FaSpinner className="animate-spin mr-1" /> Saving</> : <><FaSave className="mr-1" /> Save</>}
+                      </button>
+                      <button type="button" onClick={() => { setEditingRole(null); setEditRoleForm(EMPTY_ROLE); }} className="btn btn-sm bg-slate-200 text-slate-700 hover:bg-slate-300">
+                        <FaTimes />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-slate-900 truncate">{role.title}</p>
+                        <p className="text-[11px] text-slate-500">{role.type} &middot; {role.cycle_title || '—'}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {formatCurrency(role.application_fee)} / {formatCurrency(role.premium_fee)}
+                          {role.is_active !== undefined && (
+                            <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${role.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                              {role.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRole(role);
+                          setEditRoleForm({
+                            title: role.title || '',
+                            type: role.type || 'Administrative',
+                            description: role.description || '',
+                            application_fee: String(role.application_fee || ''),
+                            premium_fee: String(role.premium_fee || ''),
+                            cycle_id: role.cycle_id || '',
+                            is_active: role.is_active !== undefined ? role.is_active : true,
+                          });
+                        }}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-emerald-100 hover:text-emerald-600 transition-colors"
+                        title="Edit role"
+                      >
+                        <FaEdit className="text-xs" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {roles.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No roles created yet</p>}
+          </div>
         </div>
 
         {/* Locations */}
