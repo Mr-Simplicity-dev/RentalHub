@@ -1,8 +1,17 @@
 const cron = require('node-cron');
 const fs = require('fs');
-const archiver = require('archiver');
 const db = require('../config/middleware/database');
 const { sendEmail } = require('../config/utils/mailer');
+
+let archiver = null;
+try {
+  archiver = require('archiver');
+} catch (error) {
+  if (error.code !== 'MODULE_NOT_FOUND') {
+    throw error;
+  }
+  console.error('Recruitment closure ZIP dependency "archiver" is not installed. Document ZIP attachments will be skipped until npm install is run.');
+}
 
 const RECRUITMENT_EMAIL = process.env.RECRUITMENT_EMAIL || 'recruitment@rentalhub.com.ng';
 const RECRUITMENT_CLOSURE_CRON = process.env.RECRUITMENT_CLOSURE_CRON || '15 0 * * *';
@@ -132,15 +141,19 @@ const emailClosedCycleDocuments = async (cycle) => {
 
   let docsNote = 'No uploaded documents were found for this cycle.';
   if (docs.rows.length) {
-    const zipBuffer = await createDocumentsZipBuffer(docs.rows);
-    if (zipBuffer.length <= MAX_EMAIL_ATTACHMENT_BYTES) {
-      attachments.push({
-        filename: `recruitment_cycle_${safeFileSegment(cycle.id)}_documents.zip`,
-        content: zipBuffer.toString('base64'),
-      });
-      docsNote = `Attached ZIP contains ${docs.rows.length} uploaded document file(s).`;
+    if (!archiver) {
+      docsNote = `Uploaded documents were found (${docs.rows.length}), but ZIP attachment generation is unavailable because archiver is not installed on the server. Use the Recruitment Admin dashboard after dependencies are installed.`;
     } else {
-      docsNote = `Document ZIP was ${Math.ceil(zipBuffer.length / 1024 / 1024)}MB, above the configured email attachment limit. Use the Recruitment Admin dashboard bulk download for documents.`;
+      const zipBuffer = await createDocumentsZipBuffer(docs.rows);
+      if (zipBuffer.length <= MAX_EMAIL_ATTACHMENT_BYTES) {
+        attachments.push({
+          filename: `recruitment_cycle_${safeFileSegment(cycle.id)}_documents.zip`,
+          content: zipBuffer.toString('base64'),
+        });
+        docsNote = `Attached ZIP contains ${docs.rows.length} uploaded document file(s).`;
+      } else {
+        docsNote = `Document ZIP was ${Math.ceil(zipBuffer.length / 1024 / 1024)}MB, above the configured email attachment limit. Use the Recruitment Admin dashboard bulk download for documents.`;
+      }
     }
   }
 

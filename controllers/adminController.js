@@ -68,18 +68,62 @@ const ensureAdminRoleSchema = async () => {
 
   await db.query(`
     ALTER TABLE users
-      ALTER COLUMN user_type TYPE VARCHAR(50);
-
-    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS nin VARCHAR(11),
+      ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS identity_verified BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS nin_verified BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS assigned_state VARCHAR(100),
       ADD COLUMN IF NOT EXISTS assigned_city VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS lawyer_client_scope VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS is_recruitment_admin BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) NOT NULL DEFAULT 'approved',
-      ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+      ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS account_suspended_reason TEXT,
+      ADD COLUMN IF NOT EXISTS account_suspended_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS account_suspended_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
     DO $$
     DECLARE
       existing_check_name TEXT;
+      current_len INTEGER;
+      col_has_views INTEGER;
     BEGIN
+      SELECT COALESCE(character_maximum_length, 0)
+      INTO current_len
+      FROM information_schema.columns
+      WHERE table_name = 'users'
+        AND column_name = 'user_type';
+
+      IF current_len < 50 THEN
+        SELECT COUNT(*)
+        INTO col_has_views
+        FROM pg_depend d
+        JOIN pg_rewrite r ON r.oid = d.objid
+        JOIN pg_class v ON v.oid = r.ev_class
+        JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+        WHERE d.refclassid = 'pg_class'::regclass
+          AND d.classid = 'pg_rewrite'::regclass
+          AND d.refobjsubid > 0
+          AND a.attrelid = 'users'::regclass
+          AND v.relkind = 'v'
+          AND a.attname = 'user_type';
+
+        IF col_has_views > 0 THEN
+          DROP VIEW IF EXISTS financial_admin_dashboard CASCADE;
+          DROP VIEW IF EXISTS lga_admin_hierarchy CASCADE;
+          DROP VIEW IF EXISTS state_admin_earnings CASCADE;
+          DROP VIEW IF EXISTS state_admin_transportation_view CASCADE;
+          DROP VIEW IF EXISTS super_admin_transportation_oversight_view CASCADE;
+          DROP VIEW IF EXISTS transportation_system_health_view CASCADE;
+        END IF;
+
+        ALTER TABLE users ALTER COLUMN user_type TYPE VARCHAR(50);
+      END IF;
+
       SELECT c.conname
       INTO existing_check_name
       FROM pg_constraint c
@@ -1978,9 +2022,9 @@ exports.createAdmin = async (req, res) => {
       'transportation_admin',
     ];
 
-    const states = [
+    const fallbackStates = [
       'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta',
-      'Ebonyi','Edo','Ekiti','Enugu','FCT','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi',
+      'Ebonyi','Edo','Ekiti','Enugu','FCT','Federal Capital Territory','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi',
       'Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto',
       'Taraba','Yobe','Zamfara'
     ];
@@ -2035,6 +2079,8 @@ exports.createAdmin = async (req, res) => {
 
     const normalizedState = String(assigned_state || '').trim();
     const normalizedCity = String(assigned_city || '').trim();
+    let canonicalAssignedState = normalizedState;
+
     if (stateBoundRoles.has(user_type)) {
       if (!normalizedState) {
         return res.status(400).json({
@@ -2043,7 +2089,39 @@ exports.createAdmin = async (req, res) => {
         });
       }
 
-      if (!states.includes(normalizedState)) {
+      const normalizeStateValue = (value) => String(value || '').trim().toLowerCase();
+      const normalizedStateInput = normalizeStateValue(normalizedState);
+      let stateMatched = false;
+
+      try {
+        const stateRows = await db.query('SELECT state_name, state_code FROM states ORDER BY state_name ASC');
+        const match = stateRows.rows.find((row) => {
+          const stateName = normalizeStateValue(row.state_name);
+          const stateCode = normalizeStateValue(row.state_code);
+          return (
+            stateName === normalizedStateInput ||
+            stateCode === normalizedStateInput ||
+            (normalizedStateInput === 'fct' && stateName === 'federal capital territory')
+          );
+        });
+
+        if (match) {
+          canonicalAssignedState = match.state_name;
+          stateMatched = true;
+        }
+      } catch (stateLookupError) {
+        console.warn('Create admin state lookup failed, using fallback states:', stateLookupError.message);
+      }
+
+      if (!stateMatched) {
+        stateMatched = fallbackStates.some((state) => normalizeStateValue(state) === normalizedStateInput);
+        if (normalizedStateInput === 'fct') {
+          canonicalAssignedState = 'Federal Capital Territory';
+          stateMatched = true;
+        }
+      }
+
+      if (!stateMatched) {
         return res.status(400).json({
           success: false,
           message: 'Invalid assigned state selected',
@@ -2111,10 +2189,11 @@ exports.createAdmin = async (req, res) => {
       `INSERT INTO users (
         user_type, email, phone, password_hash,
         full_name, nin, assigned_state, assigned_city, lawyer_client_scope,
-        email_verified, phone_verified, identity_verified, approval_status
+        email_verified, phone_verified, identity_verified, approval_status,
+        is_recruitment_admin, is_active
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,TRUE,TRUE,$10)
-      RETURNING id, email, user_type, assigned_state, assigned_city, lawyer_client_scope, approval_status`,
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,TRUE,TRUE,$10,$11,TRUE)
+      RETURNING id, email, user_type, assigned_state, assigned_city, lawyer_client_scope, approval_status, is_recruitment_admin`,
       [
         user_type,
         normalizedEmail,
@@ -2122,10 +2201,11 @@ exports.createAdmin = async (req, res) => {
         passwordHash,
         normalizedFullName,
         normalizedNin || null,
-        normalizedState || null,
+        canonicalAssignedState || null,
         ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(user_type) ? normalizedCity : null,
         normalizedLawyerScope,
         pendingApproval ? 'pending' : 'approved',
+        user_type === 'recruitment_admin',
       ]
     );
 
