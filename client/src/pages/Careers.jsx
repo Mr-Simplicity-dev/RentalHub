@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
 import {
   FaBriefcase,
@@ -37,6 +36,7 @@ const TINY_FACE_DETECTOR_MODEL_URLS = [
   'https://cdn.jsdelivr.net/gh/vladmandic/face-api/model',
 ];
 const CAREERS_DRAFT_STORAGE_KEY = 'rentalhub_careers_application_draft';
+const CAREERS_EMAIL_STORAGE_KEY = 'rentalhub_careers_applicant_email';
 
 // ============================================================
 // face-api.js Global References (loaded from CDN)
@@ -177,7 +177,6 @@ const buildInterviewFingerprint = () => {
 };
 
 export default function Careers() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusLoading, setStatusLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
@@ -260,13 +259,19 @@ export default function Careers() {
     }
   }, []);
 
-  const loadMyApplication = useCallback(async () => {
+  const loadMyApplication = useCallback(async (emailOverride = '') => {
     try {
-      const email = form.email_address;
+      const storedEmail = typeof window !== 'undefined'
+        ? window.localStorage.getItem(CAREERS_EMAIL_STORAGE_KEY)
+        : '';
+      const email = normalize(emailOverride || form.email_address || storedEmail);
       if (!email) return;
       const res = await api.get(`/recruitment/my-application?email=${encodeURIComponent(email)}`);
       const app = res.data?.data || null;
       setApplication(app);
+      if (app?.email_address && typeof window !== 'undefined') {
+        window.localStorage.setItem(CAREERS_EMAIL_STORAGE_KEY, app.email_address);
+      }
       if (app?.access_code && !app.access_code_used) {
         setVisibleAccessCode(app.access_code);
       }
@@ -349,11 +354,23 @@ export default function Careers() {
       try {
         const res = await api.post(`/recruitment/payments/verify/${encodeURIComponent(reference)}`);
         const code = res.data?.data?.access_code;
+        const paidApplication = res.data?.data?.application;
+        if (paidApplication) {
+          setApplication(paidApplication);
+          setForm((prev) => ({
+            ...prev,
+            email_address: paidApplication.email_address || prev.email_address,
+            phone_number: paidApplication.phone_number || prev.phone_number,
+          }));
+          if (paidApplication.email_address && typeof window !== 'undefined') {
+            window.localStorage.setItem(CAREERS_EMAIL_STORAGE_KEY, paidApplication.email_address);
+          }
+        }
         if (code) {
           setVisibleAccessCode(code);
           toast.success('Payment confirmed. Your access code is ready.');
         }
-        await loadMyApplication();
+        await loadMyApplication(paidApplication?.email_address);
         const nextParams = new URLSearchParams(searchParams);
         nextParams.delete('payment_reference');
         setSearchParams(nextParams, { replace: true });
@@ -382,10 +399,14 @@ export default function Careers() {
     setSubmitting(true);
     try {
       const res = await api.post('/recruitment/apply', form);
-      setApplication(res.data?.data || null);
+      const newApplication = res.data?.data || null;
+      setApplication(newApplication);
       window.localStorage?.removeItem(CAREERS_DRAFT_STORAGE_KEY);
+      if (newApplication?.email_address) {
+        window.localStorage?.setItem(CAREERS_EMAIL_STORAGE_KEY, newApplication.email_address);
+      }
       toast.success(res.data?.message || 'Application started');
-      await loadMyApplication();
+      await loadMyApplication(newApplication?.email_address || form.email_address);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to start application');
     } finally {
@@ -888,33 +909,6 @@ export default function Careers() {
         <div className="mt-8 flex justify-center gap-3">
           <Link to="/" className="btn btn-secondary">
             Back to Home
-          </Link>
-        </div>
-      </div>
-    </motion.section>
-  );
-
-  const renderLoginPrompt = () => (
-    <motion.section
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="mx-auto flex min-h-[58vh] max-w-3xl items-center px-4 py-12"
-    >
-      <div className="w-full rounded-3xl border border-primary-200/50 bg-gradient-to-br from-white to-primary-50/30 p-8 text-center shadow-elevated-lg sm:p-12">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/20">
-          <FaBriefcase className="text-2xl" />
-        </div>
-        <h1 className="text-3xl font-black text-slate-900">Sign in to apply</h1>
-        <p className="mt-3 max-w-lg mx-auto text-base leading-7 text-slate-500">
-          Recruitment uses your existing RentalHub NG account. There is no separate career registration — just sign in and complete your application.
-        </p>
-        <div className="mt-8 flex justify-center gap-3">
-          <Link to="/login" className="btn btn-primary px-8 py-3 text-base">
-            Sign in to continue
-          </Link>
-          <Link to="/register" className="btn btn-secondary px-8 py-3 text-base">
-            Create Account
           </Link>
         </div>
       </div>
@@ -1575,7 +1569,7 @@ export default function Careers() {
     </AnimatePresence>
   );
 
-  if (statusLoading || authLoading) {
+  if (statusLoading) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-100">
