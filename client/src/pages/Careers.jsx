@@ -37,6 +37,7 @@ const TINY_FACE_DETECTOR_MODEL_URLS = [
 ];
 const CAREERS_DRAFT_STORAGE_KEY = 'rentalhub_careers_application_draft';
 const CAREERS_EMAIL_STORAGE_KEY = 'rentalhub_careers_applicant_email';
+const CAREERS_REFERENCE_STORAGE_KEY = 'rentalhub_careers_application_reference';
 
 // ============================================================
 // face-api.js Global References (loaded from CDN)
@@ -238,6 +239,39 @@ export default function Careers() {
       : selectedRole.application_fee;
   }, [selectedRole, form.application_track]);
 
+  const rememberApplication = useCallback((app) => {
+    if (!app || typeof window === 'undefined') return;
+    if (app.email_address) {
+      window.localStorage.setItem(CAREERS_EMAIL_STORAGE_KEY, app.email_address);
+    }
+    if (app.reference_number) {
+      window.localStorage.setItem(CAREERS_REFERENCE_STORAGE_KEY, app.reference_number);
+    }
+  }, []);
+
+  const getApplicantAccessPayload = useCallback((targetApplication = application) => {
+    const storedEmail = typeof window !== 'undefined'
+      ? window.localStorage.getItem(CAREERS_EMAIL_STORAGE_KEY)
+      : '';
+    const storedReference = typeof window !== 'undefined'
+      ? window.localStorage.getItem(CAREERS_REFERENCE_STORAGE_KEY)
+      : '';
+
+    return {
+      applicant_email: targetApplication?.email_address || form.email_address || storedEmail || '',
+      reference_number: targetApplication?.reference_number || storedReference || '',
+    };
+  }, [application, form.email_address]);
+
+  const withApplicantAccess = useCallback((url, targetApplication = application) => {
+    const payload = getApplicantAccessPayload(targetApplication);
+    const params = new URLSearchParams();
+    if (payload.applicant_email) params.set('applicant_email', payload.applicant_email);
+    if (payload.reference_number) params.set('reference_number', payload.reference_number);
+    const query = params.toString();
+    return query ? `${url}${url.includes('?') ? '&' : '?'}${query}` : url;
+  }, [application, getApplicantAccessPayload]);
+
   const loadPublicData = useCallback(async () => {
     setStatusLoading(true);
     try {
@@ -259,26 +293,30 @@ export default function Careers() {
     }
   }, []);
 
-  const loadMyApplication = useCallback(async (emailOverride = '') => {
+  const loadMyApplication = useCallback(async (emailOverride = '', referenceOverride = '') => {
     try {
       const storedEmail = typeof window !== 'undefined'
         ? window.localStorage.getItem(CAREERS_EMAIL_STORAGE_KEY)
         : '';
+      const storedReference = typeof window !== 'undefined'
+        ? window.localStorage.getItem(CAREERS_REFERENCE_STORAGE_KEY)
+        : '';
       const email = normalize(emailOverride || form.email_address || storedEmail);
+      const reference = normalize(referenceOverride || storedReference);
       if (!email) return;
-      const res = await api.get(`/recruitment/my-application?email=${encodeURIComponent(email)}`);
+      const params = new URLSearchParams({ email });
+      if (reference) params.set('reference_number', reference);
+      const res = await api.get(`/recruitment/my-application?${params.toString()}`);
       const app = res.data?.data || null;
       setApplication(app);
-      if (app?.email_address && typeof window !== 'undefined') {
-        window.localStorage.setItem(CAREERS_EMAIL_STORAGE_KEY, app.email_address);
-      }
+      rememberApplication(app);
       if (app?.access_code && !app.access_code_used) {
         setVisibleAccessCode(app.access_code);
       }
     } catch (error) {
       console.error('Failed to load applicant dashboard:', error);
     }
-  }, [form.email_address]);
+  }, [form.email_address, rememberApplication]);
 
   useEffect(() => {
     loadPublicData();
@@ -306,7 +344,10 @@ export default function Careers() {
       if (application?.id && application.status === 'draft') {
         setDraftSaving(true);
         try {
-          await api.put(`/recruitment/applications/${application.id}`, form);
+          await api.put(`/recruitment/applications/${application.id}`, {
+            ...form,
+            ...getApplicantAccessPayload(application),
+          });
         } catch (error) {
           console.error('Recruitment draft autosave failed:', error);
         } finally {
@@ -321,7 +362,7 @@ export default function Careers() {
     }, 30000);
 
     return () => clearInterval(timer);
-  }, [application, form]);
+  }, [application, form, getApplicantAccessPayload]);
 
   useEffect(() => {
     if (!form.state_name) {
@@ -362,15 +403,13 @@ export default function Careers() {
             email_address: paidApplication.email_address || prev.email_address,
             phone_number: paidApplication.phone_number || prev.phone_number,
           }));
-          if (paidApplication.email_address && typeof window !== 'undefined') {
-            window.localStorage.setItem(CAREERS_EMAIL_STORAGE_KEY, paidApplication.email_address);
-          }
+          rememberApplication(paidApplication);
         }
         if (code) {
           setVisibleAccessCode(code);
           toast.success('Payment confirmed. Your access code is ready.');
         }
-        await loadMyApplication(paidApplication?.email_address);
+        await loadMyApplication(paidApplication?.email_address, paidApplication?.reference_number);
         const nextParams = new URLSearchParams(searchParams);
         nextParams.delete('payment_reference');
         setSearchParams(nextParams, { replace: true });
@@ -383,7 +422,7 @@ export default function Careers() {
     };
 
     verify();
-  }, [loadMyApplication, searchParams, setSearchParams]);
+  }, [loadMyApplication, rememberApplication, searchParams, setSearchParams]);
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
@@ -402,11 +441,9 @@ export default function Careers() {
       const newApplication = res.data?.data || null;
       setApplication(newApplication);
       window.localStorage?.removeItem(CAREERS_DRAFT_STORAGE_KEY);
-      if (newApplication?.email_address) {
-        window.localStorage?.setItem(CAREERS_EMAIL_STORAGE_KEY, newApplication.email_address);
-      }
+      rememberApplication(newApplication);
       toast.success(res.data?.message || 'Application started');
-      await loadMyApplication(newApplication?.email_address || form.email_address);
+      await loadMyApplication(newApplication?.email_address || form.email_address, newApplication?.reference_number);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to start application');
     } finally {
@@ -420,6 +457,7 @@ export default function Careers() {
     try {
       const res = await api.post('/recruitment/payments/initiate', {
         application_id: application.id,
+        ...getApplicantAccessPayload(),
       });
       const url = res.data?.data?.authorization_url;
       if (url) {
@@ -440,6 +478,7 @@ export default function Careers() {
       await api.post('/recruitment/verify-access-code', {
         application_id: application.id,
         access_code: accessCodeInput,
+        ...getApplicantAccessPayload(),
       });
       toast.success('Access code verified. Document upload is now unlocked.');
       setAccessCodeInput('');
@@ -462,6 +501,9 @@ export default function Careers() {
       if (!selected) return;
       Array.from(selected).forEach((file) => formData.append(field.name, file));
     });
+    const accessPayload = getApplicantAccessPayload();
+    formData.append('applicant_email', accessPayload.applicant_email);
+    formData.append('reference_number', accessPayload.reference_number);
 
     setUploading(true);
     try {
@@ -513,7 +555,10 @@ export default function Careers() {
     if (!application?.id) return;
     setGeneratingCv(true);
     try {
-      await api.post(`/recruitment/documents/generate-cv/${application.id}`, cvForm);
+      await api.post(`/recruitment/documents/generate-cv/${application.id}`, {
+        ...cvForm,
+        ...getApplicantAccessPayload(),
+      });
       toast.success('Platform CV generated and attached');
       setCvModal(false);
       await loadMyApplication();
@@ -527,7 +572,7 @@ export default function Careers() {
   const submitApplication = async () => {
     if (!application?.id) return;
     try {
-      await api.post(`/recruitment/applications/${application.id}/submit`);
+      await api.post(`/recruitment/applications/${application.id}/submit`, getApplicantAccessPayload());
       toast.success('Application submitted successfully');
       await loadMyApplication();
     } catch (error) {
@@ -611,6 +656,7 @@ export default function Careers() {
 
     try {
       await api.post('/recruitment/interview/violation', {
+        application_id: application?.id,
         violation_type: type,
         details,
         challenge_token: interviewChallengeToken,
@@ -715,8 +761,10 @@ export default function Careers() {
 
       setInterviewStartupStep('Fetching your assigned questions...');
       const res = await api.post('/recruitment/interview/start', {
+        application_id: application.id,
         phone_number: phoneCheck,
         fingerprint,
+        ...getApplicantAccessPayload(),
       });
       setInterviewQuestions(res.data?.data?.questions || []);
       setInterviewChallengeToken(res.data?.data?.challenge_token || '');
@@ -743,17 +791,24 @@ export default function Careers() {
     const blob = new Blob(chunks, { type: 'video/webm' });
     const formData = new FormData();
     formData.append('recording', blob, `recruitment-interview-${Date.now()}.webm`);
+    formData.append('application_id', application?.id || '');
+    formData.append('challenge_token', interviewChallengeToken);
+    formData.append('fingerprint', interviewFingerprintRef.current);
     formData.append('violation_log', interviewLocked ? 'Interview locked by proctoring' : '');
     try {
       await api.post('/recruitment/interview/recording', formData);
     } catch (error) {
       console.error('Interview recording upload failed:', error);
     }
-  }, [interviewLocked]);
+  }, [application?.id, interviewChallengeToken, interviewLocked]);
 
   const completeInterview = useCallback(async () => {
     try {
-      const res = await api.post('/recruitment/interview/complete');
+      const res = await api.post('/recruitment/interview/complete', {
+        application_id: application?.id,
+        challenge_token: interviewChallengeToken,
+        fingerprint: interviewFingerprintRef.current,
+      });
       setInterviewResult(res.data?.data || null);
       toast.success('Interview completed successfully');
       stopInterviewMedia();
@@ -765,13 +820,14 @@ export default function Careers() {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to complete interview');
     }
-  }, [loadMyApplication, stopInterviewMedia, uploadRecording]);
+  }, [application?.id, interviewChallengeToken, loadMyApplication, stopInterviewMedia, uploadRecording]);
 
   const submitEmptyAnswer = useCallback(async () => {
     const question = interviewQuestions[questionIndex];
     if (!question || interviewLockedRef.current) return;
     try {
       await api.post('/recruitment/interview/answer', {
+        application_id: application?.id,
         question_id: question.id,
         answer: 'X', // X marks timed-out/unanswered
         challenge_token: interviewChallengeToken,
@@ -785,7 +841,7 @@ export default function Careers() {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit answer');
     }
-  }, [completeInterview, questionIndex, interviewQuestions, interviewChallengeToken]);
+  }, [application?.id, completeInterview, questionIndex, interviewQuestions, interviewChallengeToken]);
 
   const startQuestionTimer = useCallback(() => {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
@@ -816,6 +872,7 @@ export default function Careers() {
 
     try {
       await api.post('/recruitment/interview/answer', {
+        application_id: application?.id,
         question_id: question.id,
         answer: answer.toUpperCase(),
         challenge_token: interviewChallengeToken,
@@ -848,6 +905,7 @@ export default function Careers() {
     const sendPing = async () => {
       try {
         await api.post('/recruitment/interview/ping', {
+          application_id: application?.id,
           challenge_token: interviewChallengeToken,
           fingerprint: interviewFingerprintRef.current,
         });
@@ -865,7 +923,7 @@ export default function Careers() {
         interviewPingTimerRef.current = null;
       }
     };
-  }, [interviewMode, interviewChallengeToken, interviewLocked]);
+  }, [application?.id, interviewMode, interviewChallengeToken, interviewLocked]);
 
   // ─── Speech Recognition ────────────────────────────────
   const listenForAnswer = () => {
@@ -1174,7 +1232,7 @@ export default function Careers() {
               <h2 className="text-lg font-bold text-slate-900">Submitted Documents</h2>
               <button
                 type="button"
-                onClick={() => downloadBlob(`/recruitment/documents/download-all/${application.id}`, `${application.reference_number || 'recruitment'}-documents.zip`)}
+                onClick={() => downloadBlob(withApplicantAccess(`/recruitment/documents/download-all/${application.id}`), `${application.reference_number || 'recruitment'}-documents.zip`)}
                 className="btn btn-secondary justify-center text-xs"
               >
                 <FaDownload className="mr-2" /> Download My Submitted Documents
@@ -1185,7 +1243,7 @@ export default function Careers() {
                 <button
                   key={doc.id}
                   type="button"
-                  onClick={() => downloadBlob(`/recruitment/documents/download/${doc.id}`, doc.file_name || `${doc.document_type}.pdf`)}
+                  onClick={() => downloadBlob(withApplicantAccess(`/recruitment/documents/download/${doc.id}`), doc.file_name || `${doc.document_type}.pdf`)}
                   className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left text-sm hover:border-primary-200 hover:bg-primary-50/30 transition-all group"
                 >
                   <span className="truncate font-medium text-slate-700 group-hover:text-primary-700">

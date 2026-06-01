@@ -167,7 +167,9 @@ exports.updateApplication = async (req, res) => {
     if (!app.rows.length) {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
-    if (app.rows[0].status !== 'draft') {
+    const application = app.rows[0];
+    if (!requirePublicApplicationAccess(req, res, application)) return;
+    if (application.status !== 'draft') {
       return res.status(400).json({ success: false, message: 'Can only edit draft applications' });
     }
     
@@ -207,10 +209,14 @@ exports.updateApplication = async (req, res) => {
 
 exports.getMyApplication = async (req, res) => {
   try {
-    const { email } = req.query;
+    const { email, referenceNumber } = getApplicantAccessInput(req);
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email query parameter is required' });
     }
+    const params = [email];
+    const referenceFilter = referenceNumber
+      ? `AND UPPER(a.reference_number) = $${params.push(referenceNumber)}`
+      : '';
     const result = await db.query(
       `SELECT a.*, r.title as role_title, r.type as role_type,
               c.title as cycle_title, c.close_date as cycle_close_date
@@ -218,9 +224,10 @@ exports.getMyApplication = async (req, res) => {
        JOIN recruitment_roles r ON a.role_id = r.id
        JOIN recruitment_cycles c ON a.cycle_id = c.id
        WHERE LOWER(a.email_address) = LOWER($1)
+       ${referenceFilter}
        ORDER BY a.created_at DESC
        LIMIT 1`,
-      [email]
+      params
     );
     
     if (!result.rows.length) {
@@ -233,9 +240,14 @@ exports.getMyApplication = async (req, res) => {
       [result.rows[0].id]
     );
     
+    const application = stripPublicApplicationSecrets(result.rows[0]);
+    if (!referenceNumber) {
+      delete application.access_code;
+    }
+
     res.json({ 
       success: true, 
-      data: { ...result.rows[0], documents: docs.rows }
+      data: { ...application, documents: referenceNumber ? docs.rows : [] }
     });
   } catch (err) {
     console.error('getMyApplication error:', err);
@@ -245,7 +257,7 @@ exports.getMyApplication = async (req, res) => {
 
 exports.getMyApplications = async (req, res) => {
   try {
-    const { email } = req.query;
+    const { email } = getApplicantAccessInput(req);
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email query parameter is required' });
     }
@@ -259,7 +271,13 @@ exports.getMyApplications = async (req, res) => {
        ORDER BY a.created_at DESC`,
       [email]
     );
-    res.json({ success: true, data: result.rows });
+    const rows = result.rows.map((row) => {
+      const safeRow = stripPublicApplicationSecrets(row);
+      delete safeRow.access_code;
+      delete safeRow.payment_reference;
+      return safeRow;
+    });
+    res.json({ success: true, data: rows });
   } catch (err) {
     console.error('getMyApplications error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -286,7 +304,8 @@ exports.verifyAccessCode = async (req, res) => {
     }
     
     const application = app.rows[0];
-    
+    if (!requirePublicApplicationAccess(req, res, application, { allowAccessCode: true })) return;
+
     if (application.access_code_used) {
       return res.status(400).json({ success: false, message: 'Access code has already been used' });
     }
@@ -338,6 +357,8 @@ exports.uploadDocuments = async (req, res) => {
     }
     
     const application = app.rows[0];
+    if (!requirePublicApplicationAccess(req, res, application)) return;
+
     if (!application.access_code_used || application.payment_status !== 'paid') {
       return res.status(403).json({ 
         success: false, 
@@ -383,6 +404,8 @@ exports.submitApplication = async (req, res) => {
     }
     
     const application = app.rows[0];
+    if (!requirePublicApplicationAccess(req, res, application)) return;
+
     if (application.status !== 'draft') {
       return res.status(400).json({ success: false, message: 'Application already submitted' });
     }
@@ -430,7 +453,10 @@ exports.downloadDocument = async (req, res) => {
     const { docId } = req.params;
     
     const doc = await db.query(
-      'SELECT * FROM recruitment_documents WHERE id = $1',
+      `SELECT d.*, a.email_address, a.reference_number, a.access_code
+       FROM recruitment_documents d
+       JOIN recruitment_applications a ON a.id = d.application_id
+       WHERE d.id = $1`,
       [docId]
     );
     
@@ -438,6 +464,8 @@ exports.downloadDocument = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Document not found' });
     }
     
+    if (!requirePublicApplicationAccess(req, res, doc.rows[0])) return;
+
     const filePath = doc.rows[0].file_path;
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: 'File not found on server' });
@@ -455,13 +483,14 @@ exports.downloadMyDocumentsZip = async (req, res) => {
     const { applicationId } = req.params;
 
     const app = await db.query(
-      'SELECT id, reference_number FROM recruitment_applications WHERE id = $1',
+      'SELECT id, email_address, reference_number, access_code FROM recruitment_applications WHERE id = $1',
       [applicationId]
     );
 
     if (!app.rows.length) {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
+    if (!requirePublicApplicationAccess(req, res, app.rows[0])) return;
 
     const docs = await db.query(
       `SELECT d.*, a.reference_number
@@ -503,6 +532,8 @@ exports.generatePlatformCv = async (req, res) => {
     }
 
     const application = appResult.rows[0];
+    if (!requirePublicApplicationAccess(req, res, application)) return;
+
     if (!application.access_code_used || application.payment_status !== 'paid') {
       return res.status(403).json({
         success: false,
@@ -607,6 +638,8 @@ exports.startInterview = async (req, res) => {
     const submittedPhone = normalizePhoneForCheck(req.body?.phone_number || req.query?.phone_number);
     const fingerprint = normalizeText(req.body?.fingerprint || req.query?.fingerprint).slice(0, 300);
     const userAgent = normalizeText(req.headers['user-agent']).slice(0, 500);
+    const requestedApplicationId = req.body?.application_id || req.query?.application_id;
+    const { email, referenceNumber } = getApplicantAccessInput(req);
 
     if (!submittedPhone) {
       return res.status(400).json({
@@ -614,16 +647,34 @@ exports.startInterview = async (req, res) => {
         message: 'Phone number confirmation is required before starting the interview',
       });
     }
+
+    const identityParams = [];
+    let identitySQL = '';
+    if (requestedApplicationId) {
+      identityParams.push(requestedApplicationId);
+      identitySQL = `a.id = $${identityParams.length}`;
+    } else if (email && referenceNumber) {
+      identityParams.push(email, referenceNumber);
+      identitySQL = `LOWER(a.email_address) = LOWER($1) AND UPPER(a.reference_number) = $2`;
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Application reference is required before starting the interview',
+      });
+    }
     
     const app = await db.query(
       `SELECT a.*, c.close_date, c.extension_date
        FROM recruitment_applications a
        JOIN recruitment_cycles c ON a.cycle_id = c.id
-       WHERE a.status = 'shortlisted'
+       WHERE ${identitySQL}
+         AND a.status = 'shortlisted'
          AND a.interview_activated = TRUE
          AND COALESCE(c.extension_date, c.close_date) >= CURRENT_DATE
        ORDER BY a.interview_date NULLS LAST, a.created_at DESC
-       LIMIT 1`);
+       LIMIT 1`,
+      identityParams
+    );
     
     if (!app.rows.length) {
       return res.status(403).json({ 
@@ -633,6 +684,7 @@ exports.startInterview = async (req, res) => {
     }
     
     const application = app.rows[0];
+    if (!requirePublicApplicationAccess(req, res, application)) return;
 
     if (normalizePhoneForCheck(application.phone_number) !== submittedPhone) {
       return res.status(403).json({
@@ -713,6 +765,7 @@ exports.startInterview = async (req, res) => {
     res.json({
       success: true,
       data: {
+        application_id: application.id,
         total_questions: questions.rows.length,
         challenge_token: challengeToken,
         questions: questions.rows.map(q => ({
@@ -976,14 +1029,15 @@ exports.interviewPing = async (req, res) => {
 
 exports.completeInterview = async (req, res) => {
   try {
-    const { application_id } = req.body;
+    const { application_id, challenge_token, fingerprint } = req.body;
 
     if (!application_id) {
       return res.status(400).json({ success: false, message: 'Application ID is required' });
     }
     
     const appResult = await db.query(
-      `SELECT id, interview_last_ping_at, interview_security_log
+      `SELECT id, interview_last_ping_at, interview_security_log,
+              interview_challenge_token, interview_fingerprint
        FROM recruitment_applications
        WHERE id = $1
          AND interview_started_at IS NOT NULL
@@ -996,6 +1050,26 @@ exports.completeInterview = async (req, res) => {
     
     const application = appResult.rows[0];
     const applicationId = application.id;
+
+    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
+      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
+    }
+
+    if (
+      application.interview_fingerprint &&
+      fingerprint &&
+      normalizeText(fingerprint) !== normalizeText(application.interview_fingerprint)
+    ) {
+      await db.query(
+        `UPDATE recruitment_applications
+         SET interview_security_log = $2,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [applicationId, appendSecurityLog(application.interview_security_log, 'Browser fingerprint changed before interview completion')]
+      );
+      return res.status(403).json({ success: false, message: 'Interview browser fingerprint changed' });
+    }
+
     if (
       application.interview_last_ping_at &&
       ((Date.now() - new Date(application.interview_last_ping_at).getTime()) / 1000) > INTERVIEW_PING_STALE_SECONDS
@@ -1932,6 +2006,54 @@ const safeFileSegment = (value) =>
     .replace(/^_+|_+$/g, '')
     .slice(0, 80) || 'file';
 
+const getApplicantAccessInput = (req = {}) => ({
+  email: normalizeLower(
+    req.body?.applicant_email ||
+    req.body?.email_address ||
+    req.query?.applicant_email ||
+    req.query?.email_address ||
+    req.query?.email
+  ),
+  referenceNumber: normalizeText(
+    req.body?.reference_number ||
+    req.body?.application_reference ||
+    req.query?.reference_number ||
+    req.query?.application_reference
+  ).toUpperCase(),
+  accessCode: normalizeText(req.body?.access_code || req.query?.access_code).toUpperCase(),
+});
+
+const hasPublicApplicationAccess = (req, application, { allowAccessCode = false } = {}) => {
+  if (!application) return false;
+  const { email, referenceNumber, accessCode } = getApplicantAccessInput(req);
+  const emailMatches = email && normalizeLower(application.email_address) === email;
+  const referenceMatches = referenceNumber &&
+    normalizeText(application.reference_number).toUpperCase() === referenceNumber;
+  const accessCodeMatches = allowAccessCode &&
+    accessCode &&
+    normalizeText(application.access_code).toUpperCase() === accessCode;
+
+  return (emailMatches && referenceMatches) || accessCodeMatches;
+};
+
+const requirePublicApplicationAccess = (req, res, application, options) => {
+  if (hasPublicApplicationAccess(req, application, options)) return true;
+  res.status(403).json({
+    success: false,
+    message: 'Applicant verification failed. Please reopen your applicant dashboard from the same application reference.',
+  });
+  return false;
+};
+
+const stripPublicApplicationSecrets = (application = {}) => {
+  const copy = { ...application };
+  delete copy.payment_gateway_payload;
+  delete copy.interview_challenge_token;
+  delete copy.interview_fingerprint;
+  delete copy.interview_user_agent;
+  return copy;
+};
+
 const addSqlParam = (params, value) => {
   params.push(value);
   return `$${params.length}`;
@@ -2559,6 +2681,8 @@ exports.initiatePayment = async (req, res) => {
     }
 
     const application = appResult.rows[0];
+    if (!requirePublicApplicationAccess(req, res, application)) return;
+
     if (application.payment_status === 'paid') {
       return res.status(400).json({ success: false, message: 'Application Access Fee has already been paid' });
     }
@@ -2632,7 +2756,7 @@ exports.verifyPayment = async (req, res) => {
       return res.json({
         success: true,
         message: 'Payment already verified',
-        data: { application, access_code: application.access_code },
+        data: { application: stripPublicApplicationSecrets(application), access_code: application.access_code },
       });
     }
 
@@ -2661,7 +2785,7 @@ exports.verifyPayment = async (req, res) => {
     res.json({
       success: true,
       message: 'Payment confirmed. Your access code is ready.',
-      data: { application: paid, access_code: paid.access_code },
+      data: { application: stripPublicApplicationSecrets(paid), access_code: paid.access_code },
     });
   } catch (error) {
     console.error('verifyPayment error:', error.response?.data || error.message);
@@ -3419,7 +3543,7 @@ exports.getQuestions = exports.getAllQuestions;
 
 exports.uploadInterviewRecording = async (req, res) => {
   try {
-    const { application_id } = req.body;
+    const { application_id, challenge_token, fingerprint } = req.body;
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Recording file is required' });
     }
@@ -3429,7 +3553,8 @@ exports.uploadInterviewRecording = async (req, res) => {
     }
 
     const appResult = await db.query(
-      `SELECT id FROM recruitment_applications
+      `SELECT id, interview_challenge_token, interview_fingerprint
+       FROM recruitment_applications
        WHERE id = $1
          AND interview_started_at IS NOT NULL
        LIMIT 1`,
@@ -3440,13 +3565,26 @@ exports.uploadInterviewRecording = async (req, res) => {
       return res.status(403).json({ success: false, message: 'No interview session found' });
     }
 
+    const application = appResult.rows[0];
+    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
+      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
+    }
+
+    if (
+      application.interview_fingerprint &&
+      fingerprint &&
+      normalizeText(fingerprint) !== normalizeText(application.interview_fingerprint)
+    ) {
+      return res.status(403).json({ success: false, message: 'Interview browser fingerprint changed' });
+    }
+
     const result = await db.query(
       `INSERT INTO recruitment_interview_recordings
          (application_id, recording_path, recording_duration, violation_log)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
       [
-        appResult.rows[0].id,
+        application.id,
         req.file.path,
         Number(req.body?.duration_seconds) || null,
         normalizeText(req.body?.violation_log) || null,
