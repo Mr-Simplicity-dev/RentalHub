@@ -13,6 +13,7 @@ import api from '../../services/api';
 
 const isExternalUrl = (url) => /^https?:\/\//i.test(String(url || ''));
 const isInternalUrl = (url) => String(url || '').startsWith('/') && !String(url || '').startsWith('//');
+  import { useAuth } from '../../hooks/useAuth';
 const normalizeTargetUrl = (url) => {
   const target = String(url || '').trim();
   if (!target) return '';

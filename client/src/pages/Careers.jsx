@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
 import {
   FaBriefcase,
@@ -176,7 +177,7 @@ const buildInterviewFingerprint = () => {
 };
 
 export default function Careers() {
-  const authLoading = false;
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusLoading, setStatusLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
