@@ -375,10 +375,10 @@ const AdSpacesTab = () => {
                 value={form.target_url}
                 onChange={handleChange}
                 className="input mt-1"
-                placeholder="/register, /login, /properties/123, or https://..."
+                placeholder="/register, /login, /career, /about-us, /faqs, /pricing-plans, /list-your-property, or https://..."
               />
               <span className="mt-1 block text-xs font-normal text-gray-500">
-                Use app routes like /register, /login, or /properties/PROPERTY_ID. External links must start with https://.
+                Use app routes like /register, /login, /career, /about-us, /faqs, /pricing-plans, /list-your-property, or /properties/PROPERTY_ID. External links must start with https://.
               </span>
             </label>
 

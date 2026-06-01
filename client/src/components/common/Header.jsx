@@ -645,7 +645,7 @@ return (
           />
 
           {/* FIXED */}
-          <span className="hidden truncate bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-xl font-bold text-transparent sm:block md:text-2xl">
+          <span className="hidden truncate text-xl font-extrabold text-primary-900 tracking-tight sm:block md:text-2xl">
             RentalHub NG
           </span>
         </Link>

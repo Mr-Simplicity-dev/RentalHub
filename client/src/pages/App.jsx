@@ -645,12 +645,18 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
               <Route path="/about" element={<AboutUs />} />
+              <Route path="/about-us" element={<Navigate to="/about" replace />} />
               <Route path="/list-property" element={<ListProperty />} />
+              <Route path="/list-your-property" element={<Navigate to="/list-property" replace />} />
               <Route path="/faq" element={<Faq />} />
+              <Route path="/faqs" element={<Navigate to="/faq" replace />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/pricing" element={<Pricing />} />
-              <Route path="/careers" element={<ProtectedRoute><Careers /></ProtectedRoute>} />
+              <Route path="/pricing-plans" element={<Navigate to="/pricing" replace />} />
+              <Route path="/careers" element={<Careers />} />
+              <Route path="/career" element={<Navigate to="/careers" replace />} />
               <Route path="/landlord-guide" element={<LandlordGuide />} />
+              <Route path="/landlordguide" element={<Navigate to="/landlord-guide" replace />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route

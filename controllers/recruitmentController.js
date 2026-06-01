@@ -159,11 +159,10 @@ exports.getLGAs = async (req, res) => {
 exports.updateApplication = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
     
     const app = await db.query(
-      'SELECT * FROM recruitment_applications WHERE id = $1 AND user_id = $2',
-      [id, userId]
+      'SELECT * FROM recruitment_applications WHERE id = $1',
+      [id]
     );
     if (!app.rows.length) {
       return res.status(404).json({ success: false, message: 'Application not found' });
@@ -208,17 +207,20 @@ exports.updateApplication = async (req, res) => {
 
 exports.getMyApplication = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email query parameter is required' });
+    }
     const result = await db.query(
       `SELECT a.*, r.title as role_title, r.type as role_type,
               c.title as cycle_title, c.close_date as cycle_close_date
        FROM recruitment_applications a
        JOIN recruitment_roles r ON a.role_id = r.id
        JOIN recruitment_cycles c ON a.cycle_id = c.id
-       WHERE a.user_id = $1
+       WHERE LOWER(a.email_address) = LOWER($1)
        ORDER BY a.created_at DESC
        LIMIT 1`,
-      [userId]
+      [email]
     );
     
     if (!result.rows.length) {
@@ -243,16 +245,19 @@ exports.getMyApplication = async (req, res) => {
 
 exports.getMyApplications = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email query parameter is required' });
+    }
     const result = await db.query(
       `SELECT a.*, r.title as role_title, r.type as role_type,
               c.title as cycle_title
        FROM recruitment_applications a
        JOIN recruitment_roles r ON a.role_id = r.id
        JOIN recruitment_cycles c ON a.cycle_id = c.id
-       WHERE a.user_id = $1
+       WHERE LOWER(a.email_address) = LOWER($1)
        ORDER BY a.created_at DESC`,
-      [userId]
+      [email]
     );
     res.json({ success: true, data: result.rows });
   } catch (err) {
@@ -266,7 +271,6 @@ exports.getMyApplications = async (req, res) => {
 
 exports.verifyAccessCode = async (req, res) => {
   try {
-    const userId = req.user.id;
     const { access_code, application_id } = req.body;
     
     if (!access_code || !application_id) {
@@ -274,8 +278,8 @@ exports.verifyAccessCode = async (req, res) => {
     }
     
     const app = await db.query(
-      'SELECT * FROM recruitment_applications WHERE id = $1 AND user_id = $2',
-      [application_id, userId]
+      'SELECT * FROM recruitment_applications WHERE id = $1',
+      [application_id]
     );
     if (!app.rows.length) {
       return res.status(404).json({ success: false, message: 'Application not found' });
@@ -324,11 +328,10 @@ exports.verifyAccessCode = async (req, res) => {
 exports.uploadDocuments = async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const userId = req.user.id;
     
     const app = await db.query(
-      'SELECT * FROM recruitment_applications WHERE id = $1 AND user_id = $2',
-      [applicationId, userId]
+      'SELECT * FROM recruitment_applications WHERE id = $1',
+      [applicationId]
     );
     if (!app.rows.length) {
       return res.status(404).json({ success: false, message: 'Application not found' });
@@ -370,11 +373,10 @@ exports.uploadDocuments = async (req, res) => {
 exports.submitApplication = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
     
     const app = await db.query(
-      'SELECT * FROM recruitment_applications WHERE id = $1 AND user_id = $2',
-      [id, userId]
+      'SELECT * FROM recruitment_applications WHERE id = $1',
+      [id]
     );
     if (!app.rows.length) {
       return res.status(404).json({ success: false, message: 'Application not found' });
@@ -426,16 +428,13 @@ exports.submitApplication = async (req, res) => {
 exports.downloadDocument = async (req, res) => {
   try {
     const { docId } = req.params;
-    const userId = req.user.id;
     
     const doc = await db.query(
-      `SELECT d.*, a.user_id FROM recruitment_documents d
-       JOIN recruitment_applications a ON d.application_id = a.id
-       WHERE d.id = $1`,
+      'SELECT * FROM recruitment_documents WHERE id = $1',
       [docId]
     );
     
-    if (!doc.rows.length || doc.rows[0].user_id !== userId) {
+    if (!doc.rows.length) {
       return res.status(404).json({ success: false, message: 'Document not found' });
     }
     
@@ -454,11 +453,10 @@ exports.downloadDocument = async (req, res) => {
 exports.downloadMyDocumentsZip = async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const userId = req.user.id;
 
     const app = await db.query(
-      'SELECT id, reference_number FROM recruitment_applications WHERE id = $1 AND user_id = $2',
-      [applicationId, userId]
+      'SELECT id, reference_number FROM recruitment_applications WHERE id = $1',
+      [applicationId]
     );
 
     if (!app.rows.length) {
@@ -491,14 +489,13 @@ exports.downloadMyDocumentsZip = async (req, res) => {
 exports.generatePlatformCv = async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const userId = req.user.id;
 
     const appResult = await db.query(
       `SELECT a.*, r.title AS role_title
        FROM recruitment_applications a
        JOIN recruitment_roles r ON r.id = a.role_id
-       WHERE a.id = $1 AND a.user_id = $2`,
-      [applicationId, userId]
+       WHERE a.id = $1`,
+      [applicationId]
     );
 
     if (!appResult.rows.length) {
@@ -607,7 +604,6 @@ exports.generatePlatformCv = async (req, res) => {
 
 exports.startInterview = async (req, res) => {
   try {
-    const userId = req.user.id;
     const submittedPhone = normalizePhoneForCheck(req.body?.phone_number || req.query?.phone_number);
     const fingerprint = normalizeText(req.body?.fingerprint || req.query?.fingerprint).slice(0, 300);
     const userAgent = normalizeText(req.headers['user-agent']).slice(0, 500);
@@ -623,14 +619,11 @@ exports.startInterview = async (req, res) => {
       `SELECT a.*, c.close_date, c.extension_date
        FROM recruitment_applications a
        JOIN recruitment_cycles c ON a.cycle_id = c.id
-       WHERE a.user_id = $1
-         AND a.status = 'shortlisted'
+       WHERE a.status = 'shortlisted'
          AND a.interview_activated = TRUE
          AND COALESCE(c.extension_date, c.close_date) >= CURRENT_DATE
        ORDER BY a.interview_date NULLS LAST, a.created_at DESC
-       LIMIT 1`,
-      [userId]
-    );
+       LIMIT 1`);
     
     if (!app.rows.length) {
       return res.status(403).json({ 
@@ -741,8 +734,7 @@ exports.startInterview = async (req, res) => {
 
 exports.submitAnswer = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { question_id, answer, challenge_token, fingerprint } = req.body;
+    const { question_id, answer, challenge_token, fingerprint, application_id } = req.body;
     const normalizedAnswer = String(answer || '').trim().toUpperCase().slice(0, 1);
     
     if (!question_id || !normalizedAnswer) {
@@ -752,16 +744,20 @@ exports.submitAnswer = async (req, res) => {
     if (!['A', 'B', 'C', 'D', 'X'].includes(normalizedAnswer)) {
       return res.status(400).json({ success: false, message: 'Answer must be A, B, C, D, or X for timeout' });
     }
+
+    if (!application_id) {
+      return res.status(400).json({ success: false, message: 'Application ID is required' });
+    }
     
     // Get application
     const appResult = await db.query(
       `SELECT id, interview_started_at, interview_challenge_token, interview_fingerprint,
               interview_user_agent, interview_security_log
        FROM recruitment_applications
-       WHERE user_id = $1
+       WHERE id = $1
          AND interview_started_at IS NOT NULL
          AND interview_completed = FALSE`,
-      [userId]
+      [application_id]
     );
     if (!appResult.rows.length) {
       return res.status(403).json({ success: false, message: 'No active interview found' });
@@ -868,21 +864,23 @@ exports.submitAnswer = async (req, res) => {
 
 exports.reportViolation = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { violation_type, details, challenge_token, fingerprint } = req.body;
+    const { violation_type, details, challenge_token, fingerprint, application_id } = req.body;
+    
+    if (!application_id) {
+      return res.status(400).json({ success: false, message: 'Application ID is required' });
+    }
     
     const appResult = await db.query(
       `SELECT id, interview_challenge_token, interview_fingerprint
        FROM recruitment_applications
-       WHERE user_id = $1 AND interview_started_at IS NOT NULL`,
-      [userId]
+       WHERE id = $1 AND interview_started_at IS NOT NULL`,
+      [application_id]
     );
     if (!appResult.rows.length) {
       return res.status(403).json({ success: false, message: 'No active interview found' });
     }
     
     const application = appResult.rows[0];
-    const applicationId = application.id;
 
     if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
       return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
@@ -905,7 +903,7 @@ exports.reportViolation = async (req, res) => {
            disqualified_at = NOW(),
            updated_at = NOW()
        WHERE id = $2`,
-      [`Violation: ${violation_type || 'Unknown'} - ${details || 'No details'}`, applicationId]
+      [`Violation: ${violation_type || 'Unknown'} - ${details || 'No details'}`, application.id]
     );
     
     res.json({ 
@@ -921,18 +919,20 @@ exports.reportViolation = async (req, res) => {
 
 exports.interviewPing = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { challenge_token, fingerprint } = req.body || {};
+    const { challenge_token, fingerprint, application_id } = req.body || {};
+
+    if (!application_id) {
+      return res.status(400).json({ success: false, message: 'Application ID is required' });
+    }
 
     const appResult = await db.query(
       `SELECT id, interview_challenge_token, interview_fingerprint, interview_security_log
        FROM recruitment_applications
-       WHERE user_id = $1
+       WHERE id = $1
          AND interview_started_at IS NOT NULL
          AND interview_completed = FALSE
-       ORDER BY interview_started_at DESC
        LIMIT 1`,
-      [userId]
+      [application_id]
     );
 
     if (!appResult.rows.length) {
@@ -976,15 +976,19 @@ exports.interviewPing = async (req, res) => {
 
 exports.completeInterview = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const { application_id } = req.body;
+
+    if (!application_id) {
+      return res.status(400).json({ success: false, message: 'Application ID is required' });
+    }
     
     const appResult = await db.query(
       `SELECT id, interview_last_ping_at, interview_security_log
        FROM recruitment_applications
-       WHERE user_id = $1
+       WHERE id = $1
          AND interview_started_at IS NOT NULL
          AND interview_completed = FALSE`,
-      [userId]
+      [application_id]
     );
     if (!appResult.rows.length) {
       return res.status(403).json({ success: false, message: 'No active interview found' });
@@ -2260,14 +2264,162 @@ exports.toggleRecruitment = async (req, res) => {
   }
 };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 exports.createApplication = async (req, res) => {
   try {
-    const userId = req.user.id;
     const settings = await fetchRecruitmentStatusRow();
     if (!settings.is_active) {
       return res.status(403).json({ success: false, message: 'Recruitment is currently closed' });
     }
-
     const {
       role_id,
       full_name,
@@ -2285,7 +2437,6 @@ exports.createApplication = async (req, res) => {
       suitability_reason,
       application_track = 'standard',
     } = req.body;
-
     const required = {
       role_id,
       full_name,
@@ -2298,18 +2449,15 @@ exports.createApplication = async (req, res) => {
       highest_education,
       suitability_reason,
     };
-
     const missing = Object.entries(required)
       .filter(([, value]) => !normalizeText(value))
       .map(([key]) => key.replace(/_/g, ' '));
-
     if (missing.length) {
       return res.status(400).json({
         success: false,
         message: `Missing required fields: ${missing.join(', ')}`,
       });
     }
-
     const roleResult = await db.query(
       `SELECT r.*, c.open_date, c.close_date, c.extension_date, c.is_active AS cycle_active
        FROM recruitment_roles r
@@ -2322,11 +2470,9 @@ exports.createApplication = async (req, res) => {
        LIMIT 1`,
       [role_id]
     );
-
     if (!roleResult.rows.length) {
       return res.status(404).json({ success: false, message: 'This recruitment role is not currently open' });
     }
-
     const activationCount = await db.query(
       'SELECT COUNT(*)::INT AS count FROM recruitment_location_activation WHERE is_active = TRUE'
     );
@@ -2340,7 +2486,6 @@ exports.createApplication = async (req, res) => {
          LIMIT 1`,
         [state_name, lga_name, ALL_LGAS]
       );
-
       if (!locationResult.rows.length) {
         return res.status(403).json({
           success: false,
@@ -2348,38 +2493,19 @@ exports.createApplication = async (req, res) => {
         });
       }
     }
-
-    const existing = await db.query(
-      `SELECT id FROM recruitment_applications
-       WHERE user_id = $1
-         AND cycle_id = $2
-         AND status NOT IN ('rejected', 'disqualified')
-       LIMIT 1`,
-      [userId, roleResult.rows[0].cycle_id]
-    );
-
-    if (existing.rows.length) {
-      return res.status(400).json({
-        success: false,
-        message: 'You already have an active application for this recruitment cycle',
-      });
-    }
-
     const role = roleResult.rows[0];
     const track = application_track === 'premium' ? 'premium' : 'standard';
     const fee = track === 'premium' ? Number(role.premium_fee || 8000) : Number(role.application_fee || 5000);
-
     const result = await db.query(
       `INSERT INTO recruitment_applications (
-        user_id, cycle_id, role_id, full_name, phone_number, email_address,
+        cycle_id, role_id, full_name, phone_number, email_address,
         state_name, lga_name, area_locality, residential_address, date_of_birth,
         highest_education, years_of_experience, current_employment_status,
         skills_qualifications, suitability_reason, application_fee,
         application_track, reference_number, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'draft')
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'draft')
       RETURNING *`,
       [
-        userId,
         role.cycle_id,
         role_id,
         normalizeText(full_name),
@@ -2400,7 +2526,6 @@ exports.createApplication = async (req, res) => {
         generateReferenceNumber(),
       ]
     );
-
     res.status(201).json({
       success: true,
       data: { ...result.rows[0], role_title: role.title, role_type: role.type },
@@ -2414,7 +2539,6 @@ exports.createApplication = async (req, res) => {
 
 exports.initiatePayment = async (req, res) => {
   try {
-    const userId = req.user.id;
     const { application_id } = req.body;
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
@@ -2426,8 +2550,8 @@ exports.initiatePayment = async (req, res) => {
       `SELECT a.*, r.title AS role_title
        FROM recruitment_applications a
        JOIN recruitment_roles r ON r.id = a.role_id
-       WHERE a.id = $1 AND a.user_id = $2`,
-      [application_id, userId]
+       WHERE a.id = $1`,
+      [application_id]
     );
 
     if (!appResult.rows.length) {
@@ -2448,14 +2572,13 @@ exports.initiatePayment = async (req, res) => {
     const response = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: application.email_address || req.user.email,
+                email: application.email_address,
         amount: Math.round(Number(application.application_fee || 5000) * 100),
         reference,
         callback_url: `${getFrontendUrl()}/careers?payment_reference=${encodeURIComponent(reference)}`,
         metadata: {
           type: 'recruitment_application_access_fee',
           application_id: application.id,
-          user_id: userId,
           role_title: application.role_title,
         },
       },
@@ -2486,7 +2609,6 @@ exports.initiatePayment = async (req, res) => {
 
 exports.verifyPayment = async (req, res) => {
   try {
-    const userId = req.user.id;
     const { reference } = req.params;
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
@@ -2496,9 +2618,9 @@ exports.verifyPayment = async (req, res) => {
 
     const appResult = await db.query(
       `SELECT * FROM recruitment_applications
-       WHERE payment_reference = $1 AND user_id = $2
+       WHERE payment_reference = $1
        LIMIT 1`,
-      [reference, userId]
+      [reference]
     );
 
     if (!appResult.rows.length) {
@@ -3297,18 +3419,21 @@ exports.getQuestions = exports.getAllQuestions;
 
 exports.uploadInterviewRecording = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const { application_id } = req.body;
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Recording file is required' });
     }
 
+    if (!application_id) {
+      return res.status(400).json({ success: false, message: 'Application ID is required' });
+    }
+
     const appResult = await db.query(
       `SELECT id FROM recruitment_applications
-       WHERE user_id = $1
+       WHERE id = $1
          AND interview_started_at IS NOT NULL
-       ORDER BY interview_started_at DESC
        LIMIT 1`,
-      [userId]
+      [application_id]
     );
 
     if (!appResult.rows.length) {

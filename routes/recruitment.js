@@ -68,24 +68,24 @@ router.get('/roles/active', recruitmentController.getActiveRoles);
 router.get('/locations/states', recruitmentController.getStates);
 router.get('/locations/lgas/:state', recruitmentController.getLGAs);
 
-// ==================== AUTHENTICATED ROUTES ====================
+// ==================== PUBLIC / GUEST ROUTES ====================
 
-// Applicant routes
-router.post('/apply', recruitmentApplyLimiter, authenticate, recruitmentController.createApplication);
-router.put('/applications/:id', authenticate, recruitmentController.updateApplication);
-router.get('/my-application', authenticate, recruitmentController.getMyApplication);
-router.get('/my-applications', authenticate, recruitmentController.getMyApplications);
+// Applicant routes (no authentication required - guests can apply)
+router.post('/apply', recruitmentApplyLimiter, recruitmentController.createApplication);
+router.put('/applications/:id', recruitmentController.updateApplication);
+router.get('/my-application', recruitmentController.getMyApplication);
+router.get('/my-applications', recruitmentController.getMyApplications);
 
 // Payment initiation
-router.post('/payments/initiate', recruitmentPaymentLimiter, authenticate, recruitmentController.initiatePayment);
-router.post('/payments/verify/:reference', authenticate, recruitmentController.verifyPayment);
+router.post('/payments/initiate', recruitmentPaymentLimiter, recruitmentController.initiatePayment);
+router.post('/payments/verify/:reference', recruitmentController.verifyPayment);
 router.post('/payments/webhook', recruitmentPaymentLimiter, recruitmentController.paystackWebhook);
 
 // Access code verification
-router.post('/verify-access-code', authenticate, recruitmentController.verifyAccessCode);
+router.post('/verify-access-code', recruitmentController.verifyAccessCode);
 
 // Document upload (after access code)
-router.post('/documents/upload/:applicationId', authenticate, upload.fields([
+router.post('/documents/upload/:applicationId', upload.fields([
   { name: 'cv', maxCount: 1 },
   { name: 'cover_letter', maxCount: 1 },
   { name: 'guarantor_letter', maxCount: 1 },
@@ -95,21 +95,21 @@ router.post('/documents/upload/:applicationId', authenticate, upload.fields([
 ]), recruitmentController.uploadDocuments);
 
 // Submit application
-router.post('/applications/:id/submit', authenticate, recruitmentController.submitApplication);
+router.post('/applications/:id/submit', recruitmentController.submitApplication);
 
 // Download own documents
-router.get('/documents/download/:docId', authenticate, recruitmentController.downloadDocument);
-router.get('/documents/download-all/:applicationId', authenticate, recruitmentController.downloadMyDocumentsZip);
-router.post('/documents/generate-cv/:applicationId', authenticate, recruitmentController.generatePlatformCv);
+router.get('/documents/download/:docId', recruitmentController.downloadDocument);
+router.get('/documents/download-all/:applicationId', recruitmentController.downloadMyDocumentsZip);
+router.post('/documents/generate-cv/:applicationId', recruitmentController.generatePlatformCv);
 
 // Interview routes
-router.post('/interview/start', recruitmentInterviewLimiter, authenticate, recruitmentController.startInterview);
-router.get('/interview/start', recruitmentInterviewLimiter, authenticate, recruitmentController.startInterview);
-router.post('/interview/ping', recruitmentInterviewLimiter, authenticate, recruitmentController.interviewPing);
-router.post('/interview/answer', recruitmentInterviewLimiter, authenticate, recruitmentController.submitAnswer);
-router.post('/interview/violation', recruitmentInterviewLimiter, authenticate, recruitmentController.reportViolation);
-router.post('/interview/complete', recruitmentInterviewLimiter, authenticate, recruitmentController.completeInterview);
-router.post('/interview/recording', authenticate, recordingUpload.single('recording'), recruitmentController.uploadInterviewRecording);
+router.post('/interview/start', recruitmentInterviewLimiter, recruitmentController.startInterview);
+router.get('/interview/start', recruitmentInterviewLimiter, recruitmentController.startInterview);
+router.post('/interview/ping', recruitmentInterviewLimiter, recruitmentController.interviewPing);
+router.post('/interview/answer', recruitmentInterviewLimiter, recruitmentController.submitAnswer);
+router.post('/interview/violation', recruitmentInterviewLimiter, recruitmentController.reportViolation);
+router.post('/interview/complete', recruitmentInterviewLimiter, recruitmentController.completeInterview);
+router.post('/interview/recording', recordingUpload.single('recording'), recruitmentController.uploadInterviewRecording);
 
 // ==================== ADMIN ROUTES ====================
 

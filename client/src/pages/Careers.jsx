@@ -22,7 +22,6 @@ import {
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
-import { useAuth } from '../hooks/useAuth';
 
 // ============================================================
 // Interview Constants
@@ -177,7 +176,7 @@ const buildInterviewFingerprint = () => {
 };
 
 export default function Careers() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const authLoading = false;
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusLoading, setStatusLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
@@ -261,9 +260,10 @@ export default function Careers() {
   }, []);
 
   const loadMyApplication = useCallback(async () => {
-    if (!isAuthenticated) return;
     try {
-      const res = await api.get('/recruitment/my-application');
+      const email = form.email_address;
+      if (!email) return;
+      const res = await api.get(`/recruitment/my-application?email=${encodeURIComponent(email)}`);
       const app = res.data?.data || null;
       setApplication(app);
       if (app?.access_code && !app.access_code_used) {
@@ -272,7 +272,7 @@ export default function Careers() {
     } catch (error) {
       console.error('Failed to load applicant dashboard:', error);
     }
-  }, [isAuthenticated]);
+  }, [form.email_address]);
 
   useEffect(() => {
     loadPublicData();
@@ -339,7 +339,7 @@ export default function Careers() {
 
   useEffect(() => {
     const reference = searchParams.get('payment_reference');
-    if (!reference || !isAuthenticated) return;
+    if (!reference) return;
     if (verifiedPaymentReferenceRef.current === reference) return;
     verifiedPaymentReferenceRef.current = reference;
 
@@ -365,7 +365,7 @@ export default function Careers() {
     };
 
     verify();
-  }, [isAuthenticated, loadMyApplication, searchParams, setSearchParams]);
+  }, [loadMyApplication, searchParams, setSearchParams]);
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
@@ -1586,8 +1586,6 @@ export default function Careers() {
   }
 
   if (!isActive) return renderClosed();
-  if (!isAuthenticated) return renderLoginPrompt();
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       <section className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
@@ -1601,7 +1599,7 @@ export default function Careers() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">RentalHub NG Careers</p>
           <h1 className="mt-3 text-3xl font-black sm:text-4xl">Recruitment Portal</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
-            Apply with your existing RentalHub NG login. Pay the Application Access Fee, unlock your document upload with the access code, and track your application from draft to final decision.
+            Fill in your details below to apply. Pay the Application Access Fee, unlock your document upload with the access code, and track your application from draft to final decision.
           </p>
           {application && (
             <div className="mt-4 flex flex-wrap gap-2">
