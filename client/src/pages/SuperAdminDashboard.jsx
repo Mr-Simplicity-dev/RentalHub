@@ -31,6 +31,7 @@ import InputDialog from "../components/common/InputDialog";
 import PropertyRequestWorkflowPanel from "../components/admin/PropertyRequestWorkflowPanel";
 import TenancyWorkflowPanel from "../components/admin/TenancyWorkflowPanel";
 import RecruitmentAdminTab from "../components/admin/RecruitmentAdminTab";
+import AdminMonitorTab from "../components/admin/AdminMonitorTab";
 
 const tabs = [
   "overview",
@@ -54,6 +55,7 @@ const tabs = [
   "flags",
   "fraud",
   "admin",
+  "admin_monitor",
   "pending_approvals",
 ];
 
@@ -79,6 +81,7 @@ const tabLabels = {
   flags: "Flags",
   fraud: "Fraud",
   admin: "Admin",
+  admin_monitor: "Admin Monitor",
   pending_approvals: "Pending Approvals",
 };
 
@@ -1209,6 +1212,10 @@ export default function SuperAdminDashboard() {
 
         {tab === "admin" && (
           <AdminManagementTab />
+        )}
+
+        {tab === "admin_monitor" && (
+          <AdminMonitorTab />
         )}
 
         {tab === "pending_approvals" && (

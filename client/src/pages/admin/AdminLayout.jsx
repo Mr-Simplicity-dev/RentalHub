@@ -317,10 +317,11 @@ const AdminLayout = () => {
         : roleTheme.hoverNav
     }`;
 
-    const isSuperAdminNavActive = (tab) =>
+        const isSuperAdminNavActive = (tab) =>
       (location.pathname === '/super-admin' && superAdminTab === tab) ||
       (location.pathname === '/super-admin/transportation' && tab === 'transportation') ||
-      (location.pathname === '/super-admin/fumigation-cleaning' && tab === 'fumigation-cleaning');
+      (location.pathname === '/super-admin/fumigation-cleaning' && tab === 'fumigation-cleaning') ||
+      (location.pathname === '/super-admin' && tab === 'admin_monitor' && superAdminTab === 'admin_monitor');
 
     const superAdminNavItem = (tab) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
@@ -586,6 +587,11 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin/fumigation-cleaning" className={() => superAdminNavItem('fumigation-cleaning')}>
                   <FaSprayCan className="mr-3" />
                   Fumigation
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=admin_monitor" className={() => superAdminNavItem('admin_monitor')}>
+                  <FaUserShield className="mr-3" />
+                  Admin Monitor
                 </NavLink>
               </div>
             </div>

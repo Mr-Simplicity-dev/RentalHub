@@ -141,13 +141,13 @@ const ADMIN_SHELL_ROLES = [
 ];
 
 const getFumigationDashboardPath = (role) => {
-  if (role === 'super_fumigation_admin') return '/admin/fumigation-cleaning/super';
+  if (role === 'super_fumigation_admin') return '/super-admin/fumigation-cleaning';
   if (role === 'state_fumigation_admin') return '/admin/fumigation-cleaning/state';
   return '/admin/fumigation-cleaning';
 };
 
 const getTransportationDashboardPath = (role) => {
-  if (role === 'super_transportation_admin') return '/admin/transportation/super';
+  if (role === 'super_transportation_admin') return '/super-admin/transportation';
   if (role === 'state_transportation_admin') return '/admin/transportation/state';
   return '/admin/transportation';
 };
@@ -685,8 +685,8 @@ function App() {
               <Route path="/landlordguide" element={<Navigate to="/landlord-guide" replace />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
-              <Route
-                path="/super-admin/*"
+                            <Route
+                path="/super-admin"
                 element={
                   <SuperAdminRoute>
                     <AdminLayout />
@@ -694,9 +694,23 @@ function App() {
                 }
               >
                 <Route index element={<SuperAdminDashboard />} />
-                <Route path="transportation" element={<TransportationSuperAdminDashboard />} />
-                <Route path="fumigation-cleaning" element={<SuperFumigationAdminDashboard />} />
               </Route>
+              <Route
+                path="/super-admin/transportation"
+                element={
+                  <SuperAdminRoute>
+                    <TransportationSuperAdminDashboard />
+                  </SuperAdminRoute>
+                }
+              />
+              <Route
+                path="/super-admin/fumigation-cleaning"
+                element={
+                  <SuperAdminRoute>
+                    <SuperFumigationAdminDashboard />
+                  </SuperAdminRoute>
+                }
+              />
               <Route path="/fumigation-cleaning/booking" element={<FumigationCleaningBooking />} />
 <Route path="/fumigation-cleaning/payment/:bookingId" element={<FumigationCleaningPayment />} />
               <Route
@@ -797,27 +811,12 @@ function App() {
                     </TransportationStateAdminRoute>
                   }
                 />
-                <Route path="transportation/super"
-                  element={
-                    <TransportationSuperAdminRoute>
-                      <TransportationSuperAdminDashboard />
-                    </TransportationSuperAdminRoute>
-                  }
-                />
-                <Route
+                                <Route
                   path="fumigation-cleaning/state"
                   element={
                     <StateFumigationAdminRoute>
                       <StateFumigationAdminDashboard />
                     </StateFumigationAdminRoute>
-                  }
-                />
-                <Route
-                  path="fumigation-cleaning/super"
-                  element={
-                    <SuperFumigationAdminRoute>
-                      <SuperFumigationAdminDashboard />
-                    </SuperFumigationAdminRoute>
                   }
                 />
                                 <Route path="agents" element={<AdminAgentManagement />} />

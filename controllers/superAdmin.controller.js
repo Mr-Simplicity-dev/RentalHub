@@ -1064,6 +1064,60 @@ const getAuditLogs = async (req, res) => {
   }
 };
 
+// GET /api/super/admin-monitor
+// Returns recent admin actions from audit_logs with full actor details,
+// specifically filtering to show actions performed by admin users.
+const getAdminMonitor = async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 200);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    // Admin user types we want to monitor
+    const adminTypes = [
+      'admin', 'lga_admin', 'super_admin',
+      'financial_admin', 'lga_financial_admin', 'super_financial_admin',
+      'state_admin', 'state_financial_admin',
+      'lga_support_admin', 'state_support_admin', 'super_support_admin',
+      'recruitment_admin',
+      'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin',
+      'transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin',
+    ];
+
+    const { rows } = await db.query(
+      `SELECT l.id, l.action, l.target_type, l.target_id, l.metadata, l.ip_address, l.created_at,
+              u.id AS actor_id, u.full_name AS actor_name, u.email AS actor_email, u.user_type AS actor_role
+       FROM audit_logs l
+       INNER JOIN users u ON u.id = l.actor_id
+       WHERE u.user_type = ANY($1::text[])
+       ORDER BY l.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [adminTypes, limit, offset]
+    );
+
+    // Get total count
+    const countResult = await db.query(
+      `SELECT COUNT(*) AS total
+       FROM audit_logs l
+       INNER JOIN users u ON u.id = l.actor_id
+       WHERE u.user_type = ANY($1::text[])`,
+      [adminTypes]
+    );
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        total: parseInt(countResult.rows[0].total) || 0,
+        limit,
+        offset,
+      },
+    });
+  } catch (err) {
+    console.error('Get admin monitor error:', err);
+    res.status(500).json({ message: 'Failed to load admin activity' });
+  }
+};
+
 // ================= ANALYTICS =================
 
 // GET /api/super/analytics
@@ -2704,6 +2758,7 @@ module.exports = {
   featureProperty,
   unfeatureProperty,
   getAuditLogs,
+  getAdminMonitor,
   getAnalytics,
   getReports,
   updateReportStatus,

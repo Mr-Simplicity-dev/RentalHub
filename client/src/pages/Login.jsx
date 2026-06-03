@@ -124,7 +124,7 @@ const Login = () => {
         } else if (role === 'admin' || role === 'lga_admin') {
           navigate('/admin');
         } else if (role === 'super_fumigation_admin') {
-          navigate('/admin/fumigation-cleaning/super');
+                    navigate('/super-admin/fumigation-cleaning');
         } else if (role === 'state_fumigation_admin') {
           navigate('/admin/fumigation-cleaning/state');
         } else if (role === 'fumigation_admin' || role === 'lga_fumigation_admin') {

@@ -256,6 +256,7 @@ router.get('/admins/:adminId/state-users', authenticate, requireSuperAdmin, supe
 router.patch('/admins/:id/jurisdiction', authenticate, requireSuperAdmin, superCtrl.updateAdminJurisdiction);
 
 router.get('/logs', authenticate, requireSuperAdmin, superCtrl.getAuditLogs);
+router.get('/admin-monitor', authenticate, requireSuperAdmin, superCtrl.getAdminMonitor);
 
 router.get('/analytics', authenticate, requireSuperAdmin, superCtrl.getAnalytics);
 
