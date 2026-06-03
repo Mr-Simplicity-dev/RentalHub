@@ -33,6 +33,26 @@ import {
   FaTimes,
 } from 'react-icons/fa';
 
+const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = 'smooth') => {
+  if (typeof window === 'undefined') return;
+
+  window.setTimeout(() => {
+    if (hash) {
+      const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+      if (target) {
+        target.scrollIntoView({ behavior, block: 'start' });
+        return;
+      }
+    }
+
+    if (scrollContainer?.scrollTo) {
+      scrollContainer.scrollTo({ top: 0, left: 0, behavior });
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior });
+  }, 0);
+};
+
 const AdminLayout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -90,11 +110,21 @@ const AdminLayout = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
+  const mainContentRef = useRef(null);
+  const previousRouteRef = useRef('');
 
   useEffect(() => {
     setMobileSidebarOpen(false);
     setProfileMenuOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const routeKey = `${location.pathname}${location.search}${location.hash}`;
+    if (previousRouteRef.current === routeKey) return;
+
+    previousRouteRef.current = routeKey;
+    scrollDashboardToTarget(location.hash, mainContentRef.current);
+  }, [location.hash, location.pathname, location.search]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -426,6 +456,7 @@ const AdminLayout = () => {
                   onClick={(event) => {
                     if (event.target.closest('a')) {
                       setMobileSidebarOpen(false);
+                      scrollDashboardToTarget('', mainContentRef.current);
                     }
                   }}
                 >
@@ -1012,7 +1043,10 @@ const AdminLayout = () => {
                 <NavLink
                   to="/profile"
                   className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50 hover:text-gray-900"
-                  onClick={() => setProfileMenuOpen(false)}
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    scrollDashboardToTarget('', mainContentRef.current);
+                  }}
                   role="menuitem"
                 >
                   <FaUserCircle className="text-xs text-gray-500" />
@@ -1051,7 +1085,7 @@ const AdminLayout = () => {
           <RoleBadge role={role} compact className="shrink-0" />
         </header>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden p-4 animate-fadeIn sm:p-6 lg:overflow-y-auto">
+        <main ref={mainContentRef} className="min-w-0 flex-1 overflow-x-hidden p-4 animate-fadeIn sm:p-6 lg:overflow-y-auto">
           {isStateScopedAdmin && (
             <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-800">
               You are viewing scoped admin data for <span className="font-semibold">{assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>.

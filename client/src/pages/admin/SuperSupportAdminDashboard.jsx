@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import {
   FaBell,
@@ -54,6 +54,7 @@ const formatDate = (dateString) => {
 
 const SuperSupportAdminDashboard = () => {
   const location = useLocation();
+  const previousTabRef = useRef('');
   // State management
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
@@ -187,6 +188,17 @@ const SuperSupportAdminDashboard = () => {
     }
     setActiveTab('overview');
   }, [location.search]);
+
+  useEffect(() => {
+    if (previousTabRef.current === activeTab) return;
+    previousTabRef.current = activeTab;
+
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      }, 0);
+    }
+  }, [activeTab]);
 
   // Quick action handlers
   const handleQuickAction = async (action, data) => {

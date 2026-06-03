@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   FaBalanceScale,
   FaBars,
@@ -41,10 +41,33 @@ const ROLE_CONFIG = {
   },
 };
 
+const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = 'smooth') => {
+  if (typeof window === 'undefined') return;
+
+  window.setTimeout(() => {
+    if (hash) {
+      const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+      if (target) {
+        target.scrollIntoView({ behavior, block: 'start' });
+        return;
+      }
+    }
+
+    if (scrollContainer?.scrollTo) {
+      scrollContainer.scrollTo({ top: 0, left: 0, behavior });
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior });
+  }, 0);
+};
+
 const LawyerLayout = () => {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mainContentRef = useRef(null);
+  const previousRouteRef = useRef('');
 
   const role = String(user?.user_type || 'lawyer').trim().toLowerCase();
   const config = ROLE_CONFIG[role] || ROLE_CONFIG.lawyer;
@@ -91,6 +114,14 @@ const LawyerLayout = () => {
     navigate('/login');
   };
 
+  useEffect(() => {
+    const routeKey = `${location.pathname}${location.search}${location.hash}`;
+    if (previousRouteRef.current === routeKey) return;
+
+    previousRouteRef.current = routeKey;
+    scrollDashboardToTarget(location.hash, mainContentRef.current);
+  }, [location.hash, location.pathname, location.search]);
+
   const linkClassName = ({ isActive }) =>
     `group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
       isActive
@@ -132,7 +163,10 @@ const LawyerLayout = () => {
                 to={item.to}
                 end={item.end}
                 className={linkClassName}
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  scrollDashboardToTarget('', mainContentRef.current);
+                }}
               >
                 <Icon className="text-base" />
                 <span>{item.label}</span>
@@ -203,7 +237,7 @@ const LawyerLayout = () => {
           {sidebarContent}
         </aside>
 
-        <main className="min-w-0 flex-1">
+        <main ref={mainContentRef} className="min-w-0 flex-1">
           <Outlet />
         </main>
       </div>

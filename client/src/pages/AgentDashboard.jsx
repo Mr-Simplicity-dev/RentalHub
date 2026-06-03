@@ -8,6 +8,13 @@ import { toast } from 'react-toastify';
 import { formatCurrency } from '../utils/helpers';
 import api from '../services/api';
 
+const scrollDashboardToTop = () => {
+  if (typeof window === 'undefined') return;
+  window.setTimeout(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  }, 0);
+};
+
 const AgentDashboard = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
@@ -124,6 +131,11 @@ const AgentDashboard = () => {
     }
   };
 
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    scrollDashboardToTop();
+  };
+
   if (loading) return <Loader />;
 
   const propertyStats = {
@@ -166,7 +178,7 @@ const AgentDashboard = () => {
           {['overview', 'landlords', 'properties', 'earnings', 'support'].map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => handleTabChange(tab)}
               className={`px-4 py-3 font-medium transition ${
                 activeTab === tab
                   ? 'border-b-2 border-indigo-600 text-indigo-600'
