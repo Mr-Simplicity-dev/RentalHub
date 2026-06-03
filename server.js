@@ -571,20 +571,25 @@ app.use((err, req, res, next) => {
 const PORT = process.env.APP_PORT || 5000;
 let backgroundServicesStarted = false;
 
-const ensureStartupSchema = async () => {
-  try {
-    await db.query(`
-      ALTER TABLE users
-        ALTER COLUMN user_type TYPE VARCHAR(50);
-    `);
-  } catch (err) {
-    // Ignore if already the right type
-    if (!err.message?.includes('already')) {
-      console.error('ensureStartupSchema warning:', err.message);
-    }
-  }
-};
+// const ensureStartupSchema = async () => {
+//   try {
+//     await db.query(`
+//       ALTER TABLE users
+//         ALTER COLUMN user_type TYPE VARCHAR(50);
+//     `);
+//   } catch (err) {
+//     // Ignore if already the right type
+//     if (!err.message?.includes('already')) {
+//       console.error('ensureStartupSchema warning:', err.message);
+//     }
+//   }
+// };
 
+const ensureStartupSchema = async () => {
+  // Startup schema changes are disabled.
+  // Schema is now handled by migrations.
+  return;
+};
 
 const startBackgroundServices = () => {
   if (backgroundServicesStarted) {
