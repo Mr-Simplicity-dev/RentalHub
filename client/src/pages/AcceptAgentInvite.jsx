@@ -95,7 +95,7 @@ const AcceptAgentInvite = () => {
         <div className="max-w-md px-10 text-center space-y-6">
           <div className="flex justify-center">
             <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center">
-              <img src="/logo192.png" className="w-12 h-12" alt="logo" />
+              <img src="/rentalhub-mark.svg" className="h-12 w-12 rounded-xl object-contain shadow-sm" alt="RentalHub NG" />
             </div>
           </div>
           <h1 className="text-4xl font-bold">Activate Agent Access</h1>

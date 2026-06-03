@@ -305,7 +305,7 @@ const Header = () => {
   //         {/* Logo */}
   //         <Link to="/" className="flex min-w-0 items-center gap-2 group sm:gap-3">
   //           <img
-  //             src="/logo192.png"
+  //             src="/rentalhub-mark.svg"
   //             alt="RentalHub NG"
   //             className="h-9 shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 md:h-12 lg:h-14"
   //           />
@@ -669,9 +669,9 @@ return (
           className="flex min-w-0 max-w-[55%] sm:max-w-none items-center gap-2 group sm:gap-3"
         >
           <img
-            src="/logo192.png"
+            src="/rentalhub-mark.svg"
             alt="RentalHub NG"
-            className="h-9 shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 md:h-12 lg:h-14"
+            className="h-10 w-10 shrink-0 rounded-xl object-contain shadow-sm transition-transform duration-300 group-hover:scale-105 md:h-12 md:w-12"
           />
 
           {/* FIXED */}
