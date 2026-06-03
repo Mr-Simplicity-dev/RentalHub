@@ -308,9 +308,16 @@ const VerificationsTab = ({
 
       <div className="rounded-xl2 border border-soft bg-white p-5 shadow-card transition hover:shadow-cardHover">
 
-        <h3 className="text-lg font-semibold mb-4">
-          Admin Verification Performance
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold">
+              Admin Performance Overview
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Shows audit-logged actions per admin over the last 7 days
+            </p>
+          </div>
+        </div>
 
         <div className="overflow-x-auto">
 
@@ -318,12 +325,16 @@ const VerificationsTab = ({
 
             <thead className="bg-gray-50 text-gray-700">
 
-              <tr>
+                            <tr>
                 <th className="p-3 text-left">Admin</th>
                 <th className="p-3 text-left">Email</th>
                 <th className="p-3 text-left">Status</th>
-                <th className="p-3 text-left">Total Verified</th>
-                <th className="p-3 text-left">Last Verification</th>
+                <th className="p-3 text-left">Verified</th>
+                <th className="p-3 text-left">Actions (7d)</th>
+                <th className="p-3 text-left">Props (7d)</th>
+                <th className="p-3 text-left">Apps (7d)</th>
+                <th className="p-3 text-left">Reports (7d)</th>
+                <th className="p-3 text-left">Last Activity</th>
               </tr>
 
             </thead>
@@ -333,14 +344,14 @@ const VerificationsTab = ({
               {adminPerformance.length === 0 && (
 
                 <tr>
-                  <td colSpan="5" className="text-center py-10 text-gray-500">
+                  <td colSpan="9" className="text-center py-10 text-gray-500">
                     No admin activity yet
                   </td>
                 </tr>
 
               )}
 
-              {adminPerformance.map((a) => (
+                            {adminPerformance.map((a) => (
 
                 <tr
                   key={a.id}
@@ -374,14 +385,34 @@ const VerificationsTab = ({
                     {a.credentials_verified_count ?? 0}
                   </td>
 
-                  <td className="p-3 text-gray-600">
+                  <td className="p-3">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      (a.actions_7d ?? 0) > 0
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {a.actions_7d ?? 0}
+                    </span>
+                  </td>
 
-                    {a.last_verification_at
-                      ? new Date(
-                          a.last_verification_at
-                        ).toLocaleString()
-                      : "No activity"}
+                  <td className="p-3 text-xs text-gray-600">
+                    {a.properties_approved_7d ?? 0}
+                  </td>
 
+                  <td className="p-3 text-xs text-gray-600">
+                    {a.applications_processed_7d ?? 0}
+                  </td>
+
+                  <td className="p-3 text-xs text-gray-600">
+                    {a.reports_resolved_7d ?? 0}
+                  </td>
+
+                  <td className="p-3 text-gray-600 text-xs">
+                    {a.last_action_at
+                      ? new Date(a.last_action_at).toLocaleDateString()
+                      : a.last_verification_at
+                        ? new Date(a.last_verification_at).toLocaleDateString()
+                        : "No activity"}
                   </td>
 
                 </tr>

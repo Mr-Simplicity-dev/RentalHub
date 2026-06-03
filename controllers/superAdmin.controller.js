@@ -732,11 +732,41 @@ const getAdminPerformance = async (req, res) => {
          a.account_suspended_reason,
          a.created_at,
          COUNT(v.id)::INT AS credentials_verified_count,
-         MAX(v.identity_verified_at) AS last_verification_at
+         MAX(v.identity_verified_at) AS last_verification_at,
+         COALESCE(al7d.action_count, 0)::INT AS actions_7d,
+         COALESCE(al30d.action_count, 0)::INT AS actions_30d,
+         COALESCE(al7d.properties_approved, 0)::INT AS properties_approved_7d,
+         COALESCE(al30d.properties_approved, 0)::INT AS properties_approved_30d,
+         COALESCE(al7d.applications_processed, 0)::INT AS applications_processed_7d,
+         COALESCE(al30d.applications_processed, 0)::INT AS applications_processed_30d,
+         COALESCE(al7d.reports_resolved, 0)::INT AS reports_resolved_7d,
+         COALESCE(al30d.reports_resolved, 0)::INT AS reports_resolved_30d,
+         al7d.last_action_at
        FROM users a
        LEFT JOIN users v
          ON v.identity_verified_by = a.id
          AND v.identity_verified = TRUE
+       LEFT JOIN LATERAL (
+         SELECT
+           COUNT(*)::INT AS action_count,
+           COUNT(*) FILTER (WHERE action IN ('UNLIST_PROPERTY','FEATURE_PROPERTY','UNFEATURE_PROPERTY','APPROVE_PROPERTY','REJECT_PROPERTY','RELIST_PROPERTY'))::INT AS properties_approved,
+           COUNT(*) FILTER (WHERE action IN ('APPROVE_APPLICATION','REJECT_APPLICATION'))::INT AS applications_processed,
+           COUNT(*) FILTER (WHERE action IN ('RESOLVE_REPORT','REPORT_RESOLVED'))::INT AS reports_resolved,
+           MAX(created_at) AS last_action_at
+         FROM audit_logs
+         WHERE actor_id = a.id
+           AND created_at >= CURRENT_DATE - INTERVAL '7 days'
+       ) al7d ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT
+           COUNT(*)::INT AS action_count,
+           COUNT(*) FILTER (WHERE action IN ('UNLIST_PROPERTY','FEATURE_PROPERTY','UNFEATURE_PROPERTY','APPROVE_PROPERTY','REJECT_PROPERTY','RELIST_PROPERTY'))::INT AS properties_approved,
+           COUNT(*) FILTER (WHERE action IN ('APPROVE_APPLICATION','REJECT_APPLICATION'))::INT AS applications_processed,
+           COUNT(*) FILTER (WHERE action IN ('RESOLVE_REPORT','REPORT_RESOLVED'))::INT AS reports_resolved
+         FROM audit_logs
+         WHERE actor_id = a.id
+           AND created_at >= CURRENT_DATE - INTERVAL '30 days'
+       ) al30d ON TRUE
        WHERE (
          a.user_type IN ('super_admin', 'admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lga_transportation_admin',
                          'state_transportation_admin', 'super_transportation_admin',
@@ -748,8 +778,8 @@ const getAdminPerformance = async (req, res) => {
          OR a.user_type LIKE 'super_%'
        )
          AND a.deleted_at IS NULL
-       GROUP BY a.id, a.full_name, a.email, a.user_type, a.assigned_state, a.assigned_city, a.is_active, a.account_suspended_reason, a.created_at
-       ORDER BY credentials_verified_count DESC, a.created_at DESC`
+       GROUP BY a.id, a.full_name, a.email, a.user_type, a.assigned_state, a.assigned_city, a.is_active, a.account_suspended_reason, a.created_at, al7d.action_count, al7d.properties_approved, al7d.applications_processed, al7d.reports_resolved, al7d.last_action_at, al30d.action_count, al30d.properties_approved, al30d.applications_processed, al30d.reports_resolved
+       ORDER BY COALESCE(al7d.action_count, 0) DESC, a.created_at DESC`
     );
 
     res.json({ success: true, data: rows });

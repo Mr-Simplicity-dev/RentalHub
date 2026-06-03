@@ -413,6 +413,10 @@ const AdminListTab = () => {
               <th className="p-3 text-left">Assigned LGA</th>
               <th className="p-3 text-left">Status</th>
               <th className="p-3 text-left">Verified Cases</th>
+              <th className="p-3 text-left">Actions (7d)</th>
+              <th className="p-3 text-left">Props (7d)</th>
+              <th className="p-3 text-left">Apps (7d)</th>
+              <th className="p-3 text-left">Reports (7d)</th>
               <th className="p-3 text-left">Joined</th>
               <th className="p-3 text-center">Actions</th>
             </tr>
@@ -421,7 +425,7 @@ const AdminListTab = () => {
           <tbody>
             {!loading && admins.length === 0 && (
               <tr>
-                <td colSpan="9" className="py-10 text-center text-gray-500">
+                <td colSpan="13" className="py-10 text-center text-gray-500">
                   No admins found
                 </td>
               </tr>
@@ -472,6 +476,18 @@ const AdminListTab = () => {
                     )}
                   </td>
                   <td className="p-3">{admin.credentials_verified_count ?? 0}</td>
+                  <td className="p-3">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      (admin.actions_7d ?? 0) > 0
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {admin.actions_7d ?? 0}
+                    </span>
+                  </td>
+                  <td className="p-3 text-xs">{admin.properties_approved_7d ?? 0}</td>
+                  <td className="p-3 text-xs">{admin.applications_processed_7d ?? 0}</td>
+                  <td className="p-3 text-xs">{admin.reports_resolved_7d ?? 0}</td>
                   <td className="p-3 text-gray-500">
                     {admin.created_at
                       ? new Date(admin.created_at).toLocaleDateString()
@@ -533,7 +549,7 @@ const AdminListTab = () => {
 
                 {expandedAdminId === admin.id && (
                   <tr className="bg-blue-50/40 border-t border-blue-100">
-                    <td colSpan="9" className="p-4">
+                    <td colSpan="13" className="p-4">
                       {stateUsersLoadingByAdmin[admin.id] ? (
                         <div className="text-sm text-blue-700">Loading tenants and landlords for {admin.assigned_state}...</div>
                       ) : (
