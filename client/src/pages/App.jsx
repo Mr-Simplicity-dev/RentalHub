@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { ToastContainer } from 'react-toastify';
@@ -544,6 +544,7 @@ const AdminWithdrawalsRoute = () => {
 
 function Layout({ children }) {
   const location = useLocation();
+  const previousPathRef = useRef('');
   const [activeLanguage, setActiveLanguage] = useState(i18n.language?.split('-')[0] || 'en');
 
   const isVerificationPage =
@@ -570,6 +571,29 @@ function Layout({ children }) {
       i18n.off('languageChanged', handleLanguageChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const routeKey = `${location.pathname}${location.hash}`;
+    if (previousPathRef.current === routeKey) return undefined;
+    previousPathRef.current = routeKey;
+
+    const timeoutId = window.setTimeout(() => {
+      if (location.hash) {
+        const targetId = decodeURIComponent(location.hash.slice(1));
+        const target = document.getElementById(targetId);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
+      }
+
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [location.hash, location.pathname]);
 
   const handleLanguageSelect = (event) => {
     const nextLanguage = event.target.value;

@@ -11,6 +11,26 @@ import {
   setAuthSession,
 } from '../../services/authStorage';
 
+const scrollToLinkedRoute = (to) => {
+  if (typeof window === 'undefined') return;
+
+  window.setTimeout(() => {
+    const hash = typeof to === 'string' && to.includes('#')
+      ? to.slice(to.indexOf('#') + 1)
+      : '';
+
+    if (hash) {
+      const target = document.getElementById(decodeURIComponent(hash));
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  }, 0);
+};
+
 const Header = () => {
   const { user, isAuthenticated, logout, updateUser } = useAuth();
   const navigate = useNavigate();
@@ -219,8 +239,16 @@ const Header = () => {
     navigate('/login');
   };
 
-  const closeMobileMenu = () => {
+  const closeMobileMenu = (_event, to) => {
     setMobileMenuOpen(false);
+    scrollToLinkedRoute(to);
+  };
+
+  const handleHeaderNavigation = (to) => {
+    setMobileMenuOpen(false);
+    setShowUserMenu(false);
+    setShowNotifications(false);
+    scrollToLinkedRoute(to);
   };
 
   const handleRegisterNavigation = (event) => {
@@ -229,6 +257,7 @@ const Header = () => {
     setShowUserMenu(false);
     setShowNotifications(false);
     navigate(`/register?restart=${Date.now()}`);
+    scrollToLinkedRoute('/register');
   };
 
   const stopImpersonation = () => {
@@ -636,6 +665,7 @@ return (
         {/* Logo */}
         <Link
           to="/"
+          onClick={() => handleHeaderNavigation('/')}
           className="flex min-w-0 max-w-[55%] sm:max-w-none items-center gap-2 group sm:gap-3"
         >
           <img
@@ -681,6 +711,7 @@ return (
             <>
               <Link
                 to="/messages"
+                onClick={() => handleHeaderNavigation('/messages')}
                 className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 shrink-0"
               >
                 <FaEnvelope className="text-lg" />
@@ -768,6 +799,7 @@ return (
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setShowNotifications(false);
+                                    scrollToLinkedRoute(notif.link);
                                   }}
                                   className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700"
                                 >
@@ -836,7 +868,7 @@ return (
                     <Link
                       to={roleDashboardPath}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
-                      onClick={() => setShowUserMenu(false)}
+                      onClick={() => handleHeaderNavigation(roleDashboardPath)}
                     >
                       <FaTachometerAlt className="text-xs text-primary-500" />
                       <span className="flex-1">{t('header.dashboard')}</span>
@@ -850,7 +882,7 @@ return (
                     <Link
                       to="/profile"
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
-                      onClick={() => setShowUserMenu(false)}
+                      onClick={() => handleHeaderNavigation('/profile')}
                     >
                       <FaUser className="text-xs text-primary-500" />
                       <span>{t('header.profile')}</span>
@@ -859,7 +891,7 @@ return (
                     <Link
                       to="/applications"
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
-                      onClick={() => setShowUserMenu(false)}
+                      onClick={() => handleHeaderNavigation('/applications')}
                     >
                       <FaFileAlt className="text-xs text-primary-500" />
                       <span>{t('header.applications')}</span>
@@ -868,7 +900,7 @@ return (
                     <Link
                       to="/verification-status"
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-primary-50 hover:text-primary-700"
-                      onClick={() => setShowUserMenu(false)}
+                      onClick={() => handleHeaderNavigation('/verification-status')}
                     >
                       <FaIdCard className="text-xs text-primary-500" />
                       <span>{t('header.verification')}</span>
@@ -931,6 +963,7 @@ return (
                           onClick={() => {
                             setSelectedNotification(null);
                             setShowNotifications(false);
+                            scrollToLinkedRoute(selectedNotification.link);
                           }}
                           className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
                         >
@@ -973,6 +1006,7 @@ return (
             <div className="hidden items-center gap-2 sm:flex md:gap-3 shrink-0">
               <Link
                 to="/login"
+                onClick={() => handleHeaderNavigation('/login')}
                 className="px-3 md:px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-xl transition-all duration-200 whitespace-nowrap"
               >
                 {t('header.login')}
@@ -1085,13 +1119,21 @@ return (
 };
 
 const NavLink = ({ to, label }) => (
-  <Link to={to} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
+  <Link
+    to={to}
+    onClick={() => scrollToLinkedRoute(to)}
+    className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
+  >
     {label}
   </Link>
 );
 
 const MobileNavLink = ({ to, label, onClick }) => (
-  <Link to={to} onClick={onClick} className="px-4 py-3 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200">
+  <Link
+    to={to}
+    onClick={(event) => onClick?.(event, to)}
+    className="px-4 py-3 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
+  >
     {label}
   </Link>
 );

@@ -133,10 +133,18 @@ const Footer = () => {
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-400">&copy; 2024 RentalHub NG. {t('footer.rights')}</p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm md:justify-end">
-            <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors duration-200">
+            <Link
+              to="/privacy"
+              onClick={() => handleFooterNavigation('/privacy')}
+              className="text-gray-400 hover:text-white transition-colors duration-200"
+            >
               {t('footer.privacy')}
             </Link>
-            <Link to="/terms" className="text-gray-400 hover:text-white transition-colors duration-200">
+            <Link
+              to="/terms"
+              onClick={() => handleFooterNavigation('/terms')}
+              className="text-gray-400 hover:text-white transition-colors duration-200"
+            >
               {t('footer.terms')}
             </Link>
           </div>
@@ -146,8 +154,32 @@ const Footer = () => {
   );
 };
 
+const handleFooterNavigation = (to) => {
+  if (typeof window === 'undefined') return;
+
+  window.setTimeout(() => {
+    const hash = typeof to === 'string' && to.includes('#')
+      ? to.slice(to.indexOf('#') + 1)
+      : '';
+
+    if (hash) {
+      const target = document.getElementById(decodeURIComponent(hash));
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  }, 0);
+};
+
 const FooterLink = ({ to, label }) => (
-  <Link to={to} className="text-gray-400 hover:text-white transition-all duration-200 flex items-center gap-1 group">
+  <Link
+    to={to}
+    onClick={() => handleFooterNavigation(to)}
+    className="text-gray-400 hover:text-white transition-all duration-200 flex items-center gap-1 group"
+  >
     <span className="text-xs opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all duration-200 text-primary-400">{'>'}</span>
     {label}
   </Link>
