@@ -72,7 +72,7 @@ const AdminLayout = () => {
   const isStateFinancialAdmin = role === 'state_financial_admin';
   const isLgaSupportAdmin = role === 'lga_support_admin';
   const isStateSupportAdmin = role === 'state_support_admin';
-  const isRecruitmentAdmin = role === 'recruitment_admin';
+  const isRecruitmentAdmin = role === 'recruitment_admin' || user?.is_recruitment_admin === true;
   const isFumigationAdmin = ['fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin'].includes(role);
   const isTransportationAdmin = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin'].includes(role);
   const isStateScopedAdmin = [

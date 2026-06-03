@@ -95,6 +95,7 @@ export default function RecruitmentAdminTab() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [triggering, setTriggering] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [status, setStatus] = useState({ is_active: false });
   const [cycles, setCycles] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -127,6 +128,7 @@ export default function RecruitmentAdminTab() {
 
   const loadCore = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const [statusRes, cyclesRes, rolesRes, statesRes, locationsRes, analyticsRes] = await Promise.all([
         api.get('/recruitment/status'),
@@ -144,7 +146,9 @@ export default function RecruitmentAdminTab() {
       setLocations(locationsRes.data?.data || []);
       setAnalytics(analyticsRes.data?.data || null);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to load recruitment dashboard');
+      const message = error.response?.data?.message || 'Failed to load recruitment dashboard';
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -410,7 +414,7 @@ export default function RecruitmentAdminTab() {
             <button
               type="button"
               onClick={() => setTriggerModal(true)}
-              disabled={loading || !status.is_active}
+              disabled={loading || Boolean(loadError) || !status.is_active}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-indigo-600 transition-all disabled:opacity-50"
             >
               <FaVideo /> Trigger Interview
@@ -419,7 +423,7 @@ export default function RecruitmentAdminTab() {
             <button
               type="button"
               onClick={toggleRecruitment}
-              disabled={saving}
+              disabled={saving || Boolean(loadError)}
               className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold shadow-sm transition ${
                 status.is_active
                   ? 'bg-emerald-400 text-slate-950 hover:bg-emerald-300'
@@ -434,6 +438,22 @@ export default function RecruitmentAdminTab() {
       </motion.section>
 
       {/* ─── Metric Cards ───────────────────────────────── */}
+      {loadError && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-bold">Recruitment dashboard could not load fully.</p>
+              <p className="mt-1">
+                {loadError}. If this happens after deployment, run the pending recruitment migrations on the server database.
+              </p>
+            </div>
+            <button type="button" onClick={loadCore} className="btn bg-amber-600 text-white hover:bg-amber-700">
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
       <motion.section
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

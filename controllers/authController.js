@@ -120,7 +120,8 @@ const ensureIdentitySchema = async () => {
     ADD COLUMN IF NOT EXISTS identity_verified_at TIMESTAMP,
     ADD COLUMN IF NOT EXISTS identity_verification_status VARCHAR(20),
     ADD COLUMN IF NOT EXISTS chamber_name VARCHAR(255),
-    ADD COLUMN IF NOT EXISTS chamber_phone VARCHAR(20);
+    ADD COLUMN IF NOT EXISTS chamber_phone VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS is_recruitment_admin BOOLEAN DEFAULT FALSE;
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_international_passport_number
     ON users(international_passport_number)
@@ -1773,7 +1774,8 @@ exports.login = async (req, res) => {
               u.preferred_lga_name,
               u.deleted_at,
               u.is_active, u.account_suspended_reason,
-              COALESCE(u.approval_status, 'approved') AS approval_status
+              COALESCE(u.approval_status, 'approved') AS approval_status,
+              COALESCE(u.is_recruitment_admin, FALSE) AS is_recruitment_admin
        FROM users u
        LEFT JOIN states s ON s.id = u.preferred_state_id
        WHERE u.email = $1`,
@@ -3313,6 +3315,8 @@ const { decryptNIN } = require('../config/utils/ninEncryption');
 
 exports.getCurrentUser = async (req, res) => {
   try {
+    await ensureIdentitySchema();
+
     const userId = req.user.id;
 
     const result = await db.query(
@@ -3327,6 +3331,7 @@ exports.getCurrentUser = async (req, res) => {
               u.deleted_at,
               u.is_active, u.account_suspended_reason,
               COALESCE(u.approval_status, 'approved') AS approval_status,
+              COALESCE(u.is_recruitment_admin, FALSE) AS is_recruitment_admin,
               u.chamber_name, u.chamber_phone
        FROM users u
        LEFT JOIN states s ON s.id = u.preferred_state_id

@@ -124,6 +124,8 @@ const SUPER_TRANSPORTATION_ADMIN_ROLES = ['super_admin', 'super_financial_admin'
 const LGA_FUMIGATION_ADMIN_ROLES = ['admin', 'lga_admin', 'fumigation_admin', 'lga_fumigation_admin'];
 const STATE_FUMIGATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_fumigation_admin'];
 const SUPER_FUMIGATION_ADMIN_ROLES = ['super_admin', 'super_fumigation_admin'];
+const isRecruitmentAdminUser = (user) =>
+  RECRUITMENT_ADMIN_ROLES.includes(user?.user_type) || user?.is_recruitment_admin === true;
 const ADMIN_SHELL_ROLES = [
   'admin',
   'lga_admin',
@@ -233,7 +235,7 @@ const RecruitmentAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!RECRUITMENT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+  if (!isRecruitmentAdminUser(user)) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -286,7 +288,7 @@ const LandlordRoute = ({ children }) => {
     if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin?tab=property_requests" />;
     if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/state-support-dashboard" />;
     if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-support-dashboard" />;
-    if (RECRUITMENT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/recruitment" />;
+    if (isRecruitmentAdminUser(user)) return <Navigate to="/admin/recruitment" />;
     if (FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) {
       return <Navigate to={getFumigationDashboardPath(user?.user_type)} />;
     }
@@ -360,7 +362,7 @@ const AdminShellRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!ADMIN_SHELL_ROLES.includes(user?.user_type)) return <Navigate to="/dashboard" />;
+  if (!ADMIN_SHELL_ROLES.includes(user?.user_type) && !isRecruitmentAdminUser(user)) return <Navigate to="/dashboard" />;
 
   return children;
 };
@@ -493,7 +495,7 @@ const AdminHomeRoute = () => {
     return <Navigate to="/admin/super-support-dashboard" replace />;
   }
 
-  if (RECRUITMENT_ADMIN_ROLES.includes(user?.user_type)) {
+  if (isRecruitmentAdminUser(user)) {
     return <Navigate to="/admin/recruitment" replace />;
   }
 

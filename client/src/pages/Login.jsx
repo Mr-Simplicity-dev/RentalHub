@@ -94,7 +94,9 @@ const Login = () => {
 
         setLoginEmailSuggestions(saveLoginEmailSuggestion(email));
 
-        const role = response.data?.user?.user_type;
+        const user = response.data?.user || {};
+        const role = user.user_type;
+        const isRecruitmentAdmin = role === 'recruitment_admin' || user.is_recruitment_admin === true;
         const redirectParam = searchParams.get('redirect');
         const safeRedirect = redirectParam && redirectParam.startsWith('/') ? redirectParam : '';
 
@@ -107,6 +109,8 @@ const Login = () => {
           navigate('/super-admin');
         } else if (role === 'super_support_admin') {
           navigate('/admin/super-support-dashboard');
+        } else if (isRecruitmentAdmin) {
+          navigate('/admin/recruitment');
         } else if (role === 'state_support_admin') {
           navigate('/admin/state-support-dashboard');
         } else if (role === 'lga_support_admin') {

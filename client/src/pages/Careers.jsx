@@ -181,6 +181,7 @@ export default function Careers() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusLoading, setStatusLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
+  const [statusError, setStatusError] = useState('');
   const [roles, setRoles] = useState([]);
   const [states, setStates] = useState([]);
   const [lgas, setLgas] = useState([]);
@@ -274,6 +275,7 @@ export default function Careers() {
 
   const loadPublicData = useCallback(async () => {
     setStatusLoading(true);
+    setStatusError('');
     try {
       const [statusRes, statesRes] = await Promise.all([
         api.get('/recruitment/status'),
@@ -287,7 +289,9 @@ export default function Careers() {
         setRoles(rolesRes.data?.data || []);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to load recruitment information');
+      const message = error.response?.data?.message || 'Failed to load recruitment information';
+      setStatusError(message);
+      toast.error(message);
     } finally {
       setStatusLoading(false);
     }
@@ -973,6 +977,38 @@ export default function Careers() {
     </motion.section>
   );
 
+  const renderStatusError = () => (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="mx-auto flex min-h-[58vh] max-w-3xl items-center px-4 py-12"
+    >
+      <div className="w-full rounded-3xl border border-amber-200 bg-amber-50/90 p-8 text-center shadow-elevated-lg backdrop-blur-sm sm:p-12">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 shadow-inner">
+          <FaExclamationTriangle className="text-2xl" />
+        </div>
+        <h1 className="text-3xl font-black text-slate-900">Recruitment portal could not load</h1>
+        <p className="mx-auto mt-3 max-w-lg text-base leading-7 text-slate-600">
+          We could not confirm the recruitment status right now. This is different from recruitment being closed.
+        </p>
+        {statusError && (
+          <p className="mx-auto mt-4 max-w-lg rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-medium text-amber-800">
+            {statusError}
+          </p>
+        )}
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={loadPublicData} className="btn bg-amber-600 text-white hover:bg-amber-700">
+            Try Again
+          </button>
+          <Link to="/" className="btn btn-secondary">
+            Back to Home
+          </Link>
+        </div>
+      </div>
+    </motion.section>
+  );
+
   const renderApplicationForm = () => (
     <motion.form
       initial={{ opacity: 0, y: 16 }}
@@ -1638,6 +1674,7 @@ export default function Careers() {
     );
   }
 
+  if (statusError) return renderStatusError();
   if (!isActive) return renderClosed();
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
