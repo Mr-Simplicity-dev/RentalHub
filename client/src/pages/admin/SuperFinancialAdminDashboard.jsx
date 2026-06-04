@@ -40,6 +40,10 @@ const SuperFinancialAdminDashboard = () => {
   const [frozenFunds, setFrozenFunds] = useState([]);
   const [statePerformance, setStatePerformance] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [pendingWithdrawals, setPendingWithdrawals] = useState([]);
+  const [pendingWithdrawalsLoading, setPendingWithdrawalsLoading] = useState(true);
+  const [pendingWithdrawalsError, setPendingWithdrawalsError] = useState('');
+  const [actionLoadingIds, setActionLoadingIds] = useState([]);
   const [filters, setFilters] = useState({
     reference: '',
     txType: '',
@@ -92,6 +96,9 @@ const SuperFinancialAdminDashboard = () => {
     };
 
     boot();
+    (async () => {
+      await fetchPendingWithdrawals();
+    })();
 
     return () => {
       active = false;
@@ -166,6 +173,8 @@ const SuperFinancialAdminDashboard = () => {
     });
   }, [statePerformance, filters.state]);
 
+  const pendingWithdrawalsCount = useMemo(() => pendingWithdrawals.length, [pendingWithdrawals]);
+
   const commissionHealth = useMemo(() => {
     const pendingTotal = filteredStatePerformance.reduce(
       (sum, row) => sum + Number(row.pending_commissions || row.total_pending || 0),
@@ -230,6 +239,75 @@ const SuperFinancialAdminDashboard = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  const setActionLoading = (withdrawalId, isLoading) => {
+    setActionLoadingIds((current) => {
+      if (isLoading) {
+        return current.includes(withdrawalId) ? current : [...current, withdrawalId];
+      }
+      return current.filter((id) => id !== withdrawalId);
+    });
+  };
+
+  const handleApproveWithdrawal = async (withdrawal) => {
+    if (!window.confirm(`Approve payout for ₦${Number(withdrawal.amount).toLocaleString()} to ${withdrawal.account_name}?`)) {
+      return;
+    }
+    setActionLoading(withdrawal.id, true);
+    try {
+      await api.post(`/financial-admin/withdrawals/${withdrawal.id}/approve`, {
+        admin_note: 'Approved by SFA',
+      });
+      toast.success('Withdrawal approved and payout initiated');
+      await fetchPendingWithdrawals();
+      const historyRes = await api.get('/financial-admin/withdrawals/history');
+      setWithdrawals(historyRes.data?.data || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to approve withdrawal');
+    } finally {
+      setActionLoading(withdrawal.id, false);
+    }
+  };
+
+  const handleRejectWithdrawal = async (withdrawal) => {
+    const reason = window.prompt('Enter a reason for rejection:', 'Rejected by SFA');
+    if (reason === null) {
+      return;
+    }
+    setActionLoading(withdrawal.id, true);
+    try {
+      await api.post(`/financial-admin/withdrawals/${withdrawal.id}/reject`, {
+        admin_note: reason || 'Rejected by SFA',
+      });
+      toast.success('Withdrawal rejected and funds returned');
+      await fetchPendingWithdrawals();
+      const historyRes = await api.get('/financial-admin/withdrawals/history');
+      setWithdrawals(historyRes.data?.data || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to reject withdrawal');
+    } finally {
+      setActionLoading(withdrawal.id, false);
+    }
+  };
+
+  const fetchPendingWithdrawals = async () => {
+    setPendingWithdrawalsLoading(true);
+    setPendingWithdrawalsError('');
+
+    try {
+      const response = await api.get('/financial-admin/withdrawals/pending');
+      setPendingWithdrawals(response.data?.data || []);
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 403) {
+        setPendingWithdrawalsError('Direct withdrawal permission is required to review pending admin withdrawals.');
+      } else {
+        setPendingWithdrawalsError('Unable to load pending admin withdrawals at this time.');
+      }
+    } finally {
+      setPendingWithdrawalsLoading(false);
+    }
+  };
+
   const submitPersonalWithdrawal = async (formData) => {
     try {
       setSubmittingPersonalWithdraw(true);
@@ -284,10 +362,10 @@ const SuperFinancialAdminDashboard = () => {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/admin/super-financial-dashboard?panel=withdrawals')}
+                onClick={() => navigate('/admin/super-financial-dashboard?panel=pending-withdrawals')}
                 className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
-                Open Withdrawals Queue
+                Review Withdrawals Queue{pendingWithdrawalsCount > 0 ? ` (${pendingWithdrawalsCount})` : ''}
               </button>
               <button
                 type="button"
@@ -311,6 +389,22 @@ const SuperFinancialAdminDashboard = () => {
                 </button>
               </div>
             </div>
+            {pendingWithdrawalsCount > 0 && (
+              <div className="mt-3 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-3 text-sm text-yellow-900">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span>
+                    You have <strong>{pendingWithdrawalsCount}</strong> pending admin withdrawal request{pendingWithdrawalsCount === 1 ? '' : 's'} ready for review.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/super-financial-dashboard?panel=pending-withdrawals')}
+                    className="rounded-md border border-yellow-300 bg-white px-3 py-1 text-xs font-medium text-yellow-900 hover:bg-yellow-100"
+                  >
+                    Go to Queue
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="rounded-lg bg-blue-50 p-3">
             <FaShieldAlt className="h-6 w-6 text-blue-700" />
@@ -543,6 +637,100 @@ const SuperFinancialAdminDashboard = () => {
             ))}
           </div>
         </article>
+      </section>
+
+      <section id="super-financial-pending-withdrawals" className="rounded-xl bg-white p-5 shadow">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Pending Admin Commission Withdrawals</h2>
+            <p className="text-sm text-gray-500">Review requests from admins and initiate payout approval or rejection.</p>
+          </div>
+          <button
+            type="button"
+            onClick={fetchPendingWithdrawals}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {pendingWithdrawalsError ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            {pendingWithdrawalsError}
+          </div>
+        ) : null}
+
+        {pendingWithdrawalsLoading ? (
+          <div className="py-10 text-center text-sm text-gray-500">Loading pending withdrawals…</div>
+        ) : pendingWithdrawals.length === 0 ? (
+          <div className="py-10 text-center text-sm text-gray-500">No pending admin withdrawals found.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Admin</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Amount</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Bank</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Account</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {pendingWithdrawals.map((withdrawal) => {
+                  const isLoading = actionLoadingIds.includes(withdrawal.id);
+                  return (
+                    <tr key={withdrawal.id}>
+                      <td className="px-4 py-3 text-gray-600">{dateLabel(withdrawal.requested_at)}</td>
+                      <td className="px-4 py-3 text-gray-700">
+                        <div className="font-semibold">{withdrawal.admin_name || 'Admin'}</div>
+                        <div className="text-xs text-gray-500">{withdrawal.admin_email || ''}</div>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-gray-900">{currency(withdrawal.amount)}</td>
+                      <td className="px-4 py-3 text-gray-600">{withdrawal.bank_name}</td>
+                      <td className="px-4 py-3 text-gray-600">{withdrawal.account_number}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                          withdrawal.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : withdrawal.status === 'approved'
+                            ? 'bg-blue-100 text-blue-800'
+                            : withdrawal.status === 'processed'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {withdrawal.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => handleApproveWithdrawal(withdrawal)}
+                            className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {isLoading ? 'Processing…' : 'Approve'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => handleRejectWithdrawal(withdrawal)}
+                            className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {isLoading ? 'Processing…' : 'Reject'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section id="super-financial-withdrawals" className="rounded-xl bg-white p-5 shadow">
