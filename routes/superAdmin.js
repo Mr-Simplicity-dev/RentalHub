@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate, requireSuperAdmin } = require('../config/middleware/auth');
+const { requireSuperAdminOrDelegatedDirectWithdraw } = require('../config/middleware/requireFinancialAdmin');
 const superCtrl = require('../controllers/superAdmin.controller');
 const adCtrl = require('../controllers/adController');
 const platformRatingCtrl = require('../controllers/platformRatingController');
@@ -184,8 +185,8 @@ router.patch('/sfa-permissions/:sfaId', authenticate, requireSuperAdmin, async (
 
 // ================== SUPER ADMIN DIRECT WITHDRAWAL ==================
 
-// POST /super/withdraw/direct  (super_admin only — instant Paystack payout)
-router.post('/withdraw/direct', authenticate, requireSuperAdmin, criticalFinanceOpsLimiter, async (req, res) => {
+// POST /super/withdraw/direct  (super_admin or delegated super_financial_admin with can_direct_withdraw)
+router.post('/withdraw/direct', authenticate, requireSuperAdminOrDelegatedDirectWithdraw, criticalFinanceOpsLimiter, async (req, res) => {
   try {
     const { amount, bank_name, bank_code, account_number, account_name, password } = req.body;
 
@@ -220,6 +221,11 @@ router.post('/withdraw/direct', authenticate, requireSuperAdmin, criticalFinance
         bank_code: String(bank_code || '').trim(),
         account_number: String(account_number).trim(),
         account_name: String(account_name).trim(),
+      },
+      {
+        directPayout: true,
+        processedBy: req.user.id,
+        adminNote: 'Direct withdrawal initiated by authorized admin',
       }
     );
 

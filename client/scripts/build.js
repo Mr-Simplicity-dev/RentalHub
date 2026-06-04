@@ -3,6 +3,7 @@ process.env.DISABLE_ESLINT_PLUGIN = 'true';
 
 let buildReady = false;
 let exited = false;
+let stdoutBuffer = '';
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);
 const originalStderrWrite = process.stderr.write.bind(process.stderr);
 
@@ -14,7 +15,12 @@ const finish = (code) => {
 
 const markReadyIfBuilt = (chunk) => {
   const text = chunk.toString();
-  if (text.includes('The build folder is ready to be deployed.')) {
+  stdoutBuffer = `${stdoutBuffer}${text}`.slice(-8000);
+  if (
+    !buildReady &&
+    (stdoutBuffer.includes('The build folder is ready to be deployed.') ||
+      stdoutBuffer.includes('https://cra.link/deployment'))
+  ) {
     buildReady = true;
     setTimeout(() => {
       finish(0);

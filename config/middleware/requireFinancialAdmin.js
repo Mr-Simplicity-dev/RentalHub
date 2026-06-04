@@ -1,3 +1,4 @@
+const db = require('./database');
 const {
   isSuperFinancialAdmin,
   isSuperAdminOrSuperFinancialAdmin,
@@ -20,7 +21,34 @@ module.exports.requireFinancialAdmin = (req, res, next) => {
 
   next();
 };
+module.exports.requireSuperAdminOrDelegatedDirectWithdraw = async (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Unauthorized',
+    });
+  }
 
+  if (req.user.user_type === 'super_admin') {
+    return next();
+  }
+
+  if (req.user.user_type === 'super_financial_admin') {
+    const perm = await db.query(
+      `SELECT can_direct_withdraw FROM sfa_delegation_permissions WHERE super_financial_admin_id = $1`,
+      [req.user.id]
+    );
+
+    if (perm.rows[0]?.can_direct_withdraw) {
+      return next();
+    }
+  }
+
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Super Admin or delegated direct withdrawal permission required.',
+  });
+};
 module.exports.requireSuperAdminOrSuperFinancialAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({

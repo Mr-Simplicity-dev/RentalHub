@@ -7,6 +7,7 @@ const { authenticate } = require('../config/middleware/auth');
 const {
   requireFinancialAdmin,
   requireSuperAdminOrSuperFinancialAdmin,
+  requireSuperAdminOrDelegatedDirectWithdraw,
 } = require('../config/middleware/requireFinancialAdmin');
 const { requireSuperAdmin } = require('../config/middleware/requireSuperAdmin');
 const {
@@ -374,7 +375,7 @@ router.get('/withdrawals/history',
  * Get pending withdrawal requests
  */
 router.get('/withdrawals/pending',
-  requireSuperAdminOrSuperFinancialAdmin,
+  requireSuperAdminOrDelegatedDirectWithdraw,
   async (req, res) => {
     try {
       const db = require('../config/middleware/database');
@@ -409,7 +410,7 @@ router.get('/withdrawals/pending',
  * Approve withdrawal request
  */
 router.post('/withdrawals/:withdrawalId/approve',
-  requireSuperAdminOrSuperFinancialAdmin,
+  requireSuperAdminOrDelegatedDirectWithdraw,
   criticalFinanceOpsLimiter,
   [
     body('admin_note').optional()
@@ -529,7 +530,7 @@ router.post('/withdrawals/:withdrawalId/approve',
  * Reject withdrawal request
  */
 router.post('/withdrawals/:withdrawalId/reject',
-  requireSuperAdminOrSuperFinancialAdmin,
+  requireSuperAdminOrDelegatedDirectWithdraw,
   criticalFinanceOpsLimiter,
   [
     body('admin_note').notEmpty().withMessage('Rejection reason is required')

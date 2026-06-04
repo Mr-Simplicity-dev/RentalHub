@@ -1,5 +1,11 @@
 // ====================== IMPORTS ======================
+const axios = require('axios');
 const db = require('../config/middleware/database');
+const {
+  createTransferRecipient,
+  initiateTransfer,
+  resolveBankCodeFromName,
+} = require('./paystackTransfer.service');
 
 // ====================== COMMISSION CONFIGURATION ======================
 const COMMISSION_RATES = {
@@ -493,11 +499,21 @@ exports.calculatePerformanceBonus = async (adminId, month, year) => {
 /**
  * Process admin withdrawal
  */
-exports.processAdminWithdrawal = async (adminId, amount, bankDetails) => {
+exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = {}) => {
+  const {
+    directPayout = false,
+    processedBy = null,
+    adminNote = null,
+  } = options;
+
   try {
-    const axios = require('axios');
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
     const PAYSTACK_BASE_URL = 'https://api.paystack.co';
+
+    // Normalize bank code when bank name is provided
+    if (!bankDetails.bank_code && bankDetails.bank_name) {
+      bankDetails.bank_code = await resolveBankCodeFromName(bankDetails.bank_name);
+    }
 
     // ── Server-side account name verification via Paystack ──────────────
     if (PAYSTACK_SECRET_KEY && bankDetails.bank_name && bankDetails.account_number) {
@@ -512,7 +528,7 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails) => {
         );
         if (bank) {
           const verifyRes = await axios.get(
-            `${PAYSTACK_BASE_URL}/bank/resolve?account_number=${bankDetails.account_number}&bank_code=${bank.code}`,
+            `${PAYSTACK_BASE_URL}/bank/resolve?account_number=${bankDetails.account_number}&bank_code=${bankDetails.bank_code || bank.code}`,
             {
               headers: {
                 Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
@@ -583,67 +599,177 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails) => {
     if (amount > weeklyEarnings) {
       throw new Error(`Weekly withdrawal limit exceeded. Maximum: ₦${weeklyEarnings.toLocaleString()}`);
     }
-    
+
+    const shouldUseTransaction = directPayout;
+    if (shouldUseTransaction) {
+      await db.query('BEGIN');
+    }
+
     // Create withdrawal request
     const withdrawalResult = await db.query(
       `INSERT INTO admin_withdrawals (
         admin_id,
         amount,
         bank_name,
+        bank_code,
         account_number,
         account_name,
         status
-      ) VALUES ($1, $2, $3, $4, $5, 'pending')
+      ) VALUES ($1, $2, $3, $4, $5, $6, 'pending')
       RETURNING id, requested_at`,
       [
         adminId,
         amount,
         bankDetails.bank_name,
+        bankDetails.bank_code || null,
         bankDetails.account_number,
         bankDetails.account_name
       ]
     );
-    
-    // Update pending commissions to paid
-    await db.query(
-      `UPDATE admin_commissions 
-       SET status = 'paid',
-           paid_at = CURRENT_TIMESTAMP,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE admin_id = $1
-         AND status = 'pending'
-         AND created_at >= CURRENT_DATE - INTERVAL '7 days'`,
-      [adminId]
-    );
-    
-    // Update admin wallet balance
-    await db.query(
-      `UPDATE users 
-       SET admin_wallet_balance = admin_wallet_balance - $1,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [amount, adminId]
-    );
-    
-    // Log audit
-    await db.query(
-      `INSERT INTO transaction_audits 
-       (admin_id, action_type, amount, description)
-       VALUES ($1, 'withdrawal_requested', $2, $3)`,
-      [
-        adminId,
+
+    const withdrawalId = withdrawalResult.rows[0].id;
+
+    if (!directPayout) {
+      // Update pending commissions to paid
+      await db.query(
+        `UPDATE admin_commissions 
+         SET status = 'paid',
+             paid_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE admin_id = $1
+           AND status = 'pending'
+           AND created_at >= CURRENT_DATE - INTERVAL '7 days'`,
+        [adminId]
+      );
+      
+      // Update admin wallet balance
+      await db.query(
+        `UPDATE users 
+         SET admin_wallet_balance = admin_wallet_balance - $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [amount, adminId]
+      );
+      
+      // Log audit
+      await db.query(
+        `INSERT INTO transaction_audits 
+         (admin_id, action_type, amount, description)
+         VALUES ($1, 'withdrawal_requested', $2, $3)`,
+        [
+          adminId,
+          amount,
+          `Withdrawal requested: ₦${amount.toLocaleString()} to ${bankDetails.bank_name}`
+        ]
+      );
+
+      return {
+        withdrawal_id: withdrawalId,
+        requested_at: withdrawalResult.rows[0].requested_at,
+        amount: amount,
+        new_balance: parseFloat(admin.admin_wallet_balance) - amount
+      };
+    }
+
+    try {
+      if (!bankDetails.bank_code && bankDetails.bank_name) {
+        bankDetails.bank_code = await resolveBankCodeFromName(bankDetails.bank_name);
+      }
+
+      let recipientCode = bankDetails.paystack_recipient_code;
+      if (!recipientCode) {
+        const recipient = await createTransferRecipient({
+          name: bankDetails.account_name,
+          accountNumber: bankDetails.account_number,
+          bankCode: bankDetails.bank_code,
+        });
+        recipientCode = recipient.recipient_code;
+      }
+
+      const reference = `SAW_${withdrawalId}_${Date.now()}`;
+      const transfer = await initiateTransfer({
         amount,
-        `Withdrawal requested: ₦${amount.toLocaleString()} to ${bankDetails.bank_name}`
-      ]
-    );
-    
-    return {
-      withdrawal_id: withdrawalResult.rows[0].id,
-      requested_at: withdrawalResult.rows[0].requested_at,
-      amount: amount,
-      new_balance: parseFloat(admin.admin_wallet_balance) - amount
-    };
-    
+        recipientCode,
+        reason: `Admin direct withdrawal #${withdrawalId}`,
+        reference,
+      });
+
+      // Update pending commissions to paid
+      await db.query(
+        `UPDATE admin_commissions 
+         SET status = 'paid',
+             paid_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE admin_id = $1
+           AND status = 'pending'
+           AND created_at >= CURRENT_DATE - INTERVAL '7 days'`,
+        [adminId]
+      );
+
+      // Update admin wallet balance
+      await db.query(
+        `UPDATE users 
+         SET admin_wallet_balance = admin_wallet_balance - $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [amount, adminId]
+      );
+
+      await db.query(
+        `UPDATE admin_withdrawals
+         SET status = 'approved',
+             bank_code = $1,
+             paystack_recipient_code = $2,
+             paystack_transfer_code = $3,
+             paystack_transfer_reference = $4,
+             paystack_transfer_status = $5,
+             paystack_last_response = $6,
+             payout_attempted_at = CURRENT_TIMESTAMP,
+             processed_by = $7,
+             processed_at = CURRENT_TIMESTAMP,
+             admin_note = $8,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $9`,
+        [
+          bankDetails.bank_code || null,
+          recipientCode,
+          transfer?.transfer_code || null,
+          transfer?.reference || reference,
+          transfer?.status || 'pending',
+          JSON.stringify(transfer || {}),
+          processedBy,
+          adminNote || 'Direct payout initiated',
+          withdrawalId,
+        ]
+      );
+
+      await db.query(
+        `INSERT INTO transaction_audits 
+         (admin_id, action_type, amount, description, performed_by)
+         VALUES ($1, 'withdrawal_approved', $2, $3, $4)`,
+        [
+          adminId,
+          amount,
+          `Direct withdrawal approved: ₦${amount.toLocaleString()}`,
+          processedBy || adminId
+        ]
+      );
+
+      await db.query('COMMIT');
+
+      return {
+        withdrawal_id: withdrawalId,
+        requested_at: withdrawalResult.rows[0].requested_at,
+        amount: amount,
+        status: 'approved',
+        paystack_reference: reference,
+        paystack_status: transfer?.status || 'pending',
+        new_balance: parseFloat(admin.admin_wallet_balance) - amount
+      };
+    } catch (directError) {
+      await db.query('ROLLBACK');
+      throw directError;
+    }
   } catch (error) {
     console.error('Process admin withdrawal error:', error);
     throw error;
