@@ -130,7 +130,7 @@ const Login = () => {
         } else if (role === 'fumigation_admin' || role === 'lga_fumigation_admin') {
           navigate('/admin/fumigation-cleaning');
         } else if (role === 'super_transportation_admin') {
-          navigate('/admin/transportation/super');
+                    navigate('/super-admin/transportation');
         } else if (role === 'state_transportation_admin') {
           navigate('/admin/transportation/state');
         } else if (role === 'transportation_admin' || role === 'lga_transportation_admin') {

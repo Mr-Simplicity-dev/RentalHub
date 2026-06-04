@@ -91,13 +91,13 @@ const AdminLayout = () => {
   ].includes(role);
   const assignedStateLabel = user?.assigned_state || 'Not Assigned';
   const assignedLgaLabel = user?.assigned_city || '';
-  const fumigationBasePath = role === 'super_fumigation_admin'
-    ? '/admin/fumigation-cleaning/super'
+    const fumigationBasePath = role === 'super_fumigation_admin'
+    ? '/super-admin/fumigation-cleaning'
     : role === 'state_fumigation_admin'
     ? '/admin/fumigation-cleaning/state'
     : '/admin/fumigation-cleaning';
   const transportationBasePath = role === 'super_transportation_admin'
-    ? '/admin/transportation/super'
+    ? '/super-admin/transportation'
     : role === 'state_transportation_admin'
     ? '/admin/transportation/state'
     : '/admin/transportation';

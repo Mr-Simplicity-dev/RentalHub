@@ -38,6 +38,7 @@ const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const lastAvatarTapRef = useRef(0);
   const [badgeCounts, setBadgeCounts] = useState({
     unreadMessages: 0,
     pendingVerifications: 0,
@@ -86,7 +87,7 @@ const Header = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-    // Close menus on outside click
+  // Close menus on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -99,7 +100,6 @@ const Header = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return undefined;
@@ -275,6 +275,19 @@ const Header = () => {
     navigate('/super-admin?tab=admin');
   };
 
+  const handleAvatarTap = (event) => {
+    const now = Date.now();
+    const isDoubleTap = now - lastAvatarTapRef.current < 320;
+    lastAvatarTapRef.current = now;
+
+    if (isDoubleTap) {
+      event.preventDefault();
+      event.stopPropagation();
+      setShowAvatarPopup(true);
+      setShowUserMenu(false);
+    }
+  };
+
   // return (
   //   <header
   //     className={`sticky top-0 z-50 transition-all duration-500 ${
@@ -296,22 +309,6 @@ const Header = () => {
   //             className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-all duration-200 hover:shadow-md"
   //           >
   //             Return to Super Admin
-  //           </button>
-  //         </div>
-  //       </div>
-  //     )}
-  //     <div className="container mx-auto px-4">
-  //       <div className="flex items-center justify-between gap-2 h-16 md:h-20">
-  //         {/* Logo */}
-  //         <Link to="/" className="flex min-w-0 items-center gap-2 group sm:gap-3">
-  //           <img
-  //             src="/rentalhub-mark.svg"
-  //             alt="RentalHub NG"
-  //             className="h-9 shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 md:h-12 lg:h-14"
-  //           />
-  //           <span className="hidden truncate bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-xl font-bold text-transparent sm:block md:text-2xl">
-  //             RentalHub NG
-  //           </span>
   //         </Link>
 
   //         {/* Desktop Navigation */}
@@ -830,10 +827,7 @@ return (
                         src={user.passport_photo_url}
                         alt=""
                         className="w-full h-full object-cover cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowAvatarPopup(true);
-                        }}
+                        onClick={handleAvatarTap}
                       />
                     ) : (
                       user?.full_name?.charAt(0)?.toUpperCase() || (
@@ -1012,7 +1006,7 @@ return (
                 {t('header.login')}
               </Link>
 
-              <Link
+              <Link 
                 to="/register"
                 onClick={handleRegisterNavigation}
                 className="px-4 md:px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 whitespace-nowrap"
@@ -1046,23 +1040,23 @@ return (
         }`}
       >
         <div className="flex flex-col space-y-1 border-t border-gray-100 pt-3">
-                    <MobileNavLink
-                      to="/properties"
-                      label={t('header.browse')}
-                      onClick={closeMobileMenu}
-                    />
+          <MobileNavLink
+            to="/properties"
+            label={t('header.browse')}
+            onClick={closeMobileMenu}
+          />
 
-                    <MobileNavLink
-                      to="/list-property"
-                      label={t('footer.list')}
-                      onClick={closeMobileMenu}
-                    />
+          <MobileNavLink
+            to="/list-property"
+            label={t('footer.list')}
+            onClick={closeMobileMenu}
+          />
 
-                    <MobileNavLink
-                      to="/about"
-                      label={t('footer.about_us')}
-                      onClick={closeMobileMenu}
-                    />
+          <MobileNavLink
+            to="/about"
+            label={t('footer.about_us')}
+            onClick={closeMobileMenu}
+          />
 
           <MobileNavLink
             to="/verify-case"
