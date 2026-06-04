@@ -718,6 +718,9 @@ const FinancialAdminDashboard = () => {
                           Commission
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Wallet Credit
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
                         </th>
                       </tr>
@@ -749,6 +752,23 @@ const FinancialAdminDashboard = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {formatCurrency(transaction.commission_amount || 0)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div className="font-semibold">
+                              {formatCurrency(transaction.wallet_credit_amount || 0)}
+                            </div>
+                            {(Number(transaction.wallet_pending_amount || 0) > 0 ||
+                              Number(transaction.wallet_cleared_amount || 0) > 0) && (
+                              <div className="mt-1 text-xs text-gray-500">
+                                Pending: {formatCurrency(transaction.wallet_pending_amount || 0)}
+                                {' '}| Cleared: {formatCurrency(transaction.wallet_cleared_amount || 0)}
+                              </div>
+                            )}
+                            {transaction.wallet_owner_name && (
+                              <div className="mt-1 text-xs text-gray-500">
+                                To: {transaction.wallet_owner_name}
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${

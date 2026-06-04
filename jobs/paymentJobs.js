@@ -5,6 +5,7 @@ const {
   checkExpiredTenancyReminders
 } = require("../config/utils/paymentUtils");
 const { expireProperties } = require("../config/utils/propertyUtils");
+const { clearMaturedLandlordRentCredits } = require("../services/walletLedgerService");
 
 const CRON_TIMEZONE = process.env.CRON_TIMEZONE || "Africa/Lagos";
 
@@ -32,6 +33,22 @@ exports.startPaymentJobs = () => {
     await checkExpiredTenancyReminders({
       limit: process.env.TENANCY_EXPIRY_REMINDER_BATCH_LIMIT || 50,
     });
+  }, { timezone: CRON_TIMEZONE });
+
+  const walletClearingCron = process.env.RENT_WALLET_CLEARING_CRON || "15 1 * * *";
+
+  cron.schedule(walletClearingCron, async () => {
+    try {
+      console.log("Running landlord rent wallet clearing check...");
+      const result = await clearMaturedLandlordRentCredits({
+        limit: Number(process.env.RENT_WALLET_CLEARING_BATCH_LIMIT || 500),
+      });
+      console.log(
+        `Landlord rent wallet clearing complete: ${result.cleared_count} credits, ${result.cleared_amount} total`
+      );
+    } catch (error) {
+      console.error("Landlord rent wallet clearing failed:", error);
+    }
   }, { timezone: CRON_TIMEZONE });
 
   console.log("✅ Payment cron jobs started");

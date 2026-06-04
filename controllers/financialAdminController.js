@@ -41,7 +41,13 @@ exports.getAllTransactions = async (req, res) => {
         ac.status as commission_status,
         ff.amount as frozen_amount,
         ff.status as funds_status,
-        ff.reason as freeze_reason
+        ff.reason as freeze_reason,
+        COALESCE(wallet.wallet_credit_amount, 0) AS wallet_credit_amount,
+        COALESCE(wallet.wallet_pending_amount, 0) AS wallet_pending_amount,
+        COALESCE(wallet.wallet_cleared_amount, 0) AS wallet_cleared_amount,
+        wallet.wallet_credit_status,
+        wallet.wallet_owner_name,
+        wallet.wallet_owner_type
       FROM payments p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN properties prop ON p.property_id = prop.id
@@ -49,6 +55,18 @@ exports.getAllTransactions = async (req, res) => {
       LEFT JOIN admin_commissions ac ON p.id = ac.payment_id
       LEFT JOIN users admin ON ac.admin_id = admin.id
       LEFT JOIN frozen_funds ff ON p.user_id = ff.user_id AND ff.status = 'frozen'
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(CASE WHEN wt.type = 'credit' THEN wt.amount ELSE 0 END) AS wallet_credit_amount,
+          SUM(CASE WHEN wt.type = 'credit' AND wt.status = 'pending' THEN wt.amount ELSE 0 END) AS wallet_pending_amount,
+          SUM(CASE WHEN wt.type = 'credit' AND wt.status = 'cleared' THEN wt.amount ELSE 0 END) AS wallet_cleared_amount,
+          STRING_AGG(DISTINCT wt.status, ', ') AS wallet_credit_status,
+          STRING_AGG(DISTINCT wallet_user.full_name, ', ') AS wallet_owner_name,
+          STRING_AGG(DISTINCT wallet_user.user_type, ', ') AS wallet_owner_type
+        FROM wallet_transactions wt
+        LEFT JOIN users wallet_user ON wallet_user.id = wt.user_id
+        WHERE wt.payment_id = p.id
+      ) wallet ON TRUE
       WHERE 1=1
     `;
     

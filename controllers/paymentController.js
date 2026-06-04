@@ -25,6 +25,11 @@ const {
 } = require('../services/subscriptionCreditService');
 const commissionService = require('../services/commissionService');
 const AgentWithdrawalService = require('../services/agentWithdrawalService');
+const {
+  ensureWalletLedgerSchema: ensureSharedWalletLedgerSchema,
+  creditWallet,
+  creditLandlordRentPayment,
+} = require('../services/walletLedgerService');
 
 // ====================== PAYSTACK CONFIG ======================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -84,16 +89,7 @@ const ensurePropertyUnlockSchema = async () => {
 const ensureWalletLedgerSchema = async () => {
   if (walletLedgerSchemaReady) return;
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS wallets (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-      balance NUMERIC(12,2) NOT NULL DEFAULT 0,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
-  `);
+  await ensureSharedWalletLedgerSchema();
 
   walletLedgerSchemaReady = true;
 };
@@ -3030,21 +3026,30 @@ exports.verifyRentPayment = async (req, res) => {
 
     const payment = paymentResult.rows[0];
 
+    const wasAlreadyCompleted = payment.payment_status === 'completed';
+
     await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
-           completed_at = CURRENT_TIMESTAMP,
+           completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
            gateway_response = $1
        WHERE id = $2`,
       [JSON.stringify(transaction), payment.id]
     );
 
- // Calculate commission for rent payment
-    await commissionService.processPaymentCommission(payment.id); // ADD THIS LINE
+    await creditLandlordRentPayment({
+      paymentId: payment.id,
+      reference,
+    });
+
+    if (!wasAlreadyCompleted) {
+      // Calculate commission for rent payment
+      await commissionService.processPaymentCommission(payment.id);
+    }
 
      res.json({
       success: true,
-      message: "Rent payment successful!",
+      message: "Rent payment successful! Landlord wallet credited as pending until clearing period ends.",
       data: {
         property_id: payment.property_id,
         amount_paid: transaction.amount / 100,
@@ -3186,6 +3191,16 @@ exports.verifyWalletFunding = async (req, res) => {
 
     // Already processed
     if (payment.payment_status === 'completed') {
+      await creditWallet({
+        userId,
+        paymentId: payment.id,
+        amount: payment.amount,
+        source: 'wallet_funding',
+        reference,
+        description: `Wallet funding ${reference}`,
+        metadata: { payment_type: 'wallet_funding' },
+      });
+
       return res.json({
         success: true,
         message: 'Wallet already funded for this transaction',
@@ -3210,28 +3225,36 @@ exports.verifyWalletFunding = async (req, res) => {
     }
 
     const amountPaid = Number(transaction.amount) / 100;
+    const wasAlreadyCompleted = payment.payment_status === 'completed';
 
     // Mark payment as completed
     await db.query(
       `UPDATE payments
        SET payment_status = 'completed',
-           completed_at   = CURRENT_TIMESTAMP,
+           completed_at   = COALESCE(completed_at, CURRENT_TIMESTAMP),
            gateway_response = $1
        WHERE id = $2`,
       [JSON.stringify(transaction), payment.id]
     );
 
     // Credit the wallet
-    await db.query(
-      `INSERT INTO wallets (user_id, balance)
-       VALUES ($1, $2)
-       ON CONFLICT (user_id)
-       DO UPDATE SET balance = wallets.balance + $2, updated_at = CURRENT_TIMESTAMP`,
-      [userId, amountPaid]
-    );
+    await creditWallet({
+      userId,
+      paymentId: payment.id,
+      amount: amountPaid,
+      source: 'wallet_funding',
+      reference,
+      description: `Wallet funding ${reference}`,
+      metadata: {
+        payment_type: 'wallet_funding',
+        gateway_amount: amountPaid,
+      },
+    });
 
-// Calculate commission for wallet funding
-    await commissionService.processPaymentCommission(payment.id); // ADD THIS LINE
+    if (!wasAlreadyCompleted) {
+      // Calculate commission for wallet funding
+      await commissionService.processPaymentCommission(payment.id);
+    }
 
       return res.json({
       success: true,
@@ -3562,20 +3585,18 @@ async function handleSuccessfulPayment(data) {
     const reference = data.reference;
     const metadata = data.metadata || {};
 
-    await db.query(
+    const updateResult = await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
-           completed_at = CURRENT_TIMESTAMP,
+           completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
            gateway_response = $1
-       WHERE transaction_reference = $2`,
+       WHERE transaction_reference = $2
+       RETURNING id, payment_type, user_id, amount`,
       [JSON.stringify(data), reference]
     );
 
-    const storedPaymentResult = await db.query(
-      'SELECT id FROM payments WHERE transaction_reference = $1 LIMIT 1',
-      [reference]
-    );
-    const paymentId = storedPaymentResult.rows[0]?.id || null;
+    const storedPayment = updateResult.rows[0] || null;
+    const paymentId = storedPayment?.id || null;
 
     if (metadata.payment_type === "tenant_subscription") {
       const expiry = new Date();
@@ -3659,13 +3680,25 @@ async function handleSuccessfulPayment(data) {
     }
     
     if (metadata.payment_type === "wallet_funding") {
-      await db.query(
-        `INSERT INTO wallets (user_id, balance)
-         VALUES ($1, $2)
-         ON CONFLICT (user_id)
-         DO UPDATE SET balance = wallets.balance + $2, updated_at = CURRENT_TIMESTAMP`,
-        [metadata.user_id, data.amount / 100]
-      );
+      await creditWallet({
+        userId: metadata.user_id || storedPayment?.user_id,
+        paymentId,
+        amount: data.amount / 100,
+        source: 'wallet_funding',
+        reference,
+        description: `Wallet funding ${reference}`,
+        metadata: {
+          payment_type: 'wallet_funding',
+          gateway_amount: data.amount / 100,
+        },
+      });
+    }
+
+    if (metadata.payment_type === 'rent_payment' && paymentId) {
+      await creditLandlordRentPayment({
+        paymentId,
+        reference,
+      });
     }
 
     if (

@@ -480,13 +480,14 @@ const SuperFinancialAdminDashboard = () => {
                   <th className="py-2">Reference</th>
                   <th className="py-2">Type</th>
                   <th className="py-2">Amount</th>
+                  <th className="py-2">Wallet Credit</th>
                   <th className="py-2">Date</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredTransactions.length === 0 && (
                   <tr>
-                    <td className="py-3 text-gray-500" colSpan={4}>No transactions yet</td>
+                    <td className="py-3 text-gray-500" colSpan={5}>No transactions yet</td>
                   </tr>
                 )}
                 {filteredTransactions.map((tx) => (
@@ -494,6 +495,14 @@ const SuperFinancialAdminDashboard = () => {
                     <td className="py-2 font-medium text-gray-800">{tx.reference || tx.id}</td>
                     <td className="py-2 text-gray-600">{tx.payment_type || tx.type || 'N/A'}</td>
                     <td className="py-2 text-gray-800">{currency(tx.amount)}</td>
+                    <td className="py-2 text-gray-700">
+                      <div className="font-semibold">{currency(tx.wallet_credit_amount || 0)}</div>
+                      {(Number(tx.wallet_pending_amount || 0) > 0 || Number(tx.wallet_cleared_amount || 0) > 0) && (
+                        <div className="text-xs text-gray-500">
+                          P: {currency(tx.wallet_pending_amount || 0)} / C: {currency(tx.wallet_cleared_amount || 0)}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-2 text-gray-600">{dateLabel(tx.created_at || tx.date)}</td>
                   </tr>
                 ))}

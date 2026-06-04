@@ -25,6 +25,15 @@ const { sendEmail } = require('../config/utils/mailer');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { formatDate } = require('../config/utils/helpers');
 const { createNotification } = require('../config/utils/notificationService');
+const {
+  ensureWalletLedgerSchema,
+  creditWallet,
+  clearMaturedLandlordRentCredits,
+  reverseLandlordRentCreditForPayment,
+  getWalletBalance,
+  getWalletCreditSummaryForUser,
+  getLandlordRentDeductionTotal,
+} = require('../services/walletLedgerService');
 
 const WALLET_WITHDRAWAL_ADMIN_ROLES = ['admin', 'super_admin', 'financial_admin', 'super_financial_admin'];
 const TENANCY_ADMIN_ROLES = new Set([
@@ -942,13 +951,26 @@ exports.approveRefundRequest = async (req, res) => {
     );
 
     // ── Credit tenant wallet ────────────────────────────────────────────────
-    await db.query(
-      `INSERT INTO wallets (user_id, balance)
-       VALUES ($1, $2)
-       ON CONFLICT (user_id)
-       DO UPDATE SET balance = wallets.balance + $2, updated_at = CURRENT_TIMESTAMP`,
-      [refund.tenant_id, finalAmount]
-    );
+    await creditWallet({
+      userId: refund.tenant_id,
+      paymentId: refund.payment_id,
+      amount: finalAmount,
+      source: 'rent_refund',
+      reference: `REFUND_${refundId}_${refund.payment_id}`,
+      description: `Approved rent refund request #${refundId}`,
+      metadata: {
+        refund_id: refundId,
+        refund_type,
+        refund_months: refund_type === 'partial_months' ? refund_months : null,
+        paystack_refund_requested: paystackSuccess,
+      },
+    });
+
+    await reverseLandlordRentCreditForPayment({
+      paymentId: refund.payment_id,
+      amount: finalAmount,
+      reason: `Approved rent refund request #${refundId}`,
+    });
 
     if (paystackSuccess) {
       await db.query(
@@ -1755,6 +1777,7 @@ exports.adminReviewTenancyAdjustmentRequest = async (req, res) => {
 exports.getWalletBalance = async (req, res) => {
   try {
     await ensureRefundSchema();
+    await ensureWalletLedgerSchema();
     const userId = req.user.id;
 
     const result = await db.query(
@@ -1860,13 +1883,18 @@ exports.requestWithdrawal = async (req, res) => {
     const userResult = await db.query(`SELECT user_type FROM users WHERE id = $1`, [userId]);
     const userType = userResult.rows[0]?.user_type;
 
-    // Check wallet balance
-    const walletResult = await db.query(
-      `SELECT balance FROM wallets WHERE user_id = $1`,
-      [userId]
-    );
+    if (userType === 'landlord') {
+      await clearMaturedLandlordRentCredits({ landlordId: userId });
+    }
 
-    const balance = walletResult.rows.length ? Number(walletResult.rows[0].balance) : 0;
+    // Check wallet balance
+    const walletBalance = await getWalletBalance(userId);
+    const rentDeductions = userType === 'landlord'
+      ? await getLandlordRentDeductionTotal(userId)
+      : 0;
+    const balance = userType === 'landlord'
+      ? Math.max(0, walletBalance - rentDeductions)
+      : walletBalance;
 
     if (withdrawAmount > balance) {
       return res.status(400).json({
@@ -2216,41 +2244,23 @@ exports.walletWithdrawalWebhook = async (req, res) => {
 exports.getLandlordWalletBalance = async (req, res) => {
   try {
     await ensureRefundSchema();
+    await ensureWalletLedgerSchema();
     const landlordId = req.user.id;
 
-    // Cleared rent income = sum of rent payments > 20 calendar days old
-    // with no pending/approved refund requests
-    const clearedResult = await db.query(
-      `SELECT COALESCE(SUM(p.amount), 0) AS cleared_amount
-       FROM payments p
-       JOIN properties prop ON p.property_id = prop.id
-       WHERE prop.landlord_id   = $1
-         AND p.payment_type     = 'rent_payment'
-         AND p.payment_status   = 'completed'
-         AND p.completed_at     < NOW() - INTERVAL '20 days'
-         AND NOT EXISTS (
-           SELECT 1 FROM refund_requests rr
-           WHERE rr.payment_id = p.id
-             AND rr.status IN ('pending','approved')
-         )`,
-      [landlordId]
-    );
+    await clearMaturedLandlordRentCredits({ landlordId });
 
-    // Pending (within 14 working days or disputed)
+    const walletSummary = await getWalletCreditSummaryForUser(landlordId);
     const pendingResult = await db.query(
-      `SELECT COALESCE(SUM(p.amount), 0) AS pending_amount
-       FROM payments p
-       JOIN properties prop ON p.property_id = prop.id
-       WHERE prop.landlord_id   = $1
-         AND p.payment_type     = 'rent_payment'
-         AND p.payment_status   = 'completed'
-         AND (
-           p.completed_at >= NOW() - INTERVAL '20 days'
-           OR EXISTS (
-             SELECT 1 FROM refund_requests rr
-             WHERE rr.payment_id = p.id
-               AND rr.status IN ('pending','approved')
-           )
+      `SELECT COALESCE(SUM(wt.amount), 0) AS disputed_pending_amount
+       FROM wallet_transactions wt
+       WHERE wt.user_id = $1
+         AND wt.source = 'rent_payment'
+         AND wt.status = 'pending'
+         AND EXISTS (
+           SELECT 1
+           FROM refund_requests rr
+           WHERE rr.payment_id = wt.payment_id
+             AND rr.status IN ('pending','approved')
          )`,
       [landlordId]
     );
@@ -2263,37 +2273,23 @@ exports.getLandlordWalletBalance = async (req, res) => {
       [landlordId]
     );
 
-    const walletResult = await db.query(
-      `SELECT balance FROM wallets WHERE user_id = $1 LIMIT 1`,
-      [landlordId]
-    );
-
-    const rentDeductionResult = await db.query(
-      `SELECT COALESCE(SUM(amount), 0) AS deducted_amount
-       FROM landlord_rent_deductions
-       WHERE landlord_id = $1`,
-      [landlordId]
-    );
-
-    const cleared   = Number(clearedResult.rows[0].cleared_amount);
-    const pending   = Number(pendingResult.rows[0].pending_amount);
+    const pending   = Number(walletSummary.pending_rent || 0);
     const withdrawn = Number(withdrawnResult.rows[0].withdrawn_amount);
-    const rentDeductions = Number(rentDeductionResult.rows[0].deducted_amount);
-    const walletBalance = walletResult.rows.length
-      ? Number(walletResult.rows[0].balance || 0)
-      : 0;
-    const rentAvailable = Math.max(0, cleared - withdrawn - rentDeductions);
-    const available = rentAvailable + walletBalance;
+    const rentDeductions = await getLandlordRentDeductionTotal(landlordId);
+    const walletBalance = Number(walletSummary.wallet_balance || 0);
+    const available = Math.max(0, walletBalance - rentDeductions);
     const propertyFeeStatus = await getLandlordPropertyFeeStatus(landlordId);
 
     res.json({
       success: true,
       data: {
-        cleared_balance:   cleared,
+        cleared_balance:   available,
         wallet_balance:    walletBalance,
-        rent_available_to_withdraw: rentAvailable,
+        rent_available_to_withdraw: available,
+        cleared_rent_total: Number(walletSummary.cleared_rent || 0),
         rent_deductions_total: rentDeductions,
         pending_balance:   pending,
+        disputed_pending_balance: Number(pendingResult.rows[0]?.disputed_pending_amount || 0),
         withdrawn_total:   withdrawn,
         available_to_withdraw: available,
         property_fee: propertyFeeStatus,
