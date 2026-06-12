@@ -16,10 +16,12 @@ const {
 } = require('../config/utils/registrationAccess');
 const {
   validateNIN,
-  verifyNINWithNIMC,
+  verifyNINWithPrembly,
   validateInternationalPassport,
-  verifyInternationalPassportWithAPI
-} = require('../config/utils/ninValidator');
+  verifyInternationalPassportWithPrembly,
+  performKYCCheckWithPrembly,
+  performLivenessCheckWithPrembly
+} = require('../config/utils/premblyValidator');
 const {
   sendVerificationEmail,
   sendWelcomeEmail,
@@ -624,7 +626,7 @@ const validateAndPrepareRegistration = async (payload) => {
           message: 'Test NIN bypass enabled'
         };
       } else {
-        const nimcResult = await verifyNINWithNIMC(
+        const nimcResult = await verifyNINWithPrembly(
           cleanNIN,
           firstName,
           lastName,
@@ -637,7 +639,7 @@ const validateAndPrepareRegistration = async (payload) => {
         };
 
         if (nimcResult.status === 'not_configured') {
-          const error = new Error('NIMC verification is required but not configured on the server');
+          const error = new Error('Prembly verification is required but not configured on the server');
           error.statusCode = 503;
           throw error;
         }
@@ -696,7 +698,7 @@ const validateAndPrepareRegistration = async (payload) => {
       identityType = 'passport';
       cleanPassportNumber = passportValidation.value;
 
-      const passportResult = await verifyInternationalPassportWithAPI(
+      const passportResult = await verifyInternationalPassportWithPrembly(
         cleanPassportNumber,
         cleanFullName,
         cleanNationality,
