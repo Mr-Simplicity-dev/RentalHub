@@ -1770,14 +1770,16 @@ exports.getPropertyInspectionOptions = async (req, res) => {
          p.lga_name,
          p.full_address,
          s.state_name,
-         pir.id AS inspection_request_id,
-         pir.status AS inspection_status,
-         COALESCE(pir.amount, $2::numeric) AS inspection_amount,
-         pir.tenant_note AS inspection_note,
-         pir.requested_at AS inspection_requested_at,
-         pir.paid_at AS inspection_paid_at,
-         pay.transaction_reference AS inspection_reference,
-         pay.payment_status AS inspection_payment_status
+          pir.id AS inspection_request_id,
+          pir.status AS inspection_status,
+          COALESCE(pir.amount, $2::numeric) AS inspection_amount,
+          pir.tenant_note AS inspection_note,
+          pir.inspection_summary,
+          pir.requested_at AS inspection_requested_at,
+          pir.paid_at AS inspection_paid_at,
+          pir.completed_at AS inspection_completed_at,
+          pay.transaction_reference AS inspection_reference,
+          pay.payment_status AS inspection_payment_status
        FROM applications a
        JOIN properties p ON p.id = a.property_id
        LEFT JOIN states s ON s.id = p.state_id

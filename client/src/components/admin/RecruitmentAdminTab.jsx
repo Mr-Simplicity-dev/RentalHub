@@ -458,7 +458,7 @@ export default function RecruitmentAdminTab() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+        className="rec-admin-applications-section grid gap-4 md:grid-cols-2 xl:grid-cols-4"
       >
         <MetricCard icon={<FaUsers />} label="Total Applicants" value={analytics?.total_applicants || 0} color="blue" />
         <MetricCard icon={<FaBriefcase />} label="Fees Collected" value={formatCurrency(analytics?.total_fees_collected || 0)} color="emerald" />
@@ -479,7 +479,7 @@ export default function RecruitmentAdminTab() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid gap-5 xl:grid-cols-3"
+        className="rec-admin-jobs-section grid gap-5 xl:grid-cols-3"
       >
         {/* Cycles */}
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-elevated">
@@ -729,7 +729,7 @@ export default function RecruitmentAdminTab() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated"
+        className="rec-admin-candidates-section rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated"
       >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>

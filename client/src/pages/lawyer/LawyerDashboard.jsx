@@ -641,7 +641,7 @@ const LawyerDashboardContent = ({
           variants={staggerList}
           initial="initial"
           animate="animate"
-          className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+          className="lawyer-earnings-section mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
         >
           {workspaceStats.map((stat) => (
             <motion.div key={stat.label} variants={fadeUp}>
@@ -912,7 +912,7 @@ const LawyerDashboardContent = ({
             variants={fadeUp}
             initial="initial"
             animate="animate"
-            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6 lg:h-fit"
+            className="lawyer-clients-section rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6 lg:h-fit"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -968,7 +968,7 @@ const LawyerDashboardContent = ({
               variants={fadeUp}
               initial="initial"
               animate="animate"
-              className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+              className="lawyer-cases-section rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -1083,7 +1083,7 @@ const LawyerDashboardContent = ({
                   ) : (
                     <div className="mt-6 grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
                       <div className="space-y-6">
-                        <div className="rounded-3xl border border-slate-200 p-5">
+                        <div className="lawyer-evidence-section rounded-3xl border border-slate-200 p-5">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <h4 className="text-base font-semibold text-slate-900">Evidence Verification</h4>

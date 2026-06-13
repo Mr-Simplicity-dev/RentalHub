@@ -254,7 +254,7 @@ const TransportationAdminDashboard = () => {
 
       {activeTab === 'overview' ? (
         <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="trans-admin-revenue-section grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Bookings (30 days)" value={overview.total_bookings || 0} tone="cyan" />
             <MetricCard label="Revenue" value={formatCurrency(overview.total_revenue)} tone="emerald" />
             <MetricCard label="Pending Payments" value={overview.pending_payments || 0} tone="amber" />
@@ -265,6 +265,7 @@ const TransportationAdminDashboard = () => {
             <SectionCard
               title="Recent bookings"
               description="Latest transportation requests from tenants moving into their rented properties."
+              className="trans-admin-bookings-section"
             >
               {dashboard?.recent_bookings?.length ? (
                 <div className="space-y-3">
@@ -304,6 +305,7 @@ const TransportationAdminDashboard = () => {
             <SectionCard
               title="Service mix"
               description="What providers and service types are carrying the current booking load."
+              className="trans-admin-routes-section trans-admin-drivers-section"
             >
               {dashboard?.service_analytics?.length ? (
                 <div className="space-y-3">
@@ -347,6 +349,7 @@ const TransportationAdminDashboard = () => {
         <SectionCard
           title="Booking management"
           description="Track relocation requests and update operational or payment status when the logistics team changes state."
+          className="trans-admin-bookings-section"
         >
           {bookings.length ? (
             <div className="space-y-4">
@@ -419,6 +422,7 @@ const TransportationAdminDashboard = () => {
           <SectionCard
             title="Create service"
             description="Add a provider or pricing option for tenant relocation logistics."
+            className="trans-admin-routes-section"
           >
             <form className="space-y-4" onSubmit={createService}>
               <div className="grid gap-4 md:grid-cols-2">
@@ -515,6 +519,7 @@ const TransportationAdminDashboard = () => {
           <SectionCard
             title="Service management"
             description="Review pricing, provider activity, and availability."
+            className="trans-admin-drivers-section"
           >
             {services.length ? (
               <div className="space-y-3">

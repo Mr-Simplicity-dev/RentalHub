@@ -309,8 +309,8 @@ const FumigationCleaningAdmin = ({
         </div>
         
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+        <div className="fum-admin-payments-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="fum-admin-providers-section bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Bookings</p>
@@ -362,7 +362,7 @@ const FumigationCleaningAdmin = ({
         </div>
         
         {/* Filters and Actions */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
+        <div className="fum-admin-services-section bg-white rounded-lg shadow p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
             {/* Status Filter */}
             <div>
@@ -481,7 +481,7 @@ const FumigationCleaningAdmin = ({
         </div>
         
         {/* Bookings Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="fum-admin-bookings-section bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -798,7 +798,7 @@ const FumigationCleaningAdmin = ({
                     {selectedBooking.assigned_provider && (
                       <div>
                         <h3 className="font-bold text-gray-900 mb-3">Assigned Provider</h3>
-                        <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="fum-admin-providers-section bg-green-50 p-4 rounded-lg">
                           <h4 className="font-bold text-green-800 mb-1">
                             {selectedBooking.assigned_provider.company_name}
                           </h4>
@@ -865,7 +865,7 @@ const FumigationCleaningAdmin = ({
                 <div className="mb-6">
                   <h3 className="font-bold text-gray-900 mb-3">Available Providers</h3>
                   {providers.length > 0 ? (
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                    <div className="fum-admin-providers-section space-y-3 max-h-96 overflow-y-auto">
                       {providers.map((provider) => (
                         <div
                           key={provider.id}

@@ -697,6 +697,11 @@ const AdminLayout = () => {
                 Fumigation
               </NavLink>
 
+              <NavLink to="/admin/inspections" className={navItem}>
+                <FaClipboardList className="mr-3" />
+                Inspections
+              </NavLink>
+
               <NavLink to="/admin/agents" className={navItem}>
                 <FaUserShield className="mr-3" />
                 Agent Management

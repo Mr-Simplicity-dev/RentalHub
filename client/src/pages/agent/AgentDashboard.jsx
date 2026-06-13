@@ -84,7 +84,7 @@ const AgentDashboard = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
-      <div className="rounded-2xl bg-gradient-to-r from-sky-600 to-indigo-700 p-6 text-white shadow-lg">
+      <div className="agent-profile-section rounded-2xl bg-gradient-to-r from-sky-600 to-indigo-700 p-6 text-white shadow-lg">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm uppercase tracking-wide text-white/80">Agent Workspace</p>
@@ -158,7 +158,7 @@ const AgentDashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="rounded-2xl border bg-white p-6 shadow-sm lg:col-span-2">
+            <div className="agent-bookings-section rounded-2xl border bg-white p-6 shadow-sm lg:col-span-2">
               <div className="flex items-center gap-3">
                 <FaHome className="text-2xl text-indigo-600" />
                 <div>
@@ -187,7 +187,7 @@ const AgentDashboard = () => {
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="agent-earnings-section rounded-2xl border bg-white p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <FaClipboardList className="text-2xl text-indigo-600" />
                 <div>
@@ -214,7 +214,7 @@ const AgentDashboard = () => {
             </div>
           </div>
 
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="agent-commissions-section rounded-2xl border bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <FaShieldAlt className="text-2xl text-indigo-600" />
               <div>

@@ -279,7 +279,7 @@ const FinancialAdminDashboard = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="fin-admin-payments-section grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-lg bg-white p-5 shadow">
               <p className="text-sm font-medium text-gray-600">Withdrawable Balance</p>
               <p className="mt-2 text-2xl font-bold text-gray-900">
@@ -299,7 +299,7 @@ const FinancialAdminDashboard = () => {
             </div>
           </div>
 
-          <div className="rounded-lg bg-white p-6 shadow">
+          <div className="fin-admin-reports-section rounded-lg bg-white p-6 shadow">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Withdrawal History</h2>
@@ -387,14 +387,14 @@ const FinancialAdminDashboard = () => {
                 <button
                   type="button"
                   onClick={() => setActiveTab('frozen-funds')}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="fin-admin-refunds-section rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   View Frozen Funds
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('withdrawals')}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="fin-admin-settlements-section rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   View Withdrawal History
                 </button>
@@ -437,7 +437,7 @@ const FinancialAdminDashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="fin-admin-payments-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -517,7 +517,7 @@ const FinancialAdminDashboard = () => {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow">
+        <div className="fin-admin-reports-section bg-white rounded-lg shadow">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
               {['overview', 'transactions', 'state-admins', 'frozen-funds', 'withdrawals', 'audit-trail'].map((tab) => (
@@ -790,7 +790,7 @@ const FinancialAdminDashboard = () => {
             )}
 
             {activeTab === 'state-admins' && (
-              <div className="space-y-4">
+              <div className="fin-admin-settlements-section space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">State Admin Performance</h3>
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -874,7 +874,7 @@ const FinancialAdminDashboard = () => {
             )}
 
             {activeTab === 'frozen-funds' && (
-              <div className="space-y-4">
+              <div className="fin-admin-refunds-section space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">Frozen Funds</h3>
                   <Button onClick={openFreezeDialog} variant="danger" size="small">
@@ -946,7 +946,7 @@ const FinancialAdminDashboard = () => {
             )}
 
             {activeTab === 'withdrawals' && (
-              <div className="space-y-4">
+              <div className="fin-admin-settlements-section space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">Withdrawal History</h3>
                   <button

@@ -1322,6 +1322,13 @@ const Dashboard = () => {
       }];
   const hasActivePropertyLocation = propertyLocationCards.some(canOpenPropertyMap);
   const hasPropertyInspectionOptions = propertyInspectionOptions.length > 0;
+  const completedInspections = propertyInspectionOptions.filter(
+    (o) => o.inspection_status === 'completed'
+  );
+  const hasCompletedInspections = completedInspections.length > 0;
+  const hasEligibleInspectionOptions = propertyInspectionOptions.some(
+    (o) => !o.inspection_status || o.inspection_status === 'pending_payment'
+  );
   const inspectionFeeAmount = Number(propertyInspectionOptions[0]?.inspection_amount || 10000);
   const selectedInspectionOption =
     propertyInspectionOptions.find(
@@ -1838,25 +1845,31 @@ const Dashboard = () => {
                 onClick={() => navigate('/fumigation-cleaning/catalog')}
               />
               <QuickActionCard
-                title="Inspection Fee"
+                title={hasCompletedInspections ? 'Inspections' : 'Inspection Fee'}
                 description={
-                  hasPropertyInspectionOptions
+                  hasCompletedInspections
+                    ? `${completedInspections.length} completed — tap to view reports`
+                    : hasPropertyInspectionOptions
                     ? 'Let RentalHub NG inspect an applied property against the landlord description'
                     : 'Activated after you apply for a property'
                 }
                 icon={<FaUserCheck />}
                 onClick={openInspectionModal}
                 note={
-                  hasPropertyInspectionOptions
+                  hasCompletedInspections
+                    ? 'View Reports'
+                    : hasPropertyInspectionOptions
                     ? `₦${inspectionFeeAmount.toLocaleString()}`
                     : 'Apply first'
                 }
                 noteClass={
-                  hasPropertyInspectionOptions
+                  hasCompletedInspections
+                    ? 'bg-green-100 text-green-700 border-green-200'
+                    : hasPropertyInspectionOptions
                     ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
                     : 'bg-gray-100 text-gray-600 border-gray-200'
                 }
-                disabled={!hasPropertyInspectionOptions}
+                disabled={!hasPropertyInspectionOptions && !hasCompletedInspections}
               />
               <QuickActionCard
                 title="Request a Refund"
@@ -1979,7 +1992,52 @@ const Dashboard = () => {
             </div>
 
             <div className="px-5 py-5 sm:px-6">
-              {!hasPropertyInspectionOptions ? (
+              {hasCompletedInspections && (
+                <div className="mb-6 space-y-4">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <FaCheckCircle className="text-green-600" />
+                    Completed Inspections
+                  </h3>
+                  {completedInspections.map((item) => (
+                    <div
+                      key={item.application_id}
+                      className="rounded-xl border border-green-200 bg-green-50 p-4"
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-gray-900">{item.property_title}</p>
+                          <p className="text-xs text-gray-600">
+                            {[item.area, item.city, item.state_name].filter(Boolean).join(', ') || item.full_address}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-green-200 px-2.5 py-1 text-xs font-semibold text-green-800">
+                          Completed
+                        </span>
+                      </div>
+                      {item.inspection_note && (
+                        <p className="mb-2 text-xs text-gray-500">
+                          <span className="font-medium">Your note:</span> {item.inspection_note}
+                        </p>
+                      )}
+                      <div className="rounded-lg border border-green-100 bg-white p-3 text-sm text-gray-700">
+                        <p className="mb-1 text-xs font-semibold uppercase text-green-700">
+                          Inspection Report
+                        </p>
+                        <p className="whitespace-pre-wrap">{item.inspection_summary || 'No report summary provided.'}</p>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-400">
+                        {item.inspection_completed_at
+                          ? `Completed: ${new Date(item.inspection_completed_at).toLocaleDateString()}`
+                          : item.inspection_paid_at
+                          ? `Paid: ${new Date(item.inspection_paid_at).toLocaleDateString()}`
+                          : ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!hasEligibleInspectionOptions && !hasCompletedInspections ? (
                 <div className="space-y-4 text-center">
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-500">
                     <FaLock className="text-xl" />
@@ -2002,7 +2060,7 @@ const Dashboard = () => {
                     Browse Properties
                   </button>
                 </div>
-              ) : (
+              ) : hasEligibleInspectionOptions ? (
                 <form onSubmit={handleInspectionPayment} className="space-y-5">
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                     <p className="font-semibold">Inspection fee: ₦{inspectionFeeAmount.toLocaleString()}</p>
@@ -2022,11 +2080,13 @@ const Dashboard = () => {
                       className="input w-full"
                       required
                     >
-                      {propertyInspectionOptions.map((item) => (
-                        <option key={item.application_id} value={item.application_id}>
-                          {item.property_title} - {item.area || item.city || 'Location'} ({item.application_status})
-                        </option>
-                      ))}
+                      {propertyInspectionOptions
+                        .filter((o) => !o.inspection_status || o.inspection_status === 'pending_payment')
+                        .map((item) => (
+                          <option key={item.application_id} value={item.application_id}>
+                            {item.property_title} - {item.area || item.city || 'Location'} ({item.application_status})
+                          </option>
+                        ))}
                     </select>
                   </div>
 
@@ -2091,7 +2151,7 @@ const Dashboard = () => {
                     </button>
                   </div>
                 </form>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

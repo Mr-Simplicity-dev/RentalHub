@@ -971,7 +971,7 @@ export default function SuperAdminDashboard() {
               <button
                 type="button"
                 onClick={() => loadTab('analytics')}
-                className="rounded-md border border-white/40 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20"
+                className="super-admin-analytics-section rounded-md border border-white/40 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20"
               >
                 Open Analytics
               </button>
@@ -987,7 +987,7 @@ export default function SuperAdminDashboard() {
           </div>
         </section>
 
-        <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="super-admin-platform-section mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -1009,7 +1009,15 @@ export default function SuperAdminDashboard() {
                     key={item.name}
                     type="button"
                     onClick={() => loadTab(item.name)}
-                    className={`min-h-[92px] rounded-xl border p-3 text-left transition ${
+                    className={`${
+                      item.name === 'registration_access'
+                        ? 'super-admin-users-section '
+                        : item.name === 'recruitment'
+                        ? 'super-admin-admins-section '
+                        : item.name === 'flags'
+                        ? 'super-admin-support-section '
+                        : ''
+                    }min-h-[92px] rounded-xl border p-3 text-left transition ${
                       isActive
                         ? 'border-amber-300 bg-amber-50 text-amber-900 shadow-sm'
                         : item.featured
@@ -1036,7 +1044,7 @@ export default function SuperAdminDashboard() {
       {loading && <p className="text-gray-500">Loading...</p>}
 
       {tab === "users" && (
-        <>
+        <div className="super-admin-users-section">
           <UsersTab
             users={pagedUsers}
             selectedUsers={selectedUsers}
@@ -1054,7 +1062,7 @@ export default function SuperAdminDashboard() {
             onPageChange={setUsersPage}
             summary={getPageSummary(usersPage, PAGE_LIMITS.users, users.length)}
           />
-        </>
+        </div>
       )}
 
       {tab === "verifications" && (
@@ -1111,11 +1119,13 @@ export default function SuperAdminDashboard() {
       )}
 
       {tab === "analytics" && (
-        <AnalyticsTab analytics={analytics} />
+        <div className="super-admin-analytics-section">
+          <AnalyticsTab analytics={analytics} />
+        </div>
       )}
 
       {tab === "reports" && (
-        <>
+        <div className="super-admin-support-section">
           <ReportsTab reports={pagedReports} updateReport={updateReport} />
           <PaginationControls
             currentPage={reportsPage}
@@ -1127,7 +1137,7 @@ export default function SuperAdminDashboard() {
               reports.length
             )}
           />
-        </>
+        </div>
       )}
 
       {tab === "logs" && (
@@ -1160,7 +1170,9 @@ export default function SuperAdminDashboard() {
       )}
 
       {tab === "recruitment" && (
-        <RecruitmentAdminTab />
+        <div className="super-admin-admins-section">
+          <RecruitmentAdminTab />
+        </div>
       )}
 
       {tab === "flags" && (

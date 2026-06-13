@@ -202,25 +202,29 @@ const AdminDashboard = () => {
             title="Total Users"
             value={stats.totalUsers}
             icon={<FaUsers className="text-blue-500" />}
+            className="admin-users-section"
           />
           <StatCard
             title="Total Properties"
             value={stats.totalProperties}
             icon={<FaHome className="text-green-500" />}
+            className="admin-properties-section"
           />
           <StatCard
             title="Applications"
             value={stats.applications}
             icon={<FaFileAlt className="text-purple-500" />}
+            className="admin-disputes-section"
           />
           <StatCard
             title="Pending Verifications"
             value={stats.pendingVerifications}
             icon={<FaCheckCircle className="text-yellow-500" />}
+            className="admin-payments-section"
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-7">
+        <div className="admin-reports-section grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-7">
           <QuickCard title="Manage Users" href="/admin/users" />
           <QuickCard
             title="Verify NIN/Passport"
@@ -252,8 +256,8 @@ const AdminDashboard = () => {
   );
 };
 
-const StatCard = ({ title, value, icon }) => (
-  <div className="card">
+const StatCard = ({ title, value, icon, className = '' }) => (
+  <div className={`card ${className}`.trim()}>
     <div className="flex items-center justify-between">
       <div>
         <p className="mb-1 text-sm text-gray-600">{title}</p>
@@ -264,8 +268,8 @@ const StatCard = ({ title, value, icon }) => (
   </div>
 );
 
-const QuickCard = ({ title, href, icon = null, badge = '' }) => (
-  <a href={href} className="card block text-center">
+const QuickCard = ({ title, href, icon = null, badge = '', className = '' }) => (
+  <a href={href} className={`card block text-center ${className}`.trim()}>
     {badge && (
       <div className="mb-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
         {badge}
