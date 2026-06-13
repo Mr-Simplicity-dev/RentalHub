@@ -129,29 +129,56 @@ export default function RecruitmentAdminTab() {
   const loadCore = useCallback(async () => {
     setLoading(true);
     setLoadError('');
-    try {
-      const [statusRes, cyclesRes, rolesRes, statesRes, locationsRes, analyticsRes] = await Promise.all([
-        api.get('/recruitment/status'),
-        api.get('/recruitment/admin/cycles'),
-        api.get('/recruitment/admin/roles'),
-        api.get('/recruitment/locations/states'),
-        api.get('/recruitment/admin/locations'),
-        api.get('/recruitment/admin/analytics'),
-      ]);
+    const errors = [];
 
-      setStatus(statusRes.data?.data || { is_active: false });
-      setCycles(cyclesRes.data?.data || []);
-      setRoles(rolesRes.data?.data || []);
-      setStates(statesRes.data?.data || []);
-      setLocations(locationsRes.data?.data || []);
-      setAnalytics(analyticsRes.data?.data || null);
-    } catch (error) {
-      const message = error.response?.data?.message || 'Failed to load recruitment dashboard';
-      setLoadError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
+    try {
+      const res = await api.get('/recruitment/status');
+      setStatus(res.data?.data || { is_active: false });
+    } catch (e) {
+      errors.push(e.response?.data?.message || 'Status');
     }
+
+    try {
+      const res = await api.get('/recruitment/admin/cycles');
+      setCycles(res.data?.data || []);
+    } catch (e) {
+      errors.push(e.response?.data?.message || 'Cycles');
+    }
+
+    try {
+      const res = await api.get('/recruitment/admin/roles');
+      setRoles(res.data?.data || []);
+    } catch (e) {
+      errors.push(e.response?.data?.message || 'Roles');
+    }
+
+    try {
+      const res = await api.get('/recruitment/locations/states');
+      setStates(res.data?.data || []);
+    } catch (e) {
+      errors.push(e.response?.data?.message || 'States');
+    }
+
+    try {
+      const res = await api.get('/recruitment/admin/locations');
+      setLocations(res.data?.data || []);
+    } catch (e) {
+      errors.push(e.response?.data?.message || 'Locations');
+    }
+
+    try {
+      const res = await api.get('/recruitment/admin/analytics');
+      setAnalytics(res.data?.data || null);
+    } catch (e) {
+      errors.push(e.response?.data?.message || 'Analytics');
+    }
+
+    if (errors.length > 0) {
+      const message = 'Failed to load: ' + errors.join(', ');
+      setLoadError(message);
+      toast.warn(message);
+    }
+    setLoading(false);
   }, []);
 
   const loadApplicants = useCallback(async (page = 1) => {
@@ -414,7 +441,7 @@ export default function RecruitmentAdminTab() {
             <button
               type="button"
               onClick={() => setTriggerModal(true)}
-              disabled={loading || Boolean(loadError) || !status.is_active}
+              disabled={loading || !status.is_active}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-indigo-600 transition-all disabled:opacity-50"
             >
               <FaVideo /> Trigger Interview
@@ -423,7 +450,7 @@ export default function RecruitmentAdminTab() {
             <button
               type="button"
               onClick={toggleRecruitment}
-              disabled={saving || Boolean(loadError)}
+              disabled={saving}
               className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold shadow-sm transition ${
                 status.is_active
                   ? 'bg-emerald-400 text-slate-950 hover:bg-emerald-300'
