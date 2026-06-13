@@ -1445,7 +1445,7 @@ const Dashboard = () => {
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <section className="dashboard-properties-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {user?.user_type === 'tenant' ? (
             <>
               <StatCard
@@ -1563,10 +1563,10 @@ const Dashboard = () => {
               />
             </>
           )}
-        </div>
+        </section>
 
         {user?.user_type === 'tenant' && (
-          <section
+          <section className="dashboard-bookings-section
             className={`mb-8 rounded-lg border bg-white p-5 shadow-sm ${
               hasActivePropertyLocation ? 'border-emerald-200' : 'border-gray-200'
             }`}
@@ -1780,7 +1780,7 @@ const Dashboard = () => {
         )}
 
         {/* Recent Activities */}
-        <div className="card">
+        <section className="dashboard-analytics-section card">
           <h2 className="text-xl font-bold mb-4 text-center">{t('dashboard.recent')}</h2>
           {recentActivities.length === 0 ? (
             <p className="text-gray-600 text-center py-8">
@@ -1793,12 +1793,12 @@ const Dashboard = () => {
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         <AdSpace placement="dashboard_inline" contained={false} className="mt-8" />
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+        <section className="dashboard-messages-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
           {user?.user_type === 'tenant' ? (
             <>
               <QuickActionCard
@@ -1943,7 +1943,7 @@ const Dashboard = () => {
               />
             </>
           )}
-        </div>
+        </section>
       </div>
 
       {/* PROPERTY INSPECTION FEE MODAL (tenant only) */}

@@ -130,6 +130,174 @@ const ensureCommissionPasswordSchema = async () => {
   commissionPasswordSchemaReady = true;
 };
 
+let tourSchemaReady = false;
+const ensureTourSchema = async () => {
+  if (tourSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS user_tour_states (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      dashboard_type VARCHAR(80),
+      tour_version VARCHAR(40) NOT NULL DEFAULT '1',
+      status VARCHAR(30) NOT NULL DEFAULT 'not_started',
+      last_welcome_shown_at TIMESTAMP,
+      last_started_at TIMESTAMP,
+      last_completed_at TIMESTAMP,
+      last_dismissed_at TIMESTAMP,
+      started_count INTEGER NOT NULL DEFAULT 0,
+      completed_count INTEGER NOT NULL DEFAULT 0,
+      skipped_count INTEGER NOT NULL DEFAULT 0,
+      dismissed_count INTEGER NOT NULL DEFAULT 0,
+      replay_count INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT user_tour_states_status_check
+        CHECK (status IN ('not_started', 'welcome_shown', 'in_progress', 'completed', 'skipped', 'dismissed'))
+    );
+
+    CREATE TABLE IF NOT EXISTS user_tour_events (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      event_type VARCHAR(40) NOT NULL,
+      dashboard_type VARCHAR(80),
+      tour_version VARCHAR(40) NOT NULL DEFAULT '1',
+      step_id VARCHAR(120),
+      current_step INTEGER,
+      total_steps INTEGER,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT user_tour_events_type_check
+        CHECK (event_type IN ('welcome_shown', 'started', 'replayed', 'completed', 'skipped', 'dismissed'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_tour_events_user_created
+      ON user_tour_events(user_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_user_tour_events_type_created
+      ON user_tour_events(event_type, created_at DESC);
+  `);
+
+  tourSchemaReady = true;
+};
+
+const TOUR_EVENTS = new Set(['welcome_shown', 'started', 'replayed', 'completed', 'skipped', 'dismissed']);
+const TOUR_EVENT_STATUS = {
+  welcome_shown: 'welcome_shown',
+  started: 'in_progress',
+  replayed: 'in_progress',
+  completed: 'completed',
+  skipped: 'skipped',
+  dismissed: 'dismissed',
+};
+
+const normalizeTourText = (value, fallback = null) => {
+  const text = String(value || '').trim();
+  return text || fallback;
+};
+
+const getTourState = async (userId) => {
+  await ensureTourSchema();
+  const result = await db.query(
+    `SELECT *
+     FROM user_tour_states
+     WHERE user_id = $1
+     LIMIT 1`,
+    [userId]
+  );
+
+  return result.rows[0] || null;
+};
+
+const recordTourEvent = async (userId, payload = {}) => {
+  await ensureTourSchema();
+
+  const eventType = normalizeTourText(payload.event_type);
+  if (!TOUR_EVENTS.has(eventType)) {
+    const error = new Error('Invalid tour event type');
+    error.status = 400;
+    throw error;
+  }
+
+  const dashboardType = normalizeTourText(payload.dashboard_type);
+  const tourVersion = normalizeTourText(payload.tour_version, '1');
+  const stepId = normalizeTourText(payload.step_id);
+  const currentStep = Number.isInteger(Number(payload.current_step)) ? Number(payload.current_step) : null;
+  const totalSteps = Number.isInteger(Number(payload.total_steps)) ? Number(payload.total_steps) : null;
+  const metadata = payload.metadata && typeof payload.metadata === 'object' && !Array.isArray(payload.metadata)
+    ? payload.metadata
+    : {};
+
+  await db.query(
+    `INSERT INTO user_tour_events (
+       user_id, event_type, dashboard_type, tour_version,
+       step_id, current_step, total_steps, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+    [
+      userId,
+      eventType,
+      dashboardType,
+      tourVersion,
+      stepId,
+      currentStep,
+      totalSteps,
+      JSON.stringify(metadata),
+    ]
+  );
+
+  const startedIncrement = eventType === 'started' ? 1 : 0;
+  const completedIncrement = eventType === 'completed' ? 1 : 0;
+  const skippedIncrement = eventType === 'skipped' ? 1 : 0;
+  const dismissedIncrement = eventType === 'dismissed' ? 1 : 0;
+  const replayIncrement = eventType === 'replayed' ? 1 : 0;
+
+  const stateResult = await db.query(
+    `INSERT INTO user_tour_states (
+       user_id, dashboard_type, tour_version, status,
+       last_welcome_shown_at, last_started_at, last_completed_at, last_dismissed_at,
+       started_count, completed_count, skipped_count, dismissed_count, replay_count,
+       updated_at
+     )
+     VALUES (
+       $1, $2, $3, $4,
+       CASE WHEN $5 = 'welcome_shown' THEN CURRENT_TIMESTAMP ELSE NULL END,
+       CASE WHEN $5 IN ('started', 'replayed') THEN CURRENT_TIMESTAMP ELSE NULL END,
+       CASE WHEN $5 = 'completed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+       CASE WHEN $5 IN ('completed', 'skipped', 'dismissed') THEN CURRENT_TIMESTAMP ELSE NULL END,
+       $6, $7, $8, $9, $10,
+       CURRENT_TIMESTAMP
+     )
+     ON CONFLICT (user_id) DO UPDATE SET
+       dashboard_type = COALESCE(EXCLUDED.dashboard_type, user_tour_states.dashboard_type),
+       tour_version = EXCLUDED.tour_version,
+       status = EXCLUDED.status,
+       last_welcome_shown_at = COALESCE(EXCLUDED.last_welcome_shown_at, user_tour_states.last_welcome_shown_at),
+       last_started_at = COALESCE(EXCLUDED.last_started_at, user_tour_states.last_started_at),
+       last_completed_at = COALESCE(EXCLUDED.last_completed_at, user_tour_states.last_completed_at),
+       last_dismissed_at = COALESCE(EXCLUDED.last_dismissed_at, user_tour_states.last_dismissed_at),
+       started_count = user_tour_states.started_count + $6,
+       completed_count = user_tour_states.completed_count + $7,
+       skipped_count = user_tour_states.skipped_count + $8,
+       dismissed_count = user_tour_states.dismissed_count + $9,
+       replay_count = user_tour_states.replay_count + $10,
+       updated_at = CURRENT_TIMESTAMP
+     RETURNING *`,
+    [
+      userId,
+      dashboardType,
+      tourVersion,
+      TOUR_EVENT_STATUS[eventType],
+      eventType,
+      startedIncrement,
+      completedIncrement,
+      skippedIncrement,
+      dismissedIncrement,
+      replayIncrement,
+    ]
+  );
+
+  return stateResult.rows[0];
+};
+
 const normalizeCommissionPassword = (value) => String(value || '').trim();
 
 const validateCommissionPassword = (value) => {
@@ -396,6 +564,105 @@ router.post('/commission-password/reset', authenticate, sensitiveActionLimiter, 
     return res.status(500).json({
       success: false,
       message: 'Failed to reset commission password',
+    });
+  }
+});
+
+router.get('/tour', authenticate, async (req, res) => {
+  try {
+    const state = await getTourState(req.user.id);
+
+    return res.json({
+      success: true,
+      data: state || {
+        user_id: req.user.id,
+        status: 'not_started',
+        tour_version: '1',
+        started_count: 0,
+        completed_count: 0,
+        skipped_count: 0,
+        dismissed_count: 0,
+        replay_count: 0,
+      },
+    });
+  } catch (error) {
+    console.error('Tour state load error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load tour state',
+    });
+  }
+});
+
+router.post('/tour/events', authenticate, async (req, res) => {
+  try {
+    const state = await recordTourEvent(req.user.id, req.body || {});
+
+    return res.status(201).json({
+      success: true,
+      data: state,
+    });
+  } catch (error) {
+    console.error('Tour event record error:', error);
+    return res.status(error.status || 500).json({
+      success: false,
+      message: error.status ? error.message : 'Failed to record tour event',
+    });
+  }
+});
+
+router.get('/tour/analytics', authenticate, [
+  query('days').optional().isInt({ min: 1, max: 365 }).withMessage('Days must be between 1 and 365'),
+  validateRequest,
+], async (req, res) => {
+  try {
+    if (!['admin', 'super_admin'].includes(req.user.user_type)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required',
+      });
+    }
+
+    await ensureTourSchema();
+    const days = Number(req.query.days || 30);
+    const [summaryResult, dailyResult] = await Promise.all([
+      db.query(
+        `SELECT
+           event_type,
+           COUNT(*)::int AS event_count,
+           COUNT(DISTINCT user_id)::int AS unique_users
+         FROM user_tour_events
+         WHERE created_at >= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day')
+         GROUP BY event_type
+         ORDER BY event_type`,
+        [days]
+      ),
+      db.query(
+        `SELECT
+           DATE(created_at) AS event_date,
+           event_type,
+           COUNT(*)::int AS event_count
+         FROM user_tour_events
+         WHERE created_at >= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day')
+         GROUP BY DATE(created_at), event_type
+         ORDER BY event_date DESC, event_type`,
+        [days]
+      ),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        days,
+        summary: summaryResult.rows,
+        daily: dailyResult.rows,
+      },
+    });
+  } catch (error) {
+    console.error('Tour analytics error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load tour analytics',
     });
   }
 });

@@ -9,10 +9,12 @@ import i18n from '../i18n';
 
 import { AuthProvider } from '../context/AuthContext';
 import { SocketProvider } from '../context/SocketContext';
+import { TourProvider } from '../context/TourContext';
 import { useAuth } from '../hooks/useAuth';
 
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
+import TourManager from '../components/tour/TourManager';
 import LiveRatingFlyIn from '../components/ratings/LiveRatingFlyIn';
 import PlatformRatingPrompt from '../components/ratings/PlatformRatingPrompt';
 
@@ -646,8 +648,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
-          <SocketProvider>
+        <TourProvider>
+          <Router>
+            <SocketProvider>
             <Layout>
               <Routes>
               {/* Public Routes */}
@@ -847,11 +850,14 @@ function App() {
               </Routes>
             </Layout>
 
+            <TourManager />
+
             <ToastContainer position="top-right" autoClose={3000} />
           </SocketProvider>
         </Router>
-      </AuthProvider>
-    </QueryClientProvider>
+      </TourProvider>
+    </AuthProvider>
+  </QueryClientProvider>
   );
 }
 

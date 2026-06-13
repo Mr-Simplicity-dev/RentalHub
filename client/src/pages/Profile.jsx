@@ -5,6 +5,8 @@ import api from '../services/api';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import BackToDashboard from '../components/common/BackToDashboard';
+import { useTour } from '../hooks/useTour';
+import { getTourDashboardType, getTourStepsByUserRole } from '../config/tourConfig';
 
 const DEFAULT_LIVENESS = {
   faceDetected: false,
@@ -59,6 +61,7 @@ const loadExternalScript = (src) => {
 const Profile = () => {
   const POST_VERIFY_REDIRECT_KEY = 'pending_unlock_redirect';
   const { user, updateUser } = useAuth();
+  const { replayTour, userTourData, showTourOverlay } = useTour();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
@@ -625,6 +628,34 @@ const Profile = () => {
     }
   };
 
+  const getDashboardPathForTour = () => {
+    if (user?.user_type === 'tenant') return '/tenant/dashboard';
+    if (user?.user_type === 'agent') return '/agent/dashboard';
+    if (user?.user_type === 'lawyer') return '/lawyer';
+    if (user?.user_type === 'state_lawyer') return '/lawyer/state';
+    if (user?.user_type === 'super_lawyer') return '/lawyer/super';
+    if (String(user?.user_type || '').includes('admin')) return '/admin';
+    return '/dashboard';
+  };
+
+  const handleReplayTour = () => {
+    if (!user) return;
+
+    const tourSteps = getTourStepsByUserRole(user.user_type);
+    const dashboardType = getTourDashboardType(user.user_type);
+    const targetPath = getDashboardPathForTour();
+
+    if (window.location.pathname !== targetPath) {
+      navigate(targetPath);
+      window.setTimeout(() => {
+        replayTour(dashboardType, tourSteps);
+      }, 350);
+      return;
+    }
+
+    replayTour(dashboardType, tourSteps);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -709,6 +740,30 @@ const Profile = () => {
               {t('profile.edit_information')}
             </button>
           )}
+        </div>
+      </div>
+
+      <div className="card mb-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold text-gray-900">Guided Tour</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Replay the dashboard walkthrough for your current account role.
+            </p>
+            {userTourData?.last_completed_at && (
+              <p className="mt-2 text-xs text-gray-500">
+                Last completed {new Date(userTourData.last_completed_at).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary w-full sm:w-44"
+            onClick={handleReplayTour}
+            disabled={showTourOverlay}
+          >
+            Replay Tour
+          </button>
         </div>
       </div>
 
