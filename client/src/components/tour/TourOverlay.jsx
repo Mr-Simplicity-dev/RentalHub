@@ -1,6 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaChevronLeft, FaChevronRight, FaTimes } from 'react-icons/fa';
+
+const HIGHLIGHT_PADDING = 8;
+const TOOLTIP_GAP = 12;
+const DESKTOP_TOOLTIP_WIDTH = 360;
+const MOBILE_BREAKPOINT = 640;
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const TourOverlay = ({ 
   isOpen, 
@@ -12,60 +19,129 @@ const TourOverlay = ({
   dashboardTitle = 'Dashboard' 
 }) => {
   const [highlightBox, setHighlightBox] = useState(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const [tooltipPosition, setTooltipPosition] = useState({
+    top: 0,
+    left: 0,
+    placement: 'bottom',
+    isMobile: false,
+  });
 
   const step = steps[currentStep];
 
-  // Update highlight box and tooltip position when step changes
-  useEffect(() => {
+  const updatePosition = useCallback(() => {
     if (!step || !isOpen) return;
 
-    const timer = setTimeout(() => {
-      const element = document.querySelector(step.target);
-      if (element) {
-        const rect = element.getBoundingClientRect();
-        setHighlightBox({
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        });
+    const element = document.querySelector(step.target);
+    if (!element) {
+      setHighlightBox(null);
+      setTooltipPosition({
+        top: window.innerHeight - 24,
+        left: window.innerWidth / 2,
+        placement: 'bottom',
+        isMobile: window.innerWidth < MOBILE_BREAKPOINT,
+      });
+      return;
+    }
 
-        // Calculate tooltip position based on placement
-        let top = rect.top + rect.height + 15;
-        let left = rect.left + rect.width / 2;
+    const rect = element.getBoundingClientRect();
+    const paddedBox = {
+      top: clamp(rect.top - HIGHLIGHT_PADDING, 8, window.innerHeight - 24),
+      left: clamp(rect.left - HIGHLIGHT_PADDING, 8, window.innerWidth - 24),
+      width: Math.min(rect.width + HIGHLIGHT_PADDING * 2, window.innerWidth - 16),
+      height: Math.min(rect.height + HIGHLIGHT_PADDING * 2, window.innerHeight - 16),
+    };
 
-        if (step.placement === 'top') {
-          top = rect.top - 15;
-        } else if (step.placement === 'left') {
-          left = rect.left - 15;
-        } else if (step.placement === 'right') {
-          left = rect.left + rect.width + 15;
-        }
+    const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+    setHighlightBox(paddedBox);
 
-        setTooltipPosition({ top, left });
-      }
-    }, 100);
+    if (isMobile) {
+      setTooltipPosition({
+        top: window.innerHeight - 16,
+        left: window.innerWidth / 2,
+        placement: 'mobile',
+        isMobile: true,
+      });
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [step, isOpen, currentStep]);
+    const tooltipWidth = Math.min(DESKTOP_TOOLTIP_WIDTH, window.innerWidth - 32);
+    let placement = step.placement || 'bottom';
+    let top = paddedBox.top + paddedBox.height + TOOLTIP_GAP;
+    let left = paddedBox.left + paddedBox.width / 2;
+
+    if (placement === 'top') {
+      top = paddedBox.top - TOOLTIP_GAP;
+    } else if (placement === 'left') {
+      top = paddedBox.top + paddedBox.height / 2;
+      left = paddedBox.left - TOOLTIP_GAP;
+    } else if (placement === 'right') {
+      top = paddedBox.top + paddedBox.height / 2;
+      left = paddedBox.left + paddedBox.width + TOOLTIP_GAP;
+    }
+
+    const wouldOverflowBottom = placement === 'bottom' && top + 260 > window.innerHeight;
+    const wouldOverflowTop = placement === 'top' && top - 260 < 0;
+    const wouldOverflowLeft = placement === 'left' && left - tooltipWidth < 16;
+    const wouldOverflowRight = placement === 'right' && left + tooltipWidth > window.innerWidth - 16;
+
+    if (wouldOverflowBottom && paddedBox.top > 280) {
+      placement = 'top';
+      top = paddedBox.top - TOOLTIP_GAP;
+      left = paddedBox.left + paddedBox.width / 2;
+    } else if (wouldOverflowTop || wouldOverflowLeft || wouldOverflowRight) {
+      placement = 'bottom';
+      top = paddedBox.top + paddedBox.height + TOOLTIP_GAP;
+      left = paddedBox.left + paddedBox.width / 2;
+    }
+
+    setTooltipPosition({
+      top,
+      left: clamp(left, 16 + tooltipWidth / 2, window.innerWidth - 16 - tooltipWidth / 2),
+      placement,
+      isMobile: false,
+    });
+  }, [isOpen, step]);
+
+  useEffect(() => {
+    if (!step || !isOpen) return undefined;
+
+    const element = document.querySelector(step.target);
+    if (element) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: window.innerWidth < MOBILE_BREAKPOINT ? 'center' : 'nearest',
+        inline: 'nearest',
+      });
+    }
+
+    const timer = window.setTimeout(updatePosition, 350);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [step, isOpen, currentStep, updatePosition]);
 
   if (!isOpen || !step) return null;
 
   const progress = ((currentStep + 1) / steps.length) * 100;
+  const tooltipTransform = tooltipPosition.isMobile
+    ? 'translate(-50%, 0)'
+    : tooltipPosition.placement === 'right'
+      ? 'translateY(-50%)'
+      : tooltipPosition.placement === 'left'
+        ? 'translate(-100%, -50%)'
+        : tooltipPosition.placement === 'top'
+          ? 'translate(-50%, -100%)'
+          : 'translateX(-50%)';
 
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Dark Overlay */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-40 z-40 pointer-events-none"
-          />
-
           {/* Highlight Box */}
           {highlightBox && (
             <motion.div
@@ -74,13 +150,13 @@ const TourOverlay = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="fixed z-40 border-4 border-blue-500 rounded-lg pointer-events-none shadow-xl shadow-blue-500/50"
+              className="fixed z-40 rounded-xl border-4 border-blue-500 pointer-events-none"
               style={{
                 top: `${highlightBox.top}px`,
                 left: `${highlightBox.left}px`,
                 width: `${highlightBox.width}px`,
                 height: `${highlightBox.height}px`,
-                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.4), 0 0 30px rgba(59, 130, 246, 0.8)',
+                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.58), 0 0 28px rgba(59, 130, 246, 0.9)',
               }}
             />
           )}
@@ -92,11 +168,13 @@ const TourOverlay = ({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3, delay: 0.1 }}
-            className="fixed z-50 bg-white rounded-xl shadow-2xl p-6 max-w-sm"
+            className="fixed z-50 w-[calc(100vw-2rem)] max-w-sm rounded-xl bg-white p-5 shadow-2xl sm:p-6"
             style={{
               top: `${tooltipPosition.top}px`,
               left: `${tooltipPosition.left}px`,
-              transform: step.placement === 'right' ? 'translateY(-50%)' : 'translateX(-50%)',
+              transform: tooltipTransform,
+              maxHeight: tooltipPosition.isMobile ? 'calc(48vh - 1rem)' : 'calc(100vh - 2rem)',
+              overflowY: 'auto',
             }}
           >
             {/* Close Button */}

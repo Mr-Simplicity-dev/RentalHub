@@ -1453,6 +1453,7 @@ const Dashboard = () => {
                 title="Saved Properties"
                 value={stats?.saved_properties_count || 0}
                 onClick={() => navigate('/saved-properties')}
+                className="tour-saved-properties"
               />
               <StatCard
                 icon={<FaCheckCircle className="text-blue-500" />}
@@ -1465,6 +1466,7 @@ const Dashboard = () => {
                 title="Unread Messages"
                 value={stats?.unread_messages || 0}
                 onClick={() => navigate('/messages')}
+                className="tour-messages"
               />
               <StatCard
                 icon={<FaClock className="text-yellow-500" />}
@@ -1503,6 +1505,7 @@ const Dashboard = () => {
               <StatCard
                 icon={<FaWallet className="text-teal-500" />}
                 title="Wallet Balance"
+                className="tour-wallet"
                 value={walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
                 onClick={openWithdrawModal}
               />
@@ -1514,6 +1517,7 @@ const Dashboard = () => {
                 title={t('dashboard.total_props')}
                 value={stats?.total_properties || 0}
                 onClick={() => navigate('/my-properties')}
+                className="tour-saved-properties"
               />
               <StatCard
                 icon={<FaCheckCircle className="text-green-500" />}
@@ -1532,6 +1536,7 @@ const Dashboard = () => {
                 title={t('dashboard.unread')}
                 value={stats?.unread_messages || 0}
                 onClick={() => navigate('/messages')}
+                className="tour-messages"
               />
               <StatCard
                 icon={<FaUndo className="text-orange-500" />}
@@ -1552,6 +1557,7 @@ const Dashboard = () => {
               <StatCard
                 icon={<FaPiggyBank className="text-teal-500" />}
                 title="Available to Withdraw"
+                className="tour-wallet"
                 value={landlordWallet ? `₦${Number(landlordWallet.available_to_withdraw).toLocaleString()}` : '—'}
                 onClick={openWithdrawModal}
               />
@@ -1567,7 +1573,7 @@ const Dashboard = () => {
 
         {user?.user_type === 'tenant' && (
           <section
-            className={`dashboard-bookings-section mb-8 rounded-lg border bg-white p-5 shadow-sm ${
+            className={`dashboard-bookings-section tour-property-location mb-8 rounded-lg border bg-white p-5 shadow-sm ${
               hasActivePropertyLocation ? 'border-emerald-200' : 'border-gray-200'
             }`}
           >
@@ -1780,7 +1786,7 @@ const Dashboard = () => {
         )}
 
         {/* Recent Activities */}
-        <section className="dashboard-analytics-section card">
+        <section className="dashboard-analytics-section tour-recent-activity card">
           <h2 className="text-xl font-bold mb-4 text-center">{t('dashboard.recent')}</h2>
           {recentActivities.length === 0 ? (
             <p className="text-gray-600 text-center py-8">
@@ -1798,7 +1804,7 @@ const Dashboard = () => {
         <AdSpace placement="dashboard_inline" contained={false} className="mt-8" />
 
         {/* Quick Actions */}
-        <section className="dashboard-messages-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+        <section className="dashboard-messages-section tour-quick-actions grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
           {user?.user_type === 'tenant' ? (
             <>
               <QuickActionCard
@@ -3320,8 +3326,8 @@ const LandlordPropertyFeeModal = ({
 };
 
 // Stat Card Component
-const StatCard = ({ icon, title, value, onClick, note, noteClass = 'bg-gray-100 text-gray-700 border-gray-200' }) => (
-  <div onClick={onClick} className="card cursor-pointer">
+const StatCard = ({ icon, title, value, onClick, note, noteClass = 'bg-gray-100 text-gray-700 border-gray-200', className = '' }) => (
+  <div onClick={onClick} className={`card cursor-pointer ${className}`}>
     <div className="flex items-center justify-between">
       <div>
         <p className="text-gray-600 text-sm mb-1">{title}</p>
@@ -3403,10 +3409,11 @@ const QuickActionCard = ({
   note,
   noteClass = 'bg-gray-100 text-gray-700 border-gray-200',
   disabled = false,
+  className = '',
 }) => (
   <div
     onClick={onClick}
-    className={`card cursor-pointer text-center transition ${
+    className={`card cursor-pointer text-center transition ${className} ${
       disabled ? 'border-gray-200 bg-gray-50 opacity-80' : 'hover:-translate-y-0.5'
     }`}
     aria-disabled={disabled}
