@@ -32,6 +32,8 @@ import {
   FaTools,
   FaBalanceScale,
   FaKey,
+  FaTicketAlt,
+
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
@@ -1864,6 +1866,12 @@ const Dashboard = () => {
                 onClick={() => navigate('/subscribed-properties')}
               />
               <QuickActionCard
+                title="Help & Support"
+                description="Submit a support ticket or view your requests"
+                icon={<FaTicketAlt />}
+                onClick={() => navigate('/support')}
+              />
+              <QuickActionCard
                 title="Fumigation & Cleaning"
                 description="Browse certified fumigation and cleaning services for your property"
                 icon={<FaSprayCan />}
@@ -1978,6 +1986,12 @@ const Dashboard = () => {
                 description="View damage reports for your properties"
                 icon={<FaTools />}
                 onClick={() => navigate('/my-damage-reports')}
+              />
+              <QuickActionCard
+                title="Help & Support"
+                description="Submit a support ticket or view your requests"
+                icon={<FaTicketAlt />}
+                onClick={() => navigate('/support')}
               />
               <QuickActionCard
                 title="Withdraw Funds"

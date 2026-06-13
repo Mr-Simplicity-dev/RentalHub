@@ -78,6 +78,7 @@ import TransportationAdminDashboard from './admin/TransportationAdminDashboard';
 import TransporationAdminStateDashboard from './admin/TransporationAdminStateDashboard';
 import TransportationSuperAdminDashboard from './admin/TransportationSuperAdminDashboard';
 import LgaFumigationAdminDashboard from './admin/LgaFumigationAdminDashboard';
+import LgaSupportAdminDashboard from './admin/LgaSupportAdminDashboard';
 import StateFumigationAdminDashboard from './admin/StateFumigationAdminDashboard';
 import SuperFumigationAdminDashboard from './admin/SuperFumigationAdminDashboard';
 import LawyerDashboard from './lawyer/LawyerDashboard';
@@ -90,6 +91,7 @@ import DisputeDetails from "./DisputeDetails";
 import MyDisputes from "./MyDisputes";
 import MyDamageReports from "./MyDamageReports";
 import SubscribedProperties from "./SubscribedProperties";
+import Support from "./Support";
 import AcceptLawyerInvite from './AcceptLawyerInvite';
 import AcceptAgentInvite from './AcceptAgentInvite';
 import LocationPage from './LocationPage';
@@ -210,6 +212,19 @@ const StateAdminRoute = ({ children }) => {
   return children;
 };
 
+const LgaSupportAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+
+  return children;
+};
+
 const StateSupportAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -294,7 +309,7 @@ const LandlordRoute = ({ children }) => {
     if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/financial-dashboard" />;
     if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-financial-dashboard" />;
     if (STATE_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
-    if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin?tab=property_requests" />;
+    if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/lga-support-dashboard" />;
     if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/state-support-dashboard" />;
     if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-support-dashboard" />;
     if (isRecruitmentAdminUser(user)) return <Navigate to="/admin/recruitment" />;
@@ -493,7 +508,7 @@ const AdminHomeRoute = () => {
   }
 
   if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
-    return <Navigate to="/admin?tab=property_requests" replace />;
+    return <Navigate to="/admin/lga-support-dashboard" replace />;
   }
 
   if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
@@ -761,6 +776,7 @@ function App() {
               <Route path="/my-disputes" element={<MyDisputes />} />
               <Route path="/my-damage-reports" element={<MyDamageReports />} />
               <Route path="/subscribed-properties" element={<SubscribedProperties />} />
+              <Route path="/support" element={<Support />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
               <Route path="/nigeria" element={<NigeriaPage />} />
               <Route path="/nigeria/:stateSlug" element={<LocationPage />} />
@@ -844,6 +860,7 @@ function App() {
                 <Route path="financial-dashboard" element={<FinancialAdminRoute><FinancialAdminDashboard /></FinancialAdminRoute>} />
                 <Route path="state-dashboard" element={<StateAdminRoute><Navigate to="/admin" replace /></StateAdminRoute>} />
                 <Route path="withdrawals" element={<AdminWithdrawalsRoute />} />
+                <Route path="lga-support-dashboard" element={<LgaSupportAdminRoute><LgaSupportAdminDashboard /></LgaSupportAdminRoute>} />
                 <Route path="state-support-dashboard" element={<StateSupportAdminRoute><StateSupportAdminDashboard /></StateSupportAdminRoute>} />
                 <Route path="super-support-dashboard" element={<SuperSupportAdminRoute><SuperSupportAdminDashboard /></SuperSupportAdminRoute>} />
                 <Route path="recruitment" element={<RecruitmentAdminRoute><RecruitmentAdminDashboard /></RecruitmentAdminRoute>} />

@@ -882,9 +882,9 @@ const AdminLayout = () => {
               </p>
 
               <div className="space-y-2">
-                <NavLink to="/admin?tab=property_requests" className={navItem}>
-                  <FaHeadset className="mr-3" />
-                  Property Requests
+                <NavLink to="/admin/lga-support-dashboard" end className={navItem}>
+                  <FaTachometerAlt className="mr-3" />
+                  Dashboard
                 </NavLink>
               </div>
             </div>

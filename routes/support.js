@@ -48,6 +48,59 @@ const requireSupportAdmin = (req, res, next) => {
   });
 };
 
+router.post('/tickets', authenticate, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const { subject, description, priority } = req.body;
+
+    if (!subject || !subject.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Subject is required',
+      });
+    }
+
+    const result = await db.query(
+      `INSERT INTO support_tickets (subject, description, priority, status, user_id)
+       VALUES ($1, $2, $3, 'open', $4)
+       RETURNING *`,
+      [subject.trim(), description?.trim() || null, priority || 'medium', req.user.id]
+    );
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Create support ticket error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create support ticket',
+    });
+  }
+});
+
+router.get('/tickets/my', authenticate, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const result = await db.query(
+      `SELECT id, subject, description, priority, status, escalated_at, resolved_at, created_at, updated_at
+       FROM support_tickets
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [req.user.id]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('My support tickets error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch your tickets',
+    });
+  }
+});
+
 router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
   try {
     await ensureSupportSchema();
@@ -68,9 +121,12 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.priority, st.status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
-              u.email AS user_email, u.full_name AS user_name
+              st.assigned_to,
+              u.email AS user_email, u.full_name AS user_name,
+              a.email AS assigned_email, a.full_name AS assigned_name
        FROM support_tickets st
        LEFT JOIN users u ON u.id = st.user_id
+       LEFT JOIN users a ON a.id = st.assigned_to
        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
        ORDER BY
          CASE st.priority
@@ -127,6 +183,41 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
     res.status(500).json({
       success: false,
       message: 'Failed to escalate support ticket',
+    });
+  }
+});
+
+router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const assignedTo = req.body.assigned_to ? Number(req.body.assigned_to) : req.user.id;
+
+    const result = await db.query(
+      `UPDATE support_tickets
+       SET assigned_to = $1,
+           status = CASE WHEN status = 'open' THEN 'in_progress' ELSE status END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING *`,
+      [assignedTo, ticketId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Assign support ticket error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to assign support ticket',
     });
   }
 });
