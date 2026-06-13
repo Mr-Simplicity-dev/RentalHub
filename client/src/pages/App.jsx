@@ -42,6 +42,7 @@ import AdminProperties from './admin/AdminProperties';
 import AdminApplications from './admin/AdminApplications';
 import AdminInspections from './admin/AdminInspections';
 import AdminEvidenceVerifications from './admin/AdminEvidenceVerifications';
+import AdminLedger from './admin/AdminLedger';
 import AdminVerifications from './admin/AdminVerifications';
 import AdminLawyerInvites from './admin/AdminLawyerInvites';
 
@@ -85,6 +86,7 @@ import SuperLawyerDashboard from './lawyer/SuperLawyerDashboard';
 import AgentDashboard from './agent/AgentDashboard';
 import VerifyCase from './VerifyCase';
 import DisputeDetails from "./DisputeDetails";
+import MyDisputes from "./MyDisputes";
 import AcceptLawyerInvite from './AcceptLawyerInvite';
 import AcceptAgentInvite from './AcceptAgentInvite';
 import LocationPage from './LocationPage';
@@ -753,6 +755,7 @@ function App() {
                             <Route path="/agent/withdrawals" element={<AgentRoute><AgentWithdrawalPage /></AgentRoute>} />
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
+              <Route path="/my-disputes" element={<MyDisputes />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
               <Route path="/nigeria" element={<NigeriaPage />} />
               <Route path="/nigeria/:stateSlug" element={<LocationPage />} />
@@ -794,6 +797,7 @@ function App() {
                 <Route path="applications" element={<AdminApplications />} />
                 <Route path="inspections" element={<AdminInspections />} />
                 <Route path="evidence-verifications" element={<AdminEvidenceVerifications />} />
+                <Route path="ledger" element={<AdminLedger />} />
                 <Route path="compliance" element={<AdminCompliance />} />
                 <Route
                   path="transportation"

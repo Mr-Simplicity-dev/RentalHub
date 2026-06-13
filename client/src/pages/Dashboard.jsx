@@ -29,6 +29,7 @@ import {
   FaMapMarkedAlt,
   FaExternalLinkAlt,
   FaLock,
+  FaBalanceScale,
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
@@ -1833,6 +1834,12 @@ const Dashboard = () => {
                 onClick={() => navigate('/payment-history')}
               />
               <QuickActionCard
+                title="My Disputes"
+                description="View and manage disputes you are involved in"
+                icon={<FaBalanceScale />}
+                onClick={() => navigate('/my-disputes')}
+              />
+              <QuickActionCard
                 title="Subscription"
                 description="View Super Admin priced monthly access and multiple property add-on"
                 icon={<FaClock />}
@@ -1941,6 +1948,12 @@ const Dashboard = () => {
                 onClick={() => openLandlordGraceModal('enabled')}
                 note={graceCountdown?.label}
                 noteClass={graceCountdown?.className}
+              />
+              <QuickActionCard
+                title="My Disputes"
+                description="View and manage disputes you are involved in"
+                icon={<FaBalanceScale />}
+                onClick={() => navigate('/my-disputes')}
               />
               <QuickActionCard
                 title="Withdraw Funds"
