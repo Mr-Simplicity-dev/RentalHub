@@ -1566,8 +1566,8 @@ const Dashboard = () => {
         </section>
 
         {user?.user_type === 'tenant' && (
-          <section className="dashboard-bookings-section
-            className={`mb-8 rounded-lg border bg-white p-5 shadow-sm ${
+          <section
+            className={`dashboard-bookings-section mb-8 rounded-lg border bg-white p-5 shadow-sm ${
               hasActivePropertyLocation ? 'border-emerald-200' : 'border-gray-200'
             }`}
           >
