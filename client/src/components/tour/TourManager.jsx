@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import WelcomeModal from './WelcomeModal';
 import TourOverlay from './TourOverlay';
 import { useTour } from '../../hooks/useTour';
@@ -11,6 +12,9 @@ import { getTourStepsByUserRole } from '../../config/tourConfig';
  * This should be rendered at the app level within TourProvider context
  */
 const TourManager = () => {
+  const location = useLocation();
+  const prevPathRef = useRef(location.pathname + location.search);
+
   const {
     showWelcomeModal,
     showTourOverlay,
@@ -24,6 +28,15 @@ const TourManager = () => {
   } = useTour();
 
   const { user } = useAuth();
+
+  // Dismiss welcome modal on navigation so it doesn't persist on other pages
+  useEffect(() => {
+    const routeKey = location.pathname + location.search;
+    if (routeKey !== prevPathRef.current) {
+      prevPathRef.current = routeKey;
+      if (showWelcomeModal) dismissWelcomeModal();
+    }
+  }, [dismissWelcomeModal, location.pathname, location.search, showWelcomeModal]);
 
   const handleStartTour = () => {
     if (user) {
