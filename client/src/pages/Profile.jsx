@@ -634,6 +634,7 @@ const Profile = () => {
     if (user?.user_type === 'lawyer') return '/lawyer';
     if (user?.user_type === 'state_lawyer') return '/lawyer/state';
     if (user?.user_type === 'super_lawyer') return '/lawyer/super';
+    if (user?.user_type === 'super_admin') return '/super-admin';
     if (String(user?.user_type || '').includes('admin')) return '/admin';
     return '/dashboard';
   };
