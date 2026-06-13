@@ -14,6 +14,7 @@ import LogsTab from "../components/admin/LogsTab";
 import BroadcastTab from "../components/admin/BroadcastTab";
 import AdSpacesTab from "../components/admin/AdSpacesTab";
 import EmailMarketingTab from "../components/admin/EmailMarketingTab";
+import SmsMarketingTab from "../components/admin/SmsMarketingTab";
 import PlatformRatingsTab from "../components/admin/PlatformRatingsTab";
 import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
@@ -50,6 +51,7 @@ const tabs = [
   "broadcast",
   "ad_spaces",
   "email_marketing",
+  "sms_marketing",
   "platform_ratings",
   "recruitment",
   "pricing",
@@ -77,6 +79,7 @@ const tabLabels = {
   broadcast: "Broadcast",
   ad_spaces: "Ad Spaces",
   email_marketing: "Email Marketing",
+  sms_marketing: "SMS Marketing",
   platform_ratings: "Service Ratings",
   recruitment: "Recruitment",
   pricing: "Pricing",
@@ -1170,6 +1173,10 @@ export default function SuperAdminDashboard() {
 
       {tab === "email_marketing" && (
         <EmailMarketingTab />
+      )}
+
+      {tab === "sms_marketing" && (
+        <SmsMarketingTab />
       )}
 
       {tab === "platform_ratings" && (

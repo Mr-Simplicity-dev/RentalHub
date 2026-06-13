@@ -26,6 +26,7 @@ import {
   FaStar,
   FaWallet,
   FaHeadset,
+  FaPhone,
   FaUserShield,
   FaUserCircle,
   FaChevronDown,
@@ -543,6 +544,11 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin?tab=email_marketing" className={() => superAdminNavItem('email_marketing')}>
                   <FaEnvelope className="mr-3" />
                   Email Marketing
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=sms_marketing" className={() => superAdminNavItem('sms_marketing')}>
+                  <FaPhone className="mr-3" />
+                  SMS Marketing
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=platform_ratings" className={() => superAdminFeaturedNavItem('platform_ratings')}>
