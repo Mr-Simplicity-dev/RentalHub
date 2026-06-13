@@ -196,6 +196,7 @@ export default function SuperAdminDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const hasInitializedDashboard = useRef(false);
+  const skipUrlSyncRef = useRef(false);
 
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(false);
@@ -666,6 +667,7 @@ export default function SuperAdminDashboard() {
   const loadTab = useCallback((name) => {
   if (!tabs.includes(name)) return;
 
+  skipUrlSyncRef.current = true;
   setTab(name);
   setSearchParams({ tab: name }, { replace: true });
 
@@ -873,6 +875,11 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     if (!hasInitializedDashboard.current) {
+      return;
+    }
+
+    if (skipUrlSyncRef.current) {
+      skipUrlSyncRef.current = false;
       return;
     }
 
