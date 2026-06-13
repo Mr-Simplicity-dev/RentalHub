@@ -124,6 +124,10 @@ const AdminLayout = () => {
     if (previousRouteRef.current === routeKey) return;
 
     previousRouteRef.current = routeKey;
+
+    // Super-admin uses its own tab-based scrolling via loadTab shortcuts
+    if (!location.hash && location.pathname === '/super-admin') return;
+
     scrollDashboardToTarget(location.hash, mainContentRef.current);
   }, [location.hash, location.pathname, location.search]);
 
