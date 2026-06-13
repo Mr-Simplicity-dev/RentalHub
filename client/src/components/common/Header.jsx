@@ -38,7 +38,8 @@ const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
-  const lastAvatarTapRef = useRef(0);
+  const avatarLongPressTimerRef = useRef(null);
+  const avatarLongPressTriggeredRef = useRef(false);
   const [badgeCounts, setBadgeCounts] = useState({
     unreadMessages: 0,
     pendingVerifications: 0,
@@ -275,16 +276,28 @@ const Header = () => {
     navigate('/super-admin?tab=admin');
   };
 
-  const handleAvatarTap = (event) => {
-    const now = Date.now();
-    const isDoubleTap = now - lastAvatarTapRef.current < 320;
-    lastAvatarTapRef.current = now;
+  const clearAvatarLongPressTimer = () => {
+    if (avatarLongPressTimerRef.current) {
+      window.clearTimeout(avatarLongPressTimerRef.current);
+      avatarLongPressTimerRef.current = null;
+    }
+  };
 
-    if (isDoubleTap) {
-      event.preventDefault();
-      event.stopPropagation();
+  const startAvatarLongPress = () => {
+    clearAvatarLongPressTimer();
+    avatarLongPressTriggeredRef.current = false;
+    avatarLongPressTimerRef.current = window.setTimeout(() => {
+      avatarLongPressTriggeredRef.current = true;
       setShowAvatarPopup(true);
       setShowUserMenu(false);
+    }, 550);
+  };
+
+  const handleAvatarClick = (event) => {
+    if (avatarLongPressTriggeredRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+      avatarLongPressTriggeredRef.current = false;
     }
   };
 
@@ -826,8 +839,14 @@ return (
                       <img
                         src={user.passport_photo_url}
                         alt=""
-                        className="w-full h-full object-cover cursor-pointer"
-                        onClick={handleAvatarTap}
+                        className="w-full h-full object-cover cursor-pointer select-none"
+                        draggable="false"
+                        onPointerDown={startAvatarLongPress}
+                        onPointerUp={clearAvatarLongPressTimer}
+                        onPointerCancel={clearAvatarLongPressTimer}
+                        onPointerLeave={clearAvatarLongPressTimer}
+                        onClick={handleAvatarClick}
+                        onContextMenu={(event) => event.preventDefault()}
                       />
                     ) : (
                       user?.full_name?.charAt(0)?.toUpperCase() || (
