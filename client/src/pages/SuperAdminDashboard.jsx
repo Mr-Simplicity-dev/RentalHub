@@ -671,6 +671,14 @@ export default function SuperAdminDashboard() {
   setTab(name);
   setSearchParams({ tab: name }, { replace: true });
 
+  // Scroll to content below shortcuts (skip initial mount)
+  if (hasInitializedDashboard.current) {
+    requestAnimationFrame(() => {
+      const el = document.getElementById('super-admin-content');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   if (name === "users") guardedLoad(loadUsers, "Failed loading users");
   if (name === "properties") guardedLoad(loadProperties, "Failed loading properties");
   if (name === "logs") guardedLoad(loadLogs, "Failed loading logs");
@@ -1091,6 +1099,8 @@ export default function SuperAdminDashboard() {
             })}
           </div>
         </section>
+
+      <div id="super-admin-content" />
 
       <AdminNotifications />
 
