@@ -50,7 +50,7 @@ const WelcomeModal = ({ isOpen, onStartTour, onSkip, isReturningUser = false }) 
               <p className="text-gray-600 mb-8 leading-relaxed">
                 {isReturningUser
                   ? "It's been a while! Let's refresh you on how to make the most of RentalHub. We'll show you a quick tour of the features."
-                  : 'Get the most out of your account with a guided tour. We'll show you all the powerful features available to you.'}
+                  : "Get the most out of your account with a guided tour. We'll show you all the powerful features available to you."}
               </p>
 
               {/* Features List */}
