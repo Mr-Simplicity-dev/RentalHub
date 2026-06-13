@@ -73,6 +73,14 @@ router.get(
   paymentController.getPropertyUnlockStatus
 );
 
+// List all unlocked/subscribed properties for the current tenant
+router.get(
+  '/my-unlocked-properties',
+  authenticate,
+  isTenant,
+  paymentController.getMyUnlockedProperties
+);
+
 // Paid access for tenants who want to browse properties outside their registered state/LGA
 router.get(
   '/location-access/quote',

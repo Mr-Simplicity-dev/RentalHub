@@ -1751,6 +1751,47 @@ exports.getPropertyUnlockStatus = async (req, res) => {
   }
 };
 
+exports.getMyUnlockedProperties = async (req, res) => {
+  try {
+    await ensurePropertyUnlockSchema();
+    const userId = req.user.id;
+
+    const result = await db.query(
+      `SELECT
+         tu.id,
+         tu.property_id,
+         tu.unlocked_at,
+         tu.transaction_reference,
+         p.title AS property_title,
+         p.city,
+         s.state_name AS state,
+         p.full_address,
+         p.bedrooms,
+         p.bathrooms,
+         p.price,
+         p.price_frequency,
+         p.media
+       FROM tenant_property_unlocks tu
+       JOIN properties p ON p.id = tu.property_id
+       LEFT JOIN states s ON s.id = p.state_id
+       WHERE tu.tenant_id = $1
+       ORDER BY tu.unlocked_at DESC`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Get my unlocked properties error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get unlocked properties'
+    });
+  }
+};
+
 exports.getPropertyInspectionOptions = async (req, res) => {
   try {
     await ensurePropertyInspectionSchema();

@@ -38,6 +38,13 @@ router.get(
 	DamageReportController.getReportSummary
 );
 
+// Get current user's damage reports (landlord/tenant/admin)
+router.get(
+	'/damage-reports/my',
+	authenticate,
+	DamageReportController.getMyDamageReports
+);
+
 // Publish damage report (admin only)
 router.post(
 	'/damage-reports/:reportId/publish',

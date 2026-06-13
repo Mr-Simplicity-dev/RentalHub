@@ -88,6 +88,8 @@ import AgentDashboard from './agent/AgentDashboard';
 import VerifyCase from './VerifyCase';
 import DisputeDetails from "./DisputeDetails";
 import MyDisputes from "./MyDisputes";
+import MyDamageReports from "./MyDamageReports";
+import SubscribedProperties from "./SubscribedProperties";
 import AcceptLawyerInvite from './AcceptLawyerInvite';
 import AcceptAgentInvite from './AcceptAgentInvite';
 import LocationPage from './LocationPage';
@@ -757,6 +759,8 @@ function App() {
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
               <Route path="/my-disputes" element={<MyDisputes />} />
+              <Route path="/my-damage-reports" element={<MyDamageReports />} />
+              <Route path="/subscribed-properties" element={<SubscribedProperties />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
               <Route path="/nigeria" element={<NigeriaPage />} />
               <Route path="/nigeria/:stateSlug" element={<LocationPage />} />

@@ -29,7 +29,9 @@ import {
   FaMapMarkedAlt,
   FaExternalLinkAlt,
   FaLock,
+  FaTools,
   FaBalanceScale,
+  FaKey,
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
@@ -1840,10 +1842,26 @@ const Dashboard = () => {
                 onClick={() => navigate('/my-disputes')}
               />
               <QuickActionCard
+                title="Damage Reports"
+                description={
+                  user?.user_type === 'landlord'
+                    ? 'View damage reports for your properties'
+                    : 'View published damage reports for your rented properties'
+                }
+                icon={<FaTools />}
+                onClick={() => navigate('/my-damage-reports')}
+              />
+              <QuickActionCard
                 title="Subscription"
                 description="View Super Admin priced monthly access and multiple property add-on"
                 icon={<FaClock />}
                 onClick={() => navigate('/subscribe')}
+              />
+              <QuickActionCard
+                title="Subscribed Properties"
+                description="View properties you have unlocked access to"
+                icon={<FaKey />}
+                onClick={() => navigate('/subscribed-properties')}
               />
               <QuickActionCard
                 title="Fumigation & Cleaning"
@@ -1954,6 +1972,12 @@ const Dashboard = () => {
                 description="View and manage disputes you are involved in"
                 icon={<FaBalanceScale />}
                 onClick={() => navigate('/my-disputes')}
+              />
+              <QuickActionCard
+                title="Damage Reports"
+                description="View damage reports for your properties"
+                icon={<FaTools />}
+                onClick={() => navigate('/my-damage-reports')}
               />
               <QuickActionCard
                 title="Withdraw Funds"
