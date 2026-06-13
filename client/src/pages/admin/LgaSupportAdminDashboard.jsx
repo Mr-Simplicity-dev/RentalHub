@@ -96,10 +96,14 @@ const LgaSupportAdminDashboard = () => {
           </div>
         </div>
 
-        <PropertyRequestWorkflowPanel mode="support" title="Property Requests in Your LGA" />
-        <TenancyWorkflowPanel title="LGA Support Tenancy Grace and Refund Enablement" />
+        <div className="lga-support-property-requests-section">
+          <PropertyRequestWorkflowPanel mode="support" title="Property Requests in Your LGA" />
+        </div>
+        <div className="lga-support-tenancy-section">
+          <TenancyWorkflowPanel title="LGA Support Tenancy Grace and Refund Enablement" />
+        </div>
 
-        <div className="rounded-xl border border-amber-200 bg-white p-6 shadow-sm">
+        <div className="lga-support-tickets-section rounded-xl border border-amber-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-amber-50 p-2.5 text-amber-600">

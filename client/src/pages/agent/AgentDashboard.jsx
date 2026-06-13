@@ -115,7 +115,7 @@ const AgentDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 p-6 text-white shadow-lg sm:p-8">
+            <div className="agent-profile-section relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 p-6 text-white shadow-lg sm:p-8">
           <div className="absolute right-0 top-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-white/5" />
           <div className="absolute bottom-0 left-1/3 h-24 w-24 translate-y-4 rounded-full bg-white/5" />
           <div className="relative flex items-start justify-between gap-4">
@@ -157,7 +157,7 @@ const AgentDashboard = () => {
               <StatCard icon={<FaExchangeAlt />} label="Migration Requests" value={migrationRequests.length} />
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="agent-commissions-section rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <h2 className="text-lg font-semibold text-gray-900">State Migration Request</h2>
@@ -231,7 +231,7 @@ const AgentDashboard = () => {
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="agent-bookings-section rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="rounded-lg bg-indigo-50 p-2.5 text-indigo-600">
                       <FaBuilding className="text-lg" />
@@ -268,7 +268,7 @@ const AgentDashboard = () => {
               </div>
 
               <div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="agent-earnings-section rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="rounded-lg bg-indigo-50 p-2.5 text-indigo-600">
                       <FaClipboardList className="text-lg" />

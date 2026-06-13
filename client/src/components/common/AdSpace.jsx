@@ -13,7 +13,6 @@ import api from '../../services/api';
 
 const isExternalUrl = (url) => /^https?:\/\//i.test(String(url || ''));
 const isInternalUrl = (url) => String(url || '').startsWith('/') && !String(url || '').startsWith('//');
-  import { useAuth } from '../../hooks/useAuth';
 const normalizeTargetUrl = (url) => {
   const target = String(url || '').trim();
   if (!target) return '';
@@ -308,7 +307,27 @@ const AdSpace = ({
               : `flex-col ${hasMultipleAds ? '' : 'md:flex-row md:items-stretch'}`
           }`}
         >
-          {ad.image_url && (
+          {ad.media_type === 'video' && ad.video_url ? (
+            <div
+              className={`w-full shrink-0 overflow-hidden bg-gray-100 ${
+                isMarquee
+                  ? 'hidden w-32 sm:block md:w-44'
+                  : hasMultipleAds
+                    ? 'h-40'
+                    : 'h-40 md:h-auto md:w-56 lg:w-72'
+              }`}
+            >
+              <video
+                src={ad.video_url}
+                poster={ad.video_thumbnail || undefined}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ) : ad.image_url ? (
             <div
               className={`w-full shrink-0 overflow-hidden bg-gray-100 ${
                 isMarquee
@@ -325,7 +344,7 @@ const AdSpace = ({
                 loading="lazy"
               />
             </div>
-          )}
+          ) : null}
 
           <div className={`flex flex-1 flex-col justify-center gap-3 ${isMarquee ? 'min-h-[112px] p-4 md:p-5' : 'min-h-[140px] p-5 md:p-6'}`}>
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide opacity-75">

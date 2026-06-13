@@ -41,6 +41,7 @@ const fumigationCleaningRoutes = require('./routes/fumigationCleaning');
 const propertyUtilsRoutes = require('./routes/propertyUtils');
 const propertyAlertsRoutes = require('./routes/propertyAlerts');
 const adRoutes = require('./routes/ads');
+const emailMarketingRoutes = require('./routes/emailMarketing');
 const platformRatingRoutes = require('./routes/platformRatings');
 const recruitmentRoutes = require('./routes/recruitment');
 const referralRoutes = require('./routes/referrals');
@@ -518,6 +519,7 @@ app.use('/api/fumigation-cleaning', generalOpsLimiter, fumigationCleaningRoutes)
 app.use('/api/property-utils', generalOpsLimiter, propertyUtilsRoutes);
 app.use('/api/property-alerts', generalOpsLimiter, propertyAlertsRoutes);
 app.use('/api/ads', generalOpsLimiter, adRoutes);
+app.use('/api/email-marketing', generalOpsLimiter, emailMarketingRoutes);
 app.use('/api/platform-ratings', generalOpsLimiter, platformRatingRoutes);
 app.use('/api/recruitment', generalOpsLimiter, recruitmentRoutes);
 app.use('/api/referrals', generalOpsLimiter, referralRoutes);

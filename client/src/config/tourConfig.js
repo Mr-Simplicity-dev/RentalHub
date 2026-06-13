@@ -343,6 +343,98 @@ export const TOUR_STEPS = {
     },
   ],
 
+  // LGA Support Admin Dashboard
+  LGA_SUPPORT_DASHBOARD: [
+    {
+      id: 'lga_support_1',
+      target: '.lga-support-tickets-section',
+      title: 'Support Tickets',
+      description: 'View and manage all support tickets. Assign tickets to yourself and resolve user issues.',
+      placement: 'right',
+      highlight: true,
+    },
+    {
+      id: 'lga_support_2',
+      target: '.lga-support-property-requests-section',
+      title: 'Property Requests',
+      description: 'Review and approve property listing requests from landlords and agents in your LGA.',
+      placement: 'left',
+      highlight: true,
+    },
+    {
+      id: 'lga_support_3',
+      target: '.lga-support-tenancy-section',
+      title: 'Tenancy Operations',
+      description: 'Enable grace periods and refunds for tenants in your area.',
+      placement: 'top',
+      highlight: true,
+    },
+  ],
+
+  // State Support Admin Dashboard
+  STATE_SUPPORT_DASHBOARD: [
+    {
+      id: 'state_support_1',
+      target: '.state-support-stats-section',
+      title: 'Dashboard Overview',
+      description: 'View pending migration requests and quick stats for your state.',
+      placement: 'right',
+      highlight: true,
+    },
+    {
+      id: 'state_support_2',
+      target: '.state-support-migration-section',
+      title: 'Migration Queue',
+      description: 'Review outgoing and incoming state migration requests from agents and lawyers.',
+      placement: 'left',
+      highlight: true,
+    },
+    {
+      id: 'state_support_3',
+      target: '.state-support-property-requests-section',
+      title: 'Property Requests',
+      description: 'Review property listing requests and tenancy operations for your state.',
+      placement: 'left',
+      highlight: true,
+    },
+  ],
+
+  // Super Support Admin Dashboard
+  SUPER_SUPPORT_DASHBOARD: [
+    {
+      id: 'super_support_1',
+      target: '.super-support-overview-section',
+      title: 'Operational Overview',
+      description: 'View migration stats, ticket counts, system alerts, and commission health at a glance.',
+      placement: 'right',
+      highlight: true,
+    },
+    {
+      id: 'super_support_2',
+      target: '.super-support-migration-section',
+      title: 'Migration Queue',
+      description: 'Full migration queue with filters, approve/reject, and CSV export.',
+      placement: 'left',
+      highlight: true,
+    },
+    {
+      id: 'super_support_3',
+      target: '.super-support-tickets-section',
+      title: 'Support Tickets',
+      description: 'Manage all support tickets — resolve, escalate, or assign to team members.',
+      placement: 'left',
+      highlight: true,
+    },
+    {
+      id: 'super_support_4',
+      target: '.super-support-audit-section',
+      title: 'Audit Trail',
+      description: 'View complete audit history for all migration reviews and actions.',
+      placement: 'top',
+      highlight: true,
+    },
+  ],
+
   // Super Admin Dashboard
   SUPER_ADMIN_DASHBOARD: [
     {
@@ -413,6 +505,10 @@ export const getTourStepsByUserRole = (userRole) => {
     super_fumigation_admin: TOUR_STEPS.FUMIGATION_ADMIN_DASHBOARD,
     recruitment_admin: TOUR_STEPS.RECRUITMENT_ADMIN_DASHBOARD,
     state_admin: TOUR_STEPS.ADMIN_DASHBOARD,
+    state_financial_admin: TOUR_STEPS.FINANCIAL_ADMIN_DASHBOARD,
+    lga_support_admin: TOUR_STEPS.LGA_SUPPORT_DASHBOARD,
+    state_support_admin: TOUR_STEPS.STATE_SUPPORT_DASHBOARD,
+    super_support_admin: TOUR_STEPS.SUPER_SUPPORT_DASHBOARD,
     super_admin: TOUR_STEPS.SUPER_ADMIN_DASHBOARD,
   };
 
@@ -431,9 +527,14 @@ export const getTourDashboardType = (userRole) => {
     super_lawyer: 'lawyer_dashboard',
     admin: 'admin_dashboard',
     lga_admin: 'admin_dashboard',
+    state_admin: 'admin_dashboard',
+    state_financial_admin: 'financial_admin_dashboard',
     financial_admin: 'financial_admin_dashboard',
     lga_financial_admin: 'financial_admin_dashboard',
     super_financial_admin: 'financial_admin_dashboard',
+    lga_support_admin: 'lga_support_dashboard',
+    state_support_admin: 'state_support_dashboard',
+    super_support_admin: 'super_support_dashboard',
     transportation_admin: 'transportation_admin_dashboard',
     lga_transportation_admin: 'transportation_admin_dashboard',
     state_transportation_admin: 'transportation_admin_dashboard',
@@ -443,7 +544,6 @@ export const getTourDashboardType = (userRole) => {
     state_fumigation_admin: 'fumigation_admin_dashboard',
     super_fumigation_admin: 'fumigation_admin_dashboard',
     recruitment_admin: 'recruitment_admin_dashboard',
-    state_admin: 'admin_dashboard',
     super_admin: 'super_admin_dashboard',
   };
 

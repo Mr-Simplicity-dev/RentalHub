@@ -540,6 +540,11 @@ const AdminLayout = () => {
                   Ad Spaces
                 </NavLink>
 
+                <NavLink to="/super-admin?tab=email_marketing" className={() => superAdminNavItem('email_marketing')}>
+                  <FaEnvelope className="mr-3" />
+                  Email Marketing
+                </NavLink>
+
                 <NavLink to="/super-admin?tab=platform_ratings" className={() => superAdminFeaturedNavItem('platform_ratings')}>
                   <FaStar className="mr-3" />
                   Service Ratings

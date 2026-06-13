@@ -121,7 +121,7 @@ const StateSupportAdminDashboard = () => {
     <div className="min-h-screen bg-gradient-to-br from-state-50 via-white to-state-100/40 p-6">
       <div className="mx-auto max-w-7xl">
         <div className="space-y-6">
-      <section className="rounded-xl bg-white p-6 shadow">
+      <section className="state-support-stats-section rounded-xl bg-white p-6 shadow">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">State Support Admin Dashboard</h1>
@@ -218,14 +218,16 @@ const StateSupportAdminDashboard = () => {
         <CommissionWithdrawalBanner />
       </div>
 
-      <PropertyRequestWorkflowPanel
-        mode="support"
-        title="Tenant Property Requests in Your State"
-      />
+      <div className="state-support-property-requests-section">
+        <PropertyRequestWorkflowPanel
+          mode="support"
+          title="Tenant Property Requests in Your State"
+        />
+      </div>
 
       <TenancyWorkflowPanel title="State Support Tenancy Grace and Refund Enablement" />
 
-      <section className="rounded-xl bg-white p-5 shadow">
+      <section className="state-support-migration-section rounded-xl bg-white p-5 shadow">
         <div className="mb-4 flex items-center gap-3">
           <button
             type="button"

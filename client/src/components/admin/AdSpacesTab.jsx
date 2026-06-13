@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
-import { FaEdit, FaExternalLinkAlt, FaPlus, FaShareAlt, FaTrash, FaUpload } from 'react-icons/fa';
+import { FaEdit, FaExternalLinkAlt, FaFilm, FaImage, FaPlus, FaShareAlt, FaTrash, FaUpload } from 'react-icons/fa';
 import api from '../../services/api';
 
 const fallbackPlacements = [
@@ -17,7 +17,11 @@ const emptyForm = {
   title: '',
   description: '',
   sponsor_name: '',
+  media_type: 'image',
   image_url: '',
+  video_url: '',
+  video_thumbnail: '',
+  video_duration: '30',
   target_url: '',
   cta_label: 'Learn more',
   background_color: '#ffffff',
@@ -128,12 +132,50 @@ const AdSpacesTab = () => {
     }
   };
 
+  const handleVideoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      toast.error('Select a video file');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('video', file);
+
+    try {
+      setImageUploading(true);
+      const response = await api.post('/super/ad-spaces/video', formData);
+      const url = response.data?.data?.url;
+
+      if (!url) {
+        toast.error('Upload completed but no video URL was returned');
+        return;
+      }
+
+      setForm((prev) => ({ ...prev, video_url: url }));
+      toast.success('Ad video uploaded');
+    } catch (error) {
+      console.error('Ad video upload failed:', error.response || error);
+      toast.error(getUploadErrorMessage(error));
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
   const buildPayload = () => ({
     placement: form.placement,
     title: form.title,
     description: form.description,
     sponsor_name: form.sponsor_name,
+    media_type: form.media_type,
     image_url: form.image_url,
+    video_url: form.video_url,
+    video_thumbnail: form.video_thumbnail,
+    video_duration: form.media_type === 'video' ? Number(form.video_duration || 30) : null,
     target_url: form.target_url,
     cta_label: form.cta_label,
     background_color: form.background_color,
@@ -186,7 +228,11 @@ const AdSpacesTab = () => {
       title: ad.title || '',
       description: ad.description || '',
       sponsor_name: ad.sponsor_name || '',
+      media_type: ad.media_type || 'image',
       image_url: ad.image_url || '',
+      video_url: ad.video_url || '',
+      video_thumbnail: ad.video_thumbnail || '',
+      video_duration: String(ad.video_duration || 30),
       target_url: ad.target_url || '',
       cta_label: ad.cta_label || '',
       background_color: ad.background_color || '#ffffff',
@@ -340,33 +386,119 @@ const AdSpacesTab = () => {
               />
             </label>
 
-            <div className="text-sm font-medium text-gray-700">
-              <label htmlFor="ad-image-url">Image URL or Upload</label>
-              <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-                <input
-                  id="ad-image-url"
-                  name="image_url"
-                  value={form.image_url}
-                  onChange={handleChange}
-                  className="input min-w-0 flex-1"
-                  placeholder="https://... or /uploads/ad-spaces/image.jpg"
-                />
-                <label className="btn btn-secondary shrink-0 cursor-pointer gap-2">
-                  <FaUpload className="text-xs" />
-                  {imageUploading ? 'Uploading...' : 'Upload'}
+            <label className="text-sm font-medium text-gray-700">
+              Media Type
+              <div className="mt-1 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, media_type: 'image' }))}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                    form.media_type === 'image'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <FaImage className="text-base" />
+                  Image
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, media_type: 'video' }))}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                    form.media_type === 'video'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <FaFilm className="text-base" />
+                  Video
+                </button>
+              </div>
+            </label>
+
+            {form.media_type === 'image' ? (
+              <div className="text-sm font-medium text-gray-700">
+                <label htmlFor="ad-image-url">Image URL or Upload</label>
+                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                   <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    onChange={handleImageUpload}
-                    disabled={imageUploading || loading}
-                    className="sr-only"
+                    id="ad-image-url"
+                    name="image_url"
+                    value={form.image_url}
+                    onChange={handleChange}
+                    className="input min-w-0 flex-1"
+                    placeholder="https://... or /uploads/ad-spaces/image.jpg"
+                  />
+                  <label className="btn btn-secondary shrink-0 cursor-pointer gap-2">
+                    <FaUpload className="text-xs" />
+                    {imageUploading ? 'Uploading...' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      onChange={handleImageUpload}
+                      disabled={imageUploading || loading}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+                <p className="mt-1 text-xs font-normal text-gray-500">
+                  Paste an https URL or upload JPG, PNG, WEBP, or GIF up to 5MB.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="text-sm font-medium text-gray-700">
+                  <label htmlFor="ad-video-url">Video URL or Upload</label>
+                  <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      id="ad-video-url"
+                      name="video_url"
+                      value={form.video_url}
+                      onChange={handleChange}
+                      className="input min-w-0 flex-1"
+                      placeholder="https://... or /uploads/ad-spaces/video.mp4"
+                    />
+                    <label className="btn btn-secondary shrink-0 cursor-pointer gap-2">
+                      <FaUpload className="text-xs" />
+                      {imageUploading ? 'Uploading...' : 'Upload'}
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-msvideo"
+                        onChange={handleVideoUpload}
+                        disabled={imageUploading || loading}
+                        className="sr-only"
+                      />
+                    </label>
+                  </div>
+                  <p className="mt-1 text-xs font-normal text-gray-500">
+                    Paste an https URL or upload MP4, WebM, OGG, MOV, or AVI up to 100MB.
+                  </p>
+                </div>
+
+                <label className="text-sm font-medium text-gray-700">
+                  Video Thumbnail URL (optional)
+                  <input
+                    name="video_thumbnail"
+                    value={form.video_thumbnail}
+                    onChange={handleChange}
+                    className="input mt-1"
+                    placeholder="https://... thumbnail image"
                   />
                 </label>
-              </div>
-              <p className="mt-1 text-xs font-normal text-gray-500">
-                Paste an https URL or upload JPG, PNG, WEBP, or GIF up to 5MB.
-              </p>
-            </div>
+
+                <label className="text-sm font-medium text-gray-700">
+                  Duration (seconds)
+                  <input
+                    name="video_duration"
+                    type="number"
+                    min="1"
+                    max="300"
+                    value={form.video_duration}
+                    onChange={handleChange}
+                    className="input mt-1"
+                  />
+                </label>
+              </>
+            )}
 
             <label className="text-sm font-medium text-gray-700">
               Target URL *
@@ -469,7 +601,19 @@ const AdSpacesTab = () => {
             className="overflow-hidden rounded-xl2 border border-gray-100 shadow-sm"
             style={previewStyle}
           >
-            {form.image_url && (
+            {form.media_type === 'video' && form.video_url ? (
+              <div className="h-36 overflow-hidden bg-gray-100">
+                <video
+                  src={form.video_url}
+                  poster={form.video_thumbnail || undefined}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : form.image_url ? (
               <div className="h-36 overflow-hidden bg-gray-100">
                 <img
                   src={form.image_url}
@@ -477,7 +621,7 @@ const AdSpacesTab = () => {
                   className="h-full w-full object-cover"
                 />
               </div>
-            )}
+            ) : null}
             <div className="p-4">
               <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
                 Sponsored{form.sponsor_name ? ` | ${form.sponsor_name}` : ''}
@@ -534,15 +678,20 @@ const AdSpacesTab = () => {
                     </p>
                   </div>
 
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      ad.is_active
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
-                  >
-                    {ad.is_active ? 'Active' : 'Paused'}
-                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        ad.is_active
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {ad.is_active ? 'Active' : 'Paused'}
+                    </span>
+                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                      {ad.media_type === 'video' ? 'Video' : 'Image'}
+                    </span>
+                  </div>
                 </div>
 
                 {ad.description && (
@@ -557,6 +706,9 @@ const AdSpacesTab = () => {
                   <span>Impressions: {Number(ad.impression_count || 0).toLocaleString()}</span>
                   <span>Clicks: {Number(ad.click_count || 0).toLocaleString()}</span>
                   <span>Sharing: {ad.sharing_enabled ? 'Enabled' : 'Disabled'}</span>
+                  {ad.media_type === 'video' && (
+                    <span>Duration: {ad.video_duration || 'N/A'}s</span>
+                  )}
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">

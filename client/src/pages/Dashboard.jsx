@@ -3468,6 +3468,16 @@ const ActivityItem = ({ activity }) => {
         return <FaEnvelope className="text-purple-500" />;
       case 'review':
         return <FaCheckCircle className="text-green-500" />;
+      case 'dispute':
+        return <FaBalanceScale className="text-orange-500" />;
+      case 'damage_report':
+        return <FaTools className="text-red-500" />;
+      case 'support_ticket':
+        return <FaTicketAlt className="text-cyan-500" />;
+      case 'fumigation_booking':
+        return <FaSprayCan className="text-emerald-500" />;
+      case 'transport_booking':
+        return <FaTruck className="text-indigo-500" />;
       default:
         return <FaCheckCircle className="text-gray-500" />;
     }
@@ -3493,6 +3503,16 @@ const ActivityItem = ({ activity }) => {
           stars: activity.status,
           title: activity.property_title,
         });
+      case 'dispute':
+        return t('dashboard.activity_dispute', { title: activity.property_title, status: activity.status });
+      case 'damage_report':
+        return t('dashboard.activity_damage_report', { title: activity.property_title, status: activity.status });
+      case 'support_ticket':
+        return t('dashboard.activity_support_ticket', { title: activity.property_title, status: activity.status });
+      case 'fumigation_booking':
+        return t('dashboard.activity_fumigation_booking', { title: activity.property_title, status: activity.status });
+      case 'transport_booking':
+        return t('dashboard.activity_transport_booking', { title: activity.property_title, status: activity.status });
       default:
         return t('dashboard.activity_generic');
     }
