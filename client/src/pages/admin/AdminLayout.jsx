@@ -563,6 +563,11 @@ const AdminLayout = () => {
                   Flags
                 </NavLink>
 
+                <NavLink to="/admin/seo" className={navItem}>
+                  <FaGlobe className="mr-3" />
+                  SEO Dashboard
+                </NavLink>
+
                 <NavLink to="/super-admin?tab=registration_access" className={() => superAdminNavItem('registration_access')}>
                   <FaMapMarkerAlt className="mr-3" />
                   Registration Access

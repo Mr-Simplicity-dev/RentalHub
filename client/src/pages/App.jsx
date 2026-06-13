@@ -73,6 +73,7 @@ import AdminUserDetail from './admin/AdminUserDetail';
 import AdminPropertyDetail from './admin/AdminPropertyDetail';
 import AdminApplicationDetail from './admin/AdminApplicationDetail';
 import AdminCompliance from './admin/AdminCompliance';
+import SeoDashboard from './SeoDashboard';
 import TransportationAdminDashboard from './admin/TransportationAdminDashboard';
 import TransporationAdminStateDashboard from './admin/TransporationAdminStateDashboard';
 import TransportationSuperAdminDashboard from './admin/TransportationSuperAdminDashboard';
@@ -798,6 +799,7 @@ function App() {
                 <Route path="inspections" element={<AdminInspections />} />
                 <Route path="evidence-verifications" element={<AdminEvidenceVerifications />} />
                 <Route path="ledger" element={<AdminLedger />} />
+                <Route path="seo" element={<SuperAdminRoute><SeoDashboard /></SuperAdminRoute>} />
                 <Route path="compliance" element={<AdminCompliance />} />
                 <Route
                   path="transportation"

@@ -469,7 +469,7 @@ const Dashboard = () => {
     }
 
     if (user.user_type === 'super_fumigation_admin') {
-      navigate('/admin/fumigation-cleaning/super', { replace: true });
+      navigate('/super-admin/fumigation-cleaning', { replace: true });
       return;
     }
 
@@ -484,7 +484,7 @@ const Dashboard = () => {
     }
 
     if (user.user_type === 'super_transportation_admin') {
-      navigate('/admin/transportation/super', { replace: true });
+      navigate('/super-admin/transportation', { replace: true });
       return;
     }
 
