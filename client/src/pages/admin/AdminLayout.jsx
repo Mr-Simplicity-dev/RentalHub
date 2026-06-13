@@ -779,6 +779,11 @@ const AdminLayout = () => {
                 Lawyer Invites
               </NavLink>
 
+              <NavLink to="/admin/evidence-verifications" className={navItem}>
+                <FaShieldAlt className="mr-3" />
+                Evidence Verification
+              </NavLink>
+
               <NavLink to="/admin/compliance" className={navItem}>
                 <FaShieldAlt className="mr-3" />
                 Compliance & Risk

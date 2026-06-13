@@ -41,6 +41,7 @@ import AdminUsers from './admin/AdminUsers';
 import AdminProperties from './admin/AdminProperties';
 import AdminApplications from './admin/AdminApplications';
 import AdminInspections from './admin/AdminInspections';
+import AdminEvidenceVerifications from './admin/AdminEvidenceVerifications';
 import AdminVerifications from './admin/AdminVerifications';
 import AdminLawyerInvites from './admin/AdminLawyerInvites';
 
@@ -792,6 +793,7 @@ function App() {
                 <Route path="properties" element={<AdminProperties />} />
                 <Route path="applications" element={<AdminApplications />} />
                 <Route path="inspections" element={<AdminInspections />} />
+                <Route path="evidence-verifications" element={<AdminEvidenceVerifications />} />
                 <Route path="compliance" element={<AdminCompliance />} />
                 <Route
                   path="transportation"
