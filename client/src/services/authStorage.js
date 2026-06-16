@@ -3,6 +3,11 @@ const USER_KEY = 'user';
 const IMPERSONATION_ORIGINAL_TOKEN_KEY = 'impersonation_original_token';
 const IMPERSONATION_ORIGINAL_USER_KEY = 'impersonation_original_user';
 
+// In-memory token — survives page navigation but NOT page refresh.
+// On refresh, the HTTP-only cookie (7d session token) is used to mint a new one
+// via GET /auth/me or POST /auth/refresh-token.
+let _accessToken = null;
+
 const getSessionStorage = () => {
   if (typeof window === 'undefined') return null;
   return window.sessionStorage;
@@ -14,58 +19,53 @@ const getLocalStorage = () => {
 };
 
 export const setAuthSession = (token, user) => {
+  _accessToken = token;
   const session = getSessionStorage();
   const local = getLocalStorage();
 
   if (session) {
-    if (token) {
-      session.setItem(TOKEN_KEY, token);
-    } else {
-      session.removeItem(TOKEN_KEY);
-    }
     session.setItem(USER_KEY, JSON.stringify(user));
   }
 
   // Clear global auth keys so each tab can maintain its own account session.
   if (local) {
-    local.removeItem(TOKEN_KEY);
     local.removeItem(USER_KEY);
   }
 };
 
+export const setAuthToken = (token) => {
+  _accessToken = token;
+};
+
 export const clearAuthSession = () => {
+  _accessToken = null;
   const session = getSessionStorage();
   const local = getLocalStorage();
 
   if (session) {
-    session.removeItem(TOKEN_KEY);
     session.removeItem(USER_KEY);
   }
 
   // Backward compatibility cleanup for old global auth storage.
   if (local) {
-    local.removeItem(TOKEN_KEY);
     local.removeItem(USER_KEY);
-    // Clean up dismissed state so next login can show fresh modals
     localStorage.removeItem('lawyer_accepted_dismissed');
   }
 };
 
 export const getAuthToken = () => {
+  if (_accessToken) return _accessToken;
+
+  // Fallback: check sessionStorage for legacy tokens (one-time migration)
   const session = getSessionStorage();
-  const local = getLocalStorage();
-
-  const sessionToken = session?.getItem(TOKEN_KEY);
-  if (sessionToken) return sessionToken;
-
-  // One-time migration path for old sessions stored in localStorage.
-  const legacyToken = local?.getItem(TOKEN_KEY);
-  if (legacyToken && session) {
-    session.setItem(TOKEN_KEY, legacyToken);
-    local.removeItem(TOKEN_KEY);
+  const legacyToken = session?.getItem(TOKEN_KEY);
+  if (legacyToken) {
+    _accessToken = legacyToken;
+    session.removeItem(TOKEN_KEY);
+    return _accessToken;
   }
 
-  return legacyToken || null;
+  return null;
 };
 
 export const getAuthUser = () => {

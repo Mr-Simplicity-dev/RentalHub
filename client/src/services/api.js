@@ -1,7 +1,6 @@
 import axios from 'axios';
-import { clearAuthSession, getAuthToken } from './authStorage';
+import { clearAuthSession, getAuthToken, setAuthToken } from './authStorage';
 
-// Use relative /api so React proxy handles routing in development
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
@@ -23,6 +22,10 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Track if a refresh is already in-flight to avoid multiple simultaneous calls
+let isRefreshing = false;
+let pendingRequests = [];
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
@@ -52,15 +55,64 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor (NO hard redirect here)
+// Response interceptor with silent token refresh
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Only attempt refresh on 401 and if we haven't already retried
+    if (error.response?.status !== 401 || originalRequest?._retry) {
+      return Promise.reject(error);
+    }
+
+    // Don't try to refresh if the failing request was itself the refresh endpoint
+    if (originalRequest?.url?.includes('/auth/refresh-token')) {
       clearAuthSession();
       delete api.defaults.headers.common.Authorization;
-      // Let React handle navigation
+      return Promise.reject(error);
     }
+
+    if (isRefreshing) {
+      // Queue this request until the refresh completes
+      return new Promise((resolve) => {
+        pendingRequests.push((newToken) => {
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          resolve(api(originalRequest));
+        });
+      });
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      const { data } = await axios.post(
+        `${API_BASE_URL}/auth/refresh-token`,
+        {},
+        { withCredentials: true }
+      );
+
+      if (data.success && data.data?.token) {
+        setAuthToken(data.data.token);
+        api.defaults.headers.common.Authorization = `Bearer ${data.data.token}`;
+
+        // Replay queued requests
+        pendingRequests.forEach((cb) => cb(data.data.token));
+        pendingRequests = [];
+
+        // Retry the original request
+        originalRequest.headers.Authorization = `Bearer ${data.data.token}`;
+        return api(originalRequest);
+      }
+    } catch (_) {
+      // Refresh failed — clear session
+    }
+
+    isRefreshing = false;
+    pendingRequests = [];
+    clearAuthSession();
+    delete api.defaults.headers.common.Authorization;
     return Promise.reject(error);
   }
 );
