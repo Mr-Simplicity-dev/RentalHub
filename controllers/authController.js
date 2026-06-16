@@ -439,14 +439,15 @@ const normalizeOptionalAgentInvite = async ({
   };
 };
 
-// Generate JWT Token
-const generateToken = (userId, userType) => {
+const generateToken = (userId, userType, options = {}) => {
   return jwt.sign(
     { userId, userType },
     process.env.JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: options.expiresIn || '7d' }
   );
 };
+
+const generateAccessToken = (userId, userType) => generateToken(userId, userType, { expiresIn: '1h' });
 
 const attachAuthSession = (res, data) => {
   if (!data?.token) return data;
