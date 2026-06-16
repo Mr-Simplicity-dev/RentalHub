@@ -1,6 +1,8 @@
 const db = require('./database');
 const crypto = require('crypto');
 
+const SENSITIVE_FIELDS = new Set(['password', 'current_password', 'new_password', 'nin', 'token', 'reset_token', 'otp', 'secret', 'card_number', 'cvv']);
+
 const safeInt = (value) => {
   if (value === null || value === undefined) return null;
   const n = Number(value);
@@ -8,6 +10,19 @@ const safeInt = (value) => {
 };
 
 const audit = (action, targetType) => {
+  const sanitizeBody = (body) => {
+    if (!body || typeof body !== 'object') return body;
+    const sanitized = { ...body };
+    for (const key of Object.keys(sanitized)) {
+      if (SENSITIVE_FIELDS.has(key)) {
+        sanitized[key] = '[REDACTED]';
+      } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+        sanitized[key] = sanitizeBody(sanitized[key]);
+      }
+    }
+    return sanitized;
+  };
+
   return (req, res, next) => {
     const start = Date.now();
 
@@ -78,7 +93,7 @@ const audit = (action, targetType) => {
             JSON.stringify({
               responseTimeMs: Date.now() - start,
               query: req.query || {},
-              body: req.method !== 'GET' ? req.body : undefined
+              body: req.method !== 'GET' ? sanitizeBody(req.body) : undefined
             }),
             previousHash,
             currentHash

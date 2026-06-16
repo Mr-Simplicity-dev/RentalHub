@@ -2972,9 +2972,9 @@ exports.checkLawyerPassportForFraud = async (req, res) => {
       });
     }
 
-    // Get all tenant/landlord passports from database
+    // Get all tenant/landlord passport URLs for fraud check
     const existingPassports = await db.query(
-      `SELECT id, passport_photo_url, user_type, email, full_name 
+      `SELECT id, passport_photo_url
        FROM users 
        WHERE user_type IN ('tenant', 'landlord') 
        AND passport_photo_url IS NOT NULL
@@ -3242,8 +3242,11 @@ exports.verifyPhone = async (req, res) => {
       });
     }
 
-    // Verify OTP
-    if (parseInt(otp) !== storedOTP.code) {
+    // Verify OTP (constant-time comparison)
+    const otpStr = String(otp);
+    const storedStr = String(storedOTP.code);
+    if (otpStr.length !== storedStr.length ||
+        !crypto.timingSafeEqual(Buffer.from(otpStr), Buffer.from(storedStr))) {
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP'

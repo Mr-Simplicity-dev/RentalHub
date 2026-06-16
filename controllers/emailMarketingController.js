@@ -459,8 +459,9 @@ const updateCampaign = async (req, res) => {
     const params = [id];
     let idx = 2;
 
+    const allowedColumns = new Set(['name', 'subject', 'content_html', 'sender_name', 'sender_email', 'reply_to', 'recipient_filter', 'scheduled_at']);
     for (const [key, value] of Object.entries(fields)) {
-      if (['name', 'subject', 'content_html', 'sender_name', 'sender_email', 'reply_to', 'recipient_filter', 'scheduled_at'].includes(key)) {
+      if (allowedColumns.has(key)) {
         setClauses.push(`${key} = $${idx}`);
         params.push(key === 'recipient_filter' ? JSON.stringify(value) : value);
         idx++;

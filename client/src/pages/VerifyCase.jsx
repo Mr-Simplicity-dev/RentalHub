@@ -34,7 +34,7 @@ export default function VerifyCase() {
 
       try {
         const res = await axios.get(
-          `/evidence/verify/dispute/${targetId}`,
+          `/api/evidence/verify/dispute/${targetId}`,
           {
             params: { reference },
           }
@@ -73,7 +73,7 @@ export default function VerifyCase() {
 
     try {
       const res = await axios.post(
-        `/evidence/verify/dispute/${targetId}/pay`,
+        `/api/evidence/verify/dispute/${targetId}/pay`,
         {
           payer_email: payerEmail,
           payer_name: payerName,

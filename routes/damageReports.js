@@ -40,14 +40,14 @@ router.get(
 
 // Get current user's damage reports (landlord/tenant/admin)
 router.get(
-	'/damage-reports/my',
+	'/my',
 	authenticate,
 	DamageReportController.getMyDamageReports
 );
 
 // Publish damage report (admin only)
 router.post(
-	'/damage-reports/:reportId/publish',
+	'/:reportId/publish',
 	authenticate,
 	[param('reportId').isInt({ min: 1 }).withMessage('reportId must be a positive integer')],
 	validateRequest,
@@ -56,7 +56,7 @@ router.post(
 
 // Unpublish damage report (admin only)
 router.post(
-	'/damage-reports/:reportId/unpublish',
+	'/:reportId/unpublish',
 	authenticate,
 	[param('reportId').isInt({ min: 1 }).withMessage('reportId must be a positive integer')],
 	validateRequest,
@@ -65,7 +65,7 @@ router.post(
 
 // Update damage report (admin only)
 router.put(
-	'/damage-reports/:reportId',
+	'/:reportId',
 	authenticate,
 	[param('reportId').isInt({ min: 1 }).withMessage('reportId must be a positive integer')],
 	validateRequest,
@@ -74,7 +74,7 @@ router.put(
 
 // Delete damage report (admin only)
 router.delete(
-	'/damage-reports/:reportId',
+	'/:reportId',
 	authenticate,
 	[param('reportId').isInt({ min: 1 }).withMessage('reportId must be a positive integer')],
 	validateRequest,

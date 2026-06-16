@@ -75,7 +75,7 @@ import AdminApplicationDetail from './admin/AdminApplicationDetail';
 import AdminCompliance from './admin/AdminCompliance';
 import SeoDashboard from './SeoDashboard';
 import TransportationAdminDashboard from './admin/TransportationAdminDashboard';
-import TransporationAdminStateDashboard from './admin/TransporationAdminStateDashboard';
+import TransportationAdminStateDashboard from './admin/TransportationAdminStateDashboard';
 import TransportationSuperAdminDashboard from './admin/TransportationSuperAdminDashboard';
 import LgaFumigationAdminDashboard from './admin/LgaFumigationAdminDashboard';
 import LgaSupportAdminDashboard from './admin/LgaSupportAdminDashboard';
@@ -840,7 +840,7 @@ function App() {
                 <Route path="transportation/state"
                   element={
                     <TransportationStateAdminRoute>
-                      <TransporationAdminStateDashboard />
+                      <TransportationAdminStateDashboard />
                     </TransportationStateAdminRoute>
                   }
                 />

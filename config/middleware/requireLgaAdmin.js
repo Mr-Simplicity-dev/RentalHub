@@ -1,4 +1,4 @@
-const { isLgaAdmin } = require('../utils/roleScopes.js work on it');
+const { isLgaAdmin } = require('../utils/roleScopes');
 
 module.exports.requireLgaAdmin = (req, res, next) => {
   if (!req.user) {

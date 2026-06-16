@@ -708,24 +708,21 @@ router.put('/profile', authenticate, [
 ], async (req, res) => {
   try {
     const userId = req.user.id;
-    const { full_name, phone } = req.body;
 
+    const allowedColumns = new Set(['full_name', 'phone', 'bio', 'avatar_url']);
     const updates = [];
     const params = [];
     let paramCount = 1;
 
-    if (full_name) {
-      updates.push(`full_name = $${paramCount}`);
-      params.push(full_name);
-      paramCount++;
-    }
-
-    if (phone) {
-      updates.push(`phone = $${paramCount}`);
-      params.push(phone);
-      paramCount++;
-      // Reset phone verification if phone changed
-      updates.push(`phone_verified = FALSE`);
+    for (const [key, value] of Object.entries(req.body)) {
+      if (allowedColumns.has(key)) {
+        updates.push(`${key} = $${paramCount}`);
+        params.push(value);
+        paramCount++;
+        if (key === 'phone') {
+          updates.push('phone_verified = FALSE');
+        }
+      }
     }
 
     if (updates.length === 0) {
@@ -735,7 +732,7 @@ router.put('/profile', authenticate, [
       });
     }
 
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    updates.push('updated_at = CURRENT_TIMESTAMP');
     params.push(userId);
 
     const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;

@@ -327,11 +327,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdn.jsdelivr.net", "unpkg.com"],
+      // TODO: Replace 'unsafe-inline' with nonce-based approach for production hardening
+      scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "unpkg.com"],
       imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:"],
       connectSrc: ["'self'", "api.paystack.co"],
       fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+      styleSrc: ["'self'", "fonts.googleapis.com"],
       mediaSrc: ["'self'", "res.cloudinary.com", "blob:"],
     },
   },
@@ -534,14 +535,14 @@ app.use('/api/export', generalOpsLimiter, exportRoutes);
 app.use('/api/financial-admin', financeOpsLimiter, financialAdminRoutes);
 app.use('/api/state-admin', adminLimiter, stateAdminRoutes);
 
-app.use('/evidence', verificationOpsLimiter, verificationRoutes);
+app.use('/api/evidence', verificationOpsLimiter, verificationRoutes);
 app.use('/api/commissions', financeOpsLimiter, agentCommissionRoutes);
 app.use('/api/admin/agents', adminLimiter, adminAgentRoutes);
 app.use('/api/withdrawals', financeOpsLimiter, agentWithdrawalRoutes);
 app.use('/api/state-migrations', generalOpsLimiter, stateMigrationRoutes);
 app.use('/api/support', adminLimiter, supportRoutes);
 app.use('/api/system', adminLimiter, systemRoutes);
-app.use('/api', generalOpsLimiter, damageReportRoutes);
+app.use('/api/damage-reports', generalOpsLimiter, damageReportRoutes);
 app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
 app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
 

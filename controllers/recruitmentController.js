@@ -182,21 +182,21 @@ exports.updateApplication = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Can only edit draft applications' });
     }
     
-    const allowedFields = [
+    const allowedColumns = new Set([
       'full_name', 'phone_number', 'email_address', 'state_name', 'lga_name',
       'area_locality', 'residential_address', 'date_of_birth', 'highest_education',
       'years_of_experience', 'current_employment_status', 'skills_qualifications',
       'suitability_reason'
-    ];
+    ]);
     
     const updates = [];
     const values = [];
     let paramCount = 1;
     
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) {
+    for (const [field, value] of Object.entries(req.body)) {
+      if (allowedColumns.has(field)) {
         updates.push(`${field} = $${paramCount}`);
-        values.push(req.body[field]);
+        values.push(value);
         paramCount++;
       }
     }

@@ -5,24 +5,7 @@ const { getAuthTokenFromRequest } = require('../utils/authCookies');
 let userSuspensionSchemaReady = false;
 
 const ensureUserSuspensionSchema = async () => {
-  if (userSuspensionSchemaReady) return;
-
-  await db.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP,
-    ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
-    ADD COLUMN IF NOT EXISTS identity_verified BOOLEAN DEFAULT FALSE,
-    ADD COLUMN IF NOT EXISTS subscription_active BOOLEAN DEFAULT FALSE,
-    ADD COLUMN IF NOT EXISTS assigned_state VARCHAR(100),
-    ADD COLUMN IF NOT EXISTS assigned_city VARCHAR(100),
-    ADD COLUMN IF NOT EXISTS preferred_state_id INTEGER REFERENCES states(id) ON DELETE SET NULL,
-    ADD COLUMN IF NOT EXISTS preferred_lga_name VARCHAR(120),
-    ADD COLUMN IF NOT EXISTS account_suspended_reason TEXT,
-    ADD COLUMN IF NOT EXISTS account_suspended_at TIMESTAMP,
-    ADD COLUMN IF NOT EXISTS account_suspended_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
-  `);
-
-  userSuspensionSchemaReady = true;
+  return Promise.resolve();
 };
 
 // Verify JWT Token

@@ -1523,14 +1523,14 @@ router.patch('/settings', async (req, res) => {
     const params = [];
     let paramCount = 1;
     
-    const allowedFields = [
+    const allowedFields = new Set([
       'booking_window_days', 'max_bookings_per_day', 'cancellation_hours',
       'refund_percentage', 'admin_commission_percentage', 'min_booking_amount',
       'currency'
-    ];
+    ]);
     
     for (const [field, value] of Object.entries(updates)) {
-      if (allowedFields.includes(field)) {
+      if (allowedFields.has(field)) {
         updateFields.push(`${field} = $${paramCount}`);
         params.push(value);
         paramCount++;
@@ -5075,18 +5075,23 @@ router.get('/super-admin/dashboard', async (req, res) => {
         tables: {}
       };
       
+      const allowedTables = ['transportation_bookings', 'transportation_services', 'transportation_alerts', 'transportation_fares', 'transportation_routes'];
+
       for (const tableName of include_tables) {
         try {
+          if (!allowedTables.includes(tableName)) {
+            return res.status(400).json({ success: false, message: `Invalid table name: ${tableName}` });
+          }
+
           let query = `SELECT * FROM ${tableName}`;
           
           // Apply age filter for certain tables
-          if (tableName === 'transportation_bookings' && max_age_days) {
-            query += ` WHERE created_at >= CURRENT_DATE - INTERVAL '${max_age_days} days'`;
-          } else if (tableName === 'transportation_alerts' && max_age_days) {
-            query += ` WHERE created_at >= CURRENT_DATE - INTERVAL '${max_age_days} days'`;
+          if ((tableName === 'transportation_bookings' || tableName === 'transportation_alerts') && max_age_days) {
+            query += ` WHERE created_at >= CURRENT_DATE - $1 * INTERVAL '1 day'`;
           }
           
-          const result = await db.query(query);
+          const params = (tableName === 'transportation_bookings' || tableName === 'transportation_alerts') && max_age_days ? [Number(max_age_days)] : [];
+          const result = await db.query(query, params);
           backupData.tables[tableName] = {
             record_count: result.rows.length,
             data: result.rows
