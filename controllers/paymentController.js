@@ -3604,6 +3604,10 @@ exports.paystackWebhook = async (req, res) => {
         await handleFailedPayment(event.data);
         break;
 
+      case "charge.refund":
+        await handleRefundPayment(event.data);
+        break;
+
       case "transfer.success":
       case "transfer.failed":
       case "transfer.reversed":
@@ -3882,18 +3886,48 @@ async function handleTransferWebhook(eventName, data) {
 }
 
 
+// Handle refunded payment
+async function handleRefundPayment(data) {
+  try {
+    const reference = data.reference;
+    const paymentResult = await db.query(
+      `UPDATE payments
+       SET payment_status = 'refunded',
+           gateway_response = $1
+       WHERE transaction_reference = $2
+       RETURNING id`,
+      [JSON.stringify(data), reference]
+    );
+
+    if (paymentResult.rows.length > 0) {
+      const paymentId = paymentResult.rows[0].id;
+      await commissionService.clawbackCommissionsForPayment(paymentId, 'payment_refunded');
+    }
+
+    console.log("Payment refunded:", reference);
+  } catch (error) {
+    console.error("Webhook refund handler error:", error);
+  }
+}
+
 // Handle failed payment
 async function handleFailedPayment(data) {
   try {
     const reference = data.reference;
 
-    await db.query(
+    const paymentResult = await db.query(
       `UPDATE payments 
        SET payment_status = 'failed',
            gateway_response = $1
-       WHERE transaction_reference = $2`,
+       WHERE transaction_reference = $2
+       RETURNING id`,
       [JSON.stringify(data), reference]
     );
+
+    if (paymentResult.rows.length > 0) {
+      const paymentId = paymentResult.rows[0].id;
+      await commissionService.clawbackCommissionsForPayment(paymentId, 'payment_failed');
+    }
 
     console.log("Payment failed:", reference);
   } catch (error) {

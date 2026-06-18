@@ -51,6 +51,19 @@ exports.startPaymentJobs = () => {
     }
   }, { timezone: CRON_TIMEZONE });
 
+  // Auto-payout commissions weekly on Monday at 08:00
+  cron.schedule("0 8 * * 1", async () => {
+    try {
+      const { processAutoPayouts } = require("../services/commissionService");
+      const result = await processAutoPayouts();
+      if (result?.processed > 0) {
+        console.log(`Auto-payout complete: ${result.processed} admins, ₦${result.total_amount}`);
+      }
+    } catch (error) {
+      console.error("Auto-payout error:", error);
+    }
+  });
+
   console.log("✅ Payment cron jobs started");
 };
 

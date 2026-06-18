@@ -13,7 +13,7 @@ const { requireSuperAdmin } = require('../config/middleware/requireSuperAdmin');
 const {
   isStateFinancialAdmin,
   isSuperAdminOrSuperFinancialAdmin: isSuperOrFinancialRole,
-} = require('../config/utils/roleScopes.js work on it');
+} = require('../config/utils/roleScopes');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 
 /**
@@ -601,6 +601,69 @@ router.post('/withdrawals/:withdrawalId/reject',
         success: false,
         message: 'Failed to reject withdrawal'
       });
+    }
+  }
+);
+
+// ── Commission Configuration (super/financial admin) ──
+router.get('/commission-config',
+  authenticate,
+  requireSuperAdminOrSuperFinancialAdmin,
+  async (req, res) => {
+    try {
+      const result = await db.query(
+        'SELECT key, value, description, updated_at, updated_by FROM commission_config ORDER BY key'
+      );
+      const config = {};
+      for (const row of result.rows) {
+        config[row.key] = { value: parseFloat(row.value), description: row.description, updated_at: row.updated_at, updated_by: row.updated_by };
+      }
+      res.json({ success: true, data: config });
+    } catch (error) {
+      console.error('Get commission config error:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch commission config' });
+    }
+  }
+);
+
+router.put('/commission-config',
+  authenticate,
+  requireSuperAdminOrSuperFinancialAdmin,
+  async (req, res) => {
+    try {
+      const { updates } = req.body;
+      if (!updates || typeof updates !== 'object') {
+        return res.status(400).json({ success: false, message: 'updates object required' });
+      }
+
+      // Log old values before updating
+      const oldResult = await db.query('SELECT key, value FROM commission_config WHERE key = ANY($1)', [Object.keys(updates)]);
+      const oldMap = {};
+      for (const r of oldResult.rows) oldMap[r.key] = parseFloat(r.value);
+
+      for (const [key, value] of Object.entries(updates)) {
+        const oldVal = oldMap[key];
+        await db.query(
+          'INSERT INTO commission_config (key, value, updated_by, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) ON CONFLICT (key) DO UPDATE SET value = $2, updated_by = $3, updated_at = CURRENT_TIMESTAMP',
+          [key, String(value), req.user.id]
+        );
+
+        if (oldVal !== undefined && parseFloat(value) !== oldVal) {
+          await db.query(
+            `INSERT INTO transaction_audits (admin_id, action_type, amount, description, performed_by)
+             VALUES ($1, 'commission_rate_changed', $2, $3, $4)`,
+            [req.user.id, 0, `Commission config "${key}" changed from ${oldVal} to ${value}`]
+          );
+        }
+      }
+
+      const { invalidateCache } = require('../config/utils/commissionConfig');
+      invalidateCache();
+
+      res.json({ success: true, message: 'Commission config updated' });
+    } catch (error) {
+      console.error('Update commission config error:', error);
+      res.status(500).json({ success: false, message: 'Failed to update commission config' });
     }
   }
 );

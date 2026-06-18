@@ -34,6 +34,7 @@ import PropertyRequestWorkflowPanel from "../components/admin/PropertyRequestWor
 import TenancyWorkflowPanel from "../components/admin/TenancyWorkflowPanel";
 import RecruitmentAdminTab from "../components/admin/RecruitmentAdminTab";
 import AdminMonitorTab from "../components/admin/AdminMonitorTab";
+import CommissionConfigTab from "../components/admin/CommissionConfigTab";
 
 const tabs = [
   "overview",
@@ -61,6 +62,7 @@ const tabs = [
   "admin",
   "admin_monitor",
   "pending_approvals",
+  "commission_config",
 ];
 
 const tabLabels = {
@@ -89,6 +91,7 @@ const tabLabels = {
   admin: "Admin",
   admin_monitor: "Admin Monitor",
   pending_approvals: "Pending Approvals",
+  commission_config: "Commission Config",
 };
 
 const shortcutCategories = [
@@ -143,6 +146,7 @@ const shortcutCategories = [
       { name: "admin", label: "Admin Management", detail: "View and manage admin accounts" },
       { name: "admin_monitor", label: "Admin Monitor", detail: "Monitor admin activity and performance" },
       { name: "pending_approvals", label: "Pending Approvals", detail: "Review pending admin account approvals" },
+      { name: "commission_config", label: "Commission Config", detail: "Manage commission rates and fee distribution" },
     ],
   },
 ];
@@ -1301,6 +1305,10 @@ export default function SuperAdminDashboard() {
 
         {tab === "pending_approvals" && (
           <AdminManagementTab initialTab="pending" />
+        )}
+
+        {tab === "commission_config" && (
+          <CommissionConfigTab />
         )}
 
       <InputDialog
