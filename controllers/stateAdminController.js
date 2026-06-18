@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const {
   isStateFinancialAdmin,
   isSuperAdminOrSuperFinancialAdmin,
-} = require('../config/utils/roleScopes.js work on it');
+} = require('../config/utils/roleScopes.js ');
 
 // ====================== STATE ADMIN MANAGEMENT ======================
 
