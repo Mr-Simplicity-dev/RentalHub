@@ -10,10 +10,7 @@ const {
   requireSuperAdminOrDelegatedDirectWithdraw,
 } = require('../config/middleware/requireFinancialAdmin');
 const { requireSuperAdmin } = require('../config/middleware/requireSuperAdmin');
-const {
-  isStateFinancialAdmin,
-  isSuperAdminOrSuperFinancialAdmin: isSuperOrFinancialRole,
-} = require('../config/utils/roleScopes');
+const { isStateFinancialAdmin, isSuperAdminOrSuperFinancialAdmin: isSuperOrFinancialRole } = require('../config/utils/roleScopes');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 
 /**
