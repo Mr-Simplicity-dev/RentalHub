@@ -2,10 +2,7 @@
 const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
-const {
-  isStateFinancialAdmin,
-  isSuperAdminOrSuperFinancialAdmin,
-} = require('../config/utils/roleScopes.js ');
+const { isStateFinancialAdmin, isSuperAdminOrSuperFinancialAdmin } = require('../config/utils/roleScopes');
 
 // ====================== STATE ADMIN MANAGEMENT ======================
 

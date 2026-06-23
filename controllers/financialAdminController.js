@@ -1,7 +1,7 @@
 // ====================== IMPORTS ======================
 const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
-const { isSuperFinancialAdmin } = require('../config/utils/roleScopes.js ');
+const { isSuperFinancialAdmin } = require('../config/utils/roleScopes');
 
 // ====================== SUPER FINANCIAL ADMIN DASHBOARD ======================
 
