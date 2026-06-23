@@ -419,8 +419,37 @@ const Home = () => {
               className="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:w-auto"
             >
               {t('home.browse')}
-                        </Link>
+            </Link>
           </div>
+          {(androidAppUrl || iosAppUrl) && (
+            <div className="mt-8 pt-8 border-t border-primary-400 animate-fadeIn delay-300">
+              <p className="text-lg mb-4 text-primary-100">{t('home.download_app_cta')}</p>
+              <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
+                {androidAppUrl && (
+                  <a
+                    href={androidAppUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full rounded-lg bg-white px-8 py-3 font-semibold text-primary-600 transition-all duration-300 hover:-translate-y-0.5 hover:bg-gray-100 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
+                  >
+                    <FaMobileAlt />
+                    {t('home.download_android')}
+                  </a>
+                )}
+                {iosAppUrl && (
+                  <a
+                    href={iosAppUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
+                  >
+                    <FaMobileAlt />
+                    {t('home.download_iphone')}
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

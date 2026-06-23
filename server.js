@@ -48,6 +48,7 @@ const recruitmentRoutes = require('./routes/recruitment');
 const referralRoutes = require('./routes/referrals');
 const smsDeliveryRoutes = require('./routes/smsDelivery');
 const appLinksRoutes = require('./routes/appLinks');
+const downloadsRoutes = require('./routes/downloads');
 
 const disputesRoutes = require('./routes/disputes');
 const disputeRoutes = require('./routes/disputeRoutes');
@@ -546,6 +547,8 @@ app.use('/api/system', adminLimiter, systemRoutes);
 app.use('/api/damage-reports', generalOpsLimiter, damageReportRoutes);
 app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
 app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
+
+app.use('/api/downloads', generalOpsLimiter, downloadsRoutes);
 
 app.use((err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;

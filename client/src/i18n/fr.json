@@ -1,4 +1,4 @@
-{
+﻿{
   "login": {
     "title": "Connectez-vous à votre compte",
     "or": "Ou",
@@ -141,7 +141,8 @@
     "app_prompt_text": "Alertes de recherche plus rapides, discussions instantanées et mises à jour de dossiers directement sur votre téléphone.",
     "download_android": "Télécharger Android",
     "download_iphone": "Télécharger iPhone",
-    "close_app_prompt": "Fermer la notification de téléchargement de l’application",
+    "close_app_prompt": "Fermer la notification de téléchargement de l\u2019application",
+    "download_app_cta": "Téléchargez l\u2019application mobile RentalHub",
     "legal_support_link": "Besoin d’aide juridique ? Consultez les avocats RentalHub NG et débloquez leurs coordonnées complètes après paiement.",
     "property_request_link": "Vous ne trouvez pas le type de bien souhaité ? Envoyez une demande sur la page des biens.",
     "use_lawyers": "Utiliser les avocats RentalHub NG",
