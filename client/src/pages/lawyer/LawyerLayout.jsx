@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  FaBalanceScale,
+  FaGavel,
   FaBars,
   FaCheckCircle,
   FaEnvelope,
@@ -91,9 +91,9 @@ const LawyerLayout = () => {
         icon: FaEnvelope,
       },
       {
-        to: '/lawyers',
-        label: 'Public Directory',
-        icon: FaBalanceScale,
+        to: '/legal-support',
+        label: 'Legal Support',
+        icon: FaGavel,
       },
       {
         to: '/verification-status',

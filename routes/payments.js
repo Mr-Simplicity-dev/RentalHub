@@ -109,26 +109,6 @@ router.get(
   paymentController.verifyTenantLocationAccess
 );
 
-// ============ PLATFORM LAWYER DIRECTORY UNLOCK ============
-
-router.post(
-  '/unlock-lawyer-directory',
-  authenticate,
-  paymentController.initializeLawyerDirectoryUnlock
-);
-
-router.get(
-  '/unlock-lawyer-directory/verify/:reference',
-  authenticate,
-  paymentController.verifyLawyerDirectoryUnlock
-);
-
-router.get(
-  '/unlock-lawyer-directory/status',
-  authenticate,
-  paymentController.getLawyerDirectoryUnlockStatus
-);
-
 // ============ LANDLORD LISTING PAYMENTS ============
 
 // Get listing plans
