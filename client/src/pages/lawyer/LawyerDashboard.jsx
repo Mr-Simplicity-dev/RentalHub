@@ -502,9 +502,9 @@ const LawyerDashboardContent = ({
         description: 'Continue escalations and legal coordination.',
       },
       {
-        to: '/lawyers',
-        label: 'Public Directory',
-        description: 'Preview the lawyer listing and profile presence.',
+        to: '/legal-support',
+        label: 'Legal Support',
+        description: 'View legal support requests and assistance.',
       },
     ];
 

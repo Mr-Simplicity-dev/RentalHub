@@ -237,7 +237,7 @@ const Home = () => {
             </form>
             <div className="mt-4 animate-fadeIn delay-300">
               <Link
-                to="/lawyers"
+                to="/legal-support"
                 className="underline text-primary-100 hover:text-white text-sm transition-colors duration-300 inline-block hover:scale-105"
               >
                 {t('home.legal_support_link')}
@@ -252,7 +252,7 @@ const Home = () => {
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
                 <Link
-                  to="/lawyers"
+                  to="/legal-support"
                   className="inline-block bg-white text-primary-700 px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
                   {t('home.use_lawyers')}

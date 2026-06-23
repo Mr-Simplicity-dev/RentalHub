@@ -1192,11 +1192,11 @@ return (
                       }}
                       className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-0.5 cursor-pointer"
                     />
-                    <label htmlFor="use_rentalhub_lawyers" className="ml-2 block text-sm text-gray-700 cursor-pointer">
-                      Use Our lawyers instead —{' '}
-                      <Link to="/lawyers" className="text-indigo-600 hover:text-indigo-500 underline">
-                        pay to unlock full contact details in your state and local government area
-                      </Link>
+                    <label htmlFor="use_rentalhub_lawyers" className="ml-2 text-sm text-gray-700 cursor-pointer">
+                      <span>Legal Protection Coverage — <span className="font-semibold">₦2,000 (one-time)</span></span>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Get access to qualified legal assistance anytime you need it. No upfront lawyer search needed — we assign one from your area when you submit a request.
+                      </p>
                     </label>
                   </div>
                 </div>

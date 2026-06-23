@@ -1207,7 +1207,7 @@ const createUserFromPreparedRegistration = async ({
     //   2. Create a separate lawyer_access_fee payment record
     //   3. Distribute the N2000 to eligible admins
     // ====================================================================
-    if (preparedRegistration.useRentalhubLawyers && tenantRegistrationPayment) {
+    if (preparedRegistration.useRentalhubLawyers) {
       let assignedLawyerId = null;
       let assignedAgentId = null;
 

@@ -1153,3 +1153,153 @@ exports.updateDisputeSummary = async (req, res) => {
     });
   }
 };
+
+/* ---------------------------------------------------
+   Legal Protection Coverage & Support Requests
+--------------------------------------------------- */
+
+exports.getCoverageStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await db.query(
+      `SELECT id FROM payments
+       WHERE user_id = $1
+         AND payment_type = 'lawyer_access_fee'
+         AND payment_status = 'completed'
+       LIMIT 1`,
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        has_coverage: result.rows.length > 0,
+      },
+    });
+  } catch (error) {
+    console.error('Get coverage status error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to check coverage status',
+    });
+  }
+};
+
+exports.getMySupportRequests = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await db.query(
+      `SELECT lsr.id, lsr.subject, lsr.description, lsr.urgency, lsr.status,
+              lsr.admin_note, lsr.created_at, lsr.updated_at,
+              u.full_name AS assigned_lawyer_name
+       FROM legal_support_requests lsr
+       LEFT JOIN users u ON u.id = lsr.assigned_lawyer_id
+       WHERE lsr.client_user_id = $1
+       ORDER BY lsr.created_at DESC`,
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get support requests error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load your requests',
+    });
+  }
+};
+
+exports.submitSupportRequest = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { subject, description, urgency } = req.body;
+
+    if (!subject || !subject.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Subject is required',
+      });
+    }
+    if (!description || !description.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Description is required',
+      });
+    }
+
+    // Verify user has paid for legal protection
+    const coverageCheck = await db.query(
+      `SELECT id FROM payments
+       WHERE user_id = $1
+         AND payment_type = 'lawyer_access_fee'
+         AND payment_status = 'completed'
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (coverageCheck.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have Legal Protection Coverage. Subscribe during registration or from your dashboard.',
+      });
+    }
+
+    // Find assigned lawyer from legal_authorizations (round-robin already done at registration)
+    const lawyerResult = await db.query(
+      `SELECT lawyer_user_id
+       FROM legal_authorizations
+       WHERE client_user_id = $1
+         AND status = 'active'
+         AND property_id IS NULL
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    const assignedLawyerId = lawyerResult.rows.length > 0
+      ? lawyerResult.rows[0].lawyer_user_id
+      : null;
+
+    const result = await db.query(
+      `INSERT INTO legal_support_requests
+       (client_user_id, assigned_lawyer_id, subject, description, urgency, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending')
+       RETURNING id, subject, description, urgency, status, created_at`,
+      [userId, assignedLawyerId, subject.trim(), description.trim(), urgency || 'normal']
+    );
+
+    // Notify the assigned lawyer if one exists
+    if (assignedLawyerId) {
+      try {
+        const { sendNotification } = require('../config/utils/notificationService');
+        await sendNotification(
+          assignedLawyerId,
+          'New Legal Assistance Request',
+          `A client you are assigned to has submitted a legal assistance request: ${subject.trim()}`,
+          'legal_request',
+          userId,
+          'client'
+        );
+      } catch (notifErr) {
+        console.error('Legal request notification error:', notifErr);
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Your legal assistance request has been submitted',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Submit support request error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to submit your request',
+    });
+  }
+};

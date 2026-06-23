@@ -97,7 +97,7 @@ import AcceptAgentInvite from './AcceptAgentInvite';
 import LocationPage from './LocationPage';
 import NigeriaPage from './NigeriaPage';
 import AreaPage from './AreaPage';
-import LawyersDirectory from './LawyersDirectory';
+import LegalSupport from './LawyersDirectory';
 import FinancialAdminDashboard from './admin/FinancialAdminDashboard'; // ADD THIS LINE
 import SuperFinancialAdminDashboard from './admin/SuperFinancialAdminDashboard';
 import StateAdminDashboard from './admin/StateAdminDashboard';
@@ -681,7 +681,8 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/lawyer/accept-invite" element={<AcceptLawyerInvite />} />
               <Route path="/agent/accept-invite" element={<AcceptAgentInvite />} />
-              <Route path="/lawyers" element={<LawyersDirectory />} />
+              <Route path="/lawyers" element={<LegalSupport />} />
+              <Route path="/legal-support" element={<LegalSupport />} />
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
               <Route path="/transportation/book" element={<TransportationBooking />} />

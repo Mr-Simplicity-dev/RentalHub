@@ -168,4 +168,26 @@ router.patch(
   legalController.updateDisputeSummary
 );
 
+/* ---------------------------------------------------
+   Legal Protection Coverage & Support Requests
+--------------------------------------------------- */
+
+router.get(
+  '/coverage-status',
+  authenticate,
+  legalController.getCoverageStatus
+);
+
+router.get(
+  '/my-requests',
+  authenticate,
+  legalController.getMySupportRequests
+);
+
+router.post(
+  '/request-help',
+  authenticate,
+  legalController.submitSupportRequest
+);
+
 module.exports = router;

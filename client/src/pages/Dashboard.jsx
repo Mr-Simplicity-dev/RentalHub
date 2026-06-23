@@ -31,6 +31,7 @@ import {
   FaLock,
   FaTools,
   FaBalanceScale,
+  FaGavel,
   FaKey,
   FaTicketAlt,
 
@@ -1866,6 +1867,12 @@ const Dashboard = () => {
                 onClick={() => navigate('/subscribed-properties')}
               />
               <QuickActionCard
+                title="Request Legal Help"
+                description="Get qualified legal assistance for your rental issues"
+                icon={<FaGavel />}
+                onClick={() => navigate('/legal-support')}
+              />
+              <QuickActionCard
                 title="Help & Support"
                 description="Submit a support ticket or view your requests"
                 icon={<FaTicketAlt />}
@@ -1986,6 +1993,12 @@ const Dashboard = () => {
                 description="View damage reports for your properties"
                 icon={<FaTools />}
                 onClick={() => navigate('/my-damage-reports')}
+              />
+              <QuickActionCard
+                title="Request Legal Help"
+                description="Get qualified legal assistance for your rental issues"
+                icon={<FaGavel />}
+                onClick={() => navigate('/legal-support')}
               />
               <QuickActionCard
                 title="Help & Support"
