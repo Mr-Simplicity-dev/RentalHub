@@ -1871,6 +1871,7 @@ const Dashboard = () => {
                 description="Get qualified legal assistance for your rental issues"
                 icon={<FaGavel />}
                 onClick={() => navigate('/legal-support')}
+                className="tour-legal-help"
               />
               <QuickActionCard
                 title="Help & Support"
@@ -1999,6 +2000,7 @@ const Dashboard = () => {
                 description="Get qualified legal assistance for your rental issues"
                 icon={<FaGavel />}
                 onClick={() => navigate('/legal-support')}
+                className="tour-legal-help"
               />
               <QuickActionCard
                 title="Help & Support"

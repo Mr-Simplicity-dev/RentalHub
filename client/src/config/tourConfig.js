@@ -46,6 +46,14 @@ export const TOUR_STEPS = {
       placement: 'left',
       highlight: true,
     },
+    {
+      id: 'tenant_6',
+      target: '.tour-legal-help',
+      title: 'Request Legal Help',
+      description: 'If you have Legal Protection Coverage, submit a legal assistance request and a qualified lawyer will be assigned to help you.',
+      placement: 'left',
+      highlight: true,
+    },
   ],
 
   LANDLORD_DASHBOARD: [
@@ -86,6 +94,14 @@ export const TOUR_STEPS = {
       target: '.tour-quick-actions',
       title: 'Quick Actions',
       description: 'Use these shortcuts to list properties, view applications, manage messages, and handle payments.',
+      placement: 'top',
+      highlight: true,
+    },
+    {
+      id: 'landlord_6',
+      target: '.tour-legal-help',
+      title: 'Request Legal Help',
+      description: 'If you have Legal Protection Coverage, submit a legal assistance request and a qualified lawyer will be assigned to help you.',
       placement: 'top',
       highlight: true,
     },
