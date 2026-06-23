@@ -54,8 +54,10 @@ const {
   normalizeReferralCode,
 } = require('../services/referralService');
 const {
+  AUTH_COOKIE_NAME,
   clearAuthCookies,
   getAuthTokenFromRequest,
+  parseCookies,
   setAuthCookies,
   shouldReturnTokenInBody,
 } = require('../config/utils/authCookies');
