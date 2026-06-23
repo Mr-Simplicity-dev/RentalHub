@@ -1,0 +1,66 @@
+name: Build Mobile Apps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'RentalHubMobile/**'
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: RentalHubMobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: RentalHubMobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build APK with EAS
+        run: npx eas build -p android --profile preview --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Download EAS artifact
+        uses: actions/download-artifact@v4
+        if: always()
+        continue-on-error: true
+
+  build-ios:
+    name: Build iOS IPA
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: RentalHubMobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: RentalHubMobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build IPA with EAS
+        run: npx eas build -p ios --profile preview --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

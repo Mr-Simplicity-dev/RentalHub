@@ -4,7 +4,7 @@ import { propertyService } from '../services/propertyService';
 import PropertyCard from '../components/properties/PropertyCard';
 import Loader from '../components/common/Loader';
 import AdSpace from '../components/common/AdSpace';
-import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt, FaMobileAlt, FaTimes, FaArrowRight, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt, FaMobileAlt, FaTimes, FaArrowRight, FaMapMarkerAlt, FaWhatsapp } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
 
@@ -115,6 +115,12 @@ const Home = () => {
     setShowAppPrompt(false);
   };
 
+  const shareViaWhatsApp = (url) => {
+    const text = `${t('home.share_app_text')} ${url}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+  };
+
   useEffect(() => {
     // Sync HubSpot language with i18next
     const hubspotLang =
@@ -183,6 +189,17 @@ const Home = () => {
                 >
                   {t('home.download_iphone')}
                 </a>
+              )}
+
+              {(androidAppUrl || iosAppUrl) && (
+                <button
+                  type="button"
+                  onClick={() => shareViaWhatsApp(androidAppUrl || iosAppUrl)}
+                  className="flex items-center gap-1.5 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-green-600 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  <FaWhatsapp />
+                  {t('home.share_app')}
+                </button>
               )}
 
               <button
@@ -446,6 +463,16 @@ const Home = () => {
                     <FaMobileAlt />
                     {t('home.download_iphone')}
                   </a>
+                )}
+                {(androidAppUrl || iosAppUrl) && (
+                  <button
+                    type="button"
+                    onClick={() => shareViaWhatsApp(androidAppUrl || iosAppUrl)}
+                    className="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-600 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
+                  >
+                    <FaWhatsapp />
+                    {t('home.share_app')}
+                  </button>
                 )}
               </div>
             </div>
