@@ -275,6 +275,7 @@ router.post('/broadcasts', authenticate, requireSuperAdmin, superCtrl.createBroa
 
 router.get('/ad-spaces', authenticate, requireSuperAdmin, adCtrl.adminListAds);
 router.post('/ad-spaces/image', authenticate, requireSuperAdmin, adCtrl.uploadAdImageFile, adCtrl.uploadAdImage);
+router.post('/ad-spaces/video', authenticate, requireSuperAdmin, adCtrl.uploadAdVideoFile, adCtrl.uploadAdVideo);
 router.post('/ad-spaces', authenticate, requireSuperAdmin, adCtrl.createAd);
 router.patch('/ad-spaces/:id', authenticate, requireSuperAdmin, adCtrl.updateAd);
 router.delete('/ad-spaces/:id', authenticate, requireSuperAdmin, adCtrl.deleteAd);

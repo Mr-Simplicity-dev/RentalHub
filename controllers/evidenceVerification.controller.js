@@ -264,3 +264,84 @@ exports.verifyDispute = async (req, res) => {
     });
   }
 };
+
+exports.adminGetVerificationLogs = async (req, res) => {
+  try {
+    await ensureEvidenceVerificationSchema();
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+    const search = String(req.query.search || '').trim();
+
+    const conditions = [];
+    const params = [];
+    let paramIndex = 0;
+
+    if (search) {
+      paramIndex++;
+      conditions.push(`(
+        d.title ILIKE $${paramIndex}
+        OR evp.payer_email ILIKE $${paramIndex}
+        OR evp.transaction_reference ILIKE $${paramIndex}
+      )`);
+      params.push(`%${search}%`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countResult = await db.query(
+      `SELECT COUNT(*)
+       FROM evidence_verification_payments evp
+       JOIN disputes d ON d.id = evp.dispute_id
+       ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    const result = await db.query(
+      `SELECT
+         evp.id,
+         evp.dispute_id,
+         evp.payer_email,
+         evp.payer_name,
+         evp.amount,
+         evp.currency,
+         evp.payment_method,
+         evp.transaction_reference,
+         evp.payment_status,
+         evp.created_at,
+         evp.completed_at,
+         d.title AS dispute_title,
+         d.status AS dispute_status,
+         d.priority AS dispute_priority,
+         opener.full_name AS opened_by_name,
+         target.full_name AS against_name
+       FROM evidence_verification_payments evp
+       JOIN disputes d ON d.id = evp.dispute_id
+       LEFT JOIN users opener ON opener.id = d.opened_by
+       LEFT JOIN users target ON target.id = d.against_user
+       ${whereClause}
+       ORDER BY evp.created_at DESC
+       LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}`,
+      [...params, limit, offset]
+    );
+
+    return res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Admin evidence verification logs error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load evidence verification logs',
+    });
+  }
+};

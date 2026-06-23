@@ -304,7 +304,8 @@ class TransportationController {
                   property_id: booking.property_id,
                   service_id: booking.service_id
                 },
-                callback_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/transportation/payment/callback`
+                // FRONTEND_URL must be set in production
+                callback_url: `${process.env.FRONTEND_URL}/transportation/payment/callback`
               },
               {
                 headers: {

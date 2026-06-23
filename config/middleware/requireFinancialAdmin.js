@@ -2,7 +2,7 @@ const db = require('./database');
 const {
   isSuperFinancialAdmin,
   isSuperAdminOrSuperFinancialAdmin,
-} = require('../utils/roleScopes.js work on it');
+} = require('../utils/roleScopes');
 
 module.exports.requireFinancialAdmin = (req, res, next) => {
   if (!req.user) {

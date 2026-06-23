@@ -173,6 +173,25 @@
     }
   }
 
+  /* Mobile: Keep animation AND enable scrolling */
+  @media (max-width: 768px) {
+    .ad-marquee {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+
+    .ad-marquee-track {
+      animation: adMarqueeScroll var(--ad-marquee-duration, 36s) linear infinite;
+      width: max-content;
+    }
+
+    .ad-marquee-item {
+      flex-shrink: 0;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .ad-marquee {
       overflow-x: auto;

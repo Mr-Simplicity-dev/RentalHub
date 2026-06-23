@@ -49,7 +49,8 @@ const PaymentService = {
           amount: Math.round(paymentData.amount * 100), // Paystack expects amount in kobo
           reference: paymentData.reference,
           metadata: paymentData.metadata || {},
-          callback_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/fumigation-cleaning/payment/callback`
+          // FRONTEND_URL must be set in production
+          callback_url: `${process.env.FRONTEND_URL}/fumigation-cleaning/payment/callback`
         },
         {
           headers: {

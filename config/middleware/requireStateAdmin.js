@@ -1,4 +1,4 @@
-const { isStateFinancialAdmin } = require('../utils/roleScopes.js work on it');
+const { isStateFinancialAdmin } = require('../utils/roleScopes');
 
 module.exports.requireStateAdmin = (req, res, next) => {
   if (!req.user) {

@@ -13,6 +13,8 @@ import ReportsTab from "../components/admin/ReportsTab";
 import LogsTab from "../components/admin/LogsTab";
 import BroadcastTab from "../components/admin/BroadcastTab";
 import AdSpacesTab from "../components/admin/AdSpacesTab";
+import EmailMarketingTab from "../components/admin/EmailMarketingTab";
+import SmsMarketingTab from "../components/admin/SmsMarketingTab";
 import PlatformRatingsTab from "../components/admin/PlatformRatingsTab";
 import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
@@ -32,6 +34,7 @@ import PropertyRequestWorkflowPanel from "../components/admin/PropertyRequestWor
 import TenancyWorkflowPanel from "../components/admin/TenancyWorkflowPanel";
 import RecruitmentAdminTab from "../components/admin/RecruitmentAdminTab";
 import AdminMonitorTab from "../components/admin/AdminMonitorTab";
+import CommissionConfigTab from "../components/admin/CommissionConfigTab";
 
 const tabs = [
   "overview",
@@ -48,6 +51,8 @@ const tabs = [
   "logs",
   "broadcast",
   "ad_spaces",
+  "email_marketing",
+  "sms_marketing",
   "platform_ratings",
   "recruitment",
   "pricing",
@@ -57,6 +62,7 @@ const tabs = [
   "admin",
   "admin_monitor",
   "pending_approvals",
+  "commission_config",
 ];
 
 const tabLabels = {
@@ -74,6 +80,8 @@ const tabLabels = {
   logs: "Logs",
   broadcast: "Broadcast",
   ad_spaces: "Ad Spaces",
+  email_marketing: "Email Marketing",
+  sms_marketing: "SMS Marketing",
   platform_ratings: "Service Ratings",
   recruitment: "Recruitment",
   pricing: "Pricing",
@@ -83,34 +91,63 @@ const tabLabels = {
   admin: "Admin",
   admin_monitor: "Admin Monitor",
   pending_approvals: "Pending Approvals",
+  commission_config: "Commission Config",
 };
 
-const featuredControlTabs = [
+const shortcutCategories = [
   {
-    name: "platform_ratings",
-    label: "Service Ratings",
-    detail: "Moderate public ratings, live fly-ins, images, and location rules.",
-    featured: true,
+    key: "management",
+    label: "Platform Management",
+    color: "indigo",
+    items: [
+      { name: "overview", label: "Overview", detail: "Platform summary and key metrics" },
+      { name: "users", label: "Users", detail: "Manage platform users, roles, and bans" },
+      { name: "verifications", label: "Verifications", detail: "Review identity and document verifications" },
+      { name: "properties", label: "Properties", detail: "Browse and manage property listings" },
+      { name: "property_requests", label: "Property Requests", detail: "Review listing requests from landlords and agents" },
+      { name: "pricing", label: "Pricing", detail: "Configure platform pricing rules and fees" },
+      { name: "registration_access", label: "Registration Access", detail: "Control registration by state and LGA" },
+    ],
   },
   {
-    name: "recruitment",
-    label: "Recruitment",
-    detail: "Open careers, manage cycles, roles, fees, locations, applicants, and interviews.",
+    key: "marketing",
+    label: "Marketing & Content",
+    color: "emerald",
+    items: [
+      { name: "broadcast", label: "Broadcast", detail: "Send platform-wide email and SMS broadcasts" },
+      { name: "ad_spaces", label: "Ad Spaces", detail: "Manage advert placements and visibility" },
+      { name: "email_marketing", label: "Email Marketing", detail: "Create email campaigns and manage subscribers" },
+      { name: "sms_marketing", label: "SMS Marketing", detail: "Create SMS campaigns and manage phone subscribers" },
+      { name: "platform_ratings", label: "Service Ratings", detail: "Moderate ratings, reviews, and location rules" },
+    ],
   },
   {
-    name: "registration_access",
-    label: "Registration Access",
-    detail: "Control tenant and landlord registration by state and LGA.",
+    key: "trust",
+    label: "Legal & Trust",
+    color: "rose",
+    items: [
+      { name: "flags", label: "Flags", detail: "Toggle platform-wide operational controls" },
+      { name: "fraud", label: "Fraud", detail: "Monitor and investigate fraud reports" },
+      { name: "lawyer_invites", label: "Lawyer Invites", detail: "Send and manage lawyer invitation tokens" },
+      { name: "platform_lawyers", label: "Platform Lawyers", detail: "View and manage registered lawyers" },
+      { name: "platform_agents", label: "Platform Agents", detail: "View and manage registered agents" },
+      { name: "lawyer_activity", label: "Lawyer Activity", detail: "Monitor lawyer platform activity" },
+    ],
   },
   {
-    name: "ad_spaces",
-    label: "Ad Spaces",
-    detail: "Manage advert placement, sharing, and public visibility.",
-  },
-  {
-    name: "flags",
-    label: "Flags",
-    detail: "Switch platform-wide operational controls on or off.",
+    key: "system",
+    label: "Data & System",
+    color: "amber",
+    items: [
+      { name: "analytics", label: "Analytics", detail: "Platform analytics and usage insights" },
+      { name: "reports", label: "Reports", detail: "Generate and download platform reports" },
+      { name: "logs", label: "Logs", detail: "System activity and audit logs" },
+      { name: "recruitment", label: "Recruitment", detail: "Career module, cycles, applicants, and interviews" },
+      { name: "admin", label: "Admin Management", detail: "View and manage admin accounts" },
+      { name: "admin_monitor", label: "Admin Monitor", detail: "Monitor admin activity and performance" },
+      { name: "pending_approvals", label: "Pending Approvals", detail: "Review pending admin account approvals" },
+      { name: "commission_config", label: "Commission Config", detail: "Manage commission rates and fee distribution" },
+    ],
   },
 ];
 
@@ -163,6 +200,7 @@ export default function SuperAdminDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const hasInitializedDashboard = useRef(false);
+  const skipUrlSyncRef = useRef(false);
 
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(false);
@@ -633,8 +671,15 @@ export default function SuperAdminDashboard() {
   const loadTab = useCallback((name) => {
   if (!tabs.includes(name)) return;
 
+  skipUrlSyncRef.current = true;
   setTab(name);
   setSearchParams({ tab: name }, { replace: true });
+
+  // Scroll to content area
+  setTimeout(() => {
+    const el = document.getElementById('super-admin-content');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+  }, 0);
 
   if (name === "users") guardedLoad(loadUsers, "Failed loading users");
   if (name === "properties") guardedLoad(loadProperties, "Failed loading properties");
@@ -843,6 +888,11 @@ export default function SuperAdminDashboard() {
       return;
     }
 
+    if (skipUrlSyncRef.current) {
+      skipUrlSyncRef.current = false;
+      return;
+    }
+
     const requestedTab = searchParams.get("tab");
     if (!tabs.includes(requestedTab)) {
       if (tab !== "overview") {
@@ -971,7 +1021,7 @@ export default function SuperAdminDashboard() {
               <button
                 type="button"
                 onClick={() => loadTab('analytics')}
-                className="rounded-md border border-white/40 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20"
+                className="super-admin-analytics-section rounded-md border border-white/40 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20"
               >
                 Open Analytics
               </button>
@@ -987,56 +1037,79 @@ export default function SuperAdminDashboard() {
           </div>
         </section>
 
-        <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <section className="super-admin-platform-section mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Super Admin Shortcuts
+                Quick Navigation
               </p>
-              <h2 className="mt-1 text-base font-semibold text-slate-900">
-                Active section: {tabLabels[tab] || String(tab || '').replace(/_/g, ' ')}
+              <h2 className="mt-0.5 text-base font-semibold text-slate-900">
+                Active: {tabLabels[tab] || String(tab || '').replace(/_/g, ' ')}
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                The new ratings controls are available below as Service Ratings.
-              </p>
             </div>
+            <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-500 sm:inline-block">
+              {tabs.length} sections
+            </span>
+          </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[560px] lg:grid-cols-4">
-              {featuredControlTabs.map((item) => {
-                const isActive = tab === item.name;
-                return (
-                  <button
-                    key={item.name}
-                    type="button"
-                    onClick={() => loadTab(item.name)}
-                    className={`min-h-[92px] rounded-xl border p-3 text-left transition ${
-                      isActive
-                        ? 'border-amber-300 bg-amber-50 text-amber-900 shadow-sm'
-                        : item.featured
-                        ? 'border-slate-200 bg-slate-900 text-white hover:border-amber-300 hover:bg-slate-800'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2 text-sm font-semibold">
-                      {item.featured && <FaStar className={isActive ? 'text-amber-500' : 'text-amber-300'} />}
-                      {item.label}
-                    </span>
-                    <span className={`mt-2 block text-xs leading-5 ${isActive ? 'text-amber-800' : item.featured ? 'text-slate-200' : 'text-slate-500'}`}>
-                      {item.detail}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="space-y-5">
+            {shortcutCategories.map((cat) => {
+              const colorMap = {
+                indigo: { dot: 'bg-indigo-500', border: 'border-indigo-300', bg: 'bg-indigo-50', text: 'text-indigo-700', activeBorder: 'border-indigo-500', activeBg: 'bg-indigo-50', activeText: 'text-indigo-900', hover: 'hover:border-indigo-300 hover:bg-indigo-50' },
+                emerald: { dot: 'bg-emerald-500', border: 'border-emerald-300', bg: 'bg-emerald-50', text: 'text-emerald-700', activeBorder: 'border-emerald-500', activeBg: 'bg-emerald-50', activeText: 'text-emerald-900', hover: 'hover:border-emerald-300 hover:bg-emerald-50' },
+                rose: { dot: 'bg-rose-500', border: 'border-rose-300', bg: 'bg-rose-50', text: 'text-rose-700', activeBorder: 'border-rose-500', activeBg: 'bg-rose-50', activeText: 'text-rose-900', hover: 'hover:border-rose-300 hover:bg-rose-50' },
+                amber: { dot: 'bg-amber-500', border: 'border-amber-300', bg: 'bg-amber-50', text: 'text-amber-700', activeBorder: 'border-amber-500', activeBg: 'bg-amber-50', activeText: 'text-amber-900', hover: 'hover:border-amber-300 hover:bg-amber-50' },
+              };
+              const c = colorMap[cat.color] || colorMap.indigo;
+              const sectionClass = `super-admin-${cat.key}-section`;
+
+              return (
+                <div key={cat.key}>
+                  <div className="mb-2 flex items-center gap-2 px-1">
+                    <span className={`inline-block h-2 w-2 rounded-full ${c.dot}`} />
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{cat.label}</span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {cat.items.map((item) => {
+                      const isActive = tab === item.name;
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => loadTab(item.name)}
+                          className={`${sectionClass} group relative flex flex-col justify-center rounded-xl border-2 p-3 text-left transition-all duration-150 ${
+                            isActive
+                              ? `${c.activeBorder} ${c.activeBg} ${c.activeText} shadow-sm ring-1 ring-inset ${c.activeBorder.replace('border-', 'ring-')}`
+                              : `border-slate-200 bg-white text-slate-700 ${c.hover}`
+                          }`}
+                        >
+                          {isActive && (
+                            <span className={`absolute right-2 top-2 h-2 w-2 rounded-full ${c.dot} ring-2 ring-white`} />
+                          )}
+                          <span className={`text-sm font-semibold leading-tight ${isActive ? '' : 'group-hover:' + c.text}`}>
+                            {item.label}
+                          </span>
+                          <span className={`mt-1 block text-[11px] leading-snug ${isActive ? 'opacity-80' : 'text-slate-400 group-hover:text-slate-500'}`}>
+                            {item.detail}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
+
+      <div id="super-admin-content" className="scroll-mt-6" />
 
       <AdminNotifications />
 
       {loading && <p className="text-gray-500">Loading...</p>}
 
       {tab === "users" && (
-        <>
+        <div className="super-admin-users-section">
           <UsersTab
             users={pagedUsers}
             selectedUsers={selectedUsers}
@@ -1054,7 +1127,7 @@ export default function SuperAdminDashboard() {
             onPageChange={setUsersPage}
             summary={getPageSummary(usersPage, PAGE_LIMITS.users, users.length)}
           />
-        </>
+        </div>
       )}
 
       {tab === "verifications" && (
@@ -1111,11 +1184,13 @@ export default function SuperAdminDashboard() {
       )}
 
       {tab === "analytics" && (
-        <AnalyticsTab analytics={analytics} />
+        <div className="super-admin-analytics-section">
+          <AnalyticsTab analytics={analytics} />
+        </div>
       )}
 
       {tab === "reports" && (
-        <>
+        <div className="super-admin-support-section">
           <ReportsTab reports={pagedReports} updateReport={updateReport} />
           <PaginationControls
             currentPage={reportsPage}
@@ -1127,7 +1202,7 @@ export default function SuperAdminDashboard() {
               reports.length
             )}
           />
-        </>
+        </div>
       )}
 
       {tab === "logs" && (
@@ -1155,12 +1230,22 @@ export default function SuperAdminDashboard() {
         <AdSpacesTab />
       )}
 
+      {tab === "email_marketing" && (
+        <EmailMarketingTab />
+      )}
+
+      {tab === "sms_marketing" && (
+        <SmsMarketingTab />
+      )}
+
       {tab === "platform_ratings" && (
         <PlatformRatingsTab />
       )}
 
       {tab === "recruitment" && (
-        <RecruitmentAdminTab />
+        <div className="super-admin-admins-section">
+          <RecruitmentAdminTab />
+        </div>
       )}
 
       {tab === "flags" && (
@@ -1220,6 +1305,10 @@ export default function SuperAdminDashboard() {
 
         {tab === "pending_approvals" && (
           <AdminManagementTab initialTab="pending" />
+        )}
+
+        {tab === "commission_config" && (
+          <CommissionConfigTab />
         )}
 
       <InputDialog

@@ -493,6 +493,77 @@ exports.addDisputeMessage = async (req, res) => {
   }
 };
 
+// Edit dispute message (only sender can edit)
+exports.editDisputeMessage = async (req, res) => {
+  try {
+    const { disputeId, messageId } = req.params;
+    const { message } = req.body;
+    const userId = req.user.id;
+
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message is required'
+      });
+    }
+
+    const existing = await db.query(
+      `SELECT id, sender_id, edit_count FROM dispute_messages WHERE id = $1 AND dispute_id = $2`,
+      [messageId, disputeId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found'
+      });
+    }
+
+    if (existing.rows[0].sender_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only edit your own messages'
+      });
+    }
+
+    const currentEdits = existing.rows[0].edit_count || 0;
+    if (currentEdits >= 2) {
+      return res.status(403).json({
+        success: false,
+        message: 'Messages can only be edited up to 2 times'
+      });
+    }
+
+    const result = await db.query(
+      `UPDATE dispute_messages
+       SET message = $1, updated_at = CURRENT_TIMESTAMP, edit_count = edit_count + 1
+       WHERE id = $2 AND dispute_id = $3
+       RETURNING *`,
+      [message, messageId, disputeId]
+    );
+
+    await logAction({
+      actorId: userId,
+      action: 'Edited dispute message',
+      targetType: 'dispute',
+      targetId: disputeId,
+      ip: req.ip
+    });
+
+    res.json({
+      success: true,
+      data: sanitizeEvidenceRow(result.rows[0])
+    });
+
+  } catch (error) {
+    console.error('Edit dispute message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to edit message'
+    });
+  }
+};
+
 // Resolve dispute (Admin only)
 exports.resolveDispute = async (req, res) => {
   try {
@@ -537,6 +608,69 @@ exports.resolveDispute = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to resolve dispute'
+    });
+  }
+};
+
+// Get disputes for current user
+exports.getMyDisputes = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { status, search, page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+
+    let whereClause = 'WHERE (d.opened_by = $1 OR d.against_user = $1)';
+    const params = [userId];
+    let paramIndex = 2;
+
+    if (status) {
+      whereClause += ` AND d.status = $${paramIndex++}`;
+      params.push(status);
+    }
+
+    if (search) {
+      whereClause += ` AND (d.title ILIKE $${paramIndex} OR p.title ILIKE $${paramIndex})`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    const countResult = await db.query(
+      `SELECT COUNT(*) FROM disputes d LEFT JOIN properties p ON p.id = d.property_id ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    const result = await db.query(
+      `SELECT d.*,
+              p.title AS property_title,
+              u1.full_name AS opened_by_name,
+              u2.full_name AS against_name
+       FROM disputes d
+       LEFT JOIN properties p ON p.id = d.property_id
+       JOIN users u1 ON d.opened_by = u1.id
+       JOIN users u2 ON d.against_user = u2.id
+       ${whereClause}
+       ORDER BY d.created_at DESC
+       LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
+      [...params, parseInt(limit, 10), offset]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get my disputes error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch disputes'
     });
   }
 };

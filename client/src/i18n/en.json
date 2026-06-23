@@ -262,6 +262,11 @@
     "activity_application": "Application {{status}} for {{title}}",
     "activity_message": "Message from {{name}}",
     "activity_review": "New review ({{stars}} stars) for {{title}}",
+    "activity_dispute": "Dispute \"{{title}}\" is {{status}}",
+    "activity_damage_report": "Damage report for {{title}} is {{status}}",
+    "activity_support_ticket": "Support ticket \"{{title}}\" is {{status}}",
+    "activity_fumigation_booking": "Fumigation booking for {{title}} is {{status}}",
+    "activity_transport_booking": "Transport booking for {{title}} is {{status}}",
     "activity_generic": "Activity",
 
     "qa_browse": "Browse Properties",

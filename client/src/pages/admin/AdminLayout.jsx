@@ -26,6 +26,7 @@ import {
   FaStar,
   FaWallet,
   FaHeadset,
+  FaPhone,
   FaUserShield,
   FaUserCircle,
   FaChevronDown,
@@ -123,6 +124,10 @@ const AdminLayout = () => {
     if (previousRouteRef.current === routeKey) return;
 
     previousRouteRef.current = routeKey;
+
+    // Super-admin uses its own tab-based scrolling via loadTab shortcuts
+    if (!location.hash && location.pathname === '/super-admin') return;
+
     scrollDashboardToTarget(location.hash, mainContentRef.current);
   }, [location.hash, location.pathname, location.search]);
 
@@ -540,6 +545,16 @@ const AdminLayout = () => {
                   Ad Spaces
                 </NavLink>
 
+                <NavLink to="/super-admin?tab=email_marketing" className={() => superAdminNavItem('email_marketing')}>
+                  <FaEnvelope className="mr-3" />
+                  Email Marketing
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=sms_marketing" className={() => superAdminNavItem('sms_marketing')}>
+                  <FaPhone className="mr-3" />
+                  SMS Marketing
+                </NavLink>
+
                 <NavLink to="/super-admin?tab=platform_ratings" className={() => superAdminFeaturedNavItem('platform_ratings')}>
                   <FaStar className="mr-3" />
                   Service Ratings
@@ -561,6 +576,11 @@ const AdminLayout = () => {
                 <NavLink to="/super-admin?tab=flags" className={() => superAdminNavItem('flags')}>
                   <FaShieldAlt className="mr-3" />
                   Flags
+                </NavLink>
+
+                <NavLink to="/admin/seo" className={navItem}>
+                  <FaGlobe className="mr-3" />
+                  SEO Dashboard
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=registration_access" className={() => superAdminNavItem('registration_access')}>
@@ -697,6 +717,11 @@ const AdminLayout = () => {
                 Fumigation
               </NavLink>
 
+              <NavLink to="/admin/inspections" className={navItem}>
+                <FaClipboardList className="mr-3" />
+                Inspections
+              </NavLink>
+
               <NavLink to="/admin/agents" className={navItem}>
                 <FaUserShield className="mr-3" />
                 Agent Management
@@ -772,6 +797,11 @@ const AdminLayout = () => {
               <NavLink to="/admin/lawyer-invites" className={navItem}>
                 <FaEnvelope className="mr-3" />
                 Lawyer Invites
+              </NavLink>
+
+              <NavLink to="/admin/evidence-verifications" className={navItem}>
+                <FaShieldAlt className="mr-3" />
+                Evidence Verification
               </NavLink>
 
               <NavLink to="/admin/compliance" className={navItem}>
@@ -867,9 +897,9 @@ const AdminLayout = () => {
               </p>
 
               <div className="space-y-2">
-                <NavLink to="/admin?tab=property_requests" className={navItem}>
-                  <FaHeadset className="mr-3" />
-                  Property Requests
+                <NavLink to="/admin/lga-support-dashboard" end className={navItem}>
+                  <FaTachometerAlt className="mr-3" />
+                  Dashboard
                 </NavLink>
               </div>
             </div>

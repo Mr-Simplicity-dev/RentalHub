@@ -82,8 +82,8 @@ const getBearerToken = (req) => {
 };
 
 const getAuthTokenFromRequest = (req) => {
-  const cookies = parseCookies(req.headers.cookie);
-  return cookies[AUTH_COOKIE_NAME] || getBearerToken(req);
+  // Prefer Bearer header (access token), fall back to cookie (refresh/session token)
+  return getBearerToken(req) || parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME];
 };
 
 const getSocketAuthToken = (socket) => {

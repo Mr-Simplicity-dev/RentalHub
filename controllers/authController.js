@@ -16,10 +16,12 @@ const {
 } = require('../config/utils/registrationAccess');
 const {
   validateNIN,
-  verifyNINWithNIMC,
+  verifyNINWithPrembly,
   validateInternationalPassport,
-  verifyInternationalPassportWithAPI
-} = require('../config/utils/ninValidator');
+  verifyInternationalPassportWithPrembly,
+  performKYCCheckWithPrembly,
+  performLivenessCheckWithPrembly
+} = require('../config/utils/premblyValidator');
 const {
   sendVerificationEmail,
   sendWelcomeEmail,
@@ -57,11 +59,60 @@ const {
   setAuthCookies,
   shouldReturnTokenInBody,
 } = require('../config/utils/authCookies');
+const redis = require('../config/utils/redis');
 
-// Store OTP codes temporarily (use Redis in production)
+// OTP storage with Redis fallback to in-memory Map
 const otpStore = new Map();
-// Separate OTP store for lawyer invite verification (keyed by phone, no auth token available)
 const lawyerOtpStore = new Map();
+
+const otpGet = async (key) => {
+  if (redis) {
+    const data = await redis.get(`otp:${key}`);
+    return data ? JSON.parse(data) : null;
+  }
+  return otpStore.get(key) || null;
+};
+
+const otpSet = async (key, value, ttlSeconds = 600) => {
+  if (redis) {
+    await redis.set(`otp:${key}`, JSON.stringify(value), 'EX', ttlSeconds);
+  } else {
+    otpStore.set(key, { ...value, expiresAt: Date.now() + ttlSeconds * 1000 });
+  }
+};
+
+const otpDelete = async (key) => {
+  if (redis) {
+    await redis.del(`otp:${key}`);
+  } else {
+    otpStore.delete(key);
+  }
+};
+
+// Lawyer OTP wrappers (same pattern, separate namespace)
+const lawyerOtpGet = async (phone) => {
+  if (redis) {
+    const data = await redis.get(`otp:lawyer:${phone}`);
+    return data ? JSON.parse(data) : null;
+  }
+  return lawyerOtpStore.get(phone) || null;
+};
+
+const lawyerOtpSet = async (phone, value, ttlSeconds = 600) => {
+  if (redis) {
+    await redis.set(`otp:lawyer:${phone}`, JSON.stringify(value), 'EX', ttlSeconds);
+  } else {
+    lawyerOtpStore.set(phone, { ...value, expiresAt: Date.now() + ttlSeconds * 1000 });
+  }
+};
+
+const lawyerOtpDelete = async (phone) => {
+  if (redis) {
+    await redis.del(`otp:lawyer:${phone}`);
+  } else {
+    lawyerOtpStore.delete(phone);
+  }
+};
 let identitySchemaReady = false;
 let lawyerInviteSchemaReady = false;
 let tenantRegistrationPaymentSchemaReady = false;
@@ -437,22 +488,34 @@ const normalizeOptionalAgentInvite = async ({
   };
 };
 
-// Generate JWT Token
-const generateToken = (userId, userType) => {
+const generateToken = (userId, userType, options = {}) => {
   return jwt.sign(
     { userId, userType },
     process.env.JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: options.expiresIn || '7d' }
   );
 };
 
+const generateAccessToken = (userId, userType) => generateToken(userId, userType, { expiresIn: '1h' });
+
 const attachAuthSession = (res, data) => {
   if (!data?.token) return data;
+
+  // data.token is the 7d session token → stored in HTTP-only cookie
+  // Decode it to mint a 1h access token for the Bearer header
+  let accessToken = data.token;
+  try {
+    const decoded = jwt.verify(data.token, process.env.JWT_SECRET, { ignoreExpiration: true });
+    if (decoded?.userId) {
+      accessToken = generateAccessToken(decoded.userId, decoded.userType);
+    }
+  } catch (_) {}
 
   const csrfToken = setAuthCookies(res, data.token);
   if (shouldReturnTokenInBody()) {
     return {
       ...data,
+      token: accessToken,
       csrf_token: csrfToken,
     };
   }
@@ -460,6 +523,7 @@ const attachAuthSession = (res, data) => {
   const { token, ...safeData } = data;
   return {
     ...safeData,
+    token: accessToken,
     csrf_token: csrfToken,
   };
 };
@@ -624,7 +688,7 @@ const validateAndPrepareRegistration = async (payload) => {
           message: 'Test NIN bypass enabled'
         };
       } else {
-        const nimcResult = await verifyNINWithNIMC(
+        const nimcResult = await verifyNINWithPrembly(
           cleanNIN,
           firstName,
           lastName,
@@ -637,7 +701,7 @@ const validateAndPrepareRegistration = async (payload) => {
         };
 
         if (nimcResult.status === 'not_configured') {
-          const error = new Error('NIMC verification is required but not configured on the server');
+          const error = new Error('Prembly verification is required but not configured on the server');
           error.statusCode = 503;
           throw error;
         }
@@ -696,7 +760,7 @@ const validateAndPrepareRegistration = async (payload) => {
       identityType = 'passport';
       cleanPassportNumber = passportValidation.value;
 
-      const passportResult = await verifyInternationalPassportWithAPI(
+      const passportResult = await verifyInternationalPassportWithPrembly(
         cleanPassportNumber,
         cleanFullName,
         cleanNationality,
@@ -2117,7 +2181,7 @@ exports.acceptLawyerInvite = async (req, res) => {
     }
 
     // Store OTP keyed by phone (lawyer has no auth token yet)
-    lawyerOtpStore.set(cleanPhone, {
+    await lawyerOtpSet(cleanPhone, {
       code: otpResult.code,
       lawyerUserId,
       expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
@@ -2346,7 +2410,7 @@ exports.acceptPlatformLawyerInvite = async (req, res) => {
       });
     }
 
-    lawyerOtpStore.set(cleanPhone, {
+    await lawyerOtpSet(cleanPhone, {
       code: otpResult.code,
       lawyerUserId,
       expiresAt: Date.now() + 10 * 60 * 1000
@@ -2585,7 +2649,7 @@ exports.verifyLawyerOtp = async (req, res) => {
     }
 
     const cleanPhone = String(phone || '').replace(/\s+/g, '');
-    const storedOTP = lawyerOtpStore.get(cleanPhone);
+    const storedOTP = await lawyerOtpGet(cleanPhone);
 
     if (!storedOTP) {
       return res.status(400).json({
@@ -2595,14 +2659,17 @@ exports.verifyLawyerOtp = async (req, res) => {
     }
 
     if (Date.now() > storedOTP.expiresAt) {
-      lawyerOtpStore.delete(cleanPhone);
+      await lawyerOtpDelete(cleanPhone);
       return res.status(400).json({
         success: false,
         message: 'OTP has expired. Please go back and resubmit the form to get a new OTP.'
       });
     }
 
-    if (parseInt(otp) !== storedOTP.code) {
+    const otpStr = String(otp);
+    const storedStr = String(storedOTP.code);
+    if (otpStr.length !== storedStr.length ||
+        !crypto.timingSafeEqual(Buffer.from(otpStr), Buffer.from(storedStr))) {
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP. Please try again.'
@@ -2616,7 +2683,7 @@ exports.verifyLawyerOtp = async (req, res) => {
     );
 
     // Clear OTP from store
-    lawyerOtpStore.delete(cleanPhone);
+    await lawyerOtpDelete(cleanPhone);
 
     // Fetch lawyer user and return auth token
     const userResult = await db.query(
@@ -2970,9 +3037,9 @@ exports.checkLawyerPassportForFraud = async (req, res) => {
       });
     }
 
-    // Get all tenant/landlord passports from database
+    // Get all tenant/landlord passport URLs for fraud check
     const existingPassports = await db.query(
-      `SELECT id, passport_photo_url, user_type, email, full_name 
+      `SELECT id, passport_photo_url
        FROM users 
        WHERE user_type IN ('tenant', 'landlord') 
        AND passport_photo_url IS NOT NULL
@@ -3197,7 +3264,7 @@ exports.sendPhoneOTP = async (req, res) => {
     }
 
     // Store OTP with expiry (10 minutes)
-    otpStore.set(userId, {
+    await otpSet(userId, {
       code: otpResult.code,
       expiresAt: Date.now() + 10 * 60 * 1000
     });
@@ -3222,7 +3289,7 @@ exports.verifyPhone = async (req, res) => {
     const { otp } = req.body;
 
     // Get stored OTP
-    const storedOTP = otpStore.get(userId);
+    const storedOTP = await otpGet(userId);
 
     if (!storedOTP) {
       return res.status(400).json({
@@ -3233,15 +3300,18 @@ exports.verifyPhone = async (req, res) => {
 
     // Check expiry
     if (Date.now() > storedOTP.expiresAt) {
-      otpStore.delete(userId);
+      await otpDelete(userId);
       return res.status(400).json({
         success: false,
         message: 'OTP expired. Please request a new one.'
       });
     }
 
-    // Verify OTP
-    if (parseInt(otp) !== storedOTP.code) {
+    // Verify OTP (constant-time comparison)
+    const otpStr = String(otp);
+    const storedStr = String(storedOTP.code);
+    if (otpStr.length !== storedStr.length ||
+        !crypto.timingSafeEqual(Buffer.from(otpStr), Buffer.from(storedStr))) {
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP'
@@ -3255,7 +3325,7 @@ exports.verifyPhone = async (req, res) => {
     );
 
     // Clear OTP
-    otpStore.delete(userId);
+    await otpDelete(userId);
 
     res.json({
       success: true,
@@ -3369,23 +3439,24 @@ exports.getCurrentUser = async (req, res) => {
 // ================= REFRESH TOKEN =================
 exports.refreshToken = async (req, res) => {
   try {
-    const token = getAuthTokenFromRequest(req);
-    if (!token) {
+    // Read the 7d session token from the cookie (not the Bearer header)
+    const sessionToken = parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME];
+    if (!sessionToken) {
       return res.status(401).json({
         success: false,
-        message: 'No token provided',
+        message: 'No session token found',
       });
     }
 
-    // Verify existing token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Verify the session token (should still be valid since it's 7d)
+    const decoded = jwt.verify(sessionToken, process.env.JWT_SECRET);
     
-    // Generate new token
-    const newToken = generateToken(decoded.userId, decoded.userType);
+    // Mint a new session token (rotate) and let attachAuthSession derive the access token
+    const newSessionToken = generateToken(decoded.userId, decoded.userType);
 
     res.json({
       success: true,
-      data: attachAuthSession(res, { token: newToken }),
+      data: attachAuthSession(res, { token: newSessionToken }),
     });
   } catch (error) {
     console.error('Refresh token error:', error);

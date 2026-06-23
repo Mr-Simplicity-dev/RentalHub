@@ -364,7 +364,7 @@ const SuperSupportAdminDashboard = () => {
 
       {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <div className="space-y-6">
+        <div className="super-support-overview-section space-y-6">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -453,7 +453,7 @@ const SuperSupportAdminDashboard = () => {
 
      {/* Migration Queue Tab */}
         {activeTab === 'queue' && (
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="super-support-migration-section rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                        <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Migration Queue</h3>
               <div className="flex items-center gap-2">
@@ -697,7 +697,7 @@ const SuperSupportAdminDashboard = () => {
 
         {/* Audit Trail Tab */}
         {activeTab === 'audit' && (
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="super-support-audit-section rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Audit Trail</h3>
               <div className="flex items-center gap-2">
@@ -846,7 +846,7 @@ const SuperSupportAdminDashboard = () => {
 
         {/* Support Tickets Tab */}
         {activeTab === 'tickets' && (
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="super-support-tickets-section rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Support Tickets</h3>
               <div className="flex items-center gap-2">

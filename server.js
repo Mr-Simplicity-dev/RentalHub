@@ -41,6 +41,8 @@ const fumigationCleaningRoutes = require('./routes/fumigationCleaning');
 const propertyUtilsRoutes = require('./routes/propertyUtils');
 const propertyAlertsRoutes = require('./routes/propertyAlerts');
 const adRoutes = require('./routes/ads');
+const emailMarketingRoutes = require('./routes/emailMarketing');
+const smsMarketingRoutes = require('./routes/smsMarketing');
 const platformRatingRoutes = require('./routes/platformRatings');
 const recruitmentRoutes = require('./routes/recruitment');
 const referralRoutes = require('./routes/referrals');
@@ -65,9 +67,11 @@ const systemRoutes = require('./routes/system');
 
 const damageReportRoutes = require('./routes/damageReports');
 const rentSavingsRoutes = require('./routes/rentSavings');
+const adminInspectionRoutes = require('./routes/adminInspections');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 const { startRentSavingsJobs } = require('./jobs/rentSavingsJobs');
 const { startSmsDeliveryJobs } = require('./jobs/smsDeliveryJobs');
+const { startSmsMarketingJobs } = require('./jobs/smsMarketingJobs');
 const { startRecruitmentJobs } = require('./jobs/recruitmentJobs');
 const csrfProtection = require('./config/middleware/csrfProtection');
 const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
@@ -324,11 +328,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdn.jsdelivr.net", "unpkg.com"],
+      // TODO: Replace 'unsafe-inline' with nonce-based approach for production hardening
+      scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "unpkg.com"],
       imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:"],
       connectSrc: ["'self'", "api.paystack.co"],
       fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+      styleSrc: ["'self'", "fonts.googleapis.com"],
       mediaSrc: ["'self'", "res.cloudinary.com", "blob:"],
     },
   },
@@ -517,6 +522,8 @@ app.use('/api/fumigation-cleaning', generalOpsLimiter, fumigationCleaningRoutes)
 app.use('/api/property-utils', generalOpsLimiter, propertyUtilsRoutes);
 app.use('/api/property-alerts', generalOpsLimiter, propertyAlertsRoutes);
 app.use('/api/ads', generalOpsLimiter, adRoutes);
+app.use('/api/email-marketing', generalOpsLimiter, emailMarketingRoutes);
+app.use('/api/sms-marketing', generalOpsLimiter, smsMarketingRoutes);
 app.use('/api/platform-ratings', generalOpsLimiter, platformRatingRoutes);
 app.use('/api/recruitment', generalOpsLimiter, recruitmentRoutes);
 app.use('/api/referrals', generalOpsLimiter, referralRoutes);
@@ -529,15 +536,16 @@ app.use('/api/export', generalOpsLimiter, exportRoutes);
 app.use('/api/financial-admin', financeOpsLimiter, financialAdminRoutes);
 app.use('/api/state-admin', adminLimiter, stateAdminRoutes);
 
-app.use('/evidence', verificationOpsLimiter, verificationRoutes);
+app.use('/api/evidence', verificationOpsLimiter, verificationRoutes);
 app.use('/api/commissions', financeOpsLimiter, agentCommissionRoutes);
 app.use('/api/admin/agents', adminLimiter, adminAgentRoutes);
 app.use('/api/withdrawals', financeOpsLimiter, agentWithdrawalRoutes);
 app.use('/api/state-migrations', generalOpsLimiter, stateMigrationRoutes);
 app.use('/api/support', adminLimiter, supportRoutes);
 app.use('/api/system', adminLimiter, systemRoutes);
-app.use('/api', generalOpsLimiter, damageReportRoutes);
+app.use('/api/damage-reports', generalOpsLimiter, damageReportRoutes);
 app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
+app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
 
 app.use((err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;
@@ -602,6 +610,7 @@ const startBackgroundServices = () => {
   startPropertyJobs();
   startRentSavingsJobs();
   startSmsDeliveryJobs();
+  startSmsMarketingJobs();
   startRecruitmentJobs();
   startScheduler();
   scheduleEvidenceIntegrityMonitoring();

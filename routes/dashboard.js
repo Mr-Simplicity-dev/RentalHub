@@ -585,6 +585,85 @@ router.get("/tenant/recent-activities", authenticate, isTenant, async (req, res)
         ORDER BY m.created_at DESC
         LIMIT $2
       )
+      UNION ALL
+      (
+        SELECT
+          'dispute' AS type,
+          d.id,
+          d.status,
+          d.created_at AS activity_date,
+          COALESCE(p.title, d.title) AS property_title,
+          d.property_id,
+          NULL::text AS user_name
+        FROM disputes d
+        LEFT JOIN properties p ON d.property_id = p.id
+        WHERE d.opened_by = $1 OR d.against_user = $1
+        ORDER BY d.created_at DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
+        SELECT
+          'damage_report' AS type,
+          dr.id,
+          dr.status,
+          COALESCE(dr.published_at, dr.created_at) AS activity_date,
+          COALESCE(p.title, dr.report_title) AS property_title,
+          dr.property_id,
+          NULL::text AS user_name
+        FROM property_damage_reports dr
+        LEFT JOIN properties p ON dr.property_id = p.id
+        WHERE dr.created_by_user_id = $1
+        ORDER BY activity_date DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
+        SELECT
+          'support_ticket' AS type,
+          st.id,
+          st.status,
+          st.created_at AS activity_date,
+          st.subject AS property_title,
+          NULL::int AS property_id,
+          NULL::text AS user_name
+        FROM support_tickets st
+        WHERE st.user_id = $1
+        ORDER BY st.created_at DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
+        SELECT
+          'fumigation_booking' AS type,
+          fb.id,
+          fb.booking_status AS status,
+          (fb.booking_date + COALESCE(fb.specific_time, '00:00:00'::time))::timestamp AS activity_date,
+          p.title AS property_title,
+          fb.property_id,
+          NULL::text AS user_name
+        FROM fumigation_cleaning_bookings fb
+        JOIN properties p ON fb.property_id = p.id
+        WHERE fb.tenant_id = $1
+        ORDER BY activity_date DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
+        SELECT
+          'transport_booking' AS type,
+          tb.id,
+          tb.booking_status AS status,
+          (tb.booking_date + tb.booking_time)::timestamp AS activity_date,
+          p.title AS property_title,
+          tb.property_id,
+          NULL::text AS user_name
+        FROM transportation_bookings tb
+        JOIN properties p ON tb.property_id = p.id
+        WHERE tb.tenant_id = $1
+        ORDER BY activity_date DESC
+        LIMIT $2
+      )
       ORDER BY activity_date DESC
       LIMIT $2`,
       [userId, limit]
@@ -658,6 +737,85 @@ router.get("/landlord/recent-activities", authenticate, isLandlord, async (req, 
         JOIN users u ON r.tenant_id = u.id
         WHERE p.landlord_id = $1
         ORDER BY r.created_at DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
+        SELECT
+          'dispute' AS type,
+          d.id,
+          d.status,
+          d.created_at AS activity_date,
+          COALESCE(p.title, d.title) AS property_title,
+          d.property_id,
+          NULL::text AS user_name
+        FROM disputes d
+        JOIN properties p ON d.property_id = p.id
+        WHERE p.landlord_id = $1
+        ORDER BY d.created_at DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
+        SELECT
+          'damage_report' AS type,
+          dr.id,
+          dr.status,
+          COALESCE(dr.published_at, dr.created_at) AS activity_date,
+          COALESCE(p.title, dr.report_title) AS property_title,
+          dr.property_id,
+          NULL::text AS user_name
+        FROM property_damage_reports dr
+        LEFT JOIN properties p ON dr.property_id = p.id
+        WHERE dr.landlord_id = $1
+        ORDER BY activity_date DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
+        SELECT
+          'support_ticket' AS type,
+          st.id,
+          st.status,
+          st.created_at AS activity_date,
+          st.subject AS property_title,
+          NULL::int AS property_id,
+          NULL::text AS user_name
+        FROM support_tickets st
+        WHERE st.user_id = $1
+        ORDER BY st.created_at DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
+        SELECT
+          'fumigation_booking' AS type,
+          fb.id,
+          fb.booking_status AS status,
+          (fb.booking_date + COALESCE(fb.specific_time, '00:00:00'::time))::timestamp AS activity_date,
+          p.title AS property_title,
+          fb.property_id,
+          NULL::text AS user_name
+        FROM fumigation_cleaning_bookings fb
+        JOIN properties p ON fb.property_id = p.id
+        WHERE p.landlord_id = $1
+        ORDER BY activity_date DESC
+        LIMIT $2
+      )
+      UNION ALL
+      (
+        SELECT
+          'transport_booking' AS type,
+          tb.id,
+          tb.booking_status AS status,
+          (tb.booking_date + tb.booking_time)::timestamp AS activity_date,
+          p.title AS property_title,
+          tb.property_id,
+          NULL::text AS user_name
+        FROM transportation_bookings tb
+        JOIN properties p ON tb.property_id = p.id
+        WHERE p.landlord_id = $1
+        ORDER BY activity_date DESC
         LIMIT $2
       )
       ORDER BY activity_date DESC

@@ -317,6 +317,86 @@ class DamageReportController {
       });
     }
   }
+  /**
+   * Get damage reports across all user's properties
+   */
+  static async getMyDamageReports(req, res) {
+    try {
+      const userId = req.user.id;
+      const userType = req.user.user_type;
+      const { status, limit = 50, offset = 0 } = req.query;
+
+      let reports;
+      if (userType === 'landlord') {
+        reports = await db.query(
+          `SELECT
+             r.*,
+             p.title AS property_title,
+             p.city,
+             s.state_name AS state
+           FROM property_damage_reports r
+           JOIN properties p ON p.id = r.property_id
+           LEFT JOIN states s ON s.id = p.state_id
+           WHERE r.landlord_id = $1
+             AND ($2 = '' OR r.status = $2)
+           ORDER BY r.created_at DESC
+           LIMIT $3 OFFSET $4`,
+          [userId, status || '', parseInt(limit), parseInt(offset)]
+        );
+      } else if (userType === 'tenant') {
+        reports = await db.query(
+          `SELECT
+             r.*,
+             p.title AS property_title,
+             p.city,
+             s.state_name AS state
+           FROM property_damage_reports r
+           JOIN properties p ON p.id = r.property_id
+           LEFT JOIN states s ON s.id = p.state_id
+           WHERE r.status = 'published'
+             AND r.property_id IN (
+               SELECT property_id FROM applications
+               WHERE tenant_id = $1 AND status = 'approved'
+             )
+             AND ($2 = '' OR $2 = 'published')
+           ORDER BY r.published_at DESC
+           LIMIT $3 OFFSET $4`,
+          [userId, status || '', parseInt(limit), parseInt(offset)]
+        );
+      } else if (['admin', 'super_admin'].includes(userType)) {
+        reports = await db.query(
+          `SELECT
+             r.*,
+             p.title AS property_title,
+             p.city,
+             s.state_name AS state
+           FROM property_damage_reports r
+           JOIN properties p ON p.id = r.property_id
+           LEFT JOIN states s ON s.id = p.state_id
+           WHERE ($1 = '' OR r.status = $1)
+           ORDER BY r.created_at DESC
+           LIMIT $2 OFFSET $3`,
+          [status || '', parseInt(limit), parseInt(offset)]
+        );
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: reports.rows
+      });
+    } catch (error) {
+      console.error('Get my damage reports error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch damage reports'
+      });
+    }
+  }
 }
 
 module.exports = DamageReportController;

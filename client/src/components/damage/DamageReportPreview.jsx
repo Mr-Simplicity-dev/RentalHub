@@ -1,33 +1,7 @@
-import React, { useMemo } from 'react';
+// Removed — DamageReportPreview was unused; DamageReportCard is the active component.
+import React from 'react';
 
-/**
- * DamageReportPreview - Display damage report to tenants on property details
- * Shows: latest damage report with AI analysis
- * Hides: draft reports, internal-only reports
- */
-const DamageReportPreview = ({ damageReports }) => {
-  // Get latest published damage report (not draft)
-  const latestReport = useMemo(() => {
-    if (!damageReports || !Array.isArray(damageReports) || damageReports.length === 0) {
-      return null;
-    }
-    // Sort by date descending and get the first published one
-    return (
-      damageReports
-        .filter((r) => {
-          if (r.status) return r.status === 'published';
-          if (typeof r.is_visible_to_tenant === 'boolean') return r.is_visible_to_tenant;
-          return !r.is_draft && r.is_published;
-        })
-        .sort((a, b) => {
-          const aDate = new Date(a.published_at || a.created_at || a.reported_at || 0);
-          const bDate = new Date(b.published_at || b.created_at || b.reported_at || 0);
-          return bDate - aDate;
-        })[0] || null
-    );
-  }, [damageReports]);
-
-  if (!latestReport) {
+const DamageReportPreview = () => null;
     return null;
   }
 

@@ -1751,6 +1751,47 @@ exports.getPropertyUnlockStatus = async (req, res) => {
   }
 };
 
+exports.getMyUnlockedProperties = async (req, res) => {
+  try {
+    await ensurePropertyUnlockSchema();
+    const userId = req.user.id;
+
+    const result = await db.query(
+      `SELECT
+         tu.id,
+         tu.property_id,
+         tu.unlocked_at,
+         tu.transaction_reference,
+         p.title AS property_title,
+         p.city,
+         s.state_name AS state,
+         p.full_address,
+         p.bedrooms,
+         p.bathrooms,
+         p.price,
+         p.price_frequency,
+         p.media
+       FROM tenant_property_unlocks tu
+       JOIN properties p ON p.id = tu.property_id
+       LEFT JOIN states s ON s.id = p.state_id
+       WHERE tu.tenant_id = $1
+       ORDER BY tu.unlocked_at DESC`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Get my unlocked properties error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get unlocked properties'
+    });
+  }
+};
+
 exports.getPropertyInspectionOptions = async (req, res) => {
   try {
     await ensurePropertyInspectionSchema();
@@ -1770,14 +1811,16 @@ exports.getPropertyInspectionOptions = async (req, res) => {
          p.lga_name,
          p.full_address,
          s.state_name,
-         pir.id AS inspection_request_id,
-         pir.status AS inspection_status,
-         COALESCE(pir.amount, $2::numeric) AS inspection_amount,
-         pir.tenant_note AS inspection_note,
-         pir.requested_at AS inspection_requested_at,
-         pir.paid_at AS inspection_paid_at,
-         pay.transaction_reference AS inspection_reference,
-         pay.payment_status AS inspection_payment_status
+          pir.id AS inspection_request_id,
+          pir.status AS inspection_status,
+          COALESCE(pir.amount, $2::numeric) AS inspection_amount,
+          pir.tenant_note AS inspection_note,
+          pir.inspection_summary,
+          pir.requested_at AS inspection_requested_at,
+          pir.paid_at AS inspection_paid_at,
+          pir.completed_at AS inspection_completed_at,
+          pay.transaction_reference AS inspection_reference,
+          pay.payment_status AS inspection_payment_status
        FROM applications a
        JOIN properties p ON p.id = a.property_id
        LEFT JOIN states s ON s.id = p.state_id
@@ -3561,6 +3604,10 @@ exports.paystackWebhook = async (req, res) => {
         await handleFailedPayment(event.data);
         break;
 
+      case "charge.refund":
+        await handleRefundPayment(event.data);
+        break;
+
       case "transfer.success":
       case "transfer.failed":
       case "transfer.reversed":
@@ -3839,18 +3886,48 @@ async function handleTransferWebhook(eventName, data) {
 }
 
 
+// Handle refunded payment
+async function handleRefundPayment(data) {
+  try {
+    const reference = data.reference;
+    const paymentResult = await db.query(
+      `UPDATE payments
+       SET payment_status = 'refunded',
+           gateway_response = $1
+       WHERE transaction_reference = $2
+       RETURNING id`,
+      [JSON.stringify(data), reference]
+    );
+
+    if (paymentResult.rows.length > 0) {
+      const paymentId = paymentResult.rows[0].id;
+      await commissionService.clawbackCommissionsForPayment(paymentId, 'payment_refunded');
+    }
+
+    console.log("Payment refunded:", reference);
+  } catch (error) {
+    console.error("Webhook refund handler error:", error);
+  }
+}
+
 // Handle failed payment
 async function handleFailedPayment(data) {
   try {
     const reference = data.reference;
 
-    await db.query(
+    const paymentResult = await db.query(
       `UPDATE payments 
        SET payment_status = 'failed',
            gateway_response = $1
-       WHERE transaction_reference = $2`,
+       WHERE transaction_reference = $2
+       RETURNING id`,
       [JSON.stringify(data), reference]
     );
+
+    if (paymentResult.rows.length > 0) {
+      const paymentId = paymentResult.rows[0].id;
+      await commissionService.clawbackCommissionsForPayment(paymentId, 'payment_failed');
+    }
 
     console.log("Payment failed:", reference);
   } catch (error) {

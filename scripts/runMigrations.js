@@ -239,8 +239,8 @@ const runPendingMigrations = async () => {
         succeeded++;
       } catch (error) {
         // Attempt rollback (may fail if migration had its own tx control)
-        try { await client.query('ROLLBACK'); } catch (_) {}
-
+        try { await client.query('ROLLBACK'); } catch (rollbackErr) { console.warn(`   ⚠️  Rollback failed (may be expected): ${rollbackErr.message}`); }
+ 
         console.log(`❌ FAILED`);
         console.error(`\n   Error in ${migration.filename}:`);
         console.error(`   ${error.message}`);
@@ -261,7 +261,7 @@ const runPendingMigrations = async () => {
                ON CONFLICT (filename) DO NOTHING`,
               [migration.filename, migration.number, 'FAILED_' + hash, batch, Date.now() - startTime]
             );
-          } catch (_) {}
+          } catch (trackErr) { console.error(`   ⚠️  Failed to record failed migration in tracking table: ${trackErr.message}`); }
           continue;
         } else {
           console.error('\n   ⚠️  To continue despite errors, use: --continue-on-error');

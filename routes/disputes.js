@@ -34,6 +34,16 @@ router.get(
   disputeController.getDisputes
 );
 
+/**
+ * View current user's disputes
+ */
+router.get(
+  '/me',
+  authenticate,
+  allowRoles('tenant', 'landlord', 'admin', 'super_admin'),
+  disputeController.getMyDisputes
+);
+
 router.get(
   '/:disputeId',
   authenticate,
@@ -51,6 +61,17 @@ router.post(
   canAccessDispute,
   [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
   disputeController.addDisputeMessage
+);
+
+/**
+ * Edit a dispute message
+ */
+router.patch(
+  '/:disputeId/messages/:messageId',
+  authenticate,
+  canAccessDispute,
+  [param('disputeId').isInt({ min: 1 }).withMessage('disputeId must be a positive integer'), validateRequest],
+  disputeController.editDisputeMessage
 );
 
 /**

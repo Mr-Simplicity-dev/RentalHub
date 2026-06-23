@@ -11,7 +11,7 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 import { getAuthToken } from '../services/authStorage';
 import CallNotification from '../components/calls/CallNotification';
-import CallSessionPanel from '../components/calls/AudioCallPanel';
+import AudioCallPanel from '../components/calls/AudioCallPanel';
 import { getWebRtcIceServers } from '../config/webrtcConfig';
 
 export const SocketContext = createContext(null);
@@ -661,7 +661,7 @@ export const SocketProvider = ({ children }) => {
         onReject={rejectCall}
         onEnd={endCall}
       />
-      <CallSessionPanel
+      <AudioCallPanel
         call={activeMediaCall}
         currentUserId={user?.id}
         status={mediaCallStatus}

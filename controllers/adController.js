@@ -20,6 +20,7 @@ const AD_PLACEMENT_SQL_LIST = AD_PLACEMENTS
   .join(', ');
 const AD_IMAGE_UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'ad-spaces');
 const AD_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
+const AD_VIDEO_MAX_SIZE_BYTES = 100 * 1024 * 1024;
 const AD_IMAGE_ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.jfif', '.png', '.webp', '.gif']);
 const AD_IMAGE_MIME_EXTENSIONS = {
   'image/jpeg': '.jpg',
@@ -28,6 +29,14 @@ const AD_IMAGE_MIME_EXTENSIONS = {
   'image/webp': '.webp',
   'image/gif': '.gif',
 };
+const AD_VIDEO_MIME_EXTENSIONS = {
+  'video/mp4': '.mp4',
+  'video/webm': '.webm',
+  'video/ogg': '.ogv',
+  'video/quicktime': '.mov',
+  'video/x-msvideo': '.avi',
+};
+const AD_VIDEO_ALLOWED_EXTENSIONS = new Set(['.mp4', '.webm', '.ogv', '.mov', '.avi']);
 
 if (!fs.existsSync(AD_IMAGE_UPLOAD_DIR)) {
   fs.mkdirSync(AD_IMAGE_UPLOAD_DIR, { recursive: true });
@@ -63,6 +72,31 @@ const adImageUpload = multer({
   },
 }).single('image');
 
+const adVideoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, AD_IMAGE_UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const originalExtension = path.extname(file.originalname || '').toLowerCase();
+    const extension = AD_VIDEO_ALLOWED_EXTENSIONS.has(originalExtension)
+      ? originalExtension
+      : AD_VIDEO_MIME_EXTENSIONS[file.mimetype] || '.mp4';
+    cb(null, `ad_video_${Date.now()}_${crypto.randomBytes(8).toString('hex')}${extension}`);
+  },
+});
+
+const adVideoUpload = multer({
+  storage: adVideoStorage,
+  limits: { fileSize: AD_VIDEO_MAX_SIZE_BYTES },
+  fileFilter: (req, file, cb) => {
+    const isAllowedVideo = Boolean(AD_VIDEO_MIME_EXTENSIONS[file.mimetype]);
+    if (!isAllowedVideo) {
+      return cb(new Error('Upload an MP4, WebM, OGG, MOV, or AVI video'));
+    }
+    return cb(null, true);
+  },
+}).single('video');
+
 let adSpacesSchemaReady = false;
 
 const ensureAdSpacesSchema = async () => {
@@ -95,6 +129,25 @@ const ensureAdSpacesSchema = async () => {
 
     ALTER TABLE ad_spaces
       ADD COLUMN IF NOT EXISTS sharing_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+    ALTER TABLE ad_spaces
+      ADD COLUMN IF NOT EXISTS media_type VARCHAR(10) NOT NULL DEFAULT 'image';
+
+    ALTER TABLE ad_spaces
+      ADD COLUMN IF NOT EXISTS video_url VARCHAR(1000);
+
+    ALTER TABLE ad_spaces
+      ADD COLUMN IF NOT EXISTS video_thumbnail VARCHAR(1000);
+
+    ALTER TABLE ad_spaces
+      ADD COLUMN IF NOT EXISTS video_duration INTEGER;
+
+    ALTER TABLE ad_spaces
+      DROP CONSTRAINT IF EXISTS chk_ad_spaces_media_type;
+
+    ALTER TABLE ad_spaces
+      ADD CONSTRAINT chk_ad_spaces_media_type
+      CHECK (media_type IN ('image', 'video'));
 
     ALTER TABLE ad_spaces
       DROP CONSTRAINT IF EXISTS chk_ad_spaces_placement;
@@ -204,12 +257,21 @@ const normalizeAdPayload = (payload) => {
     throwValidation('Sort order must be a whole number');
   }
 
+  const mediaType = String(payload.media_type || 'image').toLowerCase();
+  if (!['image', 'video'].includes(mediaType)) {
+    throwValidation('Media type must be "image" or "video"');
+  }
+
   return {
     placement: normalizePlacement(payload.placement || 'home_top'),
     title: normalizeText(payload.title, 'Title', 160, { required: true }),
     description: normalizeText(payload.description, 'Description', 1200),
     sponsor_name: normalizeText(payload.sponsor_name, 'Sponsor name', 160),
+    media_type: mediaType,
     image_url: normalizeOptionalUrl(payload.image_url, 'Image URL'),
+    video_url: normalizeOptionalUrl(payload.video_url, 'Video URL'),
+    video_thumbnail: normalizeOptionalUrl(payload.video_thumbnail, 'Video thumbnail URL'),
+    video_duration: payload.video_duration ? Math.max(1, Math.min(300, Number(payload.video_duration) || 30)) : null,
     target_url: normalizeOptionalUrl(payload.target_url, 'Target URL'),
     cta_label: normalizeText(payload.cta_label, 'CTA label', 80),
     background_color: normalizeColor(payload.background_color, '#ffffff'),
@@ -264,7 +326,8 @@ const listPublicAds = async (req, res) => {
     params.push(limit);
 
     const { rows } = await db.query(
-      `SELECT id, placement, title, description, sponsor_name, image_url,
+      `SELECT id, placement, title, description, sponsor_name, media_type,
+              image_url, video_url, video_thumbnail, video_duration,
               target_url, cta_label, background_color, text_color, sharing_enabled
        FROM ad_spaces
        WHERE ${where.join(' AND ')}
@@ -348,18 +411,24 @@ const createAd = async (req, res) => {
     const ad = normalizeAdPayload(req.body || {});
     const { rows } = await db.query(
       `INSERT INTO ad_spaces (
-         placement, title, description, sponsor_name, image_url, target_url,
-         cta_label, background_color, text_color, sharing_enabled, is_active, sort_order,
+         placement, title, description, sponsor_name, media_type,
+         image_url, video_url, video_thumbnail, video_duration,
+         target_url, cta_label, background_color, text_color,
+         sharing_enabled, is_active, sort_order,
          starts_at, ends_at, created_by, updated_by
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $19)
        RETURNING *`,
       [
         ad.placement,
         ad.title,
         ad.description,
         ad.sponsor_name,
+        ad.media_type,
         ad.image_url,
+        ad.video_url,
+        ad.video_thumbnail,
+        ad.video_duration,
         ad.target_url,
         ad.cta_label,
         ad.background_color,
@@ -404,17 +473,21 @@ const updateAd = async (req, res) => {
            title = $3,
            description = $4,
            sponsor_name = $5,
-           image_url = $6,
-           target_url = $7,
-           cta_label = $8,
-           background_color = $9,
-           text_color = $10,
-           sharing_enabled = $11,
-           is_active = $12,
-           sort_order = $13,
-           starts_at = $14,
-           ends_at = $15,
-           updated_by = $16,
+           media_type = $6,
+           image_url = $7,
+           video_url = $8,
+           video_thumbnail = $9,
+           video_duration = $10,
+           target_url = $11,
+           cta_label = $12,
+           background_color = $13,
+           text_color = $14,
+           sharing_enabled = $15,
+           is_active = $16,
+           sort_order = $17,
+           starts_at = $18,
+           ends_at = $19,
+           updated_by = $20,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
        RETURNING *`,
@@ -424,7 +497,11 @@ const updateAd = async (req, res) => {
         ad.title,
         ad.description,
         ad.sponsor_name,
+        ad.media_type,
         ad.image_url,
+        ad.video_url,
+        ad.video_thumbnail,
+        ad.video_duration,
         ad.target_url,
         ad.cta_label,
         ad.background_color,
@@ -502,6 +579,44 @@ const uploadAdImage = async (req, res) => {
   }
 };
 
+const uploadAdVideoFile = (req, res, next) => {
+  adVideoUpload(req, res, (error) => {
+    if (!error) {
+      return next();
+    }
+
+    const message =
+      error.code === 'LIMIT_FILE_SIZE'
+        ? 'Ad video must be 100MB or smaller'
+        : error.message || 'Failed to upload ad video';
+
+    return res.status(400).json({
+      success: false,
+      message,
+    });
+  });
+};
+
+const uploadAdVideo = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No video uploaded',
+      });
+    }
+
+    const url = `/uploads/ad-spaces/${req.file.filename}`;
+
+    return res.json({
+      success: true,
+      data: { url },
+    });
+  } catch (error) {
+    return handleControllerError(res, error, 'Failed to upload ad video');
+  }
+};
+
 module.exports = {
   AD_PLACEMENTS,
   ensureAdSpacesSchema,
@@ -514,4 +629,6 @@ module.exports = {
   deleteAd,
   uploadAdImageFile,
   uploadAdImage,
+  uploadAdVideoFile,
+  uploadAdVideo,
 };

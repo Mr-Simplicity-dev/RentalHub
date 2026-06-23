@@ -9,10 +9,12 @@ import i18n from '../i18n';
 
 import { AuthProvider } from '../context/AuthContext';
 import { SocketProvider } from '../context/SocketContext';
+import { TourProvider } from '../context/TourContext';
 import { useAuth } from '../hooks/useAuth';
 
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
+import TourManager from '../components/tour/TourManager';
 import LiveRatingFlyIn from '../components/ratings/LiveRatingFlyIn';
 import PlatformRatingPrompt from '../components/ratings/PlatformRatingPrompt';
 
@@ -38,6 +40,9 @@ import AdminLayout from './admin/AdminLayout';
 import AdminUsers from './admin/AdminUsers';
 import AdminProperties from './admin/AdminProperties';
 import AdminApplications from './admin/AdminApplications';
+import AdminInspections from './admin/AdminInspections';
+import AdminEvidenceVerifications from './admin/AdminEvidenceVerifications';
+import AdminLedger from './admin/AdminLedger';
 import AdminVerifications from './admin/AdminVerifications';
 import AdminLawyerInvites from './admin/AdminLawyerInvites';
 
@@ -68,10 +73,12 @@ import AdminUserDetail from './admin/AdminUserDetail';
 import AdminPropertyDetail from './admin/AdminPropertyDetail';
 import AdminApplicationDetail from './admin/AdminApplicationDetail';
 import AdminCompliance from './admin/AdminCompliance';
+import SeoDashboard from './SeoDashboard';
 import TransportationAdminDashboard from './admin/TransportationAdminDashboard';
-import TransporationAdminStateDashboard from './admin/TransporationAdminStateDashboard';
+import TransportationAdminStateDashboard from './admin/TransportationAdminStateDashboard';
 import TransportationSuperAdminDashboard from './admin/TransportationSuperAdminDashboard';
 import LgaFumigationAdminDashboard from './admin/LgaFumigationAdminDashboard';
+import LgaSupportAdminDashboard from './admin/LgaSupportAdminDashboard';
 import StateFumigationAdminDashboard from './admin/StateFumigationAdminDashboard';
 import SuperFumigationAdminDashboard from './admin/SuperFumigationAdminDashboard';
 import LawyerDashboard from './lawyer/LawyerDashboard';
@@ -81,6 +88,10 @@ import SuperLawyerDashboard from './lawyer/SuperLawyerDashboard';
 import AgentDashboard from './agent/AgentDashboard';
 import VerifyCase from './VerifyCase';
 import DisputeDetails from "./DisputeDetails";
+import MyDisputes from "./MyDisputes";
+import MyDamageReports from "./MyDamageReports";
+import SubscribedProperties from "./SubscribedProperties";
+import Support from "./Support";
 import AcceptLawyerInvite from './AcceptLawyerInvite';
 import AcceptAgentInvite from './AcceptAgentInvite';
 import LocationPage from './LocationPage';
@@ -201,6 +212,19 @@ const StateAdminRoute = ({ children }) => {
   return children;
 };
 
+const LgaSupportAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+
+  return children;
+};
+
 const StateSupportAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -285,7 +309,7 @@ const LandlordRoute = ({ children }) => {
     if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/financial-dashboard" />;
     if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-financial-dashboard" />;
     if (STATE_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
-    if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin?tab=property_requests" />;
+    if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/lga-support-dashboard" />;
     if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/state-support-dashboard" />;
     if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-support-dashboard" />;
     if (isRecruitmentAdminUser(user)) return <Navigate to="/admin/recruitment" />;
@@ -484,7 +508,7 @@ const AdminHomeRoute = () => {
   }
 
   if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
-    return <Navigate to="/admin?tab=property_requests" replace />;
+    return <Navigate to="/admin/lga-support-dashboard" replace />;
   }
 
   if (STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
@@ -646,8 +670,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
-          <SocketProvider>
+        <TourProvider>
+          <Router>
+            <SocketProvider>
             <Layout>
               <Routes>
               {/* Public Routes */}
@@ -748,6 +773,10 @@ function App() {
                             <Route path="/agent/withdrawals" element={<AgentRoute><AgentWithdrawalPage /></AgentRoute>} />
               <Route path="/verify" element={<VerifyCase />} />
               <Route path="/verify-case" element={<VerifyCase />} />
+              <Route path="/my-disputes" element={<MyDisputes />} />
+              <Route path="/my-damage-reports" element={<MyDamageReports />} />
+              <Route path="/subscribed-properties" element={<SubscribedProperties />} />
+              <Route path="/support" element={<Support />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
               <Route path="/nigeria" element={<NigeriaPage />} />
               <Route path="/nigeria/:stateSlug" element={<LocationPage />} />
@@ -787,6 +816,10 @@ function App() {
                 <Route path="lawyer-invites" element={<AdminLawyerInvites />} />
                 <Route path="properties" element={<AdminProperties />} />
                 <Route path="applications" element={<AdminApplications />} />
+                <Route path="inspections" element={<AdminInspections />} />
+                <Route path="evidence-verifications" element={<AdminEvidenceVerifications />} />
+                <Route path="ledger" element={<AdminLedger />} />
+                <Route path="seo" element={<SuperAdminRoute><SeoDashboard /></SuperAdminRoute>} />
                 <Route path="compliance" element={<AdminCompliance />} />
                 <Route
                   path="transportation"
@@ -807,7 +840,7 @@ function App() {
                 <Route path="transportation/state"
                   element={
                     <TransportationStateAdminRoute>
-                      <TransporationAdminStateDashboard />
+                      <TransportationAdminStateDashboard />
                     </TransportationStateAdminRoute>
                   }
                 />
@@ -827,6 +860,7 @@ function App() {
                 <Route path="financial-dashboard" element={<FinancialAdminRoute><FinancialAdminDashboard /></FinancialAdminRoute>} />
                 <Route path="state-dashboard" element={<StateAdminRoute><Navigate to="/admin" replace /></StateAdminRoute>} />
                 <Route path="withdrawals" element={<AdminWithdrawalsRoute />} />
+                <Route path="lga-support-dashboard" element={<LgaSupportAdminRoute><LgaSupportAdminDashboard /></LgaSupportAdminRoute>} />
                 <Route path="state-support-dashboard" element={<StateSupportAdminRoute><StateSupportAdminDashboard /></StateSupportAdminRoute>} />
                 <Route path="super-support-dashboard" element={<SuperSupportAdminRoute><SuperSupportAdminDashboard /></SuperSupportAdminRoute>} />
                 <Route path="recruitment" element={<RecruitmentAdminRoute><RecruitmentAdminDashboard /></RecruitmentAdminRoute>} />
@@ -847,11 +881,14 @@ function App() {
               </Routes>
             </Layout>
 
+            <TourManager />
+
             <ToastContainer position="top-right" autoClose={3000} />
           </SocketProvider>
         </Router>
-      </AuthProvider>
-    </QueryClientProvider>
+      </TourProvider>
+    </AuthProvider>
+  </QueryClientProvider>
   );
 }
 

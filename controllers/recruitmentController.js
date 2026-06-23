@@ -53,10 +53,19 @@ const generateReferenceNumber = () => {
 };
 
 const isRecruitmentAdmin = async (userId) => {
-  const result = await db.query(
-    `SELECT user_type, is_recruitment_admin FROM users WHERE id = $1`,
-    [userId]
-  );
+  let result;
+  try {
+    result = await db.query(
+      `SELECT user_type, is_recruitment_admin FROM users WHERE id = $1`,
+      [userId]
+    );
+  } catch (e) {
+    // Fallback if is_recruitment_admin column doesn't exist (migration 063 not run)
+    result = await db.query(
+      `SELECT user_type FROM users WHERE id = $1`,
+      [userId]
+    );
+  }
   if (!result.rows.length) return false;
   const user = result.rows[0];
   return user.user_type === 'super_admin' || 
@@ -173,21 +182,21 @@ exports.updateApplication = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Can only edit draft applications' });
     }
     
-    const allowedFields = [
+    const allowedColumns = new Set([
       'full_name', 'phone_number', 'email_address', 'state_name', 'lga_name',
       'area_locality', 'residential_address', 'date_of_birth', 'highest_education',
       'years_of_experience', 'current_employment_status', 'skills_qualifications',
       'suitability_reason'
-    ];
+    ]);
     
     const updates = [];
     const values = [];
     let paramCount = 1;
     
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) {
+    for (const [field, value] of Object.entries(req.body)) {
+      if (allowedColumns.has(field)) {
         updates.push(`${field} = $${paramCount}`);
-        values.push(req.body[field]);
+        values.push(value);
         paramCount++;
       }
     }
@@ -3348,10 +3357,19 @@ exports.getAnalytics = async (req, res) => {
     const cycleFilter = req.query?.cycle_id ? 'WHERE a.cycle_id = $1' : '';
     if (req.query?.cycle_id) params.push(req.query.cycle_id);
 
+    const safeQuery = async (sql, p) => {
+      try {
+        return await db.query(sql, p);
+      } catch (err) {
+        console.error('Analytics sub-query error:', err.message);
+        return { rows: [] };
+      }
+    };
+
     const [total, fees, perRole, monthly, interview, funnel, completionTime, locationHeatmap] = await Promise.all([
-      db.query(`SELECT COUNT(*)::INT AS count FROM recruitment_applications a ${cycleFilter}`, params),
-      db.query(`SELECT COALESCE(SUM(application_fee), 0)::NUMERIC AS total FROM recruitment_applications a ${cycleFilter ? `${cycleFilter} AND` : 'WHERE'} payment_status = 'paid'`, params),
-      db.query(
+      safeQuery(`SELECT COUNT(*)::INT AS count FROM recruitment_applications a ${cycleFilter}`, params),
+      safeQuery(`SELECT COALESCE(SUM(application_fee), 0)::NUMERIC AS total FROM recruitment_applications a ${cycleFilter ? `${cycleFilter} AND` : 'WHERE'} payment_status = 'paid'`, params),
+      safeQuery(
         `SELECT r.title, COUNT(a.id)::INT AS applicants,
                 COALESCE(SUM(CASE WHEN a.payment_status = 'paid' THEN a.application_fee ELSE 0 END), 0)::NUMERIC AS revenue
          FROM recruitment_roles r
@@ -3360,7 +3378,7 @@ exports.getAnalytics = async (req, res) => {
          ORDER BY applicants DESC`,
         params
       ),
-      db.query(
+      safeQuery(
         `SELECT TO_CHAR(DATE_TRUNC('month', a.created_at), 'YYYY-MM') AS month, COUNT(*)::INT AS applicants
          FROM recruitment_applications a
          ${cycleFilter}
@@ -3368,7 +3386,7 @@ exports.getAnalytics = async (req, res) => {
          ORDER BY month`,
         params
       ),
-      db.query(
+      safeQuery(
         `SELECT
            COUNT(*) FILTER (WHERE interview_completed = TRUE)::INT AS completed,
            COUNT(*) FILTER (WHERE interview_passed = TRUE)::INT AS passed,
@@ -3377,20 +3395,20 @@ exports.getAnalytics = async (req, res) => {
          ${cycleFilter}`,
         params
       ),
-      db.query(
+      safeQuery(
         `SELECT status, COUNT(*)::INT AS count
          FROM recruitment_applications a
          ${cycleFilter}
          GROUP BY status`,
         params
       ),
-      db.query(
+      safeQuery(
         `SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600), 0)::NUMERIC AS avg_hours
          FROM recruitment_applications a
          ${cycleFilter ? `${cycleFilter} AND` : 'WHERE'} status <> 'draft'`,
         params
       ),
-      db.query(
+      safeQuery(
         `SELECT state_name, lga_name, COUNT(*)::INT AS applicants
          FROM recruitment_applications a
          ${cycleFilter}

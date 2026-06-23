@@ -4,6 +4,7 @@ const { authenticate } = require("../config/middleware/auth");
 const { requireAdmin } = require('../config/middleware/requireAdmin');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const adminController = require('../controllers/adminController');
+const evidenceVerificationController = require('../controllers/evidenceVerification.controller');
 const { allowRoles } = require('../config/middleware/roleMiddleware');
 const superAdminOnly = require('../config/middleware/superAdminOnly');
 
@@ -164,5 +165,10 @@ router.post(
   adminController.createAdmin
 );
 
+router.get(
+  '/evidence-verifications',
+  requireAdminOrSuperAdmin,
+  evidenceVerificationController.adminGetVerificationLogs
+);
 
 module.exports = router;

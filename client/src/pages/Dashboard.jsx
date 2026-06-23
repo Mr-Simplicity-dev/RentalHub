@@ -29,6 +29,11 @@ import {
   FaMapMarkedAlt,
   FaExternalLinkAlt,
   FaLock,
+  FaTools,
+  FaBalanceScale,
+  FaKey,
+  FaTicketAlt,
+
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { getTimeAgo } from '../utils/helpers';
@@ -468,7 +473,7 @@ const Dashboard = () => {
     }
 
     if (user.user_type === 'super_fumigation_admin') {
-      navigate('/admin/fumigation-cleaning/super', { replace: true });
+      navigate('/super-admin/fumigation-cleaning', { replace: true });
       return;
     }
 
@@ -483,7 +488,7 @@ const Dashboard = () => {
     }
 
     if (user.user_type === 'super_transportation_admin') {
-      navigate('/admin/transportation/super', { replace: true });
+      navigate('/super-admin/transportation', { replace: true });
       return;
     }
 
@@ -1322,6 +1327,13 @@ const Dashboard = () => {
       }];
   const hasActivePropertyLocation = propertyLocationCards.some(canOpenPropertyMap);
   const hasPropertyInspectionOptions = propertyInspectionOptions.length > 0;
+  const completedInspections = propertyInspectionOptions.filter(
+    (o) => o.inspection_status === 'completed'
+  );
+  const hasCompletedInspections = completedInspections.length > 0;
+  const hasEligibleInspectionOptions = propertyInspectionOptions.some(
+    (o) => !o.inspection_status || o.inspection_status === 'pending_payment'
+  );
   const inspectionFeeAmount = Number(propertyInspectionOptions[0]?.inspection_amount || 10000);
   const selectedInspectionOption =
     propertyInspectionOptions.find(
@@ -1445,7 +1457,7 @@ const Dashboard = () => {
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <section className="dashboard-properties-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {user?.user_type === 'tenant' ? (
             <>
               <StatCard
@@ -1453,6 +1465,7 @@ const Dashboard = () => {
                 title="Saved Properties"
                 value={stats?.saved_properties_count || 0}
                 onClick={() => navigate('/saved-properties')}
+                className="tour-saved-properties"
               />
               <StatCard
                 icon={<FaCheckCircle className="text-blue-500" />}
@@ -1465,6 +1478,7 @@ const Dashboard = () => {
                 title="Unread Messages"
                 value={stats?.unread_messages || 0}
                 onClick={() => navigate('/messages')}
+                className="tour-messages"
               />
               <StatCard
                 icon={<FaClock className="text-yellow-500" />}
@@ -1503,6 +1517,7 @@ const Dashboard = () => {
               <StatCard
                 icon={<FaWallet className="text-teal-500" />}
                 title="Wallet Balance"
+                className="tour-wallet"
                 value={walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
                 onClick={openWithdrawModal}
               />
@@ -1514,6 +1529,7 @@ const Dashboard = () => {
                 title={t('dashboard.total_props')}
                 value={stats?.total_properties || 0}
                 onClick={() => navigate('/my-properties')}
+                className="tour-saved-properties"
               />
               <StatCard
                 icon={<FaCheckCircle className="text-green-500" />}
@@ -1532,6 +1548,7 @@ const Dashboard = () => {
                 title={t('dashboard.unread')}
                 value={stats?.unread_messages || 0}
                 onClick={() => navigate('/messages')}
+                className="tour-messages"
               />
               <StatCard
                 icon={<FaUndo className="text-orange-500" />}
@@ -1552,6 +1569,7 @@ const Dashboard = () => {
               <StatCard
                 icon={<FaPiggyBank className="text-teal-500" />}
                 title="Available to Withdraw"
+                className="tour-wallet"
                 value={landlordWallet ? `₦${Number(landlordWallet.available_to_withdraw).toLocaleString()}` : '—'}
                 onClick={openWithdrawModal}
               />
@@ -1563,11 +1581,11 @@ const Dashboard = () => {
               />
             </>
           )}
-        </div>
+        </section>
 
         {user?.user_type === 'tenant' && (
           <section
-            className={`mb-8 rounded-lg border bg-white p-5 shadow-sm ${
+            className={`dashboard-bookings-section tour-property-location mb-8 rounded-lg border bg-white p-5 shadow-sm ${
               hasActivePropertyLocation ? 'border-emerald-200' : 'border-gray-200'
             }`}
           >
@@ -1780,7 +1798,7 @@ const Dashboard = () => {
         )}
 
         {/* Recent Activities */}
-        <div className="card">
+        <section className="dashboard-analytics-section tour-recent-activity card">
           <h2 className="text-xl font-bold mb-4 text-center">{t('dashboard.recent')}</h2>
           {recentActivities.length === 0 ? (
             <p className="text-gray-600 text-center py-8">
@@ -1793,12 +1811,12 @@ const Dashboard = () => {
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         <AdSpace placement="dashboard_inline" contained={false} className="mt-8" />
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+        <section className="dashboard-messages-section tour-quick-actions grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
           {user?.user_type === 'tenant' ? (
             <>
               <QuickActionCard
@@ -1820,10 +1838,38 @@ const Dashboard = () => {
                 onClick={() => navigate('/payment-history')}
               />
               <QuickActionCard
+                title="My Disputes"
+                description="View and manage disputes you are involved in"
+                icon={<FaBalanceScale />}
+                onClick={() => navigate('/my-disputes')}
+              />
+              <QuickActionCard
+                title="Damage Reports"
+                description={
+                  user?.user_type === 'landlord'
+                    ? 'View damage reports for your properties'
+                    : 'View published damage reports for your rented properties'
+                }
+                icon={<FaTools />}
+                onClick={() => navigate('/my-damage-reports')}
+              />
+              <QuickActionCard
                 title="Subscription"
                 description="View Super Admin priced monthly access and multiple property add-on"
                 icon={<FaClock />}
                 onClick={() => navigate('/subscribe')}
+              />
+              <QuickActionCard
+                title="Subscribed Properties"
+                description="View properties you have unlocked access to"
+                icon={<FaKey />}
+                onClick={() => navigate('/subscribed-properties')}
+              />
+              <QuickActionCard
+                title="Help & Support"
+                description="Submit a support ticket or view your requests"
+                icon={<FaTicketAlt />}
+                onClick={() => navigate('/support')}
               />
               <QuickActionCard
                 title="Fumigation & Cleaning"
@@ -1832,25 +1878,31 @@ const Dashboard = () => {
                 onClick={() => navigate('/fumigation-cleaning/catalog')}
               />
               <QuickActionCard
-                title="Inspection Fee"
+                title={hasCompletedInspections ? 'Inspections' : 'Inspection Fee'}
                 description={
-                  hasPropertyInspectionOptions
+                  hasCompletedInspections
+                    ? `${completedInspections.length} completed — tap to view reports`
+                    : hasPropertyInspectionOptions
                     ? 'Let RentalHub NG inspect an applied property against the landlord description'
                     : 'Activated after you apply for a property'
                 }
                 icon={<FaUserCheck />}
                 onClick={openInspectionModal}
                 note={
-                  hasPropertyInspectionOptions
+                  hasCompletedInspections
+                    ? 'View Reports'
+                    : hasPropertyInspectionOptions
                     ? `₦${inspectionFeeAmount.toLocaleString()}`
                     : 'Apply first'
                 }
                 noteClass={
-                  hasPropertyInspectionOptions
+                  hasCompletedInspections
+                    ? 'bg-green-100 text-green-700 border-green-200'
+                    : hasPropertyInspectionOptions
                     ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
                     : 'bg-gray-100 text-gray-600 border-gray-200'
                 }
-                disabled={!hasPropertyInspectionOptions}
+                disabled={!hasPropertyInspectionOptions && !hasCompletedInspections}
               />
               <QuickActionCard
                 title="Request a Refund"
@@ -1924,6 +1976,24 @@ const Dashboard = () => {
                 noteClass={graceCountdown?.className}
               />
               <QuickActionCard
+                title="My Disputes"
+                description="View and manage disputes you are involved in"
+                icon={<FaBalanceScale />}
+                onClick={() => navigate('/my-disputes')}
+              />
+              <QuickActionCard
+                title="Damage Reports"
+                description="View damage reports for your properties"
+                icon={<FaTools />}
+                onClick={() => navigate('/my-damage-reports')}
+              />
+              <QuickActionCard
+                title="Help & Support"
+                description="Submit a support ticket or view your requests"
+                icon={<FaTicketAlt />}
+                onClick={() => navigate('/support')}
+              />
+              <QuickActionCard
                 title="Withdraw Funds"
                 description="Withdraw cleared rent payments to your bank account"
                 icon={<FaUniversity />}
@@ -1943,7 +2013,7 @@ const Dashboard = () => {
               />
             </>
           )}
-        </div>
+        </section>
       </div>
 
       {/* PROPERTY INSPECTION FEE MODAL (tenant only) */}
@@ -1973,7 +2043,52 @@ const Dashboard = () => {
             </div>
 
             <div className="px-5 py-5 sm:px-6">
-              {!hasPropertyInspectionOptions ? (
+              {hasCompletedInspections && (
+                <div className="mb-6 space-y-4">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <FaCheckCircle className="text-green-600" />
+                    Completed Inspections
+                  </h3>
+                  {completedInspections.map((item) => (
+                    <div
+                      key={item.application_id}
+                      className="rounded-xl border border-green-200 bg-green-50 p-4"
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-gray-900">{item.property_title}</p>
+                          <p className="text-xs text-gray-600">
+                            {[item.area, item.city, item.state_name].filter(Boolean).join(', ') || item.full_address}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-green-200 px-2.5 py-1 text-xs font-semibold text-green-800">
+                          Completed
+                        </span>
+                      </div>
+                      {item.inspection_note && (
+                        <p className="mb-2 text-xs text-gray-500">
+                          <span className="font-medium">Your note:</span> {item.inspection_note}
+                        </p>
+                      )}
+                      <div className="rounded-lg border border-green-100 bg-white p-3 text-sm text-gray-700">
+                        <p className="mb-1 text-xs font-semibold uppercase text-green-700">
+                          Inspection Report
+                        </p>
+                        <p className="whitespace-pre-wrap">{item.inspection_summary || 'No report summary provided.'}</p>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-400">
+                        {item.inspection_completed_at
+                          ? `Completed: ${new Date(item.inspection_completed_at).toLocaleDateString()}`
+                          : item.inspection_paid_at
+                          ? `Paid: ${new Date(item.inspection_paid_at).toLocaleDateString()}`
+                          : ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!hasEligibleInspectionOptions && !hasCompletedInspections ? (
                 <div className="space-y-4 text-center">
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-500">
                     <FaLock className="text-xl" />
@@ -1996,7 +2111,7 @@ const Dashboard = () => {
                     Browse Properties
                   </button>
                 </div>
-              ) : (
+              ) : hasEligibleInspectionOptions ? (
                 <form onSubmit={handleInspectionPayment} className="space-y-5">
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                     <p className="font-semibold">Inspection fee: ₦{inspectionFeeAmount.toLocaleString()}</p>
@@ -2016,11 +2131,13 @@ const Dashboard = () => {
                       className="input w-full"
                       required
                     >
-                      {propertyInspectionOptions.map((item) => (
-                        <option key={item.application_id} value={item.application_id}>
-                          {item.property_title} - {item.area || item.city || 'Location'} ({item.application_status})
-                        </option>
-                      ))}
+                      {propertyInspectionOptions
+                        .filter((o) => !o.inspection_status || o.inspection_status === 'pending_payment')
+                        .map((item) => (
+                          <option key={item.application_id} value={item.application_id}>
+                            {item.property_title} - {item.area || item.city || 'Location'} ({item.application_status})
+                          </option>
+                        ))}
                     </select>
                   </div>
 
@@ -2085,7 +2202,7 @@ const Dashboard = () => {
                     </button>
                   </div>
                 </form>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -3320,8 +3437,8 @@ const LandlordPropertyFeeModal = ({
 };
 
 // Stat Card Component
-const StatCard = ({ icon, title, value, onClick, note, noteClass = 'bg-gray-100 text-gray-700 border-gray-200' }) => (
-  <div onClick={onClick} className="card cursor-pointer">
+const StatCard = ({ icon, title, value, onClick, note, noteClass = 'bg-gray-100 text-gray-700 border-gray-200', className = '' }) => (
+  <div onClick={onClick} className={`card cursor-pointer ${className}`}>
     <div className="flex items-center justify-between">
       <div>
         <p className="text-gray-600 text-sm mb-1">{title}</p>
@@ -3351,6 +3468,16 @@ const ActivityItem = ({ activity }) => {
         return <FaEnvelope className="text-purple-500" />;
       case 'review':
         return <FaCheckCircle className="text-green-500" />;
+      case 'dispute':
+        return <FaBalanceScale className="text-orange-500" />;
+      case 'damage_report':
+        return <FaTools className="text-red-500" />;
+      case 'support_ticket':
+        return <FaTicketAlt className="text-cyan-500" />;
+      case 'fumigation_booking':
+        return <FaSprayCan className="text-emerald-500" />;
+      case 'transport_booking':
+        return <FaTruck className="text-indigo-500" />;
       default:
         return <FaCheckCircle className="text-gray-500" />;
     }
@@ -3376,6 +3503,16 @@ const ActivityItem = ({ activity }) => {
           stars: activity.status,
           title: activity.property_title,
         });
+      case 'dispute':
+        return t('dashboard.activity_dispute', { title: activity.property_title, status: activity.status });
+      case 'damage_report':
+        return t('dashboard.activity_damage_report', { title: activity.property_title, status: activity.status });
+      case 'support_ticket':
+        return t('dashboard.activity_support_ticket', { title: activity.property_title, status: activity.status });
+      case 'fumigation_booking':
+        return t('dashboard.activity_fumigation_booking', { title: activity.property_title, status: activity.status });
+      case 'transport_booking':
+        return t('dashboard.activity_transport_booking', { title: activity.property_title, status: activity.status });
       default:
         return t('dashboard.activity_generic');
     }
@@ -3403,10 +3540,11 @@ const QuickActionCard = ({
   note,
   noteClass = 'bg-gray-100 text-gray-700 border-gray-200',
   disabled = false,
+  className = '',
 }) => (
   <div
     onClick={onClick}
-    className={`card cursor-pointer text-center transition ${
+    className={`card cursor-pointer text-center transition ${className} ${
       disabled ? 'border-gray-200 bg-gray-50 opacity-80' : 'hover:-translate-y-0.5'
     }`}
     aria-disabled={disabled}

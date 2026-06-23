@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../services/api';
+import { toast } from 'react-toastify';
+import { useAuth } from '../hooks/useAuth';
 import DisputeQRCode from '../components/DisputeQRCode';
 
 const formatDateTime = (value) => {
@@ -17,9 +19,18 @@ const getEvidenceStatusBadge = (status) => {
 
 export default function DisputeDetails() {
   const { disputeId } = useParams();
+  const { user } = useAuth();
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editMessageText, setEditMessageText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +58,71 @@ export default function DisputeDetails() {
       cancelled = true;
     };
   }, [disputeId]);
+
+  const handleFileSelect = (e) => {
+    setSelectedFile(e.target.files[0] || null);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      await api.post(`/disputes/${disputeId}/evidence`, formData);
+      toast.success('Evidence uploaded');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      const res = await api.get(`/disputes/${disputeId}`);
+      setPayload(res.data?.data || null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+    setSendingMsg(true);
+    try {
+      await api.post(`/disputes/${disputeId}/messages`, { message: newMessage.trim() });
+      setNewMessage('');
+      const res = await api.get(`/disputes/${disputeId}`);
+      setPayload(res.data?.data || null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send message');
+    } finally {
+      setSendingMsg(false);
+    }
+  };
+
+  const startEditing = (msg) => {
+    setEditingMessageId(msg.id);
+    setEditMessageText(msg.message);
+  };
+
+  const cancelEditing = () => {
+    setEditingMessageId(null);
+    setEditMessageText('');
+  };
+
+  const handleSaveEdit = async (messageId) => {
+    if (!editMessageText.trim()) return;
+    setSavingEdit(true);
+    try {
+      await api.patch(`/disputes/${disputeId}/messages/${messageId}`, { message: editMessageText.trim() });
+      setEditingMessageId(null);
+      setEditMessageText('');
+      const res = await api.get(`/disputes/${disputeId}`);
+      setPayload(res.data?.data || null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to edit message');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   if (loading) return <div className="p-6">Loading dispute...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
@@ -220,6 +296,24 @@ export default function DisputeDetails() {
         <div className="grid gap-6 lg:grid-cols-2">
           <section className="rounded-3xl bg-white p-8 shadow-sm">
             <h2 className="text-2xl font-semibold text-gray-900">Messages</h2>
+            {!dispute.is_legally_sealed && (
+              <form onSubmit={handleSendMessage} className="mt-4 flex gap-3">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-primary-600"
+                />
+                <button
+                  type="submit"
+                  disabled={sendingMsg || !newMessage.trim()}
+                  className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {sendingMsg ? 'Sending...' : 'Send'}
+                </button>
+              </form>
+            )}
             {messages.length === 0 ? (
               <p className="mt-4 text-gray-500">No messages recorded yet.</p>
             ) : (
@@ -228,9 +322,48 @@ export default function DisputeDetails() {
                   <div key={message.id} className="rounded-2xl border border-gray-200 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="font-semibold text-gray-900">{message.sender_name || 'Unknown user'}</p>
-                      <p className="text-sm text-gray-500">{formatDateTime(message.created_at)}</p>
+                      <div className="flex items-center gap-3">
+                        {(message.edit_count > 0) && (
+                          <span className="text-xs text-gray-400 italic">edited ({message.edit_count}/2)</span>
+                        )}
+                        <p className="text-sm text-gray-500">{formatDateTime(message.created_at)}</p>
+                      </div>
                     </div>
-                    <p className="mt-3 text-sm leading-7 text-gray-700">{message.message}</p>
+                    {editingMessageId === message.id ? (
+                      <div className="mt-3 space-y-2">
+                        <textarea
+                          value={editMessageText}
+                          onChange={(e) => setEditMessageText(e.target.value)}
+                          className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-primary-600"
+                          rows={2}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSaveEdit(message.id)}
+                            disabled={savingEdit || !editMessageText.trim()}
+                            className="rounded-full bg-primary-600 px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                          >
+                            {savingEdit ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            className="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-medium text-gray-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-7 text-gray-700 whitespace-pre-wrap">{message.message}</p>
+                    )}
+                    {user?.id === message.sender_id && editingMessageId !== message.id && !dispute.is_legally_sealed && (message.edit_count || 0) < 2 && (
+                      <button
+                        onClick={() => startEditing(message)}
+                        className="mt-2 text-xs text-primary-600 hover:underline"
+                      >
+                        Edit
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -266,7 +399,29 @@ export default function DisputeDetails() {
         </div>
 
         <section className="rounded-3xl bg-white p-8 shadow-sm">
-          <h2 className="text-2xl font-semibold text-gray-900">Evidence files</h2>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h2 className="text-2xl font-semibold text-gray-900">Evidence files</h2>
+            {!dispute.is_legally_sealed && (
+              <div className="flex items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.mp4,.mov,.avi,.zip,.doc,.docx"
+                  onChange={handleFileSelect}
+                  className="max-w-48 text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-100"
+                />
+                {selectedFile && (
+                  <button
+                    onClick={handleUpload}
+                    disabled={uploading}
+                    className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    {uploading ? 'Uploading...' : 'Upload'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           {evidence.length === 0 ? (
             <p className="mt-4 text-gray-500">No evidence uploaded yet.</p>
           ) : (
