@@ -369,7 +369,7 @@ const updateCampaign = async (req, res) => {
     const params = [id];
     let idx = 2;
 
-    const allowedColumns = new Set(['name', 'content', 'sender_name', 'recipient_filter', 'scheduled_at']);
+    const allowedColumns = new Set(['name', 'content', 'sender_name', 'recipient_filter', 'scheduled_at', 'max_retries']);
     for (const [key, value] of Object.entries(fields)) {
       if (allowedColumns.has(key)) {
         setClauses.push(`${key} = $${idx}`);
@@ -408,153 +408,6 @@ const deleteCampaign = async (req, res) => {
   } catch (error) {
     console.error('Delete SMS campaign error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to delete SMS campaign' });
-  }
-};
-
-const sendCampaign = async (req, res) => {
-  try {
-    await ensureSchema();
-    const { id } = req.params;
-
-    const campaign = await db.query(`SELECT * FROM sms_campaigns WHERE id = $1`, [id]);
-    if (!campaign.rows.length) return res.status(404).json({ success: false, message: 'Campaign not found' });
-
-    const c = campaign.rows[0];
-    if (c.status !== 'draft') return res.status(400).json({ success: false, message: `Campaign is already ${c.status}` });
-
-    const filter = c.recipient_filter || {};
-    const subscriberQuery = [];
-    const subscriberParams = [];
-    let idx = 1;
-
-    subscriberQuery.push(`s.subscribed = TRUE`);
-
-    if (filter.sources && Array.isArray(filter.sources) && filter.sources.length > 0) {
-      subscriberQuery.push(`s.source = ANY($${idx})`);
-      subscriberParams.push(filter.sources);
-      idx++;
-    }
-
-    if (filter.user_types && Array.isArray(filter.user_types) && filter.user_types.length > 0) {
-      subscriberQuery.push(`s.user_type = ANY($${idx})`);
-      subscriberParams.push(filter.user_types);
-      idx++;
-    }
-
-    if (filter.tags && Array.isArray(filter.tags) && filter.tags.length > 0) {
-      subscriberQuery.push(`s.tags @> $${idx}`);
-      subscriberParams.push(filter.tags);
-      idx++;
-    }
-
-    const whereClause = subscriberQuery.join(' AND ');
-    const subscribers = await db.query(
-      `SELECT id, phone, full_name FROM sms_subscribers WHERE ${whereClause}`,
-      subscriberParams
-    );
-
-    if (subscribers.rows.length === 0) {
-      return res.status(400).json({ success: false, message: 'No subscribers match the filter criteria' });
-    }
-
-    await db.query(
-      `UPDATE sms_campaigns SET status = 'sending', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [id]
-    );
-
-    const recipientInserts = subscribers.rows.map((s) =>
-      db.query(
-        `INSERT INTO sms_campaign_recipients (campaign_id, subscriber_id, phone, full_name, status)
-         VALUES ($1, $2, $3, $4, 'pending')`,
-        [id, s.id, s.phone, s.full_name || null]
-      )
-    );
-    await Promise.all(recipientInserts);
-
-    let sent = 0;
-    let failed = 0;
-
-    for (let i = 0; i < subscribers.rows.length; i += BATCH_SIZE) {
-      const batch = subscribers.rows.slice(i, i + BATCH_SIZE);
-      const batchPromises = batch.map(async (sub) => {
-        try {
-          await sendSMS(sub.phone, c.content);
-
-          await db.query(
-            `UPDATE sms_campaign_recipients SET status = 'sent', sent_at = CURRENT_TIMESTAMP
-             WHERE campaign_id = $1 AND subscriber_id = $2`,
-            [id, sub.id]
-          );
-          sent++;
-        } catch (err) {
-          await db.query(
-            `UPDATE sms_campaign_recipients SET status = 'failed', error_message = $1
-             WHERE campaign_id = $2 AND subscriber_id = $3`,
-            [err.message?.slice(0, 500) || 'Unknown error', id, sub.id]
-          );
-          failed++;
-        }
-      });
-
-      await Promise.all(batchPromises);
-    }
-
-    const total = subscribers.rows.length;
-    const stats = { sent, failed };
-    const newStatus = failed > 0 && sent === 0 ? 'draft' : 'sent';
-
-    await db.query(
-      `UPDATE sms_campaigns SET status = $1, stats = $2, sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
-      [newStatus, JSON.stringify(stats), id]
-    );
-
-    res.json({
-      success: true,
-      data: { total, sent, failed, status: newStatus },
-    });
-  } catch (error) {
-    console.error('Send SMS campaign error:', error.message);
-    res.status(500).json({ success: false, message: 'Failed to send SMS campaign' });
-  }
-};
-
-const getCampaignStats = async (req, res) => {
-  try {
-    await ensureSchema();
-    const { id } = req.params;
-
-    const campaign = await db.query(`SELECT * FROM sms_campaigns WHERE id = $1`, [id]);
-    if (!campaign.rows.length) return res.status(404).json({ success: false, message: 'Campaign not found' });
-
-    const statusCounts = await db.query(
-      `SELECT status, COUNT(*)::int AS count FROM sms_campaign_recipients WHERE campaign_id = $1 GROUP BY status`,
-      [id]
-    );
-
-    const counts = { sent: 0, failed: 0 };
-    statusCounts.rows.forEach((r) => {
-      if (counts[r.status] !== undefined) counts[r.status] = r.count;
-    });
-
-    const recipients = await db.query(
-      `SELECT r.id, r.phone, r.full_name, r.status, r.sent_at, r.error_message
-       FROM sms_campaign_recipients r
-       WHERE r.campaign_id = $1
-       ORDER BY r.created_at DESC LIMIT 200`,
-      [id]
-    );
-
-    res.json({
-      success: true,
-      data: {
-        campaign: campaign.rows[0],
-        stats: { ...campaign.rows[0].stats, ...counts, total: recipients.rows.length },
-        recipients: recipients.rows,
-      },
-    });
-  } catch (error) {
-    console.error('SMS campaign stats error:', error.message);
-    res.status(500).json({ success: false, message: 'Failed to load SMS campaign stats' });
   }
 };
 
@@ -597,9 +450,252 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
+const importSubscribers = async (req, res) => {
+  try {
+    await ensureSchema();
+    const { phones } = req.body;
+
+    if (!Array.isArray(phones) || phones.length === 0) {
+      return res.status(400).json({ success: false, message: 'No phone numbers provided' });
+    }
+
+    const normalized = phones
+      .map((p) => String(p).replace(/[\s-]/g, '').trim())
+      .filter((p) => p.length >= 10 && /^\d+$/.test(p));
+
+    if (normalized.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid phone numbers found' });
+    }
+
+    let added = 0;
+    let skipped = 0;
+
+    for (const phone of normalized) {
+      await db.query(
+        `INSERT INTO sms_subscribers (phone, source, subscribed)
+         VALUES ($1, 'import', TRUE)
+         ON CONFLICT (phone) DO UPDATE SET
+           subscribed = TRUE,
+           unsubscribed_at = NULL,
+           updated_at = CURRENT_TIMESTAMP`,
+        [phone]
+      );
+      added++;
+    }
+
+    const total = await db.query(
+      `SELECT COUNT(*)::int AS total FROM sms_subscribers WHERE source = 'import'`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        added,
+        skipped: phones.length - normalized.length,
+        totalImport: total.rows[0].total,
+      },
+    });
+  } catch (error) {
+    console.error('Import SMS subscribers error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to import SMS subscribers' });
+  }
+};
+
+const sendCampaign = async (req, res) => {
+  try {
+    await ensureSchema();
+    const { id } = req.params;
+    const { max_retries } = req.body;
+
+    const campaign = await db.query(`SELECT * FROM sms_campaigns WHERE id = $1`, [id]);
+    if (!campaign.rows.length) return res.status(404).json({ success: false, message: 'Campaign not found' });
+
+    const c = campaign.rows[0];
+    if (c.status !== 'draft') return res.status(400).json({ success: false, message: `Campaign is already ${c.status}` });
+
+    const filter = c.recipient_filter || {};
+    const subscriberQuery = [];
+    const subscriberParams = [];
+    let idx = 1;
+
+    subscriberQuery.push(`s.subscribed = TRUE`);
+
+    if (filter.sources && Array.isArray(filter.sources) && filter.sources.length > 0) {
+      subscriberQuery.push(`s.source = ANY($${idx})`);
+      subscriberParams.push(filter.sources);
+      idx++;
+    }
+
+    if (filter.user_types && Array.isArray(filter.user_types) && filter.user_types.length > 0) {
+      subscriberQuery.push(`s.user_type = ANY($${idx})`);
+      subscriberParams.push(filter.user_types);
+      idx++;
+    }
+
+    if (filter.tags && Array.isArray(filter.tags) && filter.tags.length > 0) {
+      subscriberQuery.push(`s.tags @> $${idx}`);
+      subscriberParams.push(filter.tags);
+      idx++;
+    }
+
+    const whereClause = subscriberQuery.join(' AND ');
+    const subscribers = await db.query(
+      `SELECT id, phone, full_name FROM sms_subscribers WHERE ${whereClause}`,
+      subscriberParams
+    );
+
+    if (subscribers.rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'No subscribers match the filter criteria' });
+    }
+
+    const retryCount = Math.min(Math.max(parseInt(max_retries, 10) || 0, 0), 3);
+
+    await db.query(
+      `UPDATE sms_campaigns SET status = 'queued', max_retries = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [id, retryCount]
+    );
+
+    const recipientInserts = subscribers.rows.map((s) =>
+      db.query(
+        `INSERT INTO sms_campaign_recipients (campaign_id, subscriber_id, phone, full_name, status)
+         VALUES ($1, $2, $3, $4, 'pending')`,
+        [id, s.id, s.phone, s.full_name || null]
+      )
+    );
+    await Promise.all(recipientInserts);
+
+    const segments = Math.ceil(c.content.length / 160) || 1;
+    const costResp = await db.query(
+      `SELECT value FROM commission_config WHERE key = 'sms_cost_per_segment'`
+    );
+    const costPerSegment = parseFloat(costResp.rows[0]?.value) || 4;
+    const estimatedCost = (segments * costPerSegment * subscribers.rows.length).toFixed(2);
+
+    res.json({
+      success: true,
+      data: {
+        total: subscribers.rows.length,
+        status: 'queued',
+        estimated_cost: estimatedCost,
+        estimated_segments: segments,
+        max_retries: retryCount,
+      },
+    });
+  } catch (error) {
+    console.error('Send SMS campaign error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to queue SMS campaign' });
+  }
+};
+
+const retryCampaign = async (req, res) => {
+  try {
+    await ensureSchema();
+    const { id } = req.params;
+
+    const campaign = await db.query(
+      `SELECT id, max_retries, stats FROM sms_campaigns WHERE id = $1`,
+      [id]
+    );
+    if (!campaign.rows.length) return res.status(404).json({ success: false, message: 'Campaign not found' });
+
+    const c = campaign.rows[0];
+    if (c.max_retries < 1) {
+      return res.status(400).json({ success: false, message: 'This campaign has retries disabled' });
+    }
+
+    const { rows: retryable } = await db.query(
+      `UPDATE sms_campaign_recipients SET status = 'pending', error_message = NULL, updated_at = NOW()
+       WHERE campaign_id = $1 AND status = 'failed'
+       AND last_error_type = 'transient'
+       AND retry_count < $2
+       RETURNING id`,
+      [id, c.max_retries]
+    );
+
+    if (retryable.length === 0) {
+      return res.status(400).json({ success: false, message: 'No retryable failures found' });
+    }
+
+    await db.query(
+      `UPDATE sms_campaign_recipients SET retry_count = retry_count + 1
+       WHERE campaign_id = $1 AND status = 'pending' AND retry_count > 0`,
+      [id]
+    );
+
+    await db.query(
+      `UPDATE sms_campaigns SET status = 'sending', updated_at = NOW() WHERE id = $1`,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      data: { retrying: retryable.length },
+    });
+  } catch (error) {
+    console.error('Retry SMS campaign error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to retry SMS campaign' });
+  }
+};
+
+const getCampaignStats = async (req, res) => {
+  try {
+    await ensureSchema();
+    const { id } = req.params;
+
+    const campaign = await db.query(`SELECT * FROM sms_campaigns WHERE id = $1`, [id]);
+    if (!campaign.rows.length) return res.status(404).json({ success: false, message: 'Campaign not found' });
+
+    const statusCounts = await db.query(
+      `SELECT status, COUNT(*)::int AS count FROM sms_campaign_recipients WHERE campaign_id = $1 GROUP BY status`,
+      [id]
+    );
+
+    const counts = { pending: 0, sent: 0, failed: 0 };
+    statusCounts.rows.forEach((r) => {
+      if (counts[r.status] !== undefined) counts[r.status] = r.count;
+    });
+
+    const recipients = await db.query(
+      `SELECT r.id, r.phone, r.full_name, r.status, r.sent_at, r.error_message, r.retry_count
+       FROM sms_campaign_recipients r
+       WHERE r.campaign_id = $1
+       ORDER BY r.created_at DESC LIMIT 200`,
+      [id]
+    );
+
+    const segments = Math.ceil((campaign.rows[0].content || '').length / 160) || 1;
+    const costResp = await db.query(
+      `SELECT value FROM commission_config WHERE key = 'sms_cost_per_segment'`
+    );
+    const costPerSegment = parseFloat(costResp.rows[0]?.value) || 4;
+    const totalSegments = segments * (counts.sent + counts.failed);
+    const actualCost = (totalSegments * costPerSegment).toFixed(2);
+
+    res.json({
+      success: true,
+      data: {
+        campaign: campaign.rows[0],
+        stats: { ...campaign.rows[0].stats, ...counts, total: recipients.rows.length },
+        recipients: recipients.rows,
+        cost: {
+          per_segment: costPerSegment,
+          segments_per_message: segments,
+          total_segments: totalSegments,
+          estimated: campaign.rows[0].cost_estimate,
+          actual: actualCost,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('SMS campaign stats error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to load SMS campaign stats' });
+  }
+};
+
 module.exports = {
   listSubscribers,
   syncSubscribers,
+  importSubscribers,
   addSubscriber,
   updateSubscriber,
   deleteSubscriber,
@@ -612,6 +708,7 @@ module.exports = {
   updateCampaign,
   deleteCampaign,
   sendCampaign,
+  retryCampaign,
   getCampaignStats,
   getDashboardStats,
 };

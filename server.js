@@ -71,6 +71,7 @@ const adminInspectionRoutes = require('./routes/adminInspections');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 const { startRentSavingsJobs } = require('./jobs/rentSavingsJobs');
 const { startSmsDeliveryJobs } = require('./jobs/smsDeliveryJobs');
+const { startSmsMarketingJobs } = require('./jobs/smsMarketingJobs');
 const { startRecruitmentJobs } = require('./jobs/recruitmentJobs');
 const csrfProtection = require('./config/middleware/csrfProtection');
 const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
@@ -609,6 +610,7 @@ const startBackgroundServices = () => {
   startPropertyJobs();
   startRentSavingsJobs();
   startSmsDeliveryJobs();
+  startSmsMarketingJobs();
   startRecruitmentJobs();
   startScheduler();
   scheduleEvidenceIntegrityMonitoring();

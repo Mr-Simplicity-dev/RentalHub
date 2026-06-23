@@ -2,16 +2,28 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import {
   FaEnvelope, FaUsers, FaChartBar, FaPaperPlane, FaPlus, FaTrash, FaPlay,
-  FaSyncAlt, FaSearch, FaTimes, FaEdit, FaFileAlt, FaChevronLeft, FaChevronRight, FaPhone,
+  FaSyncAlt, FaSearch, FaTimes, FaEdit, FaFileAlt, FaChevronLeft, FaChevronRight,
+  FaPhone, FaUpload, FaRedo, FaDollarSign, FaClock,
 } from 'react-icons/fa';
 import api from '../../services/api';
 
 const TAB_KEYS = ['overview', 'campaigns', 'subscribers', 'templates'];
 
+const SEGMENT_LIMIT = 160;
+const COST_PER_SEGMENT = 4;
+
+const getSegments = (text) => Math.ceil((text || '').length / SEGMENT_LIMIT) || 1;
+
+const formatCost = (segments, recipients) => {
+  const total = segments * COST_PER_SEGMENT * (recipients || 0);
+  return `\u20A6${total.toFixed(2)}`;
+};
+
 const emptyCampaign = {
   name: '', content: '',
   sender_name: '',
   template_id: '', recipient_filter: '{}',
+  max_retries: 0, scheduled_at: '',
 };
 
 const emptyTemplate = {
@@ -37,11 +49,15 @@ const SmsMarketingTab = () => {
   const [showCampaignForm, setShowCampaignForm] = useState(false);
   const [campaignStats, setCampaignStats] = useState(null);
   const [viewingCampaignId, setViewingCampaignId] = useState(null);
+  const [estimatedRecipients, setEstimatedRecipients] = useState(0);
 
   const [templates, setTemplates] = useState([]);
   const [templateForm, setTemplateForm] = useState(emptyTemplate);
   const [editingTemplateId, setEditingTemplateId] = useState(null);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
+
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvPreview, setCsvPreview] = useState([]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -141,6 +157,43 @@ const SmsMarketingTab = () => {
     }
   };
 
+  const handleCsvFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setCsvFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const lines = ev.target.result.split('\n').filter((l) => l.trim());
+      const phones = lines.map((l) => l.split(',')[0].replace(/[\s"']/g, '')).filter((p) => p.length >= 10);
+      setCsvPreview(phones.slice(0, 10));
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCsvImport = async () => {
+    if (!csvFile) { toast.error('Select a CSV file first'); return; }
+    try {
+      setLoading(true);
+      const text = await csvFile.text();
+      const phones = text.split('\n')
+        .map((l) => l.split(',')[0].replace(/[\s"']/g, '').trim())
+        .filter((p) => p.length >= 10 && /^\d+$/.test(p));
+
+      const res = await api.post('/sms-marketing/subscribers/import', { phones });
+      toast.success(`Imported: ${res.data.data.added} contacts`);
+      setCsvFile(null);
+      setCsvPreview([]);
+      document.getElementById('csv-input').value = '';
+      loadSubscribers(subSearch, subPage);
+      loadStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCampaignSubmit = async (e) => {
     e.preventDefault();
     if (!campaignForm.name.trim()) { toast.error('Campaign name is required'); return; }
@@ -151,6 +204,8 @@ const SmsMarketingTab = () => {
         ...campaignForm,
         recipient_filter: campaignForm.recipient_filter ? JSON.parse(campaignForm.recipient_filter) : {},
         template_id: campaignForm.template_id || null,
+        scheduled_at: campaignForm.scheduled_at || null,
+        max_retries: parseInt(campaignForm.max_retries, 10) || 0,
       };
 
       if (editingCampaignId) {
@@ -179,6 +234,8 @@ const SmsMarketingTab = () => {
       sender_name: campaign.sender_name || '',
       template_id: campaign.template_id || '',
       recipient_filter: JSON.stringify(campaign.recipient_filter || {}, null, 2),
+      max_retries: campaign.max_retries ?? 0,
+      scheduled_at: campaign.scheduled_at ? campaign.scheduled_at.slice(0, 16) : '',
     });
     setEditingCampaignId(campaign.id);
     setShowCampaignForm(true);
@@ -188,11 +245,27 @@ const SmsMarketingTab = () => {
     if (!window.confirm('Send this SMS campaign to all matching subscribers?')) return;
     try {
       setLoading(true);
-      const res = await api.post(`/sms-marketing/campaigns/${id}/send`);
-      toast.success(`Sent: ${res.data.data.sent} Success, ${res.data.data.failed} Failed`);
+      const form = campaigns.find((c) => c.id === id);
+      const retries = form?.max_retries ?? 0;
+      const res = await api.post(`/sms-marketing/campaigns/${id}/send`, { max_retries: retries });
+      toast.success(`Queued for ${res.data.data.total} recipients \u2022 \u20A6${res.data.data.estimated_cost} est. cost`);
       loadCampaigns();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Send failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRetryCampaign = async (id) => {
+    if (!window.confirm('Retry failed transient errors for this campaign?')) return;
+    try {
+      setLoading(true);
+      const res = await api.post(`/sms-marketing/campaigns/${id}/retry`);
+      toast.success(`Retrying ${res.data.data.retrying} messages`);
+      loadCampaigns();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Retry failed');
     } finally {
       setLoading(false);
     }
@@ -267,6 +340,10 @@ const SmsMarketingTab = () => {
 
   const totalPages = Math.ceil(subTotal / 30);
 
+  const segments = getSegments(campaignForm.content);
+  const segCost = segments * COST_PER_SEGMENT;
+  const totalCost = segCost * Math.max(estimatedRecipients, 0);
+
   const renderOverview = () => (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -339,6 +416,7 @@ const SmsMarketingTab = () => {
                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                   c.status === 'sent' ? 'bg-green-100 text-green-700' :
                   c.status === 'sending' ? 'bg-blue-100 text-blue-700' :
+                  c.status === 'queued' ? 'bg-yellow-100 text-yellow-700' :
                   c.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'
                 }`}>{c.status}</span>
               </div>
@@ -367,11 +445,43 @@ const SmsMarketingTab = () => {
           <button onClick={handleSync} disabled={loading} className="btn btn-secondary gap-2">
             <FaSyncAlt className={loading ? 'animate-spin' : ''} /> Sync
           </button>
+          <button onClick={() => document.getElementById('csv-input').click()} className="btn btn-secondary gap-2">
+            <FaUpload /> Import CSV
+          </button>
           <button onClick={() => setShowAddSubscriber(true)} className="btn btn-primary gap-2">
             <FaPlus /> Add Contact
           </button>
         </div>
       </div>
+
+      <input
+        id="csv-input" type="file" accept=".csv,.txt"
+        className="hidden" onChange={handleCsvFileChange}
+      />
+
+      {csvFile && (
+        <div className="rounded-xl border border-soft bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900"><FaFileAlt className="mr-1 inline" /> {csvFile.name}</p>
+              {csvPreview.length > 0 && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Preview: {csvPreview.join(', ')}
+                  {csvPreview.length >= 10 && '...'}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={handleCsvImport} disabled={loading} className="btn btn-primary text-xs px-3 py-2 gap-1">
+                <FaUpload /> Import
+              </button>
+              <button onClick={() => { setCsvFile(null); setCsvPreview([]); document.getElementById('csv-input').value = ''; }} className="btn btn-secondary text-xs px-3 py-2">
+                <FaTimes />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddSubscriber && (
         <form onSubmit={handleAddSubscriber} className="rounded-xl border border-soft bg-white p-4 shadow-sm">
@@ -401,13 +511,13 @@ const SmsMarketingTab = () => {
           </thead>
           <tbody>
             {subscribers.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">No SMS subscribers found. Sync contacts to get started.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">No SMS subscribers found. Sync contacts or import a CSV to get started.</td></tr>
             ) : subscribers.map((sub) => (
               <tr key={sub.id} className="border-b border-gray-50 transition hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-900">{sub.phone}</td>
-                <td className="px-4 py-3 text-gray-600">{sub.full_name || '—'}</td>
+                <td className="px-4 py-3 text-gray-600">{sub.full_name || '\u2014'}</td>
                 <td className="px-4 py-3"><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium">{sub.source}</span></td>
-                <td className="px-4 py-3 text-gray-600">{sub.user_type || '—'}</td>
+                <td className="px-4 py-3 text-gray-600">{sub.user_type || '\u2014'}</td>
                 <td className="px-4 py-3">
                   <button onClick={() => handleToggleSubscribed(sub)} className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sub.subscribed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                     {sub.subscribed ? 'Active' : 'Unsubscribed'}
@@ -439,7 +549,7 @@ const SmsMarketingTab = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900">SMS Campaigns</h3>
-        <button onClick={() => { setShowCampaignForm(true); setEditingCampaignId(null); setCampaignForm(emptyCampaign); }} className="btn btn-primary gap-2">
+        <button onClick={() => { setShowCampaignForm(true); setEditingCampaignId(null); setCampaignForm(emptyCampaign); setEstimatedRecipients(0); }} className="btn btn-primary gap-2">
           <FaPlus /> New SMS Campaign
         </button>
       </div>
@@ -449,15 +559,56 @@ const SmsMarketingTab = () => {
           <h4 className="mb-4 text-sm font-semibold text-gray-900">{editingCampaignId ? 'Edit SMS Campaign' : 'Create SMS Campaign'}</h4>
           <div className="grid gap-4">
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="text-sm font-medium text-gray-700">Campaign Name <input value={campaignForm.name} onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })} className="input mt-1" placeholder="e.g., Rent Reminder" /></label>
-              <label className="text-sm font-medium text-gray-700">Sender Name <input value={campaignForm.sender_name} onChange={(e) => setCampaignForm({ ...campaignForm, sender_name: e.target.value })} className="input mt-1" placeholder="RentalHub NG" /></label>
-              <label className="text-sm font-medium text-gray-700">Template <select value={campaignForm.template_id} onChange={(e) => setCampaignForm({ ...campaignForm, template_id: e.target.value })} className="input mt-1">
-                <option value="">No template</option>
-                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select></label>
-              <label className="text-sm font-medium text-gray-700">Recipient Filter (JSON) <textarea value={campaignForm.recipient_filter} onChange={(e) => setCampaignForm({ ...campaignForm, recipient_filter: e.target.value })} className="input mt-1 min-h-[60px] font-mono text-xs" placeholder='{"sources":["user","lead"],"user_types":["tenant","landlord"]}' /></label>
+              <label className="text-sm font-medium text-gray-700">
+                Campaign Name
+                <input value={campaignForm.name} onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })} className="input mt-1" placeholder="e.g., Rent Reminder" />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Sender Name
+                <input value={campaignForm.sender_name} onChange={(e) => setCampaignForm({ ...campaignForm, sender_name: e.target.value })} className="input mt-1" placeholder="RentalHub NG" />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Template
+                <select value={campaignForm.template_id} onChange={(e) => { const t = templates.find((x) => String(x.id) === e.target.value); setCampaignForm({ ...campaignForm, template_id: e.target.value, content: t?.content || campaignForm.content }); }} className="input mt-1">
+                  <option value="">No template</option>
+                  {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Max Retries
+                <select value={campaignForm.max_retries} onChange={(e) => setCampaignForm({ ...campaignForm, max_retries: e.target.value })} className="input mt-1">
+                  <option value={0}>No retries</option>
+                  <option value={1}>1 retry</option>
+                  <option value={2}>2 retries</option>
+                  <option value={3}>3 retries</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-gray-700 md:col-span-2">
+                Schedule Send (optional)
+                <input type="datetime-local" value={campaignForm.scheduled_at} onChange={(e) => setCampaignForm({ ...campaignForm, scheduled_at: e.target.value })} className="input mt-1" />
+              </label>
+              <label className="text-sm font-medium text-gray-700 md:col-span-2">
+                Recipient Filter (JSON)
+                <textarea value={campaignForm.recipient_filter} onChange={(e) => setCampaignForm({ ...campaignForm, recipient_filter: e.target.value })} className="input mt-1 min-h-[60px] font-mono text-xs" placeholder='{"sources":["user","lead"],"user_types":["tenant","landlord"]}' />
+              </label>
             </div>
-            <label className="text-sm font-medium text-gray-700">SMS Text Content <textarea value={campaignForm.content} onChange={(e) => setCampaignForm({ ...campaignForm, content: e.target.value })} className="input mt-1 min-h-[120px] font-mono text-xs" placeholder="Your SMS message here. Keep it short — SMS has a 160 character limit per segment." /></label>
+            <label className="text-sm font-medium text-gray-700">
+              SMS Text Content
+              <textarea value={campaignForm.content} onChange={(e) => setCampaignForm({ ...campaignForm, content: e.target.value })} className="input mt-1 min-h-[120px] font-mono text-xs" placeholder="Your SMS message here. Keep it short." />
+              <div className="mt-1 flex flex-wrap gap-4 text-xs">
+                <span className="text-gray-500">{campaignForm.content.length} chars</span>
+                <span className="text-gray-500">{segments} segment{segments > 1 ? 's' : ''} ({SEGMENT_LIMIT} chars each)</span>
+                <span className="text-gray-500">
+                  <FaDollarSign className="mr-0.5 inline" />
+                  ~{formatCost(segments, estimatedRecipients || 50)} for {estimatedRecipients || 50} recipients
+                </span>
+              </div>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Estimated Recipients Count
+              <input type="number" min={0} value={estimatedRecipients} onChange={(e) => setEstimatedRecipients(parseInt(e.target.value, 10) || 0)} className="input mt-1" placeholder="e.g., 500" />
+              <p className="mt-0.5 text-xs text-gray-400">Enter roughly how many subscribers match your filter for cost estimation</p>
+            </label>
           </div>
           <div className="mt-4 flex gap-2">
             <button type="submit" disabled={loading} className="btn btn-primary">{editingCampaignId ? 'Update' : 'Create'} SMS Campaign</button>
@@ -469,53 +620,97 @@ const SmsMarketingTab = () => {
       <div className="space-y-3">
         {campaigns.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">No SMS campaigns yet.</p>
-        ) : campaigns.map((c) => (
-          <div key={c.id} className="rounded-xl border border-soft bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold text-gray-900">{c.name}</h4>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    c.status === 'sent' ? 'bg-green-100 text-green-700' :
-                    c.status === 'sending' ? 'bg-blue-100 text-blue-700' :
-                    c.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'
-                  }`}>{c.status}</span>
+        ) : campaigns.map((c) => {
+          const hasFailures = c.stats?.failed > 0;
+          const hasRetries = c.max_retries > 0;
+          return (
+            <div key={c.id} className="rounded-xl border border-soft bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-gray-900">{c.name}</h4>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      c.status === 'sent' ? 'bg-green-100 text-green-700' :
+                      c.status === 'sending' ? 'bg-blue-100 text-blue-700' :
+                      c.status === 'queued' ? 'bg-yellow-100 text-yellow-700' :
+                      c.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'
+                    }`}>{c.status}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500 text-pretty line-clamp-2">{c.content}</p>
+                  <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-400">
+                    {c.stats?.sent > 0 && (
+                      <span>Sent: {c.stats.sent} | Failed: {c.stats.failed}</span>
+                    )}
+                    {c.scheduled_at && (
+                      <span><FaClock className="mr-0.5 inline" />Scheduled: {new Date(c.scheduled_at).toLocaleString()}</span>
+                    )}
+                    {c.max_retries > 0 && (
+                      <span>Max retries: {c.max_retries}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">Created by {c.created_by_name || 'Unknown'} &middot; {new Date(c.created_at).toLocaleDateString()}</p>
                 </div>
-                <p className="mt-1 text-sm text-gray-500 text-pretty line-clamp-2">{c.content}</p>
-                {c.stats?.sent > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Sent: {c.stats.sent} | Failed: {c.stats.failed}
-                  </p>
-                )}
-                <p className="text-xs text-gray-400 mt-0.5">Created by {c.created_by_name || 'Unknown'} &middot; {new Date(c.created_at).toLocaleDateString()}</p>
+                <div className="flex flex-wrap gap-2">
+                  {c.status === 'draft' && (
+                    <>
+                      <button onClick={() => handleEditCampaign(c)} className="btn btn-secondary px-3 py-2 text-xs"><FaEdit /></button>
+                      <button onClick={() => handleSendCampaign(c.id)} disabled={loading} className="btn btn-primary px-3 py-2 text-xs gap-1"><FaPlay /> Send</button>
+                      <button onClick={() => handleDeleteCampaign(c.id)} className="btn btn-danger px-3 py-2 text-xs"><FaTrash /></button>
+                    </>
+                  )}
+                  {(c.status === 'queued' || c.status === 'sending') && (
+                    <span className="text-xs text-yellow-600 px-3 py-2">Processing...</span>
+                  )}
+                  {c.status === 'sent' && (
+                    <>
+                      <button onClick={() => handleViewStats(c.id)} className="btn btn-secondary px-3 py-2 text-xs gap-1"><FaChartBar /> Stats</button>
+                      {hasFailures && hasRetries && (
+                        <button onClick={() => handleRetryCampaign(c.id)} disabled={loading} className="btn btn-secondary px-3 py-2 text-xs gap-1">
+                          <FaRedo /> Retry Failed
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {c.status === 'draft' && (
-                  <>
-                    <button onClick={() => handleEditCampaign(c)} className="btn btn-secondary px-3 py-2 text-xs"><FaEdit /></button>
-                    <button onClick={() => handleSendCampaign(c.id)} disabled={loading} className="btn btn-primary px-3 py-2 text-xs gap-1"><FaPlay /> Send</button>
-                    <button onClick={() => handleDeleteCampaign(c.id)} className="btn btn-danger px-3 py-2 text-xs"><FaTrash /></button>
-                  </>
-                )}
-                {c.status === 'sent' && (
-                  <button onClick={() => handleViewStats(c.id)} className="btn btn-secondary px-3 py-2 text-xs gap-1"><FaChartBar /> Stats</button>
-                )}
-              </div>
-            </div>
 
-            {viewingCampaignId === c.id && campaignStats && (
-              <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
-                <h5 className="mb-3 text-sm font-semibold text-gray-900">Campaign Stats</h5>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-gray-900">{campaignStats.stats.total}</p><p className="text-xs text-gray-500">Total</p></div>
-                  <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-green-600">{campaignStats.stats.sent}</p><p className="text-xs text-gray-500">Sent</p></div>
-                  <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-red-600">{campaignStats.stats.failed}</p><p className="text-xs text-gray-500">Failed</p></div>
+              {viewingCampaignId === c.id && campaignStats && (
+                <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+                  <h5 className="mb-3 text-sm font-semibold text-gray-900">Campaign Stats</h5>
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-gray-900">{campaignStats.stats.total || 0}</p><p className="text-xs text-gray-500">Total</p></div>
+                    <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-green-600">{campaignStats.stats.sent || 0}</p><p className="text-xs text-gray-500">Sent</p></div>
+                    <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-red-600">{campaignStats.stats.failed || 0}</p><p className="text-xs text-gray-500">Failed</p></div>
+                    <div className="rounded-lg bg-white p-3 text-center"><p className="text-lg font-bold text-blue-600">{campaignStats.stats.pending || 0}</p><p className="text-xs text-gray-500">Pending</p></div>
+                  </div>
+                  {campaignStats.cost && (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-lg bg-white p-3 text-center"><p className="text-sm font-bold text-gray-900">{campaignStats.cost.segments_per_message} seg/msg</p><p className="text-xs text-gray-500">Segments per message</p></div>
+                      <div className="rounded-lg bg-white p-3 text-center"><p className="text-sm font-bold text-gray-900">{campaignStats.cost.total_segments}</p><p className="text-xs text-gray-500">Total segments sent</p></div>
+                      <div className="rounded-lg bg-white p-3 text-center"><p className="text-sm font-bold text-purple-600">\u20A6{campaignStats.cost.actual}</p><p className="text-xs text-gray-500">Est. cost @ \u20A6{campaignStats.cost.per_segment}/seg</p></div>
+                    </div>
+                  )}
+                  {campaignStats.recipients?.length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-1 text-xs font-semibold text-gray-600">Recent recipients (last 200):</p>
+                      <div className="max-h-40 overflow-y-auto rounded-lg bg-white text-xs">
+                        {campaignStats.recipients.map((r) => (
+                          <div key={r.id} className="flex items-center justify-between border-b border-gray-50 px-3 py-1.5">
+                            <span className="text-gray-700">{r.phone} {r.full_name ? `(${r.full_name})` : ''}</span>
+                            <span className={`font-medium ${r.status === 'sent' ? 'text-green-600' : 'text-red-600'}`}>
+                              {r.status}{r.retry_count > 0 ? ` (retry ${r.retry_count})` : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <button onClick={() => setViewingCampaignId(null)} className="mt-3 text-xs text-gray-500 hover:text-gray-700">&larr; Close stats</button>
                 </div>
-                <button onClick={() => setViewingCampaignId(null)} className="mt-3 text-xs text-gray-500 hover:text-gray-700">&larr; Close stats</button>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -541,7 +736,7 @@ const SmsMarketingTab = () => {
               <option value="alert">Alert</option>
             </select></label>
             <label className="text-sm font-medium text-gray-700 md:col-span-2">Description <input value={templateForm.description} onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })} className="input mt-1" placeholder="What's this template for?" /></label>
-            <label className="text-sm font-medium text-gray-700 md:col-span-2">SMS Content <textarea value={templateForm.content} onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })} className="input mt-1 min-h-[100px] font-mono text-xs" placeholder="Your reusable SMS text template. Use {{name}} for personalization." /></label>
+            <label className="text-sm font-medium text-gray-700 md:col-span-2">SMS Content <textarea value={templateForm.content} onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })} className="input mt-1 min-h-[100px] font-mono text-xs" placeholder="Your reusable SMS text template." /></label>
           </div>
           <div className="mt-4 flex gap-2">
             <button type="submit" disabled={loading} className="btn btn-primary">{editingTemplateId ? 'Update' : 'Create'} Template</button>
