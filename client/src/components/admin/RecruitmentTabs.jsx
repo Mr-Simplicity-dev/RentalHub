@@ -5,6 +5,7 @@ import {
   FaCalendarAlt,
   FaCheckCircle,
   FaDownload,
+  FaEdit,
   FaEnvelope,
   FaMapMarkerAlt,
   FaPaperPlane,
@@ -479,13 +480,13 @@ export function RecruitmentCyclesTab({ cycles, onRefresh }) {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <StatusPill value={cycle.is_active ? 'active' : 'inactive'} />
-                        <button
+                                                <button
                           type="button"
                           onClick={() => beginEdit(cycle)}
                           className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-indigo-100 hover:text-indigo-600 transition-colors"
                           title="Edit cycle"
                         >
-                          <FaSave className="text-xs" />
+                          <FaEdit className="text-xs" />
                         </button>
                       </div>
                     </div>
@@ -740,13 +741,13 @@ export function RecruitmentRolesTab({ roles, cycles, onRefresh }) {
                           )}
                         </p>
                       </div>
-                      <button
+                                            <button
                         type="button"
                         onClick={() => beginEdit(role)}
                         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-emerald-100 hover:text-emerald-600 transition-colors"
                         title="Edit role"
                       >
-                        <FaSave className="text-xs" />
+                        <FaEdit className="text-xs" />
                       </button>
                     </div>
                   </div>
