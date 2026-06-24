@@ -21,6 +21,7 @@ import Button from '../../components/common/Button';
 import InputDialog from '../../components/common/InputDialog';
 import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
 import useRetryableAction from '../../hooks/useRetryableAction';
+import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
 
 const FinancialAdminDashboard = () => {
   const navigate = useNavigate();
@@ -520,7 +521,7 @@ const FinancialAdminDashboard = () => {
         <div className="fin-admin-reports-section bg-white rounded-lg shadow">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
-              {['overview', 'transactions', 'state-admins', 'frozen-funds', 'withdrawals', 'audit-trail'].map((tab) => (
+              {['overview', 'transactions', 'state-admins', 'frozen-funds', 'withdrawals', 'support-escalations', 'audit-trail'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -669,6 +670,10 @@ const FinancialAdminDashboard = () => {
                   </div>
                 </div>
               </div>
+            )}
+
+            {activeTab === 'support-escalations' && (
+              <DepartmentSupportEscalations department="finance" title="Finance Support Escalations" />
             )}
 
             {activeTab === 'transactions' && (

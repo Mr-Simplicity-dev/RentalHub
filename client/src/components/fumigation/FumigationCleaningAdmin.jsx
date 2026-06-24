@@ -22,6 +22,7 @@ import {
   FaPrint
 } from 'react-icons/fa';
 import Loader from '../common/Loader';
+import DepartmentSupportEscalations from '../admin/DepartmentSupportEscalations';
 
 const FUMIGATION_ADMIN_ROLES = [
   'admin',
@@ -359,6 +360,10 @@ const FumigationCleaningAdmin = ({
               </div>
             </div>
           </div>
+        </div>
+
+        <div id="support-escalations" className="mb-8">
+          <DepartmentSupportEscalations department="fumigation" title="Fumigation Support Escalations" />
         </div>
         
         {/* Filters and Actions */}

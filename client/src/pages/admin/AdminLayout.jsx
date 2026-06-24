@@ -634,6 +634,11 @@ const AdminLayout = () => {
                   Property Requests
                 </NavLink>
 
+                <NavLink to="/admin/super-support-dashboard?tab=overview" className={navItem}>
+                  <FaHeadset className="mr-3" />
+                  Support Governance
+                </NavLink>
+
                 <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Intelligence</p>
 
                 <NavLink to="/super-admin?tab=analytics" className={() => superAdminNavItem('analytics')}>
@@ -876,6 +881,10 @@ const AdminLayout = () => {
                   <FaClipboardList className="mr-3" />
                   Booking Queue
                 </NavLink>
+                <NavLink to={`${fumigationBasePath}#support-escalations`} className={navItem}>
+                  <FaArrowUp className="mr-3" />
+                  Support Escalations
+                </NavLink>
                 <NavLink to={`${fumigationBasePath}#fumigation-filters`} className={navItem}>
                   <FaFilter className="mr-3" />
                   Filters & Exports
@@ -906,6 +915,10 @@ const AdminLayout = () => {
                 <NavLink to={`${transportationBasePath}?tab=alerts`} className={() => transportationNavItem('alerts')}>
                   <FaExclamationTriangle className="mr-3" />
                   Alerts
+                </NavLink>
+                <NavLink to={`${transportationBasePath}?tab=support-escalations`} className={() => transportationNavItem('support-escalations')}>
+                  <FaArrowUp className="mr-3" />
+                  Support Escalations
                 </NavLink>
                 <NavLink to={`${transportationBasePath}?tab=analytics`} className={() => transportationNavItem('analytics')}>
                   <FaChartLine className="mr-3" />
@@ -1017,6 +1030,11 @@ const AdminLayout = () => {
                 <NavLink to="/admin/financial-dashboard?tab=withdrawals" className={() => financialNavItem('withdrawals')}>
                   <FaMoneyBill className="mr-3" />
                   Withdrawals
+                </NavLink>
+
+                <NavLink to="/admin/financial-dashboard?tab=support-escalations" className={() => financialNavItem('support-escalations')}>
+                  <FaArrowUp className="mr-3" />
+                  Support Escalations
                 </NavLink>
 
                 <NavLink to="/admin/financial-dashboard?tab=audit-trail" className={() => financialNavItem('audit-trail')}>

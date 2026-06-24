@@ -179,3 +179,50 @@ test('support service metadata normalizes category, department, and escalation s
   const hours = (dueAt.getTime() - before) / (1000 * 60 * 60);
   assert.ok(hours > 11.9 && hours <= 12.1);
 });
+
+test('department escalation access is scoped to department and jurisdiction', () => {
+  const { departmentsForUser, canAccessDepartmentEscalation } = supportRoutes._supportScopeForTest;
+
+  assert.deepEqual(departmentsForUser({ user_type: 'state_transportation_admin' }), ['transportation']);
+  assert.deepEqual(departmentsForUser({ user_type: 'lga_fumigation_admin' }), ['fumigation']);
+
+  const lagosTransportTicket = {
+    state: 'Lagos',
+    lga: 'Ikeja',
+    category: 'transportation',
+    escalation_department: 'transportation',
+    related_type: 'transportation_booking',
+  };
+
+  assert.equal(
+    canAccessDepartmentEscalation(
+      { user_type: 'state_transportation_admin', assigned_state: 'Lagos' },
+      lagosTransportTicket
+    ),
+    true
+  );
+
+  assert.equal(
+    canAccessDepartmentEscalation(
+      { user_type: 'state_transportation_admin', assigned_state: 'Oyo' },
+      lagosTransportTicket
+    ),
+    false
+  );
+
+  assert.equal(
+    canAccessDepartmentEscalation(
+      { user_type: 'state_fumigation_admin', assigned_state: 'Lagos' },
+      lagosTransportTicket
+    ),
+    false
+  );
+
+  assert.equal(
+    canAccessDepartmentEscalation(
+      { user_type: 'super_admin' },
+      lagosTransportTicket
+    ),
+    true
+  );
+});

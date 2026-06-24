@@ -15,12 +15,14 @@ import {
   StatusPill,
 } from '../../components/admin/TransportationAdminUi';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
+import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
 
 const tabs = [
   { label: 'Overview', value: 'overview' },
   { label: 'Bookings', value: 'bookings' },
   { label: 'Services', value: 'services' },
   { label: 'Alerts', value: 'alerts' },
+  { label: 'Escalations', value: 'support-escalations' },
   { label: 'Jurisdiction', value: 'jurisdiction' },
   { label: 'Analytics', value: 'analytics' },
 ];
@@ -364,6 +366,10 @@ export default function TransportationAdminStateDashboard() {
             <EmptyState title="No open alerts in your state" description="Current issues have been cleared for your jurisdiction." />
           )}
         </SectionCard>
+      ) : null}
+
+      {activeTab === 'support-escalations' ? (
+        <DepartmentSupportEscalations department="transportation" title="Transportation Support Escalations" />
       ) : null}
 
       {activeTab === 'jurisdiction' ? (

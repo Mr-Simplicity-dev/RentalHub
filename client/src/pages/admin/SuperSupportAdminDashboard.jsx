@@ -40,6 +40,7 @@ import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import InternalNotesPanel from '../../components/common/InternalNotesPanel';
 import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
+import SupportGovernancePanel from '../../components/admin/SupportGovernancePanel';
 
 // Utility functions
 const badgeClass = (status) => {
@@ -534,6 +535,7 @@ const SuperSupportAdminDashboard = () => {
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <div className="super-support-overview-section space-y-6">
+          <SupportGovernancePanel />
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>

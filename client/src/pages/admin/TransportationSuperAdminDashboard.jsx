@@ -15,11 +15,13 @@ import {
   StatusPill,
 } from '../../components/admin/TransportationAdminUi';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
+import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
 
 const tabs = [
   { label: 'Overview', value: 'overview' },
   { label: 'State admins', value: 'state-admins' },
   { label: 'Alerts', value: 'alerts' },
+  { label: 'Escalations', value: 'support-escalations' },
   { label: 'System health', value: 'health' },
   { label: 'Metrics', value: 'metrics' },
 ];
@@ -465,6 +467,10 @@ export default function TransportationSuperAdminDashboard() {
             <EmptyState title="No open alerts" description="All monitored transportation alerts are currently resolved." />
           )}
         </SectionCard>
+      ) : null}
+
+      {activeTab === 'support-escalations' ? (
+        <DepartmentSupportEscalations department="transportation" title="Transportation Support Escalations" />
       ) : null}
 
       {activeTab === 'health' ? (
