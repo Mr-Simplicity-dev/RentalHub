@@ -83,6 +83,11 @@ const FloatingContactWidget = () => {
   const [typingUser, setTypingUser] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [sentConfirm, setSentConfirm] = useState(null);
+  const [lookupEmail, setLookupEmail] = useState('');
+  const [lookupTickets, setLookupTickets] = useState([]);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [contactConv, setContactConv] = useState([]);
+  const [viewingContactTicket, setViewingContactTicket] = useState(null);
 
   const listRef = useRef(null);
   const widgetRef = useRef(null);
@@ -90,6 +95,7 @@ const FloatingContactWidget = () => {
   const typingThrottleRef = useRef(null);
   const guestSocketRef = useRef(null);
   const activeTicketRef = useRef(null);
+  const viewingContactRef = useRef(null);
   const [showGreeting, setShowGreeting] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
 
@@ -336,12 +342,6 @@ const FloatingContactWidget = () => {
   };
 
   // ── Contact lookup (anonymous) ──
-  const [lookupEmail, setLookupEmail] = useState('');
-  const [lookupTickets, setLookupTickets] = useState([]);
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [contactConv, setContactConv] = useState([]);
-  const [viewingContactTicket, setViewingContactTicket] = useState(null);
-  const viewingContactRef = useRef(null);
   viewingContactRef.current = viewingContactTicket;
 
   const handleLookup = async () => {
