@@ -538,6 +538,7 @@ const Home = () => {
           </svg>
         </button>
       </div>
+      <FloatingContactWidget />
     </div>
   );
 };
