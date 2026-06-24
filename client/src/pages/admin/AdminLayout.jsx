@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import RoleBadge from '../../components/common/RoleBadge';
+import FloatingContactWidget from '../../components/common/FloatingContactWidget';
 import {
   FaTachometerAlt,
   FaUsers,
