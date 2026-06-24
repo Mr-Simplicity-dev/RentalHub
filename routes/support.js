@@ -137,6 +137,19 @@ const ensureSupportSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_support_ticket_replies_ticket
       ON support_ticket_replies(ticket_id, created_at ASC);
+
+    CREATE TABLE IF NOT EXISTS support_ticket_internal_notes (
+      id SERIAL PRIMARY KEY,
+      ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      author_name VARCHAR(255),
+      author_role VARCHAR(50),
+      message TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_internal_notes_ticket
+      ON support_ticket_internal_notes(ticket_id, created_at ASC);
   `);
 
   supportSchemaReady = true;
@@ -887,6 +900,146 @@ router.get('/tickets/unread/count', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Unread count error:', error);
     res.status(500).json({ success: false, message: 'Failed to get unread count' });
+  }
+});
+
+// ─── Internal Notes (admin-to-admin) ──────────────────────────────────────
+
+// GET /tickets/:id/internal-notes — fetch internal notes for a ticket
+router.get('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const result = await db.query(
+      `SELECT sin.id, sin.ticket_id, sin.user_id, sin.author_name, sin.author_role, sin.message, sin.created_at,
+              u.email AS user_email
+       FROM support_ticket_internal_notes sin
+       LEFT JOIN users u ON u.id = sin.user_id
+       WHERE sin.ticket_id = $1
+       ORDER BY sin.created_at ASC, sin.id ASC`,
+      [ticketId]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get internal notes error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch internal notes' });
+  }
+});
+
+// POST /tickets/:id/internal-notes — add internal note
+router.post('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message is required' });
+    }
+
+    // Verify ticket exists
+    const ticketResult = await db.query(
+      'SELECT id, subject, assigned_to FROM support_tickets WHERE id = $1',
+      [ticketId]
+    );
+    if (!ticketResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    const ticket = ticketResult.rows[0];
+
+    const result = await db.query(
+      `INSERT INTO support_ticket_internal_notes (ticket_id, user_id, author_name, author_role, message)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [
+        ticketId,
+        req.user.id,
+        req.user.full_name || req.user.email || 'Support Admin',
+        req.user.user_type || 'support_admin',
+        message.trim(),
+      ]
+    );
+
+    const note = result.rows[0];
+
+    // Notify other admins assigned to or scoped to this ticket
+    try {
+      const { createNotification } = require('../config/utils/notificationService');
+      const adminsResult = await db.query(
+        `SELECT id FROM users
+         WHERE user_type IN ('super_support_admin', 'state_support_admin', 'lga_support_admin')
+           AND id != $1
+           AND deleted_at IS NULL AND account_suspended_at IS NULL`,
+        [req.user.id]
+      );
+      for (const admin of adminsResult.rows) {
+        await createNotification(
+          admin.id,
+          'internal_note',
+          `Internal note on ticket "${ticket.subject}"`,
+          `${note.author_name} wrote: ${note.message.substring(0, 200)}`,
+          `/support/tickets/${ticketId}`
+        );
+        emitToUser(admin.id, 'ticket:internal_note', {
+          ticketId,
+          subject: ticket.subject,
+          note: {
+            id: note.id,
+            message: note.message,
+            author_name: note.author_name,
+            created_at: note.created_at,
+          },
+        });
+      }
+    } catch (notifyErr) {
+      console.error('Internal note notification error (non-fatal):', notifyErr);
+    }
+
+    res.status(201).json({ success: true, data: note });
+  } catch (error) {
+    console.error('Create internal note error:', error);
+    res.status(500).json({ success: false, message: 'Failed to create internal note' });
+  }
+});
+
+// DELETE /tickets/:ticketId/internal-notes/:noteId — delete own internal note
+router.delete('/tickets/:ticketId/internal-notes/:noteId', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.ticketId);
+    const noteId = Number(req.params.noteId);
+
+    const noteResult = await db.query(
+      'SELECT id, user_id FROM support_ticket_internal_notes WHERE id = $1 AND ticket_id = $2',
+      [noteId, ticketId]
+    );
+    if (!noteResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Note not found' });
+    }
+
+    const note = noteResult.rows[0];
+    if (note.user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own notes' });
+    }
+
+    await db.query('DELETE FROM support_ticket_internal_notes WHERE id = $1', [noteId]);
+
+    res.json({ success: true, message: 'Note deleted' });
+  } catch (error) {
+    console.error('Delete internal note error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete internal note' });
   }
 });
 

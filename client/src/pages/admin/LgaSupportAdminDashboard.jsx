@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { FaCheckCircle, FaHeadset, FaHome, FaReply, FaSyncAlt, FaTimesCircle, FaUserCheck, FaArrowUp, FaPaperPlane, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaEdit, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaCheckCircle, FaHeadset, FaHome, FaReply, FaSyncAlt, FaTimesCircle, FaUserCheck, FaArrowUp, FaPaperPlane, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaEdit, FaTrash, FaCheck, FaTimes, FaCommentDots } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
 import api from '../../services/api';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
+import InternalNotesPanel from '../../components/common/InternalNotesPanel';
 
 const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
   const [editing, setEditing] = useState(false);
@@ -87,6 +88,7 @@ const LgaSupportAdminDashboard = () => {
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [typingUser, setTypingUser] = useState(null);
   const typingTimer = useRef(null);
+  const [chatTab, setChatTab] = useState('user');
 
   // Socket listener for real-time replies
   useEffect(() => {
@@ -155,6 +157,7 @@ const LgaSupportAdminDashboard = () => {
     setSelectedTicket(ticket);
     setReplyText('');
     setAttachmentFile(null);
+    setChatTab('user');
     loadConversation(ticket.id);
   };
 
@@ -163,6 +166,7 @@ const LgaSupportAdminDashboard = () => {
     setConversation([]);
     setAttachmentFile(null);
     setTypingUser(null);
+    setChatTab('user');
   };
 
   const handleQuickAction = async (action, ticket) => {
@@ -222,7 +226,7 @@ const LgaSupportAdminDashboard = () => {
   const conversationModal = selectedTicket && (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{selectedTicket.subject}</h3>
             <p className="text-sm text-gray-500">
@@ -244,54 +248,83 @@ const LgaSupportAdminDashboard = () => {
           </div>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
-          <div className="rounded-lg bg-gray-50 p-4">
-            <div className="mb-1 flex items-center gap-2 text-xs text-gray-500">
-              <FaUser size={10} /> {selectedTicket.user_name || selectedTicket.user_email || 'Anonymous'}
-              <span>&middot; opened &middot; {new Date(selectedTicket.created_at).toLocaleString()}</span>
-            </div>
-            <p className="whitespace-pre-wrap text-sm text-gray-800">{selectedTicket.description}</p>
-          </div>
-
-          {loadingConversation ? (
-            <div className="py-4 text-center text-sm text-gray-400">Loading messages...</div>
-          ) : conversation.length === 0 ? (
-            <div className="py-4 text-center text-sm text-gray-400">No replies yet.</div>
-          ) : (
-            conversation.map((reply) => (
-              <ChatMessage key={reply.id} reply={reply} isOwn={reply.is_admin} ticketId={selectedTicket.id}
-                onEdit={(rid, updated) => handleEditReply(rid, updated)}
-                onDelete={(rid) => handleDeleteReply(rid)} />
-            ))
-          )}
-
-          {typingUser && (
-            <div className="text-xs italic text-gray-400">{typingUser.userName} is typing...</div>
-          )}
+        {/* Chat tab toggle */}
+        <div className="flex border-b border-gray-200 px-6">
+          <button
+            onClick={() => setChatTab('user')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              chatTab === 'user' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <FaReply size={12} /> User Conversation
+          </button>
+          <button
+            onClick={() => setChatTab('internal')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              chatTab === 'internal' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <FaCommentDots size={12} /> Internal Notes
+          </button>
         </div>
 
-        {selectedTicket.status !== 'resolved' && (
-          <div className="border-t border-gray-200 px-6 py-4">
-            {attachmentFile && (
-              <div className="mb-2 flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600">
-                <FaPaperclip size={12} /> {attachmentFile.name}
-                <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={12} /></button>
+        {chatTab === 'user' ? (
+          <>
+            <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
+              <div className="rounded-lg bg-gray-50 p-4">
+                <div className="mb-1 flex items-center gap-2 text-xs text-gray-500">
+                  <FaUser size={10} /> {selectedTicket.user_name || selectedTicket.user_email || 'Anonymous'}
+                  <span>&middot; opened &middot; {new Date(selectedTicket.created_at).toLocaleString()}</span>
+                </div>
+                <p className="whitespace-pre-wrap text-sm text-gray-800">{selectedTicket.description}</p>
+              </div>
+
+              {loadingConversation ? (
+                <div className="py-4 text-center text-sm text-gray-400">Loading messages...</div>
+              ) : conversation.length === 0 ? (
+                <div className="py-4 text-center text-sm text-gray-400">No replies yet.</div>
+              ) : (
+                conversation.map((reply) => (
+                  <ChatMessage key={reply.id} reply={reply} isOwn={reply.is_admin} ticketId={selectedTicket.id}
+                    onEdit={(rid, updated) => handleEditReply(rid, updated)}
+                    onDelete={(rid) => handleDeleteReply(rid)} />
+                ))
+              )}
+
+              {typingUser && (
+                <div className="text-xs italic text-gray-400">{typingUser.userName} is typing...</div>
+              )}
+            </div>
+
+            {selectedTicket.status !== 'resolved' && (
+              <div className="border-t border-gray-200 px-6 py-4">
+                {attachmentFile && (
+                  <div className="mb-2 flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600">
+                    <FaPaperclip size={12} /> {attachmentFile.name}
+                    <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={12} /></button>
+                  </div>
+                )}
+                <div className="flex items-end gap-2">
+                  <label className="flex h-[42px] w-[42px] cursor-pointer items-center justify-center rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50">
+                    <FaPaperclip size={14} />
+                    <input type="file" className="hidden" onChange={(e) => setAttachmentFile(e.target.files[0])} />
+                  </label>
+                  <textarea value={replyText} onChange={(e) => { setReplyText(e.target.value); emitTyping(); }}
+                    placeholder="Type your reply..." rows={2}
+                    className="flex-1 resize-none rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }} />
+                  <button onClick={handleSendReply} disabled={(!replyText.trim() && !attachmentFile) || sendingReply}
+                    className="flex h-[42px] w-[42px] items-center justify-center rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40">
+                    {sendingReply ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={14} />}
+                  </button>
+                </div>
               </div>
             )}
-            <div className="flex items-end gap-2">
-              <label className="flex h-[42px] w-[42px] cursor-pointer items-center justify-center rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50">
-                <FaPaperclip size={14} />
-                <input type="file" className="hidden" onChange={(e) => setAttachmentFile(e.target.files[0])} />
-              </label>
-              <textarea value={replyText} onChange={(e) => { setReplyText(e.target.value); emitTyping(); }}
-                placeholder="Type your reply..." rows={2}
-                className="flex-1 resize-none rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }} />
-              <button onClick={handleSendReply} disabled={(!replyText.trim() && !attachmentFile) || sendingReply}
-                className="flex h-[42px] w-[42px] items-center justify-center rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40">
-                {sendingReply ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={14} />}
-              </button>
-            </div>
+          </>
+        ) : (
+          <div className="flex-1 px-6 py-4">
+            <p className="mb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Internal Admin Notes</p>
+            <InternalNotesPanel ticketId={selectedTicket.id} currentUser={user} />
           </div>
         )}
       </div>
