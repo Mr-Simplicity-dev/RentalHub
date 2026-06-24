@@ -309,7 +309,7 @@ const FumigationCleaningAdmin = ({
         </div>
         
         {/* Stats Cards */}
-        <div className="fum-admin-payments-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div id="fumigation-overview" className="fum-admin-payments-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="fum-admin-providers-section bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -362,7 +362,7 @@ const FumigationCleaningAdmin = ({
         </div>
         
         {/* Filters and Actions */}
-        <div className="fum-admin-services-section bg-white rounded-lg shadow p-6 mb-8">
+        <div id="fumigation-filters" className="fum-admin-services-section bg-white rounded-lg shadow p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
             {/* Status Filter */}
             <div>
@@ -481,7 +481,7 @@ const FumigationCleaningAdmin = ({
         </div>
         
         {/* Bookings Table */}
-        <div className="fum-admin-bookings-section bg-white rounded-lg shadow overflow-hidden">
+        <div id="fumigation-bookings" className="fum-admin-bookings-section bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">

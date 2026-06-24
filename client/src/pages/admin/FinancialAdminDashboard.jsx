@@ -279,7 +279,7 @@ const FinancialAdminDashboard = () => {
             </div>
           </div>
 
-          <div className="fin-admin-payments-section grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div id="lga-finance-overview" className="fin-admin-payments-section grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-lg bg-white p-5 shadow">
               <p className="text-sm font-medium text-gray-600">Withdrawable Balance</p>
               <p className="mt-2 text-2xl font-bold text-gray-900">
@@ -299,7 +299,7 @@ const FinancialAdminDashboard = () => {
             </div>
           </div>
 
-          <div className="fin-admin-reports-section rounded-lg bg-white p-6 shadow">
+          <div id="lga-finance-withdrawals" className="fin-admin-reports-section rounded-lg bg-white p-6 shadow">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Withdrawal History</h2>

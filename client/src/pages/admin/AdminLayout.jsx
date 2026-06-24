@@ -37,6 +37,7 @@ import {
   FaTimes,
   FaBell,
   FaIdCard,
+  FaFilter,
 } from 'react-icons/fa';
 
 const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = 'smooth') => {
@@ -450,6 +451,14 @@ const AdminLayout = () => {
         : roleTheme.hoverNav
     }`;
 
+  const stateOpsTab = new URLSearchParams(location.search).get('tab') || 'overview';
+  const stateOpsNavItem = (tab) =>
+    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+      location.pathname === '/admin' && stateOpsTab === tab
+        ? roleTheme.activeNav
+        : roleTheme.hoverNav
+    }`;
+
   const transportationTab = new URLSearchParams(location.search).get('tab') || 'overview';
   const transportationNavItem = (tab) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
@@ -575,6 +584,8 @@ const AdminLayout = () => {
                   Overview
                 </NavLink>
 
+                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">People & Trust</p>
+
                 <NavLink to="/super-admin?tab=users" className={() => superAdminNavItem('users')}>
                   <FaUsers className="mr-3" />
                   Users
@@ -605,6 +616,8 @@ const AdminLayout = () => {
                   Lawyer Activity
                 </NavLink>
 
+                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Operations</p>
+
                 <NavLink to="/super-admin?tab=properties" className={() => superAdminNavItem('properties')}>
                   <FaHome className="mr-3" />
                   Properties
@@ -614,6 +627,8 @@ const AdminLayout = () => {
                   <FaClipboardList className="mr-3" />
                   Property Requests
                 </NavLink>
+
+                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Intelligence</p>
 
                 <NavLink to="/super-admin?tab=analytics" className={() => superAdminNavItem('analytics')}>
                   <FaShieldAlt className="mr-3" />
@@ -629,6 +644,8 @@ const AdminLayout = () => {
                   <FaLock className="mr-3" />
                   Logs
                 </NavLink>
+
+                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Growth</p>
 
                 <NavLink to="/super-admin?tab=broadcast" className={() => superAdminNavItem('broadcast')}>
                   <FaEnvelope className="mr-3" />
@@ -662,6 +679,8 @@ const AdminLayout = () => {
                   <FaUserShield className="mr-3" />
                   Recruitment
                 </NavLink>
+
+                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Controls</p>
 
                 <NavLink to="/super-admin?tab=pricing" className={() => superAdminNavItem('pricing')}>
                   <FaMoneyBill className="mr-3" />
@@ -735,29 +754,39 @@ const AdminLayout = () => {
               </p>
 
               <div className="space-y-2">
-                <NavLink to="/admin" end className={navItem}>
+                <NavLink to="/admin?tab=overview" className={() => stateOpsNavItem('overview')}>
                   <FaMapMarkerAlt className="mr-3" />
-                  State Dashboard
+                  Overview
                 </NavLink>
 
-                <NavLink to="/admin/users" className={navItem}>
+                <NavLink to="/admin?tab=users" className={() => stateOpsNavItem('users')}>
                   <FaUsers className="mr-3" />
                   Users
                 </NavLink>
 
-                <NavLink to="/admin/properties" className={navItem}>
-                  <FaHome className="mr-3" />
-                  Properties
-                </NavLink>
-
-                <NavLink to="/admin/applications" className={navItem}>
+                <NavLink to="/admin?tab=transactions" className={() => stateOpsNavItem('transactions')}>
                   <FaFileAlt className="mr-3" />
-                  Applications
+                  Transactions
                 </NavLink>
 
-                <NavLink to="/admin/withdrawals" className={navItem}>
+                <NavLink to="/admin?tab=commissions" className={() => stateOpsNavItem('commissions')}>
+                  <FaMoneyBill className="mr-3" />
+                  Commissions
+                </NavLink>
+
+                <NavLink to="/admin?tab=withdrawals" className={() => stateOpsNavItem('withdrawals')}>
                   <FaMoneyBill className="mr-3" />
                   Commission Withdrawals
+                </NavLink>
+
+                <NavLink to="/admin?tab=property_requests" className={() => stateOpsNavItem('property_requests')}>
+                  <FaHome className="mr-3" />
+                  Property Requests
+                </NavLink>
+
+                <NavLink to="/admin?tab=oversight" className={() => stateOpsNavItem('oversight')}>
+                  <FaShieldAlt className="mr-3" />
+                  Oversight
                 </NavLink>
 
                 <NavLink to="/admin/transportation/state" className={navItem}>
@@ -830,12 +859,20 @@ const AdminLayout = () => {
           {isFumigationAdmin && (
             <div>
               <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
-                Fumigation Admin
+                Fumigation & Cleaning
               </p>
               <div className="space-y-2">
-                <NavLink to={fumigationBasePath} className={navItem}>
+                <NavLink to={`${fumigationBasePath}#fumigation-overview`} className={navItem}>
                   <FaSprayCan className="mr-3" />
-                  Fumigation Dashboard
+                  Overview
+                </NavLink>
+                <NavLink to={`${fumigationBasePath}#fumigation-bookings`} className={navItem}>
+                  <FaClipboardList className="mr-3" />
+                  Booking Queue
+                </NavLink>
+                <NavLink to={`${fumigationBasePath}#fumigation-filters`} className={navItem}>
+                  <FaFilter className="mr-3" />
+                  Filters & Exports
                 </NavLink>
               </div>
             </div>
@@ -1024,15 +1061,16 @@ const AdminLayout = () => {
               </p>
 
               <div className="space-y-2">
-                <NavLink to="/admin/financial-dashboard?tab=overview" className={() => financialNavItem('overview')}>
+                <NavLink to="/admin/financial-dashboard?tab=overview#lga-finance-overview" className={() => financialNavItem('overview')}>
                   <FaMoneyBill className="mr-3" />
                   Overview
                 </NavLink>
 
-                <NavLink to="/admin/financial-dashboard?tab=withdrawals" className={() => financialNavItem('withdrawals')}>
+                <NavLink to="/admin/financial-dashboard?tab=withdrawals#lga-finance-withdrawals" className={() => financialNavItem('withdrawals')}>
                   <FaWallet className="mr-3" />
-                  My Withdrawals
+                  Withdrawal History
                 </NavLink>
+
               </div>
             </div>
           )}
