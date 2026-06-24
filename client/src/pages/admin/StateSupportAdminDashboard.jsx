@@ -507,7 +507,7 @@ const StateSupportAdminDashboard = () => {
             <div className="rounded-lg bg-indigo-50 p-2.5 text-indigo-600"><FaReply className="text-lg" /></div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Support Tickets</h2>
-              <p className="text-sm text-gray-500">Tickets in your state — view, reply, assign, or escalate.</p>
+              <p className="text-sm text-gray-500">All support tickets - view, reply, assign, or escalate.</p>
             </div>
           </div>
           <button onClick={loadTickets} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><FaSyncAlt /> Refresh</button>
@@ -523,7 +523,7 @@ const StateSupportAdminDashboard = () => {
         {ticketsLoading ? (
           <div className="py-8 text-center text-sm text-gray-500">Loading tickets...</div>
         ) : tickets.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">No support tickets in your state.</div>
+          <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">No support tickets found.</div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200">

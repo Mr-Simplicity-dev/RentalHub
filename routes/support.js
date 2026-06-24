@@ -500,7 +500,7 @@ router.get('/tickets/my', authenticate, async (req, res) => {
   }
 });
 
-// ─── Admin ticket listing (scoped) ─────────────────────────────────────────
+// Admin ticket listing
 
 router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
   try {
