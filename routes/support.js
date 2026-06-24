@@ -55,6 +55,45 @@ const ESCALATION_STATUSES = new Set([
   'resolved',
 ]);
 
+const DEPARTMENT_ESCALATION_ROLES = {
+  transportation: new Set([
+    'transportation_admin',
+    'lga_transportation_admin',
+    'state_transportation_admin',
+    'super_transportation_admin',
+    'super_admin',
+    'super_support_admin',
+  ]),
+  fumigation: new Set([
+    'fumigation_admin',
+    'lga_fumigation_admin',
+    'state_fumigation_admin',
+    'super_fumigation_admin',
+    'super_admin',
+    'super_support_admin',
+  ]),
+  finance: new Set([
+    'financial_admin',
+    'lga_financial_admin',
+    'state_financial_admin',
+    'super_financial_admin',
+    'super_admin',
+    'super_support_admin',
+  ]),
+  legal: new Set([
+    'lawyer',
+    'state_lawyer',
+    'super_lawyer',
+    'super_admin',
+    'super_support_admin',
+  ]),
+  technical: new Set([
+    'admin',
+    'super_admin',
+    'super_support_admin',
+  ]),
+};
+
 let supportSchemaReady = false;
 
 // In-memory admin activity store for anonymous presence/typing indicators
@@ -342,6 +381,65 @@ const normalizeDepartment = (value, category, relatedType) => {
 const normalizeEscalationStatus = (value) => {
   const normalized = normalizeText(value).replace(/-/g, '_');
   return ESCALATION_STATUSES.has(normalized) ? normalized : 'escalated';
+};
+
+const departmentsForUser = (user) => {
+  const role = normalizeText(user?.user_type);
+  const departments = [];
+  for (const [department, roles] of Object.entries(DEPARTMENT_ESCALATION_ROLES)) {
+    if (roles.has(role)) departments.push(department);
+  }
+  return departments;
+};
+
+const canAccessDepartmentEscalation = (user, ticket = {}) => {
+  const role = normalizeText(user?.user_type);
+  if (SUPPORT_ADMIN_ROLES.has(role)) return canSupportAdminAccessTicket(user, ticket);
+  const department = normalizeDepartment(ticket.escalation_department, ticket.category, ticket.related_type);
+  const roleDepartments = departmentsForUser(user);
+  if (!roleDepartments.includes(department)) return false;
+
+  if (role.startsWith('super_') || role === 'super_admin') return true;
+  const ticketState = normalizeText(ticket.state);
+  const ticketLga = normalizeText(ticket.lga);
+  const userState = normalizeText(user?.assigned_state);
+  const userLga = normalizeText(user?.assigned_city);
+
+  if (role.startsWith('state_')) return Boolean(!ticketState || (userState && ticketState === userState));
+  if (role.startsWith('lga_')) return Boolean(!ticketState || !ticketLga || (userState && userLga && ticketState === userState && ticketLga === userLga));
+  return true;
+};
+
+const addDepartmentEscalationScope = (where, params, user, alias = 'st') => {
+  const role = normalizeText(user?.user_type);
+  where.push(`${alias}.escalation_status <> 'none'`);
+
+  if (SUPPORT_ADMIN_ROLES.has(role)) {
+    addSupportTicketScope(where, params, user, alias);
+    return;
+  }
+
+  const departments = departmentsForUser(user);
+  if (!departments.length) {
+    where.push('1 = 0');
+    return;
+  }
+
+  params.push(departments);
+  where.push(`${alias}.escalation_department = ANY($${params.length})`);
+
+  if (role.startsWith('state_') && user.assigned_state) {
+    params.push(normalizeText(user.assigned_state));
+    where.push(`(LOWER(COALESCE(${alias}.state, '')) = $${params.length} OR ${alias}.state IS NULL)`);
+  }
+
+  if (role.startsWith('lga_') && user.assigned_state && user.assigned_city) {
+    params.push(normalizeText(user.assigned_state));
+    const stateParam = `$${params.length}`;
+    params.push(normalizeText(user.assigned_city));
+    const lgaParam = `$${params.length}`;
+    where.push(`((LOWER(COALESCE(${alias}.state, '')) = ${stateParam} AND LOWER(COALESCE(${alias}.lga, '')) = ${lgaParam}) OR ${alias}.state IS NULL OR ${alias}.lga IS NULL)`);
+  }
 };
 
 const resolveSlaDueAt = (category, priority) => {
@@ -1221,6 +1319,173 @@ router.patch('/tickets/:id/escalation-status', authenticate, requireSupportAdmin
 // ─── Conversation endpoints ────────────────────────────────────────────────
 
 // GET /tickets/:id/conversation — paginated, with read receipts
+router.get('/department-escalations', authenticate, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const where = [];
+    const params = [];
+    addDepartmentEscalationScope(where, params, req.user);
+
+    if (req.query.department && req.query.department !== 'all') {
+      params.push(normalizeDepartment(req.query.department));
+      where.push(`st.escalation_department = $${params.length}`);
+    }
+
+    if (req.query.status && req.query.status !== 'all') {
+      params.push(normalizeEscalationStatus(req.query.status));
+      where.push(`st.escalation_status = $${params.length}`);
+    }
+
+    const result = await db.query(
+      `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
+              st.category, st.related_type, st.related_id, st.escalation_department,
+              st.escalation_status, st.escalation_note, st.sla_due_at, st.last_escalated_at,
+              CASE
+                WHEN st.status = 'resolved' THEN 'met'
+                WHEN st.sla_due_at IS NULL THEN 'not_set'
+                WHEN st.sla_due_at < CURRENT_TIMESTAMP THEN 'breached'
+                WHEN st.sla_due_at < CURRENT_TIMESTAMP + INTERVAL '2 hours' THEN 'due_soon'
+                ELSE 'on_track'
+              END AS sla_status,
+              st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
+              st.assigned_to,
+              u.email AS user_email, u.full_name AS user_name,
+              a.email AS assigned_email, a.full_name AS assigned_name,
+              (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = FALSE AND str.read_at IS NULL)::int AS unread_user_replies
+       FROM support_tickets st
+       LEFT JOIN users u ON u.id = st.user_id
+       LEFT JOIN users a ON a.id = st.assigned_to
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       ORDER BY
+         CASE st.escalation_status WHEN 'action_required' THEN 1 WHEN 'escalated' THEN 2 WHEN 'acknowledged' THEN 3 ELSE 4 END,
+         st.sla_due_at ASC NULLS LAST,
+         st.last_escalated_at DESC NULLS LAST
+       LIMIT 100`,
+      params
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Department escalations error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch department escalations' });
+  }
+});
+
+router.patch('/department-escalations/:id/status', authenticate, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const ticketResult = await db.query('SELECT * FROM support_tickets WHERE id = $1', [ticketId]);
+    if (!ticketResult.rows.length) return res.status(404).json({ success: false, message: 'Ticket not found' });
+    const ticket = ticketResult.rows[0];
+    if (!canAccessDepartmentEscalation(req.user, ticket)) {
+      return res.status(403).json({ success: false, message: 'You cannot update this department escalation' });
+    }
+
+    const escalationStatus = normalizeEscalationStatus(req.body.status);
+    if (escalationStatus === 'none') {
+      return res.status(400).json({ success: false, message: 'Use an active escalation status' });
+    }
+    const note = typeof req.body.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
+
+    const result = await db.query(
+      `UPDATE support_tickets
+       SET escalation_status = $1,
+           escalation_note = COALESCE($2, escalation_note),
+           status = CASE WHEN status = 'open' THEN 'in_progress' ELSE status END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING *`,
+      [escalationStatus, note || null, ticketId]
+    );
+
+    await addTicketTimeline(ticketId, req.user, 'department_status_updated', note || `Department marked escalation as ${escalationStatus.replace(/_/g, ' ')}`, {
+      escalation_status: escalationStatus,
+      department: ticket.escalation_department,
+    });
+
+    emitTicketUpdated(result.rows[0]);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Department escalation status error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update department escalation' });
+  }
+});
+
+router.get('/governance/summary', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const role = normalizeText(req.user.user_type);
+    if (role !== 'super_admin' && role !== 'super_support_admin') {
+      return res.status(403).json({ success: false, message: 'Super support governance access required' });
+    }
+
+    const [summary, byDepartment, bySla, recent] = await Promise.all([
+      db.query(
+        `SELECT
+           COUNT(*)::int AS total_tickets,
+           COUNT(*) FILTER (WHERE status <> 'resolved')::int AS active_tickets,
+           COUNT(*) FILTER (WHERE escalation_status <> 'none')::int AS escalated_tickets,
+           COUNT(*) FILTER (WHERE status <> 'resolved' AND sla_due_at < CURRENT_TIMESTAMP)::int AS breached_sla,
+           COUNT(*) FILTER (WHERE assigned_to IS NULL AND status <> 'resolved')::int AS unassigned_active
+         FROM support_tickets`
+      ),
+      db.query(
+        `SELECT escalation_department AS department,
+                COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE escalation_status IN ('escalated', 'action_required'))::int AS needs_action,
+                COUNT(*) FILTER (WHERE status <> 'resolved' AND sla_due_at < CURRENT_TIMESTAMP)::int AS breached_sla
+         FROM support_tickets
+         WHERE escalation_status <> 'none'
+         GROUP BY escalation_department
+         ORDER BY needs_action DESC, total DESC`
+      ),
+      db.query(
+        `SELECT
+           CASE
+             WHEN status = 'resolved' THEN 'met'
+             WHEN sla_due_at IS NULL THEN 'not_set'
+             WHEN sla_due_at < CURRENT_TIMESTAMP THEN 'breached'
+             WHEN sla_due_at < CURRENT_TIMESTAMP + INTERVAL '2 hours' THEN 'due_soon'
+             ELSE 'on_track'
+           END AS sla_status,
+           COUNT(*)::int AS total
+         FROM support_tickets
+         GROUP BY sla_status
+         ORDER BY total DESC`
+      ),
+      db.query(
+        `SELECT id, subject, state, lga, category, escalation_department, escalation_status,
+                priority, status, sla_due_at, last_escalated_at
+         FROM support_tickets
+         WHERE escalation_status <> 'none'
+         ORDER BY last_escalated_at DESC NULLS LAST, updated_at DESC
+         LIMIT 10`
+      ),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        summary: summary.rows[0] || {},
+        by_department: byDepartment.rows,
+        by_sla: bySla.rows,
+        recent_escalations: recent.rows,
+      },
+    });
+  } catch (error) {
+    console.error('Support governance summary error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch support governance summary' });
+  }
+});
+
 router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
   try {
     await ensureSupportSchema();
@@ -2146,6 +2411,8 @@ router._supportScopeForTest = {
   normalizeDepartment,
   normalizeEscalationStatus,
   resolveSlaDueAt,
+  departmentsForUser,
+  canAccessDepartmentEscalation,
 };
 
 module.exports = router;

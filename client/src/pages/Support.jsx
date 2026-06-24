@@ -101,7 +101,7 @@ const Support = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
-  const [form, setForm] = useState({ subject: '', description: '', priority: 'medium' });
+  const [form, setForm] = useState({ subject: '', description: '', priority: 'medium', category: 'general' });
   const [showForm, setShowForm] = useState(false);
   const [expandedTicket, setExpandedTicket] = useState(null);
   const [conversations, setConversations] = useState({});
@@ -204,7 +204,7 @@ const Support = () => {
     try {
       const res = await api.post('/support/tickets', form);
       setTickets((prev) => [res.data.data, ...prev]);
-      setForm({ subject: '', description: '', priority: 'medium' });
+      setForm({ subject: '', description: '', priority: 'medium', category: 'general' });
       setShowForm(false);
       toast.success('Ticket submitted successfully');
     } catch (err) {
@@ -291,6 +291,19 @@ const Support = () => {
                 <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} className="input w-full min-h-[120px]" placeholder="Provide as much detail as possible" rows={4} />
               </div>
               <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Issue Category</label>
+                <select value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} className="input w-full">
+                  <option value="general">General Support</option>
+                  <option value="transportation">Transportation</option>
+                  <option value="fumigation_cleaning">Fumigation & Cleaning</option>
+                  <option value="payment">Payment</option>
+                  <option value="property">Property</option>
+                  <option value="tenancy">Tenancy</option>
+                  <option value="legal">Legal</option>
+                  <option value="technical">Technical</option>
+                </select>
+              </div>
+              <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Priority</label>
                 <div className="flex flex-wrap gap-2">
                   {priorityOptions.map((opt) => (
@@ -339,6 +352,16 @@ const Support = () => {
                         )}
                       </div>
                       {ticket.description && <p className="mt-2 text-sm text-gray-600 line-clamp-2">{ticket.description}</p>}
+                      {(ticket.category || ticket.escalation_status !== 'none') && (
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium capitalize text-gray-700">{String(ticket.category || 'general').replace(/_/g, ' ')}</span>
+                          {ticket.escalation_status && ticket.escalation_status !== 'none' && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium capitalize text-amber-700">
+                              {String(ticket.escalation_department || 'support').replace(/_/g, ' ')} · {String(ticket.escalation_status).replace(/_/g, ' ')}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex-shrink-0 text-gray-400">{isExpanded ? <FaChevronUp /> : <FaChevronDown />}</div>
                   </button>
@@ -352,6 +375,20 @@ const Support = () => {
                         </div>
                         <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{ticket.description}</p>
                       </div>
+
+                      {ticket.escalation_status && ticket.escalation_status !== 'none' && (
+                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                            <FaClock /> Escalation Tracking
+                          </div>
+                          <p className="mt-1 text-sm text-amber-800">
+                            This ticket is with {String(ticket.escalation_department || 'support').replace(/_/g, ' ')} and is currently {String(ticket.escalation_status).replace(/_/g, ' ')}.
+                          </p>
+                          {ticket.sla_due_at && (
+                            <p className="mt-1 text-xs text-amber-700">Target response: {new Date(ticket.sla_due_at).toLocaleString()}</p>
+                          )}
+                        </div>
+                      )}
 
                       {convLoading ? (
                         <div className="py-4 text-center text-sm text-gray-400">Loading messages...</div>
