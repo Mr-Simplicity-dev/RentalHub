@@ -13,6 +13,7 @@ import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequest
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import InternalNotesPanel from '../../components/common/InternalNotesPanel';
 import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
+import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 
 const badgeClass = (status) => {
   if (status === 'approved') return 'bg-green-100 text-green-700';
@@ -59,7 +60,7 @@ const StateSupportAdminDashboard = () => {
   const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
   const activeTab = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab') || 'overview';
-    return ['overview', 'queue', 'property_requests', 'tenancy', 'tickets'].includes(tab) ? tab : 'overview';
+    return ['overview', 'queue', 'property_requests', 'tenancy', 'tickets', 'escalations'].includes(tab) ? tab : 'overview';
   }, [location.search]);
 
   const workspaceTabs = [
@@ -68,6 +69,7 @@ const StateSupportAdminDashboard = () => {
     { key: 'property_requests', label: 'Property Requests', to: '/admin/state-support-dashboard?tab=property_requests' },
     { key: 'tenancy', label: 'Tenancy Actions', to: '/admin/state-support-dashboard?tab=tenancy' },
     { key: 'tickets', label: 'Support Tickets', to: '/admin/state-support-dashboard?tab=tickets' },
+    { key: 'escalations', label: 'Escalations', to: '/admin/state-support-dashboard?tab=escalations' },
   ];
 
   const fetchUnreadInternalNotes = useCallback(async () => {
@@ -549,7 +551,9 @@ const StateSupportAdminDashboard = () => {
 
       {/* Support Tickets Section */}
       {activeTab === 'tickets' && (
-      <section className="rounded-xl bg-white p-5 shadow">
+      <>
+      <SupportTicketWorkspace tickets={tickets} loading={ticketsLoading} user={user} onOpenTicket={openTicket} onTicketAction={handleTicketAction} mode="tickets" />
+      <section className="hidden rounded-xl bg-white p-5 shadow">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-indigo-50 p-2.5 text-indigo-600"><FaReply className="text-lg" /></div>
@@ -632,6 +636,11 @@ const StateSupportAdminDashboard = () => {
           </div>
         )}
       </section>
+      </>
+      )}
+
+      {activeTab === 'escalations' && (
+      <SupportTicketWorkspace tickets={tickets} loading={ticketsLoading} user={user} onOpenTicket={openTicket} onTicketAction={handleTicketAction} mode="escalations" />
       )}
 
       {/* Ticket Conversation Modal */}
@@ -651,6 +660,8 @@ const StateSupportAdminDashboard = () => {
             {/* Tab toggle */}
             <div className="flex border-b border-gray-200 px-6">
               <button onClick={() => setChatTab('user')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'user' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><FaReply size={12} /> User Conversation</button>
+              <button onClick={() => setChatTab('service')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'service' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Service Context</button>
+              <button onClick={() => setChatTab('timeline')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'timeline' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Timeline</button>
               <button onClick={() => { setChatTab('internal'); fetchUnreadInternalNotes(); }} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'internal' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                 <FaCommentDots size={12} /> Internal Notes
                 {unreadInternalNotes > 0 && chatTab !== 'internal' && (
@@ -662,7 +673,6 @@ const StateSupportAdminDashboard = () => {
             {chatTab === 'user' ? (
               <>
                 <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
-                  <SupportTicketServicePanel ticket={selectedTicket} onTicketUpdated={handleTicketUpdated} />
                   <div className="rounded-lg bg-gray-50 p-4">
                     <div className="mb-1 flex items-center gap-2 text-xs text-gray-500">
                       <FaUser size={10} /> {selectedTicket.user_name || selectedTicket.user_email || 'Anonymous'}
@@ -746,6 +756,10 @@ const StateSupportAdminDashboard = () => {
                   </div>
                 )}
               </>
+            ) : chatTab === 'service' || chatTab === 'timeline' ? (
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                <SupportTicketServicePanel ticket={selectedTicket} onTicketUpdated={handleTicketUpdated} />
+              </div>
             ) : (
               <div className="flex-1 px-6 py-4">
                 <p className="mb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Internal Admin Notes</p>

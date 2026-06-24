@@ -39,6 +39,7 @@ import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequest
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import InternalNotesPanel from '../../components/common/InternalNotesPanel';
 import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
+import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 
 // Utility functions
 const badgeClass = (status) => {
@@ -255,7 +256,7 @@ const SuperSupportAdminDashboard = () => {
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'alerts', 'reports'];
+    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'escalations', 'alerts', 'reports'];
     if (tab && allowedTabs.includes(tab)) {
       setActiveTab(tab);
       return;
@@ -1014,7 +1015,9 @@ const SuperSupportAdminDashboard = () => {
 
         {/* Support Tickets Tab */}
         {activeTab === 'tickets' && (
-          <div className="super-support-tickets-section rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <>
+          <SupportTicketWorkspace tickets={dashboardData.supportTickets || []} loading={loading} user={user} onOpenTicket={(ticket) => openModal('view-ticket', ticket)} onTicketAction={handleQuickAction} mode="tickets" />
+          <div className="hidden super-support-tickets-section rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Support Tickets</h3>
               <div className="flex items-center gap-2">
@@ -1236,6 +1239,11 @@ const SuperSupportAdminDashboard = () => {
               </div>
             )}
           </div>
+          </>
+        )}
+
+        {activeTab === 'escalations' && (
+          <SupportTicketWorkspace tickets={dashboardData.supportTickets || []} loading={loading} user={user} onOpenTicket={(ticket) => openModal('view-ticket', ticket)} onTicketAction={handleQuickAction} mode="escalations" />
         )}
 
         {/* System Alerts Tab */}
@@ -1709,6 +1717,22 @@ const SuperSupportAdminDashboard = () => {
                     <FaPaperPlane size={12} /> User Conversation
                   </button>
                   <button
+                    onClick={() => setChatTab('service')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      chatTab === 'service' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Service Context
+                  </button>
+                  <button
+                    onClick={() => setChatTab('timeline')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      chatTab === 'timeline' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Timeline
+                  </button>
+                  <button
                     onClick={() => { setChatTab('internal'); fetchUnreadInternalNotes(); }}
                     className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                       chatTab === 'internal' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -1724,7 +1748,6 @@ const SuperSupportAdminDashboard = () => {
                 {chatTab === 'user' ? (
                   <>
                     <div className="mt-4 max-h-72 space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <SupportTicketServicePanel ticket={selectedItem} onTicketUpdated={handleTicketUpdated} />
                       <div className="rounded-lg bg-white p-3 shadow-sm">
                         <p className="text-xs text-slate-400">
                           {selectedItem.user_name || selectedItem.user_email || 'Anonymous'} &middot; {new Date(selectedItem.created_at).toLocaleString()}
@@ -1829,6 +1852,10 @@ const SuperSupportAdminDashboard = () => {
                       </div>
                     )}
                   </>
+                ) : chatTab === 'service' || chatTab === 'timeline' ? (
+                  <div className="mt-4 max-h-96 overflow-y-auto">
+                    <SupportTicketServicePanel ticket={selectedItem} onTicketUpdated={handleTicketUpdated} />
+                  </div>
                 ) : (
                   <div className="mt-4">
                     <p className="mb-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Internal Admin Notes</p>
