@@ -503,13 +503,13 @@ const Home = () => {
 
       {/* WhatsApp Chat Widget */}
       <div
-        className={`fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 transition-all duration-500 ${
+        className={`fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2 transition-all duration-500 ${
           showChatTip ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         }`}
       >
         {chatGreeting && (
           <div className="relative bg-white rounded-xl shadow-xl p-3 max-w-[220px] animate-fadeIn">
-            <div className="absolute -bottom-1.5 right-5 w-3 h-3 bg-white rotate-45" />
+            <div className="absolute -bottom-1.5 left-5 w-3 h-3 bg-white rotate-45" />
             <p className="text-sm text-gray-700 font-medium">
               {t('home.whatsapp_greeting')}
             </p>
@@ -538,7 +538,6 @@ const Home = () => {
           </svg>
         </button>
       </div>
-      <FloatingContactWidget />
     </div>
   );
 };
