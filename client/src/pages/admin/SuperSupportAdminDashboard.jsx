@@ -38,6 +38,7 @@ import { useAuth } from '../../hooks/useAuth';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import InternalNotesPanel from '../../components/common/InternalNotesPanel';
+import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
 
 // Utility functions
 const badgeClass = (status) => {
@@ -380,6 +381,12 @@ const SuperSupportAdminDashboard = () => {
 
   const handleDeleteReply = (replyId) => {
     setConversation((prev) => prev.filter((r) => r.id !== replyId));
+  };
+
+  const handleTicketUpdated = (updatedTicket) => {
+    if (!updatedTicket) return;
+    setSelectedItem((prev) => prev?.id === updatedTicket.id ? { ...prev, ...updatedTicket } : prev);
+    loadDashboardData();
   };
 
   // Export functions
@@ -1105,6 +1112,12 @@ const SuperSupportAdminDashboard = () => {
                       Subject
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Service
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      SLA
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       Priority
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
@@ -1121,7 +1134,7 @@ const SuperSupportAdminDashboard = () => {
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {displayedSupportTickets.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="px-4 py-8 text-center text-sm text-slate-500">
+                      <td colSpan="8" className="px-4 py-8 text-center text-sm text-slate-500">
                         No support tickets found for the selected filters.
                       </td>
                     </tr>
@@ -1134,6 +1147,17 @@ const SuperSupportAdminDashboard = () => {
                         <td className="px-4 py-3">
                           <p className="text-sm font-medium text-slate-900">{ticket.subject}</p>
                           <p className="text-xs text-slate-500 truncate max-w-xs">{ticket.description}</p>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="text-xs text-slate-700">
+                            <p className="font-medium capitalize">{(ticket.category || 'general').replace(/_/g, ' ')}</p>
+                            <p className="text-slate-500">{ticket.related_type ? `${ticket.related_type.replace(/_/g, ' ')} #${ticket.related_id}` : (ticket.escalation_department || 'support')}</p>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${ticket.sla_status === 'breached' ? 'bg-red-100 text-red-700' : ticket.sla_status === 'due_soon' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                            {(ticket.sla_status || 'on_track').replace(/_/g, ' ')}
+                          </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -1700,6 +1724,7 @@ const SuperSupportAdminDashboard = () => {
                 {chatTab === 'user' ? (
                   <>
                     <div className="mt-4 max-h-72 space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <SupportTicketServicePanel ticket={selectedItem} onTicketUpdated={handleTicketUpdated} />
                       <div className="rounded-lg bg-white p-3 shadow-sm">
                         <p className="text-xs text-slate-400">
                           {selectedItem.user_name || selectedItem.user_email || 'Anonymous'} &middot; {new Date(selectedItem.created_at).toLocaleString()}

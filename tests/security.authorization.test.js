@@ -158,3 +158,24 @@ test('support admin ticket scope follows LGA, state, assignment, and super hiera
     true
   );
 });
+
+test('support service metadata normalizes category, department, and escalation status', () => {
+  const {
+    normalizeSupportCategory,
+    normalizeRelatedType,
+    normalizeDepartment,
+    normalizeEscalationStatus,
+    resolveSlaDueAt,
+  } = supportRoutes._supportScopeForTest;
+
+  assert.equal(normalizeRelatedType('transportation-booking'), 'transportation_booking');
+  assert.equal(normalizeSupportCategory('', 'transportation_booking'), 'transportation');
+  assert.equal(normalizeDepartment('', 'fumigation_cleaning', 'fumigation_cleaning_booking'), 'fumigation');
+  assert.equal(normalizeDepartment('', 'payment', null), 'finance');
+  assert.equal(normalizeEscalationStatus('action-required'), 'action_required');
+
+  const before = Date.now();
+  const dueAt = resolveSlaDueAt('transportation', 'medium');
+  const hours = (dueAt.getTime() - before) / (1000 * 60 * 60);
+  assert.ok(hours > 11.9 && hours <= 12.1);
+});

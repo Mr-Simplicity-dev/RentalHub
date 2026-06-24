@@ -12,6 +12,7 @@ import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdra
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import InternalNotesPanel from '../../components/common/InternalNotesPanel';
+import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
 
 const badgeClass = (status) => {
   if (status === 'approved') return 'bg-green-100 text-green-700';
@@ -220,6 +221,12 @@ const StateSupportAdminDashboard = () => {
 
   const handleDeleteReply = (replyId) => {
     setConversation((prev) => prev.filter((r) => r.id !== replyId));
+  };
+
+  const handleTicketUpdated = (updatedTicket) => {
+    if (!updatedTicket) return;
+    setSelectedTicket((prev) => prev?.id === updatedTicket.id ? { ...prev, ...updatedTicket } : prev);
+    loadTickets();
   };
 
   const emitTyping = () => {
@@ -573,6 +580,8 @@ const StateSupportAdminDashboard = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Subject</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">User</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Service</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">SLA</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Priority</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
@@ -587,6 +596,17 @@ const StateSupportAdminDashboard = () => {
                       {ticket.unread_user_replies > 0 && <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">{ticket.unread_user_replies}</span>}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{ticket.user_name || ticket.user_email || '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="text-xs text-gray-700">
+                        <p className="font-medium capitalize">{(ticket.category || 'general').replace(/_/g, ' ')}</p>
+                        <p className="text-gray-500">{ticket.related_type ? `${ticket.related_type.replace(/_/g, ' ')} #${ticket.related_id}` : (ticket.escalation_department || 'support')}</p>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${ticket.sla_status === 'breached' ? 'bg-red-100 text-red-700' : ticket.sla_status === 'due_soon' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                        {(ticket.sla_status || 'on_track').replace(/_/g, ' ')}
+                      </span>
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' : ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' : ticket.priority === 'medium' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{ticket.priority}</span>
                     </td>
@@ -642,6 +662,7 @@ const StateSupportAdminDashboard = () => {
             {chatTab === 'user' ? (
               <>
                 <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
+                  <SupportTicketServicePanel ticket={selectedTicket} onTicketUpdated={handleTicketUpdated} />
                   <div className="rounded-lg bg-gray-50 p-4">
                     <div className="mb-1 flex items-center gap-2 text-xs text-gray-500">
                       <FaUser size={10} /> {selectedTicket.user_name || selectedTicket.user_email || 'Anonymous'}

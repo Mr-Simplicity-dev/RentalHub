@@ -17,6 +17,44 @@ const SUPPORT_ADMIN_ROLES = new Set([
   'lga_support_admin',
 ]);
 
+const SUPPORT_TICKET_CATEGORIES = new Set([
+  'general',
+  'account',
+  'property',
+  'tenancy',
+  'payment',
+  'transportation',
+  'fumigation_cleaning',
+  'legal',
+  'technical',
+]);
+
+const SUPPORT_RELATED_TYPES = new Set([
+  'transportation_booking',
+  'fumigation_cleaning_booking',
+  'property_request',
+  'tenancy_request',
+  'payment',
+  'dispute',
+]);
+
+const SUPPORT_DEPARTMENTS = new Set([
+  'support',
+  'transportation',
+  'fumigation',
+  'finance',
+  'legal',
+  'technical',
+]);
+
+const ESCALATION_STATUSES = new Set([
+  'none',
+  'escalated',
+  'acknowledged',
+  'action_required',
+  'resolved',
+]);
+
 let supportSchemaReady = false;
 
 // In-memory admin activity store for anonymous presence/typing indicators
@@ -126,6 +164,15 @@ const ensureSupportSchema = async () => {
       contact_email VARCHAR(255),
       priority VARCHAR(20) NOT NULL DEFAULT 'medium',
       status VARCHAR(30) NOT NULL DEFAULT 'open',
+      category VARCHAR(50) NOT NULL DEFAULT 'general',
+      related_type VARCHAR(50),
+      related_id INTEGER,
+      escalation_department VARCHAR(50) NOT NULL DEFAULT 'support',
+      escalation_status VARCHAR(30) NOT NULL DEFAULT 'none',
+      escalation_note TEXT,
+      sla_due_at TIMESTAMP,
+      last_escalated_at TIMESTAMP,
+      resolution_summary TEXT,
       user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
       escalated_at TIMESTAMP,
@@ -145,10 +192,43 @@ const ensureSupportSchema = async () => {
       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='contact_email') THEN
         ALTER TABLE support_tickets ADD COLUMN contact_email VARCHAR(255);
       END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='category') THEN
+        ALTER TABLE support_tickets ADD COLUMN category VARCHAR(50) NOT NULL DEFAULT 'general';
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='related_type') THEN
+        ALTER TABLE support_tickets ADD COLUMN related_type VARCHAR(50);
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='related_id') THEN
+        ALTER TABLE support_tickets ADD COLUMN related_id INTEGER;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='escalation_department') THEN
+        ALTER TABLE support_tickets ADD COLUMN escalation_department VARCHAR(50) NOT NULL DEFAULT 'support';
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='escalation_status') THEN
+        ALTER TABLE support_tickets ADD COLUMN escalation_status VARCHAR(30) NOT NULL DEFAULT 'none';
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='escalation_note') THEN
+        ALTER TABLE support_tickets ADD COLUMN escalation_note TEXT;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='sla_due_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN sla_due_at TIMESTAMP;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='last_escalated_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN last_escalated_at TIMESTAMP;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='resolution_summary') THEN
+        ALTER TABLE support_tickets ADD COLUMN resolution_summary TEXT;
+      END IF;
     END $$;
 
     CREATE INDEX IF NOT EXISTS idx_support_tickets_status_priority
       ON support_tickets(status, priority, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_support_tickets_service_context
+      ON support_tickets(related_type, related_id);
+    CREATE INDEX IF NOT EXISTS idx_support_tickets_department_escalation
+      ON support_tickets(escalation_department, escalation_status);
+    CREATE INDEX IF NOT EXISTS idx_support_tickets_sla
+      ON support_tickets(sla_due_at);
 
     CREATE TABLE IF NOT EXISTS support_ticket_replies (
       id SERIAL PRIMARY KEY,
@@ -207,6 +287,21 @@ const ensureSupportSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_internal_notes_ticket
       ON support_ticket_internal_notes(ticket_id, created_at ASC);
+
+    CREATE TABLE IF NOT EXISTS support_ticket_timeline (
+      id SERIAL PRIMARY KEY,
+      ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      actor_role VARCHAR(50),
+      event_type VARCHAR(80) NOT NULL,
+      message TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_support_ticket_timeline_ticket
+      ON support_ticket_timeline(ticket_id, created_at ASC);
   `);
 
   supportSchemaReady = true;
@@ -219,6 +314,121 @@ const requireSupportAdmin = (req, res, next) => {
 };
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
+
+const normalizeSupportCategory = (value, relatedType) => {
+  const normalized = normalizeText(value).replace(/-/g, '_');
+  if (SUPPORT_TICKET_CATEGORIES.has(normalized)) return normalized;
+  if (relatedType === 'transportation_booking') return 'transportation';
+  if (relatedType === 'fumigation_cleaning_booking') return 'fumigation_cleaning';
+  return 'general';
+};
+
+const normalizeRelatedType = (value) => {
+  const normalized = normalizeText(value).replace(/-/g, '_');
+  return SUPPORT_RELATED_TYPES.has(normalized) ? normalized : null;
+};
+
+const normalizeDepartment = (value, category, relatedType) => {
+  const normalized = normalizeText(value).replace(/-/g, '_');
+  if (SUPPORT_DEPARTMENTS.has(normalized)) return normalized;
+  if (relatedType === 'transportation_booking' || category === 'transportation') return 'transportation';
+  if (relatedType === 'fumigation_cleaning_booking' || category === 'fumigation_cleaning') return 'fumigation';
+  if (category === 'payment') return 'finance';
+  if (category === 'legal') return 'legal';
+  if (category === 'technical') return 'technical';
+  return 'support';
+};
+
+const normalizeEscalationStatus = (value) => {
+  const normalized = normalizeText(value).replace(/-/g, '_');
+  return ESCALATION_STATUSES.has(normalized) ? normalized : 'escalated';
+};
+
+const resolveSlaDueAt = (category, priority) => {
+  const normalizedPriority = ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium';
+  const hoursByPriority = { urgent: 2, high: 4, medium: 24, low: 72 };
+  let hours = hoursByPriority[normalizedPriority] || 24;
+  if (['transportation', 'fumigation_cleaning', 'payment'].includes(category) && normalizedPriority === 'medium') {
+    hours = 12;
+  }
+  const dueAt = new Date();
+  dueAt.setHours(dueAt.getHours() + hours);
+  return dueAt;
+};
+
+const addTicketTimeline = async (ticketId, actor, eventType, message, metadata = {}) => {
+  try {
+    await db.query(
+      `INSERT INTO support_ticket_timeline
+         (ticket_id, actor_id, actor_name, actor_role, event_type, message, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+      [
+        ticketId,
+        actor?.id || null,
+        actor?.full_name || actor?.name || actor?.email || null,
+        actor?.user_type || null,
+        eventType,
+        message || null,
+        JSON.stringify(metadata || {}),
+      ]
+    );
+  } catch (err) {
+    console.error('Support ticket timeline error (non-fatal):', err);
+  }
+};
+
+const getRelatedServiceContext = async (ticket) => {
+  const relatedId = Number(ticket?.related_id);
+  if (!ticket?.related_type || !Number.isInteger(relatedId) || relatedId <= 0) {
+    return null;
+  }
+
+  if (ticket.related_type === 'transportation_booking') {
+    const result = await db.query(
+      `SELECT tb.id, tb.booking_status, tb.payment_status, tb.pickup_address, tb.destination_address,
+              tb.booking_date, tb.booking_time, tb.total_price, tb.driver_name, tb.driver_phone,
+              tb.vehicle_number, tb.created_at, ts.service_name, ts.service_type, ts.provider_name,
+              p.title AS property_title, p.city AS property_city,
+              u.full_name AS tenant_name, u.email AS tenant_email, u.phone AS tenant_phone
+       FROM transportation_bookings tb
+       LEFT JOIN transportation_services ts ON ts.id = tb.service_id
+       LEFT JOIN properties p ON p.id = tb.property_id
+       LEFT JOIN users u ON u.id = tb.tenant_id
+       WHERE tb.id = $1`,
+      [relatedId]
+    );
+    return result.rows[0] ? { type: 'transportation_booking', data: result.rows[0] } : null;
+  }
+
+  if (ticket.related_type === 'fumigation_cleaning_booking') {
+    const result = await db.query(
+      `SELECT fcb.id, fcb.booking_reference, fcb.booking_status, fcb.payment_status,
+              fcb.booking_date, fcb.preferred_time_slot, fcb.specific_time, fcb.total_price,
+              fcb.assigned_team_leader, fcb.team_contact_phone, fcb.created_at,
+              fcs.service_name, fcc.category_name, fcc.category_type,
+              p.title AS property_title, p.full_address AS property_address,
+              u.full_name AS tenant_name, u.email AS tenant_email, u.phone AS tenant_phone,
+              sp.company_name AS assigned_provider, sp.contact_phone AS provider_phone,
+              sp.contact_email AS provider_email
+       FROM fumigation_cleaning_bookings fcb
+       LEFT JOIN fumigation_cleaning_services fcs ON fcs.id = fcb.service_id
+       LEFT JOIN fumigation_cleaning_categories fcc ON fcc.id = fcs.category_id
+       LEFT JOIN properties p ON p.id = fcb.property_id
+       LEFT JOIN users u ON u.id = fcb.tenant_id
+       LEFT JOIN service_providers sp ON sp.id = (
+         SELECT provider_id FROM booking_provider_assignments
+         WHERE booking_id = fcb.id
+         ORDER BY assigned_at DESC
+         LIMIT 1
+       )
+       WHERE fcb.id = $1`,
+      [relatedId]
+    );
+    return result.rows[0] ? { type: 'fumigation_cleaning_booking', data: result.rows[0] } : null;
+  }
+
+  return null;
+};
 
 const canSupportAdminAccessTicket = (user, ticket = {}) => {
   const role = normalizeText(user?.user_type);
@@ -354,7 +564,10 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
   try {
     await ensureSupportSchema();
 
-    const { name, email, state, lga, subject, message, priority } = req.body;
+    const { name, email, state, lga, subject, message, priority, related_id } = req.body;
+    const relatedType = normalizeRelatedType(req.body.related_type);
+    const category = normalizeSupportCategory(req.body.category, relatedType);
+    const relatedId = relatedType && Number.isInteger(Number(related_id)) ? Number(related_id) : null;
 
     if (!name || !name.trim() || !email || !email.trim() || !state || !message || !message.trim()) {
       return res.status(400).json({
@@ -364,9 +577,13 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
     }
 
     const normalizedPriority = ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium';
+    const escalationDepartment = normalizeDepartment(req.body.escalation_department, category, relatedType);
+    const slaDueAt = resolveSlaDueAt(category, normalizedPriority);
     const result = await db.query(
-      `INSERT INTO support_tickets (subject, description, state, lga, contact_email, priority, status, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, 'open', NULL)
+      `INSERT INTO support_tickets
+         (subject, description, state, lga, contact_email, priority, status, user_id,
+          category, related_type, related_id, escalation_department, sla_due_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'open', NULL, $7, $8, $9, $10, $11)
        RETURNING id`,
       [
         subject?.trim() ? `[Contact] ${subject.trim()}` : `[Contact] ${name.trim()}`,
@@ -377,6 +594,11 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
         lga || null,
         email.trim().toLowerCase(),
         normalizedPriority,
+        category,
+        relatedType,
+        relatedId,
+        escalationDepartment,
+        slaDueAt,
       ]
     );
 
@@ -395,6 +617,14 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
     } catch (replyErr) {
       console.error('Failed to store initial contact reply (non-fatal):', replyErr);
     }
+
+    await addTicketTimeline(
+      ticketId,
+      { name: name.trim(), email: email.trim().toLowerCase(), user_type: 'contact' },
+      'ticket_created',
+      'Contact support ticket opened',
+      { category, related_type: relatedType, related_id: relatedId, escalation_department: escalationDepartment }
+    );
 
     // Auto-assign: LGA support → State support → Super support
     try {
@@ -455,6 +685,12 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
         contact_email: email.trim().toLowerCase(),
         priority: normalizedPriority,
         status: 'open',
+        category,
+        related_type: relatedType,
+        related_id: relatedId,
+        escalation_department: escalationDepartment,
+        escalation_status: 'none',
+        sla_due_at: slaDueAt.toISOString(),
         user_id: null,
       },
     });
@@ -472,18 +708,44 @@ router.post('/tickets', authenticate, async (req, res) => {
   try {
     await ensureSupportSchema();
 
-    const { subject, description, priority, state, lga } = req.body;
+    const { subject, description, priority, state, lga, related_id } = req.body;
+    const relatedType = normalizeRelatedType(req.body.related_type);
+    const category = normalizeSupportCategory(req.body.category, relatedType);
+    const relatedId = relatedType && Number.isInteger(Number(related_id)) ? Number(related_id) : null;
     if (!subject || !subject.trim()) {
       return res.status(400).json({ success: false, message: 'Subject is required' });
     }
 
+    const normalizedPriority = ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium';
+    const escalationDepartment = normalizeDepartment(req.body.escalation_department, category, relatedType);
+    const slaDueAt = resolveSlaDueAt(category, normalizedPriority);
     const result = await db.query(
-      `INSERT INTO support_tickets (subject, description, priority, status, user_id, state, lga)
-       VALUES ($1, $2, $3, 'open', $4, $5, $6) RETURNING *`,
-      [subject.trim(), description?.trim() || null, priority || 'medium', req.user.id, state || null, lga || null]
+      `INSERT INTO support_tickets
+         (subject, description, priority, status, user_id, state, lga,
+          category, related_type, related_id, escalation_department, sla_due_at)
+       VALUES ($1, $2, $3, 'open', $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [
+        subject.trim(),
+        description?.trim() || null,
+        normalizedPriority,
+        req.user.id,
+        state || null,
+        lga || null,
+        category,
+        relatedType,
+        relatedId,
+        escalationDepartment,
+        slaDueAt,
+      ]
     );
 
     const ticket = result.rows[0];
+    await addTicketTimeline(ticket.id, req.user, 'ticket_created', 'Support ticket opened', {
+      category,
+      related_type: relatedType,
+      related_id: relatedId,
+      escalation_department: escalationDepartment,
+    });
 
     // Auto-assign: LGA support → State support → Super support
     if (state) {
@@ -552,6 +814,8 @@ router.get('/tickets/my', authenticate, async (req, res) => {
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
+              st.category, st.related_type, st.related_id, st.escalation_department,
+              st.escalation_status, st.sla_due_at, st.last_escalated_at,
               st.escalated_at, st.resolved_at, st.created_at, st.updated_at,
               (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = TRUE AND (str.read_at IS NULL OR str.read_at < st.updated_at))::int AS unread_admin_replies
        FROM support_tickets st
@@ -590,6 +854,15 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
+              st.category, st.related_type, st.related_id, st.escalation_department,
+              st.escalation_status, st.escalation_note, st.sla_due_at, st.last_escalated_at,
+              CASE
+                WHEN st.status = 'resolved' THEN 'met'
+                WHEN st.sla_due_at IS NULL THEN 'not_set'
+                WHEN st.sla_due_at < CURRENT_TIMESTAMP THEN 'breached'
+                WHEN st.sla_due_at < CURRENT_TIMESTAMP + INTERVAL '2 hours' THEN 'due_soon'
+                ELSE 'on_track'
+              END AS sla_status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
               st.assigned_to,
               u.email AS user_email, u.full_name AS user_name,
@@ -784,10 +1057,19 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
       return res.status(403).json({ success: false, message: 'You cannot resolve this ticket' });
     }
 
+    const resolutionSummary = typeof req.body?.resolution_summary === 'string'
+      ? req.body.resolution_summary.trim().slice(0, 1000)
+      : null;
+
     const result = await db.query(
-      `UPDATE support_tickets SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      `UPDATE support_tickets
+       SET status = 'resolved',
+           escalation_status = CASE WHEN escalation_status = 'none' THEN escalation_status ELSE 'resolved' END,
+           resolution_summary = COALESCE($2, resolution_summary),
+           resolved_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 RETURNING *`,
-      [ticketId]
+      [ticketId, resolutionSummary]
     );
 
     if (!result.rows.length) {
@@ -795,11 +1077,144 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
     }
 
     emitTicketUpdated(result.rows[0]);
+    await addTicketTimeline(ticketId, req.user, 'ticket_resolved', resolutionSummary || 'Ticket marked as resolved');
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Resolve support ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to resolve support ticket' });
+  }
+});
+
+router.get('/tickets/:id/context', authenticate, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const role = normalizeText(req.user.user_type);
+    const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
+    let ticket;
+
+    if (isSupportAdmin) {
+      const scoped = await getScopedTicket(ticketId, req.user, 'st.*, u.email AS user_email, u.full_name AS user_name');
+      if (scoped.status === 404) return res.status(404).json({ success: false, message: 'Ticket not found' });
+      if (scoped.status === 403) return res.status(403).json({ success: false, message: 'Access denied' });
+      ticket = scoped.ticket;
+    } else {
+      const ownerResult = await db.query(
+        `SELECT st.*, u.email AS user_email, u.full_name AS user_name
+         FROM support_tickets st
+         LEFT JOIN users u ON u.id = st.user_id
+         WHERE st.id = $1 AND st.user_id = $2`,
+        [ticketId, req.user.id]
+      );
+      if (!ownerResult.rows.length) return res.status(403).json({ success: false, message: 'Access denied' });
+      ticket = ownerResult.rows[0];
+    }
+
+    let relatedContext = null;
+    try {
+      relatedContext = await getRelatedServiceContext(ticket);
+    } catch (contextErr) {
+      console.error('Support related context error (non-fatal):', contextErr);
+    }
+
+    const timelineResult = await db.query(
+      `SELECT id, actor_id, actor_name, actor_role, event_type, message, metadata, created_at
+       FROM support_ticket_timeline
+       WHERE ticket_id = $1
+       ORDER BY created_at ASC, id ASC`,
+      [ticketId]
+    );
+
+    res.json({ success: true, data: { ticket, related_context: relatedContext, timeline: timelineResult.rows } });
+  } catch (error) {
+    console.error('Support ticket context error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch ticket context' });
+  }
+});
+
+router.post('/tickets/:id/escalate-department', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const { status, ticket } = await getScopedTicket(ticketId, req.user);
+    if (status === 404) return res.status(404).json({ success: false, message: 'Ticket not found' });
+    if (status === 403) return res.status(403).json({ success: false, message: 'You cannot escalate this ticket' });
+
+    const department = normalizeDepartment(req.body.department, ticket.category, ticket.related_type);
+    if (department === 'support') {
+      return res.status(400).json({ success: false, message: 'Choose an operations department to hand off to' });
+    }
+    const note = typeof req.body.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
+
+    const result = await db.query(
+      `UPDATE support_tickets
+       SET escalation_department = $1,
+           escalation_status = 'escalated',
+           escalation_note = $2,
+           last_escalated_at = CURRENT_TIMESTAMP,
+           escalated_at = COALESCE(escalated_at, CURRENT_TIMESTAMP),
+           priority = CASE WHEN priority IN ('low', 'medium') THEN 'high' ELSE priority END,
+           status = CASE WHEN status = 'open' THEN 'in_progress' ELSE status END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING *`,
+      [department, note || null, ticketId]
+    );
+
+    await addTicketTimeline(ticketId, req.user, 'department_escalated', note || `Escalated to ${department.replace(/_/g, ' ')}`, { department });
+    emitTicketUpdated(result.rows[0]);
+    emitTicketToAdmins('ticket:department_escalated', { ticketId, ticket: result.rows[0], department });
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Support department escalation error:', error);
+    res.status(500).json({ success: false, message: 'Failed to escalate ticket to department' });
+  }
+});
+
+router.patch('/tickets/:id/escalation-status', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const scoped = await getScopedTicket(ticketId, req.user);
+    if (scoped.status === 404) return res.status(404).json({ success: false, message: 'Ticket not found' });
+    if (scoped.status === 403) return res.status(403).json({ success: false, message: 'You cannot update this escalation' });
+
+    const escalationStatus = normalizeEscalationStatus(req.body.status);
+    const note = typeof req.body.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
+
+    const result = await db.query(
+      `UPDATE support_tickets
+       SET escalation_status = $1,
+           escalation_note = COALESCE($2, escalation_note),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING *`,
+      [escalationStatus, note || null, ticketId]
+    );
+
+    await addTicketTimeline(ticketId, req.user, 'escalation_status_updated', note || `Escalation status changed to ${escalationStatus.replace(/_/g, ' ')}`, { escalation_status: escalationStatus });
+    emitTicketUpdated(result.rows[0]);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Support escalation status error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update escalation status' });
   }
 });
 
@@ -1726,6 +2141,11 @@ router.get('/tickets/:id/typing-status', async (req, res) => {
 
 router._supportScopeForTest = {
   canSupportAdminAccessTicket,
+  normalizeSupportCategory,
+  normalizeRelatedType,
+  normalizeDepartment,
+  normalizeEscalationStatus,
+  resolveSlaDueAt,
 };
 
 module.exports = router;
