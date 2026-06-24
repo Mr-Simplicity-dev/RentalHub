@@ -20,10 +20,19 @@ import {
   FaSyncAlt,
   FaTimesCircle,
   FaUserShield,
+  FaPaperclip,
+  FaFile,
+  FaEdit,
+  FaTrash,
+  FaCheck,
+  FaTimes,
+  FaUser,
+  FaShieldAlt,
 } from 'react-icons/fa';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import { useSocket } from '../../hooks/useSocket';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 
@@ -56,6 +65,10 @@ const formatDate = (dateString) => {
 const SuperSupportAdminDashboard = () => {
   const location = useLocation();
   const previousTabRef = useRef('');
+  const { socket } = useSocket();
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [typingUser, setTypingUser] = useState(null);
+  const typingTimer = useRef(null);
   // State management
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
@@ -119,6 +132,8 @@ const SuperSupportAdminDashboard = () => {
     setSelectedItem(item);
     setShowModal(true);
     setReplyText('');
+    setAttachmentFile(null);
+    setTypingUser(null);
     if (type === 'view-ticket' && item) {
       loadConversation(item.id);
     }
@@ -130,6 +145,8 @@ const SuperSupportAdminDashboard = () => {
     setSelectedItem(null);
     setConversation([]);
     setReplyText('');
+    setAttachmentFile(null);
+    setTypingUser(null);
   };
 
   const queueStats = useMemo(() => {
@@ -223,6 +240,29 @@ const SuperSupportAdminDashboard = () => {
     }
   }, [activeTab]);
 
+  // Socket listeners for real-time ticket updates
+  useEffect(() => {
+    if (!socket) return;
+    const replyHandler = (data) => {
+      if (selectedItem?.id === data.ticketId && modalType === 'view-ticket') {
+        loadConversation(data.ticketId);
+      }
+    };
+    const typingHandler = (data) => {
+      if (selectedItem?.id === data.ticketId && !data.isAdmin) {
+        setTypingUser(data);
+        clearTimeout(typingTimer.current);
+        typingTimer.current = setTimeout(() => setTypingUser(null), 3000);
+      }
+    };
+    socket.on('ticket:new_reply', replyHandler);
+    socket.on('ticket:typing', typingHandler);
+    return () => {
+      socket.off('ticket:new_reply', replyHandler);
+      socket.off('ticket:typing', typingHandler);
+    };
+  }, [socket, selectedItem, modalType]);
+
   // Quick action handlers
   const handleQuickAction = async (action, data) => {
     try {
@@ -259,18 +299,39 @@ const SuperSupportAdminDashboard = () => {
   };
 
   const handleSendReply = async () => {
-    if (!replyText.trim() || !selectedItem) return;
+    const msg = replyText.trim();
+    if (!msg && !attachmentFile) return;
     setSendingReply(true);
     try {
-      const res = await api.post(`/support/tickets/${selectedItem.id}/reply`, { message: replyText.trim() });
+      const formData = new FormData();
+      if (msg) formData.append('message', msg);
+      if (attachmentFile) formData.append('attachment', attachmentFile);
+
+      const res = await api.post(`/support/tickets/${selectedItem.id}/reply`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       setConversation((prev) => [...prev, res.data.data]);
       setReplyText('');
+      setAttachmentFile(null);
       loadDashboardData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to send reply');
     } finally {
       setSendingReply(false);
     }
+  };
+
+  const emitTyping = () => {
+    if (!socket || !selectedItem) return;
+    socket.emit('ticket:typing', { ticketId: selectedItem.id });
+  };
+
+  const handleEditReply = (replyId, updated) => {
+    setConversation((prev) => prev.map((r) => r.id === replyId ? updated : r));
+  };
+
+  const handleDeleteReply = (replyId) => {
+    setConversation((prev) => prev.filter((r) => r.id !== replyId));
   };
 
   // Export functions
@@ -1553,7 +1614,6 @@ const SuperSupportAdminDashboard = () => {
 
                 {/* Conversation thread */}
                 <div className="mt-6 max-h-80 space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  {/* Original message */}
                   <div className="rounded-lg bg-white p-3 shadow-sm">
                     <p className="text-xs text-slate-400">
                       {selectedItem.user_name || selectedItem.user_email || 'Anonymous'} &middot; {new Date(selectedItem.created_at).toLocaleString()}
@@ -1568,64 +1628,96 @@ const SuperSupportAdminDashboard = () => {
                   ) : (
                     conversation.map((reply) => (
                       <div key={reply.id} className={`rounded-lg p-3 shadow-sm ${reply.is_admin ? 'ml-4 border-l-4 border-indigo-400 bg-indigo-50' : 'bg-white'}`}>
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
-                          <span className={reply.is_admin ? 'font-medium text-indigo-600' : ''}>
-                            {reply.author_name || reply.user_email || 'User'}
-                          </span>
-                          {reply.is_admin && <span className="rounded bg-indigo-200 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">Support</span>}
-                          <span>&middot; {new Date(reply.created_at).toLocaleString()}</span>
+                        <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
+                          <div className="flex items-center gap-2">
+                            <span className={reply.is_admin ? 'font-medium text-indigo-600' : ''}>
+                              {reply.author_name || reply.user_email || 'User'}
+                            </span>
+                            {reply.is_admin && <span className="rounded bg-indigo-200 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">Support</span>}
+                            <span>&middot; {new Date(reply.created_at).toLocaleString()}</span>
+                            {reply.edited_at && <span className="italic">(edited)</span>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!reply.is_admin && reply.read_at && (
+                              <span className="flex items-center gap-1 text-[10px] text-green-600"><FaCheck size={8} /> Read {new Date(reply.read_at).toLocaleString()}</span>
+                            )}
+                            {reply.is_admin && (
+                              <>
+                                <button onClick={async () => {
+                                  const newMsg = prompt('Edit message:', reply.message);
+                                  if (newMsg && newMsg.trim()) {
+                                    try {
+                                      const res = await api.patch(`/support/tickets/${selectedItem.id}/reply/${reply.id}`, { message: newMsg.trim() });
+                                      handleEditReply(reply.id, res.data.data);
+                                    } catch (e) { toast.error('Failed to edit'); }
+                                  }
+                                }} className="text-slate-400 hover:text-slate-600"><FaEdit size={11} /></button>
+                                <button onClick={async () => {
+                                  if (!window.confirm('Delete this message?')) return;
+                                  try { await api.delete(`/support/tickets/${selectedItem.id}/reply/${reply.id}`); handleDeleteReply(reply.id); }
+                                  catch (e) { toast.error('Failed to delete'); }
+                                }} className="text-slate-400 hover:text-red-500"><FaTrash size={11} /></button>
+                              </>
+                            )}
+                          </div>
                         </div>
                         <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{reply.message}</p>
+                        {reply.attachment_url && (
+                          <a href={reply.attachment_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-300">
+                            <FaFile size={12} /> {reply.attachment_name || 'Attachment'}
+                          </a>
+                        )}
                       </div>
                     ))
+                  )}
+
+                  {typingUser && (
+                    <div className="text-xs italic text-slate-400">{typingUser.userName} is typing...</div>
                   )}
                 </div>
 
                 {/* Reply form */}
-                <div className="mt-4">
-                  <div className="flex items-end gap-2">
-                    <textarea
-                      value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      placeholder="Type your reply..."
-                      rows={2}
-                      className="flex-1 resize-none rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendReply();
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={handleSendReply}
-                      disabled={!replyText.trim() || sendingReply}
-                      className="flex h-[42px] w-[42px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40"
-                    >
-                      {sendingReply ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={14} />}
-                    </button>
+                {selectedItem.status !== 'resolved' && selectedItem.status !== 'closed' && (
+                  <div className="mt-4">
+                    {attachmentFile && (
+                      <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
+                        <FaPaperclip size={12} /> {attachmentFile.name}
+                        <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={12} /></button>
+                      </div>
+                    )}
+                    <div className="flex items-end gap-2">
+                      <label className="flex h-[42px] w-[42px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50">
+                        <FaPaperclip size={14} />
+                        <input type="file" className="hidden" onChange={(e) => setAttachmentFile(e.target.files[0])} />
+                      </label>
+                      <textarea
+                        value={replyText}
+                        onChange={(e) => { setReplyText(e.target.value); emitTyping(); }}
+                        placeholder="Type your reply..."
+                        rows={2}
+                        className="flex-1 resize-none rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendReply();
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={handleSendReply}
+                        disabled={(!replyText.trim() && !attachmentFile) || sendingReply}
+                        className="flex h-[42px] w-[42px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40"
+                      >
+                        {sendingReply ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={14} />}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    onClick={closeModal}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Close
-                  </button>
+                  <button onClick={closeModal} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Close</button>
                   {selectedItem.status !== 'resolved' && selectedItem.status !== 'closed' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          handleQuickAction('resolve', selectedItem);
-                          closeModal();
-                        }}
-                        className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                      >
-                        Mark as Resolved
-                      </button>
-                    </>
+                    <button onClick={() => { handleQuickAction('resolve', selectedItem); closeModal(); }} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Mark as Resolved</button>
                   )}
                 </div>
               </div>

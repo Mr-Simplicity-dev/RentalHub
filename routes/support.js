@@ -1,6 +1,10 @@
 const express = require('express');
 const db = require('../config/middleware/database');
 const { authenticate } = require('../config/middleware/auth');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -12,6 +16,57 @@ const SUPPORT_ADMIN_ROLES = new Set([
 ]);
 
 let supportSchemaReady = false;
+let io = null;
+
+try {
+  io = require('../server').io;
+} catch (e) {
+  // server may not be fully loaded yet; io will be set later if needed
+}
+
+const ATTACHMENT_DIR = path.join(__dirname, '..', 'uploads', 'tickets');
+if (!fs.existsSync(ATTACHMENT_DIR)) {
+  fs.mkdirSync(ATTACHMENT_DIR, { recursive: true });
+}
+
+const ALLOWED_MIME = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'application/pdf': '.pdf',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'text/plain': '.txt',
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+};
+
+const attachmentStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, ATTACHMENT_DIR),
+  filename: (req, file, cb) => {
+    const ext = ALLOWED_MIME[file.mimetype] || path.extname(file.originalname) || '.bin';
+    cb(null, `ticket_${Date.now()}_${crypto.randomBytes(12).toString('hex')}${ext}`);
+  },
+});
+
+const uploadAttachment = multer({
+  storage: attachmentStorage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME[file.mimetype]) return cb(null, true);
+    cb(new Error('Only images, PDF, DOC, DOCX, TXT, XLS, XLSX allowed'), false);
+  },
+});
+
+const emitToUser = (userId, event, data) => {
+  if (!io) return;
+  io.to(`user:${userId}`).emit(event, data);
+};
+
+const emitToRole = (role, event, data) => {
+  if (!io) return;
+  io.to(`role:${role}`).emit(event, data);
+};
 
 const ensureSupportSchema = async () => {
   if (supportSchemaReady) return;
@@ -33,7 +88,6 @@ const ensureSupportSchema = async () => {
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- ensure columns exist (safe for existing tables)
     DO $$
     BEGIN
       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='state') THEN
@@ -54,8 +108,32 @@ const ensureSupportSchema = async () => {
       author_name VARCHAR(255),
       message TEXT NOT NULL,
       is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+      attachment_url TEXT,
+      attachment_name VARCHAR(255),
+      attachment_type VARCHAR(100),
+      edited_at TIMESTAMP,
+      read_at TIMESTAMP,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_ticket_replies' AND column_name='attachment_url') THEN
+        ALTER TABLE support_ticket_replies ADD COLUMN attachment_url TEXT;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_ticket_replies' AND column_name='attachment_name') THEN
+        ALTER TABLE support_ticket_replies ADD COLUMN attachment_name VARCHAR(255);
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_ticket_replies' AND column_name='attachment_type') THEN
+        ALTER TABLE support_ticket_replies ADD COLUMN attachment_type VARCHAR(100);
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_ticket_replies' AND column_name='edited_at') THEN
+        ALTER TABLE support_ticket_replies ADD COLUMN edited_at TIMESTAMP;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_ticket_replies' AND column_name='read_at') THEN
+        ALTER TABLE support_ticket_replies ADD COLUMN read_at TIMESTAMP;
+      END IF;
+    END $$;
 
     CREATE INDEX IF NOT EXISTS idx_support_ticket_replies_ticket
       ON support_ticket_replies(ticket_id, created_at ASC);
@@ -70,7 +148,72 @@ const requireSupportAdmin = (req, res, next) => {
   return res.status(403).json({ success: false, message: 'Support admin access required' });
 };
 
-// Public contact form (no auth required)
+const addReplyNotification = async (reply, ticket, senderId, recipientId) => {
+  try {
+    const { createNotification } = require('../config/utils/notificationService');
+    const isAdminReply = reply.is_admin;
+    const recipient = isAdminReply ? ticket.user_id : recipientId;
+    if (!recipient || recipient === senderId) return;
+
+    const title = isAdminReply ? 'New reply to your support ticket' : 'New message from user on ticket';
+    const message = isAdminReply
+      ? `Support team replied to "${ticket.subject}"`
+      : `A user replied to ticket "${ticket.subject}"`;
+    const link = `/support/tickets/${ticket.id}`;
+
+    await createNotification(recipient, 'ticket_reply', title, message, link);
+
+    emitToUser(recipient, 'ticket:new_reply', {
+      ticketId: ticket.id,
+      subject: ticket.subject,
+      replyId: reply.id,
+      isAdmin: reply.is_admin,
+      preview: reply.message.substring(0, 100),
+    });
+  } catch (err) {
+    console.error('Add reply notification error:', err);
+  }
+};
+
+const sendReplyEmail = async (reply, ticket, sender) => {
+  try {
+    const emailService = require('../config/utils/emailService');
+    const isAdminReply = reply.is_admin;
+
+    if (isAdminReply && ticket.user_id) {
+      const userResult = await db.query('SELECT email, full_name FROM users WHERE id = $1', [ticket.user_id]);
+      if (userResult.rows.length) {
+        const user = userResult.rows[0];
+        await emailService.sendMessageNotification(
+          user.email,
+          user.full_name || 'User',
+          'Support Team',
+          reply.message
+        );
+      }
+    } else if (!isAdminReply) {
+      const assignees = [];
+      if (ticket.assigned_to) assignees.push(ticket.assigned_to);
+      const adminResult = await db.query(
+        `SELECT email, full_name FROM users WHERE id = ANY($1)`,
+        [assignees]
+      );
+      for (const admin of adminResult.rows) {
+        await emailService.sendMessageNotification(
+          admin.email,
+          admin.full_name || 'Support Admin',
+          sender.full_name || 'A user',
+          reply.message
+        );
+      }
+    }
+  } catch (err) {
+    console.error('Reply email error:', err);
+  }
+};
+
+// ─── Public contact form ───────────────────────────────────────────────────
+
 router.post('/contact', async (req, res) => {
   try {
     await ensureSupportSchema();
@@ -110,15 +253,11 @@ router.post('/contact', async (req, res) => {
            WHERE user_type = 'lga_support_admin'
              AND assigned_state = $1
              AND assigned_city = $2
-             AND deleted_at IS NULL
-             AND account_suspended_at IS NULL
-           ORDER BY id ASC
-           LIMIT 1`,
+             AND deleted_at IS NULL AND account_suspended_at IS NULL
+           ORDER BY id ASC LIMIT 1`,
           [state, lga]
         );
-        if (lgaResult.rows.length > 0) {
-          assignedTo = lgaResult.rows[0].id;
-        }
+        if (lgaResult.rows.length > 0) assignedTo = lgaResult.rows[0].id;
       }
 
       if (!assignedTo) {
@@ -126,36 +265,25 @@ router.post('/contact', async (req, res) => {
           `SELECT id FROM users
            WHERE user_type = 'state_support_admin'
              AND assigned_state = $1
-             AND deleted_at IS NULL
-             AND account_suspended_at IS NULL
-           ORDER BY id ASC
-           LIMIT 1`,
+             AND deleted_at IS NULL AND account_suspended_at IS NULL
+           ORDER BY id ASC LIMIT 1`,
           [state]
         );
-        if (stateResult.rows.length > 0) {
-          assignedTo = stateResult.rows[0].id;
-        }
+        if (stateResult.rows.length > 0) assignedTo = stateResult.rows[0].id;
       }
 
       if (!assignedTo) {
         const superResult = await db.query(
           `SELECT id FROM users
            WHERE user_type = 'super_support_admin'
-             AND deleted_at IS NULL
-             AND account_suspended_at IS NULL
-           ORDER BY id ASC
-           LIMIT 1`
+             AND deleted_at IS NULL AND account_suspended_at IS NULL
+           ORDER BY id ASC LIMIT 1`
         );
-        if (superResult.rows.length > 0) {
-          assignedTo = superResult.rows[0].id;
-        }
+        if (superResult.rows.length > 0) assignedTo = superResult.rows[0].id;
       }
 
       if (assignedTo) {
-        await db.query(
-          `UPDATE support_tickets SET assigned_to = $1 WHERE id = $2`,
-          [assignedTo, ticketId]
-        );
+        await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticketId]);
       }
     } catch (assignErr) {
       console.error('Ticket auto-assignment error (non-fatal):', assignErr);
@@ -168,33 +296,27 @@ router.post('/contact', async (req, res) => {
   }
 });
 
+// ─── Authenticated ticket CRUD ─────────────────────────────────────────────
+
 router.post('/tickets', authenticate, async (req, res) => {
   try {
     await ensureSupportSchema();
 
     const { subject, description, priority } = req.body;
-
     if (!subject || !subject.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Subject is required',
-      });
+      return res.status(400).json({ success: false, message: 'Subject is required' });
     }
 
     const result = await db.query(
       `INSERT INTO support_tickets (subject, description, priority, status, user_id)
-       VALUES ($1, $2, $3, 'open', $4)
-       RETURNING *`,
+       VALUES ($1, $2, $3, 'open', $4) RETURNING *`,
       [subject.trim(), description?.trim() || null, priority || 'medium', req.user.id]
     );
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Create support ticket error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create support ticket',
-    });
+    res.status(500).json({ success: false, message: 'Failed to create support ticket' });
   }
 });
 
@@ -203,23 +325,23 @@ router.get('/tickets/my', authenticate, async (req, res) => {
     await ensureSupportSchema();
 
     const result = await db.query(
-      `SELECT id, subject, description, priority, status, escalated_at, resolved_at, created_at, updated_at
-       FROM support_tickets
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT 50`,
+      `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
+              st.escalated_at, st.resolved_at, st.created_at, st.updated_at,
+              (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = TRUE AND (str.read_at IS NULL OR str.read_at < st.updated_at))::int AS unread_admin_replies
+       FROM support_tickets st
+       WHERE st.user_id = $1
+       ORDER BY st.created_at DESC LIMIT 50`,
       [req.user.id]
     );
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('My support tickets error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch your tickets',
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch your tickets' });
   }
 });
+
+// ─── Admin ticket listing (scoped) ─────────────────────────────────────────
 
 router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
   try {
@@ -238,53 +360,38 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
       where.push(`st.priority = $${params.length}`);
     }
 
-    // Scope tickets by admin jurisdiction
     const role = String(req.user.user_type || '').toLowerCase();
 
     if (role === 'lga_support_admin') {
-      // Own assignments + unassigned tickets in their LGA
       params.push(req.user.id);
       params.push(String(req.user.assigned_state || ''));
       params.push(String(req.user.assigned_city || ''));
       where.push(`(
         st.assigned_to = $${params.length - 2}
-        OR (
-          st.assigned_to IS NULL
-          AND st.state = $${params.length - 1}
-          AND st.lga = $${params.length}
-        )
+        OR (st.assigned_to IS NULL AND st.state = $${params.length - 1} AND st.lga = $${params.length})
       )`);
     } else if (role === 'state_support_admin') {
-      // Own assignments + unassigned tickets in their state
       params.push(req.user.id);
       params.push(String(req.user.assigned_state || ''));
       where.push(`(
         st.assigned_to = $${params.length - 1}
-        OR (
-          st.assigned_to IS NULL
-          AND st.state = $${params.length}
-        )
+        OR (st.assigned_to IS NULL AND st.state = $${params.length})
       )`);
     }
-    // super_support_admin and super_admin see all tickets
 
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
               st.assigned_to,
               u.email AS user_email, u.full_name AS user_name,
-              a.email AS assigned_email, a.full_name AS assigned_name
+              a.email AS assigned_email, a.full_name AS assigned_name,
+              (SELECT COUNT(*) FROM support_ticket_replies str WHERE str.ticket_id = st.id AND str.is_admin = FALSE AND (str.read_at IS NULL))::int AS unread_user_replies
        FROM support_tickets st
        LEFT JOIN users u ON u.id = st.user_id
        LEFT JOIN users a ON a.id = st.assigned_to
        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
        ORDER BY
-         CASE st.priority
-           WHEN 'urgent' THEN 1
-           WHEN 'high' THEN 2
-           WHEN 'medium' THEN 3
-           ELSE 4
-         END,
+         CASE st.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
          st.created_at DESC
        LIMIT 100`,
       params
@@ -293,12 +400,11 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Support tickets error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch support tickets',
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch support tickets' });
   }
 });
+
+// ─── Escalate ──────────────────────────────────────────────────────────────
 
 router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, res) => {
   try {
@@ -306,21 +412,15 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
 
     const ticketId = Number(req.body?.ticketId || req.body?.ticket_id);
     if (!Number.isInteger(ticketId) || ticketId <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid ticket ID is required',
-      });
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
     }
 
     const currentUserType = req.user.user_type;
     const currentUserId = req.user.id;
 
-    // Get current ticket info (subject/state from description)
     const ticketResult = await db.query(
       `SELECT st.*, u.email AS user_email, u.full_name AS user_name
-       FROM support_tickets st
-       LEFT JOIN users u ON u.id = st.user_id
-       WHERE st.id = $1`,
+       FROM support_tickets st LEFT JOIN users u ON u.id = st.user_id WHERE st.id = $1`,
       [ticketId]
     );
 
@@ -331,19 +431,15 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
     const ticket = ticketResult.rows[0];
     const ticketState = ticket.state || null;
 
-    // Determine next-level assignee
     let nextAssigneeId = null;
     let escalationNote = '';
 
     if (currentUserType === 'lga_support_admin') {
-      // LGA → escalate to state support admin
       if (ticketState) {
         const stateResult = await db.query(
           `SELECT id FROM users
-           WHERE user_type = 'state_support_admin'
-             AND assigned_state = $1
-             AND deleted_at IS NULL
-             AND account_suspended_at IS NULL
+           WHERE user_type = 'state_support_admin' AND assigned_state = $1
+             AND deleted_at IS NULL AND account_suspended_at IS NULL
            ORDER BY id ASC LIMIT 1`,
           [ticketState]
         );
@@ -355,12 +451,10 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
     }
 
     if (!nextAssigneeId && (currentUserType === 'lga_support_admin' || currentUserType === 'state_support_admin')) {
-      // State-level escalation → super support admin
       const superResult = await db.query(
         `SELECT id FROM users
          WHERE user_type = 'super_support_admin'
-           AND deleted_at IS NULL
-           AND account_suspended_at IS NULL
+           AND deleted_at IS NULL AND account_suspended_at IS NULL
          ORDER BY id ASC LIMIT 1`
       );
       if (superResult.rows.length > 0) {
@@ -379,12 +473,9 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
     }
 
     await db.query(
-      `UPDATE support_tickets
-       SET priority = 'urgent',
-           status = CASE WHEN status = 'resolved' THEN status ELSE 'in_progress' END,
-           assigned_to = $1,
-           escalated_at = CURRENT_TIMESTAMP,
-           updated_at = CURRENT_TIMESTAMP
+      `UPDATE support_tickets SET priority = 'urgent',
+         status = CASE WHEN status = 'resolved' THEN status ELSE 'in_progress' END,
+         assigned_to = $1, escalated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = $2`,
       [nextAssigneeId, ticketId]
     );
@@ -396,12 +487,11 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
     });
   } catch (error) {
     console.error('Escalate support ticket error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to escalate support ticket',
-    });
+    res.status(500).json({ success: false, message: 'Failed to escalate support ticket' });
   }
 });
+
+// ─── Assign / Resolve ─────────────────────────────────────────────────────
 
 router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (req, res) => {
   try {
@@ -415,12 +505,10 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
     const assignedTo = req.body.assigned_to ? Number(req.body.assigned_to) : req.user.id;
 
     const result = await db.query(
-      `UPDATE support_tickets
-       SET assigned_to = $1,
-           status = CASE WHEN status = 'open' THEN 'in_progress' ELSE status END,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-       RETURNING *`,
+      `UPDATE support_tickets SET assigned_to = $1,
+          status = CASE WHEN status = 'open' THEN 'in_progress' ELSE status END,
+          updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 RETURNING *`,
       [assignedTo, ticketId]
     );
 
@@ -431,10 +519,7 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Assign support ticket error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to assign support ticket',
-    });
+    res.status(500).json({ success: false, message: 'Failed to assign support ticket' });
   }
 });
 
@@ -444,19 +529,12 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
 
     const ticketId = Number(req.params.id);
     if (!Number.isInteger(ticketId) || ticketId <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid ticket ID is required',
-      });
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
     }
 
     const result = await db.query(
-      `UPDATE support_tickets
-       SET status = 'resolved',
-           resolved_at = CURRENT_TIMESTAMP,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1
-       RETURNING *`,
+      `UPDATE support_tickets SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 RETURNING *`,
       [ticketId]
     );
 
@@ -467,16 +545,13 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Resolve support ticket error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to resolve support ticket',
-    });
+    res.status(500).json({ success: false, message: 'Failed to resolve support ticket' });
   }
 });
 
-// ─── Conversation / Reply endpoints ────────────────────────────────────────
+// ─── Conversation endpoints ────────────────────────────────────────────────
 
-// GET /support/tickets/:id/conversation — fetch all replies for a ticket
+// GET /tickets/:id/conversation — paginated, with read receipts
 router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
   try {
     await ensureSupportSchema();
@@ -486,10 +561,10 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
     }
 
-    // Check access: ticket owner or support admin
     const role = String(req.user.user_type || '').toLowerCase();
     const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
 
+    // Access check
     if (!isSupportAdmin) {
       const ownerCheck = await db.query(
         'SELECT id FROM support_tickets WHERE id = $1 AND user_id = $2',
@@ -500,26 +575,60 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
       }
     }
 
+    // Pagination
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+
     const result = await db.query(
       `SELECT str.id, str.ticket_id, str.user_id, str.author_name, str.message,
-              str.is_admin, str.created_at,
+              str.is_admin, str.attachment_url, str.attachment_name, str.attachment_type,
+              str.edited_at, str.read_at, str.created_at,
               u.email AS user_email
        FROM support_ticket_replies str
        LEFT JOIN users u ON u.id = str.user_id
        WHERE str.ticket_id = $1
-       ORDER BY str.created_at ASC, str.id ASC`,
+       ORDER BY str.created_at ASC, str.id ASC
+       LIMIT $2 OFFSET $3`,
+      [ticketId, limit, offset]
+    );
+
+    // Count total for pagination
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM support_ticket_replies WHERE ticket_id = $1',
       [ticketId]
     );
 
-    res.json({ success: true, data: result.rows });
+    // If viewer is a support admin, mark all non-admin replies as read
+    if (isSupportAdmin) {
+      await db.query(
+        `UPDATE support_ticket_replies SET read_at = CURRENT_TIMESTAMP
+         WHERE ticket_id = $1 AND is_admin = FALSE AND read_at IS NULL`,
+        [ticketId]
+      );
+    }
+
+    // If viewer is the ticket owner, mark all admin replies as read
+    if (!isSupportAdmin) {
+      await db.query(
+        `UPDATE support_ticket_replies SET read_at = CURRENT_TIMESTAMP
+         WHERE ticket_id = $1 AND is_admin = TRUE AND read_at IS NULL`,
+        [ticketId]
+      );
+    }
+
+    res.json({
+      success: true,
+      data: result.rows,
+      meta: { total: parseInt(countResult.rows[0].count), limit, offset },
+    });
   } catch (error) {
     console.error('Get conversation error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch conversation' });
   }
 });
 
-// POST /support/tickets/:id/reply — add a reply to a ticket
-router.post('/tickets/:id/reply', authenticate, async (req, res) => {
+// POST /tickets/:id/reply — add reply with optional file attachment
+router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachment'), async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -528,14 +637,16 @@ router.post('/tickets/:id/reply', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
     }
 
-    const { message } = req.body;
-    if (!message || !message.trim()) {
-      return res.status(400).json({ success: false, message: 'Message is required' });
+    const message = req.body?.message?.trim();
+    const hasAttachment = !!req.file;
+
+    if (!message && !hasAttachment) {
+      return res.status(400).json({ success: false, message: 'Message or attachment is required' });
     }
 
-    // Fetch ticket to verify access
+    // Fetch ticket
     const ticketResult = await db.query(
-      'SELECT id, subject, user_id, status FROM support_tickets WHERE id = $1',
+      'SELECT id, subject, user_id, status, assigned_to FROM support_tickets WHERE id = $1',
       [ticketId]
     );
     if (!ticketResult.rows.length) {
@@ -553,19 +664,24 @@ router.post('/tickets/:id/reply', authenticate, async (req, res) => {
 
     // Insert reply
     const result = await db.query(
-      `INSERT INTO support_ticket_replies (ticket_id, user_id, author_name, message, is_admin)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO support_ticket_replies (ticket_id, user_id, author_name, message, is_admin, attachment_url, attachment_name, attachment_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         ticketId,
         req.user.id,
         isSupportAdmin ? (req.user.full_name || 'Support Team') : (req.user.full_name || req.user.email),
-        message.trim(),
+        message || '',
         isSupportAdmin,
+        req.file ? `/uploads/tickets/${req.file.filename}` : null,
+        req.file ? req.file.originalname : null,
+        req.file ? req.file.mimetype : null,
       ]
     );
 
-    // If ticket was resolved, re-open it on new reply
+    const reply = result.rows[0];
+
+    // Re-open if resolved
     if (ticket.status === 'resolved') {
       await db.query(
         `UPDATE support_tickets SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
@@ -573,10 +689,204 @@ router.post('/tickets/:id/reply', authenticate, async (req, res) => {
       );
     }
 
-    res.status(201).json({ success: true, data: result.rows[0] });
+    // Notifications & email (async, non-blocking)
+    const recipientId = isSupportAdmin ? ticket.user_id : (ticket.assigned_to || null);
+    addReplyNotification(reply, ticket, req.user.id, recipientId);
+    sendReplyEmail(reply, ticket, req.user);
+
+    // Socket real-time event
+    emitToUser(recipientId, 'ticket:new_reply', {
+      ticketId: ticket.id,
+      subject: ticket.subject,
+      reply: {
+        id: reply.id,
+        message: reply.message,
+        is_admin: reply.is_admin,
+        author_name: reply.author_name,
+        attachment_url: reply.attachment_url,
+        attachment_name: reply.attachment_name,
+        attachment_type: reply.attachment_type,
+        created_at: reply.created_at,
+      },
+    });
+
+    res.status(201).json({ success: true, data: reply });
   } catch (error) {
     console.error('Reply error:', error);
     res.status(500).json({ success: false, message: 'Failed to send reply' });
+  }
+});
+
+// PATCH /tickets/:ticketId/reply/:replyId/read — mark reply as read
+router.patch('/tickets/:ticketId/reply/:replyId/read', authenticate, async (req, res) => {
+  try {
+    const ticketId = Number(req.params.ticketId);
+    const replyId = Number(req.params.replyId);
+
+    await db.query(
+      `UPDATE support_ticket_replies SET read_at = CURRENT_TIMESTAMP WHERE id = $1 AND ticket_id = $2`,
+      [replyId, ticketId]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Mark reply read error:', error);
+    res.status(500).json({ success: false, message: 'Failed to mark as read' });
+  }
+});
+
+// PATCH /tickets/:ticketId/reply/:replyId — edit reply
+router.patch('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res) => {
+  try {
+    const replyId = Number(req.params.replyId);
+    const ticketId = Number(req.params.ticketId);
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message is required' });
+    }
+
+    const replyResult = await db.query(
+      'SELECT id, user_id, is_admin FROM support_ticket_replies WHERE id = $1 AND ticket_id = $2',
+      [replyId, ticketId]
+    );
+    if (!replyResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Reply not found' });
+    }
+
+    const reply = replyResult.rows[0];
+    if (reply.user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'You can only edit your own replies' });
+    }
+
+    const result = await db.query(
+      `UPDATE support_ticket_replies SET message = $1, edited_at = CURRENT_TIMESTAMP
+       WHERE id = $2 RETURNING *`,
+      [message.trim(), replyId]
+    );
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Edit reply error:', error);
+    res.status(500).json({ success: false, message: 'Failed to edit reply' });
+  }
+});
+
+// DELETE /tickets/:ticketId/reply/:replyId — delete reply
+router.delete('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res) => {
+  try {
+    const replyId = Number(req.params.replyId);
+    const ticketId = Number(req.params.ticketId);
+
+    const replyResult = await db.query(
+      'SELECT id, user_id FROM support_ticket_replies WHERE id = $1 AND ticket_id = $2',
+      [replyId, ticketId]
+    );
+    if (!replyResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Reply not found' });
+    }
+
+    const reply = replyResult.rows[0];
+    const role = String(req.user.user_type || '').toLowerCase();
+    const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
+
+    if (reply.user_id !== req.user.id && !isSupportAdmin) {
+      return res.status(403).json({ success: false, message: 'You cannot delete this reply' });
+    }
+
+    // Delete file if present
+    const fileResult = await db.query(
+      'SELECT attachment_url FROM support_ticket_replies WHERE id = $1',
+      [replyId]
+    );
+    if (fileResult.rows.length && fileResult.rows[0].attachment_url) {
+      const filePath = path.join(__dirname, '..', fileResult.rows[0].attachment_url);
+      try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+    }
+
+    await db.query('DELETE FROM support_ticket_replies WHERE id = $1', [replyId]);
+
+    res.json({ success: true, message: 'Reply deleted' });
+  } catch (error) {
+    console.error('Delete reply error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete reply' });
+  }
+});
+
+// POST /tickets/:id/typing — typing indicator
+router.post('/tickets/:id/typing', authenticate, async (req, res) => {
+  try {
+    const ticketId = Number(req.params.id);
+
+    const ticketResult = await db.query(
+      'SELECT id, user_id, assigned_to FROM support_tickets WHERE id = $1',
+      [ticketId]
+    );
+    if (!ticketResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    const ticket = ticketResult.rows[0];
+    const isAdmin = SUPPORT_ADMIN_ROLES.has(String(req.user.user_type || '').toLowerCase());
+    const recipientId = isAdmin ? ticket.user_id : (ticket.assigned_to || null);
+
+    if (recipientId) {
+      emitToUser(recipientId, 'ticket:typing', {
+        ticketId: ticket.id,
+        userId: req.user.id,
+        userName: req.user.full_name || req.user.email,
+        isAdmin,
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Typing indicator error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send typing indicator' });
+  }
+});
+
+// GET /tickets/unread/count — unread ticket replies for current user
+router.get('/tickets/unread/count', authenticate, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const role = String(req.user.user_type || '').toLowerCase();
+    const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
+
+    let result;
+    if (isSupportAdmin) {
+      // Count tickets with unread user replies assigned to this admin
+      result = await db.query(
+        `SELECT COUNT(*) AS cnt FROM (
+          SELECT st.id FROM support_tickets st
+          WHERE st.assigned_to = $1
+            AND EXISTS (
+              SELECT 1 FROM support_ticket_replies str
+              WHERE str.ticket_id = st.id AND str.is_admin = FALSE AND str.read_at IS NULL
+            )
+        ) sub`,
+        [req.user.id]
+      );
+    } else {
+      // Count tickets with unread admin replies for this user
+      result = await db.query(
+        `SELECT COUNT(*) AS cnt FROM (
+          SELECT st.id FROM support_tickets st
+          WHERE st.user_id = $1
+            AND EXISTS (
+              SELECT 1 FROM support_ticket_replies str
+              WHERE str.ticket_id = st.id AND str.is_admin = TRUE AND str.read_at IS NULL
+            )
+        ) sub`,
+        [req.user.id]
+      );
+    }
+
+    res.json({ success: true, count: parseInt(result.rows[0].cnt) });
+  } catch (error) {
+    console.error('Unread count error:', error);
+    res.status(500).json({ success: false, message: 'Failed to get unread count' });
   }
 });
 

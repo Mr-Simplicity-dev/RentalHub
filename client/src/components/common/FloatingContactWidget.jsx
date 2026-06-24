@@ -90,7 +90,7 @@ const FloatingContactWidget = () => {
         >
           <div className="flex items-center justify-between bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-4 text-white">
             <div>
-              <p className="font-semibold text-sm">Contact us</p>
+              <p className="font-semibold text-sm">Contact RentalHub NG</p>
               <p className="text-xs text-primary-100 mt-0.5">We typically reply within minutes</p>
             </div>
             <button type="button" onClick={handleClose} className="text-white/80 hover:text-white transition p-1">
