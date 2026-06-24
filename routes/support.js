@@ -41,6 +41,10 @@ const ALLOWED_MIME = {
   'text/plain': '.txt',
   'application/vnd.ms-excel': '.xls',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  'audio/webm': '.webm',
+  'audio/mp4': '.mp4',
+  'audio/ogg': '.ogg',
+  'audio/wav': '.wav',
 };
 
 const attachmentStorage = multer.diskStorage({
@@ -56,7 +60,7 @@ const uploadAttachment = multer({
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (ALLOWED_MIME[file.mimetype]) return cb(null, true);
-    cb(new Error('Only images, PDF, DOC, DOCX, TXT, XLS, XLSX allowed'), false);
+    cb(new Error('Only images, PDF, DOC, DOCX, TXT, XLS, XLSX, and audio files allowed'), false);
   },
 });
 

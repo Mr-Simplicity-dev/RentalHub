@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaGlobeAfrica } from 'react-icons/fa';
+import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaMicrophone, FaStopCircle } from 'react-icons/fa';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
@@ -8,24 +8,33 @@ const LS_EMAIL = 'contact_widget_email';
 const LS_TICKET_ID = 'contact_widget_ticket_id';
 const LS_NAME = 'contact_widget_name';
 
-const ChatBubble = ({ msg, isOwn }) => (
-  <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isOwn ? 'bg-indigo-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md'}`}>
-      {!isOwn && msg.author_name && (
-        <p className="mb-0.5 text-[10px] font-semibold text-indigo-600">{msg.author_name}</p>
-      )}
-      <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
-      {msg.attachment_url && (
-        <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className={`mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${isOwn ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'} hover:underline`}>
-          <FaFile size={10} /> {msg.attachment_name || 'Attachment'}
-        </a>
-      )}
-      <p className={`mt-0.5 text-[10px] ${isOwn ? 'text-indigo-200' : 'text-slate-400'}`}>
-        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-      </p>
+const ChatBubble = ({ msg, isOwn }) => {
+  const isAudio = msg.attachment_type && msg.attachment_type.startsWith('audio/');
+  return (
+    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isOwn ? 'bg-indigo-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md'}`}>
+        {!isOwn && msg.author_name && (
+          <p className="mb-0.5 text-[10px] font-semibold text-indigo-600">{msg.author_name}</p>
+        )}
+        {msg.message && <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>}
+        {isAudio ? (
+          <div className={`mt-1.5 rounded-lg p-1 ${isOwn ? 'bg-indigo-500' : 'bg-slate-200'}`}>
+            <audio controls className="w-full h-9" src={msg.attachment_url} preload="none">
+              Your browser does not support audio playback.
+            </audio>
+          </div>
+        ) : msg.attachment_url ? (
+          <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className={`mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${isOwn ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'} hover:underline`}>
+            <FaFile size={10} /> {msg.attachment_name || 'Attachment'}
+          </a>
+        ) : null}
+        <p className={`mt-0.5 text-[10px] ${isOwn ? 'text-indigo-200' : 'text-slate-400'}`}>
+          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const FloatingContactWidget = () => {
   const { user, isAuthenticated } = useAuth();
@@ -158,6 +167,11 @@ const FloatingContactWidget = () => {
   };
 
   const reset = () => {
+    clearInterval(recordingTimerRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
     setForm({ name: '', email: '', state: '', lga: '', subject: '', message: '' });
     setError('');
     setView('form');
@@ -166,6 +180,8 @@ const FloatingContactWidget = () => {
     setReplyText('');
     setAttachmentFile(null);
     setTypingUser(null);
+    setIsRecording(false);
+    setRecordingDuration(0);
   };
 
   const handleClose = () => {
@@ -222,6 +238,74 @@ const FloatingContactWidget = () => {
     if (!socket || !activeTicket) return;
     socket.emit('ticket:typing', { ticketId: activeTicket.id });
   };
+
+  // ── Voice recording ──
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+  const streamRef = useRef(null);
+
+  const formatDuration = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm' });
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType });
+        const file = new File([blob], `voice_${Date.now()}.webm`, { type: recorder.mimeType });
+        setAttachmentFile(file);
+        setIsRecording(false);
+        setRecordingDuration(0);
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+        }
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      const start = Date.now();
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(Math.floor((Date.now() - start) / 1000));
+      }, 1000);
+    } catch (err) {
+      setError('Microphone access denied or not available.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    clearInterval(recordingTimerRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearInterval(recordingTimerRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, []);
 
   // ── Contact lookup (anonymous) ──
   const [lookupEmail, setLookupEmail] = useState('');
@@ -532,10 +616,19 @@ const FloatingContactWidget = () => {
           {/* ─── REPLY INPUT (conversation view only) ─── */}
           {view === 'conversation' && activeTicket && activeTicket.status !== 'resolved' && (
             <div className="border-t border-slate-200 p-3">
-              {attachmentFile && (
+              {attachmentFile && !isRecording && (
                 <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
                   <FaPaperclip size={10} /> {attachmentFile.name}
                   <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={10} /></button>
+                </div>
+              )}
+              {isRecording && (
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600">
+                  <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  Recording... {formatDuration(recordingDuration)}
+                  <button onClick={stopRecording} className="ml-auto flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-white hover:bg-red-600">
+                    <FaStopCircle size={10} /> Stop
+                  </button>
                 </div>
               )}
               <div className="flex items-end gap-2">
@@ -543,10 +636,26 @@ const FloatingContactWidget = () => {
                   <FaPaperclip size={12} />
                   <input type="file" className="hidden" onChange={(e) => setAttachmentFile(e.target.files[0])} />
                 </label>
-                <textarea value={replyText} onChange={(e) => { setReplyText(e.target.value); emitTyping(); }}
-                  placeholder="Type your message..." rows={1}
-                  className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }} />
+                {isRecording ? (
+                  <div className="flex-1" />
+                ) : (
+                  <textarea value={replyText} onChange={(e) => { setReplyText(e.target.value); emitTyping(); }}
+                    placeholder="Type your message..." rows={1}
+                    className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }} />
+                )}
+                {isRecording ? (
+                  <button onClick={stopRecording}
+                    className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0">
+                    <FaStopCircle size={14} />
+                  </button>
+                ) : (
+                  <button onClick={startRecording}
+                    className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 shrink-0"
+                    title="Record voice message">
+                    <FaMicrophone size={12} />
+                  </button>
+                )}
                 <button onClick={handleSendReply} disabled={(!replyText.trim() && !attachmentFile) || sendingReply}
                   className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
                   {sendingReply ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={12} />}
