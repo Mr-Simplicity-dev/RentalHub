@@ -38,6 +38,7 @@ import {
   FaBell,
   FaIdCard,
   FaFilter,
+  FaArrowUp,
 } from 'react-icons/fa';
 
 const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = 'smooth') => {
@@ -546,6 +547,11 @@ const AdminLayout = () => {
                   Support Tickets
                 </NavLink>
 
+                <NavLink to="/admin/super-support-dashboard?tab=escalations" className={() => supportNavItem('escalations')}>
+                  <FaArrowUp className="mr-3" />
+                  Escalations
+                </NavLink>
+
                 <NavLink to="/admin/super-support-dashboard?tab=alerts" className={() => supportNavItem('alerts')}>
                   <FaEnvelope className="mr-3" />
                   Alerts
@@ -1049,6 +1055,11 @@ const AdminLayout = () => {
                   Support Tickets
                   {badgePill(liveBadges.pendingSupportQueue)}
                 </NavLink>
+
+                <NavLink to="/admin/lga-support-dashboard?tab=escalations" className={() => supportNavItem('escalations')}>
+                  <FaArrowUp className="mr-3" />
+                  Escalations
+                </NavLink>
               </div>
             </div>
           )}
@@ -1173,6 +1184,13 @@ const AdminLayout = () => {
                     <FaLifeRing className="mr-3" />
                     Support Tickets
                     {badgePill(liveBadges.pendingSupportQueue)}
+                  </NavLink>
+                )}
+
+                  {isStateSupportAdmin && (
+                   <NavLink to="/admin/state-support-dashboard?tab=escalations" className={() => supportNavItem('escalations')}>
+                    <FaArrowUp className="mr-3" />
+                    Escalations
                   </NavLink>
                 )}
 
