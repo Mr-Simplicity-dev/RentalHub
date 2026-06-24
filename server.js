@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const fs = require('fs');
 const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -308,6 +309,9 @@ Start your search today and find the best home in ${location}.
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
+const clientBuildPath = path.join(__dirname, 'client', 'build');
+const clientIndexPath = path.join(clientBuildPath, 'index.html');
+const hasClientBuild = fs.existsSync(clientIndexPath);
 const apiRateLimitWindowMs =
   Number(process.env.API_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
 const apiRateLimitMax =
@@ -425,6 +429,10 @@ app.use((req, res, next) => {
 app.use(audit('API Request', 'system'));
 
 app.get('/', (req, res) => {
+  if (hasClientBuild) {
+    return res.sendFile(clientIndexPath);
+  }
+
   res.json({
     status: 'ok',
     message: 'Rental Hub NG API is running',
@@ -549,6 +557,14 @@ app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
 app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
 
 app.use('/api/downloads', generalOpsLimiter, downloadsRoutes);
+
+if (hasClientBuild) {
+  app.use(express.static(clientBuildPath));
+
+  app.get(/^\/(?!api\/|socket\.io\/|uploads\/).*/, (req, res) => {
+    res.sendFile(clientIndexPath);
+  });
+}
 
 app.use((err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;
