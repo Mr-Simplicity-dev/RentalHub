@@ -61,6 +61,7 @@ const FloatingContactWidget = () => {
   const listRef = useRef(null);
   const widgetRef = useRef(null);
   const typingTimer = useRef(null);
+  const convPollRef = useRef(null);
 
   // Restore identity
   useEffect(() => {
@@ -169,6 +170,7 @@ const FloatingContactWidget = () => {
   const reset = () => {
     clearInterval(recordingTimerRef.current);
     clearInterval(contactRecordingTimerRef.current);
+    clearInterval(convPollRef.current);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -429,6 +431,23 @@ const FloatingContactWidget = () => {
     poll();
     typingPollRef.current = setInterval(poll, 3000);
     return () => { clearInterval(typingPollRef.current); };
+  }, [viewingContactTicket, lookupEmail]);
+
+  // Poll conversation for anonymous users (no socket available)
+  useEffect(() => {
+    if (!viewingContactTicket || !lookupEmail.trim()) return;
+    const fetchConv = async () => {
+      try {
+        const res = await api.post('/support/tickets/contact-conversation', {
+          ticketId: viewingContactTicket.id,
+          email: lookupEmail.trim(),
+        });
+        setContactConv(res.data?.data || []);
+      } catch {}
+    };
+    // Also run immediately when ticket changes (already done in viewContactConversation, but this covers re-opens)
+    convPollRef.current = setInterval(fetchConv, 5000);
+    return () => { clearInterval(convPollRef.current); };
   }, [viewingContactTicket, lookupEmail]);
 
   const handleContactReply = async () => {

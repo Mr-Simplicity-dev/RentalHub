@@ -816,20 +816,44 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
     sendReplyEmail(reply, ticket, req.user);
 
     // Socket real-time event
-    emitToUser(recipientId, 'ticket:new_reply', {
-      ticketId: ticket.id,
-      subject: ticket.subject,
-      reply: {
-        id: reply.id,
-        message: reply.message,
-        is_admin: reply.is_admin,
-        author_name: reply.author_name,
-        attachment_url: reply.attachment_url,
-        attachment_name: reply.attachment_name,
-        attachment_type: reply.attachment_type,
-        created_at: reply.created_at,
-      },
-    });
+    if (recipientId) {
+      emitToUser(recipientId, 'ticket:new_reply', {
+        ticketId: ticket.id,
+        subject: ticket.subject,
+        reply: {
+          id: reply.id,
+          message: reply.message,
+          is_admin: reply.is_admin,
+          author_name: reply.author_name,
+          attachment_url: reply.attachment_url,
+          attachment_name: reply.attachment_name,
+          attachment_type: reply.attachment_type,
+          created_at: reply.created_at,
+        },
+      });
+    }
+
+    // For unassigned tickets or contact tickets, emit to admin role rooms
+    if (!recipientId && !isSupportAdmin) {
+      // User replied but no admin is assigned — notify scoped admins via role rooms
+      const roleRooms = ['lga_support_admin', 'state_support_admin', 'super_support_admin'];
+      for (const role of roleRooms) {
+        emitToRole(role, 'ticket:new_reply', {
+          ticketId: ticket.id,
+          subject: ticket.subject,
+          reply: {
+            id: reply.id,
+            message: reply.message,
+            is_admin: reply.is_admin,
+            author_name: reply.author_name,
+            attachment_url: reply.attachment_url,
+            attachment_name: reply.attachment_name,
+            attachment_type: reply.attachment_type,
+            created_at: reply.created_at,
+          },
+        });
+      }
+    }
 
     res.status(201).json({ success: true, data: reply });
   } catch (error) {
@@ -1314,14 +1338,15 @@ router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), asy
     }
 
     const ticketResult = await db.query(
-      'SELECT id, contact_email, status FROM support_tickets WHERE id = $1 AND user_id IS NULL',
+      'SELECT id, contact_email, status, assigned_to, state, lga FROM support_tickets WHERE id = $1 AND user_id IS NULL',
       [ticketId]
     );
     if (!ticketResult.rows.length) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
+    const ticket = ticketResult.rows[0];
 
-    if (ticketResult.rows[0].contact_email !== email.trim().toLowerCase()) {
+    if (ticket.contact_email !== email.trim().toLowerCase()) {
       return res.status(403).json({ success: false, message: 'Email does not match this ticket' });
     }
 
@@ -1339,12 +1364,57 @@ router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), asy
       ]
     );
 
+    const reply = result.rows[0];
+
     // Re-open resolved ticket
-    if (ticketResult.rows[0].status === 'resolved') {
+    if (ticket.status === 'resolved') {
       await db.query("UPDATE support_tickets SET status = 'in_progress' WHERE id = $1", [ticketId]);
     }
 
-    res.status(201).json({ success: true, data: result.rows[0] });
+    // Notify assigned admin via socket
+    const replyPayload = {
+      ticketId: ticket.id,
+      subject: ticket.subject || ticket.subject,
+      reply: {
+        id: reply.id,
+        message: reply.message,
+        is_admin: reply.is_admin,
+        author_name: reply.author_name,
+        attachment_url: reply.attachment_url,
+        attachment_name: reply.attachment_name,
+        attachment_type: reply.attachment_type,
+        created_at: reply.created_at,
+      },
+    };
+
+    if (ticket.assigned_to) {
+      emitToUser(ticket.assigned_to, 'ticket:new_reply', replyPayload);
+      // In-app notification + email
+      try {
+        const { createNotification } = require('../config/utils/notificationService');
+        await createNotification(ticket.assigned_to, 'ticket_reply', 'New reply on support ticket', `A user replied to ticket "${ticket.subject || 'Support request'}"`, `/admin/lga-support-dashboard`);
+        const emailService = require('../config/utils/emailService');
+        const adminResult = await db.query('SELECT email, full_name FROM users WHERE id = $1', [ticket.assigned_to]);
+        if (adminResult.rows.length) {
+          await emailService.sendMessageNotification(
+            adminResult.rows[0].email,
+            adminResult.rows[0].full_name || 'Support Admin',
+            ticket.contact_email || 'A user',
+            reply.message?.substring(0, 200) || 'Voice message'
+          );
+        }
+      } catch (notifyErr) {
+        console.error('Contact reply notification error:', notifyErr);
+      }
+    } else {
+      // Not assigned — notify scoped admin role rooms
+      const roleRooms = ['lga_support_admin', 'state_support_admin', 'super_support_admin'];
+      for (const role of roleRooms) {
+        emitToRole(role, 'ticket:new_reply', replyPayload);
+      }
+    }
+
+    res.status(201).json({ success: true, data: reply });
   } catch (error) {
     console.error('Contact reply error:', error);
     res.status(500).json({ success: false, message: 'Failed to send reply' });
