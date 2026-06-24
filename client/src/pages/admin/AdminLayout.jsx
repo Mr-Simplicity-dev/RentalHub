@@ -5,6 +5,7 @@ import api from '../../services/api';
 import RoleBadge from '../../components/common/RoleBadge';
 import FloatingContactWidget from '../../components/common/FloatingContactWidget';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import {
   FaTachometerAlt,
   FaUsers,
@@ -57,6 +58,14 @@ const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = '
     window.scrollTo({ top: 0, left: 0, behavior });
   }, 0);
 };
+
+const LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'ru', label: 'Русский' },
+  { value: 'fr', label: 'Français' },
+  { value: 'ar', label: 'العربية' },
+  { value: 'zh', label: '中文' },
+];
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
@@ -125,6 +134,7 @@ const AdminLayout = () => {
   const [selectedNotification, setSelectedNotification] = useState(null);
   const notifRef = useRef(null);
   const notifRefMobile = useRef(null);
+  const [activeLanguage, setActiveLanguage] = useState(i18n.language?.split('-')[0] || 'en');
 
   useEffect(() => {
     setMobileSidebarOpen(false);
@@ -152,6 +162,18 @@ const AdminLayout = () => {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const handleLanguageChange = (language = i18n.language) => {
+      const normalizedLanguage = language?.split('-')[0] || 'en';
+      setActiveLanguage(normalizedLanguage);
+      document.documentElement.lang = normalizedLanguage;
+      document.documentElement.dir = normalizedLanguage === 'ar' ? 'rtl' : 'ltr';
+    };
+    handleLanguageChange();
+    i18n.on('languageChanged', handleLanguageChange);
+    return () => { i18n.off('languageChanged', handleLanguageChange); };
   }, []);
 
   useEffect(() => {
@@ -430,6 +452,12 @@ const AdminLayout = () => {
         ? roleTheme.activeNav
         : roleTheme.hoverNav
     }`;
+
+  const handleLanguageSelect = (event) => {
+    const nextLanguage = event.target.value;
+    setActiveLanguage(nextLanguage);
+    i18n.changeLanguage(nextLanguage);
+  };
 
   return (
     <div className={`min-h-screen ${roleTheme.mainBg} lg:flex`}>
@@ -1329,6 +1357,25 @@ const AdminLayout = () => {
           </div>
         )}
 
+        <div className="flex justify-end border-b bg-white px-3 py-1 sm:px-4 sm:py-2">
+          <label className="relative block w-[8.25rem] sm:w-full sm:max-w-[12rem]" dir="ltr">
+            <span className="sr-only">{t('language.select')}</span>
+            <select
+              onChange={handleLanguageSelect}
+              value={activeLanguage}
+              aria-label={t('language.select')}
+              className="h-8 w-full appearance-none rounded-md border border-gray-300 bg-white py-1 pl-2.5 pr-7 text-xs leading-5 text-gray-700 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-200 sm:h-auto sm:rounded-lg sm:py-1.5 sm:pl-3 sm:pr-10 sm:text-sm"
+            >
+              {LANGUAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <FaChevronDown
+              className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 sm:right-3 sm:text-xs"
+              aria-hidden="true"
+            />
+          </label>
+        </div>
         <main ref={mainContentRef} className="min-w-0 flex-1 overflow-x-hidden p-4 animate-fadeIn sm:p-6 lg:overflow-y-auto">
           {isStateScopedAdmin && (
             <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-800">
