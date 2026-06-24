@@ -6,6 +6,7 @@ const agentWithdrawalController = require('../controllers/agentWithdrawalControl
 const agentCommissionController = require('../controllers/agentCommissionController');
 const damageReportController = require('../controllers/damageReportController');
 const db = require('../config/middleware/database');
+const supportRoutes = require('../routes/support');
 
 const makeRes = () => {
   const res = {};
@@ -102,4 +103,58 @@ test('damage report summary blocks unauthorized tenant', async () => {
   } finally {
     db.query = originalQuery;
   }
+});
+
+test('support admin ticket scope follows LGA, state, assignment, and super hierarchy', () => {
+  const { canSupportAdminAccessTicket } = supportRoutes._supportScopeForTest;
+  const lagosIkejaTicket = { id: 1, state: 'Lagos', lga: 'Ikeja', assigned_to: null };
+  const abujaTicket = { id: 2, state: 'FCT', lga: 'AMAC', assigned_to: null };
+
+  assert.equal(
+    canSupportAdminAccessTicket(
+      { id: 10, user_type: 'lga_support_admin', assigned_state: 'Lagos', assigned_city: 'Ikeja' },
+      lagosIkejaTicket
+    ),
+    true
+  );
+
+  assert.equal(
+    canSupportAdminAccessTicket(
+      { id: 10, user_type: 'lga_support_admin', assigned_state: 'Lagos', assigned_city: 'Surulere' },
+      lagosIkejaTicket
+    ),
+    false
+  );
+
+  assert.equal(
+    canSupportAdminAccessTicket(
+      { id: 20, user_type: 'state_support_admin', assigned_state: 'Lagos' },
+      lagosIkejaTicket
+    ),
+    true
+  );
+
+  assert.equal(
+    canSupportAdminAccessTicket(
+      { id: 20, user_type: 'state_support_admin', assigned_state: 'Lagos' },
+      abujaTicket
+    ),
+    false
+  );
+
+  assert.equal(
+    canSupportAdminAccessTicket(
+      { id: 30, user_type: 'lga_support_admin', assigned_state: 'Oyo', assigned_city: 'Ibadan' },
+      { ...lagosIkejaTicket, assigned_to: 30 }
+    ),
+    true
+  );
+
+  assert.equal(
+    canSupportAdminAccessTicket(
+      { id: 40, user_type: 'super_support_admin' },
+      abujaTicket
+    ),
+    true
+  );
 });

@@ -25,7 +25,7 @@ const adminActivity = {
   viewing: new Map(),  // ticketId -> { userId, userName, timestamp }
 };
 // Clean stale entries every 30 seconds
-setInterval(() => {
+const adminActivityCleanup = setInterval(() => {
   const now = Date.now();
   for (const [ticketId, data] of adminActivity.typing) {
     if (now - data.timestamp > 5000) adminActivity.typing.delete(ticketId);
@@ -34,6 +34,7 @@ setInterval(() => {
     if (now - data.timestamp > 30000) adminActivity.viewing.delete(ticketId);
   }
 }, 30000);
+if (typeof adminActivityCleanup.unref === 'function') adminActivityCleanup.unref();
 
 const ATTACHMENT_DIR = path.join(__dirname, '..', 'uploads', 'tickets');
 if (!fs.existsSync(ATTACHMENT_DIR)) {
@@ -215,6 +216,72 @@ const requireSupportAdmin = (req, res, next) => {
   const role = String(req.user?.user_type || '').toLowerCase();
   if (SUPPORT_ADMIN_ROLES.has(role)) return next();
   return res.status(403).json({ success: false, message: 'Support admin access required' });
+};
+
+const normalizeText = (value) => String(value || '').trim().toLowerCase();
+
+const canSupportAdminAccessTicket = (user, ticket = {}) => {
+  const role = normalizeText(user?.user_type);
+  if (!SUPPORT_ADMIN_ROLES.has(role)) return false;
+  if (role === 'super_admin' || role === 'super_support_admin') return true;
+  if (ticket.assigned_to && Number(ticket.assigned_to) === Number(user.id)) return true;
+
+  const ticketState = normalizeText(ticket.state);
+  const ticketLga = normalizeText(ticket.lga);
+  const userState = normalizeText(user.assigned_state);
+  const userLga = normalizeText(user.assigned_city);
+
+  if (role === 'state_support_admin') {
+    return Boolean(userState && ticketState && userState === ticketState);
+  }
+
+  if (role === 'lga_support_admin') {
+    return Boolean(userState && userLga && ticketState && ticketLga && userState === ticketState && userLga === ticketLga);
+  }
+
+  return false;
+};
+
+const addSupportTicketScope = (where, params, user, alias = 'st') => {
+  const role = normalizeText(user?.user_type);
+  if (role === 'super_admin' || role === 'super_support_admin') return;
+
+  if (role === 'state_support_admin') {
+    params.push(user.id);
+    const assignedParam = `$${params.length}`;
+    params.push(normalizeText(user.assigned_state));
+    const stateParam = `$${params.length}`;
+    where.push(`(${alias}.assigned_to = ${assignedParam} OR LOWER(COALESCE(${alias}.state, '')) = ${stateParam})`);
+    return;
+  }
+
+  if (role === 'lga_support_admin') {
+    params.push(user.id);
+    const assignedParam = `$${params.length}`;
+    params.push(normalizeText(user.assigned_state));
+    const stateParam = `$${params.length}`;
+    params.push(normalizeText(user.assigned_city));
+    const lgaParam = `$${params.length}`;
+    where.push(`(${alias}.assigned_to = ${assignedParam} OR (LOWER(COALESCE(${alias}.state, '')) = ${stateParam} AND LOWER(COALESCE(${alias}.lga, '')) = ${lgaParam}))`);
+    return;
+  }
+
+  where.push('1 = 0');
+};
+
+const getScopedTicket = async (ticketId, user, select = 'st.*') => {
+  const result = await db.query(
+    `SELECT ${select}
+     FROM support_tickets st
+     LEFT JOIN users u ON u.id = st.user_id
+     WHERE st.id = $1`,
+    [ticketId]
+  );
+  if (!result.rows.length) return { status: 404, ticket: null };
+
+  const ticket = result.rows[0];
+  if (!canSupportAdminAccessTicket(user, ticket)) return { status: 403, ticket: null };
+  return { status: 200, ticket };
 };
 
 const addReplyNotification = async (reply, ticket, senderId, recipientId) => {
@@ -519,6 +586,8 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
       where.push(`st.priority = $${params.length}`);
     }
 
+    addSupportTicketScope(where, params, req.user);
+
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
@@ -558,17 +627,19 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
     const currentUserType = req.user.user_type;
     const currentUserId = req.user.id;
 
-    const ticketResult = await db.query(
-      `SELECT st.*, u.email AS user_email, u.full_name AS user_name
-       FROM support_tickets st LEFT JOIN users u ON u.id = st.user_id WHERE st.id = $1`,
-      [ticketId]
+    const { status, ticket } = await getScopedTicket(
+      ticketId,
+      req.user,
+      'st.*, u.email AS user_email, u.full_name AS user_name'
     );
 
-    if (!ticketResult.rows.length) {
+    if (status === 404) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
+    if (status === 403) {
+      return res.status(403).json({ success: false, message: 'You cannot escalate this ticket' });
+    }
 
-    const ticket = ticketResult.rows[0];
     const ticketState = ticket.state || null;
 
     let nextAssigneeId = null;
@@ -652,6 +723,29 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
 
     const assignedTo = req.body.assigned_to ? Number(req.body.assigned_to) : req.user.id;
 
+    const { status, ticket } = await getScopedTicket(ticketId, req.user);
+    if (status === 404) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+    if (status === 403) {
+      return res.status(403).json({ success: false, message: 'You cannot assign this ticket' });
+    }
+
+    if (assignedTo !== req.user.id) {
+      const assigneeResult = await db.query(
+        `SELECT id, user_type, assigned_state, assigned_city
+         FROM users
+         WHERE id = $1
+           AND user_type IN ('super_admin', 'super_support_admin', 'state_support_admin', 'lga_support_admin')
+           AND deleted_at IS NULL AND account_suspended_at IS NULL`,
+        [assignedTo]
+      );
+
+      if (!assigneeResult.rows.length || !canSupportAdminAccessTicket(assigneeResult.rows[0], ticket)) {
+        return res.status(400).json({ success: false, message: 'Assignee cannot access this ticket' });
+      }
+    }
+
     const result = await db.query(
       `UPDATE support_tickets SET assigned_to = $1,
           status = CASE WHEN status = 'open' THEN 'in_progress' ELSE status END,
@@ -680,6 +774,14 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
     const ticketId = Number(req.params.id);
     if (!Number.isInteger(ticketId) || ticketId <= 0) {
       return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const { status } = await getScopedTicket(ticketId, req.user);
+    if (status === 404) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+    if (status === 403) {
+      return res.status(403).json({ success: false, message: 'You cannot resolve this ticket' });
     }
 
     const result = await db.query(
@@ -717,7 +819,15 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
     const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
 
     // Access check
-    if (!isSupportAdmin) {
+    if (isSupportAdmin) {
+      const { status } = await getScopedTicket(ticketId, req.user);
+      if (status === 404) {
+        return res.status(404).json({ success: false, message: 'Ticket not found' });
+      }
+      if (status === 403) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    } else {
       const ownerCheck = await db.query(
         'SELECT id FROM support_tickets WHERE id = $1 AND user_id = $2',
         [ticketId, req.user.id]
@@ -812,7 +922,7 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
 
     // Fetch ticket
     const ticketResult = await db.query(
-      'SELECT id, subject, user_id, status, assigned_to FROM support_tickets WHERE id = $1',
+      'SELECT id, subject, user_id, status, assigned_to, state, lga FROM support_tickets WHERE id = $1',
       [ticketId]
     );
     if (!ticketResult.rows.length) {
@@ -823,6 +933,10 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
     const role = String(req.user.user_type || '').toLowerCase();
     const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
     const isOwner = ticket.user_id === req.user.id;
+
+    if (isSupportAdmin && !canSupportAdminAccessTicket(req.user, ticket)) {
+      return res.status(403).json({ success: false, message: 'You cannot reply to this ticket' });
+    }
 
     if (!isSupportAdmin && !isOwner) {
       return res.status(403).json({ success: false, message: 'You cannot reply to this ticket' });
@@ -934,6 +1048,26 @@ router.patch('/tickets/:ticketId/reply/:replyId/read', authenticate, async (req,
   try {
     const ticketId = Number(req.params.ticketId);
     const replyId = Number(req.params.replyId);
+    const role = String(req.user.user_type || '').toLowerCase();
+    const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
+
+    if (isSupportAdmin) {
+      const { status } = await getScopedTicket(ticketId, req.user);
+      if (status === 404) {
+        return res.status(404).json({ success: false, message: 'Ticket not found' });
+      }
+      if (status === 403) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    } else {
+      const ownerCheck = await db.query(
+        'SELECT id FROM support_tickets WHERE id = $1 AND user_id = $2',
+        [ticketId, req.user.id]
+      );
+      if (!ownerCheck.rows.length) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
 
     await db.query(
       `UPDATE support_ticket_replies SET read_at = CURRENT_TIMESTAMP WHERE id = $1 AND ticket_id = $2`,
@@ -971,6 +1105,14 @@ router.patch('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res)
       return res.status(403).json({ success: false, message: 'You can only edit your own replies' });
     }
 
+    const role = String(req.user.user_type || '').toLowerCase();
+    if (SUPPORT_ADMIN_ROLES.has(role)) {
+      const { status } = await getScopedTicket(ticketId, req.user);
+      if (status === 403) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
+
     const result = await db.query(
       `UPDATE support_ticket_replies SET message = $1, edited_at = CURRENT_TIMESTAMP
        WHERE id = $2 RETURNING *`,
@@ -1002,6 +1144,16 @@ router.delete('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res
     const role = String(req.user.user_type || '').toLowerCase();
     const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
 
+    if (isSupportAdmin) {
+      const { status } = await getScopedTicket(ticketId, req.user);
+      if (status === 404) {
+        return res.status(404).json({ success: false, message: 'Ticket not found' });
+      }
+      if (status === 403) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
+
     if (reply.user_id !== req.user.id && !isSupportAdmin) {
       return res.status(403).json({ success: false, message: 'You cannot delete this reply' });
     }
@@ -1031,7 +1183,7 @@ router.post('/tickets/:id/typing', authenticate, async (req, res) => {
     const ticketId = Number(req.params.id);
 
     const ticketResult = await db.query(
-      'SELECT id, user_id, assigned_to FROM support_tickets WHERE id = $1',
+      'SELECT id, user_id, assigned_to, state, lga FROM support_tickets WHERE id = $1',
       [ticketId]
     );
     if (!ticketResult.rows.length) {
@@ -1040,6 +1192,12 @@ router.post('/tickets/:id/typing', authenticate, async (req, res) => {
 
     const ticket = ticketResult.rows[0];
     const isAdmin = SUPPORT_ADMIN_ROLES.has(String(req.user.user_type || '').toLowerCase());
+    if (isAdmin && !canSupportAdminAccessTicket(req.user, ticket)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    if (!isAdmin && ticket.user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
     const recipientId = isAdmin ? ticket.user_id : (ticket.assigned_to || null);
 
     if (recipientId) {
@@ -1077,17 +1235,22 @@ router.get('/tickets/unread/count', authenticate, async (req, res) => {
 
     let result;
     if (isSupportAdmin) {
-      // Count tickets with unread user replies assigned to this admin
+      const where = [];
+      const params = [];
+      addSupportTicketScope(where, params, req.user, 'st');
+      const scopeSql = where.length ? where.join(' AND ') : 'TRUE';
+
+      // Count tickets with unread user replies visible to this admin
       result = await db.query(
         `SELECT COUNT(*) AS cnt FROM (
           SELECT st.id FROM support_tickets st
-          WHERE st.assigned_to = $1
+          WHERE ${scopeSql}
             AND EXISTS (
               SELECT 1 FROM support_ticket_replies str
               WHERE str.ticket_id = st.id AND str.is_admin = FALSE AND str.read_at IS NULL
             )
         ) sub`,
-        [req.user.id]
+        params
       );
     } else {
       // Count tickets with unread admin replies for this user
@@ -1116,12 +1279,18 @@ router.get('/tickets/internal-notes/unread-count', authenticate, requireSupportA
   try {
     await ensureSupportSchema();
 
+    const where = ['sin.user_id != $1', 'sin.read_at IS NULL'];
+    const params = [req.user.id];
+    addSupportTicketScope(where, params, req.user, 'st');
+
     const result = await db.query(
       `SELECT COUNT(*) AS cnt FROM (
-        SELECT DISTINCT sin.ticket_id FROM support_ticket_internal_notes sin
-        WHERE sin.user_id != $1 AND sin.read_at IS NULL
+        SELECT DISTINCT sin.ticket_id
+        FROM support_ticket_internal_notes sin
+        JOIN support_tickets st ON st.id = sin.ticket_id
+        WHERE ${where.join(' AND ')}
       ) sub`,
-      [req.user.id]
+      params
     );
 
     res.json({ success: true, count: parseInt(result.rows[0].cnt) });
@@ -1207,6 +1376,14 @@ router.get('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, asy
     const limit = Math.min(Number(req.query.limit) || 200, 500);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
 
+    const { status } = await getScopedTicket(ticketId, req.user);
+    if (status === 404) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+    if (status === 403) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
     const result = await db.query(
       `SELECT sin.id, sin.ticket_id, sin.user_id, sin.author_name, sin.author_role, sin.message, sin.read_at, sin.created_at,
               u.email AS user_email
@@ -1254,7 +1431,7 @@ router.post('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, as
 
     // Verify ticket exists
     const ticketResult = await db.query(
-      'SELECT id, subject, assigned_to FROM support_tickets WHERE id = $1',
+      'SELECT id, subject, assigned_to, state, lga FROM support_tickets WHERE id = $1',
       [ticketId]
     );
     if (!ticketResult.rows.length) {
@@ -1262,6 +1439,9 @@ router.post('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, as
     }
 
     const ticket = ticketResult.rows[0];
+    if (!canSupportAdminAccessTicket(req.user, ticket)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
 
     const result = await db.query(
       `INSERT INTO support_ticket_internal_notes (ticket_id, user_id, author_name, author_role, message)
@@ -1347,6 +1527,11 @@ router.patch('/tickets/:ticketId/internal-notes/:noteId', authenticate, requireS
       return res.status(403).json({ success: false, message: 'You can only edit your own notes' });
     }
 
+    const { status } = await getScopedTicket(ticketId, req.user);
+    if (status === 403) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
     const result = await db.query(
       `UPDATE support_ticket_internal_notes SET message = $1 WHERE id = $2 RETURNING *`,
       [message.trim(), noteId]
@@ -1378,6 +1563,11 @@ router.delete('/tickets/:ticketId/internal-notes/:noteId', authenticate, require
     const note = noteResult.rows[0];
     if (note.user_id !== req.user.id) {
       return res.status(403).json({ success: false, message: 'You can only delete your own notes' });
+    }
+
+    const { status } = await getScopedTicket(ticketId, req.user);
+    if (status === 403) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     await db.query('DELETE FROM support_ticket_internal_notes WHERE id = $1', [noteId]);
@@ -1533,5 +1723,9 @@ router.get('/tickets/:id/typing-status', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to get typing status' });
   }
 });
+
+router._supportScopeForTest = {
+  canSupportAdminAccessTicket,
+};
 
 module.exports = router;

@@ -64,7 +64,7 @@ const Header = () => {
     if (role === 'super_support_admin') return '/admin/super-support-dashboard';
     if (role === 'recruitment_admin' || user?.is_recruitment_admin === true) return '/admin/recruitment';
     if (role === 'state_support_admin') return '/admin/state-support-dashboard';
-    if (role === 'lga_support_admin') return '/admin?tab=property_requests';
+    if (role === 'lga_support_admin') return '/admin/lga-support-dashboard';
     if (role === 'state_admin' || role === 'state_financial_admin' || role === 'admin' || role === 'lga_admin') return '/admin';
     if (role === 'super_financial_admin') return '/admin/super-financial-dashboard';
     if (role === 'financial_admin' || role === 'lga_financial_admin') return '/admin/financial-dashboard';
