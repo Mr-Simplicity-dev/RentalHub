@@ -54,6 +54,14 @@ export const TOUR_STEPS = {
       placement: 'left',
       highlight: true,
     },
+    {
+      id: 'tenant_7',
+      target: '.tour-support-widget',
+      title: 'Chat Support',
+      description: 'Need help? Click here to chat with our support team. You can start a conversation, view your tickets, and get real-time responses.',
+      placement: 'left',
+      highlight: true,
+    },
   ],
 
   LANDLORD_DASHBOARD: [
@@ -103,6 +111,14 @@ export const TOUR_STEPS = {
       title: 'Request Legal Help',
       description: 'If you have Legal Protection Coverage, submit a legal assistance request and a qualified lawyer will be assigned to help you.',
       placement: 'top',
+      highlight: true,
+    },
+    {
+      id: 'landlord_7',
+      target: '.tour-support-widget',
+      title: 'Chat Support',
+      description: 'Need help? Click here to chat with our support team. You can start a conversation, view your tickets, and get real-time responses.',
+      placement: 'left',
       highlight: true,
     },
   ],

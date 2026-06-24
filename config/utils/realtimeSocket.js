@@ -535,9 +535,40 @@ const configureRealtimeSocket = (io) => {
     });
   });
 
+  // Guest namespace for anonymous support ticket conversations
+  const guestNsp = io.of('/guest');
+  guestNsp.use(async (socket, next) => {
+    try {
+      const { ticketId, email } = socket.handshake.auth || {};
+      if (!ticketId || !email) return next(new Error('ticketId and email required'));
+      const result = await db.query(
+        'SELECT id FROM support_tickets WHERE id = $1 AND contact_email = $2 AND user_id IS NULL LIMIT 1',
+        [ticketId, email.toLowerCase().trim()]
+      );
+      if (!result.rows.length) return next(new Error('Invalid ticket or email'));
+      socket.ticketId = Number(ticketId);
+      socket.contactEmail = email;
+      next();
+    } catch (err) {
+      return next(new Error('Guest authentication failed'));
+    }
+  });
+
+  guestNsp.on('connection', (socket) => {
+    const room = `ticket:guest:${socket.ticketId}`;
+    socket.join(room);
+
+    socket.on('ticket:typing', () => {
+      socket.to(room).emit('ticket:typing', { ticketId: socket.ticketId, isAdmin: false });
+    });
+
+    socket.on('disconnect', () => {});
+  });
+
   return {
     onlineUsers,
     isUserOnline,
+    guestNsp,
   };
 };
 

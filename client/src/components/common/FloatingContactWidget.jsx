@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { io as socketIO } from 'socket.io-client';
 import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaMicrophone, FaStopCircle } from 'react-icons/fa';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
@@ -61,7 +62,9 @@ const FloatingContactWidget = () => {
   const listRef = useRef(null);
   const widgetRef = useRef(null);
   const typingTimer = useRef(null);
-  const convPollRef = useRef(null);
+  const guestSocketRef = useRef(null);
+
+  const [showGreeting, setShowGreeting] = useState(true);
 
   // Restore identity
   useEffect(() => {
@@ -170,7 +173,10 @@ const FloatingContactWidget = () => {
   const reset = () => {
     clearInterval(recordingTimerRef.current);
     clearInterval(contactRecordingTimerRef.current);
-    clearInterval(convPollRef.current);
+    if (guestSocketRef.current) {
+      guestSocketRef.current.disconnect();
+      guestSocketRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -433,21 +439,33 @@ const FloatingContactWidget = () => {
     return () => { clearInterval(typingPollRef.current); };
   }, [viewingContactTicket, lookupEmail]);
 
-  // Poll conversation for anonymous users (no socket available)
+  // Guest socket connection for anonymous contact conversation
   useEffect(() => {
-    if (!viewingContactTicket || !lookupEmail.trim()) return;
-    const fetchConv = async () => {
-      try {
-        const res = await api.post('/support/tickets/contact-conversation', {
-          ticketId: viewingContactTicket.id,
-          email: lookupEmail.trim(),
-        });
-        setContactConv(res.data?.data || []);
-      } catch {}
+    if (!viewingContactTicket || !lookupEmail.trim()) {
+      if (guestSocketRef.current) {
+        guestSocketRef.current.disconnect();
+        guestSocketRef.current = null;
+      }
+      return;
+    }
+    const baseUrl = (process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || '').replace(/\/api\/?$/, '') || undefined;
+    const gs = socketIO(baseUrl ? `${baseUrl}/guest` : '/guest', {
+      auth: { ticketId: viewingContactTicket.id, email: lookupEmail.trim() },
+      transports: ['websocket', 'polling'],
+    });
+    guestSocketRef.current = gs;
+    gs.on('connect', () => {});
+    gs.on('ticket:new_reply', (data) => {
+      if (data.reply && !data.reply.is_admin) return; // ignore own replies
+      setContactConv((prev) => data.reply ? [...prev, data.reply] : prev);
+    });
+    gs.on('connect_error', (err) => {
+      console.warn('Guest socket error:', err.message);
+    });
+    return () => {
+      gs.disconnect();
+      if (guestSocketRef.current === gs) guestSocketRef.current = null;
     };
-    // Also run immediately when ticket changes (already done in viewContactConversation, but this covers re-opens)
-    convPollRef.current = setInterval(fetchConv, 5000);
-    return () => { clearInterval(convPollRef.current); };
   }, [viewingContactTicket, lookupEmail]);
 
   const handleContactReply = async () => {
@@ -492,9 +510,18 @@ const FloatingContactWidget = () => {
 
   return (
     <>
+      {/* Greeting tooltip (like WhatsApp widget) */}
+      {!open && showGreeting && (
+        <div className="fixed bottom-24 right-20 z-50 animate-fadeIn">
+          <div className="relative bg-white rounded-xl shadow-xl p-3 max-w-[200px]">
+            <div className="absolute -right-1.5 top-4 w-3 h-3 bg-white rotate-45" />
+            <p className="text-sm text-gray-700 font-medium">Need help? Chat with us!</p>
+          </div>
+        </div>
+      )}
       <button
-        onClick={() => setOpen((p) => !p)}
-        className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl"
+        onClick={() => { setOpen((p) => !p); setShowGreeting(false); }}
+        className={`fixed bottom-6 right-6 z-50 tour-support-widget flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${!open ? 'animate-bounce' : ''}`}
         aria-label="Contact support"
       >
         {unreadCount > 0 && (
@@ -504,8 +531,7 @@ const FloatingContactWidget = () => {
       </button>
 
       {open && (
-        <div ref={widgetRef} className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col" style={{ maxHeight: '560px', animation: 'slideUp 0.25s ease-out' }}>
-          <style>{`@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`}</style>
+        <div ref={widgetRef} className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-slideUp" style={{ maxHeight: '560px' }}>
 
           {renderHeader()}
 

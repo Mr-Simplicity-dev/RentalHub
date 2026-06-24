@@ -90,6 +90,12 @@ const emitToRole = (role, event, data) => {
   io.to(`role:${role}`).emit(event, data);
 };
 
+const emitToGuestTicket = (ticketId, event, data) => {
+  if (!io) return;
+  const nsp = io.of('/guest');
+  if (nsp) nsp.to(`ticket:guest:${ticketId}`).emit(event, data);
+};
+
 const ensureSupportSchema = async () => {
   if (supportSchemaReady) return;
 
@@ -835,7 +841,6 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
 
     // For unassigned tickets or contact tickets, emit to admin role rooms
     if (!recipientId && !isSupportAdmin) {
-      // User replied but no admin is assigned — notify scoped admins via role rooms
       const roleRooms = ['lga_support_admin', 'state_support_admin', 'super_support_admin'];
       for (const role of roleRooms) {
         emitToRole(role, 'ticket:new_reply', {
@@ -853,6 +858,24 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
           },
         });
       }
+    }
+
+    // Admin replied to a contact ticket — notify anonymous user via guest namespace
+    if (!ticket.user_id && isSupportAdmin) {
+      emitToGuestTicket(ticket.id, 'ticket:new_reply', {
+        ticketId: ticket.id,
+        subject: ticket.subject,
+        reply: {
+          id: reply.id,
+          message: reply.message,
+          is_admin: reply.is_admin,
+          author_name: reply.author_name,
+          attachment_url: reply.attachment_url,
+          attachment_name: reply.attachment_name,
+          attachment_type: reply.attachment_type,
+          created_at: reply.created_at,
+        },
+      });
     }
 
     res.status(201).json({ success: true, data: reply });
