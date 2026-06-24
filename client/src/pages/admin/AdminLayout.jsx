@@ -124,6 +124,7 @@ const AdminLayout = () => {
   const [notifUnreadMessages, setNotifUnreadMessages] = useState(0);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const notifRef = useRef(null);
+  const notifRefMobile = useRef(null);
 
   useEffect(() => {
     setMobileSidebarOpen(false);
@@ -260,7 +261,7 @@ const AdminLayout = () => {
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifications(false);
+      if (notifRef.current && !notifRef.current.contains(e.target) && notifRefMobile.current && !notifRefMobile.current.contains(e.target)) setShowNotifications(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -1222,22 +1223,24 @@ const AdminLayout = () => {
                 </span>
               )}
             </Link>
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
-              aria-label={t('header.notifications')}
-            >
-              <FaBell className="text-base" />
-              {notifUnreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
-              )}
-            </button>
+            <div className="relative" ref={notifRefMobile}>
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
+                aria-label={t('header.notifications')}
+              >
+                <FaBell className="text-base" />
+                {notifUnreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+                )}
+              </button>
+            </div>
           </div>
           <RoleBadge role={role} compact className="shrink-0" />
         </header>
 
         {showNotifications && (
-          <div className="fixed left-2 right-2 top-20 z-50 flex max-h-[70vh] w-auto max-w-[calc(100vw-16px)] origin-top-right flex-col rounded-2xl border border-gray-100 bg-white py-2 shadow-elevated-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
+          <div className="fixed left-2 right-2 top-20 z-50 flex max-h-[70vh] w-auto max-w-[calc(100vw-16px)] origin-top-right flex-col rounded-2xl border border-gray-100 bg-white py-2 shadow-elevated-lg lg:left-auto lg:right-4 lg:top-16 lg:w-96">
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
               <h3 className="text-sm font-semibold text-gray-900">{t('header.notifications')}</h3>
               {notifUnreadCount > 0 && (
