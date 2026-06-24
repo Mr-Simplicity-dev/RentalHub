@@ -548,7 +548,7 @@ const AdminWithdrawalsRoute = () => {
   }
 
   if (LGA_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
-    return <Navigate to="/admin?tab=property_requests" replace />;
+    return <Navigate to="/admin/lga-support-dashboard" replace />;
   }
 
   if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {

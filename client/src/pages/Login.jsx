@@ -114,7 +114,7 @@ const Login = () => {
         } else if (role === 'state_support_admin') {
           navigate('/admin/state-support-dashboard');
         } else if (role === 'lga_support_admin') {
-          navigate('/admin?tab=property_requests');
+          navigate('/admin/lga-support-dashboard');
         } else if (role === 'super_financial_admin') {
           navigate('/admin/super-financial-dashboard');
         } else if (role === 'financial_admin' || role === 'lga_financial_admin') {

@@ -403,9 +403,14 @@ const AdminLayout = () => {
 
   const supportTab = new URLSearchParams(location.search).get('tab') || 'overview';
   const superAdminTab = new URLSearchParams(location.search).get('tab') || 'overview';
-  const supportNavItem = (tab) =>
+  const supportDashboardPath = isSuperSupportAdmin
+    ? '/admin/super-support-dashboard'
+    : isStateSupportAdmin
+    ? '/admin/state-support-dashboard'
+    : '/admin/lga-support-dashboard';
+  const supportNavItem = (tab, path = supportDashboardPath) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
-      location.pathname === '/admin/super-support-dashboard' && supportTab === tab
+      location.pathname === path && supportTab === tab
         ? roleTheme.activeNav
         : roleTheme.hoverNav
     }`;
@@ -542,10 +547,6 @@ const AdminLayout = () => {
                   Reports
                 </NavLink>
 
-                <NavLink to="/admin/super-support-dashboard?tab=settings" className={() => supportNavItem('settings')}>
-                  <FaLock className="mr-3" />
-                  Settings
-                </NavLink>
               </div>
             </div>
           )}
@@ -991,9 +992,25 @@ const AdminLayout = () => {
               </p>
 
               <div className="space-y-2">
-                <NavLink to="/admin/lga-support-dashboard" end className={navItem}>
+                <NavLink to="/admin/lga-support-dashboard?tab=overview" className={() => supportNavItem('overview')}>
                   <FaTachometerAlt className="mr-3" />
-                  Dashboard
+                  Overview
+                </NavLink>
+
+                <NavLink to="/admin/lga-support-dashboard?tab=property_requests" className={() => supportNavItem('property_requests')}>
+                  <FaHome className="mr-3" />
+                  Property Requests
+                </NavLink>
+
+                <NavLink to="/admin/lga-support-dashboard?tab=tenancy" className={() => supportNavItem('tenancy')}>
+                  <FaClipboardList className="mr-3" />
+                  Tenancy Actions
+                </NavLink>
+
+                <NavLink to="/admin/lga-support-dashboard?tab=tickets" className={() => supportNavItem('tickets')}>
+                  <FaLifeRing className="mr-3" />
+                  Support Tickets
+                  {badgePill(liveBadges.pendingSupportQueue)}
                 </NavLink>
               </div>
             </div>
@@ -1085,9 +1102,38 @@ const AdminLayout = () => {
                   )}
 
                   {isStateSupportAdmin && (
-                   <NavLink to="/admin/state-support-dashboard" className={navItem}>
+                   <NavLink to="/admin/state-support-dashboard?tab=overview" className={() => supportNavItem('overview')}>
+                    <FaTachometerAlt className="mr-3" />
+                    Overview
+                    {badgePill(liveBadges.pendingSupportQueue)}
+                  </NavLink>
+                )}
+
+                  {isStateSupportAdmin && (
+                   <NavLink to="/admin/state-support-dashboard?tab=queue" className={() => supportNavItem('queue')}>
+                    <FaMapMarkerAlt className="mr-3" />
+                    Migration Queue
+                  </NavLink>
+                )}
+
+                  {isStateSupportAdmin && (
+                   <NavLink to="/admin/state-support-dashboard?tab=property_requests" className={() => supportNavItem('property_requests')}>
+                    <FaHome className="mr-3" />
+                    Property Requests
+                  </NavLink>
+                )}
+
+                  {isStateSupportAdmin && (
+                   <NavLink to="/admin/state-support-dashboard?tab=tenancy" className={() => supportNavItem('tenancy')}>
+                    <FaClipboardList className="mr-3" />
+                    Tenancy Actions
+                  </NavLink>
+                )}
+
+                  {isStateSupportAdmin && (
+                   <NavLink to="/admin/state-support-dashboard?tab=tickets" className={() => supportNavItem('tickets')}>
                     <FaLifeRing className="mr-3" />
-                    State Support Dashboard
+                    Support Tickets
                     {badgePill(liveBadges.pendingSupportQueue)}
                   </NavLink>
                 )}
