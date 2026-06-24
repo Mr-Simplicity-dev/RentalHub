@@ -275,6 +275,20 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
 
     const ticketId = result.rows[0].id;
 
+    // Store initial message as a reply so it shows in the conversation
+    try {
+      const initialMsg = lga
+        ? `State: ${state}\nLGA: ${lga}\nFrom: ${name.trim()} <${email.trim()}>\n\n${message.trim()}`
+        : `State: ${state}\nFrom: ${name.trim()} <${email.trim()}>\n\n${message.trim()}`;
+      await db.query(
+        `INSERT INTO support_ticket_replies (ticket_id, user_id, author_name, message, is_admin)
+         VALUES ($1, NULL, $2, $3, FALSE)`,
+        [ticketId, name.trim(), initialMsg]
+      );
+    } catch (replyErr) {
+      console.error('Failed to store initial contact reply (non-fatal):', replyErr);
+    }
+
     // Auto-assign: LGA support → State support → Super support
     try {
       let assignedTo = null;

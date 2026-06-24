@@ -1705,11 +1705,15 @@ const SuperSupportAdminDashboard = () => {
                               </div>
                             </div>
                             <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{reply.message}</p>
-                            {reply.attachment_url && (
+                            {reply.attachment_url && reply.attachment_type && reply.attachment_type.startsWith('audio/') ? (
+                              <div className="mt-2 rounded-lg bg-slate-200 p-1">
+                                <audio controls className="w-full h-9" src={reply.attachment_url} preload="none" />
+                              </div>
+                            ) : reply.attachment_url ? (
                               <a href={reply.attachment_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-300">
                                 <FaFile size={12} /> {reply.attachment_name || 'Attachment'}
                               </a>
-                            )}
+                            ) : null}
                           </div>
                         ))
                       )}
