@@ -168,9 +168,14 @@ const FloatingContactWidget = () => {
 
   const reset = () => {
     clearInterval(recordingTimerRef.current);
+    clearInterval(contactRecordingTimerRef.current);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+    }
+    if (contactStreamRef.current) {
+      contactStreamRef.current.getTracks().forEach((t) => t.stop());
+      contactStreamRef.current = null;
     }
     setForm({ name: '', email: '', state: '', lga: '', subject: '', message: '' });
     setError('');
@@ -182,6 +187,14 @@ const FloatingContactWidget = () => {
     setTypingUser(null);
     setIsRecording(false);
     setRecordingDuration(0);
+    setContactIsRecording(false);
+    setContactRecordingDuration(0);
+    setContactReplyText('');
+    setContactReplyFile(null);
+    setLookupEmail('');
+    setLookupTickets([]);
+    setContactConv([]);
+    setViewingContactTicket(null);
   };
 
   const handleClose = () => {
@@ -247,6 +260,13 @@ const FloatingContactWidget = () => {
   const recordingTimerRef = useRef(null);
   const streamRef = useRef(null);
 
+  const [contactIsRecording, setContactIsRecording] = useState(false);
+  const [contactRecordingDuration, setContactRecordingDuration] = useState(0);
+  const contactMediaRecorderRef = useRef(null);
+  const contactAudioChunksRef = useRef([]);
+  const contactRecordingTimerRef = useRef(null);
+  const contactStreamRef = useRef(null);
+
   const formatDuration = (s) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
@@ -301,11 +321,60 @@ const FloatingContactWidget = () => {
   useEffect(() => {
     return () => {
       clearInterval(recordingTimerRef.current);
+      clearInterval(contactRecordingTimerRef.current);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
+      if (contactStreamRef.current) {
+        contactStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
     };
   }, []);
+
+  // ── Contact voice recording (anonymous) ──
+  const startContactRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      contactStreamRef.current = stream;
+      const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm' });
+      contactAudioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) contactAudioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(contactAudioChunksRef.current, { type: recorder.mimeType });
+        const file = new File([blob], `voice_${Date.now()}.webm`, { type: recorder.mimeType });
+        setContactReplyFile(file);
+        setContactIsRecording(false);
+        setContactRecordingDuration(0);
+        if (contactStreamRef.current) {
+          contactStreamRef.current.getTracks().forEach((t) => t.stop());
+          contactStreamRef.current = null;
+        }
+      };
+      contactMediaRecorderRef.current = recorder;
+      recorder.start();
+      setContactIsRecording(true);
+      setContactRecordingDuration(0);
+      const start = Date.now();
+      contactRecordingTimerRef.current = setInterval(() => {
+        setContactRecordingDuration(Math.floor((Date.now() - start) / 1000));
+      }, 1000);
+    } catch (err) {
+      setError('Microphone access denied or not available.');
+    }
+  };
+
+  const stopContactRecording = () => {
+    if (contactMediaRecorderRef.current && contactMediaRecorderRef.current.state !== 'inactive') {
+      contactMediaRecorderRef.current.stop();
+    }
+    clearInterval(contactRecordingTimerRef.current);
+    if (contactStreamRef.current) {
+      contactStreamRef.current.getTracks().forEach((t) => t.stop());
+      contactStreamRef.current = null;
+    }
+  };
 
   // ── Contact lookup (anonymous) ──
   const [lookupEmail, setLookupEmail] = useState('');
@@ -635,10 +704,19 @@ const FloatingContactWidget = () => {
                             )}
                             {/* Reply input for anonymous contact */}
                             <div className="mt-2 border-t border-indigo-200 pt-2">
-                              {contactReplyFile && (
+                              {contactReplyFile && !contactIsRecording && (
                                 <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
                                   <FaPaperclip size={8} /> {contactReplyFile.name}
                                   <button onClick={() => setContactReplyFile(null)} className="ml-auto text-red-500"><FaTimes size={8} /></button>
+                                </div>
+                              )}
+                              {contactIsRecording && (
+                                <div className="mb-1 flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs text-red-600">
+                                  <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                                  Recording... {formatDuration(contactRecordingDuration)}
+                                  <button onClick={stopContactRecording} className="ml-auto flex items-center gap-1 rounded bg-red-500 px-1.5 py-0.5 text-white hover:bg-red-600">
+                                    <FaStopCircle size={8} /> Stop
+                                  </button>
                                 </div>
                               )}
                               <div className="flex items-end gap-1.5">
@@ -650,6 +728,11 @@ const FloatingContactWidget = () => {
                                   placeholder="Type a reply..." rows={1}
                                   className="flex-1 resize-none rounded border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-indigo-400"
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />
+                                <button onClick={startContactRecording}
+                                  className="flex h-[30px] w-[30px] items-center justify-center rounded border border-slate-300 text-slate-400 hover:bg-slate-50 shrink-0"
+                                  title="Record voice message">
+                                  <FaMicrophone size={10} />
+                                </button>
                                 <button onClick={handleContactReply} disabled={(!contactReplyText.trim() && !contactReplyFile) || sendingContactReply}
                                   className="flex h-[30px] w-[30px] items-center justify-center rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
                                   {sendingContactReply ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={10} />}
