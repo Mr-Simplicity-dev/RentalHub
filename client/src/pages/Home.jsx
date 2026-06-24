@@ -7,7 +7,6 @@ import AdSpace from '../components/common/AdSpace';
 import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt, FaMobileAlt, FaTimes, FaArrowRight, FaMapMarkerAlt, FaWhatsapp } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
-import FloatingContactWidget from '../components/common/FloatingContactWidget';
 
 const HUBSPOT_LANG_MAP = {
   en: 'en',
