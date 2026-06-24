@@ -330,18 +330,69 @@ router.post('/tickets', authenticate, async (req, res) => {
   try {
     await ensureSupportSchema();
 
-    const { subject, description, priority } = req.body;
+    const { subject, description, priority, state, lga } = req.body;
     if (!subject || !subject.trim()) {
       return res.status(400).json({ success: false, message: 'Subject is required' });
     }
 
     const result = await db.query(
-      `INSERT INTO support_tickets (subject, description, priority, status, user_id)
-       VALUES ($1, $2, $3, 'open', $4) RETURNING *`,
-      [subject.trim(), description?.trim() || null, priority || 'medium', req.user.id]
+      `INSERT INTO support_tickets (subject, description, priority, status, user_id, state, lga)
+       VALUES ($1, $2, $3, 'open', $4, $5, $6) RETURNING *`,
+      [subject.trim(), description?.trim() || null, priority || 'medium', req.user.id, state || null, lga || null]
     );
 
-    res.status(201).json({ success: true, data: result.rows[0] });
+    const ticket = result.rows[0];
+
+    // Auto-assign: LGA support → State support → Super support
+    if (state) {
+      try {
+        let assignedTo = null;
+
+        if (lga) {
+          const lgaResult = await db.query(
+            `SELECT id FROM users
+             WHERE user_type = 'lga_support_admin'
+               AND assigned_state = $1
+               AND assigned_city = $2
+               AND deleted_at IS NULL AND account_suspended_at IS NULL
+             ORDER BY id ASC LIMIT 1`,
+            [state, lga]
+          );
+          if (lgaResult.rows.length > 0) assignedTo = lgaResult.rows[0].id;
+        }
+
+        if (!assignedTo) {
+          const stateResult = await db.query(
+            `SELECT id FROM users
+             WHERE user_type = 'state_support_admin'
+               AND assigned_state = $1
+               AND deleted_at IS NULL AND account_suspended_at IS NULL
+             ORDER BY id ASC LIMIT 1`,
+            [state]
+          );
+          if (stateResult.rows.length > 0) assignedTo = stateResult.rows[0].id;
+        }
+
+        if (!assignedTo) {
+          const superResult = await db.query(
+            `SELECT id FROM users
+             WHERE user_type = 'super_support_admin'
+               AND deleted_at IS NULL AND account_suspended_at IS NULL
+             ORDER BY id ASC LIMIT 1`
+          );
+          if (superResult.rows.length > 0) assignedTo = superResult.rows[0].id;
+        }
+
+        if (assignedTo) {
+          await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticket.id]);
+          ticket.assigned_to = assignedTo;
+        }
+      } catch (assignErr) {
+        console.error('Ticket auto-assignment error (non-fatal):', assignErr);
+      }
+    }
+
+    res.status(201).json({ success: true, data: ticket });
   } catch (error) {
     console.error('Create support ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to create support ticket' });

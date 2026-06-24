@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset } from 'react-icons/fa';
+import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaGlobeAfrica } from 'react-icons/fa';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
@@ -348,28 +348,65 @@ const FloatingContactWidget = () => {
 
             {/* ─── FORM VIEW (authenticated, no tickets) ─── */}
             {view === 'form' && isAuthenticated && (
-              <div className="py-2 text-center">
-                <p className="text-sm text-slate-600 mb-4">No open tickets. Start a new conversation.</p>
-                <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
-                  placeholder="How can we help you?"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none mb-3" />
-                <input type="text" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
-                  placeholder="Subject (optional)"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 mb-3" />
-                {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
-                <button onClick={async () => {
-                  if (!form.message.trim()) { setError('Please write a message.'); return; }
-                  setSending(true); setError('');
-                  try {
-                    const res = await api.post('/support/tickets', { subject: form.subject || 'Support request', description: form.message });
-                    localStorage.setItem(LS_TICKET_ID, String(res.data?.data?.id || ''));
-                    openTicketChat(res.data?.data);
-                  } catch (err) { setError(err.response?.data?.message || 'Failed to create ticket'); }
-                  finally { setSending(false); }
-                }} disabled={sending}
-                  className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
-                  {sending ? 'Creating...' : <><FaPaperPlane className="w-3.5 h-3.5" /> Start conversation</>}
-                </button>
+              <div className="py-2 text-left">
+                <p className="text-sm text-slate-600 mb-3 font-medium">Start a new conversation</p>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
+                      <span className="text-slate-400">Name</span>
+                      <p className="text-slate-800 font-medium truncate">{user?.full_name || form.name}</p>
+                    </div>
+                    <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
+                      <span className="text-slate-400">Email</span>
+                      <p className="text-slate-800 truncate">{user?.email || form.email}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">State *</label>
+                    <select value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value, lga: '' }))}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                      <option value="">Select state</option>
+                      {states.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  {lgas.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">LGA</label>
+                      <select value={form.lga} onChange={(e) => setForm((p) => ({ ...p, lga: e.target.value }))}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                        <option value="">Select LGA</option>
+                        {lgas.map((l) => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <input type="text" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
+                    placeholder="Subject (optional)"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
+                  <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
+                    placeholder="How can we help you?"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none" />
+                  {error && <p className="text-xs text-red-600">{error}</p>}
+                  <button onClick={async () => {
+                    if (!form.state) { setError('Please select your state.'); return; }
+                    if (!form.message.trim()) { setError('Please write a message.'); return; }
+                    setSending(true); setError('');
+                    try {
+                      const payload = {
+                        subject: form.subject?.trim() || 'Support request',
+                        description: form.message.trim(),
+                        state: form.state,
+                        lga: form.lga || undefined,
+                      };
+                      const res = await api.post('/support/tickets', payload);
+                      localStorage.setItem(LS_TICKET_ID, String(res.data?.data?.id || ''));
+                      openTicketChat(res.data?.data);
+                    } catch (err) { setError(err.response?.data?.message || 'Failed to create ticket'); }
+                    finally { setSending(false); }
+                  }} disabled={sending}
+                    className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
+                    {sending ? 'Creating...' : <><FaPaperPlane className="w-3.5 h-3.5" /> Start conversation</>}
+                  </button>
+                </div>
               </div>
             )}
 
