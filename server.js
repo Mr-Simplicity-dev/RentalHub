@@ -329,13 +329,13 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      // TODO: Replace 'unsafe-inline' with nonce-based approach for production hardening
-      scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "unpkg.com"],
-      imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:"],
-      connectSrc: ["'self'", "api.paystack.co"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "unpkg.com", "js-eu1.hs-scripts.com", "js.hs-scripts.com"],
+      imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:", "js-eu1.hs-scripts.com"],
+      connectSrc: ["'self'", "api.paystack.co", "api.hubspot.com", "forms.hubspot.com"],
       fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com"],
       styleSrc: ["'self'", "fonts.googleapis.com"],
       mediaSrc: ["'self'", "res.cloudinary.com", "blob:"],
+      frameSrc: ["'self'", "app.hubspot.com"],
     },
   },
   hsts: {
