@@ -80,6 +80,7 @@ const ensureSupportSchema = async () => {
       description TEXT,
       state VARCHAR(100),
       lga VARCHAR(100),
+      contact_email VARCHAR(255),
       priority VARCHAR(20) NOT NULL DEFAULT 'medium',
       status VARCHAR(30) NOT NULL DEFAULT 'open',
       user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -97,6 +98,9 @@ const ensureSupportSchema = async () => {
       END IF;
       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='lga') THEN
         ALTER TABLE support_tickets ADD COLUMN lga VARCHAR(100);
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='contact_email') THEN
+        ALTER TABLE support_tickets ADD COLUMN contact_email VARCHAR(255);
       END IF;
     END $$;
 
@@ -251,8 +255,8 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
     }
 
     const result = await db.query(
-      `INSERT INTO support_tickets (subject, description, state, lga, priority, status, user_id)
-       VALUES ($1, $2, $3, $4, 'medium', 'open', NULL)
+      `INSERT INTO support_tickets (subject, description, state, lga, contact_email, priority, status, user_id)
+       VALUES ($1, $2, $3, $4, $5, 'medium', 'open', NULL)
        RETURNING id`,
       [
         subject?.trim() ? `[Contact] ${subject.trim()}` : `[Contact] ${name.trim()}`,
@@ -261,6 +265,7 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
           : `State: ${state}\nFrom: ${name.trim()} <${email.trim()}>\n\n${message.trim()}`,
         state,
         lga || null,
+        email.trim().toLowerCase(),
       ]
     );
 
@@ -312,7 +317,7 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
       console.error('Ticket auto-assignment error (non-fatal):', assignErr);
     }
 
-    res.status(201).json({ success: true, message: 'Message sent successfully' });
+    res.status(201).json({ success: true, message: 'Message sent successfully', data: { ticketId } });
   } catch (error) {
     console.error('Contact form error:', error);
     res.status(500).json({ success: false, message: 'Failed to send message' });
@@ -930,6 +935,67 @@ router.get('/tickets/internal-notes/unread-count', authenticate, requireSupportA
   } catch (error) {
     console.error('Unread internal notes count error:', error);
     res.status(500).json({ success: false, message: 'Failed to get unread count' });
+  }
+});
+
+// POST /tickets/contact-lookup — look up contact-form tickets by email (public)
+router.post('/tickets/contact-lookup', async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const result = await db.query(
+      `SELECT id, subject, status, created_at FROM support_tickets
+       WHERE contact_email = $1 AND user_id IS NULL
+       ORDER BY created_at DESC LIMIT 10`,
+      [email.trim().toLowerCase()]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Contact lookup error:', error);
+    res.status(500).json({ success: false, message: 'Lookup failed' });
+  }
+});
+
+// POST /tickets/contact-conversation — get replies for a contact-form ticket (public, email-gated)
+router.post('/tickets/contact-conversation', async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const { ticketId, email } = req.body;
+    if (!ticketId || !email) {
+      return res.status(400).json({ success: false, message: 'Ticket ID and email are required' });
+    }
+
+    const ticketResult = await db.query(
+      'SELECT id, contact_email FROM support_tickets WHERE id = $1 AND user_id IS NULL',
+      [ticketId]
+    );
+    if (!ticketResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    if (ticketResult.rows[0].contact_email !== email.trim().toLowerCase()) {
+      return res.status(403).json({ success: false, message: 'Email does not match this ticket' });
+    }
+
+    const result = await db.query(
+      `SELECT str.id, str.message, str.is_admin, str.author_name, str.attachment_url, str.attachment_name, str.attachment_type, str.created_at
+       FROM support_ticket_replies str
+       WHERE str.ticket_id = $1
+       ORDER BY str.created_at ASC, str.id ASC`,
+      [ticketId]
+    );
+
+    res.json({ success: true, data: result.rows, ticket: { id: ticketResult.rows[0].id, contact_email: ticketResult.rows[0].contact_email } });
+  } catch (error) {
+    console.error('Contact conversation error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch conversation' });
   }
 });
 
