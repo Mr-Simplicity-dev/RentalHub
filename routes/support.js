@@ -1265,4 +1265,57 @@ router.delete('/tickets/:ticketId/internal-notes/:noteId', authenticate, require
   }
 });
 
+// POST /tickets/contact-reply — public reply for contact-form tickets (email-gated)
+router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const { ticketId, email, message } = req.body;
+    const msg = (message || '').trim();
+
+    if (!ticketId || !email) {
+      return res.status(400).json({ success: false, message: 'Ticket ID and email are required' });
+    }
+    if (!msg && !req.file) {
+      return res.status(400).json({ success: false, message: 'Message or attachment is required' });
+    }
+
+    const ticketResult = await db.query(
+      'SELECT id, contact_email, status FROM support_tickets WHERE id = $1 AND user_id IS NULL',
+      [ticketId]
+    );
+    if (!ticketResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    if (ticketResult.rows[0].contact_email !== email.trim().toLowerCase()) {
+      return res.status(403).json({ success: false, message: 'Email does not match this ticket' });
+    }
+
+    const result = await db.query(
+      `INSERT INTO support_ticket_replies (ticket_id, user_id, author_name, message, is_admin, attachment_url, attachment_name, attachment_type)
+       VALUES ($1, NULL, $2, $3, FALSE, $4, $5, $6)
+       RETURNING *`,
+      [
+        ticketId,
+        email.trim(),
+        msg,
+        req.file ? `/uploads/tickets/${req.file.filename}` : null,
+        req.file ? req.file.originalname : null,
+        req.file ? req.file.mimetype : null,
+      ]
+    );
+
+    // Re-open resolved ticket
+    if (ticketResult.rows[0].status === 'resolved') {
+      await db.query("UPDATE support_tickets SET status = 'in_progress' WHERE id = $1", [ticketId]);
+    }
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Contact reply error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send reply' });
+  }
+});
+
 module.exports = router;

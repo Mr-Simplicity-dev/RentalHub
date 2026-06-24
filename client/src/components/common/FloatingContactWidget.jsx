@@ -331,6 +331,31 @@ const FloatingContactWidget = () => {
     } catch {}
   };
 
+  const [contactReplyText, setContactReplyText] = useState('');
+  const [contactReplyFile, setContactReplyFile] = useState(null);
+  const [sendingContactReply, setSendingContactReply] = useState(false);
+
+  const handleContactReply = async () => {
+    const msg = contactReplyText.trim();
+    if (!msg && !contactReplyFile) return;
+    setSendingContactReply(true);
+    try {
+      const fd = new FormData();
+      fd.append('ticketId', viewingContactTicket.id);
+      fd.append('email', lookupEmail.trim());
+      if (msg) fd.append('message', msg);
+      if (contactReplyFile) fd.append('attachment', contactReplyFile);
+      const res = await api.post('/support/tickets/contact-reply', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setContactConv((prev) => [...prev, res.data.data]);
+      setContactReplyText('');
+      setContactReplyFile(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to send');
+    } finally { setSendingContactReply(false); }
+  };
+
   // ── Render ──
   const renderHeader = (title) => (
     <div className="flex items-center justify-between bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-3 text-white">
@@ -595,10 +620,42 @@ const FloatingContactWidget = () => {
                                 <div key={r.id} className={`rounded-xl px-3 py-2 text-sm ${r.is_admin ? 'bg-indigo-50 border border-indigo-200' : 'bg-slate-50'}`}>
                                   {r.is_admin && <p className="text-[10px] font-semibold text-indigo-600 mb-0.5">{r.author_name || 'Support'}</p>}
                                   <p className="text-slate-700">{r.message}</p>
+                                  {r.attachment_url && r.attachment_type && r.attachment_type.startsWith('audio/') ? (
+                                    <div className="mt-1 rounded-lg bg-slate-200 p-1">
+                                      <audio controls className="w-full h-8" src={r.attachment_url} preload="none" />
+                                    </div>
+                                  ) : r.attachment_url ? (
+                                    <a href={r.attachment_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 rounded-lg bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-300">
+                                      <FaFile size={10} /> {r.attachment_name || 'Attachment'}
+                                    </a>
+                                  ) : null}
                                   <p className="text-[10px] text-slate-400 mt-0.5">{new Date(r.created_at).toLocaleString()}</p>
                                 </div>
                               ))
                             )}
+                            {/* Reply input for anonymous contact */}
+                            <div className="mt-2 border-t border-indigo-200 pt-2">
+                              {contactReplyFile && (
+                                <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                                  <FaPaperclip size={8} /> {contactReplyFile.name}
+                                  <button onClick={() => setContactReplyFile(null)} className="ml-auto text-red-500"><FaTimes size={8} /></button>
+                                </div>
+                              )}
+                              <div className="flex items-end gap-1.5">
+                                <label className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded border border-slate-300 text-slate-400 hover:bg-slate-50 shrink-0">
+                                  <FaPaperclip size={10} />
+                                  <input type="file" className="hidden" onChange={(e) => setContactReplyFile(e.target.files[0])} />
+                                </label>
+                                <textarea value={contactReplyText} onChange={(e) => setContactReplyText(e.target.value)}
+                                  placeholder="Type a reply..." rows={1}
+                                  className="flex-1 resize-none rounded border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-indigo-400"
+                                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />
+                                <button onClick={handleContactReply} disabled={(!contactReplyText.trim() && !contactReplyFile) || sendingContactReply}
+                                  className="flex h-[30px] w-[30px] items-center justify-center rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
+                                  {sendingContactReply ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={10} />}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
