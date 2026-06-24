@@ -21,6 +21,8 @@ const ensureSupportSchema = async () => {
       id SERIAL PRIMARY KEY,
       subject VARCHAR(255) NOT NULL,
       description TEXT,
+      state VARCHAR(100),
+      lga VARCHAR(100),
       priority VARCHAR(20) NOT NULL DEFAULT 'medium',
       status VARCHAR(30) NOT NULL DEFAULT 'open',
       user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -31,6 +33,17 @@ const ensureSupportSchema = async () => {
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- ensure columns exist (safe for existing tables)
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='state') THEN
+        ALTER TABLE support_tickets ADD COLUMN state VARCHAR(100);
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='lga') THEN
+        ALTER TABLE support_tickets ADD COLUMN lga VARCHAR(100);
+      END IF;
+    END $$;
+
     CREATE INDEX IF NOT EXISTS idx_support_tickets_status_priority
       ON support_tickets(status, priority, created_at DESC);
   `);
@@ -39,6 +52,10 @@ const ensureSupportSchema = async () => {
 };
 
 const requireSupportAdmin = (req, res, next) => {
+  const role = String(req.user?.user_type || '').toLowerCase();
+  if (SUPPORT_ADMIN_ROLES.has(role)) return next();
+  return res.status(403).json({ success: false, message: 'Support admin access required' });
+};
 
 // Public contact form (no auth required)
 router.post('/contact', async (req, res) => {
@@ -55,14 +72,16 @@ router.post('/contact', async (req, res) => {
     }
 
     const result = await db.query(
-      `INSERT INTO support_tickets (subject, description, priority, status, user_id)
-       VALUES ($1, $2, 'medium', 'open', NULL)
+      `INSERT INTO support_tickets (subject, description, state, lga, priority, status, user_id)
+       VALUES ($1, $2, $3, $4, 'medium', 'open', NULL)
        RETURNING id`,
       [
         subject?.trim() ? `[Contact] ${subject.trim()}` : `[Contact] ${name.trim()}`,
         lga
           ? `State: ${state}\nLGA: ${lga}\nFrom: ${name.trim()} <${email.trim()}>\n\n${message.trim()}`
           : `State: ${state}\nFrom: ${name.trim()} <${email.trim()}>\n\n${message.trim()}`,
+        state,
+        lga || null,
       ]
     );
 
@@ -206,8 +225,38 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
       where.push(`st.priority = $${params.length}`);
     }
 
+    // Scope tickets by admin jurisdiction
+    const role = String(req.user.user_type || '').toLowerCase();
+
+    if (role === 'lga_support_admin') {
+      // Own assignments + unassigned tickets in their LGA
+      params.push(req.user.id);
+      params.push(String(req.user.assigned_state || ''));
+      params.push(String(req.user.assigned_city || ''));
+      where.push(`(
+        st.assigned_to = $${params.length - 2}
+        OR (
+          st.assigned_to IS NULL
+          AND st.state = $${params.length - 1}
+          AND st.lga = $${params.length}
+        )
+      )`);
+    } else if (role === 'state_support_admin') {
+      // Own assignments + unassigned tickets in their state
+      params.push(req.user.id);
+      params.push(String(req.user.assigned_state || ''));
+      where.push(`(
+        st.assigned_to = $${params.length - 1}
+        OR (
+          st.assigned_to IS NULL
+          AND st.state = $${params.length}
+        )
+      )`);
+    }
+    // super_support_admin and super_admin see all tickets
+
     const result = await db.query(
-      `SELECT st.id, st.subject, st.description, st.priority, st.status,
+      `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
               st.assigned_to,
               u.email AS user_email, u.full_name AS user_name,
@@ -250,22 +299,88 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
       });
     }
 
-    const result = await db.query(
-      `UPDATE support_tickets
-       SET priority = 'urgent',
-           status = CASE WHEN status = 'resolved' THEN status ELSE 'in_progress' END,
-           escalated_at = CURRENT_TIMESTAMP,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1
-       RETURNING *`,
+    const currentUserType = req.user.user_type;
+    const currentUserId = req.user.id;
+
+    // Get current ticket info (subject/state from description)
+    const ticketResult = await db.query(
+      `SELECT st.*, u.email AS user_email, u.full_name AS user_name
+       FROM support_tickets st
+       LEFT JOIN users u ON u.id = st.user_id
+       WHERE st.id = $1`,
       [ticketId]
     );
 
-    if (!result.rows.length) {
+    if (!ticketResult.rows.length) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    const ticket = ticketResult.rows[0];
+    const ticketState = ticket.state || null;
+
+    // Determine next-level assignee
+    let nextAssigneeId = null;
+    let escalationNote = '';
+
+    if (currentUserType === 'lga_support_admin') {
+      // LGA → escalate to state support admin
+      if (ticketState) {
+        const stateResult = await db.query(
+          `SELECT id FROM users
+           WHERE user_type = 'state_support_admin'
+             AND assigned_state = $1
+             AND deleted_at IS NULL
+             AND account_suspended_at IS NULL
+           ORDER BY id ASC LIMIT 1`,
+          [ticketState]
+        );
+        if (stateResult.rows.length > 0) {
+          nextAssigneeId = stateResult.rows[0].id;
+          escalationNote = `Escalated from LGA support (User #${currentUserId}) to state support`;
+        }
+      }
+    }
+
+    if (!nextAssigneeId && (currentUserType === 'lga_support_admin' || currentUserType === 'state_support_admin')) {
+      // State-level escalation → super support admin
+      const superResult = await db.query(
+        `SELECT id FROM users
+         WHERE user_type = 'super_support_admin'
+           AND deleted_at IS NULL
+           AND account_suspended_at IS NULL
+         ORDER BY id ASC LIMIT 1`
+      );
+      if (superResult.rows.length > 0) {
+        nextAssigneeId = superResult.rows[0].id;
+        escalationNote = escalationNote || `Escalated from ${currentUserType} (User #${currentUserId}) to super support`;
+      }
+    }
+
+    if (!nextAssigneeId) {
+      return res.status(400).json({
+        success: false,
+        message: currentUserType === 'super_support_admin'
+          ? 'Ticket is already at the highest support level'
+          : 'No available admin found at the next escalation level',
+      });
+    }
+
+    await db.query(
+      `UPDATE support_tickets
+       SET priority = 'urgent',
+           status = CASE WHEN status = 'resolved' THEN status ELSE 'in_progress' END,
+           assigned_to = $1,
+           escalated_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [nextAssigneeId, ticketId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Ticket escalated successfully',
+      data: { assigned_to: nextAssigneeId, escalation_note: escalationNote },
+    });
   } catch (error) {
     console.error('Escalate support ticket error:', error);
     res.status(500).json({
