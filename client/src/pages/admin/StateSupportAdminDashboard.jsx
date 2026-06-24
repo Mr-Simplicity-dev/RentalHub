@@ -293,28 +293,28 @@ const StateSupportAdminDashboard = () => {
   };
 
     return (
-    <div className="min-h-screen bg-gradient-to-br from-state-50 via-white to-state-100/40 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-admin-50 via-white to-admin-100/40 p-4 sm:p-6">
       <div className="mx-auto max-w-7xl">
         <div className="space-y-6">
-      <section className="state-support-stats-section rounded-xl bg-white p-6 shadow">
-        <div className="flex items-center justify-between">
+      <section className="state-support-stats-section">
+        <div className="mb-8 text-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">State Support Admin Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <h1 className="text-3xl font-bold text-gray-900">State Support Admin Dashboard</h1>
+            <p className="mt-1 text-gray-600">
               Outgoing and incoming migration decisions for {user?.assigned_state || 'your assigned state'}.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
               <button
                 type="button"
                 onClick={() => setStage('all')}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 All Queue
               </button>
               <button
                 type="button"
                 onClick={() => setStage('incoming')}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Incoming Reviews
               </button>
@@ -326,7 +326,7 @@ const StateSupportAdminDashboard = () => {
                 Refresh Queue
               </button>
             </div>
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <div className="mx-auto mt-4 max-w-4xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-medium text-amber-800">
                   Withdrawal Access: Review Only. This role handles migration/support decisions and withdrawal tickets, not personal commission withdrawal requests.
@@ -341,13 +341,6 @@ const StateSupportAdminDashboard = () => {
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={loadQueue}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            <FaSyncAlt /> Refresh
-          </button>
         </div>
       </section>
 
