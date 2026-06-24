@@ -9,6 +9,7 @@ import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequest
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import InternalNotesPanel from '../../components/common/InternalNotesPanel';
 import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
+import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 
 const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
   const [editing, setEditing] = useState(false);
@@ -101,7 +102,7 @@ const LgaSupportAdminDashboard = () => {
   const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
   const activeTab = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab') || 'overview';
-    return ['overview', 'property_requests', 'tenancy', 'tickets'].includes(tab) ? tab : 'overview';
+    return ['overview', 'property_requests', 'tenancy', 'tickets', 'escalations'].includes(tab) ? tab : 'overview';
   }, [location.search]);
 
   const workspaceTabs = [
@@ -109,6 +110,7 @@ const LgaSupportAdminDashboard = () => {
     { key: 'property_requests', label: 'Property Requests', to: '/admin/lga-support-dashboard?tab=property_requests' },
     { key: 'tenancy', label: 'Tenancy Actions', to: '/admin/lga-support-dashboard?tab=tenancy' },
     { key: 'tickets', label: 'Support Tickets', to: '/admin/lga-support-dashboard?tab=tickets' },
+    { key: 'escalations', label: 'Escalations', to: '/admin/lga-support-dashboard?tab=escalations' },
   ];
 
   // Fetch unread internal notes count
@@ -318,6 +320,22 @@ const LgaSupportAdminDashboard = () => {
             <FaReply size={12} /> User Conversation
           </button>
           <button
+            onClick={() => setChatTab('service')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              chatTab === 'service' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Service Context
+          </button>
+          <button
+            onClick={() => setChatTab('timeline')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              chatTab === 'timeline' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Timeline
+          </button>
+          <button
             onClick={() => { setChatTab('internal'); fetchUnreadInternalNotes(); }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               chatTab === 'internal' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -333,7 +351,6 @@ const LgaSupportAdminDashboard = () => {
         {chatTab === 'user' ? (
           <>
             <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
-              <SupportTicketServicePanel ticket={selectedTicket} onTicketUpdated={handleTicketUpdated} />
               <div className="rounded-lg bg-gray-50 p-4">
                 <div className="mb-1 flex items-center gap-2 text-xs text-gray-500">
                   <FaUser size={10} /> {selectedTicket.user_name || selectedTicket.user_email || 'Anonymous'}
@@ -384,6 +401,10 @@ const LgaSupportAdminDashboard = () => {
               </div>
             )}
           </>
+        ) : chatTab === 'service' || chatTab === 'timeline' ? (
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <SupportTicketServicePanel ticket={selectedTicket} onTicketUpdated={handleTicketUpdated} />
+          </div>
         ) : (
           <div className="flex-1 px-6 py-4">
             <p className="mb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Internal Admin Notes</p>
@@ -470,81 +491,11 @@ const LgaSupportAdminDashboard = () => {
         )}
 
         {activeTab === 'tickets' && (
-        <div className="lga-support-tickets-section rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-admin-50 p-2.5 text-admin-600"><FaHeadset className="text-lg" /></div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Support Tickets</h2>
-                <p className="text-sm text-gray-500">All support tickets - view, reply, assign, or escalate.</p>
-              </div>
-            </div>
-          </div>
+        <SupportTicketWorkspace tickets={data.tickets} loading={loading} user={user} onOpenTicket={openTicket} onTicketAction={handleQuickAction} mode="tickets" />
+        )}
 
-          {loading ? (
-            <div className="mt-5 py-10 text-center text-sm text-gray-500">Loading tickets...</div>
-          ) : data.tickets.length === 0 ? (
-            <div className="mt-5 rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">No support tickets found.</div>
-          ) : (
-            <div className="mt-5 overflow-x-auto rounded-lg border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Subject</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">User</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Service</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">SLA</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Priority</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {data.tickets.map((ticket) => (
-                    <tr key={ticket.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-4 py-3"><code className="text-sm font-medium text-gray-900">#{ticket.id}</code></td>
-                      <td className="max-w-xs truncate px-4 py-3 text-sm text-gray-900">
-                        {ticket.subject}
-                        {ticket.unread_user_replies > 0 && <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">{ticket.unread_user_replies}</span>}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{ticket.user_name || ticket.user_email || '\u2014'}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="text-xs text-gray-700">
-                          <p className="font-medium capitalize">{(ticket.category || 'general').replace(/_/g, ' ')}</p>
-                          <p className="text-gray-500">{ticket.related_type ? `${ticket.related_type.replace(/_/g, ' ')} #${ticket.related_id}` : (ticket.escalation_department || 'support')}</p>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${ticket.sla_status === 'breached' ? 'bg-red-100 text-red-700' : ticket.sla_status === 'due_soon' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                          {(ticket.sla_status || 'on_track').replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' : ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' : ticket.priority === 'medium' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{ticket.priority}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${ticket.status === 'open' ? 'bg-amber-100 text-amber-700' : ticket.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : ticket.status === 'resolved' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{ticket.status?.replace(/_/g, ' ')}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => openTicket(ticket)} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"><FaReply size={12} /> View</button>
-                          <button onClick={() => handleQuickAction('assign_me', ticket)} disabled={ticket.assigned_to === user.id} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"><FaUserCheck size={12} /> Assign</button>
-                          {ticket.status !== 'resolved' && (
-                            <>
-                              <button onClick={() => handleQuickAction('escalate', ticket)} className="inline-flex items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50"><FaArrowUp size={12} /> Escalate</button>
-                              <button onClick={() => handleQuickAction('resolve', ticket)} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"><FaCheckCircle size={12} /> Resolve</button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {activeTab === 'escalations' && (
+        <SupportTicketWorkspace tickets={data.tickets} loading={loading} user={user} onOpenTicket={openTicket} onTicketAction={handleQuickAction} mode="escalations" />
         )}
       </div>
 
