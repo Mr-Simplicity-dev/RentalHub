@@ -150,7 +150,9 @@
     "use_lawyers": "Utiliser les avocats RentalHub NG",
     "verify_dispute_evidence": "Vérifier les preuves du litige",
     "submit_request": "Envoyer une demande",
-    "whatsapp_message": "Bonjour RentalHub NG, j’ai besoin d’aide pour trouver une maison."
+    "whatsapp_message": "Bonjour RentalHub NG, j\u2019ai besoin d\u2019aide pour trouver une maison.",
+    "whatsapp_greeting": "Bonjour ! Besoin d\u2019aide pour trouver un logement ?",
+    "chat_with_us": "Discutez avec nous sur WhatsApp",
   },
 
   "footer": {

@@ -31,6 +31,8 @@ const Home = () => {
   const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [propertiesLoaded, setPropertiesLoaded] = useState(false);
   const [locationsLoaded, setLocationsLoaded] = useState(false);
+  const [showChatTip, setShowChatTip] = useState(false);
+  const [chatGreeting, setChatGreeting] = useState(false);
   
   const heroRef = useRef(null);
   const featuresRef = useRef(null);
@@ -139,6 +141,12 @@ const Home = () => {
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
+
+  useEffect(() => {
+    const tipTimer = setTimeout(() => setShowChatTip(true), 3000);
+    const greetTimer = setTimeout(() => setChatGreeting(true), 6000);
+    return () => { clearTimeout(tipTimer); clearTimeout(greetTimer); };
+  }, []);
 
   useEffect(() => {
     // Sync HubSpot language with i18next
@@ -493,26 +501,43 @@ const Home = () => {
         </div>
       </section>
 
-      {/* WhatsApp Floating Button (Multilingual) */}
-      <a
-        href={`https://wa.me/2348030601238?text=${encodeURIComponent(
-          t('home.whatsapp_message')
-        )}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`fixed bottom-6 left-6 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all duration-300 transform hover:scale-110 hover:shadow-xl ${
-          isScrolled ? 'animate-bounce' : ''
+      {/* WhatsApp Chat Widget */}
+      <div
+        className={`fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 transition-all duration-500 ${
+          showChatTip ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         }`}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 32 32"
-          fill="currentColor"
-          className="w-7 h-7"
+        {chatGreeting && (
+          <div className="relative bg-white rounded-xl shadow-xl p-3 max-w-[220px] animate-fadeIn">
+            <div className="absolute -bottom-1.5 right-5 w-3 h-3 bg-white rotate-45" />
+            <p className="text-sm text-gray-700 font-medium">
+              {t('home.whatsapp_greeting')}
+            </p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => {
+            const msg = `${t('home.whatsapp_message')}%0A%0A${window.location.href}`;
+            window.open(`https://wa.me/2348030601238?text=${msg}`, '_blank', 'noopener,noreferrer');
+          }}
+          aria-label={t('home.chat_with_us')}
+          title={t('home.chat_with_us')}
+          className={`flex items-center justify-center w-14 h-14 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${
+            chatGreeting ? 'animate-bounce' : ''
+          }`}
         >
-          <path d="M16.001 2.002C8.27 2.002 2 8.272 2 16.003c0 2.803.733 5.539 2.122 7.958L2 30l6.2-2.063c2.338 1.276 4.973 1.95 7.801 1.95 7.73 0 14-6.27 14-14 0-7.731-6.27-14.001-14-14.001z" />
-        </svg>
-      </a>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 32 32"
+            fill="currentColor"
+            className="w-7 h-7"
+          >
+            <path d="M16.001 2.002C8.27 2.002 2 8.272 2 16.003c0 2.803.733 5.539 2.122 7.958L2 30l6.2-2.063c2.338 1.276 4.973 1.95 7.801 1.95 7.73 0 14-6.27 14-14 0-7.731-6.27-14.001-14-14.001z" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 };

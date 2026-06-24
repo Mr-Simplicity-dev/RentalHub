@@ -150,7 +150,9 @@
     "use_lawyers": "使用 RentalHub NG 律师",
     "verify_dispute_evidence": "验证纠纷证据",
     "submit_request": "提交请求",
-    "whatsapp_message": "您好 RentalHub NG，我需要帮助寻找房子。"
+    "whatsapp_message": "您好 RentalHub NG，我需要帮助寻找房子。",
+    "whatsapp_greeting": "您好！需要帮忙找房子吗？",
+    "chat_with_us": "在 WhatsApp 上与我们聊天"
   },
 
   "footer": {

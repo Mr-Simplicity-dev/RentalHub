@@ -150,7 +150,9 @@
     "use_lawyers": "Использовать юристов RentalHub NG",
     "verify_dispute_evidence": "Проверить доказательства спора",
     "submit_request": "Отправить запрос",
-    "whatsapp_message": "Здравствуйте, RentalHub NG, мне нужна помощь в поиске жилья."
+    "whatsapp_message": "Здравствуйте, RentalHub NG, мне нужна помощь в поиске жилья.",
+    "whatsapp_greeting": "Здравствуйте! Нужна помощь в поиске жилья?",
+    "chat_with_us": "Напишите нам в WhatsApp"
   },
 
   "footer": {

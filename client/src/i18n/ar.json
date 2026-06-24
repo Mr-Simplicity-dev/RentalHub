@@ -150,7 +150,9 @@
     "use_lawyers": "استخدم محامي RentalHub NG",
     "verify_dispute_evidence": "تحقق من أدلة النزاع",
     "submit_request": "إرسال طلب",
-    "whatsapp_message": "مرحبًا RentalHub NG، أحتاج إلى مساعدة في العثور على منزل."
+    "whatsapp_message": "مرحبًا RentalHub NG، أحتاج إلى مساعدة في العثور على منزل.",
+    "whatsapp_greeting": "مرحبًا! هل تحتاج مساعدة في العثور على منزل؟",
+    "chat_with_us": "تحدث معنا على واتساب"
   },
 
   "footer": {

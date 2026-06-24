@@ -150,7 +150,9 @@
     "use_lawyers": "Legal Protection Coverage",
     "verify_dispute_evidence": "Verify Dispute Evidence",
     "submit_request": "Submit Request",
-    "whatsapp_message": "Hello RentalHub NG, I need help finding a home."
+    "whatsapp_message": "Hello RentalHub NG, I need help finding a home.",
+    "whatsapp_greeting": "Hi! Need help finding a home?",
+    "chat_with_us": "Chat with us on WhatsApp"
   },
 
   "footer": {
