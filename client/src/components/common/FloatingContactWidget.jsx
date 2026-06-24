@@ -1,17 +1,27 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { io as socketIO } from 'socket.io-client';
-import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaMicrophone, FaStopCircle } from 'react-icons/fa';
+import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaMicrophone, FaStopCircle, FaCheck } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
+import useVoiceRecorder from '../../hooks/useVoiceRecorder';
 
 const LS_EMAIL = 'contact_widget_email';
 const LS_TICKET_ID = 'contact_widget_ticket_id';
 const LS_NAME = 'contact_widget_name';
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/mpeg'];
+
+const formatTime = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const ChatBubble = ({ msg, isOwn }) => {
   const isAudio = msg.attachment_type && msg.attachment_type.startsWith('audio/');
+  const readAt = msg.read_at ? new Date(msg.read_at) : null;
   return (
     <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isOwn ? 'bg-indigo-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md'}`}>
@@ -30,20 +40,33 @@ const ChatBubble = ({ msg, isOwn }) => {
             <FaFile size={10} /> {msg.attachment_name || 'Attachment'}
           </a>
         ) : null}
-        <p className={`mt-0.5 text-[10px] ${isOwn ? 'text-indigo-200' : 'text-slate-400'}`}>
-          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </p>
+        <div className={`mt-0.5 flex items-center gap-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+          <p className={`text-[10px] ${isOwn ? 'text-indigo-200' : 'text-slate-400'}`}>
+            {formatTime(new Date(msg.created_at))}
+          </p>
+          {isOwn && readAt && (
+            <span className="text-[9px] text-indigo-200" title={`Read ${formatTime(readAt)}`}>
+              <FaCheck className="w-2.5 h-2.5" />
+            </span>
+          )}
+          {isOwn && msg._temp && (
+            <span className="text-[10px] text-indigo-200 italic">Sending...</span>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
 const FloatingContactWidget = () => {
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const { socket } = useSocket();
+  const authRecorder = useVoiceRecorder();
+  const contactRecorder = useVoiceRecorder();
 
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState('form'); // 'form' | 'tickets' | 'conversation' | 'success' | 'check-status'
+  const [view, setView] = useState('form');
   const [form, setForm] = useState({ name: '', email: '', state: '', lga: '', subject: '', message: '' });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -59,13 +82,37 @@ const FloatingContactWidget = () => {
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [typingUser, setTypingUser] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [sentConfirm, setSentConfirm] = useState(null);
 
   const listRef = useRef(null);
   const widgetRef = useRef(null);
   const typingTimer = useRef(null);
+  const typingThrottleRef = useRef(null);
   const guestSocketRef = useRef(null);
-
+  const activeTicketRef = useRef(null);
   const [showGreeting, setShowGreeting] = useState(true);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+
+  // Scroll management
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      setIsNearBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+    };
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll only if near bottom
+  useEffect(() => {
+    if (listRef.current && isNearBottom) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [conversation, isNearBottom, contactConv]);
+
+  // Keep ref in sync
+  activeTicketRef.current = activeTicket;
 
   // Restore identity
   useEffect(() => {
@@ -77,6 +124,16 @@ const FloatingContactWidget = () => {
       setForm((p) => ({ ...p, email: savedEmail, name: savedName || '' }));
     }
   }, [isAuthenticated, user]);
+
+  // Keyboard accessibility
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open]);
 
   // Click-outside close
   useEffect(() => {
@@ -136,26 +193,31 @@ const FloatingContactWidget = () => {
     return () => clearInterval(interval);
   }, [isAuthenticated, open]);
 
-  // Socket listeners
+  // Socket listeners — using ref to avoid stale closure + race condition
   useEffect(() => {
     if (!socket || !isAuthenticated) return;
     const replyHandler = (data) => {
-      if (activeTicket?.id === data.ticketId) loadConversation(data.ticketId);
+      if (activeTicketRef.current?.id === data.ticketId && data.reply) {
+        setConversation((prev) => {
+          if (prev.some((r) => r.id === data.reply.id)) return prev;
+          return [...prev, data.reply];
+        });
+      }
     };
-    socket.on('ticket:new_reply', replyHandler);
     const typingHandler = (data) => {
-      if (activeTicket?.id === data.ticketId && data.isAdmin) {
+      if (activeTicketRef.current?.id === data.ticketId && data.isAdmin) {
         setTypingUser(data);
         clearTimeout(typingTimer.current);
         typingTimer.current = setTimeout(() => setTypingUser(null), 3000);
       }
     };
+    socket.on('ticket:new_reply', replyHandler);
     socket.on('ticket:typing', typingHandler);
     return () => {
       socket.off('ticket:new_reply', replyHandler);
       socket.off('ticket:typing', typingHandler);
     };
-  }, [socket, isAuthenticated, activeTicket]);
+  }, [socket, isAuthenticated]);
 
   const loadConversation = useCallback(async (ticketId) => {
     setLoadingConv(true);
@@ -171,20 +233,19 @@ const FloatingContactWidget = () => {
     loadConversation(ticket.id);
   };
 
+  const validateFile = (file) => {
+    if (!file) return null;
+    if (file.size > MAX_FILE_SIZE) return t('widget.file_too_large', 'File must be under 15MB');
+    if (!ALLOWED_TYPES.includes(file.type)) return t('widget.file_type_not_allowed', 'File type not supported');
+    return null;
+  };
+
   const reset = () => {
-    clearInterval(recordingTimerRef.current);
-    clearInterval(contactRecordingTimerRef.current);
+    authRecorder.reset();
+    contactRecorder.reset();
     if (guestSocketRef.current) {
       guestSocketRef.current.disconnect();
       guestSocketRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (contactStreamRef.current) {
-      contactStreamRef.current.getTracks().forEach((t) => t.stop());
-      contactStreamRef.current = null;
     }
     setForm({ name: '', email: '', state: '', lga: '', subject: '', message: '' });
     setError('');
@@ -194,10 +255,7 @@ const FloatingContactWidget = () => {
     setReplyText('');
     setAttachmentFile(null);
     setTypingUser(null);
-    setIsRecording(false);
-    setRecordingDuration(0);
-    setContactIsRecording(false);
-    setContactRecordingDuration(0);
+    setSentConfirm(null);
     setContactReplyText('');
     setContactReplyFile(null);
     setLookupEmail('');
@@ -214,16 +272,11 @@ const FloatingContactWidget = () => {
     setTimeout(reset, 300);
   };
 
-  // Auto-scroll conversation
-  useEffect(() => {
-    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [conversation]);
-
   // ── Contact form submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim() || !form.email.trim() || !form.state || !form.message.trim()) {
-      setError('Please fill in name, email, state, and message.');
+      setError(t('widget.fill_required', 'Please fill in name, email, state, and message.'));
       return;
     }
     setSending(true);
@@ -235,14 +288,20 @@ const FloatingContactWidget = () => {
       localStorage.setItem(LS_TICKET_ID, String(res.data?.data?.ticketId || ''));
       setView('success');
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not send message.');
+      setError(err.response?.data?.message || t('widget.send_failed', 'Could not send message.'));
     } finally { setSending(false); }
   };
 
-  // ── Send reply (authenticated) ──
+  // ── Send reply (authenticated) with optimistic update ──
   const handleSendReply = async () => {
     const msg = replyText.trim();
     if (!msg && !attachmentFile) return;
+    const tempId = `temp_${Date.now()}`;
+    const optimist = { id: tempId, message: msg, is_admin: false, author_name: user?.full_name, created_at: new Date().toISOString(), _temp: true };
+    if (attachmentFile) optimist.attachment_name = attachmentFile.name;
+    setConversation((prev) => [...prev, optimist]);
+    setReplyText('');
+    setAttachmentFile(null);
     setSendingReply(true);
     try {
       const fd = new FormData();
@@ -251,141 +310,21 @@ const FloatingContactWidget = () => {
       const res = await api.post(`/support/tickets/${activeTicket.id}/reply`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setConversation((prev) => [...prev, res.data.data]);
-      setReplyText('');
-      setAttachmentFile(null);
+      setConversation((prev) => prev.map((r) => r.id === tempId ? { ...res.data.data, _temp: false } : r));
+      setSentConfirm('sent');
+      setTimeout(() => setSentConfirm(null), 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send');
+      setConversation((prev) => prev.filter((r) => r.id !== tempId));
+      setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
     } finally { setSendingReply(false); }
   };
 
+  // Throttled typing emit
   const emitTyping = () => {
     if (!socket || !activeTicket) return;
+    if (typingThrottleRef.current) return;
+    typingThrottleRef.current = setTimeout(() => { typingThrottleRef.current = null; }, 2000);
     socket.emit('ticket:typing', { ticketId: activeTicket.id });
-  };
-
-  // ── Voice recording ──
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const recordingTimerRef = useRef(null);
-  const streamRef = useRef(null);
-
-  const [contactIsRecording, setContactIsRecording] = useState(false);
-  const [contactRecordingDuration, setContactRecordingDuration] = useState(0);
-  const contactMediaRecorderRef = useRef(null);
-  const contactAudioChunksRef = useRef([]);
-  const contactRecordingTimerRef = useRef(null);
-  const contactStreamRef = useRef(null);
-
-  const formatDuration = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm' });
-      audioChunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-      recorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType });
-        const file = new File([blob], `voice_${Date.now()}.webm`, { type: recorder.mimeType });
-        setAttachmentFile(file);
-        setIsRecording(false);
-        setRecordingDuration(0);
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((t) => t.stop());
-          streamRef.current = null;
-        }
-      };
-      mediaRecorderRef.current = recorder;
-      recorder.start();
-      setIsRecording(true);
-      setRecordingDuration(0);
-      const start = Date.now();
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingDuration(Math.floor((Date.now() - start) / 1000));
-      }, 1000);
-    } catch (err) {
-      setError('Microphone access denied or not available.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    clearInterval(recordingTimerRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      clearInterval(recordingTimerRef.current);
-      clearInterval(contactRecordingTimerRef.current);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      }
-      if (contactStreamRef.current) {
-        contactStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
-    };
-  }, []);
-
-  // ── Contact voice recording (anonymous) ──
-  const startContactRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      contactStreamRef.current = stream;
-      const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm' });
-      contactAudioChunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) contactAudioChunksRef.current.push(e.data);
-      };
-      recorder.onstop = () => {
-        const blob = new Blob(contactAudioChunksRef.current, { type: recorder.mimeType });
-        const file = new File([blob], `voice_${Date.now()}.webm`, { type: recorder.mimeType });
-        setContactReplyFile(file);
-        setContactIsRecording(false);
-        setContactRecordingDuration(0);
-        if (contactStreamRef.current) {
-          contactStreamRef.current.getTracks().forEach((t) => t.stop());
-          contactStreamRef.current = null;
-        }
-      };
-      contactMediaRecorderRef.current = recorder;
-      recorder.start();
-      setContactIsRecording(true);
-      setContactRecordingDuration(0);
-      const start = Date.now();
-      contactRecordingTimerRef.current = setInterval(() => {
-        setContactRecordingDuration(Math.floor((Date.now() - start) / 1000));
-      }, 1000);
-    } catch (err) {
-      setError('Microphone access denied or not available.');
-    }
-  };
-
-  const stopContactRecording = () => {
-    if (contactMediaRecorderRef.current && contactMediaRecorderRef.current.state !== 'inactive') {
-      contactMediaRecorderRef.current.stop();
-    }
-    clearInterval(contactRecordingTimerRef.current);
-    if (contactStreamRef.current) {
-      contactStreamRef.current.getTracks().forEach((t) => t.stop());
-      contactStreamRef.current = null;
-    }
   };
 
   // ── Contact lookup (anonymous) ──
@@ -394,6 +333,8 @@ const FloatingContactWidget = () => {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [contactConv, setContactConv] = useState([]);
   const [viewingContactTicket, setViewingContactTicket] = useState(null);
+  const viewingContactRef = useRef(null);
+  viewingContactRef.current = viewingContactTicket;
 
   const handleLookup = async () => {
     if (!lookupEmail.trim()) return;
@@ -440,7 +381,7 @@ const FloatingContactWidget = () => {
     return () => { clearInterval(typingPollRef.current); };
   }, [viewingContactTicket, lookupEmail]);
 
-  // Guest socket connection for anonymous contact conversation
+  // Guest socket — stable deps using ref
   useEffect(() => {
     if (!viewingContactTicket || !lookupEmail.trim()) {
       if (guestSocketRef.current) {
@@ -453,21 +394,22 @@ const FloatingContactWidget = () => {
     const gs = socketIO(baseUrl ? `${baseUrl}/guest` : '/guest', {
       auth: { ticketId: viewingContactTicket.id, email: lookupEmail.trim() },
       transports: ['websocket', 'polling'],
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
     });
     guestSocketRef.current = gs;
-    gs.on('connect', () => {});
     gs.on('ticket:new_reply', (data) => {
-      if (data.reply && !data.reply.is_admin) return; // ignore own replies
-      setContactConv((prev) => data.reply ? [...prev, data.reply] : prev);
-    });
-    gs.on('connect_error', (err) => {
-      console.warn('Guest socket error:', err.message);
+      if (!data.reply || !data.reply.is_admin) return;
+      setContactConv((prev) => {
+        if (prev.some((r) => r.id === data.reply.id)) return prev;
+        return [...prev, data.reply];
+      });
     });
     return () => {
       gs.disconnect();
       if (guestSocketRef.current === gs) guestSocketRef.current = null;
     };
-  }, [viewingContactTicket, lookupEmail]);
+  }, [viewingContactTicket?.id, lookupEmail]);
 
   const handleContactReply = async () => {
     const msg = contactReplyText.trim();
@@ -486,45 +428,123 @@ const FloatingContactWidget = () => {
       setContactReplyText('');
       setContactReplyFile(null);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send');
+      setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
     } finally { setSendingContactReply(false); }
   };
 
   // ── Render ──
-  const renderHeader = (title) => (
+  const renderHeader = () => (
     <div className="flex items-center justify-between bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-3 text-white">
       <div className="flex items-center gap-2">
         {view !== 'form' && view !== 'success' && (
-          <button onClick={() => { setView(isAuthenticated ? 'tickets' : 'form'); setActiveTicket(null); setConversation([]); setContactConv([]); setViewingContactTicket(null); }} className="text-white/80 hover:text-white p-0.5">
+          <button onClick={() => { setView(isAuthenticated ? 'tickets' : 'form'); setActiveTicket(null); setConversation([]); setContactConv([]); setViewingContactTicket(null); }} className="text-white/80 hover:text-white p-0.5" aria-label={t('widget.back', 'Back')}>
             <FaArrowLeft size={14} />
           </button>
         )}
         <FaHeadset size={16} />
         <div>
-          <p className="text-sm font-semibold">RentalHub Support</p>
-          <p className="text-[10px] text-indigo-200">We typically reply within minutes</p>
+          <p className="text-sm font-semibold">{t('widget.support_title', 'RentalHub Support')}</p>
+          <p className="text-[10px] text-indigo-200">{t('widget.reply_minutes', 'We typically reply within minutes')}</p>
         </div>
       </div>
-      <button onClick={handleClose} className="text-white/80 hover:text-white p-1"><FaTimes /></button>
+      <button onClick={handleClose} className="text-white/80 hover:text-white p-1" aria-label={t('widget.close', 'Close')}><FaTimes /></button>
+    </div>
+  );
+
+  const fileInput = (onFile, currentFile, isRecording) => (
+    <>
+      {currentFile && !isRecording && (
+        <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
+          <FaPaperclip size={8} /> {currentFile.name}
+          <button onClick={() => onFile(null)} className="ml-auto text-red-500"><FaTimes size={8} /></button>
+        </div>
+      )}
+      <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 shrink-0">
+        <FaPaperclip size={12} />
+        <input type="file" className="hidden" onChange={(e) => {
+          const f = e.target.files[0];
+          const err = validateFile(f);
+          if (err) { setError(err); return; }
+          onFile(f);
+        }} />
+      </label>
+    </>
+  );
+
+  const voiceButton = (recorder, onFile) => {
+    if (recorder.isRecording) {
+      return (
+        <button onClick={recorder.stop}
+          className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0">
+          <FaStopCircle size={14} />
+        </button>
+      );
+    }
+    return (
+      <button onClick={async () => {
+        try {
+          await recorder.start();
+        } catch (err) {
+          setError(err.message);
+        }
+      }}
+        className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 shrink-0"
+        title={t('widget.record_voice', 'Record voice message')}>
+        <FaMicrophone size={12} />
+      </button>
+    );
+  };
+
+  const replyInput = (value, onChange, onSend, sending, recorder, file, setFile) => (
+    <div className="border-t border-slate-200 p-3">
+      {recorder.isRecording && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600">
+          <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+          {t('widget.recording', 'Recording...')} {recorder.formatDuration(recorder.duration)}
+          <button onClick={recorder.stop} className="ml-auto flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-white hover:bg-red-600">
+            <FaStopCircle size={10} /> {t('widget.stop', 'Stop')}
+          </button>
+        </div>
+      )}
+      {file && !recorder.isRecording && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
+          <FaPaperclip size={10} /> {file.name}
+          <button onClick={() => setFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={10} /></button>
+        </div>
+      )}
+      <div className="flex items-end gap-2">
+        {!file && <>{fileInput(setFile, file, recorder.isRecording)}</>}
+        {!recorder.isRecording && !file && (
+          <textarea value={value} onChange={(e) => { onChange(e.target.value); if (emitTyping) emitTyping(); }}
+            placeholder={t('widget.type_message', 'Type your message...')} rows={1}
+            className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } }} />
+        )}
+        {recorder.isRecording && <div className="flex-1" />}
+        {voiceButton(recorder, setFile)}
+        <button onClick={onSend} disabled={(!value.trim() && !file && !recorder.recordedFile) || sending}
+          className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
+          {sending ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={12} />}
+        </button>
+      </div>
     </div>
   );
 
   return (
     <>
-      {/* Greeting tooltip + button container */}
       <div className="fixed bottom-6 right-6 z-50 flex sm:flex-col flex-col-reverse items-end gap-2">
         {!open && showGreeting && (
           <div className="animate-fadeIn">
             <div className="relative bg-white rounded-xl shadow-xl p-3 max-w-[200px]">
               <div className="absolute -bottom-1.5 right-5 w-3 h-3 bg-white rotate-45" />
-              <p className="text-sm text-gray-700 font-medium">Need help? Chat with us!</p>
+              <p className="text-sm text-gray-700 font-medium">{t('widget.need_help', 'Need help? Chat with us!')}</p>
             </div>
           </div>
         )}
         <button
           onClick={() => { setOpen((p) => !p); setShowGreeting(false); }}
           className={`tour-support-widget flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${!open ? 'animate-bounce' : ''}`}
-          aria-label="Contact support"
+          aria-label={t('widget.contact_support', 'Contact support')}
         >
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{unreadCount}</span>
@@ -544,33 +564,32 @@ const FloatingContactWidget = () => {
             className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
             style={{ maxHeight: '560px' }}
           >
-
           {renderHeader()}
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={listRef}>
             {/* ─── FORM VIEW (anonymous/fallback) ─── */}
             {view === 'form' && !isAuthenticated && (
               <form onSubmit={handleSubmit} className="space-y-3">
-                <p className="text-xs text-slate-500">Fill this form and we'll get back to you via email.</p>
+                <p className="text-xs text-slate-500">{t('widget.fill_form', "Fill this form and we'll get back to you via email.")}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Name *</label>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.name', 'Name')} *</label>
                     <input type="text" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
-                      placeholder="Your name" />
+                      placeholder={t('widget.your_name', 'Your name')} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Email *</label>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.email', 'Email')} *</label>
                     <input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
                       placeholder="you@example.com" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">State *</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.state', 'State')} *</label>
                   <select value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value, lga: '' }))}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                    <option value="">Select state</option>
+                    <option value="">{t('widget.select_state', 'Select state')}</option>
                     {states.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
@@ -579,31 +598,31 @@ const FloatingContactWidget = () => {
                     <label className="block text-xs font-medium text-slate-600 mb-1">LGA</label>
                     <select value={form.lga} onChange={(e) => setForm((p) => ({ ...p, lga: e.target.value }))}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                      <option value="">Select LGA</option>
+                      <option value="">{t('widget.select_lga', 'Select LGA')}</option>
                       {lgas.map((l) => <option key={l} value={l}>{l}</option>)}
                     </select>
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Subject</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.subject', 'Subject')}</label>
                   <input type="text" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
-                    placeholder="How can we help?" />
+                    placeholder={t('widget.how_can_we_help', 'How can we help?')} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Message *</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.message', 'Message')} *</label>
                   <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none"
-                    placeholder="Tell us more..." />
+                    placeholder={t('widget.tell_us_more', 'Tell us more...')} />
                 </div>
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 <button type="submit" disabled={sending}
                   className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 transition">
-                  {sending ? 'Sending...' : <><FaPaperPlane className="w-3.5 h-3.5" /> Send message</>}
+                  {sending ? t('widget.sending', 'Sending...') : <><FaPaperPlane className="w-3.5 h-3.5" /> {t('widget.send_message', 'Send message')}</>}
                 </button>
                 <button type="button" onClick={() => { setView('check-status'); setLookupEmail(localStorage.getItem(LS_EMAIL) || ''); }}
                   className="w-full text-center text-xs text-indigo-600 hover:underline">
-                  Already contacted us? Check your ticket status
+                  {t('widget.check_status', 'Already contacted us? Check your ticket status')}
                 </button>
               </form>
             )}
@@ -611,23 +630,23 @@ const FloatingContactWidget = () => {
             {/* ─── FORM VIEW (authenticated, no tickets) ─── */}
             {view === 'form' && isAuthenticated && (
               <div className="py-2 text-left">
-                <p className="text-sm text-slate-600 mb-3 font-medium">Start a new conversation</p>
+                <p className="text-sm text-slate-600 mb-3 font-medium">{t('widget.start_conversation', 'Start a new conversation')}</p>
                 <div className="space-y-3">
                   <div className="flex gap-2">
                     <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
-                      <span className="text-slate-400">Name</span>
+                      <span className="text-slate-400">{t('widget.name', 'Name')}</span>
                       <p className="text-slate-800 font-medium truncate">{user?.full_name || form.name}</p>
                     </div>
                     <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
-                      <span className="text-slate-400">Email</span>
+                      <span className="text-slate-400">{t('widget.email', 'Email')}</span>
                       <p className="text-slate-800 truncate">{user?.email || form.email}</p>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">State *</label>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.state', 'State')} *</label>
                     <select value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value, lga: '' }))}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                      <option value="">Select state</option>
+                      <option value="">{t('widget.select_state', 'Select state')}</option>
                       {states.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
@@ -636,21 +655,21 @@ const FloatingContactWidget = () => {
                       <label className="block text-xs font-medium text-slate-600 mb-1">LGA</label>
                       <select value={form.lga} onChange={(e) => setForm((p) => ({ ...p, lga: e.target.value }))}
                         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                        <option value="">Select LGA</option>
+                        <option value="">{t('widget.select_lga', 'Select LGA')}</option>
                         {lgas.map((l) => <option key={l} value={l}>{l}</option>)}
                       </select>
                     </div>
                   )}
                   <input type="text" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
-                    placeholder="Subject (optional)"
+                    placeholder={t('widget.subject_optional', 'Subject (optional)')}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                   <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
-                    placeholder="How can we help you?"
+                    placeholder={t('widget.how_can_we_help', 'How can we help you?')}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none" />
                   {error && <p className="text-xs text-red-600">{error}</p>}
                   <button onClick={async () => {
-                    if (!form.state) { setError('Please select your state.'); return; }
-                    if (!form.message.trim()) { setError('Please write a message.'); return; }
+                    if (!form.state) { setError(t('widget.select_state_error', 'Please select your state.')); return; }
+                    if (!form.message.trim()) { setError(t('widget.write_message_error', 'Please write a message.')); return; }
                     setSending(true); setError('');
                     try {
                       const payload = {
@@ -662,11 +681,11 @@ const FloatingContactWidget = () => {
                       const res = await api.post('/support/tickets', payload);
                       localStorage.setItem(LS_TICKET_ID, String(res.data?.data?.id || ''));
                       openTicketChat(res.data?.data);
-                    } catch (err) { setError(err.response?.data?.message || 'Failed to create ticket'); }
+                    } catch (err) { setError(err.response?.data?.message || t('widget.create_failed', 'Failed to create ticket')); }
                     finally { setSending(false); }
                   }} disabled={sending}
                     className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
-                    {sending ? 'Creating...' : <><FaPaperPlane className="w-3.5 h-3.5" /> Start conversation</>}
+                    {sending ? t('widget.creating', 'Creating...') : <><FaPaperPlane className="w-3.5 h-3.5" /> {t('widget.start_conversation_btn', 'Start conversation')}</>}
                   </button>
                 </div>
               </div>
@@ -676,25 +695,30 @@ const FloatingContactWidget = () => {
             {view === 'success' && (
               <div className="flex flex-col items-center py-4 text-center">
                 <FaCheckCircle className="text-green-500 text-4xl mb-3" />
-                <p className="font-semibold text-slate-900">Message sent!</p>
-                <p className="text-sm text-slate-600 mt-1">We'll get back to you shortly.</p>
+                <p className="font-semibold text-slate-900">{t('widget.message_sent', 'Message sent!')}</p>
+                <p className="text-sm text-slate-600 mt-1">{t('widget.will_reply', "We'll get back to you shortly.")}</p>
                 {localStorage.getItem(LS_TICKET_ID) && (
-                  <p className="mt-2 text-xs text-slate-400">Ticket #<span className="font-mono">{localStorage.getItem(LS_TICKET_ID)}</span></p>
+                  <p className="mt-2 text-xs text-slate-400">{t('widget.ticket', 'Ticket')} #<span className="font-mono">{localStorage.getItem(LS_TICKET_ID)}</span></p>
                 )}
-                <button onClick={handleClose} className="mt-4 text-sm text-indigo-600 hover:underline">Close</button>
+                <button onClick={handleClose} className="mt-4 text-sm text-indigo-600 hover:underline">{t('widget.close_btn', 'Close')}</button>
+                {sentConfirm && (
+                  <p className="mt-2 text-xs text-green-600 flex items-center gap-1"><FaCheck size={10} /> {t('widget.sent', 'Sent!')}</p>
+                )}
               </div>
             )}
 
             {/* ─── TICKET LIST (authenticated) ─── */}
             {view === 'tickets' && isAuthenticated && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Your Tickets</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('widget.your_tickets', 'Your Tickets')}</p>
                 {loadingTickets ? (
-                  <p className="text-sm text-slate-400 text-center py-4">Loading...</p>
+                  <div className="space-y-2 py-2">
+                    {[1,2,3].map((i) => <div key={i} className="h-16 rounded-xl bg-slate-100 animate-pulse" />)}
+                  </div>
                 ) : tickets.length === 0 ? (
                   <div className="text-center py-4">
-                    <p className="text-sm text-slate-500 mb-3">No tickets yet.</p>
-                    <button onClick={() => setView('form')} className="text-sm text-indigo-600 hover:underline">Start a new conversation</button>
+                    <p className="text-sm text-slate-500 mb-3">{t('widget.no_tickets', 'No tickets yet.')}</p>
+                    <button onClick={() => setView('form')} className="text-sm text-indigo-600 hover:underline">{t('widget.start_new', 'Start a new conversation')}</button>
                   </div>
                 ) : (
                   tickets.map((ticket) => (
@@ -709,7 +733,7 @@ const FloatingContactWidget = () => {
                       </div>
                       <p className="mt-1 text-[11px] text-slate-400">#{ticket.id} &middot; {new Date(ticket.created_at).toLocaleDateString()}</p>
                       {ticket.unread_admin_replies > 0 && (
-                        <span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{ticket.unread_admin_replies} new</span>
+                        <span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{ticket.unread_admin_replies} {t('widget.new', 'new')}</span>
                       )}
                     </button>
                   ))
@@ -722,16 +746,19 @@ const FloatingContactWidget = () => {
               <div className="space-y-3">
                 <p className="text-xs font-semibold text-slate-500 truncate">{activeTicket.subject}</p>
                 {loadingConv ? (
-                  <div className="py-4 text-center text-sm text-slate-400">Loading messages...</div>
+                  <div className="space-y-3 py-2">
+                    {[1,2].map((i) => <div key={i} className={`h-12 rounded-xl bg-slate-100 animate-pulse ${i % 2 === 0 ? 'ml-12' : 'mr-12'}`} />)}
+                  </div>
                 ) : (
                   <>
+                    {conversation.length === 0 && <p className="text-sm text-slate-400 text-center py-4">{t('widget.no_messages', 'No messages yet.')}</p>}
                     {conversation.map((reply) => (
                       <ChatBubble key={reply.id} msg={reply} isOwn={!reply.is_admin} />
                     ))}
                     {typingUser && (
                       <div className="flex justify-start">
                         <div className="rounded-2xl bg-slate-100 px-4 py-2.5 text-sm text-slate-400 italic">
-                          {typingUser.userName} is typing...
+                          {typingUser.userName} {t('widget.is_typing', 'is typing...')}
                         </div>
                       </div>
                     )}
@@ -743,17 +770,17 @@ const FloatingContactWidget = () => {
             {/* ─── CHECK STATUS (anonymous) ─── */}
             {view === 'check-status' && (
               <div className="space-y-3">
-                <p className="text-xs text-slate-500">Enter the email you used to contact us.</p>
+                <p className="text-xs text-slate-500">{t('widget.enter_email', 'Enter the email you used to contact us.')}</p>
                 <input type="email" value={lookupEmail} onChange={(e) => setLookupEmail(e.target.value)}
                   placeholder="your@email.com"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                 <button onClick={handleLookup} disabled={lookupLoading}
                   className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
-                  {lookupLoading ? 'Searching...' : 'Look up my tickets'}
+                  {lookupLoading ? t('widget.searching', 'Searching...') : t('widget.lookup', 'Look up my tickets')}
                 </button>
                 {lookupTickets.length > 0 && (
                   <div className="space-y-2 mt-3">
-                    <p className="text-xs font-semibold text-slate-500 uppercase">Your tickets</p>
+                    <p className="text-xs font-semibold text-slate-500 uppercase">{t('widget.your_tickets', 'Your tickets')}</p>
                     {lookupTickets.map((t) => (
                       <div key={t.id}>
                         <button onClick={() => viewContactConversation(t)}
@@ -768,7 +795,7 @@ const FloatingContactWidget = () => {
                         </button>
                         {viewingContactTicket?.id === t.id && (
                           <div className="mt-2 space-y-2 pl-2 border-l-2 border-indigo-300">
-                            {contactConv.length === 0 ? <p className="text-xs text-slate-400">No replies yet.</p> : (
+                            {contactConv.length === 0 ? <p className="text-xs text-slate-400">{t('widget.no_replies', 'No replies yet.')}</p> : (
                               contactConv.map((r) => (
                                 <div key={r.id} className={`rounded-xl px-3 py-2 text-sm ${r.is_admin ? 'bg-indigo-50 border border-indigo-200' : 'bg-slate-50'}`}>
                                   {r.is_admin && <p className="text-[10px] font-semibold text-indigo-600 mb-0.5">{r.author_name || 'Support'}</p>}
@@ -789,48 +816,63 @@ const FloatingContactWidget = () => {
                             {adminViewingName && (
                               <p className="text-[10px] text-green-600 italic flex items-center gap-1">
                                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
-                                {adminViewingName} is viewing this conversation
+                                {adminViewingName} {t('widget.is_viewing', 'is viewing this conversation')}
                               </p>
                             )}
                             {adminTypingName && (
                               <p className="text-[10px] text-indigo-600 italic flex items-center gap-1">
                                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                                {adminTypingName} is typing...
+                                {adminTypingName} {t('widget.is_typing', 'is typing...')}
                               </p>
                             )}
                             {/* Reply input for anonymous contact */}
                             <div className="mt-2 border-t border-indigo-200 pt-2">
-                              {contactReplyFile && !contactIsRecording && (
+                              {contactRecorder.isRecording && (
+                                <div className="mb-1 flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs text-red-600">
+                                  <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                                  {t('widget.recording', 'Recording...')} {contactRecorder.formatDuration(contactRecorder.duration)}
+                                  <button onClick={contactRecorder.stop} className="ml-auto flex items-center gap-1 rounded bg-red-500 px-1.5 py-0.5 text-white hover:bg-red-600">
+                                    <FaStopCircle size={8} /> {t('widget.stop', 'Stop')}
+                                  </button>
+                                </div>
+                              )}
+                              {contactReplyFile && !contactRecorder.isRecording && (
                                 <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
                                   <FaPaperclip size={8} /> {contactReplyFile.name}
                                   <button onClick={() => setContactReplyFile(null)} className="ml-auto text-red-500"><FaTimes size={8} /></button>
                                 </div>
                               )}
-                              {contactIsRecording && (
-                                <div className="mb-1 flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs text-red-600">
-                                  <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                                  Recording... {formatDuration(contactRecordingDuration)}
-                                  <button onClick={stopContactRecording} className="ml-auto flex items-center gap-1 rounded bg-red-500 px-1.5 py-0.5 text-white hover:bg-red-600">
-                                    <FaStopCircle size={8} /> Stop
-                                  </button>
-                                </div>
-                              )}
                               <div className="flex items-end gap-1.5">
-                                <label className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded border border-slate-300 text-slate-400 hover:bg-slate-50 shrink-0">
+                                <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded border border-slate-300 text-slate-400 hover:bg-slate-50 shrink-0">
                                   <FaPaperclip size={10} />
-                                  <input type="file" className="hidden" onChange={(e) => setContactReplyFile(e.target.files[0])} />
+                                  <input type="file" className="hidden" onChange={(e) => {
+                                    const f = e.target.files[0];
+                                    const err = validateFile(f);
+                                    if (err) { setError(err); return; }
+                                    setContactReplyFile(f);
+                                  }} />
                                 </label>
                                 <textarea value={contactReplyText} onChange={(e) => setContactReplyText(e.target.value)}
-                                  placeholder="Type a reply..." rows={1}
-                                  className="flex-1 resize-none rounded border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-indigo-400"
+                                  placeholder={t('widget.type_reply', 'Type a reply...')} rows={1}
+                                  className="flex-1 resize-none rounded border border-slate-300 px-2 py-2 text-xs outline-none focus:border-indigo-400"
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />
-                                <button onClick={startContactRecording}
-                                  className="flex h-[30px] w-[30px] items-center justify-center rounded border border-slate-300 text-slate-400 hover:bg-slate-50 shrink-0"
-                                  title="Record voice message">
-                                  <FaMicrophone size={10} />
-                                </button>
-                                <button onClick={handleContactReply} disabled={(!contactReplyText.trim() && !contactReplyFile) || sendingContactReply}
-                                  className="flex h-[30px] w-[30px] items-center justify-center rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
+                                {contactRecorder.isRecording ? (
+                                  <button onClick={contactRecorder.stop}
+                                    className="flex h-[36px] w-[36px] items-center justify-center rounded bg-red-500 text-white hover:bg-red-600 shrink-0">
+                                    <FaStopCircle size={10} />
+                                  </button>
+                                ) : (
+                                  <button onClick={async () => {
+                                    try { await contactRecorder.start(); }
+                                    catch (err) { setError(err.message); }
+                                  }}
+                                    className="flex h-[36px] w-[36px] items-center justify-center rounded border border-slate-300 text-slate-400 hover:bg-slate-50 shrink-0"
+                                    title={t('widget.record_voice', 'Record voice message')}>
+                                    <FaMicrophone size={10} />
+                                  </button>
+                                )}
+                                <button onClick={handleContactReply} disabled={(!contactReplyText.trim() && !contactReplyFile && !contactRecorder.recordedFile) || sendingContactReply}
+                                  className="flex h-[36px] w-[36px] items-center justify-center rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
                                   {sendingContactReply ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={10} />}
                                 </button>
                               </div>
@@ -842,57 +884,65 @@ const FloatingContactWidget = () => {
                   </div>
                 )}
                 {lookupTickets.length === 0 && !lookupLoading && lookupEmail.trim() && (
-                  <p className="text-xs text-slate-400 text-center">No tickets found for this email.</p>
+                  <p className="text-xs text-slate-400 text-center">{t('widget.no_tickets_email', 'No tickets found for this email.')}</p>
                 )}
-                <button onClick={() => setView('form')} className="w-full text-center text-xs text-indigo-600 hover:underline">Start a new conversation</button>
+                <button onClick={() => setView('form')} className="w-full text-center text-xs text-indigo-600 hover:underline">{t('widget.start_new', 'Start a new conversation')}</button>
               </div>
             )}
           </div>
 
-          {/* ─── REPLY INPUT (conversation view only) ─── */}
+          {/* ─── REPLY INPUT (authenticated conversation) ─── */}
           {view === 'conversation' && activeTicket && activeTicket.status !== 'resolved' && (
             <div className="border-t border-slate-200 p-3">
-              {attachmentFile && !isRecording && (
+              {authRecorder.isRecording && (
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600">
+                  <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  {t('widget.recording', 'Recording...')} {authRecorder.formatDuration(authRecorder.duration)}
+                  <button onClick={authRecorder.stop} className="ml-auto flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-white hover:bg-red-600">
+                    <FaStopCircle size={10} /> {t('widget.stop', 'Stop')}
+                  </button>
+                </div>
+              )}
+              {attachmentFile && !authRecorder.isRecording && (
                 <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
                   <FaPaperclip size={10} /> {attachmentFile.name}
                   <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={10} /></button>
                 </div>
               )}
-              {isRecording && (
-                <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600">
-                  <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                  Recording... {formatDuration(recordingDuration)}
-                  <button onClick={stopRecording} className="ml-auto flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-white hover:bg-red-600">
-                    <FaStopCircle size={10} /> Stop
-                  </button>
-                </div>
-              )}
               <div className="flex items-end gap-2">
                 <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 shrink-0">
                   <FaPaperclip size={12} />
-                  <input type="file" className="hidden" onChange={(e) => setAttachmentFile(e.target.files[0])} />
+                  <input type="file" className="hidden" onChange={(e) => {
+                    const f = e.target.files[0];
+                    const err = validateFile(f);
+                    if (err) { setError(err); return; }
+                    setAttachmentFile(f);
+                  }} />
                 </label>
-                {isRecording ? (
+                {authRecorder.isRecording ? (
                   <div className="flex-1" />
                 ) : (
                   <textarea value={replyText} onChange={(e) => { setReplyText(e.target.value); emitTyping(); }}
-                    placeholder="Type your message..." rows={1}
+                    placeholder={t('widget.type_message', 'Type your message...')} rows={1}
                     className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }} />
                 )}
-                {isRecording ? (
-                  <button onClick={stopRecording}
+                {authRecorder.isRecording ? (
+                  <button onClick={authRecorder.stop}
                     className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0">
                     <FaStopCircle size={14} />
                   </button>
                 ) : (
-                  <button onClick={startRecording}
+                  <button onClick={async () => {
+                    try { await authRecorder.start(); }
+                    catch (err) { setError(err.message); }
+                  }}
                     className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 shrink-0"
-                    title="Record voice message">
+                    title={t('widget.record_voice', 'Record voice message')}>
                     <FaMicrophone size={12} />
                   </button>
                 )}
-                <button onClick={handleSendReply} disabled={(!replyText.trim() && !attachmentFile) || sendingReply}
+                <button onClick={handleSendReply} disabled={(!replyText.trim() && !attachmentFile && !authRecorder.recordedFile) || sendingReply}
                   className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
                   {sendingReply ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={12} />}
                 </button>
