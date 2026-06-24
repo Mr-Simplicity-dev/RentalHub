@@ -46,6 +46,19 @@ const ensureSupportSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_support_tickets_status_priority
       ON support_tickets(status, priority, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS support_ticket_replies (
+      id SERIAL PRIMARY KEY,
+      ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      author_name VARCHAR(255),
+      message TEXT NOT NULL,
+      is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_support_ticket_replies_ticket
+      ON support_ticket_replies(ticket_id, created_at ASC);
   `);
 
   supportSchemaReady = true;
@@ -458,6 +471,112 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
       success: false,
       message: 'Failed to resolve support ticket',
     });
+  }
+});
+
+// ─── Conversation / Reply endpoints ────────────────────────────────────────
+
+// GET /support/tickets/:id/conversation — fetch all replies for a ticket
+router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    // Check access: ticket owner or support admin
+    const role = String(req.user.user_type || '').toLowerCase();
+    const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
+
+    if (!isSupportAdmin) {
+      const ownerCheck = await db.query(
+        'SELECT id FROM support_tickets WHERE id = $1 AND user_id = $2',
+        [ticketId, req.user.id]
+      );
+      if (!ownerCheck.rows.length) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
+
+    const result = await db.query(
+      `SELECT str.id, str.ticket_id, str.user_id, str.author_name, str.message,
+              str.is_admin, str.created_at,
+              u.email AS user_email
+       FROM support_ticket_replies str
+       LEFT JOIN users u ON u.id = str.user_id
+       WHERE str.ticket_id = $1
+       ORDER BY str.created_at ASC, str.id ASC`,
+      [ticketId]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get conversation error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch conversation' });
+  }
+});
+
+// POST /support/tickets/:id/reply — add a reply to a ticket
+router.post('/tickets/:id/reply', authenticate, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message is required' });
+    }
+
+    // Fetch ticket to verify access
+    const ticketResult = await db.query(
+      'SELECT id, subject, user_id, status FROM support_tickets WHERE id = $1',
+      [ticketId]
+    );
+    if (!ticketResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    const ticket = ticketResult.rows[0];
+    const role = String(req.user.user_type || '').toLowerCase();
+    const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
+    const isOwner = ticket.user_id === req.user.id;
+
+    if (!isSupportAdmin && !isOwner) {
+      return res.status(403).json({ success: false, message: 'You cannot reply to this ticket' });
+    }
+
+    // Insert reply
+    const result = await db.query(
+      `INSERT INTO support_ticket_replies (ticket_id, user_id, author_name, message, is_admin)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [
+        ticketId,
+        req.user.id,
+        isSupportAdmin ? (req.user.full_name || 'Support Team') : (req.user.full_name || req.user.email),
+        message.trim(),
+        isSupportAdmin,
+      ]
+    );
+
+    // If ticket was resolved, re-open it on new reply
+    if (ticket.status === 'resolved') {
+      await db.query(
+        `UPDATE support_tickets SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [ticketId]
+      );
+    }
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Reply error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send reply' });
   }
 });
 

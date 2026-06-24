@@ -16,6 +16,7 @@ import {
   FaMoneyBill,
   FaRandom,
   FaRegStar,
+  FaPaperPlane,
   FaSyncAlt,
   FaTimesCircle,
   FaUserShield,
@@ -80,7 +81,23 @@ const SuperSupportAdminDashboard = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
+  const [conversation, setConversation] = useState([]);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [loadingConversation, setLoadingConversation] = useState(false);
   const isModalOpen = showModal;
+
+  const loadConversation = useCallback(async (ticketId) => {
+    setLoadingConversation(true);
+    try {
+      const res = await api.get(`/support/tickets/${ticketId}/conversation`);
+      setConversation(res.data?.data || []);
+    } catch {
+      setConversation([]);
+    } finally {
+      setLoadingConversation(false);
+    }
+  }, []);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -101,12 +118,18 @@ const SuperSupportAdminDashboard = () => {
     setModalType(type);
     setSelectedItem(item);
     setShowModal(true);
+    setReplyText('');
+    if (type === 'view-ticket' && item) {
+      loadConversation(item.id);
+    }
   };
 
   const closeModal = () => {
     setShowModal(false);
     setModalType('');
     setSelectedItem(null);
+    setConversation([]);
+    setReplyText('');
   };
 
   const queueStats = useMemo(() => {
@@ -232,6 +255,21 @@ const SuperSupportAdminDashboard = () => {
       loadDashboardData();
     } catch (error) {
       toast.error('Action failed');
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!replyText.trim() || !selectedItem) return;
+    setSendingReply(true);
+    try {
+      const res = await api.post(`/support/tickets/${selectedItem.id}/reply`, { message: replyText.trim() });
+      setConversation((prev) => [...prev, res.data.data]);
+      setReplyText('');
+      loadDashboardData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send reply');
+    } finally {
+      setSendingReply(false);
     }
   };
 
@@ -1482,14 +1520,14 @@ const SuperSupportAdminDashboard = () => {
                     <p className="text-sm text-slate-900">{selectedItem.subject}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-500">Description</p>
-                    <p className="text-sm text-slate-900">{selectedItem.description}</p>
+                    <p className="text-xs font-medium text-slate-500">Location</p>
+                    <p className="text-sm text-slate-900">{selectedItem.state}{selectedItem.lga ? ` / ${selectedItem.lga}` : ''}</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div>
                       <p className="text-xs font-medium text-slate-500">Priority</p>
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        selectedItem.priority === 'high' || selectedItem.priority === 'urgent' 
+                        selectedItem.priority === 'high' || selectedItem.priority === 'urgent'
                           ? 'bg-red-100 text-red-800'
                           : selectedItem.priority === 'medium'
                           ? 'bg-amber-100 text-amber-800'
@@ -1512,6 +1550,63 @@ const SuperSupportAdminDashboard = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Conversation thread */}
+                <div className="mt-6 max-h-80 space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  {/* Original message */}
+                  <div className="rounded-lg bg-white p-3 shadow-sm">
+                    <p className="text-xs text-slate-400">
+                      {selectedItem.user_name || selectedItem.user_email || 'Anonymous'} &middot; {new Date(selectedItem.created_at).toLocaleString()}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{selectedItem.description}</p>
+                  </div>
+
+                  {loadingConversation ? (
+                    <div className="py-4 text-center text-sm text-slate-400">Loading messages...</div>
+                  ) : conversation.length === 0 ? (
+                    <div className="py-4 text-center text-sm text-slate-400">No replies yet.</div>
+                  ) : (
+                    conversation.map((reply) => (
+                      <div key={reply.id} className={`rounded-lg p-3 shadow-sm ${reply.is_admin ? 'ml-4 border-l-4 border-indigo-400 bg-indigo-50' : 'bg-white'}`}>
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                          <span className={reply.is_admin ? 'font-medium text-indigo-600' : ''}>
+                            {reply.author_name || reply.user_email || 'User'}
+                          </span>
+                          {reply.is_admin && <span className="rounded bg-indigo-200 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">Support</span>}
+                          <span>&middot; {new Date(reply.created_at).toLocaleString()}</span>
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{reply.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Reply form */}
+                <div className="mt-4">
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="Type your reply..."
+                      rows={2}
+                      className="flex-1 resize-none rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendReply();
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={handleSendReply}
+                      disabled={!replyText.trim() || sendingReply}
+                      className="flex h-[42px] w-[42px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40"
+                    >
+                      {sendingReply ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={14} />}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="mt-6 flex justify-end gap-3">
                   <button
                     onClick={closeModal}
@@ -1530,17 +1625,6 @@ const SuperSupportAdminDashboard = () => {
                       >
                         Mark as Resolved
                       </button>
-                      {selectedItem.priority !== 'urgent' && (
-                        <button
-                          onClick={() => {
-                            handleQuickAction('escalate', selectedItem);
-                            closeModal();
-                          }}
-                          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                        >
-                          Escalate
-                        </button>
-                      )}
                     </>
                   )}
                 </div>
