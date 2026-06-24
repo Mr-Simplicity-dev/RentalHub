@@ -816,19 +816,19 @@ const FloatingContactWidget = () => {
                 {lookupTickets.length > 0 && (
                   <div className="space-y-2 mt-3">
                     <p className="text-xs font-semibold text-slate-500 uppercase">{t('widget.your_tickets', 'Your tickets')}</p>
-                    {lookupTickets.map((t) => (
-                      <div key={t.id}>
-                        <button onClick={() => viewContactConversation(t)}
+                    {lookupTickets.map((ticket) => (
+                      <div key={ticket.id}>
+                        <button onClick={() => viewContactConversation(ticket)}
                           className="w-full text-left rounded-xl border border-slate-200 p-3 hover:border-indigo-300 transition">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-slate-900 truncate">{t.subject}</p>
+                            <p className="text-sm font-medium text-slate-900 truncate">{ticket.subject}</p>
                             <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                              t.status === 'resolved' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                            }`}>{t.status}</span>
+                              ticket.status === 'resolved' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                            }`}>{ticket.status}</span>
                           </div>
-                          <p className="mt-0.5 text-[11px] text-slate-400">{new Date(t.created_at).toLocaleDateString()}</p>
+                          <p className="mt-0.5 text-[11px] text-slate-400">{new Date(ticket.created_at).toLocaleDateString()}</p>
                         </button>
-                        {viewingContactTicket?.id === t.id && (
+                        {viewingContactTicket?.id === ticket.id && (
                           <div className="mt-2 space-y-2 pl-2 border-l-2 border-indigo-300">
                             {contactConv.length === 0 ? <p className="text-xs text-slate-400">{t('widget.no_replies', 'No replies yet.')}</p> : (
                               contactConv.map((r) => (
