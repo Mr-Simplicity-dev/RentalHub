@@ -469,7 +469,7 @@ const Dashboard = () => {
     }
 
     if (user.user_type === 'lga_support_admin') {
-      navigate('/admin?tab=property_requests', { replace: true });
+      navigate('/admin/lga-support-dashboard', { replace: true });
       return;
     }
 

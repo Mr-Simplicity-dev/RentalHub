@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaArrowDown, FaArrowUp, FaCheckCircle, FaSyncAlt, FaTimesCircle, FaReply, FaPaperPlane, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaEdit, FaTrash, FaCheck, FaTimes, FaCommentDots, FaUserCheck } from 'react-icons/fa';
+import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import InputDialog from '../../components/common/InputDialog';
 import ApprovalTimeline from '../../components/common/ApprovalTimeline';
@@ -33,6 +34,7 @@ const resolveCurrentStep = (row) => {
 const StateSupportAdminDashboard = () => {
   const { user } = useAuth();
   const { socket } = useSocket();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [stage, setStage] = useState('all');
   const [queue, setQueue] = useState([]);
@@ -54,6 +56,18 @@ const StateSupportAdminDashboard = () => {
   const typingTimer = useRef(null);
   const [chatTab, setChatTab] = useState('user');
   const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
+  const activeTab = useMemo(() => {
+    const tab = new URLSearchParams(location.search).get('tab') || 'overview';
+    return ['overview', 'queue', 'property_requests', 'tenancy', 'tickets'].includes(tab) ? tab : 'overview';
+  }, [location.search]);
+
+  const workspaceTabs = [
+    { key: 'overview', label: 'Overview', to: '/admin/state-support-dashboard?tab=overview' },
+    { key: 'queue', label: 'Migration Queue', to: '/admin/state-support-dashboard?tab=queue' },
+    { key: 'property_requests', label: 'Property Requests', to: '/admin/state-support-dashboard?tab=property_requests' },
+    { key: 'tenancy', label: 'Tenancy Actions', to: '/admin/state-support-dashboard?tab=tenancy' },
+    { key: 'tickets', label: 'Support Tickets', to: '/admin/state-support-dashboard?tab=tickets' },
+  ];
 
   const fetchUnreadInternalNotes = useCallback(async () => {
     try {
@@ -303,27 +317,13 @@ const StateSupportAdminDashboard = () => {
             <p className="mt-1 text-gray-600">
               Outgoing and incoming migration decisions for {user?.assigned_state || 'your assigned state'}.
             </p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setStage('all')}
-                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                All Queue
-              </button>
-              <button
-                type="button"
-                onClick={() => setStage('incoming')}
-                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Incoming Reviews
-              </button>
+            <div className="mt-4">
               <button
                 type="button"
                 onClick={loadQueue}
                 className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
               >
-                Refresh Queue
+                Refresh Workspace
               </button>
             </div>
             <div className="mx-auto mt-4 max-w-4xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left">
@@ -344,7 +344,23 @@ const StateSupportAdminDashboard = () => {
         </div>
       </section>
 
-      {(stats.incomingPending > 0 || stats.outgoingPending > 0) && (
+      <nav className="flex gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+        {workspaceTabs.map((tab) => (
+          <Link
+            key={tab.key}
+            to={tab.to}
+            className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === tab.key
+                ? 'bg-indigo-600 text-white'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            }`}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </nav>
+
+      {activeTab === 'overview' && (stats.incomingPending > 0 || stats.outgoingPending > 0) && (
         <section className="rounded-xl border-l-4 border-red-500 bg-red-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -355,17 +371,19 @@ const StateSupportAdminDashboard = () => {
                 Review pending outgoing and incoming stages to avoid escalation delays.
               </p>
             </div>
-            <button
-              type="button"
+            <Link
+              to="/admin/state-support-dashboard?tab=queue"
               onClick={() => setStage('incoming')}
               className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
             >
               Review Pending
-            </button>
+            </Link>
           </div>
         </section>
       )}
 
+      {activeTab === 'overview' && (
+      <>
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <article className="rounded-xl bg-white p-5 shadow">
           <p className="text-xs uppercase tracking-wide text-gray-500">Visible Requests</p>
@@ -385,16 +403,37 @@ const StateSupportAdminDashboard = () => {
       <div className="mb-6">
         <CommissionWithdrawalBanner />
       </div>
+      <div className="grid gap-3 md:grid-cols-4">
+        <Link to="/admin/state-support-dashboard?tab=queue" className="rounded-lg border border-gray-200 bg-white p-4 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
+          Review migration queue
+        </Link>
+        <Link to="/admin/state-support-dashboard?tab=property_requests" className="rounded-lg border border-gray-200 bg-white p-4 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
+          Review property requests
+        </Link>
+        <Link to="/admin/state-support-dashboard?tab=tenancy" className="rounded-lg border border-gray-200 bg-white p-4 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
+          Handle tenancy actions
+        </Link>
+        <Link to="/admin/state-support-dashboard?tab=tickets" className="rounded-lg border border-gray-200 bg-white p-4 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
+          Open support inbox
+        </Link>
+      </div>
+      </>
+      )}
 
+      {activeTab === 'property_requests' && (
       <div className="state-support-property-requests-section">
         <PropertyRequestWorkflowPanel
           mode="support"
           title="Tenant Property Requests in Your State"
         />
       </div>
+      )}
 
+      {activeTab === 'tenancy' && (
       <TenancyWorkflowPanel title="State Support Tenancy Grace and Refund Enablement" />
+      )}
 
+      {activeTab === 'queue' && (
       <section className="state-support-migration-section rounded-xl bg-white p-5 shadow">
         <div className="mb-4 flex items-center gap-3">
           <button
@@ -499,8 +538,10 @@ const StateSupportAdminDashboard = () => {
           </div>
         )}
       </section>
+      )}
 
       {/* Support Tickets Section */}
+      {activeTab === 'tickets' && (
       <section className="rounded-xl bg-white p-5 shadow">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -571,6 +612,7 @@ const StateSupportAdminDashboard = () => {
           </div>
         )}
       </section>
+      )}
 
       {/* Ticket Conversation Modal */}
       {selectedTicket && (

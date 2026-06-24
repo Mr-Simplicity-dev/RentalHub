@@ -254,7 +254,7 @@ const SuperSupportAdminDashboard = () => {
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'alerts', 'reports', 'settings'];
+    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'alerts', 'reports'];
     if (tab && allowedTabs.includes(tab)) {
       setActiveTab(tab);
       return;

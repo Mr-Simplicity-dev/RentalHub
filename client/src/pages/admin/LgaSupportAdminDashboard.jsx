@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { FaCheckCircle, FaHeadset, FaHome, FaReply, FaSyncAlt, FaTimesCircle, FaUserCheck, FaArrowUp, FaPaperPlane, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaEdit, FaTrash, FaCheck, FaTimes, FaCommentDots } from 'react-icons/fa';
+import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
@@ -84,6 +85,7 @@ const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
 const LgaSupportAdminDashboard = () => {
   const { user } = useAuth();
   const { socket } = useSocket();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({ tickets: [] });
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -96,6 +98,17 @@ const LgaSupportAdminDashboard = () => {
   const typingTimer = useRef(null);
   const [chatTab, setChatTab] = useState('user');
   const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
+  const activeTab = useMemo(() => {
+    const tab = new URLSearchParams(location.search).get('tab') || 'overview';
+    return ['overview', 'property_requests', 'tenancy', 'tickets'].includes(tab) ? tab : 'overview';
+  }, [location.search]);
+
+  const workspaceTabs = [
+    { key: 'overview', label: 'Overview', to: '/admin/lga-support-dashboard?tab=overview' },
+    { key: 'property_requests', label: 'Property Requests', to: '/admin/lga-support-dashboard?tab=property_requests' },
+    { key: 'tenancy', label: 'Tenancy Actions', to: '/admin/lga-support-dashboard?tab=tenancy' },
+    { key: 'tickets', label: 'Support Tickets', to: '/admin/lga-support-dashboard?tab=tickets' },
+  ];
 
   // Fetch unread internal notes count
   const fetchUnreadInternalNotes = useCallback(async () => {
@@ -387,6 +400,23 @@ const LgaSupportAdminDashboard = () => {
           </div>
         </div>
 
+        <nav className="flex gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+          {workspaceTabs.map((tab) => (
+            <Link
+              key={tab.key}
+              to={tab.to}
+              className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-admin-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </nav>
+
+        {activeTab === 'overview' && (
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -406,15 +436,32 @@ const LgaSupportAdminDashboard = () => {
               <p className="mt-1 text-2xl font-bold text-gray-800">{ticketStats.unassigned}</p>
             </div>
           </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <Link to="/admin/lga-support-dashboard?tab=property_requests" className="rounded-lg border border-gray-200 p-4 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+              Review property requests
+            </Link>
+            <Link to="/admin/lga-support-dashboard?tab=tenancy" className="rounded-lg border border-gray-200 p-4 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+              Handle tenancy actions
+            </Link>
+            <Link to="/admin/lga-support-dashboard?tab=tickets" className="rounded-lg border border-gray-200 p-4 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+              Open support inbox
+            </Link>
+          </div>
         </div>
+        )}
 
+        {activeTab === 'property_requests' && (
         <div className="lga-support-property-requests-section">
           <PropertyRequestWorkflowPanel mode="support" title="Property Requests in Your LGA" />
         </div>
+        )}
+        {activeTab === 'tenancy' && (
         <div className="lga-support-tenancy-section">
           <TenancyWorkflowPanel title="LGA Support Tenancy Grace and Refund Enablement" />
         </div>
+        )}
 
+        {activeTab === 'tickets' && (
         <div className="lga-support-tickets-section rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -477,6 +524,7 @@ const LgaSupportAdminDashboard = () => {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {conversationModal}
