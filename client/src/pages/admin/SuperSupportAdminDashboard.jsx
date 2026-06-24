@@ -451,9 +451,23 @@ const SuperSupportAdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-100/40 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-admin-50 via-white to-admin-100/40 p-4 sm:p-6">
       <div className="mx-auto max-w-7xl">
         <div className="space-y-6">
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-bold text-gray-900">Super Support Dashboard</h1>
+        <p className="mt-1 text-gray-600">
+          Operational overview for queue approvals, ticket resolution, and system alert monitoring.
+        </p>
+        <div className="mt-4">
+          <button
+            onClick={loadDashboardData}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <FaSyncAlt size={14} /> Refresh
+          </button>
+        </div>
+      </div>
 
       {/* Commission Withdrawal Banner */}
       <CommissionWithdrawalBanner />
@@ -498,9 +512,9 @@ const SuperSupportAdminDashboard = () => {
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Super Support Dashboard</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Overview</h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  Operational overview for queue approvals, ticket resolution, and system alert monitoring.
+                  Queue approvals, ticket resolution, and system alert monitoring.
                 </p>
               </div>
               <button

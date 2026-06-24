@@ -374,24 +374,24 @@ const LgaSupportAdminDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-amber-100/40 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-admin-50 via-white to-admin-100/40 p-4 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="rounded-xl border border-amber-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">LGA Support Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Manage property requests, tenancy operations, and support tickets for{' '}
-                <span className="font-semibold text-amber-700">{user?.assigned_city || user?.assigned_state || 'your LGA'}</span>.
-              </p>
-            </div>
-            <button onClick={loadDashboard} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><FaSyncAlt /> Refresh</button>
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900">LGA Support Dashboard</h1>
+          <p className="mt-1 text-gray-600">
+            Manage property requests, tenancy operations, and support tickets for{' '}
+            <span className="font-semibold text-admin-700">{user?.assigned_city || user?.assigned_state || 'your LGA'}</span>.
+          </p>
+          <div className="mt-4">
+            <button onClick={loadDashboard} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><FaSyncAlt /> Refresh</button>
           </div>
+        </div>
 
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <p className="text-xs font-medium text-amber-700">Open Tickets</p>
-              <p className="mt-1 text-2xl font-bold text-amber-800">{ticketStats.open}</p>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs font-medium text-gray-600">Open Tickets</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">{ticketStats.open}</p>
             </div>
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
               <p className="text-xs font-medium text-blue-700">In Progress</p>
@@ -415,10 +415,10 @@ const LgaSupportAdminDashboard = () => {
           <TenancyWorkflowPanel title="LGA Support Tenancy Grace and Refund Enablement" />
         </div>
 
-        <div className="lga-support-tickets-section rounded-xl border border-amber-200 bg-white p-6 shadow-sm">
+        <div className="lga-support-tickets-section rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-amber-50 p-2.5 text-amber-600"><FaHeadset className="text-lg" /></div>
+              <div className="rounded-lg bg-admin-50 p-2.5 text-admin-600"><FaHeadset className="text-lg" /></div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Support Tickets</h2>
                 <p className="text-sm text-gray-500">All tickets in your LGA — view, reply, assign, or escalate.</p>
