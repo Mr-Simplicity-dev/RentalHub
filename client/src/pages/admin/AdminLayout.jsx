@@ -1132,6 +1132,7 @@ const AdminLayout = () => {
         </main>
       </div>
 
+    <FloatingContactWidget />
     </div>
   );
 };
