@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import RoleBadge from '../../components/common/RoleBadge';
 import FloatingContactWidget from '../../components/common/FloatingContactWidget';
+import { useTranslation } from 'react-i18next';
 import {
   FaTachometerAlt,
   FaUsers,
@@ -33,6 +34,8 @@ import {
   FaChevronDown,
   FaBars,
   FaTimes,
+  FaBell,
+  FaIdCard,
 } from 'react-icons/fa';
 
 const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = 'smooth') => {
@@ -57,6 +60,7 @@ const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = '
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const role = (user?.user_type || '').trim().toLowerCase();
@@ -114,6 +118,12 @@ const AdminLayout = () => {
   const profileMenuRef = useRef(null);
   const mainContentRef = useRef(null);
   const previousRouteRef = useRef('');
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notifUnreadCount, setNotifUnreadCount] = useState(0);
+  const [notifUnreadMessages, setNotifUnreadMessages] = useState(0);
+  const [selectedNotification, setSelectedNotification] = useState(null);
+  const notifRef = useRef(null);
 
   useEffect(() => {
     setMobileSidebarOpen(false);
@@ -217,6 +227,60 @@ const AdminLayout = () => {
     isStateFinancialAdmin,
     user?.id,
   ]);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await api.get('/notifications', { params: { limit: 10 } });
+      if (res.data?.success) setNotifications(res.data.data || []);
+    } catch {}
+    try {
+      const countRes = await api.get('/notifications/unread/count');
+      if (countRes.data?.success) setNotifUnreadCount(Number(countRes.data?.data?.unread_count || 0));
+    } catch {}
+  }, [user?.id]);
+
+  const fetchUnreadMessages = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const unreadRes = await api.get('/messages/unread/count');
+      setNotifUnreadMessages(Number(unreadRes.data?.data?.unread_count || 0));
+    } catch {}
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchNotifications();
+    fetchUnreadMessages();
+    const intervalId = setInterval(() => {
+      fetchNotifications();
+      fetchUnreadMessages();
+    }, 30000);
+    return () => clearInterval(intervalId);
+  }, [fetchNotifications, fetchUnreadMessages]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifications(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const markNotifAsRead = async (notifId) => {
+    try {
+      await api.patch(`/notifications/${notifId}/read`);
+      setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, is_read: true } : n)));
+      setNotifUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {}
+  };
+
+  const markAllNotifsAsRead = async () => {
+    try {
+      await api.patch('/notifications/read-all');
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setNotifUnreadCount(0);
+    } catch {}
+  };
 
   const badgePill = (count, tone = 'red') => {
     if (!count || count < 1) return null;
@@ -1036,6 +1100,33 @@ const AdminLayout = () => {
             <p className="mt-0.5 truncate text-xs text-gray-500">
               {assignedLgaLabel || assignedStateLabel || 'Platform dashboard'}
             </p>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Link
+              to="/messages"
+              className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 shrink-0"
+            >
+              <FaEnvelope className="text-lg" />
+              {notifUnreadMessages > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                  {notifUnreadMessages > 99 ? '99+' : notifUnreadMessages}
+                </span>
+              )}
+            </Link>
+
+            <div className="relative shrink-0" ref={notifRef}>
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
+                aria-label={t('header.notifications')}
+              >
+                <FaBell className="text-lg" />
+                {notifUnreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="relative shrink-0" ref={profileMenuRef}>

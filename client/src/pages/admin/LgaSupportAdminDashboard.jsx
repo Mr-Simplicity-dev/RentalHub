@@ -421,7 +421,7 @@ const LgaSupportAdminDashboard = () => {
               <div className="rounded-lg bg-admin-50 p-2.5 text-admin-600"><FaHeadset className="text-lg" /></div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Support Tickets</h2>
-                <p className="text-sm text-gray-500">All tickets in your LGA — view, reply, assign, or escalate.</p>
+                <p className="text-sm text-gray-500">All support tickets - view, reply, assign, or escalate.</p>
               </div>
             </div>
           </div>
