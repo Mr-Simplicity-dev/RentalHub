@@ -66,6 +66,12 @@ const recruitmentInterviewLimiter = buildLimiter({
   message: 'Too many recruitment interview requests. Please slow down.',
 });
 
+const contactFormLimiter = buildLimiter({
+  windowMs: Number(process.env.CONTACT_FORM_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.CONTACT_FORM_MAX) || 5,
+  message: 'Too many contact form submissions. Please wait 15 minutes and try again.',
+});
+
 module.exports = {
   authSensitiveLimiter,
   paymentOpsLimiter,
@@ -76,4 +82,5 @@ module.exports = {
   recruitmentApplyLimiter,
   recruitmentPaymentLimiter,
   recruitmentInterviewLimiter,
+  contactFormLimiter,
 };

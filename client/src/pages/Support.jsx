@@ -1,8 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { toast } from 'react-toastify';
-import { FaTicketAlt, FaPaperPlane, FaClock, FaCheckCircle, FaExclamationCircle, FaBug, FaLightbulb, FaQuestionCircle, FaSpinner } from 'react-icons/fa';
+import { FaTicketAlt, FaPaperPlane, FaClock, FaCheckCircle, FaExclamationCircle, FaBug, FaLightbulb, FaQuestionCircle, FaSpinner, FaChevronDown, FaChevronUp, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
+import { useSocket } from '../hooks/useSocket';
+
+const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(reply.message);
+
+  const handleSaveEdit = async () => {
+    if (!editText.trim()) return;
+    try {
+      const res = await api.patch(`/support/tickets/${ticketId}/reply/${reply.id}`, { message: editText.trim() });
+      onEdit(reply.id, res.data.data);
+      setEditing(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to edit');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this message?')) return;
+    try {
+      await api.delete(`/support/tickets/${ticketId}/reply/${reply.id}`);
+      onDelete(reply.id);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete');
+    }
+  };
+
+  return (
+    <div className={`rounded-lg p-4 ${reply.is_admin ? 'ml-6 border-l-4 border-primary-300 bg-primary-50' : 'bg-gray-50'}`}>
+      <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
+        <div className="flex items-center gap-2">
+          {reply.is_admin ? <FaShieldAlt size={10} className="text-primary-600" /> : <FaUser size={10} />}
+          <span className={reply.is_admin ? 'font-medium text-primary-700' : ''}>
+            {reply.author_name || reply.user_email || 'User'}
+          </span>
+          {reply.is_admin && <span className="rounded bg-primary-200 px-1.5 py-0.5 text-[10px] font-medium text-primary-800">Support</span>}
+          <span>&middot; {new Date(reply.created_at).toLocaleString()}</span>
+          {reply.edited_at && <span className="italic">(edited)</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {reply.read_at && reply.is_admin && (
+            <span className="flex items-center gap-1 text-[10px] text-green-600"><FaCheck size={8} /> Read {new Date(reply.read_at).toLocaleString()}</span>
+          )}
+          {isOwn && (
+            <>
+              {!editing && <button onClick={() => setEditing(true)} className="text-gray-400 hover:text-gray-600"><FaEdit size={11} /></button>}
+              <button onClick={handleDelete} className="text-gray-400 hover:text-red-500"><FaTrash size={11} /></button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="mt-2 flex items-end gap-2">
+          <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={2} className="flex-1 resize-none rounded-lg border border-gray-300 p-2 text-sm outline-none focus:border-primary-400" />
+          <button onClick={handleSaveEdit} className="flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-green-600 text-white hover:bg-green-700"><FaCheck size={12} /></button>
+          <button onClick={() => { setEditing(false); setEditText(reply.message); }} className="flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400"><FaTimes size={12} /></button>
+        </div>
+      ) : (
+        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{reply.message}</p>
+      )}
+
+      {reply.attachment_url && (
+        <a href={reply.attachment_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
+          <FaFile size={12} /> {reply.attachment_name || 'Attachment'}
+        </a>
+      )}
+    </div>
+  );
+};
 
 const priorityOptions = [
   { value: 'low', label: 'Low', color: 'bg-gray-100 text-gray-600' },
@@ -26,11 +96,83 @@ const statusBadge = (status) => {
 };
 
 const Support = () => {
+  const { socket } = useSocket();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [sendingReply, setSendingReply] = useState(false);
   const [form, setForm] = useState({ subject: '', description: '', priority: 'medium' });
   const [showForm, setShowForm] = useState(false);
+  const [expandedTicket, setExpandedTicket] = useState(null);
+  const [conversations, setConversations] = useState({});
+  const [replyTexts, setReplyTexts] = useState({});
+  const [loadingConv, setLoadingConv] = useState({});
+  const [typingUsers, setTypingUsers] = useState({});
+  const [attachmentFiles, setAttachmentFiles] = useState({});
+  const [conversationMeta, setConversationMeta] = useState({});
+  const typingTimers = useRef({});
+
+  const loadConversation = useCallback(async (ticketId) => {
+    setLoadingConv((prev) => ({ ...prev, [ticketId]: true }));
+    try {
+      const offset = conversations[ticketId]?.length || 0;
+      const res = await api.get(`/support/tickets/${ticketId}/conversation?limit=100&offset=${offset}`);
+      setConversations((prev) => ({ ...prev, [ticketId]: res.data?.data || [] }));
+      setConversationMeta((prev) => ({ ...prev, [ticketId]: res.data?.meta }));
+    } catch {
+      setConversations((prev) => ({ ...prev, [ticketId]: [] }));
+    } finally {
+      setLoadingConv((prev) => ({ ...prev, [ticketId]: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (data) => {
+      const ticketId = data.ticketId;
+
+      // Reload conversation if this ticket is expanded
+      if (expandedTicket === ticketId) {
+        loadConversation(ticketId);
+      }
+
+      // If it's an admin reply and the ticket is not expanded, increment a local counter
+      // (visual hint)
+    };
+    socket.on('ticket:new_reply', handler);
+    return () => socket.off('ticket:new_reply', handler);
+  }, [socket, expandedTicket, loadConversation]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (data) => {
+      setTypingUsers((prev) => ({
+        ...prev,
+        [data.ticketId]: { userName: data.userName, isAdmin: data.isAdmin },
+      }));
+      clearTimeout(typingTimers.current[data.ticketId]);
+      typingTimers.current[data.ticketId] = setTimeout(() => {
+        setTypingUsers((prev) => {
+          const next = { ...prev };
+          delete next[data.ticketId];
+          return next;
+        });
+      }, 3000);
+    };
+    socket.on('ticket:typing', handler);
+    return () => socket.off('ticket:typing', handler);
+  }, [socket]);
+
+  const toggleExpand = (ticketId) => {
+    if (expandedTicket === ticketId) {
+      setExpandedTicket(null);
+      return;
+    }
+    setExpandedTicket(ticketId);
+    if (!conversations[ticketId]) {
+      loadConversation(ticketId);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -66,6 +208,51 @@ const Support = () => {
     }
   };
 
+  const handleSendReply = async (ticketId) => {
+    const msg = (replyTexts[ticketId] || '').trim();
+    const file = attachmentFiles[ticketId];
+    if (!msg && !file) return;
+    setSendingReply(true);
+    try {
+      const formData = new FormData();
+      if (msg) formData.append('message', msg);
+      if (file) formData.append('attachment', file);
+
+      const res = await api.post(`/support/tickets/${ticketId}/reply`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setConversations((prev) => ({
+        ...prev,
+        [ticketId]: [...(prev[ticketId] || []), res.data.data],
+      }));
+      setReplyTexts((prev) => ({ ...prev, [ticketId]: '' }));
+      setAttachmentFiles((prev) => { const n = { ...prev }; delete n[ticketId]; return n; });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send reply');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const emitTyping = (ticketId) => {
+    if (!socket) return;
+    socket.emit('ticket:typing', { ticketId });
+  };
+
+  const handleEditReply = (ticketId, replyId, updated) => {
+    setConversations((prev) => ({
+      ...prev,
+      [ticketId]: (prev[ticketId] || []).map((r) => r.id === replyId ? updated : r),
+    }));
+  };
+
+  const handleDeleteReply = (ticketId, replyId) => {
+    setConversations((prev) => ({
+      ...prev,
+      [ticketId]: (prev[ticketId] || []).filter((r) => r.id !== replyId),
+    }));
+  };
+
   if (loading) return <Loader />;
 
   return (
@@ -74,7 +261,7 @@ const Support = () => {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Help & Support</h1>
-            <p className="mt-2 text-sm text-gray-600">Submit a ticket and track your requests</p>
+            <p className="mt-2 text-sm text-gray-600">Submit a ticket, track requests, and chat with support</p>
           </div>
           <button
             onClick={() => setShowForm((p) => !p)}
@@ -88,57 +275,33 @@ const Support = () => {
           <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900">Create a new support ticket</h2>
             <p className="mt-1 text-sm text-gray-500">Describe your issue and our support team will get back to you.</p>
-
             <div className="mt-5 space-y-4">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Subject *</label>
-                <input
-                  value={form.subject}
-                  onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
-                  className="input w-full"
-                  placeholder="Brief summary of your issue"
-                  maxLength={255}
-                />
+                <input value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))} className="input w-full" placeholder="Brief summary of your issue" maxLength={255} />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-                  className="input w-full min-h-[120px]"
-                  placeholder="Provide as much detail as possible"
-                  rows={4}
-                />
+                <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} className="input w-full min-h-[120px]" placeholder="Provide as much detail as possible" rows={4} />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Priority</label>
                 <div className="flex flex-wrap gap-2">
                   {priorityOptions.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setForm((p) => ({ ...p, priority: opt.value }))}
-                      className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                        form.priority === opt.value
-                          ? 'ring-2 ring-primary-500 ring-offset-2 ' + opt.color
-                          : opt.color + ' hover:ring-1 hover:ring-gray-300'
-                      }`}
-                    >
+                    <button key={opt.value} type="button" onClick={() => setForm((p) => ({ ...p, priority: opt.value }))}
+                      className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${form.priority === opt.value ? 'ring-2 ring-primary-500 ring-offset-2 ' + opt.color : opt.color + ' hover:ring-1 hover:ring-gray-300'}`}>
                       {opt.label}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
-
             <div className="mt-6 flex items-center gap-3">
               <button type="submit" disabled={submitting} className="btn btn-primary inline-flex items-center gap-2">
                 {submitting ? <FaSpinner className="animate-spin" /> : <FaPaperPlane />}
                 {submitting ? 'Submitting...' : 'Submit Ticket'}
               </button>
-              <button type="button" onClick={() => setShowForm(false)} className="btn text-gray-600">
-                Cancel
-              </button>
+              <button type="button" onClick={() => setShowForm(false)} className="btn text-gray-600">Cancel</button>
             </div>
           </form>
         )}
@@ -147,42 +310,93 @@ const Support = () => {
           <div className="rounded-2xl bg-white p-12 text-center shadow-sm">
             <FaTicketAlt className="mx-auto text-5xl text-gray-300" />
             <h3 className="mt-4 text-xl font-semibold text-gray-900">No support tickets yet</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              Have an issue? Create a ticket and our team will help you out.
-            </p>
+            <p className="mt-2 text-sm text-gray-600">Have an issue? Create a ticket and our team will help you out.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {tickets.map((ticket) => (
-              <div key={ticket.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">{ticket.subject}</h3>
-                      {statusBadge(ticket.status)}
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        priorityOptions.find((o) => o.value === ticket.priority)?.color || 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {ticket.priority}
-                      </span>
+            {tickets.map((ticket) => {
+              const isExpanded = expandedTicket === ticket.id;
+              const conv = conversations[ticket.id] || [];
+              const convLoading = loadingConv[ticket.id];
+              const typing = typingUsers[ticket.id];
+
+              return (
+                <div key={ticket.id} className="rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md">
+                  <button onClick={() => toggleExpand(ticket.id)} className="flex w-full items-start justify-between gap-3 p-5 text-left">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-gray-900">{ticket.subject}</h3>
+                        {statusBadge(ticket.status)}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${priorityOptions.find((o) => o.value === ticket.priority)?.color || 'bg-gray-100 text-gray-600'}`}>{ticket.priority}</span>
+                        {ticket.unread_admin_replies > 0 && !isExpanded && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{ticket.unread_admin_replies} new</span>
+                        )}
+                      </div>
+                      {ticket.description && <p className="mt-2 text-sm text-gray-600 line-clamp-2">{ticket.description}</p>}
                     </div>
-                    {ticket.description && (
-                      <p className="mt-2 text-sm text-gray-600 line-clamp-2">{ticket.description}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-400">
-                  <span className="inline-flex items-center gap-1">
-                    <FaClock /> Created {new Date(ticket.created_at).toLocaleDateString()}
-                  </span>
-                  {ticket.resolved_at && (
-                    <span className="inline-flex items-center gap-1 text-emerald-500">
-                      <FaCheckCircle /> Resolved {new Date(ticket.resolved_at).toLocaleDateString()}
-                    </span>
+                    <div className="flex-shrink-0 text-gray-400">{isExpanded ? <FaChevronUp /> : <FaChevronDown />}</div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 px-5 pb-5">
+                      <div className="mt-4 rounded-lg bg-gray-50 p-4">
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <FaUser size={10} /> You <span>&middot; opened</span> <span>&middot; {new Date(ticket.created_at).toLocaleString()}</span>
+                          {ticket.state && <span>&middot; {ticket.state}{ticket.lga && ` / ${ticket.lga}`}</span>}
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{ticket.description}</p>
+                      </div>
+
+                      {convLoading ? (
+                        <div className="py-4 text-center text-sm text-gray-400">Loading messages...</div>
+                      ) : conv.length > 0 ? (
+                        <div className="mt-3 space-y-3">
+                          {conv.map((reply) => (
+                            <ChatMessage key={reply.id} reply={reply} isOwn={!reply.is_admin} ticketId={ticket.id}
+                              onEdit={(rid, updated) => handleEditReply(ticket.id, rid, updated)}
+                              onDelete={(rid) => handleDeleteReply(ticket.id, rid)} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-4 text-center text-sm text-gray-400">No replies yet. You can reply below.</div>
+                      )}
+
+                      {typing && (
+                        <div className="mt-2 text-xs italic text-gray-400">
+                          {typing.userName} is typing{typing.isAdmin ? ' (Support)' : ''}...
+                        </div>
+                      )}
+
+                      {ticket.status !== 'resolved' && ticket.status !== 'closed' && (
+                        <div className="mt-4 space-y-2">
+                          {attachmentFiles[ticket.id] && (
+                            <div className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600">
+                              <FaPaperclip size={12} /> {attachmentFiles[ticket.id].name}
+                              <button onClick={() => setAttachmentFiles((p) => { const n = { ...p }; delete n[ticket.id]; return n; })} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={12} /></button>
+                            </div>
+                          )}
+                          <div className="flex items-end gap-2">
+                            <label className="flex h-[42px] w-[42px] cursor-pointer items-center justify-center rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50">
+                              <FaPaperclip size={14} />
+                              <input type="file" className="hidden" onChange={(e) => setAttachmentFiles((p) => ({ ...p, [ticket.id]: e.target.files[0] }))} />
+                            </label>
+                            <textarea value={replyTexts[ticket.id] || ''}
+                              onChange={(e) => { setReplyTexts((prev) => ({ ...prev, [ticket.id]: e.target.value })); emitTyping(ticket.id); }}
+                              placeholder="Write a reply..." rows={2}
+                              className="flex-1 resize-none rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400"
+                              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(ticket.id); } }} />
+                            <button onClick={() => handleSendReply(ticket.id)} disabled={!((replyTexts[ticket.id] || '').trim()) && !attachmentFiles[ticket.id] || sendingReply}
+                              className="flex h-[42px] w-[42px] items-center justify-center rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40">
+                              {sendingReply ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={14} />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -191,31 +405,19 @@ const Support = () => {
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
               <FaQuestionCircle className="mt-0.5 text-primary-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">How to list a property</p>
-                <p className="mt-0.5 text-xs text-gray-500">Visit your dashboard and click "Add Property" to get started.</p>
-              </div>
+              <div><p className="text-sm font-medium text-gray-900">How to list a property</p><p className="mt-0.5 text-xs text-gray-500">Visit your dashboard and click "Add Property" to get started.</p></div>
             </div>
             <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
               <FaBug className="mt-0.5 text-primary-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">Report a bug</p>
-                <p className="mt-0.5 text-xs text-gray-500">Create a ticket with the bug details and our team will investigate.</p>
-              </div>
+              <div><p className="text-sm font-medium text-gray-900">Report a bug</p><p className="mt-0.5 text-xs text-gray-500">Create a ticket with the bug details and our team will investigate.</p></div>
             </div>
             <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
               <FaLightbulb className="mt-0.5 text-primary-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">Feature suggestions</p>
-                <p className="mt-0.5 text-xs text-gray-500">Share your ideas for improving the platform.</p>
-              </div>
+              <div><p className="text-sm font-medium text-gray-900">Feature suggestions</p><p className="mt-0.5 text-xs text-gray-500">Share your ideas for improving the platform.</p></div>
             </div>
             <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
               <FaExclamationCircle className="mt-0.5 text-primary-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">Account issues</p>
-                <p className="mt-0.5 text-xs text-gray-500">Facing login, verification or profile issues? Let us know.</p>
-              </div>
+              <div><p className="text-sm font-medium text-gray-900">Account issues</p><p className="mt-0.5 text-xs text-gray-500">Facing login, verification or profile issues? Let us know.</p></div>
             </div>
           </div>
         </div>
