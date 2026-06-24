@@ -39,14 +39,102 @@ const ensureSupportSchema = async () => {
 };
 
 const requireSupportAdmin = (req, res, next) => {
-  const role = String(req.user?.user_type || '').toLowerCase();
-  if (SUPPORT_ADMIN_ROLES.has(role)) return next();
 
-  return res.status(403).json({
-    success: false,
-    message: 'Support admin access required',
-  });
-};
+// Public contact form (no auth required)
+router.post('/contact', async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const { name, email, state, lga, subject, message } = req.body;
+
+    if (!name || !name.trim() || !email || !email.trim() || !state || !message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, email, state, and message are required',
+      });
+    }
+
+    const result = await db.query(
+      `INSERT INTO support_tickets (subject, description, priority, status, user_id)
+       VALUES ($1, $2, 'medium', 'open', NULL)
+       RETURNING id`,
+      [
+        subject?.trim() ? `[Contact] ${subject.trim()}` : `[Contact] ${name.trim()}`,
+        lga
+          ? `State: ${state}\nLGA: ${lga}\nFrom: ${name.trim()} <${email.trim()}>\n\n${message.trim()}`
+          : `State: ${state}\nFrom: ${name.trim()} <${email.trim()}>\n\n${message.trim()}`,
+      ]
+    );
+
+    const ticketId = result.rows[0].id;
+
+    // Auto-assign: LGA support → State support → Super support
+    try {
+      let assignedTo = null;
+
+      if (lga) {
+        const lgaResult = await db.query(
+          `SELECT id FROM users
+           WHERE user_type = 'lga_support_admin'
+             AND assigned_state = $1
+             AND assigned_city = $2
+             AND deleted_at IS NULL
+             AND account_suspended_at IS NULL
+           ORDER BY id ASC
+           LIMIT 1`,
+          [state, lga]
+        );
+        if (lgaResult.rows.length > 0) {
+          assignedTo = lgaResult.rows[0].id;
+        }
+      }
+
+      if (!assignedTo) {
+        const stateResult = await db.query(
+          `SELECT id FROM users
+           WHERE user_type = 'state_support_admin'
+             AND assigned_state = $1
+             AND deleted_at IS NULL
+             AND account_suspended_at IS NULL
+           ORDER BY id ASC
+           LIMIT 1`,
+          [state]
+        );
+        if (stateResult.rows.length > 0) {
+          assignedTo = stateResult.rows[0].id;
+        }
+      }
+
+      if (!assignedTo) {
+        const superResult = await db.query(
+          `SELECT id FROM users
+           WHERE user_type = 'super_support_admin'
+             AND deleted_at IS NULL
+             AND account_suspended_at IS NULL
+           ORDER BY id ASC
+           LIMIT 1`
+        );
+        if (superResult.rows.length > 0) {
+          assignedTo = superResult.rows[0].id;
+        }
+      }
+
+      if (assignedTo) {
+        await db.query(
+          `UPDATE support_tickets SET assigned_to = $1 WHERE id = $2`,
+          [assignedTo, ticketId]
+        );
+      }
+    } catch (assignErr) {
+      console.error('Ticket auto-assignment error (non-fatal):', assignErr);
+    }
+
+    res.status(201).json({ success: true, message: 'Message sent successfully' });
+  } catch (error) {
+    console.error('Contact form error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send message' });
+  }
+});
 
 router.post('/tickets', authenticate, async (req, res) => {
   try {

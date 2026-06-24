@@ -7,6 +7,7 @@ import AdSpace from '../components/common/AdSpace';
 import { FaSearch, FaHome, FaCheckCircle, FaShieldAlt, FaMobileAlt, FaTimes, FaArrowRight, FaMapMarkerAlt, FaWhatsapp } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
+import FloatingContactWidget from '../components/common/FloatingContactWidget';
 
 const HUBSPOT_LANG_MAP = {
   en: 'en',
@@ -513,6 +514,7 @@ const Home = () => {
           <path d="M16.001 2.002C8.27 2.002 2 8.272 2 16.003c0 2.803.733 5.539 2.122 7.958L2 30l6.2-2.063c2.338 1.276 4.973 1.95 7.801 1.95 7.73 0 14-6.27 14-14 0-7.731-6.27-14.001-14-14.001z" />
         </svg>
       </a>
+      <FloatingContactWidget />
     </div>
   );
 };
