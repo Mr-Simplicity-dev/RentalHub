@@ -188,6 +188,23 @@ const SuperSupportAdminDashboard = () => {
     };
   }, [dashboardData?.supportTickets]);
 
+  const displayedSupportTickets = useMemo(() => {
+    const search = String(filters.search || '').trim().toLowerCase();
+    return (dashboardData?.supportTickets || []).filter((ticket) => {
+      if (filters.priority && ticket.priority !== filters.priority) return false;
+      if (filters.status && ticket.status !== filters.status) return false;
+      if (!search) return true;
+
+      return (
+        String(ticket.id || '').includes(search) ||
+        String(ticket.subject || '').toLowerCase().includes(search) ||
+        String(ticket.description || '').toLowerCase().includes(search) ||
+        String(ticket.user_email || '').toLowerCase().includes(search) ||
+        String(ticket.user_name || '').toLowerCase().includes(search)
+      );
+    });
+  }, [dashboardData?.supportTickets, filters.priority, filters.search, filters.status]);
+
   // Load dashboard data
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
@@ -196,7 +213,7 @@ const SuperSupportAdminDashboard = () => {
       const [queueRes, auditRes, ticketsRes, alertsRes, metricsRes] = await Promise.all([
         api.get(`/state-migrations/support/queue?stage=all&status=${filters.status}`),
         api.get(`/state-migrations/support/audit?status=${filters.status}`),
-        api.get('/support/tickets?priority=high&status=open'),
+        api.get('/support/tickets'),
         api.get('/system/alerts'),
         api.get('/dashboard/metrics'),
       ]);
@@ -1102,14 +1119,14 @@ const SuperSupportAdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
-                  {dashboardData.supportTickets.length === 0 ? (
+                  {displayedSupportTickets.length === 0 ? (
                     <tr>
                       <td colSpan="6" className="px-4 py-8 text-center text-sm text-slate-500">
                         No support tickets found for the selected filters.
                       </td>
                     </tr>
                   ) : (
-                    dashboardData.supportTickets.map((ticket) => (
+                    displayedSupportTickets.map((ticket) => (
                       <tr key={ticket.id} className="hover:bg-slate-50">
                         <td className="whitespace-nowrap px-4 py-3">
                           <code className="text-sm font-medium text-slate-900">#{ticket.id}</code>
@@ -1179,10 +1196,10 @@ const SuperSupportAdminDashboard = () => {
             </div>
 
             {/* Pagination */}
-            {dashboardData.supportTickets.length > 0 && (
+            {displayedSupportTickets.length > 0 && (
               <div className="mt-4 flex items-center justify-between">
                 <p className="text-sm text-slate-600">
-                  Showing {dashboardData.supportTickets.length} tickets
+                  Showing {displayedSupportTickets.length} tickets
                 </p>
                 <div className="flex gap-2">
                   <button className="rounded-lg border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50">
