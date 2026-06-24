@@ -1210,8 +1210,121 @@ const AdminLayout = () => {
               {assignedLgaLabel || assignedStateLabel || user?.full_name || 'Administrator'}
             </p>
           </div>
+          <div className="flex items-center gap-1">
+            <Link
+              to="/messages"
+              className="relative p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 shrink-0"
+            >
+              <FaEnvelope className="text-base" />
+              {notifUnreadMessages > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white ring-2 ring-white">
+                  {notifUnreadMessages > 99 ? '99+' : notifUnreadMessages}
+                </span>
+              )}
+            </Link>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
+              aria-label={t('header.notifications')}
+            >
+              <FaBell className="text-base" />
+              {notifUnreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+              )}
+            </button>
+          </div>
           <RoleBadge role={role} compact className="shrink-0" />
         </header>
+
+        {showNotifications && (
+          <div className="fixed left-2 right-2 top-20 z-50 flex max-h-[70vh] w-auto max-w-[calc(100vw-16px)] origin-top-right flex-col rounded-2xl border border-gray-100 bg-white py-2 shadow-elevated-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
+              <h3 className="text-sm font-semibold text-gray-900">{t('header.notifications')}</h3>
+              {notifUnreadCount > 0 && (
+                <button onClick={markAllNotifsAsRead} className="text-xs font-medium text-primary-600 hover:text-primary-700">
+                  {t('header.mark_all_read')}
+                </button>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <FaBell className="mx-auto mb-2 text-2xl text-gray-300" />
+                  <p className="text-sm text-gray-500">{t('header.no_notifications')}</p>
+                </div>
+              ) : (
+                notifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`cursor-pointer border-b border-gray-50 px-4 py-3 transition-colors hover:bg-gray-50 ${!notif.is_read ? 'bg-primary-50/40' : ''}`}
+                    onClick={() => {
+                      setSelectedNotification(notif);
+                      if (!notif.is_read) markNotifAsRead(notif.id);
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-900">{notif.title}</p>
+                        <p className="mt-0.5 truncate text-xs text-gray-600">{notif.message}</p>
+                        <p className="mt-1 text-[10px] text-gray-400">
+                          {new Date(notif.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      {!notif.is_read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary-500" />}
+                    </div>
+                    {notif.link && (
+                      <div className="mt-2 flex justify-end">
+                        <Link
+                          to={notif.link}
+                          onClick={(e) => { e.stopPropagation(); setShowNotifications(false); }}
+                          className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700"
+                        >
+                          <FaIdCard className="text-[10px]" />
+                          {t('header.take_action')}
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {selectedNotification && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
+            onClick={() => setSelectedNotification(null)}
+          >
+            <div
+              className="w-full max-w-lg rounded-2xl border border-gray-100 bg-white shadow-elevated-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                <h3 className="min-w-0 pr-3 text-base font-semibold text-gray-900">{selectedNotification.title}</h3>
+                <button onClick={() => setSelectedNotification(null)} className="text-xl leading-none text-gray-400 hover:text-gray-600" aria-label="Close">&times;</button>
+              </div>
+              <div className="px-6 py-4">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{selectedNotification.message}</p>
+                <p className="mt-4 text-xs text-gray-400">
+                  {new Date(selectedNotification.created_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+              {selectedNotification.link && (
+                <div className="flex justify-center border-t border-gray-100 px-6 py-4">
+                  <Link
+                    to={selectedNotification.link}
+                    onClick={() => { setSelectedNotification(null); setShowNotifications(false); }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                  >
+                    <FaIdCard className="text-xs" />
+                    {t('header.take_action')}
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <main ref={mainContentRef} className="min-w-0 flex-1 overflow-x-hidden p-4 animate-fadeIn sm:p-6 lg:overflow-y-auto">
           {isStateScopedAdmin && (
