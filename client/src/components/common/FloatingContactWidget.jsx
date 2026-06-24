@@ -195,6 +195,9 @@ const FloatingContactWidget = () => {
     setLookupTickets([]);
     setContactConv([]);
     setViewingContactTicket(null);
+    setAdminTypingName(null);
+    setAdminViewingName(null);
+    if (typingPollRef.current) clearInterval(typingPollRef.current);
   };
 
   const handleClose = () => {
@@ -403,6 +406,30 @@ const FloatingContactWidget = () => {
   const [contactReplyText, setContactReplyText] = useState('');
   const [contactReplyFile, setContactReplyFile] = useState(null);
   const [sendingContactReply, setSendingContactReply] = useState(false);
+  const [adminTypingName, setAdminTypingName] = useState(null);
+  const [adminViewingName, setAdminViewingName] = useState(null);
+  const typingPollRef = useRef(null);
+
+  // Poll admin typing/viewing status for anonymous contact conversation
+  useEffect(() => {
+    if (!viewingContactTicket || !lookupEmail.trim()) {
+      setAdminTypingName(null);
+      setAdminViewingName(null);
+      return;
+    }
+    const poll = async () => {
+      try {
+        const res = await api.get(`/support/tickets/${viewingContactTicket.id}/typing-status`, {
+          params: { email: lookupEmail.trim() },
+        });
+        setAdminTypingName(res.data?.typing?.userName || null);
+        setAdminViewingName(res.data?.viewing?.userName || null);
+      } catch {}
+    };
+    poll();
+    typingPollRef.current = setInterval(poll, 3000);
+    return () => { clearInterval(typingPollRef.current); };
+  }, [viewingContactTicket, lookupEmail]);
 
   const handleContactReply = async () => {
     const msg = contactReplyText.trim();
@@ -701,6 +728,18 @@ const FloatingContactWidget = () => {
                                   <p className="text-[10px] text-slate-400 mt-0.5">{new Date(r.created_at).toLocaleString()}</p>
                                 </div>
                               ))
+                            )}
+                            {adminViewingName && (
+                              <p className="text-[10px] text-green-600 italic flex items-center gap-1">
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
+                                {adminViewingName} is viewing this conversation
+                              </p>
+                            )}
+                            {adminTypingName && (
+                              <p className="text-[10px] text-indigo-600 italic flex items-center gap-1">
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                {adminTypingName} is typing...
+                              </p>
                             )}
                             {/* Reply input for anonymous contact */}
                             <div className="mt-2 border-t border-indigo-200 pt-2">

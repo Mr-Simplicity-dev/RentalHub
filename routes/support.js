@@ -26,6 +26,22 @@ try {
   // server may not be fully loaded yet; io will be set later if needed
 }
 
+// In-memory admin activity store for anonymous presence/typing indicators
+const adminActivity = {
+  typing: new Map(),   // ticketId -> { userId, userName, timestamp }
+  viewing: new Map(),  // ticketId -> { userId, userName, timestamp }
+};
+// Clean stale entries every 30 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [ticketId, data] of adminActivity.typing) {
+    if (now - data.timestamp > 5000) adminActivity.typing.delete(ticketId);
+  }
+  for (const [ticketId, data] of adminActivity.viewing) {
+    if (now - data.timestamp > 30000) adminActivity.viewing.delete(ticketId);
+  }
+}, 30000);
+
 const ATTACHMENT_DIR = path.join(__dirname, '..', 'uploads', 'tickets');
 if (!fs.existsSync(ATTACHMENT_DIR)) {
   fs.mkdirSync(ATTACHMENT_DIR, { recursive: true });
@@ -702,6 +718,14 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
          WHERE ticket_id = $1 AND is_admin = FALSE AND read_at IS NULL`,
         [ticketId]
       );
+      // Track admin viewing for anonymous contact presence
+      if (!ticketResult.rows[0]?.user_id) {
+        adminActivity.viewing.set(ticketId, {
+          userId: req.user.id,
+          userName: req.user.full_name || req.user.email,
+          timestamp: Date.now(),
+        });
+      }
     }
 
     // If viewer is the ticket owner, mark all admin replies as read
@@ -933,6 +957,15 @@ router.post('/tickets/:id/typing', authenticate, async (req, res) => {
         userId: req.user.id,
         userName: req.user.full_name || req.user.email,
         isAdmin,
+      });
+    }
+
+    // Track admin typing in-memory for anonymous contact-form tickets
+    if (isAdmin && !ticket.user_id) {
+      adminActivity.typing.set(ticketId, {
+        userId: req.user.id,
+        userName: req.user.full_name || req.user.email,
+        timestamp: Date.now(),
       });
     }
 
@@ -1315,6 +1348,47 @@ router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), asy
   } catch (error) {
     console.error('Contact reply error:', error);
     res.status(500).json({ success: false, message: 'Failed to send reply' });
+  }
+});
+
+// GET /tickets/:id/typing-status — polling endpoint for anonymous contact users
+router.get('/tickets/:id/typing-status', async (req, res) => {
+  try {
+    const ticketId = Number(req.params.id);
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email query param is required' });
+    }
+
+    // Verify this is a contact ticket and email matches
+    const ticketResult = await db.query(
+      'SELECT id, contact_email FROM support_tickets WHERE id = $1 AND user_id IS NULL',
+      [ticketId]
+    );
+    if (!ticketResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+    if (ticketResult.rows[0].contact_email !== email.trim().toLowerCase()) {
+      return res.status(403).json({ success: false, message: 'Email does not match' });
+    }
+
+    const now = Date.now();
+    const typingData = adminActivity.typing.get(ticketId);
+    const viewingData = adminActivity.viewing.get(ticketId);
+
+    res.json({
+      success: true,
+      typing: typingData && (now - typingData.timestamp < 5000)
+        ? { userName: typingData.userName }
+        : null,
+      viewing: viewingData && (now - viewingData.timestamp < 30000)
+        ? { userName: viewingData.userName }
+        : null,
+    });
+  } catch (error) {
+    console.error('Typing status error:', error);
+    res.status(500).json({ success: false, message: 'Failed to get typing status' });
   }
 });
 
