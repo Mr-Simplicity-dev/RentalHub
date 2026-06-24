@@ -260,8 +260,16 @@ const SuperSupportAdminDashboard = () => {
   useEffect(() => {
     if (!socket) return;
     const replyHandler = (data) => {
+      loadDashboardData();
       if (selectedItem?.id === data.ticketId && modalType === 'view-ticket') {
-        loadConversation(data.ticketId);
+        if (data.reply) {
+          setConversation((prev) => {
+            if (prev.some((reply) => reply.id === data.reply.id)) return prev;
+            return [...prev, data.reply];
+          });
+        } else {
+          loadConversation(data.ticketId);
+        }
       }
     };
     const typingHandler = (data) => {
@@ -272,15 +280,19 @@ const SuperSupportAdminDashboard = () => {
       }
     };
     socket.on('ticket:new_reply', replyHandler);
+    socket.on('ticket:created', loadDashboardData);
+    socket.on('ticket:updated', loadDashboardData);
     socket.on('ticket:typing', typingHandler);
     const internalNoteHandler = () => { fetchUnreadInternalNotes(); };
     socket.on('ticket:internal_note', internalNoteHandler);
     return () => {
       socket.off('ticket:new_reply', replyHandler);
+      socket.off('ticket:created', loadDashboardData);
+      socket.off('ticket:updated', loadDashboardData);
       socket.off('ticket:typing', typingHandler);
       socket.off('ticket:internal_note', internalNoteHandler);
     };
-  }, [socket, selectedItem, modalType, fetchUnreadInternalNotes]);
+  }, [socket, selectedItem, modalType, fetchUnreadInternalNotes, loadDashboardData, loadConversation]);
 
   // Quick action handlers
   const handleQuickAction = async (action, data) => {

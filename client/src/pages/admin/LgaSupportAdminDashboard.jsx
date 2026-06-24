@@ -110,12 +110,28 @@ const LgaSupportAdminDashboard = () => {
   // Socket listener for real-time replies
   useEffect(() => {
     if (!socket) return;
+    const refreshTickets = async () => {
+      try {
+        const ticketsRes = await api.get('/support/tickets');
+        setData({ tickets: ticketsRes.data?.data || [] });
+      } catch {}
+    };
     const handler = (data) => {
+      refreshTickets();
       if (selectedTicket?.id === data.ticketId) {
-        loadConversation(data.ticketId);
+        if (data.reply) {
+          setConversation((prev) => {
+            if (prev.some((reply) => reply.id === data.reply.id)) return prev;
+            return [...prev, data.reply];
+          });
+        } else {
+          loadConversation(data.ticketId);
+        }
       }
     };
     socket.on('ticket:new_reply', handler);
+    socket.on('ticket:created', refreshTickets);
+    socket.on('ticket:updated', refreshTickets);
 
     const typingHandler = (data) => {
       if (selectedTicket?.id === data.ticketId && !data.isAdmin) {
@@ -131,6 +147,8 @@ const LgaSupportAdminDashboard = () => {
 
     return () => {
       socket.off('ticket:new_reply', handler);
+      socket.off('ticket:created', refreshTickets);
+      socket.off('ticket:updated', refreshTickets);
       socket.off('ticket:typing', typingHandler);
       socket.off('ticket:internal_note', internalNoteHandler);
     };

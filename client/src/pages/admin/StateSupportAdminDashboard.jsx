@@ -81,8 +81,24 @@ const StateSupportAdminDashboard = () => {
   // Socket listeners for real-time ticket updates
   useEffect(() => {
     if (!socket) return;
+    const refreshTickets = async () => {
+      try {
+        const res = await api.get('/support/tickets');
+        setTickets(res.data?.data || []);
+      } catch {}
+    };
     const replyHandler = (data) => {
-      if (selectedTicket?.id === data.ticketId) loadConversation(data.ticketId);
+      refreshTickets();
+      if (selectedTicket?.id === data.ticketId) {
+        if (data.reply) {
+          setConversation((prev) => {
+            if (prev.some((reply) => reply.id === data.reply.id)) return prev;
+            return [...prev, data.reply];
+          });
+        } else {
+          loadConversation(data.ticketId);
+        }
+      }
     };
     const typingHandler = (data) => {
       if (selectedTicket?.id === data.ticketId && !data.isAdmin) {
@@ -92,15 +108,19 @@ const StateSupportAdminDashboard = () => {
       }
     };
     socket.on('ticket:new_reply', replyHandler);
+    socket.on('ticket:created', refreshTickets);
+    socket.on('ticket:updated', refreshTickets);
     socket.on('ticket:typing', typingHandler);
     const internalNoteHandler = () => { fetchUnreadInternalNotes(); };
     socket.on('ticket:internal_note', internalNoteHandler);
     return () => {
       socket.off('ticket:new_reply', replyHandler);
+      socket.off('ticket:created', refreshTickets);
+      socket.off('ticket:updated', refreshTickets);
       socket.off('ticket:typing', typingHandler);
       socket.off('ticket:internal_note', internalNoteHandler);
     };
-  }, [socket, selectedTicket, loadConversation, fetchUnreadInternalNotes]);
+  }, [socket, selectedTicket, fetchUnreadInternalNotes]);
 
   const ticketStats = useMemo(() => ({
     total: tickets.length,

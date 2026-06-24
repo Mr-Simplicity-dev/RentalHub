@@ -739,6 +739,10 @@ router.put('/profile', authenticate, [
 
     const result = await db.query(query, params);
 
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
     // Remove sensitive data
     delete result.rows[0].password_hash;
 

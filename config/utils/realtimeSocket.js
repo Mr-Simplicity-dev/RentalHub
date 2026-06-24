@@ -7,6 +7,12 @@ const { getSocketAuthToken } = require('./authCookies');
 const CALL_ALLOWED_ROLES = new Set(['tenant', 'landlord', 'agent']);
 const CALL_TYPES = new Set(['audio', 'video', 'virtual_tour']);
 const CALL_RING_TIMEOUT_MS = Number(process.env.CALL_RING_TIMEOUT_MS || 45000);
+const SUPPORT_ADMIN_ROLES = new Set([
+  'super_admin',
+  'super_support_admin',
+  'state_support_admin',
+  'lga_support_admin',
+]);
 
 const onlineUsers = new Map();
 const socketUsers = new Map();
@@ -258,6 +264,52 @@ const configureRealtimeSocket = (io) => {
 
       if (typeof callback === 'function') {
         callback({ success: true, statuses });
+      }
+    });
+
+    socket.on('ticket:typing', async (payload = {}) => {
+      try {
+        const ticketId = Number(payload.ticketId || payload.ticket_id);
+        if (!Number.isInteger(ticketId) || ticketId <= 0) return;
+
+        const ticketResult = await db.query(
+          `SELECT id, user_id, assigned_to
+           FROM support_tickets
+           WHERE id = $1
+           LIMIT 1`,
+          [ticketId]
+        );
+        const ticket = ticketResult.rows[0];
+        if (!ticket) return;
+
+        const isAdmin = SUPPORT_ADMIN_ROLES.has(String(user.user_type || '').toLowerCase());
+        const eventPayload = {
+          ticketId,
+          userId: user.id,
+          userName: user.full_name || user.email || 'User',
+          isAdmin,
+        };
+
+        if (isAdmin) {
+          if (ticket.user_id) {
+            io.to(toUserRoom(ticket.user_id)).emit('ticket:typing', eventPayload);
+          } else {
+            io.of('/guest').to(`ticket:guest:${ticketId}`).emit('ticket:typing', eventPayload);
+          }
+          return;
+        }
+
+        if (Number(ticket.user_id) !== Number(user.id)) return;
+
+        if (ticket.assigned_to) {
+          io.to(toUserRoom(ticket.assigned_to)).emit('ticket:typing', eventPayload);
+        } else {
+          for (const role of SUPPORT_ADMIN_ROLES) {
+            io.to(`role:${role}`).emit('ticket:typing', eventPayload);
+          }
+        }
+      } catch (error) {
+        console.error('ticket:typing socket error:', error.message);
       }
     });
 

@@ -112,6 +112,17 @@ const Support = () => {
   const [conversationMeta, setConversationMeta] = useState({});
   const typingTimers = useRef({});
 
+  const loadTickets = useCallback(async () => {
+    try {
+      const res = await api.get('/support/tickets/my');
+      setTickets(res.data?.data || []);
+    } catch {
+      toast.error('Failed to load your tickets');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const loadConversation = useCallback(async (ticketId) => {
     setLoadingConv((prev) => ({ ...prev, [ticketId]: true }));
     try {
@@ -130,18 +141,25 @@ const Support = () => {
     if (!socket) return;
     const handler = (data) => {
       const ticketId = data.ticketId;
+      loadTickets();
 
-      // Reload conversation if this ticket is expanded
-      if (expandedTicket === ticketId) {
-        loadConversation(ticketId);
+      if (data.reply) {
+        setConversations((prev) => {
+          const current = prev[ticketId] || [];
+          if (!current.length || current.some((reply) => reply.id === data.reply.id)) return prev;
+          return { ...prev, [ticketId]: [...current, data.reply] };
+        });
       }
 
-      // If it's an admin reply and the ticket is not expanded, increment a local counter
-      // (visual hint)
+      if (expandedTicket === ticketId && !data.reply) loadConversation(ticketId);
     };
     socket.on('ticket:new_reply', handler);
-    return () => socket.off('ticket:new_reply', handler);
-  }, [socket, expandedTicket, loadConversation]);
+    socket.on('ticket:updated', loadTickets);
+    return () => {
+      socket.off('ticket:new_reply', handler);
+      socket.off('ticket:updated', loadTickets);
+    };
+  }, [socket, expandedTicket, loadConversation, loadTickets]);
 
   useEffect(() => {
     if (!socket) return;
@@ -174,19 +192,7 @@ const Support = () => {
     }
   };
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await api.get('/support/tickets/my');
-        setTickets(res.data?.data || []);
-      } catch {
-        toast.error('Failed to load your tickets');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+  useEffect(() => { loadTickets(); }, [loadTickets]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
