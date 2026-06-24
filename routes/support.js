@@ -719,6 +719,12 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
       [ticketId]
     );
 
+    // Fetch ticket to check if anonymous (for admin presence tracking)
+    const ticketResult = await db.query(
+      'SELECT user_id FROM support_tickets WHERE id = $1',
+      [ticketId]
+    );
+
     // If viewer is a support admin, mark all non-admin replies as read
     if (isSupportAdmin) {
       await db.query(
@@ -727,7 +733,7 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
         [ticketId]
       );
       // Track admin viewing for anonymous contact presence
-      if (!ticketResult.rows[0]?.user_id) {
+      if (ticketResult.rows.length > 0 && !ticketResult.rows[0].user_id) {
         adminActivity.viewing.set(ticketId, {
           userId: req.user.id,
           userName: req.user.full_name || req.user.email,
