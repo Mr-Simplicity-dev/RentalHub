@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { io as socketIO } from 'socket.io-client';
 import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaMicrophone, FaStopCircle } from 'react-icons/fa';
 import api from '../../services/api';
@@ -510,28 +511,39 @@ const FloatingContactWidget = () => {
 
   return (
     <>
-      {/* Greeting tooltip (like WhatsApp widget) */}
-      {!open && showGreeting && (
-        <div className="fixed bottom-24 right-20 z-50 animate-fadeIn">
-          <div className="relative bg-white rounded-xl shadow-xl p-3 max-w-[200px]">
-            <div className="absolute -right-1.5 top-4 w-3 h-3 bg-white rotate-45" />
-            <p className="text-sm text-gray-700 font-medium">Need help? Chat with us!</p>
+      {/* Greeting tooltip + button container */}
+      <div className="fixed bottom-6 right-6 z-50 flex sm:flex-col flex-col-reverse items-end gap-2">
+        {!open && showGreeting && (
+          <div className="animate-fadeIn">
+            <div className="relative bg-white rounded-xl shadow-xl p-3 max-w-[200px]">
+              <div className="absolute -bottom-1.5 right-5 w-3 h-3 bg-white rotate-45" />
+              <p className="text-sm text-gray-700 font-medium">Need help? Chat with us!</p>
+            </div>
           </div>
-        </div>
-      )}
-      <button
-        onClick={() => { setOpen((p) => !p); setShowGreeting(false); }}
-        className={`fixed bottom-6 right-6 z-50 tour-support-widget flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${!open ? 'animate-bounce' : ''}`}
-        aria-label="Contact support"
-      >
-        {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{unreadCount}</span>
         )}
-        <FaCommentAlt className="w-5 h-5" />
-      </button>
+        <button
+          onClick={() => { setOpen((p) => !p); setShowGreeting(false); }}
+          className={`tour-support-widget flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${!open ? 'animate-bounce' : ''}`}
+          aria-label="Contact support"
+        >
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{unreadCount}</span>
+          )}
+          <FaCommentAlt className="w-5 h-5" />
+        </button>
+      </div>
 
-      {open && (
-        <div ref={widgetRef} className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-slideUp" style={{ maxHeight: '560px' }}>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            ref={widgetRef}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
+            style={{ maxHeight: '560px' }}
+          >
 
           {renderHeader()}
 
@@ -887,8 +899,9 @@ const FloatingContactWidget = () => {
               </div>
             </div>
           )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };
