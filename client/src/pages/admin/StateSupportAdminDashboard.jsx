@@ -5,6 +5,7 @@ import InputDialog from '../../components/common/InputDialog';
 import ApprovalTimeline from '../../components/common/ApprovalTimeline';
 import useRetryableAction from '../../hooks/useRetryableAction';
 import { useAuth } from '../../hooks/useAuth';
+import { useSocket } from '../../hooks/useSocket';
 import api from '../../services/api';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
@@ -31,6 +32,7 @@ const resolveCurrentStep = (row) => {
 
 const StateSupportAdminDashboard = () => {
   const { user } = useAuth();
+  const { socket } = useSocket();
   const [loading, setLoading] = useState(true);
   const [stage, setStage] = useState('all');
   const [queue, setQueue] = useState([]);
@@ -51,6 +53,16 @@ const StateSupportAdminDashboard = () => {
   const [typingUser, setTypingUser] = useState(null);
   const typingTimer = useRef(null);
   const [chatTab, setChatTab] = useState('user');
+  const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
+
+  const fetchUnreadInternalNotes = useCallback(async () => {
+    try {
+      const res = await api.get('/support/tickets/internal-notes/unread-count');
+      setUnreadInternalNotes(res.data?.count || 0);
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchUnreadInternalNotes(); }, [fetchUnreadInternalNotes]);
 
   const loadTickets = useCallback(async () => {
     setTicketsLoading(true);
@@ -65,6 +77,30 @@ const StateSupportAdminDashboard = () => {
   }, []);
 
   useEffect(() => { loadTickets(); }, [loadTickets]);
+
+  // Socket listeners for real-time ticket updates
+  useEffect(() => {
+    if (!socket) return;
+    const replyHandler = (data) => {
+      if (selectedTicket?.id === data.ticketId) loadConversation(data.ticketId);
+    };
+    const typingHandler = (data) => {
+      if (selectedTicket?.id === data.ticketId && !data.isAdmin) {
+        setTypingUser(data);
+        clearTimeout(typingTimer.current);
+        typingTimer.current = setTimeout(() => setTypingUser(null), 3000);
+      }
+    };
+    socket.on('ticket:new_reply', replyHandler);
+    socket.on('ticket:typing', typingHandler);
+    const internalNoteHandler = () => { fetchUnreadInternalNotes(); };
+    socket.on('ticket:internal_note', internalNoteHandler);
+    return () => {
+      socket.off('ticket:new_reply', replyHandler);
+      socket.off('ticket:typing', typingHandler);
+      socket.off('ticket:internal_note', internalNoteHandler);
+    };
+  }, [socket, selectedTicket, loadConversation, fetchUnreadInternalNotes]);
 
   const ticketStats = useMemo(() => ({
     total: tickets.length,
@@ -153,7 +189,8 @@ const StateSupportAdminDashboard = () => {
   };
 
   const emitTyping = () => {
-    // Socket typing not wired in this dashboard yet
+    if (!socket || !selectedTicket) return;
+    socket.emit('ticket:typing', { ticketId: selectedTicket.id });
   };
 
   const reviewAction = useRetryableAction(
@@ -539,7 +576,12 @@ const StateSupportAdminDashboard = () => {
             {/* Tab toggle */}
             <div className="flex border-b border-gray-200 px-6">
               <button onClick={() => setChatTab('user')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'user' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><FaReply size={12} /> User Conversation</button>
-              <button onClick={() => setChatTab('internal')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'internal' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><FaCommentDots size={12} /> Internal Notes</button>
+              <button onClick={() => { setChatTab('internal'); fetchUnreadInternalNotes(); }} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'internal' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                <FaCommentDots size={12} /> Internal Notes
+                {unreadInternalNotes > 0 && chatTab !== 'internal' && (
+                  <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-medium text-white">{unreadInternalNotes}</span>
+                )}
+              </button>
             </div>
 
             {chatTab === 'user' ? (
@@ -590,6 +632,10 @@ const StateSupportAdminDashboard = () => {
                       </div>
                     ))
                   )}
+
+                  {typingUser && (
+                    <div className="text-xs italic text-slate-400">{typingUser.userName} is typing...</div>
+                  )}
                 </div>
                 {selectedTicket.status !== 'resolved' && (
                   <div className="border-t border-gray-200 px-6 py-4">
@@ -604,7 +650,7 @@ const StateSupportAdminDashboard = () => {
                         <FaPaperclip size={14} />
                         <input type="file" className="hidden" onChange={(e) => setAttachmentFile(e.target.files[0])} />
                       </label>
-                      <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder="Type your reply..." rows={2}
+                      <textarea value={replyText} onChange={(e) => { setReplyText(e.target.value); emitTyping(); }} placeholder="Type your reply..." rows={2}
                         className="flex-1 resize-none rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }} />
                       <button onClick={handleSendReply} disabled={(!replyText.trim() && !attachmentFile) || sendingReply}
@@ -618,7 +664,7 @@ const StateSupportAdminDashboard = () => {
             ) : (
               <div className="flex-1 px-6 py-4">
                 <p className="mb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Internal Admin Notes</p>
-                <InternalNotesPanel ticketId={selectedTicket.id} currentUser={user} />
+                <InternalNotesPanel ticketId={selectedTicket.id} currentUser={user} readOnly={selectedTicket.status === 'resolved'} />
               </div>
             )}
 

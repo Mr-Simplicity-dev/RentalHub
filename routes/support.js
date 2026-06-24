@@ -8,6 +8,8 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
+const { contactFormLimiter } = require('../config/middleware/securityRateLimiters');
+
 const SUPPORT_ADMIN_ROLES = new Set([
   'super_admin',
   'super_support_admin',
@@ -145,8 +147,16 @@ const ensureSupportSchema = async () => {
       author_name VARCHAR(255),
       author_role VARCHAR(50),
       message TEXT NOT NULL,
+      read_at TIMESTAMP,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_ticket_internal_notes' AND column_name='read_at') THEN
+        ALTER TABLE support_ticket_internal_notes ADD COLUMN read_at TIMESTAMP;
+      END IF;
+    END $$;
 
     CREATE INDEX IF NOT EXISTS idx_internal_notes_ticket
       ON support_ticket_internal_notes(ticket_id, created_at ASC);
@@ -227,7 +237,7 @@ const sendReplyEmail = async (reply, ticket, sender) => {
 
 // ─── Public contact form ───────────────────────────────────────────────────
 
-router.post('/contact', async (req, res) => {
+router.post('/contact', contactFormLimiter, async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -589,7 +599,7 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
     }
 
     // Pagination
-    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const limit = Math.min(Number(req.query.limit) || 200, 500);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
 
     const result = await db.query(
@@ -903,6 +913,26 @@ router.get('/tickets/unread/count', authenticate, async (req, res) => {
   }
 });
 
+// GET /tickets/internal-notes/unread-count — count tickets with unread internal notes for this admin
+router.get('/tickets/internal-notes/unread-count', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const result = await db.query(
+      `SELECT COUNT(*) AS cnt FROM (
+        SELECT DISTINCT sin.ticket_id FROM support_ticket_internal_notes sin
+        WHERE sin.user_id != $1 AND sin.read_at IS NULL
+      ) sub`,
+      [req.user.id]
+    );
+
+    res.json({ success: true, count: parseInt(result.rows[0].cnt) });
+  } catch (error) {
+    console.error('Unread internal notes count error:', error);
+    res.status(500).json({ success: false, message: 'Failed to get unread count' });
+  }
+});
+
 // ─── Internal Notes (admin-to-admin) ──────────────────────────────────────
 
 // GET /tickets/:id/internal-notes — fetch internal notes for a ticket
@@ -915,17 +945,33 @@ router.get('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, asy
       return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
     }
 
+    const limit = Math.min(Number(req.query.limit) || 200, 500);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+
     const result = await db.query(
-      `SELECT sin.id, sin.ticket_id, sin.user_id, sin.author_name, sin.author_role, sin.message, sin.created_at,
+      `SELECT sin.id, sin.ticket_id, sin.user_id, sin.author_name, sin.author_role, sin.message, sin.read_at, sin.created_at,
               u.email AS user_email
        FROM support_ticket_internal_notes sin
        LEFT JOIN users u ON u.id = sin.user_id
        WHERE sin.ticket_id = $1
-       ORDER BY sin.created_at ASC, sin.id ASC`,
+       ORDER BY sin.created_at ASC, sin.id ASC
+       LIMIT $2 OFFSET $3`,
+      [ticketId, limit, offset]
+    );
+
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM support_ticket_internal_notes WHERE ticket_id = $1',
       [ticketId]
     );
 
-    res.json({ success: true, data: result.rows });
+    // Mark notes as read by this admin
+    await db.query(
+      `UPDATE support_ticket_internal_notes SET read_at = CURRENT_TIMESTAMP
+       WHERE ticket_id = $1 AND (read_at IS NULL OR read_at < CURRENT_TIMESTAMP)`,
+      [ticketId]
+    );
+
+    res.json({ success: true, data: result.rows, meta: { total: parseInt(countResult.rows[0].count), limit, offset } });
   } catch (error) {
     console.error('Get internal notes error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch internal notes' });
@@ -973,22 +1019,28 @@ router.post('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, as
 
     const note = result.rows[0];
 
-    // Notify other admins assigned to or scoped to this ticket
+    // Notify only relevant admins (assigned to ticket or jurisdiction-scoped)
     try {
       const { createNotification } = require('../config/utils/notificationService');
       const adminsResult = await db.query(
         `SELECT id FROM users
          WHERE user_type IN ('super_support_admin', 'state_support_admin', 'lga_support_admin')
            AND id != $1
-           AND deleted_at IS NULL AND account_suspended_at IS NULL`,
-        [req.user.id]
+           AND deleted_at IS NULL AND account_suspended_at IS NULL
+           AND (
+             id = $2
+             OR (user_type = 'super_support_admin')
+             OR (user_type = 'state_support_admin' AND assigned_state = $3)
+             OR (user_type = 'lga_support_admin' AND assigned_state = $3 AND assigned_city = $4)
+           )`,
+        [req.user.id, ticket.assigned_to, ticket.state || '', ticket.lga || '']
       );
       for (const admin of adminsResult.rows) {
         await createNotification(
           admin.id,
           'internal_note',
           `Internal note on ticket "${ticket.subject}"`,
-          `${note.author_name} wrote: ${note.message.substring(0, 200)}`,
+          `${note.author_name} posted an internal note on "${ticket.subject}"`,
           `/support/tickets/${ticketId}`
         );
         emitToUser(admin.id, 'ticket:internal_note', {
@@ -996,8 +1048,8 @@ router.post('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, as
           subject: ticket.subject,
           note: {
             id: note.id,
-            message: note.message,
             author_name: note.author_name,
+            preview: note.message.substring(0, 100),
             created_at: note.created_at,
           },
         });
@@ -1010,6 +1062,41 @@ router.post('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, as
   } catch (error) {
     console.error('Create internal note error:', error);
     res.status(500).json({ success: false, message: 'Failed to create internal note' });
+  }
+});
+
+// PATCH /tickets/:ticketId/internal-notes/:noteId — edit own internal note
+router.patch('/tickets/:ticketId/internal-notes/:noteId', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    const ticketId = Number(req.params.ticketId);
+    const noteId = Number(req.params.noteId);
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message is required' });
+    }
+
+    const noteResult = await db.query(
+      'SELECT id, user_id FROM support_ticket_internal_notes WHERE id = $1 AND ticket_id = $2',
+      [noteId, ticketId]
+    );
+    if (!noteResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Note not found' });
+    }
+
+    if (noteResult.rows[0].user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'You can only edit your own notes' });
+    }
+
+    const result = await db.query(
+      `UPDATE support_ticket_internal_notes SET message = $1 WHERE id = $2 RETURNING *`,
+      [message.trim(), noteId]
+    );
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Edit internal note error:', error);
+    res.status(500).json({ success: false, message: 'Failed to edit internal note' });
   }
 });
 

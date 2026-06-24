@@ -1,15 +1,17 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { FaTrash, FaCommentDots } from 'react-icons/fa';
+import { FaTrash, FaCommentDots, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useSocket } from '../../hooks/useSocket';
 import api from '../../services/api';
 
-const InternalNotesPanel = ({ ticketId, currentUser }) => {
+const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
   const { socket } = useSocket();
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
   const listRef = useRef(null);
 
   const loadNotes = useCallback(async () => {
@@ -56,6 +58,18 @@ const InternalNotesPanel = ({ ticketId, currentUser }) => {
     }
   };
 
+  const handleEdit = async (noteId) => {
+    if (!editText.trim()) return;
+    try {
+      const res = await api.patch(`/support/tickets/${ticketId}/internal-notes/${noteId}`, { message: editText.trim() });
+      setNotes((prev) => prev.map((n) => n.id === noteId ? res.data.data : n));
+      setEditingId(null);
+      setEditText('');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to edit');
+    }
+  };
+
   const handleDelete = async (noteId) => {
     if (!window.confirm('Delete this internal note?')) return;
     try {
@@ -84,16 +98,30 @@ const InternalNotesPanel = ({ ticketId, currentUser }) => {
                   <span>&middot; {new Date(note.created_at).toLocaleString()}</span>
                 </div>
                 {note.user_id === currentUser?.id && (
-                  <button onClick={() => handleDelete(note.id)} className="text-slate-400 hover:text-red-500"><FaTrash size={10} /></button>
+                  <div className="flex items-center gap-1">
+                    {editingId !== note.id && (
+                      <button onClick={() => { setEditingId(note.id); setEditText(note.message); }} className="text-slate-400 hover:text-slate-600"><FaEdit size={10} /></button>
+                    )}
+                    <button onClick={() => handleDelete(note.id)} className="text-slate-400 hover:text-red-500"><FaTrash size={10} /></button>
+                  </div>
                 )}
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{note.message}</p>
+              {editingId === note.id ? (
+                <div className="mt-2 flex items-end gap-2">
+                  <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={2} className="flex-1 resize-none rounded-lg border border-amber-300 p-2 text-sm outline-none focus:border-amber-400" />
+                  <button onClick={() => handleEdit(note.id)} className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-green-600 text-white hover:bg-green-700"><FaCheck size={10} /></button>
+                  <button onClick={() => { setEditingId(null); setEditText(''); }} className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-slate-300 text-slate-700 hover:bg-slate-400"><FaTimes size={10} /></button>
+                </div>
+              ) : (
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{note.message}</p>
+              )}
             </div>
           ))
         )}
       </div>
 
-      <div className="mt-3 flex items-end gap-2 border-t border-slate-200 pt-3">
+      {!readOnly && (
+        <div className="mt-3 flex items-end gap-2 border-t border-slate-200 pt-3">
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
@@ -110,6 +138,7 @@ const InternalNotesPanel = ({ ticketId, currentUser }) => {
           {sending ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaCommentDots size={12} />}
         </button>
       </div>
+      )}
     </div>
   );
 };

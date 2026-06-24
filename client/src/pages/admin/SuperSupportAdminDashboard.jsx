@@ -74,6 +74,16 @@ const SuperSupportAdminDashboard = () => {
   const [typingUser, setTypingUser] = useState(null);
   const typingTimer = useRef(null);
   const [chatTab, setChatTab] = useState('user');
+  const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
+
+  const fetchUnreadInternalNotes = useCallback(async () => {
+    try {
+      const res = await api.get('/support/tickets/internal-notes/unread-count');
+      setUnreadInternalNotes(res.data?.count || 0);
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchUnreadInternalNotes(); }, [fetchUnreadInternalNotes]);
   // State management
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
@@ -263,11 +273,14 @@ const SuperSupportAdminDashboard = () => {
     };
     socket.on('ticket:new_reply', replyHandler);
     socket.on('ticket:typing', typingHandler);
+    const internalNoteHandler = () => { fetchUnreadInternalNotes(); };
+    socket.on('ticket:internal_note', internalNoteHandler);
     return () => {
       socket.off('ticket:new_reply', replyHandler);
       socket.off('ticket:typing', typingHandler);
+      socket.off('ticket:internal_note', internalNoteHandler);
     };
-  }, [socket, selectedItem, modalType]);
+  }, [socket, selectedItem, modalType, fetchUnreadInternalNotes]);
 
   // Quick action handlers
   const handleQuickAction = async (action, data) => {
@@ -1629,12 +1642,15 @@ const SuperSupportAdminDashboard = () => {
                     <FaPaperPlane size={12} /> User Conversation
                   </button>
                   <button
-                    onClick={() => setChatTab('internal')}
+                    onClick={() => { setChatTab('internal'); fetchUnreadInternalNotes(); }}
                     className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                       chatTab === 'internal' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
                     }`}
                   >
                     <FaCommentDots size={12} /> Internal Notes
+                    {unreadInternalNotes > 0 && chatTab !== 'internal' && (
+                      <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-medium text-white">{unreadInternalNotes}</span>
+                    )}
                   </button>
                 </div>
 
@@ -1745,7 +1761,7 @@ const SuperSupportAdminDashboard = () => {
                   <div className="mt-4">
                     <p className="mb-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Internal Admin Notes</p>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <InternalNotesPanel ticketId={selectedItem.id} currentUser={user} />
+                      <InternalNotesPanel ticketId={selectedItem.id} currentUser={user} readOnly={selectedItem.status === 'resolved'} />
                     </div>
                   </div>
                 )}

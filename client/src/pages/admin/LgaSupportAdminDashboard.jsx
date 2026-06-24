@@ -89,6 +89,17 @@ const LgaSupportAdminDashboard = () => {
   const [typingUser, setTypingUser] = useState(null);
   const typingTimer = useRef(null);
   const [chatTab, setChatTab] = useState('user');
+  const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
+
+  // Fetch unread internal notes count
+  const fetchUnreadInternalNotes = useCallback(async () => {
+    try {
+      const res = await api.get('/support/tickets/internal-notes/unread-count');
+      setUnreadInternalNotes(res.data?.count || 0);
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchUnreadInternalNotes(); }, [fetchUnreadInternalNotes]);
 
   // Socket listener for real-time replies
   useEffect(() => {
@@ -109,11 +120,15 @@ const LgaSupportAdminDashboard = () => {
     };
     socket.on('ticket:typing', typingHandler);
 
+    const internalNoteHandler = () => { fetchUnreadInternalNotes(); };
+    socket.on('ticket:internal_note', internalNoteHandler);
+
     return () => {
       socket.off('ticket:new_reply', handler);
       socket.off('ticket:typing', typingHandler);
+      socket.off('ticket:internal_note', internalNoteHandler);
     };
-  }, [socket, selectedTicket]);
+  }, [socket, selectedTicket, fetchUnreadInternalNotes]);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -259,12 +274,15 @@ const LgaSupportAdminDashboard = () => {
             <FaReply size={12} /> User Conversation
           </button>
           <button
-            onClick={() => setChatTab('internal')}
+            onClick={() => { setChatTab('internal'); fetchUnreadInternalNotes(); }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               chatTab === 'internal' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             <FaCommentDots size={12} /> Internal Notes
+            {unreadInternalNotes > 0 && chatTab !== 'internal' && (
+              <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-medium text-white">{unreadInternalNotes}</span>
+            )}
           </button>
         </div>
 
@@ -324,7 +342,7 @@ const LgaSupportAdminDashboard = () => {
         ) : (
           <div className="flex-1 px-6 py-4">
             <p className="mb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Internal Admin Notes</p>
-            <InternalNotesPanel ticketId={selectedTicket.id} currentUser={user} />
+            <InternalNotesPanel ticketId={selectedTicket.id} currentUser={user} readOnly={selectedTicket.status === 'resolved'} />
           </div>
         )}
       </div>
