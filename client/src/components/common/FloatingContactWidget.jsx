@@ -67,7 +67,7 @@ const FloatingContactWidget = () => {
 
   const [open, setOpen] = useState(false);
   const [view, setView] = useState('form');
-  const [form, setForm] = useState({ name: '', email: '', state: '', lga: '', subject: '', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [locations, setLocations] = useState([]);
@@ -247,7 +247,7 @@ const FloatingContactWidget = () => {
       guestSocketRef.current.disconnect();
       guestSocketRef.current = null;
     }
-    setForm({ name: '', email: '', state: '', lga: '', subject: '', message: '' });
+    setForm({ name: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
     setError('');
     setView('form');
     setActiveTicket(null);
@@ -536,7 +536,7 @@ const FloatingContactWidget = () => {
         {!open && showGreeting && (
           <div className="animate-fadeIn">
             <div className="relative bg-white rounded-xl shadow-xl p-3 max-w-[200px]">
-              <div className="absolute -bottom-1.5 right-5 w-3 h-3 bg-white rotate-45" />
+              <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white rotate-45" />
               <p className="text-sm text-gray-700 font-medium">{t('widget.need_help', 'Need help? Chat with us!')}</p>
             </div>
           </div>
@@ -610,6 +610,16 @@ const FloatingContactWidget = () => {
                     placeholder={t('widget.how_can_we_help', 'How can we help?')} />
                 </div>
                 <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.priority', 'Priority')}</label>
+                  <select value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                    <option value="medium">{t('widget.medium', 'Medium')}</option>
+                    <option value="low">{t('widget.low', 'Low')}</option>
+                    <option value="high">{t('widget.high', 'High')}</option>
+                    <option value="urgent">{t('widget.urgent', 'Urgent')}</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.message', 'Message')} *</label>
                   <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none"
@@ -666,6 +676,16 @@ const FloatingContactWidget = () => {
                   <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
                     placeholder={t('widget.how_can_we_help', 'How can we help you?')}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none" />
+                  <div className="pt-1">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.priority', 'Priority')}</label>
+                    <select value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                      <option value="medium">{t('widget.medium', 'Medium')}</option>
+                      <option value="low">{t('widget.low', 'Low')}</option>
+                      <option value="high">{t('widget.high', 'High')}</option>
+                      <option value="urgent">{t('widget.urgent', 'Urgent')}</option>
+                    </select>
+                  </div>
                   {error && <p className="text-xs text-red-600">{error}</p>}
                   <button onClick={async () => {
                     if (!form.state) { setError(t('widget.select_state_error', 'Please select your state.')); return; }
@@ -677,6 +697,7 @@ const FloatingContactWidget = () => {
                         description: form.message.trim(),
                         state: form.state,
                         lga: form.lga || undefined,
+                        priority: form.priority,
                       };
                       const res = await api.post('/support/tickets', payload);
                       localStorage.setItem(LS_TICKET_ID, String(res.data?.data?.id || ''));

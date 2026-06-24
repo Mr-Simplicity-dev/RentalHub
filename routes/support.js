@@ -271,7 +271,7 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
   try {
     await ensureSupportSchema();
 
-    const { name, email, state, lga, subject, message } = req.body;
+    const { name, email, state, lga, subject, message, priority } = req.body;
 
     if (!name || !name.trim() || !email || !email.trim() || !state || !message || !message.trim()) {
       return res.status(400).json({
@@ -280,9 +280,10 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
       });
     }
 
+    const normalizedPriority = ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium';
     const result = await db.query(
       `INSERT INTO support_tickets (subject, description, state, lga, contact_email, priority, status, user_id)
-       VALUES ($1, $2, $3, $4, $5, 'medium', 'open', NULL)
+       VALUES ($1, $2, $3, $4, $5, $6, 'open', NULL)
        RETURNING id`,
       [
         subject?.trim() ? `[Contact] ${subject.trim()}` : `[Contact] ${name.trim()}`,
@@ -292,6 +293,7 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
         state,
         lga || null,
         email.trim().toLowerCase(),
+        normalizedPriority,
       ]
     );
 
