@@ -519,25 +519,6 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
       where.push(`st.priority = $${params.length}`);
     }
 
-    const role = String(req.user.user_type || '').toLowerCase();
-
-    if (role === 'lga_support_admin') {
-      params.push(req.user.id);
-      params.push(String(req.user.assigned_state || ''));
-      params.push(String(req.user.assigned_city || ''));
-      where.push(`(
-        st.assigned_to = $${params.length - 2}
-        OR (st.assigned_to IS NULL AND st.state = $${params.length - 1} AND st.lga = $${params.length})
-      )`);
-    } else if (role === 'state_support_admin') {
-      params.push(req.user.id);
-      params.push(String(req.user.assigned_state || ''));
-      where.push(`(
-        st.assigned_to = $${params.length - 1}
-        OR (st.assigned_to IS NULL AND st.state = $${params.length})
-      )`);
-    }
-
     const result = await db.query(
       `SELECT st.id, st.subject, st.description, st.state, st.lga, st.priority, st.status,
               st.created_at, st.updated_at, st.escalated_at, st.resolved_at,
