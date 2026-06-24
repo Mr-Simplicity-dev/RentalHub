@@ -197,12 +197,16 @@ const FloatingContactWidget = () => {
   useEffect(() => {
     if (!socket || !isAuthenticated) return;
     const replyHandler = (data) => {
+      fetchMyTickets();
       if (activeTicketRef.current?.id === data.ticketId && data.reply) {
         setConversation((prev) => {
           if (prev.some((r) => r.id === data.reply.id)) return prev;
           return [...prev, data.reply];
         });
       }
+    };
+    const ticketListHandler = () => {
+      fetchMyTickets();
     };
     const typingHandler = (data) => {
       if (activeTicketRef.current?.id === data.ticketId && data.isAdmin) {
@@ -212,12 +216,16 @@ const FloatingContactWidget = () => {
       }
     };
     socket.on('ticket:new_reply', replyHandler);
+    socket.on('ticket:created', ticketListHandler);
+    socket.on('ticket:updated', ticketListHandler);
     socket.on('ticket:typing', typingHandler);
     return () => {
       socket.off('ticket:new_reply', replyHandler);
+      socket.off('ticket:created', ticketListHandler);
+      socket.off('ticket:updated', ticketListHandler);
       socket.off('ticket:typing', typingHandler);
     };
-  }, [socket, isAuthenticated]);
+  }, [socket, isAuthenticated, fetchMyTickets]);
 
   const loadConversation = useCallback(async (ticketId) => {
     setLoadingConv(true);
@@ -404,6 +412,12 @@ const FloatingContactWidget = () => {
         if (prev.some((r) => r.id === data.reply.id)) return prev;
         return [...prev, data.reply];
       });
+    });
+    gs.on('ticket:typing', (data) => {
+      if (!data.isAdmin) return;
+      setAdminTypingName(data.userName || t('widget.support_team', 'Support'));
+      clearTimeout(typingTimer.current);
+      typingTimer.current = setTimeout(() => setAdminTypingName(null), 3000);
     });
     return () => {
       gs.disconnect();
@@ -873,7 +887,7 @@ const FloatingContactWidget = () => {
                                     setContactReplyFile(f);
                                   }} />
                                 </label>
-                                <textarea value={contactReplyText} onChange={(e) => setContactReplyText(e.target.value)}
+                                <textarea value={contactReplyText} onChange={(e) => { setContactReplyText(e.target.value); guestSocketRef.current?.emit('ticket:typing'); }}
                                   placeholder={t('widget.type_reply', 'Type a reply...')} rows={1}
                                   className="flex-1 resize-none rounded border border-slate-300 px-2 py-2 text-xs outline-none focus:border-indigo-400"
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />

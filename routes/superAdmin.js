@@ -55,10 +55,8 @@ router.get('/pending-admins', authenticate, async (req, res, next) => {
 });
 
 // PATCH /super/pending-admins/:id/approve
-router.patch('/pending-admins/:id/approve', authenticate, async (req, res) => {
+router.patch('/pending-admins/:id/approve', authenticate, canManagePendingAdmins, async (req, res) => {
   try {
-    await new Promise((resolve, reject) => canManagePendingAdmins(req, res, resolve));
-
     const { id } = req.params;
     const isSFA = req.user.user_type === 'super_financial_admin';
 
@@ -90,10 +88,8 @@ router.patch('/pending-admins/:id/approve', authenticate, async (req, res) => {
 });
 
 // PATCH /super/pending-admins/:id/reject
-router.patch('/pending-admins/:id/reject', authenticate, async (req, res) => {
+router.patch('/pending-admins/:id/reject', authenticate, canManagePendingAdmins, async (req, res) => {
   try {
-    await new Promise((resolve, reject) => canManagePendingAdmins(req, res, resolve));
-
     const { id } = req.params;
     const isSFA = req.user.user_type === 'super_financial_admin';
 
@@ -207,6 +203,9 @@ router.post('/withdraw/direct', authenticate, requireSuperAdminOrDelegatedDirect
       `SELECT password_hash FROM users WHERE id = $1`,
       [req.user.id]
     );
+    if (!userRow.rows.length) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
     const passwordMatch = await bcrypt.compare(String(password), userRow.rows[0].password_hash);
     if (!passwordMatch) {
       return res.status(403).json({ success: false, message: 'Incorrect password' });

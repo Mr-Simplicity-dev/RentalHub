@@ -18,13 +18,6 @@ const SUPPORT_ADMIN_ROLES = new Set([
 ]);
 
 let supportSchemaReady = false;
-let io = null;
-
-try {
-  io = require('../server').io;
-} catch (e) {
-  // server may not be fully loaded yet; io will be set later if needed
-}
 
 // In-memory admin activity store for anonymous presence/typing indicators
 const adminActivity = {
@@ -80,20 +73,43 @@ const uploadAttachment = multer({
   },
 });
 
+const getIO = () => {
+  try { return require('../server').io; } catch { return null; }
+};
+
 const emitToUser = (userId, event, data) => {
+  const io = getIO();
   if (!io) return;
   io.to(`user:${userId}`).emit(event, data);
 };
 
 const emitToRole = (role, event, data) => {
+  const io = getIO();
   if (!io) return;
   io.to(`role:${role}`).emit(event, data);
 };
 
 const emitToGuestTicket = (ticketId, event, data) => {
+  const io = getIO();
   if (!io) return;
   const nsp = io.of('/guest');
   if (nsp) nsp.to(`ticket:guest:${ticketId}`).emit(event, data);
+};
+
+const emitTicketToAdmins = (event, payload) => {
+  for (const role of SUPPORT_ADMIN_ROLES) {
+    emitToRole(role, event, payload);
+  }
+};
+
+const emitTicketUpdated = (ticket, extra = {}) => {
+  if (!ticket?.id) return;
+  const payload = {
+    ticketId: ticket.id,
+    ticket: { ...ticket, ...extra },
+  };
+  emitTicketToAdmins('ticket:updated', payload);
+  if (ticket.user_id) emitToUser(ticket.user_id, 'ticket:updated', payload);
 };
 
 const ensureSupportSchema = async () => {
@@ -221,7 +237,7 @@ const addReplyNotification = async (reply, ticket, senderId, recipientId) => {
       subject: ticket.subject,
       replyId: reply.id,
       isAdmin: reply.is_admin,
-      preview: reply.message.substring(0, 100),
+      preview: (reply.message || '').substring(0, 100),
     });
   } catch (err) {
     console.error('Add reply notification error:', err);
@@ -359,6 +375,23 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
       console.error('Ticket auto-assignment error (non-fatal):', assignErr);
     }
 
+    emitTicketToAdmins('ticket:created', {
+      ticketId,
+      ticket: {
+        id: ticketId,
+        subject: subject?.trim() ? `[Contact] ${subject.trim()}` : `[Contact] ${name.trim()}`,
+        description: lga
+          ? `State: ${state}\nLGA: ${lga}\nFrom: ${name.trim()} <${email.trim()}>\n\n${message.trim()}`
+          : `State: ${state}\nFrom: ${name.trim()} <${email.trim()}>\n\n${message.trim()}`,
+        state,
+        lga: lga || null,
+        contact_email: email.trim().toLowerCase(),
+        priority: normalizedPriority,
+        status: 'open',
+        user_id: null,
+      },
+    });
+
     res.status(201).json({ success: true, message: 'Message sent successfully', data: { ticketId } });
   } catch (error) {
     console.error('Contact form error:', error);
@@ -433,6 +466,11 @@ router.post('/tickets', authenticate, async (req, res) => {
         console.error('Ticket auto-assignment error (non-fatal):', assignErr);
       }
     }
+
+    emitTicketToAdmins('ticket:created', {
+      ticketId: ticket.id,
+      ticket,
+    });
 
     res.status(201).json({ success: true, data: ticket });
   } catch (error) {
@@ -601,6 +639,14 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
       [nextAssigneeId, ticketId]
     );
 
+    emitTicketUpdated(ticket, {
+      priority: 'urgent',
+      status: ticket.status === 'resolved' ? ticket.status : 'in_progress',
+      assigned_to: nextAssigneeId,
+      escalated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
     res.json({
       success: true,
       message: 'Ticket escalated successfully',
@@ -637,6 +683,8 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
+    emitTicketUpdated(result.rows[0]);
+
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Assign support ticket error:', error);
@@ -662,6 +710,8 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
     if (!result.rows.length) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
+
+    emitTicketUpdated(result.rows[0]);
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -822,12 +872,17 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
         `UPDATE support_tickets SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
         [ticketId]
       );
+      ticket.status = 'in_progress';
     }
+    emitTicketUpdated(ticket, {
+      status: ticket.status,
+      updated_at: new Date().toISOString(),
+    });
 
     // Notifications & email (async, non-blocking)
     const recipientId = isSupportAdmin ? ticket.user_id : (ticket.assigned_to || null);
-    addReplyNotification(reply, ticket, req.user.id, recipientId);
-    sendReplyEmail(reply, ticket, req.user);
+    addReplyNotification(reply, ticket, req.user.id, recipientId).catch(() => {});
+    sendReplyEmail(reply, ticket, req.user).catch(() => {});
 
     // Socket real-time event
     if (recipientId) {
@@ -1400,7 +1455,12 @@ router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), asy
     // Re-open resolved ticket
     if (ticket.status === 'resolved') {
       await db.query("UPDATE support_tickets SET status = 'in_progress' WHERE id = $1", [ticketId]);
+      ticket.status = 'in_progress';
     }
+    emitTicketUpdated(ticket, {
+      status: ticket.status,
+      updated_at: new Date().toISOString(),
+    });
 
     // Notify assigned admin via socket
     const replyPayload = {
