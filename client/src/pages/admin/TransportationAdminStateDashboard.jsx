@@ -33,6 +33,7 @@ export default function TransportationAdminStateDashboard() {
   const [activeTab, setActiveTab] = useState(() => {
     return new URLSearchParams(location.search).get('tab') || 'overview';
   });
+  const highlightedBookingId = new URLSearchParams(location.search).get('bookingId');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -266,8 +267,8 @@ export default function TransportationAdminStateDashboard() {
         >
           {bookings.length ? (
             <div className="space-y-3">
-              {bookings.map((booking) => (
-                <div key={booking.id} className="rounded-2xl border border-slate-200 p-4">
+              {[...bookings].sort((a, b) => (String(b.id) === highlightedBookingId) - (String(a.id) === highlightedBookingId)).map((booking) => (
+                <div key={booking.id} className={`rounded-2xl border p-4 ${String(booking.id) === highlightedBookingId ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}>
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
                       <p className="font-semibold text-slate-900">
