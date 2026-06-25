@@ -86,10 +86,70 @@ const ensureSchema = async () => {
   await db.query(`CREATE INDEX IF NOT EXISTS idx_ecr_campaign ON email_campaign_recipients (campaign_id)`);
   await db.query(`CREATE INDEX IF NOT EXISTS idx_ecr_status ON email_campaign_recipients (status)`);
 
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS email_marketing_operations (
+      id SERIAL PRIMARY KEY,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      entity_type VARCHAR(50) NOT NULL,
+      entity_id INTEGER,
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_email_marketing_operations_entity
+      ON email_marketing_operations(entity_type, entity_id, created_at DESC)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_email_marketing_operations_created
+      ON email_marketing_operations(created_at DESC)
+  `);
+
   schemaReady = true;
 };
 
 const generateUnsubscribeToken = () => crypto.randomBytes(32).toString('hex');
+
+const getActorName = (user = {}) =>
+  user.full_name || user.name || user.email || user.username || 'Admin';
+
+const requireActionNote = (req, res, message) => {
+  const note = String(req.body?.reason || req.body?.note || req.body?.approval_note || '').trim();
+  if (!note) {
+    res.status(400).json({ success: false, message });
+    return null;
+  }
+  return note;
+};
+
+const recordOperation = async ({
+  actor,
+  entityType,
+  entityId,
+  eventType,
+  note = '',
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO email_marketing_operations (
+       actor_id, actor_name, entity_type, entity_id, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+    [
+      actor?.id || null,
+      getActorName(actor),
+      entityType,
+      entityId || null,
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
 
 // ─── Subscribers ────────────────────────────────────────────────────────────
 
@@ -263,11 +323,28 @@ const deleteSubscriber = async (req, res) => {
   try {
     await ensureSchema();
     const { id } = req.params;
-    const result = await db.query(`DELETE FROM email_subscribers WHERE id = $1 RETURNING id`, [id]);
+    const reason = requireActionNote(req, res, 'A subscriber removal reason is required');
+    if (!reason) return;
+
+    const result = await db.query(
+      `DELETE FROM email_subscribers
+       WHERE id = $1
+       RETURNING id, email, full_name, source, user_type, subscribed`,
+      [id]
+    );
 
     if (!result.rows.length) {
       return res.status(404).json({ success: false, message: 'Subscriber not found' });
     }
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'subscriber',
+      entityId: result.rows[0].id,
+      eventType: 'subscriber_removed',
+      note: reason,
+      metadata: { subscriber: result.rows[0] },
+    });
 
     res.json({ success: true });
   } catch (error) {
@@ -392,8 +469,26 @@ const deleteTemplate = async (req, res) => {
   try {
     await ensureSchema();
     const { id } = req.params;
-    const result = await db.query(`DELETE FROM email_templates WHERE id = $1 AND is_system = FALSE RETURNING id`, [id]);
+    const reason = requireActionNote(req, res, 'A template deletion reason is required');
+    if (!reason) return;
+
+    const result = await db.query(
+      `DELETE FROM email_templates
+       WHERE id = $1 AND is_system = FALSE
+       RETURNING id, name, subject, category, is_system, created_by`,
+      [id]
+    );
     if (!result.rows.length) return res.status(404).json({ success: false, message: 'Template not found or is system-protected' });
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'template',
+      entityId: result.rows[0].id,
+      eventType: 'template_deleted',
+      note: reason,
+      metadata: { template: result.rows[0] },
+    });
+
     res.json({ success: true });
   } catch (error) {
     console.error('Delete template error:', error.message);
@@ -407,9 +502,20 @@ const listCampaigns = async (req, res) => {
   try {
     await ensureSchema();
     const { rows } = await db.query(
-      `SELECT c.*, u.full_name AS created_by_name
+      `SELECT c.*, u.full_name AS created_by_name,
+              COALESCE(ops.operations, '[]'::json) AS operations
        FROM email_campaigns c
        LEFT JOIN users u ON u.id = c.created_by
+       LEFT JOIN LATERAL (
+         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+           FROM email_marketing_operations
+           WHERE entity_type = 'campaign' AND entity_id = c.id
+           ORDER BY created_at DESC, id DESC
+           LIMIT 3
+         ) operation_rows
+       ) ops ON TRUE
        ORDER BY c.created_at DESC`
     );
     res.json({ success: true, data: rows });
@@ -488,12 +594,28 @@ const deleteCampaign = async (req, res) => {
   try {
     await ensureSchema();
     const { id } = req.params;
-    const check = await db.query(`SELECT status FROM email_campaigns WHERE id = $1`, [id]);
+    const reason = requireActionNote(req, res, 'A campaign deletion reason is required');
+    if (!reason) return;
+
+    const check = await db.query(
+      `SELECT id, name, subject, status, stats, created_by FROM email_campaigns WHERE id = $1`,
+      [id]
+    );
     if (!check.rows.length) return res.status(404).json({ success: false, message: 'Campaign not found' });
     if (check.rows[0].status === 'sending' || check.rows[0].status === 'sent') {
       return res.status(400).json({ success: false, message: 'Cannot delete a sending or sent campaign' });
     }
     await db.query(`DELETE FROM email_campaigns WHERE id = $1`, [id]);
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'campaign',
+      entityId: Number(id),
+      eventType: 'campaign_deleted',
+      note: reason,
+      metadata: { campaign: check.rows[0] },
+    });
+
     res.json({ success: true });
   } catch (error) {
     console.error('Delete campaign error:', error.message);
@@ -505,6 +627,8 @@ const sendCampaign = async (req, res) => {
   try {
     await ensureSchema();
     const { id } = req.params;
+    const approvalNote = requireActionNote(req, res, 'A launch approval note is required');
+    if (!approvalNote) return;
 
     const campaign = await db.query(`SELECT * FROM email_campaigns WHERE id = $1`, [id]);
     if (!campaign.rows.length) return res.status(404).json({ success: false, message: 'Campaign not found' });
@@ -619,6 +743,20 @@ const sendCampaign = async (req, res) => {
       `UPDATE email_campaigns SET status = $1, stats = $2, sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
       [newStatus, JSON.stringify(stats), id]
     );
+
+    await recordOperation({
+      actor: req.user,
+      entityType: 'campaign',
+      entityId: Number(id),
+      eventType: 'campaign_sent',
+      note: approvalNote,
+      metadata: {
+        total,
+        sent,
+        failed,
+        status: newStatus,
+      },
+    });
 
     res.json({
       success: true,

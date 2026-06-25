@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 const PropertiesTab = ({
   properties,
@@ -8,6 +8,13 @@ const PropertiesTab = ({
   unlistProperty,
   toggleFeatured,
 }) => {
+  const [propertyAction, setPropertyAction] = useState({
+    open: false,
+    property: null,
+    action: "",
+    reason: "",
+    error: "",
+  });
 
   const toggleProperty = (id) => {
     setSelectedProps((prev) =>
@@ -25,6 +32,72 @@ const PropertiesTab = ({
     }
   };
 
+  const openPropertyAction = (property, action) => {
+    setPropertyAction({
+      open: true,
+      property,
+      action,
+      reason: "",
+      error: "",
+    });
+  };
+
+  const closePropertyAction = () => {
+    setPropertyAction({
+      open: false,
+      property: null,
+      action: "",
+      reason: "",
+      error: "",
+    });
+  };
+
+  const getActionTitle = () => {
+    if (propertyAction.action === "bulk_unlist") return "Unlist selected properties";
+    if (propertyAction.action === "unlist") return "Unlist property";
+    if (propertyAction.action === "feature") return "Feature property";
+    return "Unfeature property";
+  };
+
+  const getActionReasonLabel = () => {
+    if (propertyAction.action === "bulk_unlist") return "Bulk unlist reason";
+    if (propertyAction.action === "unlist") return "Unlist reason";
+    if (propertyAction.action === "feature") return "Feature reason";
+    return "Unfeature reason";
+  };
+
+  const submitPropertyAction = async () => {
+    const reason = propertyAction.reason.trim();
+
+    if (!reason) {
+      setPropertyAction((prev) => ({
+        ...prev,
+        error: `${getActionReasonLabel()} is required.`,
+      }));
+      return;
+    }
+
+    try {
+      if (propertyAction.action === "bulk_unlist") {
+        await bulkProps(reason);
+        setSelectedProps([]);
+      } else if (propertyAction.action === "unlist") {
+        await unlistProperty(propertyAction.property.id, reason);
+      } else if (propertyAction.action === "feature") {
+        await toggleFeatured(propertyAction.property.id, true, reason);
+      } else if (propertyAction.action === "unfeature") {
+        await toggleFeatured(propertyAction.property.id, false, reason);
+      }
+
+      closePropertyAction();
+    } catch (err) {
+      setPropertyAction((prev) => ({
+        ...prev,
+        error: err.response?.data?.message || "Property action failed.",
+      }));
+    }
+  };
+
   return (
     <div className="space-y-4 animate-fadeIn">
 
@@ -38,7 +111,7 @@ const PropertiesTab = ({
           </span>
 
           <button
-            onClick={bulkProps}
+            onClick={() => openPropertyAction(null, "bulk_unlist")}
             className="rounded-lg bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-700"
           >
             Unlist Selected
@@ -148,7 +221,7 @@ const PropertiesTab = ({
 
                     {(p.is_available ?? p.is_active) && (
                       <button
-                        onClick={() => unlistProperty(p.id)}
+                        onClick={() => openPropertyAction(p, "unlist")}
                         className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
                       >
                         Unlist
@@ -156,7 +229,12 @@ const PropertiesTab = ({
                     )}
 
                     <button
-                      onClick={() => toggleFeatured(p.id, !p.featured)}
+                      onClick={() =>
+                        openPropertyAction(
+                          p,
+                          p.featured ? "unfeature" : "feature"
+                        )
+                      }
                       className={`rounded-lg px-2 py-1 text-xs transition-colors ${
                         p.featured
                           ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
@@ -167,6 +245,21 @@ const PropertiesTab = ({
                     </button>
 
                   </div>
+
+                  {Array.isArray(p.operations) && p.operations.length > 0 && (
+                    <div className="mt-2 space-y-1 text-xs text-gray-500">
+                      {p.operations.slice(0, 2).map((operation) => (
+                        <p
+                          key={operation.id}
+                          className="max-w-[190px] truncate"
+                          title={operation.note || operation.event_type}
+                        >
+                          {String(operation.event_type || "").replace(/_/g, " ")} by{" "}
+                          {operation.actor_name || "Super admin"}
+                        </p>
+                      ))}
+                    </div>
+                  )}
 
                 </td>
 
@@ -179,6 +272,72 @@ const PropertiesTab = ({
         </table>
 
       </div>
+
+      {propertyAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl2 bg-white shadow-card">
+            <div className="border-b border-soft px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {getActionTitle()}
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {propertyAction.action === "bulk_unlist"
+                  ? `${selectedProps.length} selected properties`
+                  : propertyAction.property?.title}
+              </p>
+            </div>
+
+            <div className="space-y-3 px-6 py-4">
+              <label className="block text-sm font-medium text-gray-700">
+                {getActionReasonLabel()}
+              </label>
+              <textarea
+                value={propertyAction.reason}
+                onChange={(event) =>
+                  setPropertyAction((prev) => ({
+                    ...prev,
+                    reason: event.target.value,
+                    error: "",
+                  }))
+                }
+                rows={4}
+                className="w-full rounded-lg border border-soft px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                placeholder="Explain why this property moderation action is needed"
+              />
+              <p className="text-xs text-gray-500">
+                This reason is saved in property governance history.
+              </p>
+
+              {propertyAction.error && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {propertyAction.error}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-soft px-6 py-4">
+              <button
+                type="button"
+                onClick={closePropertyAction}
+                className="rounded-lg border border-soft px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitPropertyAction}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
+                  propertyAction.action === "feature"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

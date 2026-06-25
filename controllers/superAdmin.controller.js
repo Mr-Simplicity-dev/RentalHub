@@ -1389,13 +1389,73 @@ const updateAdminJurisdiction = async (req, res) => {
 
 // ================= PROPERTIES =================
 
+const ensurePropertyOperationSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS property_operations (
+      id SERIAL PRIMARY KEY,
+      property_id INTEGER REFERENCES properties(id) ON DELETE CASCADE,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_property_operations_property
+      ON property_operations(property_id, created_at DESC)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_property_operations_created
+      ON property_operations(created_at DESC)
+  `);
+};
+
+const createPropertyOperation = async ({
+  propertyId,
+  actor,
+  eventType,
+  note,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO property_operations (
+       property_id, actor_id, actor_name, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      propertyId,
+      actor?.id || null,
+      getAdminOperationActorName(actor),
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
 // GET /api/super/properties
 const getAllProperties = async (req, res) => {
   try {
+    await ensurePropertyOperationSchema();
+
     const { rows } = await db.query(
-      `SELECT p.*, u.full_name AS landlord_name
+      `SELECT p.*, u.full_name AS landlord_name,
+              COALESCE(ops.operations, '[]'::json) AS operations
        FROM properties p
        LEFT JOIN users u ON u.id = COALESCE(p.landlord_id, p.user_id)
+       LEFT JOIN LATERAL (
+         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+           FROM property_operations
+           WHERE property_id = p.id
+           ORDER BY created_at DESC, id DESC
+           LIMIT 3
+         ) operation_rows
+       ) ops ON TRUE
        ORDER BY p.created_at DESC`
     );
 
@@ -1409,19 +1469,41 @@ const getAllProperties = async (req, res) => {
 // PATCH /api/super/properties/:id/unlist
 const unlistProperty = async (req, res) => {
   const { id } = req.params;
+  const reason = String(req.body?.reason || req.body?.note || '').trim();
 
   try {
-    await db.query(
+    await ensurePropertyOperationSchema();
+
+    if (!reason) {
+      return res.status(400).json({ message: 'An unlist reason is required' });
+    }
+
+    const result = await db.query(
       `UPDATE properties
        SET is_available = FALSE,
            updated_at = NOW()
-       WHERE id = $1`,
+       WHERE id = $1
+       RETURNING id, title, landlord_id, user_id, is_available, featured`,
       [id]
     );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
     await db.query(
       'DELETE FROM saved_properties WHERE property_id = $1',
       [id]
     );
+
+    await createPropertyOperation({
+      propertyId: Number(id),
+      actor: req.user,
+      eventType: 'property_unlisted',
+      note: reason,
+      metadata: result.rows[0],
+    });
+
     await logAction(req.user.id, 'UNLIST_PROPERTY', 'property', id);
 
     res.json({ success: true, message: 'Property unlisted' });
@@ -1434,15 +1516,36 @@ const unlistProperty = async (req, res) => {
 // PATCH /api/super/properties/:id/feature
 const featureProperty = async (req, res) => {
   const { id } = req.params;
+  const reason = String(req.body?.reason || req.body?.note || '').trim();
 
   try {
-    await db.query(
+    await ensurePropertyOperationSchema();
+
+    if (!reason) {
+      return res.status(400).json({ message: 'A feature reason is required' });
+    }
+
+    const result = await db.query(
       `UPDATE properties
        SET featured = TRUE,
            updated_at = NOW()
-       WHERE id = $1`,
+       WHERE id = $1
+       RETURNING id, title, landlord_id, user_id, is_available, featured`,
       [id]
     );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    await createPropertyOperation({
+      propertyId: Number(id),
+      actor: req.user,
+      eventType: 'property_featured',
+      note: reason,
+      metadata: result.rows[0],
+    });
+
     await logAction(req.user.id, 'FEATURE_PROPERTY', 'property', id);
 
     res.json({ success: true, message: 'Property marked as featured' });
@@ -1455,15 +1558,36 @@ const featureProperty = async (req, res) => {
 // PATCH /api/super/properties/:id/unfeature
 const unfeatureProperty = async (req, res) => {
   const { id } = req.params;
+  const reason = String(req.body?.reason || req.body?.note || '').trim();
 
   try {
-    await db.query(
+    await ensurePropertyOperationSchema();
+
+    if (!reason) {
+      return res.status(400).json({ message: 'An unfeature reason is required' });
+    }
+
+    const result = await db.query(
       `UPDATE properties
        SET featured = FALSE,
            updated_at = NOW()
-       WHERE id = $1`,
+       WHERE id = $1
+       RETURNING id, title, landlord_id, user_id, is_available, featured`,
       [id]
     );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    await createPropertyOperation({
+      propertyId: Number(id),
+      actor: req.user,
+      eventType: 'property_unfeatured',
+      note: reason,
+      metadata: result.rows[0],
+    });
+
     await logAction(req.user.id, 'UNFEATURE_PROPERTY', 'property', id);
 
     res.json({ success: true, message: 'Property removed from featured' });
@@ -1616,13 +1740,79 @@ const getAnalytics = async (req, res) => {
 
 // ================= REPORTS =================
 
+const ensureReportOperationSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS report_operations (
+      id SERIAL PRIMARY KEY,
+      report_id INTEGER REFERENCES reports(id) ON DELETE CASCADE,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      previous_status VARCHAR(50),
+      new_status VARCHAR(50),
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_report_operations_report
+      ON report_operations(report_id, created_at DESC)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_report_operations_created
+      ON report_operations(created_at DESC)
+  `);
+};
+
+const createReportOperation = async ({
+  reportId,
+  actor,
+  eventType,
+  note,
+  previousStatus,
+  newStatus,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO report_operations (
+       report_id, actor_id, actor_name, event_type, note, previous_status, new_status, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+    [
+      reportId,
+      actor?.id || null,
+      getAdminOperationActorName(actor),
+      eventType,
+      note || null,
+      previousStatus || null,
+      newStatus || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
 // GET /api/super/reports
 const getReports = async (req, res) => {
   try {
+    await ensureReportOperationSchema();
+
     const { rows } = await db.query(
-      `SELECT r.*, u.full_name AS reporter_name
+      `SELECT r.*, u.full_name AS reporter_name,
+              COALESCE(ops.operations, '[]'::json) AS operations
        FROM reports r
        LEFT JOIN users u ON u.id = r.reporter_id
+       LEFT JOIN LATERAL (
+         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, previous_status, new_status, metadata, created_at
+           FROM report_operations
+           WHERE report_id = r.id
+           ORDER BY created_at DESC, id DESC
+           LIMIT 3
+         ) operation_rows
+       ) ops ON TRUE
        ORDER BY r.created_at DESC`
     );
 
@@ -1635,10 +1825,42 @@ const getReports = async (req, res) => {
 // PATCH /api/super/reports/:id
 const updateReportStatus = async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const status = String(req.body?.status || '').trim().toLowerCase();
+  const note = String(req.body?.note || req.body?.reason || '').trim();
 
   try {
+    await ensureReportOperationSchema();
+
+    if (!['pending', 'resolved', 'dismissed'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid report status' });
+    }
+
+    if ((status === 'resolved' || status === 'dismissed') && !note) {
+      return res.status(400).json({ message: 'An investigation note is required' });
+    }
+
+    const existing = await db.query(`SELECT * FROM reports WHERE id = $1`, [id]);
+    if (!existing.rows.length) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    const previousStatus = existing.rows[0].status;
+
     await db.query(`UPDATE reports SET status = $1 WHERE id = $2`, [status, id]);
+
+    await createReportOperation({
+      reportId: Number(id),
+      actor: req.user,
+      eventType: status === 'resolved' ? 'report_resolved' : status === 'dismissed' ? 'report_dismissed' : 'report_reopened',
+      note,
+      previousStatus,
+      newStatus: status,
+      metadata: {
+        target_type: existing.rows[0].target_type,
+        target_id: existing.rows[0].target_id,
+      },
+    });
+
     await logAction(req.user.id, `REPORT_${status.toUpperCase()}`, 'report', id);
 
     res.json({ success: true });
@@ -1650,9 +1872,35 @@ const updateReportStatus = async (req, res) => {
 // PATCH /api/super/reports/:reportId/resolve
 const resolveReport = async (req, res) => {
   const { reportId } = req.params;
+  const note = String(req.body?.note || req.body?.reason || '').trim();
 
   try {
+    await ensureReportOperationSchema();
+
+    if (!note) {
+      return res.status(400).json({ message: 'An investigation note is required' });
+    }
+
+    const existing = await db.query(`SELECT * FROM reports WHERE id = $1`, [reportId]);
+    if (!existing.rows.length) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
     await db.query(`UPDATE reports SET status = 'resolved' WHERE id = $1`, [reportId]);
+
+    await createReportOperation({
+      reportId: Number(reportId),
+      actor: req.user,
+      eventType: 'report_resolved',
+      note,
+      previousStatus: existing.rows[0].status,
+      newStatus: 'resolved',
+      metadata: {
+        target_type: existing.rows[0].target_type,
+        target_id: existing.rows[0].target_id,
+      },
+    });
+
     await logAction(req.user.id, 'RESOLVE_REPORT', 'report', reportId);
     res.json({ success: true, message: 'Report resolved' });
   } catch (err) {
@@ -2839,8 +3087,11 @@ const bulkUserAction = async (req, res) => {
 
 const bulkPropertyAction = async (req, res) => {
   const { ids, action } = req.body;
+  const reason = String(req.body?.reason || req.body?.note || '').trim();
 
   try {
+    await ensurePropertyOperationSchema();
+
     if (!Array.isArray(ids) || !ids.length) {
       return res.status(400).json({ message: 'No properties selected' });
     }
@@ -2849,17 +3100,36 @@ const bulkPropertyAction = async (req, res) => {
       return res.status(400).json({ message: 'Invalid action' });
     }
 
-    await db.query(
+    if (!reason) {
+      return res.status(400).json({ message: 'A bulk unlist reason is required' });
+    }
+
+    const actionResult = await db.query(
       `UPDATE properties
        SET is_available = FALSE,
            updated_at = NOW()
-       WHERE id = ANY($1)`,
+       WHERE id = ANY($1)
+       RETURNING id, title, landlord_id, user_id, is_available, featured`,
       [ids]
     );
+
     await db.query(
       'DELETE FROM saved_properties WHERE property_id = ANY($1)',
       [ids]
     );
+
+    for (const row of actionResult.rows) {
+      await createPropertyOperation({
+        propertyId: row.id,
+        actor: req.user,
+        eventType: 'property_bulk_unlisted',
+        note: reason,
+        metadata: {
+          ...row,
+          bulk_action: true,
+        },
+      });
+    }
 
     await logAction(req.user.id, 'BULK_UNLIST_PROPERTIES', 'property', null);
 
@@ -3146,11 +3416,72 @@ const removeRegistrationAccessRule = async (req, res) => {
 };
 
 // fraud
+const ensureFraudOperationSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS fraud_flag_operations (
+      id SERIAL PRIMARY KEY,
+      fraud_flag_id INTEGER REFERENCES fraud_flags(id) ON DELETE CASCADE,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_fraud_flag_operations_flag
+      ON fraud_flag_operations(fraud_flag_id, created_at DESC)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_fraud_flag_operations_created
+      ON fraud_flag_operations(created_at DESC)
+  `);
+};
+
+const createFraudFlagOperation = async ({
+  fraudFlagId,
+  actor,
+  eventType,
+  note,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO fraud_flag_operations (
+       fraud_flag_id, actor_id, actor_name, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      fraudFlagId,
+      actor?.id || null,
+      getAdminOperationActorName(actor),
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
 const getFraudFlags = async (req, res) => {
   try {
+    await ensureFraudOperationSchema();
+
     const { rows } = await db.query(
-      `SELECT * FROM fraud_flags
-       WHERE resolved = FALSE
+      `SELECT ff.*,
+              COALESCE(ops.operations, '[]'::json) AS operations
+       FROM fraud_flags ff
+       LEFT JOIN LATERAL (
+         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+           FROM fraud_flag_operations
+           WHERE fraud_flag_id = ff.id
+           ORDER BY created_at DESC, id DESC
+           LIMIT 3
+         ) operation_rows
+       ) ops ON TRUE
+       WHERE ff.resolved = FALSE
        ORDER BY score DESC, created_at DESC`
     );
 
@@ -3162,11 +3493,42 @@ const getFraudFlags = async (req, res) => {
 
 const resolveFraudFlag = async (req, res) => {
   const { id } = req.params;
+  const note = String(req.body?.note || req.body?.reason || '').trim();
 
-  await db.query(`UPDATE fraud_flags SET resolved = TRUE WHERE id = $1`, [id]);
-  await logAction(req.user.id, 'RESOLVE_FRAUD_FLAG', 'fraud', id);
+  try {
+    await ensureFraudOperationSchema();
 
-  res.json({ success: true });
+    if (!note) {
+      return res.status(400).json({ message: 'A fraud resolution note is required' });
+    }
+
+    const existing = await db.query(`SELECT * FROM fraud_flags WHERE id = $1`, [id]);
+    if (!existing.rows.length) {
+      return res.status(404).json({ message: 'Fraud flag not found' });
+    }
+
+    await db.query(`UPDATE fraud_flags SET resolved = TRUE WHERE id = $1`, [id]);
+
+    await createFraudFlagOperation({
+      fraudFlagId: Number(id),
+      actor: req.user,
+      eventType: 'fraud_flag_resolved',
+      note,
+      metadata: {
+        entity_type: existing.rows[0].entity_type,
+        entity_id: existing.rows[0].entity_id,
+        rule: existing.rows[0].rule,
+        score: existing.rows[0].score,
+      },
+    });
+
+    await logAction(req.user.id, 'RESOLVE_FRAUD_FLAG', 'fraud', id);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Resolve fraud flag error:', err);
+    res.status(500).json({ message: 'Failed to resolve fraud flag' });
+  }
 };
 
 const getRangeStart = (timeRange) => {

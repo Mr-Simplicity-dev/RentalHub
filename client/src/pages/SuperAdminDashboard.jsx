@@ -799,15 +799,20 @@ export default function SuperAdminDashboard() {
     loadAdminPerformance();
   };
 
-  const unlistProperty = async (id) => {
-    await api.patch(`/super/properties/${id}/unlist`);
+  const unlistProperty = async (id, reason = "") => {
+    await api.patch(`/super/properties/${id}/unlist`, {
+      reason: String(reason || "").trim(),
+    });
     toast.success("Property unlisted");
     loadProperties();
   };
 
-  const toggleFeaturedProperty = async (id, shouldFeature) => {
+  const toggleFeaturedProperty = async (id, shouldFeature, reason = "") => {
     await api.patch(
-      `/super/properties/${id}/${shouldFeature ? "feature" : "unfeature"}`
+      `/super/properties/${id}/${shouldFeature ? "feature" : "unfeature"}`,
+      {
+        reason: String(reason || "").trim(),
+      }
     );
     toast.success(
       shouldFeature ? "Property featured" : "Property removed from featured"
@@ -829,20 +834,26 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const bulkProps = async () => {
+  const bulkProps = async (reason = "") => {
     await api.post("/super/properties/bulk", {
       ids: selectedProps,
       action: "unlist",
+      reason: String(reason || "").trim(),
     });
     toast.success("Bulk unlist completed");
     loadProperties();
   };
 
-  const updateReport = async (id, status) => {
+  const updateReport = async (id, status, note = "") => {
     if (status === "resolved") {
-      await api.patch(`/super/reports/${id}/resolve`);
+      await api.patch(`/super/reports/${id}/resolve`, {
+        note: String(note || "").trim(),
+      });
     } else {
-      await api.patch(`/super/reports/${id}`, { status });
+      await api.patch(`/super/reports/${id}`, {
+        status,
+        note: String(note || "").trim(),
+      });
     }
     loadReports();
   };
