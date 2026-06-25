@@ -74,6 +74,59 @@ const isRecruitmentAdmin = async (userId) => {
          user.is_recruitment_admin === true;
 };
 
+let recruitmentOperationsSchemaReady = false;
+
+const getActorName = (user) =>
+  user?.full_name || user?.name || user?.email || user?.username || `User ${user?.id || ''}`.trim();
+
+const ensureRecruitmentOperationsSchema = async () => {
+  if (recruitmentOperationsSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS recruitment_application_operations (
+      id SERIAL PRIMARY KEY,
+      application_id INTEGER NOT NULL REFERENCES recruitment_applications(id) ON DELETE CASCADE,
+      admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_recruitment_application_operations_application
+    ON recruitment_application_operations(application_id, created_at DESC)
+  `);
+
+  recruitmentOperationsSchemaReady = true;
+};
+
+const createRecruitmentOperation = async ({
+  applicationId,
+  adminId,
+  actorName,
+  eventType,
+  note,
+  metadata = {}
+}) => {
+  await ensureRecruitmentOperationsSchema();
+  await db.query(
+    `INSERT INTO recruitment_application_operations (
+      application_id, admin_id, actor_name, event_type, note, metadata
+    ) VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      applicationId,
+      adminId || null,
+      actorName || null,
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {})
+    ]
+  );
+};
+
 const isAdmin = async (userId) => {
   const result = await db.query(
     `SELECT user_type FROM users WHERE id = $1`,
@@ -1391,6 +1444,7 @@ exports.getAllApplications = async (req, res) => {
 
 exports.getApplicationDetail = async (req, res) => {
   try {
+    await ensureRecruitmentOperationsSchema();
     if (!(await isRecruitmentAdmin(req.user.id))) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
@@ -1432,13 +1486,22 @@ exports.getApplicationDetail = async (req, res) => {
       );
       interviewAnswers = answers.rows;
     }
+
+    const operations = await db.query(
+      `SELECT *
+       FROM recruitment_application_operations
+       WHERE application_id = $1
+       ORDER BY created_at DESC, id DESC`,
+      [id]
+    );
     
     res.json({
       success: true,
       data: {
         ...result.rows[0],
         documents: docs.rows,
-        interview_answers: interviewAnswers
+        interview_answers: interviewAnswers,
+        operations: operations.rows
       }
     });
   } catch (err) {
@@ -2893,18 +2956,27 @@ exports.getApplicants = async (req, res) => {
 
 const setApplicantStatus = async (req, res, status) => {
   try {
+    await ensureRecruitmentOperationsSchema();
     if (!(await isRecruitmentAdmin(req.user.id))) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     const { id } = req.params;
     const notes = normalizeText(req.body?.notes || req.body?.admin_notes || req.body?.reason);
+    const decisionReason = normalizeText(req.body?.decision_reason || req.body?.shortlist_reason || req.body?.rejection_reason);
     const interviewDate = req.body?.interview_date || null;
+
+    const previous = await db.query(
+      `SELECT id, status FROM recruitment_applications WHERE id = $1`,
+      [id]
+    );
 
     const result = await db.query(
       `UPDATE recruitment_applications
        SET status = $1,
            admin_notes = COALESCE(NULLIF($2, ''), admin_notes),
+           shortlist_reason = CASE WHEN $1 = 'shortlisted' THEN COALESCE(NULLIF($6, ''), shortlist_reason) ELSE shortlist_reason END,
+           disqualified_reason = CASE WHEN $1 IN ('rejected', 'disqualified') THEN COALESCE(NULLIF($6, ''), disqualified_reason) ELSE disqualified_reason END,
            reviewed_by = $3,
            reviewed_at = NOW(),
            interview_date = COALESCE($4, interview_date),
@@ -2912,12 +2984,25 @@ const setApplicantStatus = async (req, res, status) => {
            updated_at = NOW()
        WHERE id = $5
        RETURNING *`,
-      [status, notes, req.user.id, interviewDate, id]
+      [status, notes, req.user.id, interviewDate, id, decisionReason]
     );
 
     if (!result.rows.length) {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
+
+    await createRecruitmentOperation({
+      applicationId: id,
+      adminId: req.user.id,
+      actorName: getActorName(req.user),
+      eventType: `status_${status}`,
+      note: decisionReason || notes || `Application marked ${status}`,
+      metadata: {
+        old_status: previous.rows[0]?.status || null,
+        new_status: status,
+        interview_date: interviewDate || null
+      }
+    });
 
     res.json({ success: true, data: result.rows[0], message: `Application marked ${status}` });
   } catch (error) {
@@ -2932,6 +3017,7 @@ exports.shortlistApplicant = (req, res) => setApplicantStatus(req, res, 'shortli
 
 exports.bulkProcessApplicants = async (req, res) => {
   try {
+    await ensureRecruitmentOperationsSchema();
     if (!(await isRecruitmentAdmin(req.user.id))) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
@@ -2954,6 +3040,15 @@ exports.bulkProcessApplicants = async (req, res) => {
        RETURNING id`,
       [status, normalizeText(req.body?.notes), req.user.id, ids]
     );
+
+    await Promise.all(result.rows.map((row) => createRecruitmentOperation({
+      applicationId: row.id,
+      adminId: req.user.id,
+      actorName: getActorName(req.user),
+      eventType: `bulk_${status}`,
+      note: normalizeText(req.body?.notes) || `Bulk marked ${status}`,
+      metadata: { new_status: status, bulk: true }
+    })));
 
     res.json({ success: true, data: { updated: result.rowCount }, message: `${result.rowCount} applications updated` });
   } catch (error) {
@@ -3043,6 +3138,7 @@ exports.bulkActivateLocations = async (req, res) => {
 
 exports.setInterviewDate = async (req, res) => {
   try {
+    await ensureRecruitmentOperationsSchema();
     if (!(await isRecruitmentAdmin(req.user.id))) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
@@ -3060,6 +3156,17 @@ exports.setInterviewDate = async (req, res) => {
     if (!result.rows.length) {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
+
+    await createRecruitmentOperation({
+      applicationId: req.params.id,
+      adminId: req.user.id,
+      actorName: getActorName(req.user),
+      eventType: 'interview_scheduled',
+      note: normalizeText(req.body?.notes) || 'Interview date scheduled',
+      metadata: {
+        interview_date: req.body?.interview_date
+      }
+    });
 
     res.json({ success: true, data: result.rows[0], message: 'Interview date set' });
   } catch (error) {

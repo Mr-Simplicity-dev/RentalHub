@@ -36,6 +36,73 @@ const requireTransportationAdminAccess = (req, res, next) => {
   return next();
 };
 
+let transportationOperationsSchemaReady = false;
+
+const getActorName = (user) =>
+  user?.full_name || user?.name || user?.email || user?.username || `User ${user?.id || ''}`.trim();
+
+const ensureTransportationOperationsSchema = async () => {
+  if (transportationOperationsSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE transportation_bookings
+      ADD COLUMN IF NOT EXISTS admin_notes TEXT,
+      ADD COLUMN IF NOT EXISTS pickup_confirmed_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS dropoff_confirmed_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS pickup_proof_url TEXT,
+      ADD COLUMN IF NOT EXISTS dropoff_proof_url TEXT,
+      ADD COLUMN IF NOT EXISTS dispatch_notes TEXT,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS transportation_booking_operations (
+      id SERIAL PRIMARY KEY,
+      booking_id INTEGER NOT NULL REFERENCES transportation_bookings(id) ON DELETE CASCADE,
+      admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      proof_url TEXT,
+      metadata JSONB DEFAULT '{}',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_transportation_operations_booking
+    ON transportation_booking_operations(booking_id, created_at DESC)
+  `);
+
+  transportationOperationsSchemaReady = true;
+};
+
+const createTransportationOperation = async ({
+  bookingId,
+  adminId,
+  actorName,
+  eventType,
+  note,
+  proofUrl,
+  metadata = {}
+}) => {
+  await ensureTransportationOperationsSchema();
+  await db.query(
+    `INSERT INTO transportation_booking_operations (
+      booking_id, admin_id, actor_name, event_type, note, proof_url, metadata
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      bookingId,
+      adminId || null,
+      actorName || null,
+      eventType,
+      note || null,
+      proofUrl || null,
+      JSON.stringify(metadata || {})
+    ]
+  );
+};
+
 // ====================== AUTHENTICATION ======================
 router.use(authenticate);
 router.use(requireTransportationAdminAccess);
@@ -182,6 +249,7 @@ router.get('/dashboard', async (req, res) => {
  */
 router.get('/bookings', async (req, res) => {
   try {
+    await ensureTransportationOperationsSchema();
     const {
       page = 1,
       limit = 20,
@@ -344,6 +412,7 @@ router.get('/bookings', async (req, res) => {
  */
 router.get('/bookings/:bookingId', async (req, res) => {
   try {
+    await ensureTransportationOperationsSchema();
     const { bookingId } = req.params;
     
     const result = await db.query(`
@@ -397,10 +466,225 @@ router.get('/bookings/:bookingId', async (req, res) => {
 });
 
 /**
+ * Get transportation booking operations timeline
+ */
+router.get('/bookings/:bookingId/operations', async (req, res) => {
+  try {
+    await ensureTransportationOperationsSchema();
+    const { bookingId } = req.params;
+
+    const bookingResult = await db.query(
+      'SELECT id FROM transportation_bookings WHERE id = $1',
+      [bookingId]
+    );
+
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transportation booking not found'
+      });
+    }
+
+    const result = await db.query(
+      `SELECT *
+       FROM transportation_booking_operations
+       WHERE booking_id = $1
+       ORDER BY created_at DESC, id DESC`,
+      [bookingId]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Get transportation operations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch transportation operations'
+    });
+  }
+});
+
+/**
+ * Update transportation dispatch lifecycle
+ */
+router.patch('/bookings/:bookingId/dispatch', async (req, res) => {
+  try {
+    await ensureTransportationOperationsSchema();
+    const { bookingId } = req.params;
+    const {
+      action,
+      driver_name,
+      driver_phone,
+      vehicle_number,
+      note = '',
+      proof_url = ''
+    } = req.body;
+    const adminId = req.user.id;
+    const actorName = getActorName(req.user);
+    const validActions = ['assign_driver', 'pickup_confirmed', 'dropoff_confirmed', 'cancelled'];
+
+    if (!validActions.includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid dispatch action. Must be one of: ${validActions.join(', ')}`
+      });
+    }
+
+    if (action === 'assign_driver' && (!driver_name || !driver_phone || !vehicle_number)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Driver name, driver phone, and vehicle number are required'
+      });
+    }
+
+    if (['dropoff_confirmed', 'cancelled'].includes(action) && !String(note).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'A dispatch note is required for this action'
+      });
+    }
+
+    const bookingResult = await db.query(
+      'SELECT * FROM transportation_bookings WHERE id = $1',
+      [bookingId]
+    );
+
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transportation booking not found'
+      });
+    }
+
+    const booking = bookingResult.rows[0];
+    const updates = ['updated_at = CURRENT_TIMESTAMP'];
+    const params = [];
+    let paramCount = 1;
+    let nextStatus = booking.booking_status;
+    let eventType = action;
+
+    if (action === 'assign_driver') {
+      nextStatus = 'confirmed';
+      updates.push(
+        `booking_status = $${paramCount++}`,
+        'confirmed_at = CURRENT_TIMESTAMP',
+        `driver_name = $${paramCount++}`,
+        `driver_phone = $${paramCount++}`,
+        `vehicle_number = $${paramCount++}`
+      );
+      params.push(nextStatus, driver_name, driver_phone, vehicle_number);
+    }
+
+    if (action === 'pickup_confirmed') {
+      nextStatus = 'in_progress';
+      updates.push(
+        `booking_status = $${paramCount++}`,
+        'started_at = CURRENT_TIMESTAMP',
+        'pickup_confirmed_at = CURRENT_TIMESTAMP'
+      );
+      params.push(nextStatus);
+      if (proof_url) {
+        updates.push(`pickup_proof_url = $${paramCount++}`);
+        params.push(proof_url);
+      }
+    }
+
+    if (action === 'dropoff_confirmed') {
+      nextStatus = 'completed';
+      updates.push(
+        `booking_status = $${paramCount++}`,
+        'completed_at = CURRENT_TIMESTAMP',
+        'dropoff_confirmed_at = CURRENT_TIMESTAMP'
+      );
+      params.push(nextStatus);
+      if (proof_url) {
+        updates.push(`dropoff_proof_url = $${paramCount++}`);
+        params.push(proof_url);
+      }
+    }
+
+    if (action === 'cancelled') {
+      nextStatus = 'cancelled';
+      eventType = 'dispatch_cancelled';
+      updates.push(
+        `booking_status = $${paramCount++}`,
+        'cancelled_at = CURRENT_TIMESTAMP'
+      );
+      params.push(nextStatus);
+    }
+
+    if (String(note).trim()) {
+      updates.push(`dispatch_notes = $${paramCount++}`, `admin_notes = $${paramCount++}`);
+      params.push(String(note).trim(), String(note).trim());
+    }
+
+    params.push(bookingId);
+
+    const updateResult = await db.query(
+      `UPDATE transportation_bookings
+       SET ${updates.join(', ')}
+       WHERE id = $${paramCount}
+       RETURNING *`,
+      params
+    );
+
+    await createTransportationOperation({
+      bookingId,
+      adminId,
+      actorName,
+      eventType,
+      note: String(note).trim() || null,
+      proofUrl: String(proof_url).trim() || null,
+      metadata: {
+        old_status: booking.booking_status,
+        new_status: nextStatus,
+        driver_name: driver_name || booking.driver_name || null,
+        driver_phone: driver_phone || booking.driver_phone || null,
+        vehicle_number: vehicle_number || booking.vehicle_number || null
+      }
+    });
+
+    await db.query(
+      `INSERT INTO admin_transportation_actions
+       (admin_id, booking_id, action_type, action_details, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        adminId,
+        bookingId,
+        eventType,
+        JSON.stringify({
+          old_status: booking.booking_status,
+          new_status: nextStatus,
+          note: String(note).trim() || null,
+          proof_url: String(proof_url).trim() || null
+        }),
+        req.ip,
+        req.get('User-Agent')
+      ]
+    );
+
+    res.json({
+      success: true,
+      data: updateResult.rows[0],
+      message: 'Transportation dispatch updated successfully'
+    });
+  } catch (error) {
+    console.error('Update transportation dispatch error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update transportation dispatch'
+    });
+  }
+});
+
+/**
  * Update transportation booking status (admin override)
  */
 router.patch('/bookings/:bookingId/status', async (req, res) => {
   try {
+    await ensureTransportationOperationsSchema();
     const { bookingId } = req.params;
     const { booking_status, admin_notes } = req.body;
     const adminId = req.user.id;
@@ -469,6 +753,18 @@ router.patch('/bookings/:bookingId/status', async (req, res) => {
     `;
     
     const updateResult = await db.query(updateQuery, params);
+
+    await createTransportationOperation({
+      bookingId,
+      adminId,
+      actorName: getActorName(req.user),
+      eventType: `status_${booking_status}`,
+      note: admin_notes || null,
+      metadata: {
+        old_status: booking.booking_status,
+        new_status: booking_status
+      }
+    });
     
     // Log admin action
     await db.query(

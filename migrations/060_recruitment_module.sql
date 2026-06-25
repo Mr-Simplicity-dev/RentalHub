@@ -143,6 +143,20 @@ ALTER TABLE recruitment_applications
   ADD COLUMN IF NOT EXISTS shortlist_reason TEXT,
   ADD COLUMN IF NOT EXISTS current_stage VARCHAR(50);
 
+CREATE TABLE IF NOT EXISTS recruitment_application_operations (
+  id SERIAL PRIMARY KEY,
+  application_id INTEGER NOT NULL REFERENCES recruitment_applications(id) ON DELETE CASCADE,
+  admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  actor_name VARCHAR(255),
+  event_type VARCHAR(80) NOT NULL,
+  note TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_recruitment_application_operations_application
+  ON recruitment_application_operations(application_id, created_at DESC);
+
 -- 6. Uploaded documents per application
 CREATE TABLE IF NOT EXISTS recruitment_documents (
   id SERIAL PRIMARY KEY,

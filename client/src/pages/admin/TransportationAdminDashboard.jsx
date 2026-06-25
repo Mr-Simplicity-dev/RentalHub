@@ -52,6 +52,9 @@ const TransportationAdminDashboard = () => {
   const [alerts, setAlerts] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [serviceForm, setServiceForm] = useState(defaultServiceForm);
+  const [dispatchForms, setDispatchForms] = useState({});
+  const [operationsByBooking, setOperationsByBooking] = useState({});
+  const [openOperations, setOpenOperations] = useState({});
 
   const loadDashboard = useCallback(async () => {
     const response = await api.get('/transportation-admin/dashboard');
@@ -154,6 +157,76 @@ const TransportationAdminDashboard = () => {
       await Promise.all([loadDashboard(), loadBookings(), loadAnalytics()]);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update payment status');
+    } finally {
+      setActionKey('');
+    }
+  };
+
+  const updateDispatchForm = (bookingId, patch) => {
+    setDispatchForms((current) => ({
+      ...current,
+      [bookingId]: {
+        driver_name: '',
+        driver_phone: '',
+        vehicle_number: '',
+        note: '',
+        proof_url: '',
+        ...(current[bookingId] || {}),
+        ...patch,
+      },
+    }));
+  };
+
+  const loadBookingOperations = async (bookingId) => {
+    const response = await api.get(`/transportation-admin/bookings/${bookingId}/operations`);
+    setOperationsByBooking((current) => ({
+      ...current,
+      [bookingId]: response.data?.data || [],
+    }));
+  };
+
+  const toggleBookingOperations = async (bookingId) => {
+    const willOpen = !openOperations[bookingId];
+    setOpenOperations((current) => ({ ...current, [bookingId]: willOpen }));
+    if (willOpen && !operationsByBooking[bookingId]) {
+      try {
+        await loadBookingOperations(bookingId);
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Failed to load dispatch history');
+      }
+    }
+  };
+
+  const submitDispatchAction = async (booking, action) => {
+    const form = dispatchForms[booking.id] || {};
+    if (action === 'assign_driver' && (!form.driver_name || !form.driver_phone || !form.vehicle_number)) {
+      toast.error('Add driver name, phone, and vehicle number');
+      return;
+    }
+    if (['dropoff_confirmed', 'cancelled'].includes(action) && !String(form.note || '').trim()) {
+      toast.error('Add a dispatch note for this action');
+      return;
+    }
+
+    const key = `dispatch-${booking.id}-${action}`;
+    try {
+      setActionKey(key);
+      await api.patch(`/transportation-admin/bookings/${booking.id}/dispatch`, {
+        action,
+        driver_name: form.driver_name,
+        driver_phone: form.driver_phone,
+        vehicle_number: form.vehicle_number,
+        note: form.note,
+        proof_url: form.proof_url,
+      });
+      toast.success('Dispatch updated');
+      updateDispatchForm(booking.id, {
+        note: '',
+        proof_url: '',
+      });
+      await Promise.all([loadDashboard(), loadBookings(), loadAnalytics(), loadBookingOperations(booking.id)]);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update dispatch');
     } finally {
       setActionKey('');
     }
@@ -405,6 +478,121 @@ const TransportationAdminDashboard = () => {
                         </select>
                       </label>
                     </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span>Driver: {booking.driver_name || 'Not assigned'}</span>
+                      {booking.vehicle_number ? <span>Vehicle: {booking.vehicle_number}</span> : null}
+                      {booking.pickup_proof_url ? (
+                        <a href={booking.pickup_proof_url} target="_blank" rel="noreferrer" className="font-semibold text-cyan-700 underline">
+                          Pickup proof
+                        </a>
+                      ) : null}
+                      {booking.dropoff_proof_url ? (
+                        <a href={booking.dropoff_proof_url} target="_blank" rel="noreferrer" className="font-semibold text-cyan-700 underline">
+                          Dropoff proof
+                        </a>
+                      ) : null}
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <input
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                        placeholder="Driver name"
+                        value={dispatchForms[booking.id]?.driver_name ?? booking.driver_name ?? ''}
+                        onChange={(event) => updateDispatchForm(booking.id, { driver_name: event.target.value })}
+                      />
+                      <input
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                        placeholder="Driver phone"
+                        value={dispatchForms[booking.id]?.driver_phone ?? booking.driver_phone ?? ''}
+                        onChange={(event) => updateDispatchForm(booking.id, { driver_phone: event.target.value })}
+                      />
+                      <input
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                        placeholder="Vehicle number"
+                        value={dispatchForms[booking.id]?.vehicle_number ?? booking.vehicle_number ?? ''}
+                        onChange={(event) => updateDispatchForm(booking.id, { vehicle_number: event.target.value })}
+                      />
+                      <input
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-3"
+                        placeholder="Proof URL for pickup/dropoff"
+                        value={dispatchForms[booking.id]?.proof_url || ''}
+                        onChange={(event) => updateDispatchForm(booking.id, { proof_url: event.target.value })}
+                      />
+                      <textarea
+                        className="min-h-[76px] rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-3"
+                        placeholder="Dispatch note, pickup condition, dropoff confirmation, cancellation reason..."
+                        value={dispatchForms[booking.id]?.note || ''}
+                        onChange={(event) => updateDispatchForm(booking.id, { note: event.target.value })}
+                      />
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {[
+                        ['assign_driver', 'Assign driver'],
+                        ['pickup_confirmed', 'Confirm pickup'],
+                        ['dropoff_confirmed', 'Confirm dropoff'],
+                        ['cancelled', 'Cancel dispatch'],
+                      ].map(([action, label]) => (
+                        <button
+                          key={action}
+                          type="button"
+                          onClick={() => submitDispatchAction(booking, action)}
+                          disabled={actionKey === `dispatch-${booking.id}-${action}`}
+                          className={`rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
+                            action === 'cancelled'
+                              ? 'border border-rose-200 bg-white text-rose-700 hover:bg-rose-50'
+                              : action === 'dropoff_confirmed'
+                                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                                : 'border border-slate-200 bg-white text-slate-700 hover:bg-white'
+                          }`}
+                        >
+                          {actionKey === `dispatch-${booking.id}-${action}` ? 'Saving...' : label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => toggleBookingOperations(booking.id)}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white"
+                      >
+                        {openOperations[booking.id] ? 'Hide history' : 'Show history'}
+                      </button>
+                    </div>
+
+                    {openOperations[booking.id] ? (
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                        {operationsByBooking[booking.id]?.length ? (
+                          <div className="space-y-3">
+                            {operationsByBooking[booking.id].map((operation) => (
+                              <div key={operation.id} className="border-l-2 border-cyan-200 pl-3">
+                                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                                  <p className="text-sm font-semibold capitalize text-slate-900">
+                                    {String(operation.event_type || '').replace(/_/g, ' ')}
+                                  </p>
+                                  <p className="text-xs text-slate-500">{formatDateTime(operation.created_at)}</p>
+                                </div>
+                                <p className="text-xs text-slate-500">{operation.actor_name || 'System'}</p>
+                                {operation.note ? <p className="mt-1 text-sm text-slate-600">{operation.note}</p> : null}
+                                {operation.proof_url ? (
+                                  <a
+                                    href={operation.proof_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-1 inline-block text-sm font-semibold text-cyan-700 underline"
+                                  >
+                                    Open proof
+                                  </a>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500">No dispatch history yet.</p>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}

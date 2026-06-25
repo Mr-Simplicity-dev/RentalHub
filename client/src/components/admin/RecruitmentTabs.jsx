@@ -913,6 +913,9 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionKey, setActionKey] = useState('');
+  const [decisionModal, setDecisionModal] = useState({ open: false, applicant: null, action: '' });
+  const [decisionForm, setDecisionForm] = useState({ notes: '', decision_reason: '', interview_date: '' });
+  const [detailModal, setDetailModal] = useState({ open: false, applicant: null, loading: false });
 
   const loadApplicants = useCallback(async (page = 1) => {
     setLoading(true);
@@ -949,6 +952,64 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
     }
   };
 
+  const openDecisionModal = (applicant, action) => {
+    setDecisionModal({ open: true, applicant, action });
+    setDecisionForm({
+      notes: '',
+      decision_reason: '',
+      interview_date: applicant.interview_date ? String(applicant.interview_date).slice(0, 16) : '',
+    });
+  };
+
+  const closeDecisionModal = () => {
+    setDecisionModal({ open: false, applicant: null, action: '' });
+    setDecisionForm({ notes: '', decision_reason: '', interview_date: '' });
+  };
+
+  const submitDecision = async () => {
+    const { applicant, action } = decisionModal;
+    if (!applicant || !action) return;
+    if (['reject', 'shortlist'].includes(action) && !decisionForm.decision_reason.trim()) {
+      toast.error(action === 'reject' ? 'Add a rejection reason' : 'Add a shortlist reason');
+      return;
+    }
+    if (action === 'set-interview' && !decisionForm.interview_date) {
+      toast.error('Choose an interview date');
+      return;
+    }
+
+    const body = {
+      notes: decisionForm.notes.trim(),
+      decision_reason: decisionForm.decision_reason.trim(),
+    };
+
+    if (action === 'shortlist') {
+      body.shortlist_reason = decisionForm.decision_reason.trim();
+    }
+
+    if (action === 'reject') {
+      body.rejection_reason = decisionForm.decision_reason.trim();
+    }
+
+    if (action === 'set-interview') {
+      body.interview_date = decisionForm.interview_date;
+    }
+
+    await updateApplicant(applicant.id, action, body);
+    closeDecisionModal();
+  };
+
+  const openApplicantHistory = async (applicant) => {
+    setDetailModal({ open: true, applicant, loading: true });
+    try {
+      const res = await api.get(`/recruitment/admin/applicants/${applicant.id}`);
+      setDetailModal({ open: true, applicant: res.data?.data || applicant, loading: false });
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to load applicant history');
+      setDetailModal({ open: false, applicant: null, loading: false });
+    }
+  };
+
   const bulkProcess = async (statusValue) => {
     if (!selectedIds.length) {
       toast.error('Select at least one applicant');
@@ -972,11 +1033,7 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
   };
 
   const setInterviewDate = async (applicant) => {
-    const value = window.prompt('Interview date and time (YYYY-MM-DD HH:mm)', '');
-    if (!value) return;
-    await updateApplicant(applicant.id, 'set-interview', {
-      interview_date: value.replace(' ', 'T'),
-    });
+    openDecisionModal(applicant, 'set-interview');
   };
 
   const handleSelected = (id, checked) => {
@@ -1240,7 +1297,7 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap justify-end gap-1.5">
                         <ActionButton
-                          onClick={() => updateApplicant(applicant.id, "shortlist")}
+                          onClick={() => openDecisionModal(applicant, "shortlist")}
                           disabled={actionKey.startsWith(applicant.id)}
                           loading={actionKey === `${applicant.id}-shortlist`}
                           variant="success"
@@ -1249,7 +1306,7 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
                           Shortlist
                         </ActionButton>
                         <ActionButton
-                          onClick={() => updateApplicant(applicant.id, "approve")}
+                          onClick={() => openDecisionModal(applicant, "approve")}
                           disabled={actionKey.startsWith(applicant.id)}
                           loading={actionKey === `${applicant.id}-approve`}
                           variant="primary"
@@ -1258,7 +1315,7 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
                           Approve
                         </ActionButton>
                         <ActionButton
-                          onClick={() => updateApplicant(applicant.id, "reject")}
+                          onClick={() => openDecisionModal(applicant, "reject")}
                           disabled={actionKey.startsWith(applicant.id)}
                           loading={actionKey === `${applicant.id}-reject`}
                           variant="danger"
@@ -1298,6 +1355,13 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
                         >
                           ZIP
                         </ActionButton>
+                        <ActionButton
+                          onClick={() => openApplicantHistory(applicant)}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          History
+                        </ActionButton>
                       </div>
                     </td>
                   </motion.tr>
@@ -1335,6 +1399,154 @@ export function RecruitmentApplicantsTab({ roles, onRefreshCore }) {
           </div>
         </>
       )}
+      <AnimatePresence>
+        {detailModal.open ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 12 }}
+              className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">Applicant History</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {detailModal.applicant?.full_name || 'Applicant'} - {detailModal.applicant?.reference_number || ''}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailModal({ open: false, applicant: null, loading: false })}
+                  className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Status</p>
+                  <div className="mt-2"><StatusPill value={detailModal.applicant?.status} /></div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Payment</p>
+                  <div className="mt-2"><StatusPill value={detailModal.applicant?.payment_status} /></div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Documents</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">{detailModal.applicant?.documents?.length || 0}</p>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-slate-200 p-4">
+                <h4 className="text-sm font-bold text-slate-900">Review Trail</h4>
+                {detailModal.loading ? (
+                  <p className="mt-3 text-sm text-slate-500">Loading history...</p>
+                ) : detailModal.applicant?.operations?.length ? (
+                  <div className="mt-3 max-h-80 space-y-3 overflow-y-auto">
+                    {detailModal.applicant.operations.map((operation) => (
+                      <div key={operation.id} className="border-l-2 border-indigo-200 pl-3">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                          <p className="text-sm font-semibold capitalize text-slate-900">
+                            {String(operation.event_type || '').replace(/_/g, ' ')}
+                          </p>
+                          <p className="text-xs text-slate-500">{formatDateTime(operation.created_at)}</p>
+                        </div>
+                        <p className="text-xs text-slate-500">{operation.actor_name || 'System'}</p>
+                        {operation.note ? <p className="mt-1 text-sm text-slate-600">{operation.note}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-500">No review history recorded yet.</p>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+
+        {decisionModal.open && decisionModal.applicant ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 12 }}
+              className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 capitalize">
+                    {decisionModal.action.replace(/-/g, ' ')} applicant
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {decisionModal.applicant.full_name} - {decisionModal.applicant.reference_number}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDecisionModal}
+                  className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {decisionModal.action === 'set-interview' ? (
+                  <FormInput
+                    label="Interview Date"
+                    type="datetime-local"
+                    value={decisionForm.interview_date}
+                    onChange={(value) => setDecisionForm((prev) => ({ ...prev, interview_date: value }))}
+                  />
+                ) : null}
+
+                {['shortlist', 'reject'].includes(decisionModal.action) ? (
+                  <FormTextarea
+                    label={decisionModal.action === 'reject' ? 'Decision reason' : 'Shortlist reason'}
+                    value={decisionForm.decision_reason}
+                    onChange={(value) => setDecisionForm((prev) => ({ ...prev, decision_reason: value }))}
+                    placeholder={decisionModal.action === 'reject' ? 'Why is this applicant rejected?' : 'Why is this applicant shortlisted?'}
+                    rows={3}
+                  />
+                ) : null}
+
+                <FormTextarea
+                  label="Admin note"
+                  value={decisionForm.notes}
+                  onChange={(value) => setDecisionForm((prev) => ({ ...prev, notes: value }))}
+                  placeholder="Internal note for the recruitment audit trail"
+                  rows={3}
+                />
+              </div>
+
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <ActionButton onClick={closeDecisionModal} variant="secondary">
+                  Cancel
+                </ActionButton>
+                <ActionButton
+                  onClick={submitDecision}
+                  loading={actionKey === `${decisionModal.applicant.id}-${decisionModal.action}`}
+                  variant={decisionModal.action === 'reject' ? 'danger' : 'primary'}
+                >
+                  Save Decision
+                </ActionButton>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </SectionCard>
   );
 }

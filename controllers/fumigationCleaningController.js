@@ -18,6 +18,16 @@ const FUMIGATION_ADMIN_ROLES = new Set([
 const isFumigationAdminUser = (user) =>
   Boolean(user?.is_admin) || FUMIGATION_ADMIN_ROLES.has(String(user?.user_type || '').toLowerCase());
 
+const getActorName = (user) =>
+  user?.full_name || user?.name || user?.email || user?.username || `User ${user?.id || ''}`.trim();
+
+const lifecycleStatusToBookingStatus = {
+  accepted: 'scheduled',
+  declined: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed'
+};
+
 // ---------------------------------------------------------------------------
 // Paystack payment adapter with explicit local-only mock fallback.
 // ---------------------------------------------------------------------------
@@ -1011,6 +1021,24 @@ class FumigationCleaningController {
         update_data
       );
 
+      try {
+        const assignment = await FumigationCleaningService.getLatestProviderAssignment(bookingId);
+        await FumigationCleaningService.createBookingOperation({
+          booking_id: bookingId,
+          provider_id: assignment?.provider_id,
+          actor_id: req.user?.id,
+          actor_name: getActorName(req.user),
+          event_type: `status_${status}`,
+          note: update_data.admin_note || update_data.cancellation_reason || null,
+          metadata: {
+            status,
+            update_data
+          }
+        });
+      } catch (operationError) {
+        console.error('Failed to write fumigation status operation:', operationError);
+      }
+
       // Send status update notification to tenant
       try {
         await NotificationService.sendBookingStatusUpdate({
@@ -1094,6 +1122,24 @@ class FumigationCleaningController {
         assigned_team_members: [provider.contact_person]
       });
 
+      try {
+        await FumigationCleaningService.createBookingOperation({
+          booking_id: bookingId,
+          provider_id,
+          actor_id: req.user?.id,
+          actor_name: getActorName(req.user),
+          event_type: 'provider_assigned',
+          note: `${provider.company_name} assigned to booking`,
+          metadata: {
+            provider_name: provider.company_name,
+            contact_person: provider.contact_person,
+            contact_phone: provider.contact_phone
+          }
+        });
+      } catch (operationError) {
+        console.error('Failed to write fumigation assignment operation:', operationError);
+      }
+
       // Send provider assignment notification
       try {
         await NotificationService.sendProviderAssignment({
@@ -1118,6 +1164,152 @@ class FumigationCleaningController {
       res.status(500).json({
         success: false,
         message: 'Failed to assign provider',
+        error: error.message
+      });
+    }
+  }
+
+  async getBookingOperations(req, res) {
+    try {
+      if (!isFumigationAdminUser(req.user)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Admin privileges required'
+        });
+      }
+
+      const { bookingId } = req.params;
+      const booking = await FumigationCleaningService.getBookingById(bookingId);
+
+      if (!booking) {
+        return res.status(404).json({
+          success: false,
+          message: 'Booking not found'
+        });
+      }
+
+      const [assignment, operations] = await Promise.all([
+        FumigationCleaningService.getLatestProviderAssignment(bookingId),
+        FumigationCleaningService.getBookingOperations(bookingId)
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          assignment,
+          operations
+        },
+        message: 'Booking operations retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error getting booking operations:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve booking operations',
+        error: error.message
+      });
+    }
+  }
+
+  async updateProviderLifecycle(req, res) {
+    try {
+      if (!isFumigationAdminUser(req.user)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Admin privileges required'
+        });
+      }
+
+      const { bookingId } = req.params;
+      const { action, note = '', proof_url = '' } = req.body;
+      const allowedActions = ['accepted', 'declined', 'in_progress', 'completed'];
+
+      if (!allowedActions.includes(action)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid provider lifecycle action'
+        });
+      }
+
+      if (['declined', 'completed'].includes(action) && !String(note).trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'A note is required for this operation'
+        });
+      }
+
+      const booking = await FumigationCleaningService.getBookingById(bookingId);
+
+      if (!booking) {
+        return res.status(404).json({
+          success: false,
+          message: 'Booking not found'
+        });
+      }
+
+      const currentAssignment = await FumigationCleaningService.getLatestProviderAssignment(bookingId);
+
+      if (!currentAssignment) {
+        return res.status(400).json({
+          success: false,
+          message: 'Assign a provider before updating provider operations'
+        });
+      }
+
+      const assignment = await FumigationCleaningService.updateProviderAssignmentLifecycle(bookingId, {
+        status: action,
+        note: String(note).trim(),
+        proof_url: String(proof_url).trim()
+      });
+
+      const bookingStatus = lifecycleStatusToBookingStatus[action];
+      const updatedBooking = await FumigationCleaningService.updateBookingStatus(bookingId, bookingStatus, {
+        admin_note: String(note).trim() || undefined
+      });
+
+      await FumigationCleaningService.createBookingOperation({
+        booking_id: bookingId,
+        provider_id: currentAssignment.provider_id,
+        actor_id: req.user?.id,
+        actor_name: getActorName(req.user),
+        event_type: `provider_${action}`,
+        note: String(note).trim() || null,
+        proof_url: String(proof_url).trim() || null,
+        metadata: {
+          booking_status: bookingStatus,
+          provider_name: currentAssignment.company_name
+        }
+      });
+
+      try {
+        await NotificationService.sendBookingStatusUpdate({
+          tenantId: booking.tenant_id,
+          bookingId: booking.id,
+          bookingReference: booking.booking_reference,
+          newStatus: bookingStatus,
+          updateDetails: {
+            admin_note: String(note).trim() || undefined,
+            provider_name: currentAssignment.company_name,
+            proof_url: String(proof_url).trim() || undefined
+          }
+        });
+      } catch (notificationError) {
+        console.error('Failed to send provider lifecycle notification:', notificationError);
+      }
+
+      res.json({
+        success: true,
+        data: {
+          assignment,
+          booking: updatedBooking
+        },
+        message: 'Provider operation updated successfully'
+      });
+    } catch (error) {
+      console.error('Error updating provider operation:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update provider operation',
         error: error.message
       });
     }

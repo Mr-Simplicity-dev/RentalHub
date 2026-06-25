@@ -8,7 +8,9 @@ router.use(authenticate);
 
 router.get('/', requireAdminOrSuperAdmin, adminInspectionController.getInspections);
 router.get('/:id', requireAdminOrSuperAdmin, adminInspectionController.getInspectionById);
+router.get('/:id/operations', requireAdminOrSuperAdmin, adminInspectionController.getInspectionOperations);
 router.post('/:id/assign', requireAdminOrSuperAdmin, adminInspectionController.assignInspection);
+router.post('/:id/start', requireAdminOrSuperAdmin, adminInspectionController.startInspection);
 router.post('/:id/complete', requireAdminOrSuperAdmin, adminInspectionController.completeInspection);
 router.post('/:id/cancel', requireAdminOrSuperAdmin, adminInspectionController.cancelInspection);
 

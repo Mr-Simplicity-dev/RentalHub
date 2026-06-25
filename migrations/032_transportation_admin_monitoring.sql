@@ -72,6 +72,28 @@ CREATE TABLE IF NOT EXISTS transportation_alerts (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 5b. Create transportation operations timeline table
+CREATE TABLE IF NOT EXISTS transportation_booking_operations (
+  id SERIAL PRIMARY KEY,
+  booking_id INTEGER NOT NULL REFERENCES transportation_bookings(id) ON DELETE CASCADE,
+  admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  actor_name VARCHAR(255),
+  event_type VARCHAR(80) NOT NULL,
+  note TEXT,
+  proof_url TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE transportation_bookings
+  ADD COLUMN IF NOT EXISTS admin_notes TEXT,
+  ADD COLUMN IF NOT EXISTS pickup_confirmed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS dropoff_confirmed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS pickup_proof_url TEXT,
+  ADD COLUMN IF NOT EXISTS dropoff_proof_url TEXT,
+  ADD COLUMN IF NOT EXISTS dispatch_notes TEXT,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
 -- 6. Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_admin_transportation_actions_admin ON admin_transportation_actions(admin_id);
 CREATE INDEX IF NOT EXISTS idx_admin_transportation_actions_booking ON admin_transportation_actions(booking_id);
@@ -93,6 +115,7 @@ CREATE INDEX IF NOT EXISTS idx_transportation_alerts_type ON transportation_aler
 CREATE INDEX IF NOT EXISTS idx_transportation_alerts_level ON transportation_alerts(alert_level);
 CREATE INDEX IF NOT EXISTS idx_transportation_alerts_resolved ON transportation_alerts(is_resolved);
 CREATE INDEX IF NOT EXISTS idx_transportation_alerts_created ON transportation_alerts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_transportation_operations_booking ON transportation_booking_operations(booking_id, created_at DESC);
 
 -- 7. Create views for admin monitoring (SIMPLIFIED VERSION)
 
