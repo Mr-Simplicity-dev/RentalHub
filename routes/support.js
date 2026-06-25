@@ -152,6 +152,7 @@ const uploadAttachment = multer({
 });
 
 const getIO = () => {
+  if (process.env.NODE_ENV === 'test') return null;
   try { return require('../server').io; } catch { return null; }
 };
 
@@ -663,6 +664,45 @@ const notifyDepartmentEscalation = async (ticket, department, note = '') => {
   }
 };
 
+const sendSupportAlertEmails = async (recipientIds, subject, message, path = '/admin/super-support-dashboard?tab=escalations') => {
+  try {
+    const ids = Array.from(recipientIds || []).filter(Boolean);
+    if (!ids.length) return;
+
+    const recipients = await db.query(
+      `SELECT id, email, full_name
+       FROM users
+       WHERE id = ANY($1)
+         AND email IS NOT NULL
+         AND deleted_at IS NULL
+         AND account_suspended_at IS NULL`,
+      [ids]
+    );
+    if (!recipients.rows.length) return;
+
+    const { sendEmail } = require('../config/utils/mailer');
+    const { getFrontendUrl } = require('../config/utils/frontendUrl');
+    const url = `${getFrontendUrl()}${path}`;
+
+    for (const recipient of recipients.rows) {
+      await sendEmail({
+        to: recipient.email,
+        subject,
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+            <h2 style="margin-bottom: 8px;">${subject}</h2>
+            <p>Hello ${recipient.full_name || 'Admin'},</p>
+            <p>${message}</p>
+            <p><a href="${url}" style="color: #2563eb;">Open support dashboard</a></p>
+          </div>
+        `,
+      });
+    }
+  } catch (err) {
+    console.error('Support alert email error (non-fatal):', err.message || err);
+  }
+};
+
 const csvEscape = (value) => {
   if (value === null || value === undefined) return '';
   const text = String(value);
@@ -783,6 +823,10 @@ const notifySlaRisk = async (ticket, severity, policies = {}) => {
       await createNotification(userId, 'support_sla', title, message, link);
       emitToUser(userId, 'ticket:sla_alert', { ticketId: ticket.id, severity, ticket });
     }
+
+    if (severity === 'breached') {
+      await sendSupportAlertEmails(recipientIds, title, message, link);
+    }
   } catch (err) {
     console.error('Support SLA notification error:', err);
   }
@@ -814,6 +858,8 @@ const notifyPolicyRisk = async (ticket, severity, policies = {}) => {
       await createNotification(userId, 'support_policy_alert', title, message, '/admin/super-support-dashboard?tab=escalations');
       emitToUser(userId, 'ticket:policy_alert', { ticketId: ticket.id, severity, ticket });
     }
+
+    await sendSupportAlertEmails(recipientIds, title, message, '/admin/super-support-dashboard?tab=escalations');
 
     await notifyDepartmentEscalation(ticket, ticket.escalation_department, message);
   } catch (err) {
@@ -930,9 +976,11 @@ const runSupportSlaMonitor = async () => {
   }
 };
 
-const supportSlaMonitor = setInterval(runSupportSlaMonitor, 5 * 60 * 1000);
-if (typeof supportSlaMonitor.unref === 'function') supportSlaMonitor.unref();
-setTimeout(runSupportSlaMonitor, 30000).unref?.();
+if (process.env.NODE_ENV !== 'test') {
+  const supportSlaMonitor = setInterval(runSupportSlaMonitor, 5 * 60 * 1000);
+  if (typeof supportSlaMonitor.unref === 'function') supportSlaMonitor.unref();
+  setTimeout(runSupportSlaMonitor, 30000).unref?.();
+}
 
 const sendReplyEmail = async (reply, ticket, sender) => {
   try {
@@ -2849,6 +2897,10 @@ router._supportScopeForTest = {
   resolveSlaDueAt,
   departmentsForUser,
   canAccessDepartmentEscalation,
+  getRelatedAdminPath,
+  getDepartmentEscalationPath,
+  getSupportPolicySettings,
+  runSupportSlaMonitor,
 };
 
 module.exports = router;

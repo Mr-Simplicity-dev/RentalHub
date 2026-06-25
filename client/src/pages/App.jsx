@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { ToastContainer } from 'react-toastify';
@@ -75,13 +75,6 @@ import AdminPropertyDetail from './admin/AdminPropertyDetail';
 import AdminApplicationDetail from './admin/AdminApplicationDetail';
 import AdminCompliance from './admin/AdminCompliance';
 import SeoDashboard from './SeoDashboard';
-import TransportationAdminDashboard from './admin/TransportationAdminDashboard';
-import TransportationAdminStateDashboard from './admin/TransportationAdminStateDashboard';
-import TransportationSuperAdminDashboard from './admin/TransportationSuperAdminDashboard';
-import LgaFumigationAdminDashboard from './admin/LgaFumigationAdminDashboard';
-import LgaSupportAdminDashboard from './admin/LgaSupportAdminDashboard';
-import StateFumigationAdminDashboard from './admin/StateFumigationAdminDashboard';
-import SuperFumigationAdminDashboard from './admin/SuperFumigationAdminDashboard';
 import LawyerDashboard from './lawyer/LawyerDashboard';
 import LawyerLayout from './lawyer/LawyerLayout';
 import StateLawyerDashboard from './lawyer/StateLawyerDashboard';
@@ -100,17 +93,25 @@ import NigeriaPage from './NigeriaPage';
 import AreaPage from './AreaPage';
 import LegalSupport from './LawyersDirectory';
 import MobileAppPage from './MobileAppPage';
-import FinancialAdminDashboard from './admin/FinancialAdminDashboard'; // ADD THIS LINE
-import SuperFinancialAdminDashboard from './admin/SuperFinancialAdminDashboard';
-import StateAdminDashboard from './admin/StateAdminDashboard';
-import StateSupportAdminDashboard from './admin/StateSupportAdminDashboard';
-import SuperSupportAdminDashboard from './admin/SuperSupportAdminDashboard';
-import RecruitmentAdminDashboard from './admin/RecruitmentAdminDashboard';
 import AgentEarningsPage from './agent/AgentEarningsPage';
 
 import AdminAgentManagement from './admin/AdminAgentManagement';
 import AgentWithdrawalPage from './agent/AgentWithdrawalPage';
 import VerificationStatus from './VerificationStatus';
+
+const TransportationAdminDashboard = React.lazy(() => import('./admin/TransportationAdminDashboard'));
+const TransportationAdminStateDashboard = React.lazy(() => import('./admin/TransportationAdminStateDashboard'));
+const TransportationSuperAdminDashboard = React.lazy(() => import('./admin/TransportationSuperAdminDashboard'));
+const LgaFumigationAdminDashboard = React.lazy(() => import('./admin/LgaFumigationAdminDashboard'));
+const LgaSupportAdminDashboard = React.lazy(() => import('./admin/LgaSupportAdminDashboard'));
+const StateFumigationAdminDashboard = React.lazy(() => import('./admin/StateFumigationAdminDashboard'));
+const SuperFumigationAdminDashboard = React.lazy(() => import('./admin/SuperFumigationAdminDashboard'));
+const FinancialAdminDashboard = React.lazy(() => import('./admin/FinancialAdminDashboard'));
+const SuperFinancialAdminDashboard = React.lazy(() => import('./admin/SuperFinancialAdminDashboard'));
+const StateAdminDashboard = React.lazy(() => import('./admin/StateAdminDashboard'));
+const StateSupportAdminDashboard = React.lazy(() => import('./admin/StateSupportAdminDashboard'));
+const SuperSupportAdminDashboard = React.lazy(() => import('./admin/SuperSupportAdminDashboard'));
+const RecruitmentAdminDashboard = React.lazy(() => import('./admin/RecruitmentAdminDashboard'));
 
 const queryClient = new QueryClient();
 const LANGUAGE_OPTIONS = [
@@ -678,6 +679,7 @@ function App() {
           <Router>
             <SocketProvider>
             <Layout>
+              <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center text-sm text-gray-500">Loading...</div>}>
               <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
@@ -885,6 +887,7 @@ function App() {
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
             </Layout>
 
             <TourManager />

@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+process.env.NODE_ENV = 'test';
+
 const legalController = require('../controllers/legalController');
 const agentWithdrawalController = require('../controllers/agentWithdrawalController');
 const agentCommissionController = require('../controllers/agentCommissionController');
@@ -224,5 +226,86 @@ test('department escalation access is scoped to department and jurisdiction', ()
       lagosTransportTicket
     ),
     true
+  );
+});
+
+test('support SLA monitor applies policy timers and marks one-time alert columns', async () => {
+  const { runSupportSlaMonitor } = supportRoutes._supportScopeForTest;
+  const originalQuery = db.query;
+  const calls = [];
+  const timelineEvents = [];
+
+  db.query = async (sql, params = []) => {
+    const text = String(sql);
+    calls.push({ text, params });
+
+    if (text.includes('CREATE TABLE IF NOT EXISTS support_tickets')) return { rows: [] };
+    if (text.includes("SELECT value FROM support_policy_settings WHERE key = 'support_governance'")) {
+      return {
+        rows: [{
+          value: {
+            sla_due_soon_hours: 3,
+            escalation_acknowledgement_hours: 5,
+            department_resolution_hours: 26,
+            notify_super_admin_on_breach: false,
+          },
+        }],
+      };
+    }
+    if (text.includes('SET sla_warning_notified_at')) {
+      assert.deepEqual(params, [3]);
+      return { rows: [{ id: 1, subject: 'Due soon', assigned_to: null }] };
+    }
+    if (text.includes('SET sla_breach_notified_at')) {
+      return { rows: [{ id: 2, subject: 'Breached', assigned_to: null }] };
+    }
+    if (text.includes('SET escalation_ack_notified_at')) {
+      assert.deepEqual(params, [5]);
+      return { rows: [{ id: 3, subject: 'Ack overdue', assigned_to: null, escalation_department: 'transportation' }] };
+    }
+    if (text.includes('SET department_resolution_notified_at')) {
+      assert.deepEqual(params, [26]);
+      return { rows: [{ id: 4, subject: 'Resolution overdue', assigned_to: null, escalation_department: 'fumigation' }] };
+    }
+    if (text.includes('INSERT INTO support_ticket_timeline')) {
+      timelineEvents.push(params[4]);
+      return { rows: [] };
+    }
+    if (text.includes('FROM users')) return { rows: [] };
+    return { rows: [] };
+  };
+
+  try {
+    await runSupportSlaMonitor();
+  } finally {
+    db.query = originalQuery;
+  }
+
+  assert.ok(calls.some((call) => call.text.includes('sla_warning_notified_at')));
+  assert.ok(calls.some((call) => call.text.includes('sla_breach_notified_at')));
+  assert.ok(calls.some((call) => call.text.includes('escalation_ack_notified_at')));
+  assert.ok(calls.some((call) => call.text.includes('department_resolution_notified_at')));
+  assert.deepEqual(
+    timelineEvents.sort(),
+    ['department_acknowledgement_overdue', 'department_resolution_overdue', 'sla_breached', 'sla_due_soon'].sort()
+  );
+});
+
+test('support admin deep links point to scoped operational dashboards', () => {
+  const { getRelatedAdminPath, getDepartmentEscalationPath } = supportRoutes._supportScopeForTest;
+
+  assert.equal(
+    getRelatedAdminPath({ related_type: 'transportation_booking', related_id: 42, category: 'transportation' }, 'state_transportation_admin'),
+    '/admin/transportation/state?tab=bookings&bookingId=42'
+  );
+
+  assert.equal(
+    getRelatedAdminPath({ related_type: 'fumigation_cleaning_booking', related_id: 7, category: 'fumigation_cleaning' }, 'super_fumigation_admin'),
+    '/super-admin/fumigation-cleaning?bookingId=7#fumigation-bookings'
+  );
+
+  assert.equal(
+    getDepartmentEscalationPath('finance', 'super_financial_admin'),
+    '/admin/super-financial-dashboard?panel=support-escalations'
   );
 });
