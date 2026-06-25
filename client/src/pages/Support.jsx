@@ -101,7 +101,9 @@ const Support = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
-  const [form, setForm] = useState({ subject: '', description: '', priority: 'medium', category: 'general' });
+  const [form, setForm] = useState({ subject: '', description: '', priority: 'medium', category: 'general', related_type: '', related_id: '' });
+  const [serviceOptions, setServiceOptions] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [expandedTicket, setExpandedTicket] = useState(null);
   const [conversations, setConversations] = useState({});
@@ -194,6 +196,28 @@ const Support = () => {
 
   useEffect(() => { loadTickets(); }, [loadTickets]);
 
+  useEffect(() => {
+    const loadServiceOptions = async () => {
+      if (!['transportation', 'fumigation_cleaning'].includes(form.category)) {
+        setServiceOptions([]);
+        return;
+      }
+
+      setLoadingServices(true);
+      try {
+        const endpoint = form.category === 'transportation' ? '/transportation/bookings' : '/fumigation-cleaning/bookings';
+        const res = await api.get(endpoint);
+        setServiceOptions(res.data?.data || []);
+      } catch {
+        setServiceOptions([]);
+      } finally {
+        setLoadingServices(false);
+      }
+    };
+
+    loadServiceOptions();
+  }, [form.category]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.subject.trim()) {
@@ -204,7 +228,7 @@ const Support = () => {
     try {
       const res = await api.post('/support/tickets', form);
       setTickets((prev) => [res.data.data, ...prev]);
-      setForm({ subject: '', description: '', priority: 'medium', category: 'general' });
+      setForm({ subject: '', description: '', priority: 'medium', category: 'general', related_type: '', related_id: '' });
       setShowForm(false);
       toast.success('Ticket submitted successfully');
     } catch (err) {
@@ -292,7 +316,11 @@ const Support = () => {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Issue Category</label>
-                <select value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} className="input w-full">
+                <select
+                  value={form.category}
+                  onChange={(e) => setForm((p) => ({ ...p, category: e.target.value, related_type: '', related_id: '' }))}
+                  className="input w-full"
+                >
                   <option value="general">General Support</option>
                   <option value="transportation">Transportation</option>
                   <option value="fumigation_cleaning">Fumigation & Cleaning</option>
@@ -303,6 +331,27 @@ const Support = () => {
                   <option value="technical">Technical</option>
                 </select>
               </div>
+              {['transportation', 'fumigation_cleaning'].includes(form.category) && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">Related Booking</label>
+                  <select
+                    value={form.related_id}
+                    onChange={(e) => setForm((p) => ({
+                      ...p,
+                      related_id: e.target.value,
+                      related_type: p.category === 'transportation' ? 'transportation_booking' : 'fumigation_cleaning_booking',
+                    }))}
+                    className="input w-full"
+                  >
+                    <option value="">{loadingServices ? 'Loading bookings...' : 'No specific booking'}</option>
+                    {serviceOptions.map((booking) => (
+                      <option key={booking.id} value={booking.id}>
+                        #{booking.booking_reference || booking.id} - {booking.service_name || booking.category_name || 'Booking'} - {String(booking.booking_status || booking.status || 'pending').replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Priority</label>
                 <div className="flex flex-wrap gap-2">

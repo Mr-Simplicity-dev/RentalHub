@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FaClock, FaExchangeAlt, FaInfoCircle, FaRoute, FaSprayCan, FaSyncAlt } from 'react-icons/fa';
+import { FaClock, FaExchangeAlt, FaExternalLinkAlt, FaInfoCircle, FaRoute, FaSprayCan, FaSyncAlt } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 
@@ -192,6 +192,12 @@ const SupportTicketServicePanel = ({ ticket, onTicketUpdated }) => {
       </div>
 
       <ContextFields context={relatedContext} />
+
+      {effectiveTicket?.related_admin_path && (
+        <a href={effectiveTicket.related_admin_path} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          <FaExternalLinkAlt /> Open related operational record
+        </a>
+      )}
 
       <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
         <select

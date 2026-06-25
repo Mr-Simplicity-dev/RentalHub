@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FaCheckCircle, FaClipboardCheck, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
+import { FaCheckCircle, FaClipboardCheck, FaExternalLinkAlt, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 
@@ -109,6 +109,11 @@ const DepartmentSupportEscalations = ({ department = '', title = 'Support Escala
               {ticket.escalation_note && <p className="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-700">{ticket.escalation_note}</p>}
 
               <div className="mt-3 flex flex-wrap gap-2">
+                {ticket.related_admin_path && (
+                  <a href={ticket.related_admin_path} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                    <FaExternalLinkAlt /> Open Related Work
+                  </a>
+                )}
                 <button disabled={Boolean(actionId)} onClick={() => updateStatus(ticket, 'acknowledged')} className="inline-flex items-center gap-2 rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">
                   <FaClipboardCheck /> Acknowledge
                 </button>

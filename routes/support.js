@@ -258,6 +258,12 @@ const ensureSupportSchema = async () => {
       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='resolution_summary') THEN
         ALTER TABLE support_tickets ADD COLUMN resolution_summary TEXT;
       END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='sla_warning_notified_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN sla_warning_notified_at TIMESTAMP;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='sla_breach_notified_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN sla_breach_notified_at TIMESTAMP;
+      END IF;
     END $$;
 
     CREATE INDEX IF NOT EXISTS idx_support_tickets_status_priority
@@ -341,6 +347,13 @@ const ensureSupportSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_support_ticket_timeline_ticket
       ON support_ticket_timeline(ticket_id, created_at ASC);
+
+    CREATE TABLE IF NOT EXISTS support_policy_settings (
+      key VARCHAR(80) PRIMARY KEY,
+      value JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   supportSchemaReady = true;
@@ -528,6 +541,127 @@ const getRelatedServiceContext = async (ticket) => {
   return null;
 };
 
+const getRelatedAdminPath = (ticket = {}, role = '') => {
+  const normalizedRole = normalizeText(role);
+  const relatedId = Number(ticket.related_id);
+  const queryId = Number.isInteger(relatedId) && relatedId > 0 ? `&bookingId=${relatedId}` : '';
+
+  if (ticket.related_type === 'transportation_booking' || ticket.category === 'transportation') {
+    if (normalizedRole === 'super_admin' || normalizedRole === 'super_transportation_admin') {
+      return `/super-admin/transportation?tab=bookings${queryId}`;
+    }
+    if (normalizedRole === 'state_transportation_admin') {
+      return `/admin/transportation/state?tab=bookings${queryId}`;
+    }
+    return `/admin/transportation?tab=bookings${queryId}`;
+  }
+
+  if (ticket.related_type === 'fumigation_cleaning_booking' || ticket.category === 'fumigation_cleaning') {
+    if (normalizedRole === 'super_admin' || normalizedRole === 'super_fumigation_admin') {
+      return `/super-admin/fumigation-cleaning#fumigation-bookings`;
+    }
+    if (normalizedRole === 'state_fumigation_admin') {
+      return `/admin/fumigation-cleaning/state#fumigation-bookings`;
+    }
+    return `/admin/fumigation-cleaning#fumigation-bookings`;
+  }
+
+  if (ticket.category === 'payment') {
+    if (normalizedRole === 'super_admin' || normalizedRole === 'super_financial_admin') {
+      return '/admin/super-financial-dashboard?panel=transactions';
+    }
+    return '/admin/financial-dashboard?tab=transactions';
+  }
+
+  return null;
+};
+
+const getDepartmentEscalationPath = (department, role = '') => {
+  const normalizedDepartment = normalizeDepartment(department);
+  const normalizedRole = normalizeText(role);
+  if (normalizedDepartment === 'transportation') {
+    if (normalizedRole === 'super_transportation_admin') return '/super-admin/transportation?tab=support-escalations';
+    if (normalizedRole === 'state_transportation_admin') return '/admin/transportation/state?tab=support-escalations';
+    return '/admin/transportation?tab=support-escalations';
+  }
+  if (normalizedDepartment === 'fumigation') {
+    if (normalizedRole === 'super_fumigation_admin') return '/super-admin/fumigation-cleaning#support-escalations';
+    if (normalizedRole === 'state_fumigation_admin') return '/admin/fumigation-cleaning/state#support-escalations';
+    return '/admin/fumigation-cleaning#support-escalations';
+  }
+  if (normalizedDepartment === 'finance') {
+    if (normalizedRole === 'super_financial_admin') return '/admin/super-financial-dashboard?panel=support-escalations';
+    return '/admin/financial-dashboard?tab=support-escalations';
+  }
+  return '/admin/super-support-dashboard?tab=escalations';
+};
+
+const findDepartmentEscalationRecipients = async (ticket, department) => {
+  const roles = DEPARTMENT_ESCALATION_ROLES[normalizeDepartment(department)] || new Set();
+  if (!roles.size) return [];
+
+  const params = [Array.from(roles)];
+  const where = [`LOWER(user_type) = ANY($1)`, `(status IS NULL OR status <> 'suspended')`];
+  const ticketState = normalizeText(ticket.state);
+  const ticketLga = normalizeText(ticket.lga);
+
+  if (ticketState) {
+    params.push(ticketState);
+    where.push(`(assigned_state IS NULL OR LOWER(COALESCE(assigned_state, '')) = $${params.length} OR LOWER(user_type) LIKE 'super_%' OR LOWER(user_type) IN ('super_admin', 'super_support_admin'))`);
+  }
+
+  if (ticketLga) {
+    params.push(ticketLga);
+    where.push(`(assigned_city IS NULL OR LOWER(COALESCE(assigned_city, '')) = $${params.length} OR LOWER(user_type) NOT LIKE 'lga_%')`);
+  }
+
+  const result = await db.query(
+    `SELECT id, full_name, email, user_type
+     FROM users
+     WHERE ${where.join(' AND ')}
+     ORDER BY
+       CASE
+         WHEN LOWER(user_type) LIKE 'lga_%' THEN 1
+         WHEN LOWER(user_type) LIKE 'state_%' THEN 2
+         WHEN LOWER(user_type) LIKE 'super_%' OR LOWER(user_type) = 'super_admin' THEN 3
+         ELSE 4
+       END
+     LIMIT 30`,
+    params
+  );
+
+  return result.rows;
+};
+
+const notifyDepartmentEscalation = async (ticket, department, note = '') => {
+  try {
+    const { createNotification } = require('../config/utils/notificationService');
+    const recipients = await findDepartmentEscalationRecipients(ticket, department);
+    const notified = new Set();
+
+    for (const user of recipients) {
+      if (!user.id || notified.has(user.id)) continue;
+      notified.add(user.id);
+      await createNotification(
+        user.id,
+        'support_department_escalation',
+        'Support ticket needs department action',
+        `Ticket #${ticket.id} "${ticket.subject}" was handed to ${normalizeDepartment(department).replace(/_/g, ' ')}.${note ? ` Note: ${note}` : ''}`,
+        getDepartmentEscalationPath(department, user.user_type)
+      );
+      emitToUser(user.id, 'ticket:department_escalated', { ticketId: ticket.id, ticket, department });
+    }
+  } catch (err) {
+    console.error('Department escalation notification error:', err);
+  }
+};
+
+const csvEscape = (value) => {
+  if (value === null || value === undefined) return '';
+  const text = String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
 const canSupportAdminAccessTicket = (user, ticket = {}) => {
   const role = normalizeText(user?.user_type);
   if (!SUPPORT_ADMIN_ROLES.has(role)) return false;
@@ -618,6 +752,101 @@ const addReplyNotification = async (reply, ticket, senderId, recipientId) => {
     console.error('Add reply notification error:', err);
   }
 };
+
+const notifySlaRisk = async (ticket, severity, policies = {}) => {
+  try {
+    const { createNotification } = require('../config/utils/notificationService');
+    const recipientIds = new Set();
+    if (ticket.assigned_to) recipientIds.add(ticket.assigned_to);
+
+    if (severity !== 'breached' || policies.notify_super_admin_on_breach !== false) {
+      const superResult = await db.query(
+        `SELECT id FROM users
+         WHERE LOWER(user_type) IN ('super_admin', 'super_support_admin')
+         LIMIT 25`
+      );
+      for (const user of superResult.rows) recipientIds.add(user.id);
+    }
+
+    const title = severity === 'breached' ? 'Support SLA breached' : 'Support SLA due soon';
+    const message = `Ticket #${ticket.id} "${ticket.subject}" ${severity === 'breached' ? 'has breached its SLA' : 'is approaching its SLA deadline'}.`;
+    const link = '/admin/super-support-dashboard?tab=tickets';
+
+    for (const userId of recipientIds) {
+      await createNotification(userId, 'support_sla', title, message, link);
+      emitToUser(userId, 'ticket:sla_alert', { ticketId: ticket.id, severity, ticket });
+    }
+  } catch (err) {
+    console.error('Support SLA notification error:', err);
+  }
+};
+
+const getSupportPolicySettings = async () => {
+  try {
+    const result = await db.query(`SELECT value FROM support_policy_settings WHERE key = 'support_governance'`);
+    return {
+      sla_due_soon_hours: 2,
+      escalation_acknowledgement_hours: 4,
+      department_resolution_hours: 24,
+      notify_super_admin_on_breach: true,
+      ...(result.rows[0]?.value || {}),
+    };
+  } catch (err) {
+    return {
+      sla_due_soon_hours: 2,
+      escalation_acknowledgement_hours: 4,
+      department_resolution_hours: 24,
+      notify_super_admin_on_breach: true,
+    };
+  }
+};
+
+const runSupportSlaMonitor = async () => {
+  try {
+    await ensureSupportSchema();
+    const policies = await getSupportPolicySettings();
+    const dueSoonHours = Math.max(1, Math.min(24, Number(policies.sla_due_soon_hours) || 2));
+
+    const dueSoon = await db.query(
+      `UPDATE support_tickets
+       SET sla_warning_notified_at = CURRENT_TIMESTAMP
+       WHERE status <> 'resolved'
+         AND sla_due_at IS NOT NULL
+         AND sla_due_at > CURRENT_TIMESTAMP
+         AND sla_due_at <= CURRENT_TIMESTAMP + ($1::int * INTERVAL '1 hour')
+         AND sla_warning_notified_at IS NULL
+       RETURNING id, subject, assigned_to, user_id, state, lga, category, priority, status, sla_due_at`
+      ,
+      [dueSoonHours]
+    );
+
+    const breached = await db.query(
+      `UPDATE support_tickets
+       SET sla_breach_notified_at = CURRENT_TIMESTAMP
+       WHERE status <> 'resolved'
+         AND sla_due_at IS NOT NULL
+         AND sla_due_at <= CURRENT_TIMESTAMP
+         AND sla_breach_notified_at IS NULL
+       RETURNING id, subject, assigned_to, user_id, state, lga, category, priority, status, sla_due_at`
+    );
+
+    for (const ticket of dueSoon.rows) {
+      await notifySlaRisk(ticket, 'due_soon', policies);
+      await addTicketTimeline(ticket.id, null, 'sla_due_soon', 'SLA is due within two hours');
+    }
+
+    for (const ticket of breached.rows) {
+      await notifySlaRisk(ticket, 'breached', policies);
+      await addTicketTimeline(ticket.id, null, 'sla_breached', 'SLA deadline was breached');
+    }
+  } catch (err) {
+    console.error('Support SLA monitor error:', err);
+  }
+};
+
+const supportSlaMonitor = setInterval(runSupportSlaMonitor, 5 * 60 * 1000);
+if (typeof supportSlaMonitor.unref === 'function') supportSlaMonitor.unref();
+setTimeout(runSupportSlaMonitor, 30000).unref?.();
 
 const sendReplyEmail = async (reply, ticket, sender) => {
   try {
@@ -1229,7 +1458,14 @@ router.get('/tickets/:id/context', authenticate, async (req, res) => {
       [ticketId]
     );
 
-    res.json({ success: true, data: { ticket, related_context: relatedContext, timeline: timelineResult.rows } });
+    res.json({
+      success: true,
+      data: {
+        ticket: { ...ticket, related_admin_path: getRelatedAdminPath(ticket, req.user.user_type) },
+        related_context: relatedContext,
+        timeline: timelineResult.rows,
+      },
+    });
   } catch (error) {
     console.error('Support ticket context error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch ticket context' });
@@ -1271,6 +1507,7 @@ router.post('/tickets/:id/escalate-department', authenticate, requireSupportAdmi
     );
 
     await addTicketTimeline(ticketId, req.user, 'department_escalated', note || `Escalated to ${department.replace(/_/g, ' ')}`, { department });
+    await notifyDepartmentEscalation(result.rows[0], department, note);
     emitTicketUpdated(result.rows[0]);
     emitTicketToAdmins('ticket:department_escalated', { ticketId, ticket: result.rows[0], department });
 
@@ -1365,7 +1602,13 @@ router.get('/department-escalations', authenticate, async (req, res) => {
       params
     );
 
-    res.json({ success: true, data: result.rows });
+    const rows = result.rows.map((ticket) => ({
+      ...ticket,
+      related_admin_path: getRelatedAdminPath(ticket, req.user.user_type),
+      escalation_admin_path: getDepartmentEscalationPath(ticket.escalation_department, req.user.user_type),
+    }));
+
+    res.json({ success: true, data: rows });
   } catch (error) {
     console.error('Department escalations error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch department escalations' });
@@ -1483,6 +1726,111 @@ router.get('/governance/summary', authenticate, requireSupportAdmin, async (req,
   } catch (error) {
     console.error('Support governance summary error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch support governance summary' });
+  }
+});
+
+router.get('/governance/export', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const role = normalizeText(req.user.user_type);
+    if (role !== 'super_admin' && role !== 'super_support_admin') {
+      return res.status(403).json({ success: false, message: 'Super support governance access required' });
+    }
+
+    const result = await db.query(
+      `SELECT st.id, st.subject, st.category, st.priority, st.status, st.state, st.lga,
+              st.escalation_department, st.escalation_status, st.escalation_note,
+              st.sla_due_at, st.last_escalated_at, st.resolved_at, st.created_at, st.updated_at,
+              CASE
+                WHEN st.status = 'resolved' THEN 'met'
+                WHEN st.sla_due_at IS NULL THEN 'not_set'
+                WHEN st.sla_due_at < CURRENT_TIMESTAMP THEN 'breached'
+                WHEN st.sla_due_at < CURRENT_TIMESTAMP + INTERVAL '2 hours' THEN 'due_soon'
+                ELSE 'on_track'
+              END AS sla_status,
+              u.email AS user_email, u.full_name AS user_name,
+              a.email AS assigned_email, a.full_name AS assigned_name
+       FROM support_tickets st
+       LEFT JOIN users u ON u.id = st.user_id
+       LEFT JOIN users a ON a.id = st.assigned_to
+       ORDER BY st.updated_at DESC
+       LIMIT 5000`
+    );
+
+    const headers = [
+      'ticket_id', 'subject', 'category', 'priority', 'ticket_status', 'state', 'lga',
+      'department', 'escalation_status', 'sla_status', 'sla_due_at', 'last_escalated_at',
+      'resolved_at', 'created_at', 'updated_at', 'user_name', 'user_email',
+      'assigned_name', 'assigned_email', 'escalation_note',
+    ];
+
+    const rows = result.rows.map((row) => [
+      row.id, row.subject, row.category, row.priority, row.status, row.state, row.lga,
+      row.escalation_department, row.escalation_status, row.sla_status, row.sla_due_at,
+      row.last_escalated_at, row.resolved_at, row.created_at, row.updated_at,
+      row.user_name, row.user_email, row.assigned_name, row.assigned_email, row.escalation_note,
+    ]);
+
+    const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="support-governance-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Support governance export error:', error);
+    res.status(500).json({ success: false, message: 'Failed to export support governance report' });
+  }
+});
+
+router.get('/governance/policies', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+    const role = normalizeText(req.user.user_type);
+    if (role !== 'super_admin' && role !== 'super_support_admin') {
+      return res.status(403).json({ success: false, message: 'Super support governance access required' });
+    }
+
+    const result = await db.query(`SELECT key, value, updated_at FROM support_policy_settings WHERE key = 'support_governance'`);
+    const defaults = {
+      sla_due_soon_hours: 2,
+      escalation_acknowledgement_hours: 4,
+      department_resolution_hours: 24,
+      notify_super_admin_on_breach: true,
+    };
+    res.json({ success: true, data: result.rows[0]?.value || defaults, updated_at: result.rows[0]?.updated_at || null });
+  } catch (error) {
+    console.error('Support governance policies error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch support governance policies' });
+  }
+});
+
+router.put('/governance/policies', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+    const role = normalizeText(req.user.user_type);
+    if (role !== 'super_admin' && role !== 'super_support_admin') {
+      return res.status(403).json({ success: false, message: 'Super support governance access required' });
+    }
+
+    const policy = {
+      sla_due_soon_hours: Math.max(1, Math.min(24, Number(req.body.sla_due_soon_hours) || 2)),
+      escalation_acknowledgement_hours: Math.max(1, Math.min(72, Number(req.body.escalation_acknowledgement_hours) || 4)),
+      department_resolution_hours: Math.max(1, Math.min(168, Number(req.body.department_resolution_hours) || 24)),
+      notify_super_admin_on_breach: req.body.notify_super_admin_on_breach !== false,
+    };
+
+    const result = await db.query(
+      `INSERT INTO support_policy_settings (key, value, updated_by, updated_at)
+       VALUES ('support_governance', $1::jsonb, $2, CURRENT_TIMESTAMP)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP
+       RETURNING value, updated_at`,
+      [JSON.stringify(policy), req.user.id]
+    );
+
+    res.json({ success: true, data: result.rows[0].value, updated_at: result.rows[0].updated_at });
+  } catch (error) {
+    console.error('Support governance policy update error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update support governance policies' });
   }
 });
 
