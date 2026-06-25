@@ -858,8 +858,11 @@ export default function SuperAdminDashboard() {
     loadReports();
   };
 
-  const sendBroadcast = async () => {
-    await api.post("/super/broadcasts", broadcastForm);
+  const sendBroadcast = async (approvalNote = "") => {
+    await api.post("/super/broadcasts", {
+      ...broadcastForm,
+      approval_note: String(approvalNote || "").trim(),
+    });
 
     toast.success("Broadcast sent");
 
