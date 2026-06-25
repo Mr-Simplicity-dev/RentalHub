@@ -3140,10 +3140,80 @@ const bulkPropertyAction = async (req, res) => {
 };
 
 // feature flags
+const ensureFeatureFlagOperationSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS feature_flag_operations (
+      id SERIAL PRIMARY KEY,
+      flag_key VARCHAR(100) NOT NULL,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      previous_enabled BOOLEAN,
+      new_enabled BOOLEAN,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_feature_flag_operations_key
+      ON feature_flag_operations(flag_key, created_at DESC)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_feature_flag_operations_created
+      ON feature_flag_operations(created_at DESC)
+  `);
+};
+
+const createFeatureFlagOperation = async ({
+  flagKey,
+  actor,
+  eventType,
+  note,
+  previousEnabled,
+  newEnabled,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO feature_flag_operations (
+       flag_key, actor_id, actor_name, event_type, note, previous_enabled, new_enabled, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+    [
+      flagKey,
+      actor?.id || null,
+      getAdminOperationActorName(actor),
+      eventType,
+      note || null,
+      typeof previousEnabled === 'boolean' ? previousEnabled : null,
+      typeof newEnabled === 'boolean' ? newEnabled : null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
 const getFeatureFlags = async (req, res) => {
   try {
     await ensureFeatureFlagsTable({ syncDefaults: true });
-    const { rows } = await db.query(`SELECT * FROM feature_flags ORDER BY key`);
+    await ensureFeatureFlagOperationSchema();
+
+    const { rows } = await db.query(
+      `SELECT ff.*,
+              COALESCE(ops.operations, '[]'::json) AS operations
+       FROM feature_flags ff
+       LEFT JOIN LATERAL (
+         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, previous_enabled, new_enabled, metadata, created_at
+           FROM feature_flag_operations
+           WHERE flag_key = ff.key
+           ORDER BY created_at DESC, id DESC
+           LIMIT 3
+         ) operation_rows
+       ) ops ON TRUE
+       ORDER BY ff.key`
+    );
     const flagMap = new Map(
       DEFAULT_FEATURE_FLAGS.map((flag) => [flag.key, { ...flag }])
     );
@@ -3168,12 +3238,24 @@ const getFeatureFlags = async (req, res) => {
 const updateFeatureFlag = async (req, res) => {
   const { key } = req.params;
   const { enabled } = req.body;
+  const reason = String(req.body?.reason || req.body?.note || '').trim();
 
   try {
     await ensureFeatureFlagsTable();
+    await ensureFeatureFlagOperationSchema();
     await syncDefaultFeatureFlags();
 
+    if (!reason) {
+      return res.status(400).json({ message: 'A feature flag change reason is required' });
+    }
+
     const defaultFlag = DEFAULT_FEATURE_FLAGS.find((flag) => flag.key === key);
+    const existing = await db.query(`SELECT key, enabled, description FROM feature_flags WHERE key = $1`, [key]);
+    const previousEnabled = existing.rows.length
+      ? existing.rows[0].enabled
+      : defaultFlag
+        ? defaultFlag.enabled
+        : null;
     let result;
 
     if (defaultFlag) {
@@ -3182,12 +3264,12 @@ const updateFeatureFlag = async (req, res) => {
          VALUES ($1, $2, $3, NOW())
          ON CONFLICT (key)
          DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = NOW()
-         RETURNING key`,
+         RETURNING key, enabled, description`,
         [key, enabled, defaultFlag.description]
       );
     } else {
       result = await db.query(
-        `UPDATE feature_flags SET enabled = $1, updated_at = NOW() WHERE key = $2 RETURNING key`,
+        `UPDATE feature_flags SET enabled = $1, updated_at = NOW() WHERE key = $2 RETURNING key, enabled, description`,
         [enabled, key]
       );
     }
@@ -3195,6 +3277,18 @@ const updateFeatureFlag = async (req, res) => {
     if (!result.rowCount) {
       return res.status(404).json({ message: 'Feature flag not found' });
     }
+
+    await createFeatureFlagOperation({
+      flagKey: key,
+      actor: req.user,
+      eventType: enabled ? 'feature_flag_enabled' : 'feature_flag_disabled',
+      note: reason,
+      previousEnabled,
+      newEnabled: !!enabled,
+      metadata: {
+        description: result.rows[0].description || defaultFlag?.description || null,
+      },
+    });
 
     await logAction(req.user.id, `TOGGLE_FLAG_${key}`, 'feature_flag', null);
 

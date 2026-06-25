@@ -872,13 +872,17 @@ export default function SuperAdminDashboard() {
     loadBroadcasts();
   };
 
-  const toggleFlag = async (key, enabled) => {
+  const toggleFlag = async (key, enabled, reason = "") => {
     try {
-      await api.patch(`/super/flags/${key}`, { enabled });
+      await api.patch(`/super/flags/${key}`, {
+        enabled,
+        reason: String(reason || "").trim(),
+      });
       toast.success(`Flag ${enabled ? "enabled" : "disabled"}`);
       loadFlags();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update flag");
+      throw err;
     }
   };
 
