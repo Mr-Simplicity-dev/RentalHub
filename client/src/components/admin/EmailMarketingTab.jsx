@@ -19,6 +19,37 @@ const emptyTemplate = {
   name: '', description: '', subject: '', content_html: '', category: 'general',
 };
 
+const governanceCopy = {
+  send_campaign: {
+    title: 'Send email campaign',
+    label: 'Launch approval note',
+    placeholder: 'Who approved this send and why is it needed now?',
+    required: 'A launch approval note is required',
+    tone: 'primary',
+  },
+  delete_campaign: {
+    title: 'Delete email campaign',
+    label: 'Deletion reason',
+    placeholder: 'Explain why this campaign should be deleted',
+    required: 'A campaign deletion reason is required',
+    tone: 'danger',
+  },
+  delete_subscriber: {
+    title: 'Remove email subscriber',
+    label: 'Removal reason',
+    placeholder: 'Explain why this contact is being removed',
+    required: 'A subscriber removal reason is required',
+    tone: 'danger',
+  },
+  delete_template: {
+    title: 'Delete email template',
+    label: 'Deletion reason',
+    placeholder: 'Explain why this template should be deleted',
+    required: 'A template deletion reason is required',
+    tone: 'danger',
+  },
+};
+
 const EmailMarketingTab = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
@@ -47,6 +78,13 @@ const EmailMarketingTab = () => {
   const [templateForm, setTemplateForm] = useState(emptyTemplate);
   const [editingTemplateId, setEditingTemplateId] = useState(null);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [governanceAction, setGovernanceAction] = useState({
+    open: false,
+    type: '',
+    target: null,
+    note: '',
+    error: '',
+  });
 
   const loadStats = useCallback(async () => {
     try {
@@ -95,6 +133,69 @@ const EmailMarketingTab = () => {
     if (activeTab === 'subscribers') loadSubscribers(subSearch, subPage);
   }, [activeTab, subSearch, subPage, loadSubscribers]);
 
+  const openGovernanceAction = (type, target) => {
+    setGovernanceAction({
+      open: true,
+      type,
+      target,
+      note: '',
+      error: '',
+    });
+  };
+
+  const closeGovernanceAction = () => {
+    setGovernanceAction({
+      open: false,
+      type: '',
+      target: null,
+      note: '',
+      error: '',
+    });
+  };
+
+  const updateGovernanceNote = (note) => {
+    setGovernanceAction((prev) => ({
+      ...prev,
+      note,
+      error: '',
+    }));
+  };
+
+  const setGovernanceError = (error) => {
+    setGovernanceAction((prev) => ({
+      ...prev,
+      error,
+    }));
+  };
+
+  const submitGovernanceAction = async () => {
+    const copy = governanceCopy[governanceAction.type];
+    const note = governanceAction.note.trim();
+    const target = governanceAction.target;
+
+    if (!copy) return;
+    if (!note) {
+      setGovernanceError(copy.required);
+      return;
+    }
+
+    try {
+      if (governanceAction.type === 'delete_subscriber') {
+        await handleDeleteSubscriber(target.id, note);
+      } else if (governanceAction.type === 'send_campaign') {
+        await handleSendCampaign(target.id, note);
+      } else if (governanceAction.type === 'delete_campaign') {
+        await handleDeleteCampaign(target.id, note);
+      } else if (governanceAction.type === 'delete_template') {
+        await handleDeleteTemplate(target.id, note);
+      }
+
+      closeGovernanceAction();
+    } catch (err) {
+      setGovernanceError(err.response?.data?.message || 'Email marketing action failed');
+    }
+  };
+
   // ─── Sync ─────────────────────────────────────────────────────────────────
   const handleSync = async () => {
     try {
@@ -126,15 +227,17 @@ const EmailMarketingTab = () => {
     }
   };
 
-  const handleDeleteSubscriber = async (id) => {
-    if (!window.confirm('Remove this subscriber?')) return;
+  const handleDeleteSubscriber = async (id, reason = '') => {
     try {
-      await api.delete(`/email-marketing/subscribers/${id}`);
+      await api.delete(`/email-marketing/subscribers/${id}`, {
+        data: { reason },
+      });
       toast.success('Subscriber removed');
       loadSubscribers(subSearch, subPage);
       loadStats();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete');
+      throw err;
     }
   };
 
@@ -196,29 +299,33 @@ const EmailMarketingTab = () => {
     setShowCampaignForm(true);
   };
 
-  const handleSendCampaign = async (id) => {
-    if (!window.confirm('Send this campaign to all matching subscribers?')) return;
+  const handleSendCampaign = async (id, approvalNote = '') => {
     try {
       setLoading(true);
-      const res = await api.post(`/email-marketing/campaigns/${id}/send`);
+      const res = await api.post(`/email-marketing/campaigns/${id}/send`, {
+        approval_note: approvalNote,
+      });
       toast.success(`Sent: ${res.data.data.sent} Success, ${res.data.data.failed} Failed`);
       loadCampaigns();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Send failed');
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteCampaign = async (id) => {
-    if (!window.confirm('Delete this campaign?')) return;
+  const handleDeleteCampaign = async (id, reason = '') => {
     try {
-      await api.delete(`/email-marketing/campaigns/${id}`);
+      await api.delete(`/email-marketing/campaigns/${id}`, {
+        data: { reason },
+      });
       toast.success('Campaign deleted');
       loadCampaigns();
       if (viewingCampaignId === id) setViewingCampaignId(null);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete');
+      throw err;
     }
   };
 
@@ -268,14 +375,16 @@ const EmailMarketingTab = () => {
     setShowTemplateForm(true);
   };
 
-  const handleDeleteTemplate = async (id) => {
-    if (!window.confirm('Delete this template?')) return;
+  const handleDeleteTemplate = async (id, reason = '') => {
     try {
-      await api.delete(`/email-marketing/templates/${id}`);
+      await api.delete(`/email-marketing/templates/${id}`, {
+        data: { reason },
+      });
       toast.success('Template deleted');
       loadTemplates();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete');
+      throw err;
     }
   };
 
@@ -430,7 +539,7 @@ const EmailMarketingTab = () => {
                 </td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{new Date(sub.created_at).toLocaleDateString()}</td>
                 <td className="px-4 py-3 text-right">
-                  <button onClick={() => handleDeleteSubscriber(sub.id)} className="text-red-500 hover:text-red-700" title="Remove">
+                  <button onClick={() => openGovernanceAction('delete_subscriber', sub)} className="text-red-500 hover:text-red-700" title="Remove">
                     <FaTrash />
                   </button>
                 </td>
@@ -511,8 +620,8 @@ const EmailMarketingTab = () => {
                 {c.status === 'draft' && (
                   <>
                     <button onClick={() => handleEditCampaign(c)} className="btn btn-secondary px-3 py-2 text-xs"><FaEdit /></button>
-                    <button onClick={() => handleSendCampaign(c.id)} disabled={loading} className="btn btn-primary px-3 py-2 text-xs gap-1"><FaPlay /> Send</button>
-                    <button onClick={() => handleDeleteCampaign(c.id)} className="btn btn-danger px-3 py-2 text-xs"><FaTrash /></button>
+                    <button onClick={() => openGovernanceAction('send_campaign', c)} disabled={loading} className="btn btn-primary px-3 py-2 text-xs gap-1"><FaPlay /> Send</button>
+                    <button onClick={() => openGovernanceAction('delete_campaign', c)} className="btn btn-danger px-3 py-2 text-xs"><FaTrash /></button>
                   </>
                 )}
                 {c.status === 'sent' && (
@@ -520,6 +629,19 @@ const EmailMarketingTab = () => {
                 )}
               </div>
             </div>
+
+            {Array.isArray(c.operations) && c.operations.length > 0 && (
+              <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                <p className="mb-1 font-semibold text-gray-600">Recent governance</p>
+                <div className="space-y-1">
+                  {c.operations.slice(0, 2).map((op) => (
+                    <p key={op.id} className="truncate" title={op.note || op.event_type}>
+                      {String(op.event_type || '').replace(/_/g, ' ')} by {op.actor_name || 'Admin'}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {viewingCampaignId === c.id && campaignStats && (
               <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
@@ -585,7 +707,7 @@ const EmailMarketingTab = () => {
               </div>
               <div className="flex gap-1">
                 <button onClick={() => handleEditTemplate(t)} className="text-gray-500 hover:text-primary-600 p-1"><FaEdit /></button>
-                {!t.is_system && <button onClick={() => handleDeleteTemplate(t.id)} className="text-gray-500 hover:text-red-600 p-1"><FaTrash /></button>}
+                {!t.is_system && <button onClick={() => openGovernanceAction('delete_template', t)} className="text-gray-500 hover:text-red-600 p-1"><FaTrash /></button>}
               </div>
             </div>
             <p className="mt-2 text-xs text-gray-500 line-clamp-2">{t.description || 'No description'}</p>
@@ -620,6 +742,71 @@ const EmailMarketingTab = () => {
       {activeTab === 'subscribers' && renderSubscribers()}
       {activeTab === 'campaigns' && renderCampaigns()}
       {activeTab === 'templates' && renderTemplates()}
+
+      {governanceAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
+            <div className="border-b border-gray-100 px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {governanceCopy[governanceAction.type]?.title || 'Confirm email action'}
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {governanceAction.type.includes('campaign')
+                  ? governanceAction.target?.name
+                  : governanceAction.type === 'delete_template'
+                    ? governanceAction.target?.name
+                    : `${governanceAction.target?.email || ''} ${governanceAction.target?.full_name ? `- ${governanceAction.target.full_name}` : ''}`}
+              </p>
+            </div>
+
+            <div className="space-y-4 px-6 py-4">
+              {governanceAction.type === 'send_campaign' && (
+                <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800">
+                  <p className="font-semibold">Audience and compliance check</p>
+                  <p className="mt-1">
+                    This will send the campaign to every subscribed contact matching the campaign filter.
+                  </p>
+                </div>
+              )}
+
+              <label className="block text-sm font-medium text-gray-700">
+                {governanceCopy[governanceAction.type]?.label || 'Reason'}
+                <textarea
+                  value={governanceAction.note}
+                  onChange={(event) => updateGovernanceNote(event.target.value)}
+                  rows={4}
+                  className="input mt-2 min-h-[110px]"
+                  placeholder={governanceCopy[governanceAction.type]?.placeholder || 'Add the reason for this action'}
+                />
+              </label>
+
+              <p className="text-xs text-gray-500">
+                This note is saved in email marketing governance history.
+              </p>
+
+              {governanceAction.error && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {governanceAction.error}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
+              <button type="button" onClick={closeGovernanceAction} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitGovernanceAction}
+                disabled={loading}
+                className={governanceCopy[governanceAction.type]?.tone === 'danger' ? 'btn btn-danger' : 'btn btn-primary'}
+              >
+                {loading ? 'Working...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

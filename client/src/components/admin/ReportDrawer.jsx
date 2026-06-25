@@ -161,6 +161,34 @@ const ReportDrawer = ({ report, closeDrawer, updateReport }) => {
 
           )}
 
+          {Array.isArray(report.operations) && report.operations.length > 0 && (
+
+            <div className="border rounded-lg p-4 bg-gray-50">
+
+              <p className="text-xs text-gray-500 uppercase mb-2">
+                Governance History
+              </p>
+
+              <div className="space-y-3">
+                {report.operations.map((operation) => (
+                  <div key={operation.id}>
+                    <p className="text-sm font-medium text-gray-700">
+                      {String(operation.event_type || "").replace(/_/g, " ")} by{" "}
+                      {operation.actor_name || "Super admin"}
+                    </p>
+                    {operation.note && (
+                      <p className="mt-1 text-xs text-gray-500 leading-relaxed">
+                        {operation.note}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+            </div>
+
+          )}
+
         </div>
 
         {/* ACTION FOOTER */}
