@@ -19,7 +19,7 @@ const isFumigationAdminUser = (user) =>
   Boolean(user?.is_admin) || FUMIGATION_ADMIN_ROLES.has(String(user?.user_type || '').toLowerCase());
 
 // ---------------------------------------------------------------------------
-// PaymentService — inline mock (replace body with real implementation later)
+// Paystack payment adapter with explicit local-only mock fallback.
 // ---------------------------------------------------------------------------
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
@@ -125,9 +125,6 @@ const PaymentService = {
   }
 };
 
-// ---------------------------------------------------------------------------
-// NotificationService — inline mock (replace body with real implementation later)
-// ---------------------------------------------------------------------------
 class FumigationCleaningController {
   constructor() {
     Object.getOwnPropertyNames(FumigationCleaningController.prototype)
