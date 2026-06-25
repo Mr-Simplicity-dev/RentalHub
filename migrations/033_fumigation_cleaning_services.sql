@@ -167,12 +167,32 @@ CREATE TABLE IF NOT EXISTS booking_provider_assignments (
     booking_id INTEGER NOT NULL REFERENCES fumigation_cleaning_bookings(id),
     provider_id INTEGER NOT NULL REFERENCES service_providers(id),
     assignment_status VARCHAR(50) DEFAULT 'assigned' CHECK (assignment_status IN (
-        'assigned', 'accepted', 'declined', 'completed'
+        'assigned', 'accepted', 'declined', 'in_progress', 'completed'
     )),
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     accepted_at TIMESTAMP,
     declined_at TIMESTAMP,
-    declined_reason TEXT
+    declined_reason TEXT,
+    arrival_confirmed_at TIMESTAMP,
+    completion_confirmed_at TIMESTAMP,
+    arrival_proof_url TEXT,
+    completion_proof_url TEXT,
+    operations_note TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Booking Operations Timeline
+CREATE TABLE IF NOT EXISTS fumigation_booking_operations (
+    id SERIAL PRIMARY KEY,
+    booking_id INTEGER NOT NULL REFERENCES fumigation_cleaning_bookings(id) ON DELETE CASCADE,
+    provider_id INTEGER REFERENCES service_providers(id) ON DELETE SET NULL,
+    actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    actor_name VARCHAR(255),
+    event_type VARCHAR(80) NOT NULL,
+    note TEXT,
+    proof_url TEXT,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Payment Records Table
@@ -267,6 +287,7 @@ CREATE INDEX IF NOT EXISTS idx_fc_services_active ON fumigation_cleaning_service
 CREATE INDEX IF NOT EXISTS idx_service_addons_service ON service_addons(service_id);
 CREATE INDEX IF NOT EXISTS idx_providers_active ON service_providers(is_active);
 CREATE INDEX IF NOT EXISTS idx_booking_provider ON booking_provider_assignments(booking_id, provider_id);
+CREATE INDEX IF NOT EXISTS idx_fc_booking_operations_booking ON fumigation_booking_operations(booking_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_booking ON fumigation_payments(booking_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_booking ON service_reviews(booking_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_service ON service_reviews(service_id);

@@ -47,6 +47,18 @@ const AdminInspections = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completeSummary, setCompleteSummary] = useState('');
+  const [completeReportUrl, setCompleteReportUrl] = useState('');
+  const [completeProofUrls, setCompleteProofUrls] = useState('');
+  const [completeAdminNote, setCompleteAdminNote] = useState('');
+  const [findings, setFindings] = useState({
+    overall_condition: '',
+    listing_accuracy: '',
+    safety_notes: '',
+    repair_notes: '',
+  });
+  const [operations, setOperations] = useState([]);
+  const [operationsLoading, setOperationsLoading] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const loadInspections = useCallback(async (p = 1, query = '', status = '') => {
     setLoading(true);
@@ -83,9 +95,25 @@ const AdminInspections = () => {
       if (res.data?.success) {
         setSelectedInspection(res.data.data);
         setShowDetailModal(true);
+        loadOperations(inspection.id);
       }
     } catch (err) {
       console.error('Failed to load inspection detail:', err);
+    }
+  };
+
+  const loadOperations = async (id) => {
+    setOperationsLoading(true);
+    try {
+      const res = await api.get(`/admin/inspections/${id}/operations`);
+      if (res.data?.success) {
+        setOperations(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load inspection history:', err);
+      setOperations([]);
+    } finally {
+      setOperationsLoading(false);
     }
   };
 
@@ -110,12 +138,29 @@ const AdminInspections = () => {
     if (!completeSummary.trim()) return;
     setActionLoading(true);
     try {
+      const proofUrls = completeProofUrls
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean);
       const res = await api.post(`/admin/inspections/${selectedInspection.id}/complete`, {
         inspection_summary: completeSummary,
+        inspection_report_url: completeReportUrl.trim(),
+        inspection_proof_urls: proofUrls,
+        inspection_findings: findings,
+        admin_note: completeAdminNote.trim(),
       });
       if (res.data?.success) {
         setShowCompleteModal(false);
         setCompleteSummary('');
+        setCompleteReportUrl('');
+        setCompleteProofUrls('');
+        setCompleteAdminNote('');
+        setFindings({
+          overall_condition: '',
+          listing_accuracy: '',
+          safety_notes: '',
+          repair_notes: '',
+        });
         setSelectedInspection(null);
         setShowDetailModal(false);
         loadInspections(page, debouncedSearch, statusFilter);
@@ -127,14 +172,39 @@ const AdminInspections = () => {
     }
   };
 
-  const handleCancel = async (id) => {
+  const handleStart = async (id) => {
     setActionLoading(true);
     try {
-      const res = await api.post(`/admin/inspections/${id}/cancel`);
+      const res = await api.post(`/admin/inspections/${id}/start`, {
+        admin_note: 'Inspection visit started',
+      });
       if (res.data?.success) {
         loadInspections(page, debouncedSearch, statusFilter);
         if (selectedInspection?.id === id) {
-          setSelectedInspection((prev) => ({ ...prev, status: 'cancelled' }));
+          setSelectedInspection((prev) => ({ ...prev, status: 'inspecting', started_at: new Date().toISOString() }));
+          loadOperations(id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to start inspection:', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancel = async (id) => {
+    if (!cancelReason.trim()) return;
+    setActionLoading(true);
+    try {
+      const res = await api.post(`/admin/inspections/${id}/cancel`, {
+        cancellation_reason: cancelReason.trim(),
+      });
+      if (res.data?.success) {
+        setCancelReason('');
+        loadInspections(page, debouncedSearch, statusFilter);
+        if (selectedInspection?.id === id) {
+          setSelectedInspection((prev) => ({ ...prev, status: 'cancelled', cancellation_reason: cancelReason.trim() }));
+          loadOperations(id);
         }
       }
     } catch (err) {
@@ -336,6 +406,16 @@ const AdminInspections = () => {
                     Completed: {new Date(selectedInspection.completed_at).toLocaleDateString()}
                   </p>
                 )}
+                {selectedInspection.started_at && (
+                  <p className="text-sm text-gray-600">
+                    Started: {new Date(selectedInspection.started_at).toLocaleDateString()}
+                  </p>
+                )}
+                {selectedInspection.cancelled_at && (
+                  <p className="text-sm text-gray-600">
+                    Cancelled: {new Date(selectedInspection.cancelled_at).toLocaleDateString()}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -371,8 +451,67 @@ const AdminInspections = () => {
                 <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-gray-800">
                   {selectedInspection.inspection_summary}
                 </div>
+                {selectedInspection.inspection_report_url && (
+                  <a
+                    href={selectedInspection.inspection_report_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-block text-sm font-semibold text-primary-700 underline"
+                  >
+                    Open report proof
+                  </a>
+                )}
               </div>
             )}
+
+            {selectedInspection.cancellation_reason && (
+              <div>
+                <h4 className="mb-1 text-sm font-semibold text-gray-500 uppercase">
+                  Cancellation Reason
+                </h4>
+                <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  {selectedInspection.cancellation_reason}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <h4 className="mb-2 text-sm font-semibold text-gray-500 uppercase">
+                Operations History
+              </h4>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                {operationsLoading ? (
+                  <p className="text-sm text-gray-500">Loading history...</p>
+                ) : operations.length ? (
+                  <div className="max-h-64 space-y-3 overflow-y-auto">
+                    {operations.map((operation) => (
+                      <div key={operation.id} className="border-l-2 border-primary-200 pl-3">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                          <p className="text-sm font-semibold capitalize text-gray-900">
+                            {String(operation.event_type || '').replace(/_/g, ' ')}
+                          </p>
+                          <p className="text-xs text-gray-500">{new Date(operation.created_at).toLocaleString()}</p>
+                        </div>
+                        <p className="text-xs text-gray-500">{operation.actor_name || 'System'}</p>
+                        {operation.note && <p className="mt-1 text-sm text-gray-700">{operation.note}</p>}
+                        {operation.proof_url && (
+                          <a
+                            href={operation.proof_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-block text-sm font-semibold text-primary-700 underline"
+                          >
+                            Open proof
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No inspection history yet.</p>
+                )}
+              </div>
+            </div>
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3 border-t pt-4">
@@ -387,6 +526,16 @@ const AdminInspections = () => {
               )}
               {(selectedInspection.status === 'assigned' || selectedInspection.status === 'inspecting') && (
                 <>
+                  {selectedInspection.status === 'assigned' && (
+                    <button
+                      onClick={() => handleStart(selectedInspection.id)}
+                      disabled={actionLoading}
+                      className="btn btn-outline"
+                    >
+                      <FaClipboardList className="mr-1" />
+                      Start Inspection
+                    </button>
+                  )}
                   <button
                     onClick={() => { setShowCompleteModal(true); }}
                     disabled={actionLoading}
@@ -397,12 +546,18 @@ const AdminInspections = () => {
                   </button>
                   <button
                     onClick={() => handleCancel(selectedInspection.id)}
-                    disabled={actionLoading}
+                    disabled={actionLoading || !cancelReason.trim()}
                     className="btn btn-outline border-red-300 text-red-600 hover:bg-red-50"
                   >
                     <FaBan className="mr-1" />
                     Cancel
                   </button>
+                  <input
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="input min-w-[240px] flex-1"
+                    placeholder="Cancellation reason"
+                  />
                 </>
               )}
               {selectedInspection.status === 'cancelled' && (
@@ -433,6 +588,72 @@ const AdminInspections = () => {
               placeholder="Describe what was found during the inspection. Mention property condition, accuracy of listing details, any issues discovered..."
             />
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Overall condition
+              <input
+                value={findings.overall_condition}
+                onChange={(e) => setFindings((prev) => ({ ...prev, overall_condition: e.target.value }))}
+                className="input mt-1"
+                placeholder="Good, fair, poor..."
+              />
+            </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Listing accuracy
+              <input
+                value={findings.listing_accuracy}
+                onChange={(e) => setFindings((prev) => ({ ...prev, listing_accuracy: e.target.value }))}
+                className="input mt-1"
+                placeholder="Accurate, mismatch found..."
+              />
+            </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Safety notes
+              <input
+                value={findings.safety_notes}
+                onChange={(e) => setFindings((prev) => ({ ...prev, safety_notes: e.target.value }))}
+                className="input mt-1"
+                placeholder="Electrical, access, security..."
+              />
+            </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Repair notes
+              <input
+                value={findings.repair_notes}
+                onChange={(e) => setFindings((prev) => ({ ...prev, repair_notes: e.target.value }))}
+                className="input mt-1"
+                placeholder="Repairs or follow-up needed"
+              />
+            </label>
+          </div>
+          <label className="block text-sm font-medium text-gray-700">
+            Report proof URL
+            <input
+              value={completeReportUrl}
+              onChange={(e) => setCompleteReportUrl(e.target.value)}
+              className="input mt-1"
+              placeholder="https://..."
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700">
+            Photo/proof URLs
+            <textarea
+              value={completeProofUrls}
+              onChange={(e) => setCompleteProofUrls(e.target.value)}
+              rows={3}
+              className="input mt-1 w-full resize-none"
+              placeholder="One proof URL per line"
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700">
+            Admin note
+            <input
+              value={completeAdminNote}
+              onChange={(e) => setCompleteAdminNote(e.target.value)}
+              className="input mt-1"
+              placeholder="Internal note for audit history"
+            />
+          </label>
           <div className="flex gap-3">
             <button
               onClick={() => { setShowCompleteModal(false); setCompleteSummary(''); }}

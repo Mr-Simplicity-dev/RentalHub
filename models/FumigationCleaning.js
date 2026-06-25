@@ -2,6 +2,51 @@ const db = require('../config/middleware/database');
 const { v4: uuidv4 } = require('uuid');
 
 class FumigationCleaningService {
+  static operationsSchemaReady = false;
+
+  static async ensureOperationsSchema() {
+    if (this.operationsSchemaReady) return;
+
+    await db.query(`
+      ALTER TABLE booking_provider_assignments
+        DROP CONSTRAINT IF EXISTS booking_provider_assignments_assignment_status_check
+    `);
+    await db.query(`
+      ALTER TABLE booking_provider_assignments
+        ADD CONSTRAINT booking_provider_assignments_assignment_status_check
+        CHECK (assignment_status IN ('assigned', 'accepted', 'declined', 'in_progress', 'completed'))
+    `);
+    await db.query(`
+      ALTER TABLE booking_provider_assignments
+        ADD COLUMN IF NOT EXISTS arrival_confirmed_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS completion_confirmed_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS arrival_proof_url TEXT,
+        ADD COLUMN IF NOT EXISTS completion_proof_url TEXT,
+        ADD COLUMN IF NOT EXISTS operations_note TEXT,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS fumigation_booking_operations (
+        id SERIAL PRIMARY KEY,
+        booking_id INTEGER NOT NULL REFERENCES fumigation_cleaning_bookings(id) ON DELETE CASCADE,
+        provider_id INTEGER REFERENCES service_providers(id) ON DELETE SET NULL,
+        actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        actor_name VARCHAR(255),
+        event_type VARCHAR(80) NOT NULL,
+        note TEXT,
+        proof_url TEXT,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_fc_booking_operations_booking
+      ON fumigation_booking_operations(booking_id, created_at DESC)
+    `);
+
+    this.operationsSchemaReady = true;
+  }
+
   // ============ SERVICE CATALOG METHODS ============
 
   // Get all service categories
@@ -617,6 +662,7 @@ class FumigationCleaningService {
 
   // Assign provider to booking
   static async assignProviderToBooking(bookingId, providerId) {
+    await this.ensureOperationsSchema();
     const result = await db.query(
       `INSERT INTO booking_provider_assignments (booking_id, provider_id)
        VALUES ($1, $2)
@@ -625,6 +671,121 @@ class FumigationCleaningService {
     );
     
     return result.rows[0];
+  }
+
+  static async getLatestProviderAssignment(bookingId) {
+    await this.ensureOperationsSchema();
+    const result = await db.query(
+      `SELECT bpa.*, sp.company_name, sp.contact_person, sp.contact_phone, sp.contact_email, sp.service_specialization
+       FROM booking_provider_assignments bpa
+       JOIN service_providers sp ON sp.id = bpa.provider_id
+       WHERE bpa.booking_id = $1
+       ORDER BY bpa.assigned_at DESC, bpa.id DESC
+       LIMIT 1`,
+      [bookingId]
+    );
+
+    return result.rows[0];
+  }
+
+  static async updateProviderAssignmentLifecycle(bookingId, lifecycleData = {}) {
+    await this.ensureOperationsSchema();
+    const { status, note, proof_url } = lifecycleData;
+    const updates = ['assignment_status = $1', 'operations_note = $2', 'updated_at = CURRENT_TIMESTAMP'];
+    const params = [status, note || null];
+    let paramCount = 3;
+
+    if (status === 'accepted') {
+      updates.push('accepted_at = CURRENT_TIMESTAMP');
+    }
+
+    if (status === 'declined') {
+      updates.push('declined_at = CURRENT_TIMESTAMP', 'declined_reason = $' + paramCount);
+      params.push(note || null);
+      paramCount++;
+    }
+
+    if (status === 'in_progress') {
+      updates.push('arrival_confirmed_at = CURRENT_TIMESTAMP');
+      if (proof_url) {
+        updates.push('arrival_proof_url = $' + paramCount);
+        params.push(proof_url);
+        paramCount++;
+      }
+    }
+
+    if (status === 'completed') {
+      updates.push('completion_confirmed_at = CURRENT_TIMESTAMP');
+      if (proof_url) {
+        updates.push('completion_proof_url = $' + paramCount);
+        params.push(proof_url);
+        paramCount++;
+      }
+    }
+
+    params.push(bookingId);
+
+    const result = await db.query(
+      `UPDATE booking_provider_assignments
+       SET ${updates.join(', ')}
+       WHERE id = (
+         SELECT id FROM booking_provider_assignments
+         WHERE booking_id = $${paramCount}
+         ORDER BY assigned_at DESC, id DESC
+         LIMIT 1
+       )
+       RETURNING *`,
+      params
+    );
+
+    return result.rows[0];
+  }
+
+  static async createBookingOperation(operationData) {
+    await this.ensureOperationsSchema();
+    const {
+      booking_id,
+      provider_id,
+      actor_id,
+      actor_name,
+      event_type,
+      note,
+      proof_url,
+      metadata = {}
+    } = operationData;
+
+    const result = await db.query(
+      `INSERT INTO fumigation_booking_operations (
+        booking_id, provider_id, actor_id, actor_name, event_type, note, proof_url, metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *`,
+      [
+        booking_id,
+        provider_id || null,
+        actor_id || null,
+        actor_name || null,
+        event_type,
+        note || null,
+        proof_url || null,
+        JSON.stringify(metadata || {})
+      ]
+    );
+
+    return result.rows[0];
+  }
+
+  static async getBookingOperations(bookingId) {
+    await this.ensureOperationsSchema();
+    const result = await db.query(
+      `SELECT fbo.*, sp.company_name AS provider_name
+       FROM fumigation_booking_operations fbo
+       LEFT JOIN service_providers sp ON sp.id = fbo.provider_id
+       WHERE fbo.booking_id = $1
+       ORDER BY fbo.created_at DESC, fbo.id DESC`,
+      [bookingId]
+    );
+
+    return result.rows;
   }
 
   // ============ REVIEW & FEEDBACK METHODS ============
@@ -757,6 +918,7 @@ class FumigationCleaningService {
 
   // Get all bookings for admin (with filters)
   static async getAllBookings(filters = {}) {
+    await this.ensureOperationsSchema();
     let query = `
       SELECT 
         fcb.*,
@@ -768,18 +930,39 @@ class FumigationCleaningService {
         u.full_name as tenant_name,
         u.email as tenant_email,
         u.phone as tenant_phone,
-        sp.company_name as assigned_provider
+        CASE
+          WHEN sp.id IS NULL THEN NULL
+          ELSE jsonb_build_object(
+            'id', sp.id,
+            'company_name', sp.company_name,
+            'contact_person', sp.contact_person,
+            'contact_phone', sp.contact_phone,
+            'contact_email', sp.contact_email,
+            'service_specialization', sp.service_specialization,
+            'assignment_status', bpa.assignment_status,
+            'accepted_at', bpa.accepted_at,
+            'declined_at', bpa.declined_at,
+            'declined_reason', bpa.declined_reason,
+            'arrival_confirmed_at', bpa.arrival_confirmed_at,
+            'completion_confirmed_at', bpa.completion_confirmed_at,
+            'arrival_proof_url', bpa.arrival_proof_url,
+            'completion_proof_url', bpa.completion_proof_url,
+            'operations_note', bpa.operations_note
+          )
+        END as assigned_provider
       FROM fumigation_cleaning_bookings fcb
       JOIN fumigation_cleaning_services fcs ON fcb.service_id = fcs.id
       JOIN fumigation_cleaning_categories fcc ON fcs.category_id = fcc.id
       JOIN properties p ON fcb.property_id = p.id
       JOIN users u ON fcb.tenant_id = u.id
-      LEFT JOIN service_providers sp ON sp.id = (
-        SELECT provider_id 
-        FROM booking_provider_assignments 
-        WHERE booking_id = fcb.id 
+      LEFT JOIN LATERAL (
+        SELECT *
+        FROM booking_provider_assignments
+        WHERE booking_id = fcb.id
+        ORDER BY assigned_at DESC, id DESC
         LIMIT 1
-      )
+      ) bpa ON TRUE
+      LEFT JOIN service_providers sp ON sp.id = bpa.provider_id
       WHERE 1=1
     `;
     const params = [];

@@ -3,6 +3,72 @@ const db = require('../config/middleware/database');
 const STATE_ADMIN_ROLES = new Set(['state_admin', 'state_financial_admin']);
 const LGA_ADMIN_ROLES = new Set(['admin', 'lga_admin']);
 const isLgaAdminRole = (role) => LGA_ADMIN_ROLES.has(String(role || '').trim().toLowerCase());
+let inspectionOperationsSchemaReady = false;
+
+const getActorName = (user) =>
+  user?.full_name || user?.name || user?.email || user?.username || `User ${user?.id || ''}`.trim();
+
+const ensureInspectionOperationsSchema = async () => {
+  if (inspectionOperationsSchemaReady) return;
+
+  await db.query(`
+    ALTER TABLE property_inspection_requests
+      ADD COLUMN IF NOT EXISTS started_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS cancellation_reason TEXT,
+      ADD COLUMN IF NOT EXISTS inspection_report_url TEXT,
+      ADD COLUMN IF NOT EXISTS inspection_proof_urls JSONB DEFAULT '[]',
+      ADD COLUMN IF NOT EXISTS inspection_findings JSONB DEFAULT '{}',
+      ADD COLUMN IF NOT EXISTS admin_note TEXT
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS property_inspection_operations (
+      id SERIAL PRIMARY KEY,
+      inspection_id INTEGER NOT NULL REFERENCES property_inspection_requests(id) ON DELETE CASCADE,
+      admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      proof_url TEXT,
+      metadata JSONB DEFAULT '{}',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_property_inspection_operations_request
+    ON property_inspection_operations(inspection_id, created_at DESC)
+  `);
+
+  inspectionOperationsSchemaReady = true;
+};
+
+const createInspectionOperation = async ({
+  inspectionId,
+  adminId,
+  actorName,
+  eventType,
+  note,
+  proofUrl,
+  metadata = {}
+}) => {
+  await ensureInspectionOperationsSchema();
+  await db.query(
+    `INSERT INTO property_inspection_operations (
+      inspection_id, admin_id, actor_name, event_type, note, proof_url, metadata
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      inspectionId,
+      adminId || null,
+      actorName || null,
+      eventType,
+      note || null,
+      proofUrl || null,
+      JSON.stringify(metadata || {})
+    ]
+  );
+};
 
 const getRequesterStateScope = async (user) => {
   const result = await db.query(
@@ -31,6 +97,7 @@ const getRequesterScope = async (user) => {
 
 exports.getInspections = async (req, res) => {
   try {
+    await ensureInspectionOperationsSchema();
     const { assignedState, assignedCity } = await getRequesterScope(req.user);
 
     if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
@@ -109,6 +176,13 @@ exports.getInspections = async (req, res) => {
          pir.status,
          pir.tenant_note,
          pir.inspection_summary,
+         pir.started_at,
+         pir.cancelled_at,
+         pir.cancellation_reason,
+         pir.inspection_report_url,
+         pir.inspection_proof_urls,
+         pir.inspection_findings,
+         pir.admin_note,
          pir.assigned_admin_id,
          pir.requested_at,
          pir.paid_at,
@@ -161,6 +235,7 @@ exports.getInspections = async (req, res) => {
 
 exports.getInspectionById = async (req, res) => {
   try {
+    await ensureInspectionOperationsSchema();
     const { id } = req.params;
 
     const result = await db.query(
@@ -174,6 +249,13 @@ exports.getInspectionById = async (req, res) => {
          pir.status,
          pir.tenant_note,
          pir.inspection_summary,
+         pir.started_at,
+         pir.cancelled_at,
+         pir.cancellation_reason,
+         pir.inspection_report_url,
+         pir.inspection_proof_urls,
+         pir.inspection_findings,
+         pir.admin_note,
          pir.assigned_admin_id,
          pir.requested_at,
          pir.paid_at,
@@ -229,6 +311,7 @@ exports.getInspectionById = async (req, res) => {
 
 exports.assignInspection = async (req, res) => {
   try {
+    await ensureInspectionOperationsSchema();
     const { id } = req.params;
     const adminId = req.user.id;
 
@@ -269,6 +352,15 @@ exports.assignInspection = async (req, res) => {
       [adminId, id]
     );
 
+    await createInspectionOperation({
+      inspectionId: id,
+      adminId,
+      actorName: getActorName(req.user),
+      eventType: 'assigned',
+      note: 'Inspection assigned to admin',
+      metadata: { previous_status: insp.status, new_status: 'assigned' }
+    });
+
     return res.json({
       success: true,
       message: 'Inspection assigned successfully',
@@ -283,11 +375,124 @@ exports.assignInspection = async (req, res) => {
   }
 };
 
-exports.completeInspection = async (req, res) => {
+exports.startInspection = async (req, res) => {
   try {
+    await ensureInspectionOperationsSchema();
     const { id } = req.params;
     const adminId = req.user.id;
-    const { inspection_summary } = req.body;
+    const note = String(req.body?.admin_note || req.body?.note || '').trim();
+
+    const inspection = await db.query(
+      `SELECT * FROM property_inspection_requests WHERE id = $1`,
+      [id]
+    );
+
+    if (!inspection.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inspection request not found',
+      });
+    }
+
+    const insp = inspection.rows[0];
+
+    if (!['assigned', 'inspecting'].includes(insp.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot start inspection with status '${insp.status}'`,
+      });
+    }
+
+    if (insp.assigned_admin_id !== adminId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not the assigned admin for this inspection',
+      });
+    }
+
+    await db.query(
+      `UPDATE property_inspection_requests
+       SET status = 'inspecting',
+           started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+           admin_note = COALESCE(NULLIF($1, ''), admin_note),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [note, id]
+    );
+
+    await createInspectionOperation({
+      inspectionId: id,
+      adminId,
+      actorName: getActorName(req.user),
+      eventType: 'started',
+      note: note || 'Inspection started',
+      metadata: { previous_status: insp.status, new_status: 'inspecting' }
+    });
+
+    return res.json({
+      success: true,
+      message: 'Inspection started',
+      data: { id, status: 'inspecting' },
+    });
+  } catch (error) {
+    console.error('Admin start inspection error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to start inspection',
+    });
+  }
+};
+
+exports.getInspectionOperations = async (req, res) => {
+  try {
+    await ensureInspectionOperationsSchema();
+    const { id } = req.params;
+
+    const inspection = await db.query(
+      `SELECT id FROM property_inspection_requests WHERE id = $1`,
+      [id]
+    );
+
+    if (!inspection.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inspection request not found',
+      });
+    }
+
+    const result = await db.query(
+      `SELECT *
+       FROM property_inspection_operations
+       WHERE inspection_id = $1
+       ORDER BY created_at DESC, id DESC`,
+      [id]
+    );
+
+    return res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Admin get inspection operations error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load inspection history',
+    });
+  }
+};
+
+exports.completeInspection = async (req, res) => {
+  try {
+    await ensureInspectionOperationsSchema();
+    const { id } = req.params;
+    const adminId = req.user.id;
+    const {
+      inspection_summary,
+      inspection_report_url = '',
+      inspection_proof_urls = [],
+      inspection_findings = {},
+      admin_note = ''
+    } = req.body;
 
     if (!inspection_summary || !String(inspection_summary).trim()) {
       return res.status(400).json({
@@ -328,11 +533,37 @@ exports.completeInspection = async (req, res) => {
       `UPDATE property_inspection_requests
        SET status = 'completed',
            inspection_summary = $1,
+           inspection_report_url = $2,
+           inspection_proof_urls = $3,
+           inspection_findings = $4,
+           admin_note = $5,
            completed_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [String(inspection_summary).trim(), id]
+       WHERE id = $6`,
+      [
+        String(inspection_summary).trim(),
+        String(inspection_report_url || '').trim() || null,
+        JSON.stringify(Array.isArray(inspection_proof_urls) ? inspection_proof_urls : []),
+        JSON.stringify(inspection_findings && typeof inspection_findings === 'object' ? inspection_findings : {}),
+        String(admin_note || '').trim() || null,
+        id
+      ]
     );
+
+    await createInspectionOperation({
+      inspectionId: id,
+      adminId,
+      actorName: getActorName(req.user),
+      eventType: 'completed',
+      note: String(admin_note || inspection_summary).trim(),
+      proofUrl: String(inspection_report_url || '').trim() || null,
+      metadata: {
+        previous_status: insp.status,
+        new_status: 'completed',
+        proof_count: Array.isArray(inspection_proof_urls) ? inspection_proof_urls.length : 0,
+        findings: inspection_findings || {}
+      }
+    });
 
     return res.json({
       success: true,
@@ -350,8 +581,17 @@ exports.completeInspection = async (req, res) => {
 
 exports.cancelInspection = async (req, res) => {
   try {
+    await ensureInspectionOperationsSchema();
     const { id } = req.params;
     const adminId = req.user.id;
+    const cancellationReason = String(req.body?.cancellation_reason || req.body?.admin_note || '').trim();
+
+    if (!cancellationReason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cancellation reason is required',
+      });
+    }
 
     const inspection = await db.query(
       `SELECT * FROM property_inspection_requests WHERE id = $1`,
@@ -384,10 +624,22 @@ exports.cancelInspection = async (req, res) => {
     await db.query(
       `UPDATE property_inspection_requests
        SET status = 'cancelled',
+           cancellation_reason = $2,
+           admin_note = $2,
+           cancelled_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
-      [id]
+      [id, cancellationReason]
     );
+
+    await createInspectionOperation({
+      inspectionId: id,
+      adminId,
+      actorName: getActorName(req.user),
+      eventType: 'cancelled',
+      note: cancellationReason,
+      metadata: { previous_status: insp.status, new_status: 'cancelled' }
+    });
 
     return res.json({
       success: true,

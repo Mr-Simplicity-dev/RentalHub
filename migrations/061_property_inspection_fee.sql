@@ -60,6 +60,27 @@ CREATE TABLE IF NOT EXISTS property_inspection_requests (
     CHECK (status IN ('pending_payment', 'paid', 'assigned', 'inspecting', 'completed', 'cancelled'))
 );
 
+ALTER TABLE property_inspection_requests
+  ADD COLUMN IF NOT EXISTS started_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS cancellation_reason TEXT,
+  ADD COLUMN IF NOT EXISTS inspection_report_url TEXT,
+  ADD COLUMN IF NOT EXISTS inspection_proof_urls JSONB DEFAULT '[]',
+  ADD COLUMN IF NOT EXISTS inspection_findings JSONB DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS admin_note TEXT;
+
+CREATE TABLE IF NOT EXISTS property_inspection_operations (
+  id SERIAL PRIMARY KEY,
+  inspection_id INTEGER NOT NULL REFERENCES property_inspection_requests(id) ON DELETE CASCADE,
+  admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  actor_name VARCHAR(255),
+  event_type VARCHAR(80) NOT NULL,
+  note TEXT,
+  proof_url TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_property_inspection_requests_application
   ON property_inspection_requests(application_id);
 
@@ -68,3 +89,6 @@ CREATE INDEX IF NOT EXISTS idx_property_inspection_requests_tenant
 
 CREATE INDEX IF NOT EXISTS idx_property_inspection_requests_property
   ON property_inspection_requests(property_id);
+
+CREATE INDEX IF NOT EXISTS idx_property_inspection_operations_request
+  ON property_inspection_operations(inspection_id, created_at DESC);

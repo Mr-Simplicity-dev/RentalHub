@@ -242,6 +242,25 @@ router.post('/admin/bookings/:bookingId/assign-provider',
   fumigationCleaningController.assignProvider
 );
 
+// Get booking provider operations and timeline (admin)
+router.get('/admin/bookings/:bookingId/operations',
+  authenticate,
+  requireFumigationAdminAccess,
+  fumigationCleaningController.getBookingOperations
+);
+
+// Update provider lifecycle: accepted, declined, arrived/in-progress, completed (admin)
+router.patch('/admin/bookings/:bookingId/provider-lifecycle',
+  authenticate,
+  requireFumigationAdminAccess,
+  [
+    body('action').isIn(['accepted', 'declined', 'in_progress', 'completed']).withMessage('Invalid provider action'),
+    body('note').optional().isString(),
+    body('proof_url').optional().isString()
+  ],
+  fumigationCleaningController.updateProviderLifecycle
+);
+
 // Get available providers for booking (admin)
 router.get('/admin/bookings/:bookingId/available-providers',
   authenticate,

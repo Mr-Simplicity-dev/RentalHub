@@ -58,6 +58,12 @@ const FumigationCleaningAdmin = ({
   const [statusSaving, setStatusSaving] = useState(false);
   const [providers, setProviders] = useState([]);
   const [selectedProvider, setSelectedProvider] = useState(null);
+  const [operations, setOperations] = useState([]);
+  const [assignmentDetails, setAssignmentDetails] = useState(null);
+  const [operationsLoading, setOperationsLoading] = useState(false);
+  const [operationSaving, setOperationSaving] = useState('');
+  const [operationNote, setOperationNote] = useState('');
+  const [operationProofUrl, setOperationProofUrl] = useState('');
   
   // Filters
   const [statusFilter, setStatusFilter] = useState('all');
@@ -226,10 +232,36 @@ const FumigationCleaningAdmin = ({
       minute: '2-digit'
     });
   };
+
+  const refreshBookings = async () => {
+    const bookingsRes = await api.get('/fumigation-cleaning/admin/bookings');
+    const nextBookings = bookingsRes.data?.data || [];
+    setBookings(nextBookings);
+    return nextBookings;
+  };
+
+  const loadBookingOperations = async (bookingId) => {
+    setOperationsLoading(true);
+    try {
+      const response = await api.get(`/fumigation-cleaning/admin/bookings/${bookingId}/operations`);
+      setOperations(response.data?.data?.operations || []);
+      setAssignmentDetails(response.data?.data?.assignment || null);
+    } catch (error) {
+      console.error('Error loading booking operations:', error);
+      setOperations([]);
+      setAssignmentDetails(null);
+      toast.error(error.response?.data?.message || 'Failed to load booking operations');
+    } finally {
+      setOperationsLoading(false);
+    }
+  };
   
   const handleViewBooking = (booking) => {
     setSelectedBooking(booking);
     setShowBookingDetails(true);
+    setOperationNote('');
+    setOperationProofUrl('');
+    loadBookingOperations(booking.id);
   };
   
   const handleAssignProvider = (booking) => {
@@ -269,9 +301,7 @@ const FumigationCleaningAdmin = ({
       if (response.data?.success) {
         toast.success('Booking status updated');
         closeStatusDialog();
-        // Refresh bookings
-        const bookingsRes = await api.get('/fumigation-cleaning/admin/bookings');
-        setBookings(bookingsRes.data?.data || []);
+        await refreshBookings();
       } else {
         toast.error(response.data?.message || 'Failed to update status');
       }
@@ -299,15 +329,54 @@ const FumigationCleaningAdmin = ({
         setShowAssignProvider(false);
         setSelectedProvider(null);
         
-        // Refresh bookings
-        const bookingsRes = await api.get('/fumigation-cleaning/admin/bookings');
-        setBookings(bookingsRes.data?.data || []);
+        const nextBookings = await refreshBookings();
+        const updatedBooking = nextBookings.find((booking) => booking.id === selectedBooking.id);
+        if (updatedBooking) {
+          setSelectedBooking(updatedBooking);
+        }
+        await loadBookingOperations(selectedBooking.id);
       } else {
         toast.error(response.data?.message || 'Failed to assign provider');
       }
     } catch (error) {
       console.error('Error assigning provider:', error);
       toast.error(error.response?.data?.message || 'Failed to assign provider');
+    }
+  };
+
+  const submitProviderOperation = async (action) => {
+    if (!selectedBooking) return;
+    if (['declined', 'completed'].includes(action) && !operationNote.trim()) {
+      toast.error('Add an operational note for this provider action');
+      return;
+    }
+
+    setOperationSaving(action);
+    try {
+      const response = await api.patch(`/fumigation-cleaning/admin/bookings/${selectedBooking.id}/provider-lifecycle`, {
+        action,
+        note: operationNote.trim(),
+        proof_url: operationProofUrl.trim(),
+      });
+
+      if (response.data?.success) {
+        toast.success('Provider operation updated');
+        setOperationNote('');
+        setOperationProofUrl('');
+        const nextBookings = await refreshBookings();
+        const updatedBooking = nextBookings.find((booking) => booking.id === selectedBooking.id);
+        if (updatedBooking) {
+          setSelectedBooking(updatedBooking);
+        }
+        await loadBookingOperations(selectedBooking.id);
+      } else {
+        toast.error(response.data?.message || 'Failed to update provider operation');
+      }
+    } catch (error) {
+      console.error('Error updating provider operation:', error);
+      toast.error(error.response?.data?.message || 'Failed to update provider operation');
+    } finally {
+      setOperationSaving('');
     }
   };
   
@@ -918,21 +987,164 @@ const FumigationCleaningAdmin = ({
                     {selectedBooking.assigned_provider && (
                       <div>
                         <h3 className="font-bold text-gray-900 mb-3">Assigned Provider</h3>
-                    <div className="fum-admin-providers-section bg-green-50 p-4 rounded-lg">
+                        <div className="fum-admin-providers-section bg-green-50 p-4 rounded-lg">
                           <h4 className="font-bold text-green-800 mb-1">
-                            {selectedBooking.assigned_provider.company_name}
+                            {selectedBooking.assigned_provider.company_name || selectedBooking.assigned_provider}
                           </h4>
                           <p className="text-sm text-green-700">
-                            {selectedBooking.assigned_provider.service_specialization}
+                            {selectedBooking.assigned_provider.service_specialization || 'Assigned service provider'}
                           </p>
                           <div className="mt-2 text-sm text-green-600">
-                            <p>Contact: {selectedBooking.assigned_provider.contact_phone}</p>
-                            <p>Email: {selectedBooking.assigned_provider.contact_email}</p>
+                            <p>Contact: {selectedBooking.assigned_provider.contact_phone || 'Not provided'}</p>
+                            <p>Email: {selectedBooking.assigned_provider.contact_email || 'Not provided'}</p>
+                            <p>Status: {(assignmentDetails?.assignment_status || selectedBooking.assigned_provider.assignment_status || 'assigned').replace('_', ' ')}</p>
+                            {(assignmentDetails?.arrival_proof_url || selectedBooking.assigned_provider.arrival_proof_url) && (
+                              <p>
+                                Arrival Proof:{' '}
+                                <a
+                                  href={assignmentDetails?.arrival_proof_url || selectedBooking.assigned_provider.arrival_proof_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-semibold text-green-800 underline"
+                                >
+                                  Open
+                                </a>
+                              </p>
+                            )}
+                            {(assignmentDetails?.completion_proof_url || selectedBooking.assigned_provider.completion_proof_url) && (
+                              <p>
+                                Completion Proof:{' '}
+                                <a
+                                  href={assignmentDetails?.completion_proof_url || selectedBooking.assigned_provider.completion_proof_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-semibold text-green-800 underline"
+                                >
+                                  Open
+                                </a>
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
                     )}
                   </div>
+                </div>
+
+                <div className="mb-6 border-t border-gray-200 pt-6">
+                  <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                    <div>
+                      <h3 className="font-bold text-gray-900">Provider Operations</h3>
+                      <p className="text-sm text-gray-600">Track assignment response, arrival proof, completion proof, and admin notes.</p>
+                    </div>
+                    <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(selectedBooking.booking_status)}`}>
+                      {selectedBooking.booking_status.replace('_', ' ')}
+                    </span>
+                  </div>
+
+                  {selectedBooking.assigned_provider ? (
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
+                      <div className="rounded-lg border border-gray-200 p-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <label className="block text-sm font-medium text-gray-700 md:col-span-2">
+                            Operation note
+                            <textarea
+                              value={operationNote}
+                              onChange={(event) => setOperationNote(event.target.value)}
+                              rows={3}
+                              className="input mt-2 w-full"
+                              placeholder="Provider accepted, arrived with tenant confirmation, treatment completed, decline reason..."
+                            />
+                          </label>
+                          <label className="block text-sm font-medium text-gray-700 md:col-span-2">
+                            Proof URL
+                            <input
+                              type="url"
+                              value={operationProofUrl}
+                              onChange={(event) => setOperationProofUrl(event.target.value)}
+                              className="input mt-2 w-full"
+                              placeholder="https://..."
+                            />
+                          </label>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          <button
+                            type="button"
+                            onClick={() => submitProviderOperation('accepted')}
+                            disabled={Boolean(operationSaving)}
+                            className="btn btn-outline text-sm"
+                          >
+                            {operationSaving === 'accepted' ? 'Saving...' : 'Accepted'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => submitProviderOperation('declined')}
+                            disabled={Boolean(operationSaving)}
+                            className="btn btn-outline text-sm text-red-700"
+                          >
+                            {operationSaving === 'declined' ? 'Saving...' : 'Declined'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => submitProviderOperation('in_progress')}
+                            disabled={Boolean(operationSaving)}
+                            className="btn btn-outline text-sm text-orange-700"
+                          >
+                            {operationSaving === 'in_progress' ? 'Saving...' : 'Arrived'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => submitProviderOperation('completed')}
+                            disabled={Boolean(operationSaving)}
+                            className="btn btn-primary text-sm"
+                          >
+                            {operationSaving === 'completed' ? 'Saving...' : 'Completed'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-gray-200 p-4">
+                        <h4 className="mb-3 font-bold text-gray-900">Operations Timeline</h4>
+                        {operationsLoading ? (
+                          <p className="text-sm text-gray-500">Loading operations...</p>
+                        ) : operations.length > 0 ? (
+                          <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
+                            {operations.map((operation) => (
+                              <div key={operation.id} className="border-l-2 border-blue-200 pl-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="text-sm font-semibold capitalize text-gray-900">
+                                    {operation.event_type.replaceAll('_', ' ')}
+                                  </p>
+                                  <p className="shrink-0 text-xs text-gray-500">{formatDateTime(operation.created_at)}</p>
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  {operation.actor_name || 'System'}{operation.provider_name ? ` - ${operation.provider_name}` : ''}
+                                </p>
+                                {operation.note && <p className="mt-1 text-sm text-gray-700">{operation.note}</p>}
+                                {operation.proof_url && (
+                                  <a
+                                    href={operation.proof_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-1 inline-block text-sm font-semibold text-blue-700 underline"
+                                  >
+                                    Open proof
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">No operation events yet.</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-600">
+                      Assign a provider before recording acceptance, arrival, or completion proof.
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex flex-col justify-end gap-3 border-t border-gray-200 pt-6 sm:flex-row">
