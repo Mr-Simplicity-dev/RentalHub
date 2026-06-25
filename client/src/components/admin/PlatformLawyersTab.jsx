@@ -42,6 +42,13 @@ const PlatformLawyersTab = () => {
   const [entriesPage, setEntriesPage] = useState(1);
   const [applicationsPage, setApplicationsPage] = useState(1);
   const [broadcastsPage, setBroadcastsPage] = useState(1);
+  const [reviewDialog, setReviewDialog] = useState({
+    open: false,
+    application: null,
+    action: '',
+    note: '',
+  });
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   const loadData = async () => {
     try {
@@ -156,34 +163,53 @@ const PlatformLawyersTab = () => {
     }
   };
 
-  const reviewApplication = async (application, action) => {
-    const promptMessage =
-      action === 'reject'
-        ? 'Optional rejection note for the lawyer'
-        : 'Optional approval note';
-    const reviewInput = window.prompt(promptMessage, '');
+  const openReviewDialog = (application, action) => {
+    setReviewDialog({
+      open: true,
+      application,
+      action,
+      note: application.review_note || '',
+    });
+  };
 
-    if (reviewInput === null) {
+  const closeReviewDialog = () => {
+    setReviewDialog({
+      open: false,
+      application: null,
+      action: '',
+      note: '',
+    });
+  };
+
+  const submitApplicationReview = async () => {
+    const { application, action, note } = reviewDialog;
+
+    if (!application || !action) return;
+
+    if (action === 'reject' && !note.trim()) {
+      toast.error('Add a rejection reason before rejecting this application');
       return;
     }
 
-    const review_note = reviewInput || '';
-
     try {
+      setReviewSaving(true);
       await api.patch(
         `/super/platform-lawyers/applications/${application.id}/${action}`,
-        { review_note }
+        { review_note: note.trim() }
       );
       toast.success(
         action === 'approve'
           ? 'Lawyer application approved'
           : 'Lawyer application rejected'
       );
+      closeReviewDialog();
       await loadData();
     } catch (error) {
       toast.error(
         error.response?.data?.message || `Failed to ${action} application`
       );
+    } finally {
+      setReviewSaving(false);
     }
   };
 
@@ -456,14 +482,14 @@ const PlatformLawyersTab = () => {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => reviewApplication(application, 'approve')}
+                        onClick={() => openReviewDialog(application, 'approve')}
                         className="rounded-lg border border-green-200 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
                       >
                         Approve
                       </button>
                       <button
                         type="button"
-                        onClick={() => reviewApplication(application, 'reject')}
+                        onClick={() => openReviewDialog(application, 'reject')}
                         className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
                       >
                         Reject
@@ -471,6 +497,38 @@ const PlatformLawyersTab = () => {
                     </div>
                   ) : null}
                 </div>
+                {application.review_history?.length ? (
+                  <div className="mt-4 border-t border-gray-100 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Decision history
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {application.review_history.slice(0, 3).map((event) => (
+                        <div
+                          key={event.id}
+                          className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-gray-700"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-medium capitalize">
+                              {event.event_type.replace(/_/g, ' ')}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(event.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">
+                            By {event.actor_name || 'Super admin'}
+                          </p>
+                          {event.note ? (
+                            <p className="mt-1 text-sm text-gray-600">
+                              {event.note}
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -513,6 +571,82 @@ const PlatformLawyersTab = () => {
           summary={`Showing ${broadcasts.length === 0 ? 0 : broadcastsStart + 1}-${Math.min(broadcastsPage * BROADCASTS_PAGE_SIZE, broadcasts.length)} of ${broadcasts.length}`}
         />
       </div>
+
+      {reviewDialog.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-soft bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {reviewDialog.action === 'approve'
+                    ? 'Approve lawyer application'
+                    : 'Reject lawyer application'}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {reviewDialog.application?.full_name} - {reviewDialog.application?.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeReviewDialog}
+                className="rounded-lg px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <label className="mt-5 block text-sm font-medium text-gray-700">
+              {reviewDialog.action === 'reject'
+                ? 'Rejection reason'
+                : 'Approval note'}
+            </label>
+            <textarea
+              className="input mt-2 h-32 w-full"
+              placeholder={
+                reviewDialog.action === 'reject'
+                  ? 'Explain why this lawyer is not approved yet'
+                  : 'Optional note for the approval record'
+              }
+              value={reviewDialog.note}
+              onChange={(e) =>
+                setReviewDialog((prev) => ({ ...prev, note: e.target.value }))
+              }
+            />
+            {reviewDialog.action === 'reject' ? (
+              <p className="mt-2 text-xs text-gray-500">
+                This reason is required and will be saved in the decision history.
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeReviewDialog}
+                disabled={reviewSaving}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitApplicationReview}
+                disabled={reviewSaving}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60 ${
+                  reviewDialog.action === 'approve'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {reviewSaving
+                  ? 'Saving...'
+                  : reviewDialog.action === 'approve'
+                    ? 'Approve application'
+                    : 'Reject application'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

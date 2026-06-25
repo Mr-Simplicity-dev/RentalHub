@@ -11,6 +11,7 @@ const initialManualForm = {
   phone: '',
   nationality: 'Nigeria',
   is_active: true,
+  governance_note: '',
 };
 
 const PlatformAgentsTab = () => {
@@ -19,6 +20,13 @@ const PlatformAgentsTab = () => {
   const [entries, setEntries] = useState([]);
   const [manualForm, setManualForm] = useState(initialManualForm);
   const [entriesPage, setEntriesPage] = useState(1);
+  const [actionDialog, setActionDialog] = useState({
+    open: false,
+    entry: null,
+    action: '',
+    note: '',
+  });
+  const [actionSaving, setActionSaving] = useState(false);
 
   const loadData = async () => {
     try {
@@ -54,31 +62,65 @@ const PlatformAgentsTab = () => {
     }
   };
 
-  const toggleEntry = async (entry) => {
-    try {
-      await api.patch(`/super/platform-agents/${entry.id}`, {
-        is_active: !entry.is_active,
-      });
-      toast.success(
-        entry.is_active ? 'Agent removed from public directory' : 'Agent activated in public directory'
-      );
-      await loadData();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update agent record');
-    }
+  const openActionDialog = (entry, action) => {
+    setActionDialog({
+      open: true,
+      entry,
+      action,
+      note: '',
+    });
   };
 
-  const deleteEntry = async (entry) => {
-    if (!window.confirm(`Delete ${entry.display_name || entry.full_name}?`)) {
+  const closeActionDialog = () => {
+    setActionDialog({
+      open: false,
+      entry: null,
+      action: '',
+      note: '',
+    });
+  };
+
+  const submitAgentAction = async () => {
+    const { entry, action, note } = actionDialog;
+
+    if (!entry || !action) return;
+
+    if ((action === 'deactivate' || action === 'delete') && !note.trim()) {
+      toast.error(
+        action === 'delete'
+          ? 'Add a deletion reason before removing this agent'
+          : 'Add a deactivation reason before disabling this agent'
+      );
       return;
     }
 
     try {
-      await api.delete(`/super/platform-agents/${entry.id}`);
-      toast.success('Platform agent record deleted');
+      setActionSaving(true);
+
+      if (action === 'delete') {
+        await api.delete(`/super/platform-agents/${entry.id}`, {
+          data: { governance_note: note.trim() },
+        });
+        toast.success('Platform agent record deleted');
+      } else {
+        const isActive = action === 'activate';
+        await api.patch(`/super/platform-agents/${entry.id}`, {
+          is_active: isActive,
+          governance_note: note.trim(),
+        });
+        toast.success(
+          isActive
+            ? 'Agent activated in public directory'
+            : 'Agent removed from public directory'
+        );
+      }
+
+      closeActionDialog();
       await loadData();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete agent record');
+      toast.error(error.response?.data?.message || 'Failed to update agent record');
+    } finally {
+      setActionSaving(false);
     }
   };
 
@@ -130,6 +172,14 @@ const PlatformAgentsTab = () => {
               value={manualForm.nationality}
               onChange={(e) =>
                 setManualForm((prev) => ({ ...prev, nationality: e.target.value }))
+              }
+            />
+            <textarea
+              className="input md:col-span-2"
+              placeholder="Governance note, e.g. why this agent is being added"
+              value={manualForm.governance_note}
+              onChange={(e) =>
+                setManualForm((prev) => ({ ...prev, governance_note: e.target.value }))
               }
             />
           </div>
@@ -205,20 +255,52 @@ const PlatformAgentsTab = () => {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => toggleEntry(entry)}
+                      onClick={() =>
+                        openActionDialog(entry, entry.is_active ? 'deactivate' : 'activate')
+                      }
                       className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                     >
                       {entry.is_active ? 'Deactivate' : 'Activate'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => deleteEntry(entry)}
+                      onClick={() => openActionDialog(entry, 'delete')}
                       className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
                     >
                       Delete
                     </button>
                   </div>
                 </div>
+                {entry.operations?.length ? (
+                  <div className="mt-4 border-t border-gray-100 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Governance history
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {entry.operations.slice(0, 3).map((event) => (
+                        <div
+                          key={event.id}
+                          className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-gray-700"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-medium capitalize">
+                              {event.event_type.replace(/_/g, ' ')}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(event.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">
+                            By {event.actor_name || 'Super admin'}
+                          </p>
+                          {event.note ? (
+                            <p className="mt-1 text-sm text-gray-600">{event.note}</p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -254,6 +336,92 @@ const PlatformAgentsTab = () => {
           </p>
         </div>
       </div>
+
+      {actionDialog.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-soft bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {actionDialog.action === 'delete'
+                    ? 'Delete platform agent'
+                    : actionDialog.action === 'activate'
+                      ? 'Activate platform agent'
+                      : 'Deactivate platform agent'}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {actionDialog.entry?.display_name || actionDialog.entry?.full_name} - {actionDialog.entry?.display_email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeActionDialog}
+                className="rounded-lg px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <label className="mt-5 block text-sm font-medium text-gray-700">
+              {actionDialog.action === 'activate'
+                ? 'Governance note'
+                : actionDialog.action === 'delete'
+                  ? 'Deletion reason'
+                  : 'Deactivation reason'}
+            </label>
+            <textarea
+              className="input mt-2 h-32 w-full"
+              placeholder={
+                actionDialog.action === 'activate'
+                  ? 'Optional note for why this agent is being activated'
+                  : actionDialog.action === 'delete'
+                    ? 'Explain why this agent is being removed'
+                    : 'Explain why this agent is being deactivated'
+              }
+              value={actionDialog.note}
+              onChange={(e) =>
+                setActionDialog((prev) => ({ ...prev, note: e.target.value }))
+              }
+            />
+            {actionDialog.action !== 'activate' ? (
+              <p className="mt-2 text-xs text-gray-500">
+                This reason is required and will be saved in the governance history.
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeActionDialog}
+                disabled={actionSaving}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitAgentAction}
+                disabled={actionSaving}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60 ${
+                  actionDialog.action === 'delete'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : actionDialog.action === 'activate'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-slate-700 hover:bg-slate-800'
+                }`}
+              >
+                {actionSaving
+                  ? 'Saving...'
+                  : actionDialog.action === 'delete'
+                    ? 'Delete agent'
+                    : actionDialog.action === 'activate'
+                      ? 'Activate agent'
+                      : 'Deactivate agent'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -37,16 +37,25 @@ const resolveSuperAdminRecipient = async () => {
 export const approvalService = {
   async fetchPendingAdminApprovals() {
     const res = await api.get('/super/pending-admins');
-    return res.data?.data || [];
+    const data = res.data?.data;
+
+    if (Array.isArray(data)) {
+      return { pending: data, recent_decisions: [] };
+    }
+
+    return {
+      pending: data?.pending || [],
+      recent_decisions: data?.recent_decisions || [],
+    };
   },
 
-  async approvePendingAdmin(adminId) {
-    const res = await api.patch(`/super/pending-admins/${adminId}/approve`);
+  async approvePendingAdmin(adminId, payload = {}) {
+    const res = await api.patch(`/super/pending-admins/${adminId}/approve`, payload);
     return res.data;
   },
 
-  async rejectPendingAdmin(adminId) {
-    const res = await api.patch(`/super/pending-admins/${adminId}/reject`);
+  async rejectPendingAdmin(adminId, payload = {}) {
+    const res = await api.patch(`/super/pending-admins/${adminId}/reject`, payload);
     return res.data;
   },
 

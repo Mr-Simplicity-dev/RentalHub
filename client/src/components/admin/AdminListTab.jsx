@@ -214,6 +214,20 @@ const AdminListTab = () => {
   const [stateUsersByAdmin, setStateUsersByAdmin] = useState({});
   const [stateUsersLoadingByAdmin, setStateUsersLoadingByAdmin] = useState({});
   const [adminsPage, setAdminsPage] = useState(1);
+  const [accountAction, setAccountAction] = useState({
+    open: false,
+    admin: null,
+    action: '',
+    reason: '',
+  });
+  const [jurisdictionDialog, setJurisdictionDialog] = useState({
+    open: false,
+    admin: null,
+    assigned_state: '',
+    assigned_city: '',
+    reason: '',
+  });
+  const [modalSaving, setModalSaving] = useState(false);
 
   const fetchAdmins = async () => {
     try {
@@ -233,57 +247,22 @@ const AdminListTab = () => {
     fetchAdmins();
   }, []);
 
-  const suspendAdmin = async (admin) => {
-    const reason = window.prompt(
-      `Suspend ${admin.full_name}? Enter a reason (this will be shown at login):`,
-      ''
-    );
-
-    if (reason === null) return;
-
-    const normalizedReason = String(reason || '').trim();
-    if (!normalizedReason) {
-      window.alert('Suspension reason is required.');
-      return;
-    }
-
-    await api.patch(`/super/users/${admin.id}/ban`, { reason: normalizedReason });
-    fetchAdmins();
+  const openAccountAction = (admin, action) => {
+    setAccountAction({
+      open: true,
+      admin,
+      action,
+      reason: '',
+    });
   };
 
-  
-
-    const deleteAdmin = async (admin) => {
-    const ok = window.confirm(
-      `Delete ${admin.full_name}? This will deactivate the account and block login.`
-    );
-    if (!ok) return;
-
-    try {
-      // Try the admin-specific endpoint first
-      await api.delete(`/super/admins/${admin.id}`);
-      toast.success(`Admin ${admin.full_name} deleted successfully`);
-      fetchAdmins();
-    } catch (err) {
-      console.error('Delete admin error:', err);
-      // If admin-specific endpoint fails, try the general user endpoint
-      try {
-        await api.delete(`/super/users/${admin.id}`);
-        toast.success(`Admin ${admin.full_name} deleted successfully`);
-        fetchAdmins();
-      } catch (secondErr) {
-        const errorMessage = secondErr.response?.data?.message || 
-                            err.response?.data?.message || 
-                            'Failed to delete admin. Please check permissions and try again.';
-        toast.error(errorMessage);
-      }
-    }
-  };
-
-  const unsuspendAdmin = async (admin) => {
-    if (!window.confirm(`Unsuspend ${admin.full_name}? Their account will be restored.`)) return;
-    await api.patch(`/super/users/${admin.id}/unban`);
-    fetchAdmins();
+  const closeAccountAction = () => {
+    setAccountAction({
+      open: false,
+      admin: null,
+      action: '',
+      reason: '',
+    });
   };
 
   const isStateScopedRole = (role) => String(role || '').startsWith('state_');
@@ -293,37 +272,99 @@ const AdminListTab = () => {
     return value === 'admin' || value === 'lawyer' || value.startsWith('lga_') || value.startsWith('state_');
   };
 
-  const editJurisdiction = async (admin) => {
+  const openJurisdictionDialog = (admin) => {
+    setJurisdictionDialog({
+      open: true,
+      admin,
+      assigned_state: admin.assigned_state || '',
+      assigned_city: admin.assigned_city || '',
+      reason: '',
+    });
+  };
+
+  const closeJurisdictionDialog = () => {
+    setJurisdictionDialog({
+      open: false,
+      admin: null,
+      assigned_state: '',
+      assigned_city: '',
+      reason: '',
+    });
+  };
+
+  const submitAccountAction = async () => {
+    const { admin, action, reason } = accountAction;
+
+    if (!admin || !action) return;
+
+    if ((action === 'suspend' || action === 'delete') && !reason.trim()) {
+      toast.error(action === 'delete' ? 'Deletion reason is required' : 'Suspension reason is required');
+      return;
+    }
+
     try {
-      const stateInput = window.prompt('Assigned State', admin.assigned_state || '');
-      if (stateInput === null) return;
+      setModalSaving(true);
 
-      const normalizedState = String(stateInput || '').trim();
-      if (isJurisdictionRole(admin.user_type) && !normalizedState) {
-        window.alert('Assigned state is required for this role.');
-        return;
+      if (action === 'suspend') {
+        await api.patch(`/super/users/${admin.id}/ban`, { reason: reason.trim() });
+        toast.success(`${admin.full_name} suspended`);
+      } else if (action === 'unsuspend') {
+        await api.patch(`/super/users/${admin.id}/unban`, { reason: reason.trim() });
+        toast.success(`${admin.full_name} unsuspended`);
+      } else if (action === 'delete') {
+        await api.delete(`/super/users/${admin.id}`, {
+          data: { reason: reason.trim() },
+        });
+        toast.success(`Admin ${admin.full_name} deleted successfully`);
       }
 
-      let normalizedCity = '';
-      if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(admin.user_type)) {
-        const lgaInput = window.prompt('Assigned Local Government (LGA)', admin.assigned_city || '');
-        if (lgaInput === null) return;
-        normalizedCity = String(lgaInput || '').trim();
+      closeAccountAction();
+      await fetchAdmins();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update admin account');
+    } finally {
+      setModalSaving(false);
+    }
+  };
 
-        if (!normalizedCity) {
-          window.alert('Assigned local government is required for admin role.');
-          return;
-        }
-      }
+  const submitJurisdictionUpdate = async () => {
+    const { admin, assigned_state, assigned_city, reason } = jurisdictionDialog;
 
+    if (!admin) return;
+
+    const normalizedState = String(assigned_state || '').trim();
+    const normalizedCity = String(assigned_city || '').trim();
+
+    if (isJurisdictionRole(admin.user_type) && !normalizedState) {
+      toast.error('Assigned state is required for this role');
+      return;
+    }
+
+    if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(admin.user_type) && !normalizedCity) {
+      toast.error('Assigned local government is required for this role');
+      return;
+    }
+
+    if (!reason.trim()) {
+      toast.error('Jurisdiction change reason is required');
+      return;
+    }
+
+    try {
+      setModalSaving(true);
       await api.patch(`/super/admins/${admin.id}/jurisdiction`, {
         assigned_state: normalizedState,
         assigned_city: normalizedCity,
+        reason: reason.trim(),
       });
 
-      fetchAdmins();
+      toast.success('Admin jurisdiction updated');
+      closeJurisdictionDialog();
+      await fetchAdmins();
     } catch (err) {
-      window.alert(err.response?.data?.message || 'Failed to update admin jurisdiction');
+      toast.error(err.response?.data?.message || 'Failed to update admin jurisdiction');
+    } finally {
+      setModalSaving(false);
     }
   };
 
@@ -474,6 +515,19 @@ const AdminListTab = () => {
                         {admin.account_suspended_reason}
                       </p>
                     )}
+                    {admin.account_operations?.length ? (
+                      <div className="mt-2 max-w-[240px] space-y-1">
+                        {admin.account_operations.slice(0, 2).map((operation) => (
+                          <p
+                            key={operation.id}
+                            className="truncate text-xs text-gray-500"
+                            title={operation.note || operation.event_type}
+                          >
+                            {operation.event_type.replace(/_/g, ' ')} by {operation.actor_name || 'Super admin'}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="p-3">{admin.credentials_verified_count ?? 0}</td>
                   <td className="p-3">
@@ -506,7 +560,7 @@ const AdminListTab = () => {
 
                       {admin.is_active && admin.user_type !== 'super_admin' && (
                         <button
-                          onClick={() => suspendAdmin(admin)}
+                          onClick={() => openAccountAction(admin, 'suspend')}
                           className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white transition-colors hover:bg-red-700"
                         >
                           Suspend
@@ -515,7 +569,7 @@ const AdminListTab = () => {
 
                       {!admin.is_active && admin.user_type !== 'super_admin' && (
                         <button
-                          onClick={() => unsuspendAdmin(admin)}
+                          onClick={() => openAccountAction(admin, 'unsuspend')}
                           className="rounded-lg bg-green-600 px-3 py-1 text-xs text-white transition-colors hover:bg-green-700"
                         >
                           Unsuspend
@@ -524,7 +578,7 @@ const AdminListTab = () => {
 
                       {admin.user_type !== 'super_admin' && (
                         <button
-                          onClick={() => editJurisdiction(admin)}
+                          onClick={() => openJurisdictionDialog(admin)}
                           className="rounded-lg bg-indigo-600 px-3 py-1 text-xs text-white transition-colors hover:bg-indigo-700"
                         >
                           Edit Jurisdiction
@@ -533,7 +587,7 @@ const AdminListTab = () => {
 
                       {admin.user_type !== 'super_admin' ? (
                         <button
-                          onClick={() => deleteAdmin(admin)}
+                          onClick={() => openAccountAction(admin, 'delete')}
                           className="rounded-lg bg-gray-700 px-3 py-1 text-xs text-white transition-colors hover:bg-gray-800"
                         >
                           Delete
@@ -612,6 +666,169 @@ const AdminListTab = () => {
         onPageChange={setAdminsPage}
         summary={`Showing ${admins.length === 0 ? 0 : adminsStart + 1}-${Math.min(adminsPage * ADMINS_PAGE_SIZE, admins.length)} of ${admins.length}`}
       />
+
+      {accountAction.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {accountAction.action === 'delete'
+                    ? 'Delete admin account'
+                    : accountAction.action === 'suspend'
+                      ? 'Suspend admin account'
+                      : 'Unsuspend admin account'}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {accountAction.admin?.full_name} - {accountAction.admin?.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAccountAction}
+                className="rounded-lg px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <label className="mt-5 block text-sm font-medium text-gray-700">
+              {accountAction.action === 'delete'
+                ? 'Deletion reason'
+                : accountAction.action === 'suspend'
+                  ? 'Suspension reason'
+                  : 'Restoration note'}
+            </label>
+            <textarea
+              className="mt-2 h-32 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder={
+                accountAction.action === 'delete'
+                  ? 'Explain why this admin account is being deleted'
+                  : accountAction.action === 'suspend'
+                    ? 'Explain why this admin account is being suspended'
+                    : 'Optional note for restoring this admin account'
+              }
+              value={accountAction.reason}
+              onChange={(event) =>
+                setAccountAction((prev) => ({ ...prev, reason: event.target.value }))
+              }
+            />
+            {accountAction.action !== 'unsuspend' ? (
+              <p className="mt-2 text-xs text-gray-500">
+                This reason is required and will be saved in the admin account history.
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeAccountAction}
+                disabled={modalSaving}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitAccountAction}
+                disabled={modalSaving}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60 ${
+                  accountAction.action === 'delete'
+                    ? 'bg-gray-800 hover:bg-gray-900'
+                    : accountAction.action === 'suspend'
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {modalSaving
+                  ? 'Saving...'
+                  : accountAction.action === 'delete'
+                    ? 'Delete admin'
+                    : accountAction.action === 'suspend'
+                      ? 'Suspend admin'
+                      : 'Unsuspend admin'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {jurisdictionDialog.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">Edit admin jurisdiction</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {jurisdictionDialog.admin?.full_name} - {jurisdictionDialog.admin?.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeJurisdictionDialog}
+                className="rounded-lg px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Assigned State
+                <input
+                  className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={jurisdictionDialog.assigned_state}
+                  onChange={(event) =>
+                    setJurisdictionDialog((prev) => ({ ...prev, assigned_state: event.target.value }))
+                  }
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-gray-700">
+                Assigned LGA
+                <input
+                  className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={jurisdictionDialog.assigned_city}
+                  onChange={(event) =>
+                    setJurisdictionDialog((prev) => ({ ...prev, assigned_city: event.target.value }))
+                  }
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-gray-700">
+                Change reason
+                <textarea
+                  className="mt-2 h-28 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="Explain why this admin jurisdiction is changing"
+                  value={jurisdictionDialog.reason}
+                  onChange={(event) =>
+                    setJurisdictionDialog((prev) => ({ ...prev, reason: event.target.value }))
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeJurisdictionDialog}
+                disabled={modalSaving}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitJurisdictionUpdate}
+                disabled={modalSaving}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {modalSaving ? 'Saving...' : 'Update jurisdiction'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

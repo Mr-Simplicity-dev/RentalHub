@@ -43,6 +43,8 @@ const {
 
 let verificationAuditSchemaReady = false;
 let userSuspensionSchemaReady = false;
+let adminAccountOperationSchemaReady = false;
+let identityVerificationOperationSchemaReady = false;
 const USER_VERIFICATION_STATUS_EXPR = `
   COALESCE(
     u.identity_verification_status,
@@ -87,6 +89,125 @@ const ensureUserSuspensionSchema = async () => {
   `);
 
   userSuspensionSchemaReady = true;
+};
+
+const ensureAdminAccountOperationSchema = async () => {
+  if (adminAccountOperationSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS admin_account_operations (
+      id SERIAL PRIMARY KEY,
+      admin_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      admin_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_admin_account_operations_admin
+      ON admin_account_operations(admin_user_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_admin_account_operations_created
+      ON admin_account_operations(created_at DESC);
+  `);
+
+  adminAccountOperationSchemaReady = true;
+};
+
+const ensureIdentityVerificationOperationSchema = async () => {
+  if (identityVerificationOperationSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS identity_verification_operations (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      user_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_identity_verification_operations_user
+      ON identity_verification_operations(user_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_identity_verification_operations_created
+      ON identity_verification_operations(created_at DESC);
+  `);
+
+  identityVerificationOperationSchemaReady = true;
+};
+
+const getAdminOperationActorName = (user = {}) =>
+  user.full_name || user.name || user.email || `Admin #${user.id || 'unknown'}`;
+
+const createAdminAccountOperation = async ({
+  adminUserId,
+  actorId,
+  actorName,
+  eventType,
+  note = null,
+  adminSnapshot = {},
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO admin_account_operations (
+       admin_user_id,
+       actor_id,
+       actor_name,
+       event_type,
+       note,
+       admin_snapshot,
+       metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)`,
+    [
+      adminUserId || null,
+      actorId || null,
+      actorName || null,
+      eventType,
+      note || null,
+      JSON.stringify(adminSnapshot || {}),
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
+const createIdentityVerificationOperation = async ({
+  userId,
+  actorId,
+  actorName,
+  eventType,
+  note = null,
+  userSnapshot = {},
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO identity_verification_operations (
+       user_id,
+       actor_id,
+       actor_name,
+       event_type,
+       note,
+       user_snapshot,
+       metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)`,
+    [
+      userId || null,
+      actorId || null,
+      getAdminOperationActorName({ id: actorId, full_name: actorName }) || null,
+      eventType,
+      note || null,
+      JSON.stringify(userSnapshot || {}),
+      JSON.stringify(metadata || {}),
+    ]
+  );
 };
 
 const buildDeletedEmail = (userId) => `deleted+u${userId}.${Date.now()}@deleted.local`;
@@ -151,6 +272,7 @@ const getDashboardPathForRole = (userType) => {
 const getAllUsers = async (req, res) => {
     try {
       await ensureVerificationAuditSchema();
+      await ensureAdminAccountOperationSchema();
 
       const { rows } = await db.query(
         `SELECT
@@ -173,7 +295,8 @@ const getAllUsers = async (req, res) => {
            u.approval_status,
            ${USER_VERIFICATION_STATUS_EXPR} AS identity_verification_status,
            v.full_name AS identity_verified_by_name,
-           COALESCE(vc.total_verified, 0)::INT AS credentials_verified_count
+           COALESCE(vc.total_verified, 0)::INT AS credentials_verified_count,
+           COALESCE(ops.operations, '[]'::json) AS account_operations
          FROM users u
          LEFT JOIN users v ON v.id = u.identity_verified_by
          LEFT JOIN LATERAL (
@@ -181,8 +304,18 @@ const getAllUsers = async (req, res) => {
            FROM users uv
            WHERE uv.identity_verified_by = u.id
          ) vc ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+           FROM (
+             SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+             FROM admin_account_operations
+             WHERE admin_user_id = u.id
+             ORDER BY created_at DESC, id DESC
+             LIMIT 3
+           ) operation_rows
+         ) ops ON TRUE
          WHERE u.deleted_at IS NULL
-           AND u.user_type IN ('tenant', 'landlord')
+           AND u.user_type IN ('tenant', 'landlord', 'agent')
          ORDER BY u.created_at DESC`
       );
 
@@ -321,10 +454,35 @@ const banUser = async (req, res) => {
 
   try {
     await ensureUserSuspensionSchema();
+    await ensureAdminAccountOperationSchema();
 
     const reason = String(req.body?.reason || '').trim();
 
-    await db.query(
+    if (!reason) {
+      return res.status(400).json({ message: 'A suspension reason is required' });
+    }
+
+    await db.query('BEGIN');
+
+    const existingResult = await db.query(
+      `SELECT id, full_name, email, user_type, assigned_state, assigned_city,
+              is_active, account_suspended_reason, account_suspended_at
+       FROM users
+       WHERE id = $1
+         AND user_type <> 'super_admin'
+         AND deleted_at IS NULL
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (!existingResult.rows.length) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ message: 'User not found or cannot be suspended' });
+    }
+
+    const existing = existingResult.rows[0];
+
+    const updateResult = await db.query(
       `UPDATE users
        SET is_active = FALSE,
            account_suspended_reason = $2,
@@ -332,12 +490,33 @@ const banUser = async (req, res) => {
            account_suspended_by = $3,
            updated_at = NOW()
        WHERE id = $1 AND user_type <> 'super_admin'`,
-      [id, reason || null, req.user.id]
+      [id, reason, req.user.id]
     );
+
+    if (!updateResult.rowCount) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ message: 'User not found or cannot be suspended' });
+    }
+
+    await createAdminAccountOperation({
+      adminUserId: Number(id),
+      actorId: req.user.id,
+      actorName: getAdminOperationActorName(req.user),
+      eventType: 'admin_suspended',
+      note: reason,
+      adminSnapshot: existing,
+      metadata: {
+        old_is_active: existing.is_active,
+        new_is_active: false,
+      },
+    });
+
+    await db.query('COMMIT');
     await logAction(req.user.id, 'BAN_USER', 'user', id);
 
     res.json({ success: true, message: 'User banned' });
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ message: 'Failed to ban user' });
   }
@@ -349,7 +528,31 @@ const unbanUser = async (req, res) => {
 
   try {
     await ensureVerificationAuditSchema();
+    await ensureIdentityVerificationOperationSchema();
     await ensureUserSuspensionSchema();
+    await ensureAdminAccountOperationSchema();
+
+    const reason = String(req.body?.reason || req.body?.note || '').trim() || null;
+
+    await db.query('BEGIN');
+
+    const existingResult = await db.query(
+      `SELECT id, full_name, email, user_type, assigned_state, assigned_city,
+              is_active, account_suspended_reason, account_suspended_at
+       FROM users
+       WHERE id = $1
+         AND user_type <> 'super_admin'
+         AND deleted_at IS NULL
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (!existingResult.rows.length) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ message: 'User not found or cannot be unbanned' });
+    }
+
+    const existing = existingResult.rows[0];
 
     const result = await db.query(
       `UPDATE users
@@ -366,13 +569,30 @@ const unbanUser = async (req, res) => {
     );
 
     if (!result.rows.length) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ message: 'User not found or cannot be unbanned' });
     }
 
+    await createAdminAccountOperation({
+      adminUserId: Number(id),
+      actorId: req.user.id,
+      actorName: getAdminOperationActorName(req.user),
+      eventType: 'admin_unsuspended',
+      note: reason,
+      adminSnapshot: existing,
+      metadata: {
+        old_is_active: existing.is_active,
+        new_is_active: true,
+        previous_suspension_reason: existing.account_suspended_reason,
+      },
+    });
+
+    await db.query('COMMIT');
     await logAction(req.user.id, 'UNBAN_USER', 'user', id);
 
     res.json({ success: true, message: 'User unbanned' });
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ message: 'Failed to unban user' });
   }
@@ -385,9 +605,17 @@ const deleteUser = async (req, res) => {
   try {
     await ensureVerificationAuditSchema();
     await ensureUserSuspensionSchema();
+    await ensureAdminAccountOperationSchema();
+
+    const reason = String(req.body?.reason || req.body?.delete_reason || '').trim();
+
+    if (!reason) {
+      return res.status(400).json({ message: 'A deletion reason is required' });
+    }
 
     const existingResult = await db.query(
-      `SELECT id, user_type, email, phone, nin
+      `SELECT id, full_name, user_type, email, phone, nin, assigned_state, assigned_city,
+              is_active, account_suspended_reason, account_suspended_at, created_at
        FROM users
        WHERE id = $1
          AND user_type <> 'super_admin'
@@ -414,6 +642,19 @@ const deleteUser = async (req, res) => {
       if (!hardDeleteResult.rows.length) {
         return res.status(404).json({ message: 'User not found or cannot be deleted' });
       }
+
+      await createAdminAccountOperation({
+        adminUserId: null,
+        actorId: req.user.id,
+        actorName: getAdminOperationActorName(req.user),
+        eventType: 'admin_deleted',
+        note: reason,
+        adminSnapshot: existingUser,
+        metadata: {
+          delete_mode: 'hard_delete',
+          deleted_user_id: Number(id),
+        },
+      });
 
       await logAction(req.user.id, 'DELETE_USER', 'user', id);
 
@@ -453,6 +694,18 @@ const deleteUser = async (req, res) => {
     if (!result.rows.length) {
       return res.status(404).json({ message: 'User not found or cannot be deleted' });
     }
+
+    await createAdminAccountOperation({
+      adminUserId: Number(id),
+      actorId: req.user.id,
+      actorName: getAdminOperationActorName(req.user),
+      eventType: 'admin_deleted',
+      note: reason,
+      adminSnapshot: existingUser,
+      metadata: {
+        delete_mode: 'soft_delete',
+      },
+    });
 
     await logAction(req.user.id, 'DELETE_USER', 'user', id);
 
@@ -566,9 +819,20 @@ const getIdentityVerifications = async (req, res) => {
         u.identity_verified_at,
         u.identity_verified_by,
         v.full_name AS identity_verified_by_name,
-        u.created_at
+        u.created_at,
+        COALESCE(ops.operations, '[]'::json) AS verification_operations
       FROM users u
       LEFT JOIN users v ON v.id = u.identity_verified_by
+      LEFT JOIN LATERAL (
+        SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+        FROM (
+          SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+          FROM identity_verification_operations
+          WHERE user_id = u.id
+          ORDER BY created_at DESC, id DESC
+          LIMIT 3
+        ) operation_rows
+      ) ops ON TRUE
       ${whereClause}
       ORDER BY
         CASE ${USER_VERIFICATION_STATUS_EXPR}
@@ -611,6 +875,30 @@ const approveIdentityVerification = async (req, res) => {
 
   try {
     await ensureVerificationAuditSchema();
+    await ensureIdentityVerificationOperationSchema();
+
+    const reviewNote = String(req.body?.review_note || req.body?.note || '').trim() || null;
+
+    await db.query('BEGIN');
+
+    const existingResult = await db.query(
+      `SELECT id, full_name, email, user_type, identity_document_type, nationality,
+              identity_verified, identity_verification_status, passport_photo_url,
+              identity_verified_at, identity_verified_by
+       FROM users
+       WHERE id = $1
+         AND deleted_at IS NULL
+         AND user_type <> 'super_admin'
+       FOR UPDATE`,
+      [userId]
+    );
+
+    if (!existingResult.rows.length) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ message: 'User not found or not eligible for verification' });
+    }
+
+    const existingUser = existingResult.rows[0];
 
     const result = await db.query(
       `UPDATE users
@@ -629,13 +917,29 @@ const approveIdentityVerification = async (req, res) => {
     );
 
     if (!result.rows.length) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ message: 'User not found or not eligible for verification' });
     }
 
+    await createIdentityVerificationOperation({
+      userId: Number(userId),
+      actorId: req.user.id,
+      actorName: getAdminOperationActorName(req.user),
+      eventType: 'identity_verified',
+      note: reviewNote,
+      userSnapshot: existingUser,
+      metadata: {
+        old_status: existingUser.identity_verification_status,
+        new_status: 'verified',
+      },
+    });
+
+    await db.query('COMMIT');
     await logAction(req.user.id, 'VERIFY_USER', 'user', userId);
 
     res.json({ success: true, message: 'User verified' });
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ message: 'Failed to verify user' });
   }
@@ -647,6 +951,34 @@ const rejectIdentityVerification = async (req, res) => {
 
   try {
     await ensureVerificationAuditSchema();
+    await ensureIdentityVerificationOperationSchema();
+
+    const reviewNote = String(req.body?.review_note || req.body?.reason || req.body?.note || '').trim();
+
+    if (!reviewNote) {
+      return res.status(400).json({ message: 'A rejection reason is required' });
+    }
+
+    await db.query('BEGIN');
+
+    const existingResult = await db.query(
+      `SELECT id, full_name, email, user_type, identity_document_type, nationality,
+              identity_verified, identity_verification_status, passport_photo_url,
+              identity_verified_at, identity_verified_by
+       FROM users
+       WHERE id = $1
+         AND deleted_at IS NULL
+         AND user_type <> 'super_admin'
+       FOR UPDATE`,
+      [userId]
+    );
+
+    if (!existingResult.rows.length) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ message: 'User not found or cannot be rejected' });
+    }
+
+    const existingUser = existingResult.rows[0];
 
     const result = await db.query(
       `UPDATE users
@@ -663,13 +995,29 @@ const rejectIdentityVerification = async (req, res) => {
     );
 
     if (!result.rows.length) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ message: 'User not found or cannot be rejected' });
     }
 
+    await createIdentityVerificationOperation({
+      userId: Number(userId),
+      actorId: req.user.id,
+      actorName: getAdminOperationActorName(req.user),
+      eventType: 'identity_rejected',
+      note: reviewNote,
+      userSnapshot: existingUser,
+      metadata: {
+        old_status: existingUser.identity_verification_status,
+        new_status: 'rejected',
+      },
+    });
+
+    await db.query('COMMIT');
     await logAction(req.user.id, 'REJECT_USER_VERIFICATION', 'user', userId);
 
     res.json({ success: true, message: 'User verification rejected' });
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ message: 'Failed to reject verification' });
   }
@@ -681,6 +1029,35 @@ const deleteRejectedVerification = async (req, res) => {
 
   try {
     await ensureVerificationAuditSchema();
+    await ensureIdentityVerificationOperationSchema();
+
+    const deleteReason = String(req.body?.delete_reason || req.body?.reason || req.body?.note || '').trim();
+
+    if (!deleteReason) {
+      return res.status(400).json({ message: 'A delete reason is required' });
+    }
+
+    await db.query('BEGIN');
+
+    const existingResult = await db.query(
+      `SELECT id, full_name, email, user_type, identity_document_type, nationality,
+              identity_verified, identity_verification_status, passport_photo_url,
+              identity_verified_at, identity_verified_by
+       FROM users
+       WHERE id = $1
+         AND deleted_at IS NULL
+         AND user_type <> 'super_admin'
+         AND identity_verification_status = 'rejected'
+       FOR UPDATE`,
+      [userId]
+    );
+
+    if (!existingResult.rows.length) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ message: 'Rejected verification record not found' });
+    }
+
+    const existingUser = existingResult.rows[0];
 
     const result = await db.query(
       `UPDATE users
@@ -699,13 +1076,29 @@ const deleteRejectedVerification = async (req, res) => {
     );
 
     if (!result.rows.length) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ message: 'Rejected verification record not found' });
     }
 
+    await createIdentityVerificationOperation({
+      userId: Number(userId),
+      actorId: req.user.id,
+      actorName: getAdminOperationActorName(req.user),
+      eventType: 'identity_rejected_record_deleted',
+      note: deleteReason,
+      userSnapshot: existingUser,
+      metadata: {
+        old_status: existingUser.identity_verification_status,
+        new_status: null,
+      },
+    });
+
+    await db.query('COMMIT');
     await logAction(req.user.id, 'DELETE_REJECTED_VERIFICATION', 'user', userId);
 
     res.json({ success: true, message: 'Rejected verification deleted' });
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ message: 'Failed to delete rejected verification' });
   }
@@ -719,6 +1112,7 @@ const verifyUser = approveIdentityVerification;
 const getAdminPerformance = async (req, res) => {
   try {
     await ensureVerificationAuditSchema();
+    await ensureAdminAccountOperationSchema();
 
     const { rows } = await db.query(
       `SELECT
@@ -741,7 +1135,8 @@ const getAdminPerformance = async (req, res) => {
          COALESCE(al30d.applications_processed, 0)::INT AS applications_processed_30d,
          COALESCE(al7d.reports_resolved, 0)::INT AS reports_resolved_7d,
          COALESCE(al30d.reports_resolved, 0)::INT AS reports_resolved_30d,
-         al7d.last_action_at
+         al7d.last_action_at,
+         COALESCE(ops.operations, '[]'::json) AS account_operations
        FROM users a
        LEFT JOIN users v
          ON v.identity_verified_by = a.id
@@ -767,6 +1162,16 @@ const getAdminPerformance = async (req, res) => {
          WHERE actor_id = a.id
            AND created_at >= CURRENT_DATE - INTERVAL '30 days'
        ) al30d ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+           FROM admin_account_operations
+           WHERE admin_user_id = a.id
+           ORDER BY created_at DESC, id DESC
+           LIMIT 3
+         ) operation_rows
+       ) ops ON TRUE
        WHERE (
          a.user_type IN ('super_admin', 'admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lga_transportation_admin',
                          'state_transportation_admin', 'super_transportation_admin',
@@ -778,7 +1183,7 @@ const getAdminPerformance = async (req, res) => {
          OR a.user_type LIKE 'super_%'
        )
          AND a.deleted_at IS NULL
-       GROUP BY a.id, a.full_name, a.email, a.user_type, a.assigned_state, a.assigned_city, a.is_active, a.account_suspended_reason, a.created_at, al7d.action_count, al7d.properties_approved, al7d.applications_processed, al7d.reports_resolved, al7d.last_action_at, al30d.action_count, al30d.properties_approved, al30d.applications_processed, al30d.reports_resolved
+       GROUP BY a.id, a.full_name, a.email, a.user_type, a.assigned_state, a.assigned_city, a.is_active, a.account_suspended_reason, a.created_at, al7d.action_count, al7d.properties_approved, al7d.applications_processed, al7d.reports_resolved, al7d.last_action_at, al30d.action_count, al30d.properties_approved, al30d.applications_processed, al30d.reports_resolved, ops.operations
        ORDER BY COALESCE(al7d.action_count, 0) DESC, a.created_at DESC`
     );
 
@@ -878,12 +1283,19 @@ const getAdminStateUsers = async (req, res) => {
 
 const updateAdminJurisdiction = async (req, res) => {
   try {
+    await ensureAdminAccountOperationSchema();
+
     const adminId = req.params.id;
     const normalizedState = String(req.body?.assigned_state || '').trim();
     const normalizedCity = String(req.body?.assigned_city || '').trim();
+    const reason = String(req.body?.reason || req.body?.note || '').trim();
+
+    if (!reason) {
+      return res.status(400).json({ success: false, message: 'A jurisdiction change reason is required' });
+    }
 
     const targetResult = await db.query(
-      `SELECT id, user_type
+      `SELECT id, full_name, email, user_type, assigned_state, assigned_city, is_active
        FROM users
        WHERE id = $1
          AND deleted_at IS NULL
@@ -895,7 +1307,8 @@ const updateAdminJurisdiction = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Admin not found' });
     }
 
-    const targetRole = String(targetResult.rows[0].user_type || '');
+    const targetAdmin = targetResult.rows[0];
+    const targetRole = String(targetAdmin.user_type || '');
 
     if (targetRole === 'super_admin') {
       return res.status(403).json({ success: false, message: 'Super admin jurisdiction cannot be edited' });
@@ -947,6 +1360,21 @@ const updateAdminJurisdiction = async (req, res) => {
     );
 
     await logAction(req.user.id, 'UPDATE_ADMIN_JURISDICTION', 'user', adminId);
+
+    await createAdminAccountOperation({
+      adminUserId: Number(adminId),
+      actorId: req.user.id,
+      actorName: getAdminOperationActorName(req.user),
+      eventType: 'admin_jurisdiction_updated',
+      note: reason,
+      adminSnapshot: targetAdmin,
+      metadata: {
+        old_assigned_state: targetAdmin.assigned_state,
+        old_assigned_city: targetAdmin.assigned_city,
+        new_assigned_state: updateResult.rows[0].assigned_state,
+        new_assigned_city: updateResult.rows[0].assigned_city,
+      },
+    });
 
     res.json({
       success: true,
@@ -1269,6 +1697,38 @@ const createBroadcast = async (req, res) => {
 
 // ================= PLATFORM LAWYERS =================
 
+const getPlatformLawyerActorName = (user = {}) =>
+  user.full_name || user.name || user.email || `Admin #${user.id || 'unknown'}`;
+
+const createPlatformLawyerApplicationOperation = async ({
+  applicationId,
+  adminId,
+  actorName,
+  eventType,
+  note = null,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO platform_lawyer_application_operations (
+       application_id,
+       admin_id,
+       actor_name,
+       event_type,
+       note,
+       metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      applicationId,
+      adminId || null,
+      actorName || null,
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
 const getPlatformLawyerManagementData = async (req, res) => {
   try {
     await ensurePlatformLawyerSchema();
@@ -1339,11 +1799,43 @@ const getPlatformLawyerManagementData = async (req, res) => {
       ),
     ]);
 
+    const applicationIds = applicationsResult.rows.map((application) => application.id);
+    let operationsByApplication = {};
+
+    if (applicationIds.length) {
+      const operationsResult = await db.query(
+        `SELECT
+           id,
+           application_id,
+           admin_id,
+           actor_name,
+           event_type,
+           note,
+           metadata,
+           created_at
+         FROM platform_lawyer_application_operations
+         WHERE application_id = ANY($1::int[])
+         ORDER BY created_at DESC, id DESC`,
+        [applicationIds]
+      );
+
+      operationsByApplication = operationsResult.rows.reduce((acc, operation) => {
+        if (!acc[operation.application_id]) {
+          acc[operation.application_id] = [];
+        }
+        acc[operation.application_id].push(operation);
+        return acc;
+      }, {});
+    }
+
     res.json({
       success: true,
       data: {
         entries: entriesResult.rows,
-        applications: applicationsResult.rows,
+        applications: applicationsResult.rows.map((application) => ({
+          ...application,
+          review_history: operationsByApplication[application.id] || [],
+        })),
         recruitment_broadcasts: broadcastsResult.rows,
         invite_expiry_hours: PLATFORM_LAWYER_INVITE_EXPIRY_HOURS,
       },
@@ -1716,6 +2208,8 @@ const approvePlatformLawyerApplication = async (req, res) => {
   try {
     await ensurePlatformLawyerSchema();
 
+    const reviewNote = String(req.body.review_note || '').trim() || null;
+
     await db.query('BEGIN');
 
     const applicationResult = await db.query(
@@ -1740,6 +2234,7 @@ const approvePlatformLawyerApplication = async (req, res) => {
     }
 
     const application = applicationResult.rows[0];
+    const previousStatus = application.status;
 
     let platformLawyerResult = await db.query(
       `SELECT *
@@ -1829,10 +2324,23 @@ const approvePlatformLawyerApplication = async (req, res) => {
        WHERE id = $1`,
       [
         application.id,
-        String(req.body.review_note || '').trim() || null,
+        reviewNote,
         req.user.id,
       ]
     );
+
+    await createPlatformLawyerApplicationOperation({
+      applicationId: application.id,
+      adminId: req.user.id,
+      actorName: getPlatformLawyerActorName(req.user),
+      eventType: 'application_approved',
+      note: reviewNote,
+      metadata: {
+        old_status: previousStatus,
+        new_status: 'approved',
+        platform_lawyer_id: platformLawyer.id,
+      },
+    });
 
     await db.query('COMMIT');
     await logAction(req.user.id, 'APPROVE_PLATFORM_LAWYER_APPLICATION', 'platform_lawyer_application', application.id);
@@ -1855,6 +2363,29 @@ const rejectPlatformLawyerApplication = async (req, res) => {
   try {
     await ensurePlatformLawyerSchema();
 
+    const reviewNote = String(req.body.review_note || '').trim();
+
+    if (!reviewNote) {
+      return res.status(400).json({ message: 'A rejection reason is required' });
+    }
+
+    await db.query('BEGIN');
+
+    const existingResult = await db.query(
+      `SELECT id, status
+       FROM platform_lawyer_applications
+       WHERE id = $1
+       FOR UPDATE`,
+      [req.params.applicationId]
+    );
+
+    if (!existingResult.rows.length) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    const previousStatus = existingResult.rows[0].status;
+
     const applicationResult = await db.query(
       `UPDATE platform_lawyer_applications
        SET status = 'rejected',
@@ -1866,12 +2397,13 @@ const rejectPlatformLawyerApplication = async (req, res) => {
        RETURNING id`,
       [
         req.params.applicationId,
-        String(req.body.review_note || '').trim() || null,
+        reviewNote,
         req.user.id,
       ]
     );
 
     if (!applicationResult.rows.length) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ message: 'Application not found' });
     }
 
@@ -1885,10 +2417,25 @@ const rejectPlatformLawyerApplication = async (req, res) => {
       [req.params.applicationId, req.user.id]
     );
 
+    await createPlatformLawyerApplicationOperation({
+      applicationId: Number(req.params.applicationId),
+      adminId: req.user.id,
+      actorName: getPlatformLawyerActorName(req.user),
+      eventType: 'application_rejected',
+      note: reviewNote,
+      metadata: {
+        old_status: previousStatus,
+        new_status: 'rejected',
+      },
+    });
+
+    await db.query('COMMIT');
+
     await logAction(req.user.id, 'REJECT_PLATFORM_LAWYER_APPLICATION', 'platform_lawyer_application', req.params.applicationId);
 
     res.json({ success: true });
   } catch (error) {
+    await db.query('ROLLBACK');
     console.error('Reject platform lawyer application error:', error);
     res.status(500).json({ message: 'Failed to reject lawyer application' });
   }
@@ -1915,16 +2462,84 @@ const getPlatformAgentManagementData = async (req, res) => {
        ORDER BY pa.created_at DESC`
     );
 
+    const agentIds = rows.map((entry) => entry.id);
+    let operationsByAgent = {};
+
+    if (agentIds.length) {
+      const operationsResult = await db.query(
+        `SELECT
+           id,
+           agent_id,
+           admin_id,
+           actor_name,
+           event_type,
+           note,
+           agent_snapshot,
+           metadata,
+           created_at
+         FROM platform_agent_operations
+         WHERE agent_id = ANY($1::int[])
+         ORDER BY created_at DESC, id DESC`,
+        [agentIds]
+      );
+
+      operationsByAgent = operationsResult.rows.reduce((acc, operation) => {
+        if (!acc[operation.agent_id]) {
+          acc[operation.agent_id] = [];
+        }
+        acc[operation.agent_id].push(operation);
+        return acc;
+      }, {});
+    }
+
     res.json({
       success: true,
       data: {
-        entries: rows,
+        entries: rows.map((entry) => ({
+          ...entry,
+          operations: operationsByAgent[entry.id] || [],
+        })),
       },
     });
   } catch (error) {
     console.error('Get platform agent management data error:', error);
     res.status(500).json({ message: 'Failed to load platform agents' });
   }
+};
+
+const getPlatformAgentActorName = (user = {}) =>
+  user.full_name || user.name || user.email || `Admin #${user.id || 'unknown'}`;
+
+const createPlatformAgentOperation = async ({
+  agentId = null,
+  adminId,
+  actorName,
+  eventType,
+  note = null,
+  agentSnapshot = {},
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO platform_agent_operations (
+       agent_id,
+       admin_id,
+       actor_name,
+       event_type,
+       note,
+       agent_snapshot,
+       metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)`,
+    [
+      agentId,
+      adminId || null,
+      actorName || null,
+      eventType,
+      note || null,
+      JSON.stringify(agentSnapshot || {}),
+      JSON.stringify(metadata || {}),
+    ]
+  );
 };
 
 const createManualPlatformAgent = async (req, res) => {
@@ -1983,6 +2598,19 @@ const createManualPlatformAgent = async (req, res) => {
       ]
     );
 
+    await createPlatformAgentOperation({
+      agentId: rows[0].id,
+      adminId: req.user.id,
+      actorName: getPlatformAgentActorName(req.user),
+      eventType: 'agent_created',
+      note: String(req.body.governance_note || '').trim() || null,
+      agentSnapshot: rows[0],
+      metadata: {
+        source_type: rows[0].source_type,
+        is_active: rows[0].is_active,
+      },
+    });
+
     await logAction(req.user.id, 'CREATE_PLATFORM_AGENT', 'platform_agent', rows[0].id);
 
     res.status(201).json({ success: true, data: rows[0] });
@@ -2001,6 +2629,26 @@ const updatePlatformAgent = async (req, res) => {
       return res.status(400).json({ message: 'Invalid platform agent id' });
     }
 
+    const nextActive = req.body.is_active !== false;
+    const governanceNote = String(req.body.governance_note || '').trim();
+
+    const existingResult = await db.query(
+      `SELECT *
+       FROM platform_agents
+       WHERE id = $1`,
+      [agentId]
+    );
+
+    if (!existingResult.rows.length) {
+      return res.status(404).json({ message: 'Platform agent not found' });
+    }
+
+    const existing = existingResult.rows[0];
+
+    if (existing.is_active && !nextActive && !governanceNote) {
+      return res.status(400).json({ message: 'A deactivation reason is required' });
+    }
+
     const result = await db.query(
       `UPDATE platform_agents
        SET is_active = $2,
@@ -2008,16 +2656,27 @@ const updatePlatformAgent = async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
        RETURNING *`,
-      [agentId, req.body.is_active !== false, req.user.id]
+      [agentId, nextActive, req.user.id]
     );
 
-    if (!result.rows.length) {
-      return res.status(404).json({ message: 'Platform agent not found' });
-    }
+    const updated = result.rows[0];
+
+    await createPlatformAgentOperation({
+      agentId,
+      adminId: req.user.id,
+      actorName: getPlatformAgentActorName(req.user),
+      eventType: nextActive ? 'agent_activated' : 'agent_deactivated',
+      note: governanceNote || null,
+      agentSnapshot: updated,
+      metadata: {
+        old_is_active: existing.is_active,
+        new_is_active: updated.is_active,
+      },
+    });
 
     await logAction(req.user.id, 'UPDATE_PLATFORM_AGENT', 'platform_agent', agentId);
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: updated });
   } catch (error) {
     console.error('Update platform agent error:', error);
     res.status(500).json({ message: 'Failed to update platform agent record' });
@@ -2033,19 +2692,59 @@ const deletePlatformAgent = async (req, res) => {
       return res.status(400).json({ message: 'Invalid platform agent id' });
     }
 
+    const governanceNote = String(req.body.governance_note || '').trim();
+
+    if (!governanceNote) {
+      return res.status(400).json({ message: 'A deletion reason is required' });
+    }
+
+    await db.query('BEGIN');
+
+    const existingResult = await db.query(
+      `SELECT *
+       FROM platform_agents
+       WHERE id = $1
+       FOR UPDATE`,
+      [agentId]
+    );
+
+    if (!existingResult.rows.length) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ message: 'Platform agent not found' });
+    }
+
+    const existing = existingResult.rows[0];
+
+    await createPlatformAgentOperation({
+      agentId,
+      adminId: req.user.id,
+      actorName: getPlatformAgentActorName(req.user),
+      eventType: 'agent_deleted',
+      note: governanceNote,
+      agentSnapshot: existing,
+      metadata: {
+        source_type: existing.source_type,
+        was_active: existing.is_active,
+      },
+    });
+
     const result = await db.query(
       `DELETE FROM platform_agents WHERE id = $1 RETURNING id`,
       [agentId]
     );
 
     if (!result.rows.length) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ message: 'Platform agent not found' });
     }
+
+    await db.query('COMMIT');
 
     await logAction(req.user.id, 'DELETE_PLATFORM_AGENT', 'platform_agent', agentId);
 
     res.json({ success: true });
   } catch (error) {
+    await db.query('ROLLBACK');
     console.error('Delete platform agent error:', error);
     res.status(500).json({ message: 'Failed to delete platform agent record' });
   }
@@ -2054,9 +2753,11 @@ const deletePlatformAgent = async (req, res) => {
 // Bulk actions
 const bulkUserAction = async (req, res) => {
   const { ids, action } = req.body;
+  const reason = String(req.body?.reason || req.body?.note || '').trim();
 
   try {
     await ensureVerificationAuditSchema();
+    await ensureAdminAccountOperationSchema();
 
     if (!Array.isArray(ids) || !ids.length) {
       return res.status(400).json({ message: 'No users selected' });
@@ -2068,7 +2769,22 @@ const bulkUserAction = async (req, res) => {
 
     switch (action) {
       case 'ban':
-        query = `UPDATE users SET is_active = FALSE WHERE id = ANY($1) AND user_type <> 'super_admin'`;
+        if (!reason) {
+          return res.status(400).json({ message: 'A bulk ban reason is required' });
+        }
+        query = `
+          UPDATE users
+          SET is_active = FALSE,
+              account_suspended_reason = $2,
+              account_suspended_at = NOW(),
+              account_suspended_by = $3,
+              updated_at = NOW()
+          WHERE id = ANY($1)
+            AND user_type <> 'super_admin'
+            AND deleted_at IS NULL
+          RETURNING id, full_name, email, user_type, is_active, account_suspended_reason
+        `;
+        params = [ids, reason, req.user.id];
         logActionName = 'BULK_BAN_USERS';
         break;
       case 'verify':
@@ -2095,7 +2811,24 @@ const bulkUserAction = async (req, res) => {
         return res.status(400).json({ message: 'Invalid action' });
     }
 
-    await db.query(query, params);
+    const actionResult = await db.query(query, params);
+
+    if (action === 'ban') {
+      for (const row of actionResult.rows) {
+        await createAdminAccountOperation({
+          adminUserId: row.id,
+          actorId: req.user.id,
+          actorName: getAdminOperationActorName(req.user),
+          eventType: 'user_bulk_suspended',
+          note: reason,
+          adminSnapshot: row,
+          metadata: {
+            bulk_action: true,
+          },
+        });
+      }
+    }
+
     await logAction(req.user.id, logActionName, 'user', null);
 
     res.json({ success: true });

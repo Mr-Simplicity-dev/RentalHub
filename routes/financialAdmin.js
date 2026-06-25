@@ -45,6 +45,75 @@ const {
   resolveBankCodeFromName,
 } = require('../services/paystackTransfer.service');
 
+let adminWithdrawalOperationSchemaReady = false;
+
+const ensureAdminWithdrawalOperationSchema = async () => {
+  if (adminWithdrawalOperationSchemaReady) return;
+
+  const db = require('../config/middleware/database');
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS admin_withdrawal_operations (
+      id SERIAL PRIMARY KEY,
+      withdrawal_id INTEGER REFERENCES admin_withdrawals(id) ON DELETE SET NULL,
+      admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      withdrawal_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_admin_withdrawal_operations_withdrawal
+      ON admin_withdrawal_operations(withdrawal_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_admin_withdrawal_operations_created
+      ON admin_withdrawal_operations(created_at DESC);
+  `);
+
+  adminWithdrawalOperationSchemaReady = true;
+};
+
+const getFinanceActorName = (user = {}) =>
+  user.full_name || user.name || user.email || `Admin #${user.id || 'unknown'}`;
+
+const createAdminWithdrawalOperation = async ({
+  withdrawalId,
+  adminId,
+  actorId,
+  actorName,
+  eventType,
+  note = null,
+  withdrawalSnapshot = {},
+  metadata = {},
+}) => {
+  const db = require('../config/middleware/database');
+  await db.query(
+    `INSERT INTO admin_withdrawal_operations (
+       withdrawal_id,
+       admin_id,
+       actor_id,
+       actor_name,
+       event_type,
+       note,
+       withdrawal_snapshot,
+       metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)`,
+    [
+      withdrawalId || null,
+      adminId || null,
+      actorId || null,
+      actorName || null,
+      eventType,
+      note || null,
+      JSON.stringify(withdrawalSnapshot || {}),
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
 // ====================== AUTHENTICATION ======================
 router.use(authenticate);
 
@@ -376,22 +445,41 @@ router.get('/withdrawals/pending',
   async (req, res) => {
     try {
       const db = require('../config/middleware/database');
-      const result = await db.query(
-        `SELECT 
-          aw.*,
-          u.full_name as admin_name,
-          u.email as admin_email,
-          u.assigned_state,
-          u.assigned_city
-         FROM admin_withdrawals aw
-         JOIN users u ON aw.admin_id = u.id
-         WHERE aw.status = 'pending'
-         ORDER BY aw.requested_at DESC`
-      );
+      await ensureAdminWithdrawalOperationSchema();
+
+      const [pendingResult, decisionsResult] = await Promise.all([
+        db.query(
+          `SELECT 
+            aw.*,
+            u.full_name as admin_name,
+            u.email as admin_email,
+            u.assigned_state,
+            u.assigned_city
+           FROM admin_withdrawals aw
+           JOIN users u ON aw.admin_id = u.id
+           WHERE aw.status = 'pending'
+           ORDER BY aw.requested_at DESC`
+        ),
+        db.query(
+          `SELECT
+             awo.*,
+             reviewer.full_name AS reviewer_name,
+             requester.full_name AS requester_name,
+             requester.email AS requester_email
+           FROM admin_withdrawal_operations awo
+           LEFT JOIN users reviewer ON reviewer.id = awo.actor_id
+           LEFT JOIN users requester ON requester.id = awo.admin_id
+           ORDER BY awo.created_at DESC
+           LIMIT 25`
+        ),
+      ]);
       
       res.json({
         success: true,
-        data: result.rows
+        data: {
+          pending: pendingResult.rows,
+          recent_decisions: decisionsResult.rows,
+        }
       });
     } catch (error) {
       console.error('Get pending withdrawals error:', error);
@@ -413,17 +501,22 @@ router.post('/withdrawals/:withdrawalId/approve',
     body('admin_note').optional()
   ],
   async (req, res) => {
+    const db = require('../config/middleware/database');
     try {
-      const db = require('../config/middleware/database');
+      await ensureAdminWithdrawalOperationSchema();
+
       const { withdrawalId } = req.params;
-      const { admin_note } = req.body;
+      const adminNote = String(req.body?.admin_note || '').trim() || 'Approved by finance review';
+
+      await db.query('BEGIN');
 
       const existing = await db.query(
-        `SELECT * FROM admin_withdrawals WHERE id = $1 LIMIT 1`,
+        `SELECT * FROM admin_withdrawals WHERE id = $1 LIMIT 1 FOR UPDATE`,
         [withdrawalId]
       );
 
       if (existing.rows.length === 0) {
+        await db.query('ROLLBACK');
         return res.status(404).json({
           success: false,
           message: 'Withdrawal request not found'
@@ -432,6 +525,7 @@ router.post('/withdrawals/:withdrawalId/approve',
 
       const withdrawal = existing.rows[0];
       if (withdrawal.status !== 'pending') {
+        await db.query('ROLLBACK');
         return res.status(400).json({
           success: false,
           message: `Withdrawal request is already ${withdrawal.status}`
@@ -482,13 +576,14 @@ router.post('/withdrawals/:withdrawalId/approve',
           transfer?.reference || reference,
           transfer?.status || 'pending',
           JSON.stringify(transfer || {}),
-          admin_note || 'Auto payout initiated',
+          adminNote,
           req.user.id,
           withdrawalId,
         ]
       );
       
       if (result.rows.length === 0) {
+        await db.query('ROLLBACK');
         return res.status(404).json({
           success: false,
           message: 'Withdrawal request not found or already processed'
@@ -507,6 +602,23 @@ router.post('/withdrawals/:withdrawalId/approve',
           req.user.id
         ]
       );
+
+      await createAdminWithdrawalOperation({
+        withdrawalId: Number(withdrawalId),
+        adminId: result.rows[0].admin_id,
+        actorId: req.user.id,
+        actorName: getFinanceActorName(req.user),
+        eventType: 'withdrawal_approved',
+        note: adminNote,
+        withdrawalSnapshot: withdrawal,
+        metadata: {
+          amount: Number(result.rows[0].amount || 0),
+          transfer_reference: transfer?.reference || reference,
+          transfer_status: transfer?.status || 'pending',
+        },
+      });
+
+      await db.query('COMMIT');
       
       res.json({
         success: true,
@@ -514,6 +626,7 @@ router.post('/withdrawals/:withdrawalId/approve',
         data: result.rows[0]
       });
     } catch (error) {
+      await db.query('ROLLBACK');
       console.error('Approve withdrawal error:', error);
       res.status(500).json({
         success: false,
@@ -533,18 +646,30 @@ router.post('/withdrawals/:withdrawalId/reject',
     body('admin_note').notEmpty().withMessage('Rejection reason is required')
   ],
   async (req, res) => {
+    const db = require('../config/middleware/database');
     try {
-      const db = require('../config/middleware/database');
+      await ensureAdminWithdrawalOperationSchema();
+
       const { withdrawalId } = req.params;
-      const { admin_note } = req.body;
+      const adminNote = String(req.body?.admin_note || '').trim();
+
+      if (!adminNote) {
+        return res.status(400).json({
+          success: false,
+          message: 'Rejection reason is required'
+        });
+      }
+
+      await db.query('BEGIN');
       
       // Get withdrawal details first
       const withdrawalResult = await db.query(
-        `SELECT * FROM admin_withdrawals WHERE id = $1`,
+        `SELECT * FROM admin_withdrawals WHERE id = $1 FOR UPDATE`,
         [withdrawalId]
       );
       
       if (withdrawalResult.rows.length === 0) {
+        await db.query('ROLLBACK');
         return res.status(404).json({
           success: false,
           message: 'Withdrawal request not found'
@@ -552,6 +677,14 @@ router.post('/withdrawals/:withdrawalId/reject',
       }
       
       const withdrawal = withdrawalResult.rows[0];
+
+      if (withdrawal.status !== 'pending') {
+        await db.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          message: `Withdrawal request is already ${withdrawal.status}`
+        });
+      }
       
       // Return funds to admin wallet
       await db.query(
@@ -571,7 +704,7 @@ router.post('/withdrawals/:withdrawalId/reject',
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $3
          RETURNING *`,
-        [req.user.id, admin_note, withdrawalId]
+        [req.user.id, adminNote, withdrawalId]
       );
       
       // Log audit
@@ -582,10 +715,26 @@ router.post('/withdrawals/:withdrawalId/reject',
         [
           withdrawal.admin_id,
           withdrawal.amount,
-          `Withdrawal rejected: ${admin_note}`,
+          `Withdrawal rejected: ${adminNote}`,
           req.user.id
         ]
       );
+
+      await createAdminWithdrawalOperation({
+        withdrawalId: Number(withdrawalId),
+        adminId: withdrawal.admin_id,
+        actorId: req.user.id,
+        actorName: getFinanceActorName(req.user),
+        eventType: 'withdrawal_rejected',
+        note: adminNote,
+        withdrawalSnapshot: withdrawal,
+        metadata: {
+          amount: Number(withdrawal.amount || 0),
+          refunded_to_wallet: true,
+        },
+      });
+
+      await db.query('COMMIT');
       
       res.json({
         success: true,
@@ -593,6 +742,7 @@ router.post('/withdrawals/:withdrawalId/reject',
         data: result.rows[0]
       });
     } catch (error) {
+      await db.query('ROLLBACK');
       console.error('Reject withdrawal error:', error);
       res.status(500).json({
         success: false,

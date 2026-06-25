@@ -16,6 +16,13 @@ const UsersTab = ({
 }) => {
   const [selectedUserForModal, setSelectedUserForModal] = useState(null);
   const [sendingNotification, setSendingNotification] = useState(false);
+  const [accountAction, setAccountAction] = useState({
+    open: false,
+    user: null,
+    action: "",
+    reason: "",
+  });
+  const [accountActionError, setAccountActionError] = useState("");
 
   const notifyUser = async (user) => {
     if (sendingNotification) return;
@@ -63,6 +70,54 @@ const UsersTab = ({
     }
   };
 
+  const openAccountAction = (user, action) => {
+    setAccountActionError("");
+    setAccountAction({
+      open: true,
+      user,
+      action,
+      reason: "",
+    });
+  };
+
+  const closeAccountAction = () => {
+    setAccountActionError("");
+    setAccountAction({
+      open: false,
+      user: null,
+      action: "",
+      reason: "",
+    });
+  };
+
+  const submitAccountAction = async () => {
+    const { user, action, reason } = accountAction;
+    const normalizedReason = reason.trim();
+
+    if ((action === "ban" || action === "delete" || action === "bulk_ban") && !normalizedReason) {
+      setAccountActionError(action === "delete" ? "Deletion reason is required." : "Ban reason is required.");
+      return;
+    }
+
+    try {
+      if (action === "ban") {
+        await banUser(user.id, normalizedReason);
+      } else if (action === "unban") {
+        await unbanUser(user.id, normalizedReason);
+      } else if (action === "delete") {
+        await deleteUser(user.id, normalizedReason);
+      } else if (action === "bulk_ban") {
+        await bulkUsers("ban", normalizedReason);
+        setSelectedUsers([]);
+      }
+    } catch (err) {
+      setAccountActionError(err.response?.data?.message || "Account action failed");
+      return;
+    }
+
+    closeAccountAction();
+  };
+
   return (
     <div className="space-y-4 animate-fadeIn">
 
@@ -76,7 +131,7 @@ const UsersTab = ({
           </span>
 
           <button
-            onClick={() => bulkUsers("ban")}
+            onClick={() => openAccountAction(null, "bulk_ban")}
             className="rounded-lg bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-700"
           >
             Ban
@@ -250,7 +305,7 @@ const UsersTab = ({
 
                     {u.user_type !== "super_admin" && u.is_active && (
                       <button
-                        onClick={() => banUser(u.id)}
+                        onClick={() => openAccountAction(u, "ban")}
                         className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
                       >
                         Ban
@@ -259,7 +314,7 @@ const UsersTab = ({
 
                     {!u.is_active && u.user_type !== "super_admin" && (
                       <button
-                        onClick={() => unbanUser(u.id)}
+                        onClick={() => openAccountAction(u, "unban")}
                         className="rounded-lg bg-indigo-600 px-2 py-1 text-xs text-white transition-colors hover:bg-indigo-700"
                       >
                         Unban
@@ -268,7 +323,7 @@ const UsersTab = ({
 
                     {u.user_type !== "super_admin" && (
                       <button
-                        onClick={() => deleteUser(u.id)}
+                        onClick={() => openAccountAction(u, "delete")}
                         className="rounded-lg bg-gray-700 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-800"
                       >
                         Delete
@@ -276,6 +331,21 @@ const UsersTab = ({
                     )}
 
                   </div>
+
+                  {Array.isArray(u.account_operations) && u.account_operations.length > 0 && (
+                    <div className="mt-2 space-y-1 text-xs text-gray-500">
+                      {u.account_operations.slice(0, 2).map((operation) => (
+                        <p
+                          key={operation.id}
+                          className="max-w-[180px] truncate"
+                          title={operation.note || operation.event_type}
+                        >
+                          {String(operation.event_type || "").replace(/_/g, " ")} by{" "}
+                          {operation.actor_name || "Super admin"}
+                        </p>
+                      ))}
+                    </div>
+                  )}
 
                 </td>
 
@@ -605,6 +675,85 @@ const UsersTab = ({
               <p className="text-xs text-gray-400 text-center mt-2">
                 The user will receive this reminder in their dashboard notification bell.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {accountAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl2 bg-white shadow-card">
+            <div className="border-b border-soft px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {accountAction.action === "bulk_ban"
+                  ? "Ban selected users"
+                  : accountAction.action === "ban"
+                  ? "Ban user"
+                  : accountAction.action === "delete"
+                  ? "Delete user"
+                  : "Unban user"}
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {accountAction.action === "bulk_ban"
+                  ? `${selectedUsers.length} selected user${selectedUsers.length === 1 ? "" : "s"} will be banned.`
+                  : `${accountAction.user?.full_name || "This user"} (${accountAction.user?.email || "no email"})`}
+              </p>
+            </div>
+
+            <div className="space-y-3 px-6 py-4">
+              <label className="block text-sm font-medium text-gray-700">
+                {accountAction.action === "unban" ? "Admin note" : "Reason"}
+              </label>
+              <textarea
+                value={accountAction.reason}
+                onChange={(event) => {
+                  setAccountActionError("");
+                  setAccountAction((prev) => ({
+                    ...prev,
+                    reason: event.target.value,
+                  }));
+                }}
+                rows={4}
+                placeholder={
+                  accountAction.action === "unban"
+                    ? "Optional note for the account history"
+                    : "Explain why this action is needed"
+                }
+                className="w-full rounded-lg border border-soft px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+
+              {accountAction.action !== "unban" && (
+                <p className="text-xs text-gray-500">
+                  This reason is saved in the user account history for audit review.
+                </p>
+              )}
+
+              {accountActionError && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {accountActionError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-soft px-6 py-4">
+              <button
+                type="button"
+                onClick={closeAccountAction}
+                className="rounded-lg border border-soft px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitAccountAction}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
+                  accountAction.action === "delete" || accountAction.action === "ban" || accountAction.action === "bulk_ban"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
+              >
+                Confirm
+              </button>
             </div>
           </div>
         </div>

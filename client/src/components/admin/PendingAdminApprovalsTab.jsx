@@ -22,10 +22,17 @@ export default function PendingAdminApprovalsTab() {
   const isSuperAdmin = user?.user_type === "super_admin";
 
   const [pending, setPending] = useState([]);
+  const [recentDecisions, setRecentDecisions] = useState([]);
   const [escalations, setEscalations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [escalationsLoading, setEscalationsLoading] = useState(false);
   const [actionId, setActionId] = useState(null);
+  const [decisionDialog, setDecisionDialog] = useState({
+    open: false,
+    admin: null,
+    decision: "",
+    note: "",
+  });
 
   const parseEscalationBody = (rawText) => {
     try {
@@ -45,8 +52,9 @@ export default function PendingAdminApprovalsTab() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const rows = await approvalService.fetchPendingAdminApprovals();
-      setPending(rows);
+      const result = await approvalService.fetchPendingAdminApprovals();
+      setPending(result.pending || []);
+      setRecentDecisions(result.recent_decisions || []);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load pending admins");
     } finally {
@@ -74,29 +82,53 @@ export default function PendingAdminApprovalsTab() {
     loadAll();
   }, [loadAll]);
 
-  const approve = async (id) => {
-    if (!window.confirm("Approve this admin account? They will be able to log in immediately.")) return;
-    try {
-      setActionId(id);
-      await approvalService.approvePendingAdmin(id);
-      toast.success("Admin account approved");
-      await load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to approve");
-    } finally {
-      setActionId(null);
-    }
+  const openDecisionDialog = (admin, decision) => {
+    setDecisionDialog({
+      open: true,
+      admin,
+      decision,
+      note: "",
+    });
   };
 
-  const reject = async (id) => {
-    if (!window.confirm("Reject and permanently remove this pending admin account?")) return;
+  const closeDecisionDialog = () => {
+    setDecisionDialog({
+      open: false,
+      admin: null,
+      decision: "",
+      note: "",
+    });
+  };
+
+  const submitDecision = async () => {
+    const { admin, decision, note } = decisionDialog;
+
+    if (!admin || !decision) return;
+
+    if (decision === "rejected" && !note.trim()) {
+      toast.error("Add a rejection reason before rejecting this admin");
+      return;
+    }
+
     try {
-      setActionId(id);
-      await approvalService.rejectPendingAdmin(id);
-      toast.success("Admin account rejected and removed");
+      setActionId(admin.id);
+      const payload = { decision_note: note.trim() };
+
+      if (decision === "approved") {
+        await approvalService.approvePendingAdmin(admin.id, payload);
+        toast.success("Admin account approved");
+      } else {
+        await approvalService.rejectPendingAdmin(admin.id, payload);
+        toast.success("Admin account rejected and removed");
+      }
+
+      closeDecisionDialog();
       await load();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to reject");
+      toast.error(
+        err.response?.data?.message ||
+          `Failed to ${decision === "approved" ? "approve" : "reject"}`
+      );
     } finally {
       setActionId(null);
     }
@@ -238,14 +270,14 @@ export default function PendingAdminApprovalsTab() {
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
                             <button
-                              onClick={() => approve(adm.id)}
+                              onClick={() => openDecisionDialog(adm, "approved")}
                               disabled={isBusy}
                               className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
                             >
                               Approve
                             </button>
                             <button
-                              onClick={() => reject(adm.id)}
+                              onClick={() => openDecisionDialog(adm, "rejected")}
                               disabled={isBusy}
                               className="rounded-md bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200 disabled:opacity-50"
                             >
@@ -260,6 +292,54 @@ export default function PendingAdminApprovalsTab() {
               </table>
             </div>
           )}
+
+          <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-gray-800">Recent Approval Decisions</h4>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                {recentDecisions.length}
+              </span>
+            </div>
+
+            {recentDecisions.length === 0 ? (
+              <p className="text-xs text-gray-500">No approval decisions recorded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {recentDecisions.slice(0, 8).map((decision) => {
+                  const snapshot = decision.target_snapshot || {};
+                  return (
+                    <article key={decision.id} className="rounded-lg bg-gray-50 p-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {snapshot.full_name || snapshot.email || `Admin #${decision.target_user_id}`}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {snapshot.email || "No email"} - {snapshot.user_type || "admin"}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
+                            decision.decision === "approved"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {decision.decision}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        By {decision.actor_name || "Approver"} on {new Date(decision.created_at).toLocaleString()}
+                      </p>
+                      {decision.note ? (
+                        <p className="mt-1 text-xs text-gray-600">{decision.note}</p>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         <aside className="rounded-xl border border-gray-200 bg-white p-4">
@@ -358,6 +438,82 @@ export default function PendingAdminApprovalsTab() {
           )}
         </aside>
       </div>
+
+      {decisionDialog.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {decisionDialog.decision === "approved"
+                    ? "Approve admin account"
+                    : "Reject admin account"}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {decisionDialog.admin?.full_name} - {decisionDialog.admin?.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeDecisionDialog}
+                className="rounded-lg px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <label className="mt-5 block text-sm font-medium text-gray-700">
+              {decisionDialog.decision === "approved"
+                ? "Approval note"
+                : "Rejection reason"}
+            </label>
+            <textarea
+              className="mt-2 h-32 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder={
+                decisionDialog.decision === "approved"
+                  ? "Optional note for the approval record"
+                  : "Explain why this admin account is being rejected"
+              }
+              value={decisionDialog.note}
+              onChange={(event) =>
+                setDecisionDialog((prev) => ({ ...prev, note: event.target.value }))
+              }
+            />
+            {decisionDialog.decision === "rejected" ? (
+              <p className="mt-2 text-xs text-gray-500">
+                This reason is required and will be saved in the approval history.
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeDecisionDialog}
+                disabled={actionId === decisionDialog.admin?.id}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitDecision}
+                disabled={actionId === decisionDialog.admin?.id}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60 ${
+                  decisionDialog.decision === "approved"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                {actionId === decisionDialog.admin?.id
+                  ? "Saving..."
+                  : decisionDialog.decision === "approved"
+                    ? "Approve account"
+                    : "Reject account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
