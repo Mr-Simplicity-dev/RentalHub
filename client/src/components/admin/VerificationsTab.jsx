@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import PaginationControls from "./PaginationControls";
 
 const getPassportPhotoUrl = (rawUrl) => {
@@ -41,12 +41,61 @@ const VerificationsTab = ({
   deleteRejectedVerification,
   adminPerformance,
 }) => {
+  const [reviewDialog, setReviewDialog] = useState({
+    open: false,
+    verification: null,
+    action: "",
+    note: "",
+  });
+  const [reviewError, setReviewError] = useState("");
+
   const getReviewStatus = (verification) => {
     if (verification?.identity_verification_status) {
       return verification.identity_verification_status;
     }
 
     return verification?.identity_verified ? "verified" : "pending";
+  };
+
+  const openReviewDialog = (verification, action) => {
+    setReviewError("");
+    setReviewDialog({
+      open: true,
+      verification,
+      action,
+      note: "",
+    });
+  };
+
+  const closeReviewDialog = () => {
+    setReviewError("");
+    setReviewDialog({
+      open: false,
+      verification: null,
+      action: "",
+      note: "",
+    });
+  };
+
+  const submitReview = async () => {
+    const { verification, action, note } = reviewDialog;
+
+    if (!verification || !action) return;
+
+    if ((action === "reject" || action === "delete") && !note.trim()) {
+      setReviewError(action === "delete" ? "Delete reason is required." : "Rejection reason is required.");
+      return;
+    }
+
+    if (action === "approve") {
+      await verifyIdentity(verification.id, note);
+    } else if (action === "reject") {
+      await rejectIdentity(verification.id, note);
+    } else if (action === "delete") {
+      await deleteRejectedVerification(verification.id, note);
+    }
+
+    closeReviewDialog();
   };
 
   return (
@@ -244,14 +293,14 @@ const VerificationsTab = ({
 
                           <>
                             <button
-                              onClick={() => verifyIdentity(v.id)}
+                              onClick={() => openReviewDialog(v, "approve")}
                               className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700"
                             >
                               Approve
                             </button>
 
                             <button
-                              onClick={() => rejectIdentity(v.id)}
+                              onClick={() => openReviewDialog(v, "reject")}
                               className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
                             >
                               Reject
@@ -263,14 +312,14 @@ const VerificationsTab = ({
                         {reviewStatus === "rejected" && (
                           <>
                             <button
-                              onClick={() => verifyIdentity(v.id)}
+                              onClick={() => openReviewDialog(v, "approve")}
                               className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700"
                             >
                               Approve
                             </button>
 
                             <button
-                              onClick={() => deleteRejectedVerification(v.id)}
+                              onClick={() => openReviewDialog(v, "delete")}
                               className="rounded-lg bg-gray-700 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-800"
                             >
                               Delete
@@ -279,6 +328,16 @@ const VerificationsTab = ({
                         )}
 
                       </div>
+
+                      {v.verification_operations?.length ? (
+                        <div className="mt-2 space-y-1 text-xs text-gray-500">
+                          {v.verification_operations.slice(0, 2).map((operation) => (
+                            <p key={operation.id} title={operation.note || operation.event_type}>
+                              {operation.event_type.replace(/_/g, " ")} by {operation.actor_name || "Super admin"}
+                            </p>
+                          ))}
+                        </div>
+                      ) : null}
 
                     </td>
 
@@ -302,6 +361,91 @@ const VerificationsTab = ({
         />
 
       </div>
+
+      {reviewDialog.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {reviewDialog.action === "approve"
+                    ? "Approve identity verification"
+                    : reviewDialog.action === "reject"
+                      ? "Reject identity verification"
+                      : "Delete rejected verification"}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {reviewDialog.verification?.full_name} - {reviewDialog.verification?.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeReviewDialog}
+                className="rounded-lg px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <label className="mt-5 block text-sm font-medium text-gray-700">
+              {reviewDialog.action === "approve"
+                ? "Approval note"
+                : reviewDialog.action === "reject"
+                  ? "Rejection reason"
+                  : "Delete reason"}
+            </label>
+            <textarea
+              className="mt-2 h-32 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder={
+                reviewDialog.action === "approve"
+                  ? "Optional note for the verification record"
+                  : reviewDialog.action === "reject"
+                    ? "Explain why this identity document is being rejected"
+                    : "Explain why this rejected verification record is being cleared"
+              }
+              value={reviewDialog.note}
+              onChange={(event) =>
+                setReviewDialog((prev) => ({ ...prev, note: event.target.value }))
+              }
+            />
+            {reviewDialog.action !== "approve" ? (
+              <p className="mt-2 text-xs text-gray-500">
+                This reason is required and will be saved in the verification history.
+              </p>
+            ) : null}
+            {reviewError ? (
+              <p className="mt-2 text-sm font-medium text-red-600">{reviewError}</p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeReviewDialog}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitReview}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
+                  reviewDialog.action === "approve"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : reviewDialog.action === "reject"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-gray-800 hover:bg-gray-900"
+                }`}
+              >
+                {reviewDialog.action === "approve"
+                  ? "Approve"
+                  : reviewDialog.action === "reject"
+                    ? "Reject"
+                    : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
 
       {/* ADMIN PERFORMANCE SECTION */}

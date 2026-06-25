@@ -42,9 +42,16 @@ const SuperFinancialAdminDashboard = () => {
   const [statePerformance, setStatePerformance] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [pendingWithdrawals, setPendingWithdrawals] = useState([]);
+  const [recentWithdrawalDecisions, setRecentWithdrawalDecisions] = useState([]);
   const [pendingWithdrawalsLoading, setPendingWithdrawalsLoading] = useState(true);
   const [pendingWithdrawalsError, setPendingWithdrawalsError] = useState('');
   const [actionLoadingIds, setActionLoadingIds] = useState([]);
+  const [withdrawalDecision, setWithdrawalDecision] = useState({
+    open: false,
+    withdrawal: null,
+    action: '',
+    note: '',
+  });
   const [filters, setFilters] = useState({
     reference: '',
     txType: '',
@@ -249,42 +256,50 @@ const SuperFinancialAdminDashboard = () => {
     });
   };
 
-  const handleApproveWithdrawal = async (withdrawal) => {
-    if (!window.confirm(`Approve payout for ₦${Number(withdrawal.amount).toLocaleString()} to ${withdrawal.account_name}?`)) {
-      return;
-    }
-    setActionLoading(withdrawal.id, true);
-    try {
-      await api.post(`/financial-admin/withdrawals/${withdrawal.id}/approve`, {
-        admin_note: 'Approved by SFA',
-      });
-      toast.success('Withdrawal approved and payout initiated');
-      await fetchPendingWithdrawals();
-      const historyRes = await api.get('/financial-admin/withdrawals/history');
-      setWithdrawals(historyRes.data?.data || []);
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to approve withdrawal');
-    } finally {
-      setActionLoading(withdrawal.id, false);
-    }
+  const openWithdrawalDecision = (withdrawal, action) => {
+    setWithdrawalDecision({
+      open: true,
+      withdrawal,
+      action,
+      note: action === 'approve' ? 'Approved by SFA review' : '',
+    });
   };
 
-  const handleRejectWithdrawal = async (withdrawal) => {
-    const reason = window.prompt('Enter a reason for rejection:', 'Rejected by SFA');
-    if (reason === null) {
+  const closeWithdrawalDecision = () => {
+    setWithdrawalDecision({
+      open: false,
+      withdrawal: null,
+      action: '',
+      note: '',
+    });
+  };
+
+  const submitWithdrawalDecision = async () => {
+    const { withdrawal, action, note } = withdrawalDecision;
+
+    if (!withdrawal || !action) return;
+
+    if (action === 'reject' && !note.trim()) {
+      toast.error('Add a rejection reason before rejecting this withdrawal');
       return;
     }
+
     setActionLoading(withdrawal.id, true);
     try {
-      await api.post(`/financial-admin/withdrawals/${withdrawal.id}/reject`, {
-        admin_note: reason || 'Rejected by SFA',
+      await api.post(`/financial-admin/withdrawals/${withdrawal.id}/${action}`, {
+        admin_note: note.trim(),
       });
-      toast.success('Withdrawal rejected and funds returned');
+      toast.success(
+        action === 'approve'
+          ? 'Withdrawal approved and payout initiated'
+          : 'Withdrawal rejected and funds returned'
+      );
+      closeWithdrawalDecision();
       await fetchPendingWithdrawals();
       const historyRes = await api.get('/financial-admin/withdrawals/history');
       setWithdrawals(historyRes.data?.data || []);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to reject withdrawal');
+      toast.error(error.response?.data?.message || `Failed to ${action} withdrawal`);
     } finally {
       setActionLoading(withdrawal.id, false);
     }
@@ -296,7 +311,14 @@ const SuperFinancialAdminDashboard = () => {
 
     try {
       const response = await api.get('/financial-admin/withdrawals/pending');
-      setPendingWithdrawals(response.data?.data || []);
+      const data = response.data?.data;
+      if (Array.isArray(data)) {
+        setPendingWithdrawals(data);
+        setRecentWithdrawalDecisions([]);
+      } else {
+        setPendingWithdrawals(data?.pending || []);
+        setRecentWithdrawalDecisions(data?.recent_decisions || []);
+      }
     } catch (error) {
       const status = error?.response?.status;
       if (status === 403) {
@@ -714,7 +736,7 @@ const SuperFinancialAdminDashboard = () => {
                           <button
                             type="button"
                             disabled={isLoading}
-                            onClick={() => handleApproveWithdrawal(withdrawal)}
+                            onClick={() => openWithdrawalDecision(withdrawal, 'approve')}
                             className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
                           >
                             {isLoading ? 'Processing…' : 'Approve'}
@@ -722,7 +744,7 @@ const SuperFinancialAdminDashboard = () => {
                           <button
                             type="button"
                             disabled={isLoading}
-                            onClick={() => handleRejectWithdrawal(withdrawal)}
+                            onClick={() => openWithdrawalDecision(withdrawal, 'reject')}
                             className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                           >
                             {isLoading ? 'Processing…' : 'Reject'}
@@ -736,6 +758,48 @@ const SuperFinancialAdminDashboard = () => {
             </table>
           </div>
         )}
+
+        <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900">Recent Withdrawal Decisions</h3>
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs text-gray-600">
+              {recentWithdrawalDecisions.length}
+            </span>
+          </div>
+          {recentWithdrawalDecisions.length === 0 ? (
+            <p className="text-sm text-gray-500">No withdrawal decisions recorded yet.</p>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2">
+              {recentWithdrawalDecisions.slice(0, 8).map((decision) => (
+                <article key={decision.id} className="rounded-lg bg-white p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {decision.requester_name || decision.requester_email || `Admin #${decision.admin_id}`}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(decision.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      decision.event_type === 'withdrawal_approved'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {decision.event_type.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    By {decision.actor_name || decision.reviewer_name || 'Finance reviewer'}
+                  </p>
+                  {decision.note ? (
+                    <p className="mt-1 text-xs text-gray-600">{decision.note}</p>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       <section id="super-financial-withdrawals" className="rounded-xl bg-white p-5 shadow">
@@ -838,6 +902,89 @@ const SuperFinancialAdminDashboard = () => {
           Use this dashboard for nationwide finance monitoring and open the state dashboard only for state-bounded operations.
         </p>
       </section>
+
+      {withdrawalDecision.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {withdrawalDecision.action === 'approve'
+                    ? 'Approve withdrawal'
+                    : 'Reject withdrawal'}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {withdrawalDecision.withdrawal?.admin_name || 'Admin'} - {currency(withdrawalDecision.withdrawal?.amount)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeWithdrawalDecision}
+                className="rounded-lg px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
+              <p>{withdrawalDecision.withdrawal?.bank_name || 'Bank unavailable'}</p>
+              <p>
+                {withdrawalDecision.withdrawal?.account_name || 'Account name unavailable'} - {withdrawalDecision.withdrawal?.account_number || 'No account number'}
+              </p>
+            </div>
+
+            <label className="mt-5 block text-sm font-medium text-gray-700">
+              {withdrawalDecision.action === 'approve'
+                ? 'Approval note'
+                : 'Rejection reason'}
+            </label>
+            <textarea
+              className="mt-2 h-32 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder={
+                withdrawalDecision.action === 'approve'
+                  ? 'Note for this payout approval'
+                  : 'Explain why this withdrawal is being rejected'
+              }
+              value={withdrawalDecision.note}
+              onChange={(event) =>
+                setWithdrawalDecision((prev) => ({ ...prev, note: event.target.value }))
+              }
+            />
+            {withdrawalDecision.action === 'reject' ? (
+              <p className="mt-2 text-xs text-gray-500">
+                This reason is required and funds will only be returned if the request is still pending.
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeWithdrawalDecision}
+                disabled={actionLoadingIds.includes(withdrawalDecision.withdrawal?.id)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitWithdrawalDecision}
+                disabled={actionLoadingIds.includes(withdrawalDecision.withdrawal?.id)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60 ${
+                  withdrawalDecision.action === 'approve'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {actionLoadingIds.includes(withdrawalDecision.withdrawal?.id)
+                  ? 'Processing...'
+                  : withdrawalDecision.action === 'approve'
+                    ? 'Approve payout'
+                    : 'Reject withdrawal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <AdminWithdrawalModal
         isOpen={showPersonalWithdrawDialog}

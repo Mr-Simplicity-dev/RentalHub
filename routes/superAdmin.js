@@ -14,6 +14,67 @@ const router = express.Router();
 
 // ================== PENDING ADMIN APPROVALS ==================
 
+let adminApprovalDecisionSchemaReady = false;
+
+const ensureAdminApprovalDecisionSchema = async () => {
+  if (adminApprovalDecisionSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS admin_approval_decisions (
+      id SERIAL PRIMARY KEY,
+      target_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      decision VARCHAR(20) NOT NULL,
+      note TEXT,
+      target_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT chk_admin_approval_decision
+        CHECK (decision IN ('approved', 'rejected'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_admin_approval_decisions_created
+      ON admin_approval_decisions(created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_admin_approval_decisions_target
+      ON admin_approval_decisions(target_user_id, created_at DESC);
+  `);
+
+  adminApprovalDecisionSchemaReady = true;
+};
+
+const getApprovalActorName = (user = {}) =>
+  user.full_name || user.name || user.email || `Admin #${user.id || 'unknown'}`;
+
+const createAdminApprovalDecision = async ({
+  targetUserId,
+  actorId,
+  actorName,
+  decision,
+  note = null,
+  targetSnapshot = {},
+}) => {
+  await db.query(
+    `INSERT INTO admin_approval_decisions (
+       target_user_id,
+       actor_id,
+       actor_name,
+       decision,
+       note,
+       target_snapshot
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      targetUserId,
+      actorId || null,
+      actorName || null,
+      decision,
+      note || null,
+      JSON.stringify(targetSnapshot || {}),
+    ]
+  );
+};
+
 // Allow super_admin OR a delegated super_financial_admin to hit these routes
 const canManagePendingAdmins = async (req, res, next) => {
   const userType = req.user?.user_type;
@@ -33,10 +94,13 @@ const canManagePendingAdmins = async (req, res, next) => {
 // GET /super/pending-admins
 router.get('/pending-admins', authenticate, async (req, res, next) => {
   try {
+    await ensureAdminApprovalDecisionSchema();
+
     await canManagePendingAdmins(req, res, async () => {
       // Super Financial Admin cannot see other super_financial_admin pending accounts
       const isSFA = req.user.user_type === 'super_financial_admin';
-      const rows = await db.query(
+      const [pendingResult, decisionsResult] = await Promise.all([
+        db.query(
         `SELECT id, full_name, email, phone, user_type,
                 assigned_state, assigned_city, lawyer_client_scope,
                 created_at, approval_status
@@ -45,8 +109,31 @@ router.get('/pending-admins', authenticate, async (req, res, next) => {
            AND deleted_at IS NULL
            ${isSFA ? `AND user_type <> 'super_financial_admin'` : ''}
          ORDER BY created_at DESC`
-      );
-      res.json({ success: true, data: rows.rows });
+        ),
+        db.query(
+          `SELECT
+             id,
+             target_user_id,
+             actor_id,
+             actor_name,
+             decision,
+             note,
+             target_snapshot,
+             created_at
+           FROM admin_approval_decisions
+           ${isSFA ? `WHERE COALESCE(target_snapshot->>'user_type', '') <> 'super_financial_admin'` : ''}
+           ORDER BY created_at DESC
+           LIMIT 25`
+        ),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          pending: pendingResult.rows,
+          recent_decisions: decisionsResult.rows,
+        },
+      });
     });
   } catch (err) {
     console.error('Get pending admins error:', err);
@@ -57,21 +144,33 @@ router.get('/pending-admins', authenticate, async (req, res, next) => {
 // PATCH /super/pending-admins/:id/approve
 router.patch('/pending-admins/:id/approve', authenticate, canManagePendingAdmins, async (req, res) => {
   try {
+    await ensureAdminApprovalDecisionSchema();
+
     const { id } = req.params;
     const isSFA = req.user.user_type === 'super_financial_admin';
+    const decisionNote = String(req.body?.decision_note || '').trim() || null;
+
+    await db.query('BEGIN');
 
     // SFA cannot approve another super_financial_admin
     const target = await db.query(
-      `SELECT user_type, approval_status FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      `SELECT id, full_name, email, phone, user_type, assigned_state, assigned_city,
+              lawyer_client_scope, approval_status, created_at
+       FROM users
+       WHERE id = $1 AND deleted_at IS NULL
+       FOR UPDATE`,
       [id]
     );
     if (!target.rows.length) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ success: false, message: 'Admin not found' });
     }
     if (target.rows[0].approval_status !== 'pending') {
+      await db.query('ROLLBACK');
       return res.status(400).json({ success: false, message: 'Account is not pending approval' });
     }
     if (isSFA && target.rows[0].user_type === 'super_financial_admin') {
+      await db.query('ROLLBACK');
       return res.status(403).json({ success: false, message: 'Only the Super Admin can approve Super Financial Admin accounts' });
     }
 
@@ -80,8 +179,20 @@ router.patch('/pending-admins/:id/approve', authenticate, canManagePendingAdmins
       [id]
     );
 
+    await createAdminApprovalDecision({
+      targetUserId: Number(id),
+      actorId: req.user.id,
+      actorName: getApprovalActorName(req.user),
+      decision: 'approved',
+      note: decisionNote,
+      targetSnapshot: target.rows[0],
+    });
+
+    await db.query('COMMIT');
+
     res.json({ success: true, message: 'Admin account approved successfully' });
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error('Approve pending admin error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -90,20 +201,36 @@ router.patch('/pending-admins/:id/approve', authenticate, canManagePendingAdmins
 // PATCH /super/pending-admins/:id/reject
 router.patch('/pending-admins/:id/reject', authenticate, canManagePendingAdmins, async (req, res) => {
   try {
+    await ensureAdminApprovalDecisionSchema();
+
     const { id } = req.params;
     const isSFA = req.user.user_type === 'super_financial_admin';
+    const decisionNote = String(req.body?.decision_note || '').trim();
+
+    if (!decisionNote) {
+      return res.status(400).json({ success: false, message: 'A rejection reason is required' });
+    }
+
+    await db.query('BEGIN');
 
     const target = await db.query(
-      `SELECT user_type, approval_status FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      `SELECT id, full_name, email, phone, user_type, assigned_state, assigned_city,
+              lawyer_client_scope, approval_status, created_at
+       FROM users
+       WHERE id = $1 AND deleted_at IS NULL
+       FOR UPDATE`,
       [id]
     );
     if (!target.rows.length) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ success: false, message: 'Admin not found' });
     }
     if (target.rows[0].approval_status !== 'pending') {
+      await db.query('ROLLBACK');
       return res.status(400).json({ success: false, message: 'Account is not pending approval' });
     }
     if (isSFA && target.rows[0].user_type === 'super_financial_admin') {
+      await db.query('ROLLBACK');
       return res.status(403).json({ success: false, message: 'Only the Super Admin can reject Super Financial Admin accounts' });
     }
 
@@ -113,8 +240,20 @@ router.patch('/pending-admins/:id/reject', authenticate, canManagePendingAdmins,
       [id]
     );
 
+    await createAdminApprovalDecision({
+      targetUserId: Number(id),
+      actorId: req.user.id,
+      actorName: getApprovalActorName(req.user),
+      decision: 'rejected',
+      note: decisionNote,
+      targetSnapshot: target.rows[0],
+    });
+
+    await db.query('COMMIT');
+
     res.json({ success: true, message: 'Admin account rejected and removed' });
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error('Reject pending admin error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }

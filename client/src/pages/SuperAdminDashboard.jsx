@@ -705,9 +705,11 @@ export default function SuperAdminDashboard() {
   setSearchParams
 ]);
 
-  const verifyIdentity = async (id) => {
+  const verifyIdentity = async (id, reviewNote = "") => {
     try {
-      await api.patch(`/super/verifications/${id}/approve`);
+      await api.patch(`/super/verifications/${id}/approve`, {
+        review_note: String(reviewNote || "").trim(),
+      });
       toast.success("Identity verified");
       await Promise.all([
         loadVerifications(verificationPage),
@@ -719,9 +721,11 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const rejectIdentity = async (id) => {
+  const rejectIdentity = async (id, reviewNote = "") => {
     try {
-      await api.patch(`/super/verifications/${id}/reject`);
+      await api.patch(`/super/verifications/${id}/reject`, {
+        review_note: String(reviewNote || "").trim(),
+      });
       toast.success("Identity rejected");
       await Promise.all([
         loadVerifications(verificationPage),
@@ -733,13 +737,11 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const deleteRejectedVerification = async (id) => {
-    if (!window.confirm("Delete this rejected verification record?")) {
-      return;
-    }
-
+  const deleteRejectedVerification = async (id, deleteReason = "") => {
     try {
-      await api.delete(`/super/verifications/${id}`);
+      await api.delete(`/super/verifications/${id}`, {
+        data: { delete_reason: String(deleteReason || "").trim() },
+      });
       toast.success("Rejected verification deleted");
       await Promise.all([
         loadVerifications(verificationPage),
@@ -751,34 +753,42 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const banUser = async (id) => {
+  const banUser = async (id, reason = "") => {
     try {
-      await api.patch(`/super/users/${id}/ban`);
+      await api.patch(`/super/users/${id}/ban`, {
+        reason: String(reason || "").trim(),
+      });
       toast.success("User banned");
       loadUsers();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to ban user");
+      throw err;
     }
   };
 
-  const unbanUser = async (id) => {
+  const unbanUser = async (id, reason = "") => {
     try {
-      await api.patch(`/super/users/${id}/unban`);
+      await api.patch(`/super/users/${id}/unban`, {
+        reason: String(reason || "").trim(),
+      });
       toast.success("User unbanned");
       loadUsers();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to unban user");
+      throw err;
     }
   };
 
-  const deleteUser = async (id) => {
-    if (!window.confirm("Delete this user? This action hides the user account.")) return;
+  const deleteUser = async (id, reason = "") => {
     try {
-      await api.delete(`/super/users/${id}`);
+      await api.delete(`/super/users/${id}`, {
+        data: { reason: String(reason || "").trim() },
+      });
       toast.success("User deleted");
       loadUsers();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete user");
+      throw err;
     }
   };
 
@@ -805,10 +815,11 @@ export default function SuperAdminDashboard() {
     loadProperties();
   };
 
-  const bulkUsers = async (action) => {
+  const bulkUsers = async (action, reason = "") => {
     await api.post("/super/users/bulk", {
       ids: selectedUsers,
       action,
+      reason: String(reason || "").trim(),
     });
     toast.success("Bulk action completed");
     loadUsers();
