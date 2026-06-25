@@ -65,6 +65,14 @@ const PLATFORM_PRIORITY_FLAG_ORDER = [
 ];
 
 const FlagsTab = ({ flags, toggleFlag }) => {
+  const [flagAction, setFlagAction] = React.useState({
+    open: false,
+    flag: null,
+    enabled: false,
+    reason: "",
+    error: "",
+  });
+
   const mergedFlags = React.useMemo(() => {
     const map = new Map((flags || []).map((flag) => [flag.key, { ...flag }]));
 
@@ -134,6 +142,21 @@ const FlagsTab = ({ flags, toggleFlag }) => {
             {meta?.description || f.description}
           </p>
 
+          {Array.isArray(f.operations) && f.operations.length > 0 && (
+            <div className="mt-2 space-y-1 text-xs text-gray-500">
+              {f.operations.slice(0, 2).map((operation) => (
+                <p
+                  key={operation.id}
+                  className="truncate"
+                  title={operation.note || operation.event_type}
+                >
+                  {String(operation.event_type || "").replace(/_/g, " ")} by{" "}
+                  {operation.actor_name || "Super admin"}
+                </p>
+              ))}
+            </div>
+          )}
+
           {inactive && f.enabled && (
             <p className="mt-1 text-xs text-amber-700">
               Saved as on, but inactive while Allow Registration is off.
@@ -154,7 +177,15 @@ const FlagsTab = ({ flags, toggleFlag }) => {
 
           <button
             type="button"
-            onClick={() => toggleFlag(f.key, !f.enabled)}
+            onClick={() =>
+              setFlagAction({
+                open: true,
+                flag: f,
+                enabled: !f.enabled,
+                reason: "",
+                error: "",
+              })
+            }
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
               f.enabled ? "bg-green-500" : "bg-gray-300"
             }`}
@@ -253,6 +284,105 @@ const FlagsTab = ({ flags, toggleFlag }) => {
           </div>
         )}
       </div>
+
+      {flagAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl2 bg-white shadow-card">
+            <div className="border-b border-soft px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {flagAction.enabled ? "Enable feature flag" : "Disable feature flag"}
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {FLAG_META[flagAction.flag?.key]?.label || flagAction.flag?.key}
+              </p>
+            </div>
+
+            <div className="space-y-3 px-6 py-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Change reason
+              </label>
+              <textarea
+                value={flagAction.reason}
+                onChange={(event) =>
+                  setFlagAction((prev) => ({
+                    ...prev,
+                    reason: event.target.value,
+                    error: "",
+                  }))
+                }
+                rows={4}
+                className="w-full rounded-lg border border-soft px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                placeholder="Explain why this platform switch is being changed"
+              />
+              <p className="text-xs text-gray-500">
+                This reason is saved in feature flag governance history.
+              </p>
+
+              {flagAction.error && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {flagAction.error}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-soft px-6 py-4">
+              <button
+                type="button"
+                onClick={() =>
+                  setFlagAction({
+                    open: false,
+                    flag: null,
+                    enabled: false,
+                    reason: "",
+                    error: "",
+                  })
+                }
+                className="rounded-lg border border-soft px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const reason = flagAction.reason.trim();
+                  if (!reason) {
+                    setFlagAction((prev) => ({
+                      ...prev,
+                      error: "A feature flag change reason is required.",
+                    }));
+                    return;
+                  }
+
+                  try {
+                    await toggleFlag(flagAction.flag.key, flagAction.enabled, reason);
+                    setFlagAction({
+                      open: false,
+                      flag: null,
+                      enabled: false,
+                      reason: "",
+                      error: "",
+                    });
+                  } catch (err) {
+                    setFlagAction((prev) => ({
+                      ...prev,
+                      error:
+                        err.response?.data?.message ||
+                        "Failed to update feature flag.",
+                    }));
+                  }
+                }}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
+                  flagAction.enabled
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-gray-700 hover:bg-gray-800"
+                }`}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
