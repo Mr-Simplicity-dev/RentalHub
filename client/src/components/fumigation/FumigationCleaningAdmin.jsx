@@ -53,6 +53,9 @@ const FumigationCleaningAdmin = ({
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [showAssignProvider, setShowAssignProvider] = useState(false);
+  const [statusDialog, setStatusDialog] = useState({ open: false, booking: null, status: '' });
+  const [statusNote, setStatusNote] = useState('');
+  const [statusSaving, setStatusSaving] = useState(false);
   const [providers, setProviders] = useState([]);
   const [selectedProvider, setSelectedProvider] = useState(null);
   
@@ -234,16 +237,38 @@ const FumigationCleaningAdmin = ({
     setShowAssignProvider(true);
   };
   
-  const handleUpdateStatus = async (bookingId, newStatus) => {
-    if (!window.confirm(`Change booking status to ${newStatus}?`)) return;
-    
+  const openStatusDialog = (booking, newStatus) => {
+    setStatusDialog({ open: true, booking, status: newStatus });
+    setStatusNote('');
+  };
+
+  const closeStatusDialog = () => {
+    setStatusDialog({ open: false, booking: null, status: '' });
+    setStatusNote('');
+  };
+
+  const handleUpdateStatus = async () => {
+    const booking = statusDialog.booking;
+    const newStatus = statusDialog.status;
+    if (!booking || !newStatus) return;
+    if (['completed', 'cancelled', 'rescheduled'].includes(newStatus) && !statusNote.trim()) {
+      toast.error('Add an operational note for this status change');
+      return;
+    }
+
+    setStatusSaving(true);
     try {
-      const response = await api.put(`/fumigation-cleaning/admin/bookings/${bookingId}/status`, {
-        status: newStatus
+      const response = await api.put(`/fumigation-cleaning/admin/bookings/${booking.id}/status`, {
+        status: newStatus,
+        update_data: {
+          admin_note: statusNote.trim() || undefined,
+          updated_by_admin: user?.id,
+        },
       });
       
       if (response.data?.success) {
         toast.success('Booking status updated');
+        closeStatusDialog();
         // Refresh bookings
         const bookingsRes = await api.get('/fumigation-cleaning/admin/bookings');
         setBookings(bookingsRes.data?.data || []);
@@ -253,6 +278,8 @@ const FumigationCleaningAdmin = ({
     } catch (error) {
       console.error('Error updating booking status:', error);
       toast.error(error.response?.data?.message || 'Failed to update status');
+    } finally {
+      setStatusSaving(false);
     }
   };
   
@@ -284,9 +311,57 @@ const FumigationCleaningAdmin = ({
     }
   };
   
+  const csvEscape = (value) => {
+    const text = value === null || value === undefined ? '' : String(value);
+    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+
   const handleExportData = (format) => {
-    toast.info(`Exporting data as ${format}...`);
-    // In a real implementation, this would generate and download a file
+    const headers = ['Booking ID', 'Tenant', 'Service', 'Property', 'Booking Date', 'Time Slot', 'Status', 'Payment', 'Amount', 'Provider'];
+    const rows = filteredBookings.map((booking) => [
+      `FC-${booking.id?.toString().padStart(6, '0')}`,
+      booking.tenant_name,
+      booking.service_name,
+      booking.property_address,
+      booking.booking_date,
+      booking.preferred_time_slot,
+      booking.booking_status,
+      booking.payment_status,
+      booking.total_price,
+      booking.assigned_provider?.company_name || booking.assigned_team_leader || '',
+    ]);
+
+    if (format === 'CSV') {
+      const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `fumigation-bookings-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const printable = window.open('', '_blank');
+    if (!printable) return toast.error('Allow popups to print this report');
+    printable.document.write(`
+      <html>
+        <head><title>Fumigation Bookings Report</title></head>
+        <body style="font-family: Arial, sans-serif;">
+          <h1>Fumigation & Cleaning Bookings</h1>
+          <p>Generated ${new Date().toLocaleString()}</p>
+          <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+            <thead><tr>${headers.map((heading) => `<th>${heading}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${csvEscape(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printable.document.close();
+    printable.print();
   };
   
   if (loading) {
@@ -588,14 +663,14 @@ const FumigationCleaningAdmin = ({
                             <FaUserCheck />
                           </button>
                           <button
-                            onClick={() => handleUpdateStatus(booking.id, 'confirmed')}
+                            onClick={() => openStatusDialog(booking, 'confirmed')}
                             className="text-purple-600 hover:text-purple-900"
                             title="Confirm Booking"
                           >
                             <FaCheckCircle />
                           </button>
                           <button
-                            onClick={() => handleUpdateStatus(booking.id, 'cancelled')}
+                            onClick={() => openStatusDialog(booking, 'cancelled')}
                             className="text-red-600 hover:text-red-900"
                             title="Cancel Booking"
                           >
@@ -637,6 +712,44 @@ const FumigationCleaningAdmin = ({
           </div>
         </div>
         
+        {/* Booking Details Modal */}
+        {statusDialog.open && statusDialog.booking && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+              <div className="border-b border-gray-200 p-6">
+                <h2 className="text-xl font-bold text-gray-900">Update Booking Status</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  FC-{statusDialog.booking.id.toString().padStart(6, '0')} will be marked as {statusDialog.status.replace('_', ' ')}.
+                </p>
+              </div>
+              <div className="space-y-4 p-6">
+                <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+                  <p className="font-semibold text-gray-900">{statusDialog.booking.service_name}</p>
+                  <p>{statusDialog.booking.tenant_name || 'Unknown tenant'} • {formatDate(statusDialog.booking.booking_date)}</p>
+                </div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Operational note {['completed', 'cancelled', 'rescheduled'].includes(statusDialog.status) && <span className="text-red-600">*</span>}
+                  <textarea
+                    value={statusNote}
+                    onChange={(event) => setStatusNote(event.target.value)}
+                    rows={4}
+                    className="input mt-2 w-full"
+                    placeholder="Add provider update, cancellation reason, completion proof summary, or customer-impact note"
+                  />
+                </label>
+              </div>
+              <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
+                <button type="button" onClick={closeStatusDialog} className="btn btn-outline" disabled={statusSaving}>
+                  Cancel
+                </button>
+                <button type="button" onClick={handleUpdateStatus} className="btn btn-primary" disabled={statusSaving}>
+                  {statusSaving ? 'Updating...' : 'Update Status'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Booking Details Modal */}
         {showBookingDetails && selectedBooking && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
