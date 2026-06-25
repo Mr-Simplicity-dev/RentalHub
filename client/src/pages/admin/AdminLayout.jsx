@@ -1136,6 +1136,11 @@ const AdminLayout = () => {
                   <FaLock className="mr-3" />
                   Frozen Funds
                 </NavLink>
+
+                <NavLink to="/admin/super-financial-dashboard?panel=support-escalations" className={() => superFinancialNavItem('support-escalations')}>
+                  <FaArrowUp className="mr-3" />
+                  Support Escalations
+                </NavLink>
               </div>
             </div>
           )}

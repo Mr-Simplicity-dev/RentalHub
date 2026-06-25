@@ -264,6 +264,12 @@ const ensureSupportSchema = async () => {
       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='sla_breach_notified_at') THEN
         ALTER TABLE support_tickets ADD COLUMN sla_breach_notified_at TIMESTAMP;
       END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='escalation_ack_notified_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN escalation_ack_notified_at TIMESTAMP;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='department_resolution_notified_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN department_resolution_notified_at TIMESTAMP;
+      END IF;
     END $$;
 
     CREATE INDEX IF NOT EXISTS idx_support_tickets_status_priority
@@ -557,13 +563,14 @@ const getRelatedAdminPath = (ticket = {}, role = '') => {
   }
 
   if (ticket.related_type === 'fumigation_cleaning_booking' || ticket.category === 'fumigation_cleaning') {
+    const query = Number.isInteger(relatedId) && relatedId > 0 ? `?bookingId=${relatedId}` : '';
     if (normalizedRole === 'super_admin' || normalizedRole === 'super_fumigation_admin') {
-      return `/super-admin/fumigation-cleaning#fumigation-bookings`;
+      return `/super-admin/fumigation-cleaning${query}#fumigation-bookings`;
     }
     if (normalizedRole === 'state_fumigation_admin') {
-      return `/admin/fumigation-cleaning/state#fumigation-bookings`;
+      return `/admin/fumigation-cleaning/state${query}#fumigation-bookings`;
     }
-    return `/admin/fumigation-cleaning#fumigation-bookings`;
+    return `/admin/fumigation-cleaning${query}#fumigation-bookings`;
   }
 
   if (ticket.category === 'payment') {
@@ -601,7 +608,7 @@ const findDepartmentEscalationRecipients = async (ticket, department) => {
   if (!roles.size) return [];
 
   const params = [Array.from(roles)];
-  const where = [`LOWER(user_type) = ANY($1)`, `(status IS NULL OR status <> 'suspended')`];
+  const where = [`LOWER(user_type) = ANY($1)`, `deleted_at IS NULL`, `account_suspended_at IS NULL`];
   const ticketState = normalizeText(ticket.state);
   const ticketLga = normalizeText(ticket.lga);
 
@@ -781,6 +788,39 @@ const notifySlaRisk = async (ticket, severity, policies = {}) => {
   }
 };
 
+const notifyPolicyRisk = async (ticket, severity, policies = {}) => {
+  try {
+    const { createNotification } = require('../config/utils/notificationService');
+    const recipientIds = new Set();
+    if (ticket.assigned_to) recipientIds.add(ticket.assigned_to);
+
+    if (policies.notify_super_admin_on_breach !== false) {
+      const superResult = await db.query(
+        `SELECT id FROM users
+         WHERE LOWER(user_type) IN ('super_admin', 'super_support_admin')
+         LIMIT 25`
+      );
+      for (const user of superResult.rows) recipientIds.add(user.id);
+    }
+
+    const title = severity === 'ack_overdue'
+      ? 'Department escalation acknowledgement overdue'
+      : 'Department escalation resolution overdue';
+    const message = severity === 'ack_overdue'
+      ? `Ticket #${ticket.id} "${ticket.subject}" has not been acknowledged by ${ticket.escalation_department}.`
+      : `Ticket #${ticket.id} "${ticket.subject}" is still unresolved after the department resolution target.`;
+
+    for (const userId of recipientIds) {
+      await createNotification(userId, 'support_policy_alert', title, message, '/admin/super-support-dashboard?tab=escalations');
+      emitToUser(userId, 'ticket:policy_alert', { ticketId: ticket.id, severity, ticket });
+    }
+
+    await notifyDepartmentEscalation(ticket, ticket.escalation_department, message);
+  } catch (err) {
+    console.error('Support policy notification error:', err);
+  }
+};
+
 const getSupportPolicySettings = async () => {
   try {
     const result = await db.query(`SELECT value FROM support_policy_settings WHERE key = 'support_governance'`);
@@ -806,6 +846,8 @@ const runSupportSlaMonitor = async () => {
     await ensureSupportSchema();
     const policies = await getSupportPolicySettings();
     const dueSoonHours = Math.max(1, Math.min(24, Number(policies.sla_due_soon_hours) || 2));
+    const acknowledgeHours = Math.max(1, Math.min(72, Number(policies.escalation_acknowledgement_hours) || 4));
+    const resolutionHours = Math.max(1, Math.min(168, Number(policies.department_resolution_hours) || 24));
 
     const dueSoon = await db.query(
       `UPDATE support_tickets
@@ -830,6 +872,38 @@ const runSupportSlaMonitor = async () => {
        RETURNING id, subject, assigned_to, user_id, state, lga, category, priority, status, sla_due_at`
     );
 
+    const acknowledgementOverdue = await db.query(
+      `UPDATE support_tickets
+       SET escalation_ack_notified_at = CURRENT_TIMESTAMP,
+           escalation_status = CASE WHEN escalation_status = 'escalated' THEN 'action_required' ELSE escalation_status END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE status <> 'resolved'
+         AND escalation_status = 'escalated'
+         AND escalation_department <> 'support'
+         AND last_escalated_at IS NOT NULL
+         AND last_escalated_at <= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 hour')
+         AND escalation_ack_notified_at IS NULL
+       RETURNING id, subject, assigned_to, user_id, state, lga, category, priority, status,
+                 escalation_department, escalation_status, last_escalated_at, related_type, related_id`,
+      [acknowledgeHours]
+    );
+
+    const resolutionOverdue = await db.query(
+      `UPDATE support_tickets
+       SET department_resolution_notified_at = CURRENT_TIMESTAMP,
+           escalation_status = CASE WHEN escalation_status IN ('escalated', 'acknowledged') THEN 'action_required' ELSE escalation_status END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE status <> 'resolved'
+         AND escalation_status IN ('escalated', 'acknowledged', 'action_required')
+         AND escalation_department <> 'support'
+         AND last_escalated_at IS NOT NULL
+         AND last_escalated_at <= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 hour')
+         AND department_resolution_notified_at IS NULL
+       RETURNING id, subject, assigned_to, user_id, state, lga, category, priority, status,
+                 escalation_department, escalation_status, last_escalated_at, related_type, related_id`,
+      [resolutionHours]
+    );
+
     for (const ticket of dueSoon.rows) {
       await notifySlaRisk(ticket, 'due_soon', policies);
       await addTicketTimeline(ticket.id, null, 'sla_due_soon', 'SLA is due within two hours');
@@ -838,6 +912,18 @@ const runSupportSlaMonitor = async () => {
     for (const ticket of breached.rows) {
       await notifySlaRisk(ticket, 'breached', policies);
       await addTicketTimeline(ticket.id, null, 'sla_breached', 'SLA deadline was breached');
+    }
+
+    for (const ticket of acknowledgementOverdue.rows) {
+      await notifyPolicyRisk(ticket, 'ack_overdue', policies);
+      await addTicketTimeline(ticket.id, null, 'department_acknowledgement_overdue', `Department acknowledgement target of ${acknowledgeHours} hours was missed`);
+      emitTicketUpdated(ticket);
+    }
+
+    for (const ticket of resolutionOverdue.rows) {
+      await notifyPolicyRisk(ticket, 'resolution_overdue', policies);
+      await addTicketTimeline(ticket.id, null, 'department_resolution_overdue', `Department resolution target of ${resolutionHours} hours was missed`);
+      emitTicketUpdated(ticket);
     }
   } catch (err) {
     console.error('Support SLA monitor error:', err);
@@ -1497,6 +1583,8 @@ router.post('/tickets/:id/escalate-department', authenticate, requireSupportAdmi
            escalation_status = 'escalated',
            escalation_note = $2,
            last_escalated_at = CURRENT_TIMESTAMP,
+           escalation_ack_notified_at = NULL,
+           department_resolution_notified_at = NULL,
            escalated_at = COALESCE(escalated_at, CURRENT_TIMESTAMP),
            priority = CASE WHEN priority IN ('low', 'medium') THEN 'high' ELSE priority END,
            status = CASE WHEN status = 'open' THEN 'in_progress' ELSE status END,

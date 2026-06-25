@@ -12,6 +12,7 @@ import {
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
+import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
 import { useAuth } from '../../hooks/useAuth';
 
 const currency = (value) =>
@@ -637,6 +638,10 @@ const SuperFinancialAdminDashboard = () => {
             ))}
           </div>
         </article>
+      </section>
+
+      <section id="super-financial-support-escalations">
+        <DepartmentSupportEscalations department="finance" title="Finance Support Escalations" />
       </section>
 
       <section id="super-financial-pending-withdrawals" className="rounded-xl bg-white p-5 shadow">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
@@ -42,7 +42,9 @@ const FumigationCleaningAdmin = ({
   scopeLabel = '',
 }) => {
   const { user } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
+  const highlightedBookingId = new URLSearchParams(location.search).get('bookingId');
   
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState([]);
@@ -513,8 +515,8 @@ const FumigationCleaningAdmin = ({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredBookings.length > 0 ? (
-                  filteredBookings.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50">
+                  [...filteredBookings].sort((a, b) => (String(b.id) === highlightedBookingId) - (String(a.id) === highlightedBookingId)).map((booking) => (
+                    <tr key={booking.id} className={String(booking.id) === highlightedBookingId ? 'bg-amber-50 ring-1 ring-amber-300' : 'hover:bg-gray-50'}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
                           FC-{booking.id.toString().padStart(6, '0')}
