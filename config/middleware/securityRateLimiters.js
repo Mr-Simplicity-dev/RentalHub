@@ -72,6 +72,12 @@ const contactFormLimiter = buildLimiter({
   message: 'Too many contact form submissions. Please wait 15 minutes and try again.',
 });
 
+const typingLimiter = buildLimiter({
+  windowMs: Number(process.env.TYPING_WINDOW_MS) || 1000,
+  max: Number(process.env.TYPING_MAX) || 5,
+  message: 'Too many typing indicator requests. Please slow down.',
+});
+
 module.exports = {
   authSensitiveLimiter,
   paymentOpsLimiter,
@@ -83,4 +89,5 @@ module.exports = {
   recruitmentPaymentLimiter,
   recruitmentInterviewLimiter,
   contactFormLimiter,
+  typingLimiter,
 };

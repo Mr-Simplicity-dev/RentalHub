@@ -16,6 +16,9 @@ const bcrypt = require('bcryptjs');
 let verificationAuditSchemaReady = false;
 let lawyerScopeSchemaReady = false;
 let adminRoleSchemaReady = false;
+let propertyOperationSchemaReady = false;
+let applicationOperationSchemaReady = false;
+let userAccountOperationSchemaReady = false;
 const VERIFICATION_TARGET_USER_TYPES = "('tenant', 'landlord', 'agent', 'lawyer')";
 const USER_VERIFICATION_STATUS_EXPR = `
   COALESCE(
@@ -172,6 +175,170 @@ const ensureAdminRoleSchema = async () => {
   `);
 
   adminRoleSchemaReady = true;
+};
+
+const ensurePropertyOperationSchema = async () => {
+  if (propertyOperationSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS property_operations (
+      id SERIAL PRIMARY KEY,
+      property_id INTEGER REFERENCES properties(id) ON DELETE CASCADE,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_property_operations_property
+      ON property_operations(property_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_property_operations_created
+      ON property_operations(created_at DESC);
+  `);
+
+  propertyOperationSchemaReady = true;
+};
+
+const getOperationActorName = (user = {}) =>
+  user.full_name || user.name || user.email || user.username || `Admin #${user.id || 'unknown'}`;
+
+const requireOperationNote = (body, message) => {
+  const note = String(body?.reason || body?.note || body?.governance_note || '').trim();
+  if (!note) {
+    const error = new Error(message);
+    error.statusCode = 400;
+    throw error;
+  }
+  return note;
+};
+
+const recordPropertyOperation = async ({
+  propertyId,
+  actor,
+  eventType,
+  note,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO property_operations (
+       property_id, actor_id, actor_name, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      propertyId,
+      actor?.id || null,
+      getOperationActorName(actor),
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
+const ensureApplicationOperationSchema = async () => {
+  if (applicationOperationSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS rental_application_operations (
+      id SERIAL PRIMARY KEY,
+      application_id INTEGER REFERENCES applications(id) ON DELETE CASCADE,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      previous_status VARCHAR(40),
+      new_status VARCHAR(40),
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_rental_application_ops_application
+      ON rental_application_operations(application_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_rental_application_ops_created
+      ON rental_application_operations(created_at DESC);
+  `);
+
+  applicationOperationSchemaReady = true;
+};
+
+const recordApplicationOperation = async ({
+  applicationId,
+  actor,
+  eventType,
+  note,
+  previousStatus,
+  newStatus,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO rental_application_operations (
+       application_id, actor_id, actor_name, event_type, note,
+       previous_status, new_status, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+    [
+      applicationId,
+      actor?.id || null,
+      getOperationActorName(actor),
+      eventType,
+      note || null,
+      previousStatus || null,
+      newStatus || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
+const ensureUserAccountOperationSchema = async () => {
+  if (userAccountOperationSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS user_account_operations (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_account_operations_user
+      ON user_account_operations(user_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_user_account_operations_created
+      ON user_account_operations(created_at DESC);
+  `);
+
+  userAccountOperationSchemaReady = true;
+};
+
+const recordUserAccountOperation = async ({
+  userId,
+  actor,
+  eventType,
+  note,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO user_account_operations (
+       user_id, actor_id, actor_name, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      userId,
+      actor?.id || null,
+      getOperationActorName(actor),
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
 };
 
 const buildDeletedEmail = (userId) => `deleted+u${userId}.${Date.now()}@deleted.local`;
@@ -1380,7 +1547,11 @@ exports.getAllApplications = async (req, res) => {
 // DELETE (soft) /api/admin/users/:id
 exports.deleteUser = async (req, res) => {
   try {
+    await ensureAdminRoleSchema();
+    await ensureUserAccountOperationSchema();
+
     const { id } = req.params;
+    const reason = requireOperationNote(req.body, 'A disable reason is required');
 
     // Prevent deleting yourself
     const currentUserId = req.user.userId || req.user.id;
@@ -1392,7 +1563,9 @@ exports.deleteUser = async (req, res) => {
     }
 
     const targetResult = await db.query(
-      'SELECT user_type FROM users WHERE id = $1 AND deleted_at IS NULL',
+      `SELECT id, full_name, email, user_type
+       FROM users
+       WHERE id = $1 AND deleted_at IS NULL`,
       [id]
     );
 
@@ -1403,7 +1576,8 @@ exports.deleteUser = async (req, res) => {
       });
     }
 
-    const targetType = targetResult.rows[0].user_type;
+    const targetUser = targetResult.rows[0];
+    const targetType = targetUser.user_type;
     if (!['tenant', 'landlord'].includes(targetType)) {
       return res.status(403).json({
         success: false,
@@ -1412,9 +1586,28 @@ exports.deleteUser = async (req, res) => {
     }
 
     await db.query(
-      'UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
-      [id]
+      `UPDATE users
+       SET deleted_at = NOW(),
+           is_active = FALSE,
+           account_suspended_reason = $2,
+           account_suspended_at = NOW(),
+           account_suspended_by = $3,
+           updated_at = NOW()
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [id, reason, currentUserId]
     );
+
+    await recordUserAccountOperation({
+      userId: targetUser.id,
+      actor: req.user,
+      eventType: 'user_disabled',
+      note: reason,
+      metadata: {
+        target_name: targetUser.full_name,
+        target_email: targetUser.email,
+        target_type: targetUser.user_type,
+      },
+    });
 
     res.json({
       success: true,
@@ -1422,9 +1615,9 @@ exports.deleteUser = async (req, res) => {
     });
   } catch (err) {
     console.error('Soft delete user error:', err);
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
       success: false,
-      message: 'Failed to disable user',
+      message: err.statusCode ? err.message : 'Failed to disable user',
     });
   }
 };
@@ -1433,9 +1626,11 @@ exports.deleteUser = async (req, res) => {
 exports.verifyUser = async (req, res) => {
   try {
     await ensureVerificationAuditSchema();
+    await ensureUserAccountOperationSchema();
 
     const { id } = req.params;
     const adminId = req.user.id;
+    const note = requireOperationNote(req.body, 'A verification note is required');
 
     const result = await db.query(
       `UPDATE users
@@ -1449,7 +1644,7 @@ exports.verifyUser = async (req, res) => {
          AND user_type IN ${VERIFICATION_TARGET_USER_TYPES}
          AND passport_photo_url IS NOT NULL
          AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
-       RETURNING id`,
+       RETURNING id, full_name, email, user_type`,
       [id, adminId]
     );
 
@@ -1460,15 +1655,28 @@ exports.verifyUser = async (req, res) => {
       });
     }
 
+    const verifiedUser = result.rows[0];
+    await recordUserAccountOperation({
+      userId: verifiedUser.id,
+      actor: req.user,
+      eventType: 'user_identity_verified',
+      note,
+      metadata: {
+        target_name: verifiedUser.full_name,
+        target_email: verifiedUser.email,
+        target_type: verifiedUser.user_type,
+      },
+    });
+
     res.json({
       success: true,
       message: 'User verified successfully',
     });
   } catch (err) {
     console.error('Manual verify user error:', err);
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
       success: false,
-      message: 'Failed to verify user',
+      message: err.statusCode ? err.message : 'Failed to verify user',
     });
   }
 };
@@ -1477,6 +1685,8 @@ exports.verifyUser = async (req, res) => {
 // GET /api/admin/users/:id
 exports.getUserById = async (req, res) => {
   try {
+    await ensureUserAccountOperationSchema();
+
     const { id } = req.params;
     const { assignedState, assignedCity } = await getRequesterScope(req.user);
 
@@ -1538,8 +1748,19 @@ exports.getUserById = async (req, res) => {
     const result = await db.query(
       `SELECT id, full_name, email, phone, user_type,
               email_verified, phone_verified, identity_verified,
-              created_at
+              created_at,
+              COALESCE(account_ops.operations, '[]'::json) AS account_operations
        FROM users
+       LEFT JOIN LATERAL (
+         SELECT json_agg(account_operation_row ORDER BY account_operation_row.created_at DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+           FROM user_account_operations
+           WHERE user_id = users.id
+           ORDER BY created_at DESC
+           LIMIT 8
+         ) account_operation_row
+       ) account_ops ON TRUE
        WHERE id = $1
          AND deleted_at IS NULL
          AND user_type IN ('tenant', 'landlord')
@@ -1678,6 +1899,7 @@ exports.assignAgentToLandlord = async (req, res) => {
 // GET /api/admin/properties/:id
 exports.getPropertyById = async (req, res) => {
   try {
+    await ensurePropertyOperationSchema();
     const { id } = req.params;
     const { assignedState, assignedCity } = await getRequesterScope(req.user);
 
@@ -1705,10 +1927,21 @@ exports.getPropertyById = async (req, res) => {
     const stateClause = extraClauses.join(' ');
 
     const result = await db.query(
-      `SELECT p.*, u.full_name AS landlord_name, u.email AS landlord_email
+      `SELECT p.*, u.full_name AS landlord_name, u.email AS landlord_email,
+              COALESCE(ops.operations, '[]'::json) AS operations
        FROM properties p
        LEFT JOIN users u ON p.user_id = u.id
        LEFT JOIN states s ON s.id = p.state_id
+       LEFT JOIN LATERAL (
+         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+           FROM property_operations
+           WHERE property_id = p.id
+           ORDER BY created_at DESC, id DESC
+           LIMIT 5
+         ) operation_rows
+       ) ops ON TRUE
        WHERE p.id = $1
          ${stateClause}`,
       queryParams
@@ -1727,6 +1960,7 @@ exports.getPropertyById = async (req, res) => {
 // GET /api/admin/applications/:id
 exports.getApplicationById = async (req, res) => {
   try {
+    await ensureApplicationOperationSchema();
     const { id } = req.params;
     const { assignedState, assignedCity } = await getRequesterScope(req.user);
 
@@ -1764,12 +1998,23 @@ exports.getApplicationById = async (req, res) => {
          a.id, a.status, a.created_at,
          t.full_name AS tenant_name, t.email AS tenant_email,
          p.title AS property_title,
-         l.full_name AS landlord_name
+         l.full_name AS landlord_name,
+         COALESCE(ops.operations, '[]'::json) AS operations
        FROM applications a
        JOIN users t ON a.tenant_id = t.id
        JOIN properties p ON a.property_id = p.id
        LEFT JOIN states s ON s.id = p.state_id
        LEFT JOIN users l ON p.user_id = l.id
+       LEFT JOIN LATERAL (
+         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, previous_status, new_status, metadata, created_at
+           FROM rental_application_operations
+           WHERE application_id = a.id
+           ORDER BY created_at DESC, id DESC
+           LIMIT 5
+         ) operation_rows
+       ) ops ON TRUE
        WHERE a.id = $1
          ${stateClause}`,
       queryParams
@@ -1788,7 +2033,9 @@ exports.getApplicationById = async (req, res) => {
 // POST /api/admin/applications/:id/approve
 exports.approveApplication = async (req, res) => {
   try {
+    await ensureApplicationOperationSchema();
     const { id } = req.params;
+    const note = requireOperationNote(req.body, 'An approval note is required');
     const { assignedState, assignedCity } = await getRequesterScope(req.user);
 
     if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
@@ -1835,7 +2082,7 @@ exports.approveApplication = async (req, res) => {
        SET status = 'approved', updated_at = NOW()
        WHERE id = $1
          ${stateCheck}
-       RETURNING id, status`,
+       RETURNING id, status, property_id`,
       queryParams
     );
 
@@ -1846,6 +2093,18 @@ exports.approveApplication = async (req, res) => {
       });
     }
 
+    await recordApplicationOperation({
+      applicationId: Number(id),
+      actor: req.user,
+      eventType: 'application_approved',
+      note,
+      previousStatus: 'pending',
+      newStatus: result.rows[0].status,
+      metadata: {
+        property_id: result.rows[0].property_id,
+      },
+    });
+
     res.json({
       success: true,
       message: 'Application approved',
@@ -1853,9 +2112,9 @@ exports.approveApplication = async (req, res) => {
     });
   } catch (err) {
     console.error('Approve application error:', err);
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
       success: false,
-      message: 'Failed to approve application',
+      message: err.message || 'Failed to approve application',
     });
   }
 };
@@ -1863,7 +2122,9 @@ exports.approveApplication = async (req, res) => {
 // POST /api/admin/applications/:id/reject
 exports.rejectApplication = async (req, res) => {
   try {
+    await ensureApplicationOperationSchema();
     const { id } = req.params;
+    const note = requireOperationNote(req.body, 'A rejection reason is required');
     const { assignedState, assignedCity } = await getRequesterScope(req.user);
 
     if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
@@ -1910,7 +2171,7 @@ exports.rejectApplication = async (req, res) => {
        SET status = 'rejected', updated_at = NOW()
        WHERE id = $1
          ${stateCheck}
-       RETURNING id, status`,
+       RETURNING id, status, property_id`,
       queryParams
     );
 
@@ -1921,6 +2182,18 @@ exports.rejectApplication = async (req, res) => {
       });
     }
 
+    await recordApplicationOperation({
+      applicationId: Number(id),
+      actor: req.user,
+      eventType: 'application_rejected',
+      note,
+      previousStatus: 'pending',
+      newStatus: result.rows[0].status,
+      metadata: {
+        property_id: result.rows[0].property_id,
+      },
+    });
+
     res.json({
       success: true,
       message: 'Application rejected',
@@ -1928,9 +2201,9 @@ exports.rejectApplication = async (req, res) => {
     });
   } catch (err) {
     console.error('Reject application error:', err);
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
       success: false,
-      message: 'Failed to reject application',
+      message: err.message || 'Failed to reject application',
     });
   }
 };
@@ -2239,7 +2512,9 @@ exports.createAdmin = async (req, res) => {
 // PATCH /api/admin/properties/:id/unlist
 exports.unlistProperty = async (req, res) => {
   try {
+    await ensurePropertyOperationSchema();
     const { id } = req.params;
+    const note = requireOperationNote(req.body, 'An unlist reason is required');
 
     const result = await db.query(
       `
@@ -2265,6 +2540,16 @@ exports.unlistProperty = async (req, res) => {
       [id]
     );
 
+    await recordPropertyOperation({
+      propertyId: Number(id),
+      actor: req.user,
+      eventType: 'property_unlisted',
+      note,
+      metadata: {
+        title: result.rows[0].title,
+      },
+    });
+
     res.json({
       success: true,
       message: 'Property unlisted successfully',
@@ -2272,9 +2557,9 @@ exports.unlistProperty = async (req, res) => {
     });
   } catch (err) {
     console.error('Admin unlist property error:', err);
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
       success: false,
-      message: 'Failed to unlist property',
+      message: err.message || 'Failed to unlist property',
     });
   }
 };
@@ -2282,7 +2567,9 @@ exports.unlistProperty = async (req, res) => {
 // PATCH /api/admin/properties/:id/relist
 exports.relistProperty = async (req, res) => {
   try {
+    await ensurePropertyOperationSchema();
     const { id } = req.params;
+    const note = requireOperationNote(req.body, 'A relist reason is required');
 
     const result = await db.query(
       `
@@ -2303,6 +2590,16 @@ exports.relistProperty = async (req, res) => {
       });
     }
 
+    await recordPropertyOperation({
+      propertyId: Number(id),
+      actor: req.user,
+      eventType: 'property_relisted',
+      note,
+      metadata: {
+        title: result.rows[0].title,
+      },
+    });
+
     res.json({
       success: true,
       message: 'Property relisted successfully',
@@ -2310,9 +2607,9 @@ exports.relistProperty = async (req, res) => {
     });
   } catch (err) {
     console.error('Admin relist property error:', err);
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
       success: false,
-      message: 'Failed to relist property',
+      message: err.message || 'Failed to relist property',
     });
   }
 };
@@ -2320,7 +2617,9 @@ exports.relistProperty = async (req, res) => {
 // PATCH /api/admin/properties/:id/feature
 exports.featureProperty = async (req, res) => {
   try {
+    await ensurePropertyOperationSchema();
     const { id } = req.params;
+    const note = requireOperationNote(req.body, 'A feature reason is required');
 
     const result = await db.query(
       `
@@ -2341,6 +2640,16 @@ exports.featureProperty = async (req, res) => {
       });
     }
 
+    await recordPropertyOperation({
+      propertyId: Number(id),
+      actor: req.user,
+      eventType: 'property_featured',
+      note,
+      metadata: {
+        title: result.rows[0].title,
+      },
+    });
+
     res.json({
       success: true,
       message: 'Property marked as featured',
@@ -2348,9 +2657,9 @@ exports.featureProperty = async (req, res) => {
     });
   } catch (err) {
     console.error('Admin feature property error:', err);
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
       success: false,
-      message: 'Failed to feature property',
+      message: err.message || 'Failed to feature property',
     });
   }
 };
@@ -2358,7 +2667,9 @@ exports.featureProperty = async (req, res) => {
 // PATCH /api/admin/properties/:id/unfeature
 exports.unfeatureProperty = async (req, res) => {
   try {
+    await ensurePropertyOperationSchema();
     const { id } = req.params;
+    const note = requireOperationNote(req.body, 'An unfeature reason is required');
 
     const result = await db.query(
       `
@@ -2379,6 +2690,16 @@ exports.unfeatureProperty = async (req, res) => {
       });
     }
 
+    await recordPropertyOperation({
+      propertyId: Number(id),
+      actor: req.user,
+      eventType: 'property_unfeatured',
+      note,
+      metadata: {
+        title: result.rows[0].title,
+      },
+    });
+
     res.json({
       success: true,
       message: 'Property removed from featured',
@@ -2386,9 +2707,9 @@ exports.unfeatureProperty = async (req, res) => {
     });
   } catch (err) {
     console.error('Admin unfeature property error:', err);
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
       success: false,
-      message: 'Failed to unfeature property',
+      message: err.message || 'Failed to unfeature property',
     });
   }
 };

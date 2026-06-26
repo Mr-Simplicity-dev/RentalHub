@@ -8,7 +8,7 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
-const { contactFormLimiter } = require('../config/middleware/securityRateLimiters');
+const { contactFormLimiter, typingLimiter } = require('../config/middleware/securityRateLimiters');
 
 const SUPPORT_ADMIN_ROLES = new Set([
   'super_admin',
@@ -113,6 +113,31 @@ const adminActivityCleanup = setInterval(() => {
 }, 30000);
 if (typeof adminActivityCleanup.unref === 'function') adminActivityCleanup.unref();
 
+const MAGIC_BYTES = {
+  'image/jpeg': [[0xFF, 0xD8, 0xFF]],
+  'image/png': [[0x89, 0x50, 0x4E, 0x47]],
+  'image/gif': [[0x47, 0x49, 0x46, 0x38, 0x39, 0x37], [0x47, 0x49, 0x46, 0x38, 0x38, 0x61]],
+  'application/pdf': [[0x25, 0x50, 0x44, 0x46]],
+  'application/msword': [[0xD0, 0xCF, 0x11, 0xE0]],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [[0x50, 0x4B, 0x03, 0x04]],
+  'application/vnd.ms-excel': [[0xD0, 0xCF, 0x11, 0xE0]],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [[0x50, 0x4B, 0x03, 0x04]],
+  'audio/webm': [[0x1A, 0x45, 0xDF, 0xA3]],
+  'audio/ogg': [[0x4F, 0x67, 0x67, 0x53]],
+  'audio/wav': [[0x52, 0x49, 0x46, 0x46]],
+};
+
+const verifyMagicBytes = (filePath, expectedMime) => {
+  if (expectedMime === 'text/plain' || MAGIC_BYTES[expectedMime] === 'skip') return true;
+  const signatures = MAGIC_BYTES[expectedMime];
+  if (!signatures) return false;
+  const fd = fs.openSync(filePath, 'r');
+  const buf = Buffer.alloc(16);
+  fs.readSync(fd, buf, 0, 16, 0);
+  fs.closeSync(fd);
+  return signatures.some((sig) => sig.every((byte, i) => buf[i] === byte));
+};
+
 const ATTACHMENT_DIR = path.join(__dirname, '..', 'uploads', 'tickets');
 if (!fs.existsSync(ATTACHMENT_DIR)) {
   fs.mkdirSync(ATTACHMENT_DIR, { recursive: true });
@@ -151,9 +176,21 @@ const uploadAttachment = multer({
   },
 });
 
+const verifyUploadedFile = (req, res, next) => {
+  if (!req.file) return next();
+  if (req.file.mimetype === 'text/plain') return next();
+  if (!verifyMagicBytes(req.file.path, req.file.mimetype)) {
+    try { fs.unlinkSync(req.file.path); } catch {}
+    return res.status(400).json({ success: false, message: 'Uploaded file content does not match its declared type' });
+  }
+  next();
+};
+
+let _ioCache = null;
 const getIO = () => {
   if (process.env.NODE_ENV === 'test') return null;
-  try { return require('../server').io; } catch { return null; }
+  if (_ioCache) return _ioCache;
+  try { _ioCache = require('../server').io; return _ioCache; } catch { return null; }
 };
 
 const emitToUser = (userId, event, data) => {
@@ -1037,7 +1074,10 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
       });
     }
 
-    const normalizedPriority = ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium';
+    if (priority && !['low', 'medium', 'high', 'urgent'].includes(priority)) {
+      return res.status(400).json({ success: false, message: 'Priority must be one of: low, medium, high, urgent' });
+    }
+    const normalizedPriority = priority || 'medium';
     const escalationDepartment = normalizeDepartment(req.body.escalation_department, category, relatedType);
     const slaDueAt = resolveSlaDueAt(category, normalizedPriority);
     const result = await db.query(
@@ -2068,7 +2108,7 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
 });
 
 // POST /tickets/:id/reply — add reply with optional file attachment
-router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachment'), async (req, res) => {
+router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachment'), verifyUploadedFile, async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -2318,8 +2358,8 @@ router.delete('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res
       }
     }
 
-    if (reply.user_id !== req.user.id && !isSupportAdmin) {
-      return res.status(403).json({ success: false, message: 'You cannot delete this reply' });
+    if (reply.user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own replies' });
     }
 
     // Delete file if present
@@ -2342,7 +2382,7 @@ router.delete('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res
 });
 
 // POST /tickets/:id/typing — typing indicator
-router.post('/tickets/:id/typing', authenticate, async (req, res) => {
+router.post('/tickets/:id/typing', authenticate, typingLimiter, async (req, res) => {
   try {
     const ticketId = Number(req.params.id);
 
@@ -2744,7 +2784,7 @@ router.delete('/tickets/:ticketId/internal-notes/:noteId', authenticate, require
 });
 
 // POST /tickets/contact-reply — public reply for contact-form tickets (email-gated)
-router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), async (req, res) => {
+router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), verifyUploadedFile, async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -2759,7 +2799,7 @@ router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), asy
     }
 
     const ticketResult = await db.query(
-      'SELECT id, contact_email, status, assigned_to, state, lga FROM support_tickets WHERE id = $1 AND user_id IS NULL',
+      'SELECT id, subject, contact_email, status, assigned_to, state, lga FROM support_tickets WHERE id = $1 AND user_id IS NULL',
       [ticketId]
     );
     if (!ticketResult.rows.length) {
@@ -2789,7 +2829,7 @@ router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), asy
 
     // Re-open resolved ticket
     if (ticket.status === 'resolved') {
-      await db.query("UPDATE support_tickets SET status = 'in_progress' WHERE id = $1", [ticketId]);
+      await db.query("UPDATE support_tickets SET status = 'in_progress', resolved_at = NULL WHERE id = $1", [ticketId]);
       ticket.status = 'in_progress';
     }
     emitTicketUpdated(ticket, {
@@ -2800,7 +2840,7 @@ router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), asy
     // Notify assigned admin via socket
     const replyPayload = {
       ticketId: ticket.id,
-      subject: ticket.subject || ticket.subject,
+      subject: ticket.subject,
       reply: {
         id: reply.id,
         message: reply.message,

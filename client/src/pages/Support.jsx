@@ -4,10 +4,12 @@ import { toast } from 'react-toastify';
 import { FaTicketAlt, FaPaperPlane, FaClock, FaCheckCircle, FaExclamationCircle, FaBug, FaLightbulb, FaQuestionCircle, FaSpinner, FaChevronDown, FaChevronUp, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { useSocket } from '../hooks/useSocket';
+import SupportReplyActionModal from '../components/common/SupportReplyActionModal';
 
 const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(reply.message);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const handleSaveEdit = async () => {
     if (!editText.trim()) return;
@@ -17,16 +19,6 @@ const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
       setEditing(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to edit');
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!window.confirm('Delete this message?')) return;
-    try {
-      await api.delete(`/support/tickets/${ticketId}/reply/${reply.id}`);
-      onDelete(reply.id);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
     }
   };
 
@@ -49,7 +41,7 @@ const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
           {isOwn && (
             <>
               {!editing && <button onClick={() => setEditing(true)} className="text-gray-400 hover:text-gray-600"><FaEdit size={11} /></button>}
-              <button onClick={handleDelete} className="text-gray-400 hover:text-red-500"><FaTrash size={11} /></button>
+              <button onClick={() => setDeleteOpen(true)} className="text-gray-400 hover:text-red-500"><FaTrash size={11} /></button>
             </>
           )}
         </div>
@@ -70,6 +62,14 @@ const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
           <FaFile size={12} /> {reply.attachment_name || 'Attachment'}
         </a>
       )}
+      <SupportReplyActionModal
+        isOpen={deleteOpen}
+        action="delete"
+        ticketId={ticketId}
+        reply={reply}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={onDelete}
+      />
     </div>
   );
 };

@@ -85,9 +85,11 @@ const PlatformAgentsTab = () => {
 
     if (!entry || !action) return;
 
-    if ((action === 'deactivate' || action === 'delete') && !note.trim()) {
+    if (!note.trim()) {
       toast.error(
-        action === 'delete'
+        action === 'activate'
+          ? 'Add an activation reason before enabling this agent'
+          : action === 'delete'
           ? 'Add a deletion reason before removing this agent'
           : 'Add a deactivation reason before disabling this agent'
       );
@@ -364,7 +366,7 @@ const PlatformAgentsTab = () => {
 
             <label className="mt-5 block text-sm font-medium text-gray-700">
               {actionDialog.action === 'activate'
-                ? 'Governance note'
+                ? 'Activation reason'
                 : actionDialog.action === 'delete'
                   ? 'Deletion reason'
                   : 'Deactivation reason'}
@@ -373,7 +375,7 @@ const PlatformAgentsTab = () => {
               className="input mt-2 h-32 w-full"
               placeholder={
                 actionDialog.action === 'activate'
-                  ? 'Optional note for why this agent is being activated'
+                  ? 'Explain why this agent is being activated'
                   : actionDialog.action === 'delete'
                     ? 'Explain why this agent is being removed'
                     : 'Explain why this agent is being deactivated'
@@ -383,11 +385,9 @@ const PlatformAgentsTab = () => {
                 setActionDialog((prev) => ({ ...prev, note: e.target.value }))
               }
             />
-            {actionDialog.action !== 'activate' ? (
-              <p className="mt-2 text-xs text-gray-500">
-                This reason is required and will be saved in the governance history.
-              </p>
-            ) : null}
+            <p className="mt-2 text-xs text-gray-500">
+              This reason is required and will be saved in the governance history.
+            </p>
 
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button

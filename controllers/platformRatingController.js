@@ -113,6 +113,26 @@ const ensurePlatformRatingSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_platform_rating_location_rules_scope
       ON platform_rating_location_rules (state_id, lga_name, user_role, rating_context);
+
+    CREATE TABLE IF NOT EXISTS platform_rating_operations (
+      id SERIAL PRIMARY KEY,
+      entity_type VARCHAR(50) NOT NULL,
+      entity_id INTEGER,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      previous_status VARCHAR(20),
+      new_status VARCHAR(20),
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_platform_rating_operations_entity
+      ON platform_rating_operations (entity_type, entity_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_platform_rating_operations_created
+      ON platform_rating_operations (created_at DESC);
   `);
 
   platformRatingSchemaReady = true;
@@ -147,6 +167,49 @@ const normalizeDisplayMode = (value, fallback = 'first_name') => {
 };
 
 const normalizeSourceRef = (value) => String(value || '').trim().slice(0, 120);
+
+const getActorName = (user = {}) =>
+  user.full_name || user.name || user.email || user.username || `Admin #${user.id || 'unknown'}`;
+
+const requireActionNote = (body, message) => {
+  const note = String(body?.admin_note || body?.reason || body?.note || '').trim();
+  if (!note) {
+    const error = new Error(message);
+    error.statusCode = 400;
+    throw error;
+  }
+  return note;
+};
+
+const recordOperation = async ({
+  entityType,
+  entityId,
+  actor,
+  eventType,
+  note,
+  previousStatus = null,
+  newStatus = null,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO platform_rating_operations (
+       entity_type, entity_id, actor_id, actor_name, event_type, note,
+       previous_status, new_status, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
+    [
+      entityType,
+      entityId || null,
+      actor?.id || null,
+      getActorName(actor),
+      eventType,
+      note || null,
+      previousStatus,
+      newStatus,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
 
 const tableExists = async (tableName) => {
   const { rows } = await db.query('SELECT to_regclass($1) AS table_name', [`public.${tableName}`]);
@@ -658,18 +721,42 @@ exports.adminListRatings = async (req, res) => {
     const [ratingsResult, rulesResult, statesResult] = await Promise.all([
       db.query(
         `SELECT r.*, u.full_name, u.email, u.passport_photo_url,
-                reviewer.full_name AS reviewed_by_name
+                reviewer.full_name AS reviewed_by_name,
+                COALESCE(ops.operations, '[]'::json) AS operations
          FROM platform_service_ratings r
          JOIN users u ON u.id = r.user_id
          LEFT JOIN users reviewer ON reviewer.id = r.reviewed_by
+         LEFT JOIN LATERAL (
+           SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+           FROM (
+             SELECT id, actor_id, actor_name, event_type, note, previous_status, new_status, metadata, created_at
+             FROM platform_rating_operations
+             WHERE entity_type = 'rating'
+               AND entity_id = r.id
+             ORDER BY created_at DESC, id DESC
+             LIMIT 3
+           ) operation_rows
+         ) ops ON TRUE
          ORDER BY
            CASE r.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
            r.created_at DESC
          LIMIT 200`
       ),
       db.query(
-        `SELECT *
-         FROM platform_rating_location_rules
+        `SELECT pr.*,
+                COALESCE(ops.operations, '[]'::json) AS operations
+         FROM platform_rating_location_rules pr
+         LEFT JOIN LATERAL (
+           SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+           FROM (
+             SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+             FROM platform_rating_operations
+             WHERE entity_type = 'rule'
+               AND entity_id = pr.id
+             ORDER BY created_at DESC, id DESC
+             LIMIT 3
+           ) operation_rows
+         ) ops ON TRUE
          ORDER BY created_at DESC, id DESC`
       ),
       db.query('SELECT id, state_name FROM states ORDER BY state_name ASC'),
@@ -697,6 +784,7 @@ exports.adminUpdateSettings = async (req, res) => {
   try {
     await ensurePlatformRatingSchema();
     const current = await getSettings();
+    const note = requireActionNote(req.body, 'A settings change reason is required');
 
     const settings = {
       flyins_enabled: normalizeBoolean(req.body.flyins_enabled, current.flyins_enabled),
@@ -738,10 +826,25 @@ exports.adminUpdateSettings = async (req, res) => {
       ]
     );
 
+    await recordOperation({
+      entityType: 'settings',
+      entityId: 1,
+      actor: req.user,
+      eventType: 'rating_settings_updated',
+      note,
+      metadata: {
+        previous: current,
+        next: rows[0],
+      },
+    });
+
     res.json({ success: true, data: rows[0] });
   } catch (error) {
     console.error('Update platform rating settings error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update rating settings' });
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to update rating settings',
+    });
   }
 };
 
@@ -756,6 +859,12 @@ exports.adminModerateRating = async (req, res) => {
     if (!['approved', 'hidden', 'rejected', 'pending'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid rating status' });
     }
+    const note = requireActionNote(req.body, 'A moderation note is required');
+
+    const existing = await db.query('SELECT * FROM platform_service_ratings WHERE id = $1', [ratingId]);
+    if (!existing.rows.length) {
+      return res.status(404).json({ success: false, message: 'Rating not found' });
+    }
 
     const { rows } = await db.query(
       `UPDATE platform_service_ratings
@@ -766,17 +875,34 @@ exports.adminModerateRating = async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
        RETURNING *`,
-      [ratingId, status, String(req.body.admin_note || '').trim() || null, req.user.id]
+      [ratingId, status, note, req.user.id]
     );
 
-    if (!rows.length) {
-      return res.status(404).json({ success: false, message: 'Rating not found' });
-    }
+    await recordOperation({
+      entityType: 'rating',
+      entityId: ratingId,
+      actor: req.user,
+      eventType: `rating_${status}`,
+      note,
+      previousStatus: existing.rows[0].status,
+      newStatus: rows[0].status,
+      metadata: {
+        user_id: rows[0].user_id,
+        user_role: rows[0].user_role,
+        rating_context: rows[0].rating_context,
+        stars: rows[0].stars,
+        source_type: rows[0].source_type,
+        source_ref: rows[0].source_ref,
+      },
+    });
 
     res.json({ success: true, data: rows[0] });
   } catch (error) {
     console.error('Moderate platform rating error:', error);
-    res.status(500).json({ success: false, message: 'Failed to moderate rating' });
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to moderate rating',
+    });
   }
 };
 
@@ -810,6 +936,7 @@ exports.adminCreateRule = async (req, res) => {
   try {
     await ensurePlatformRatingSchema();
     const rule = await normalizeRulePayload(req.body || {});
+    const note = String(req.body?.reason || req.body?.note || rule.notes || '').trim() || null;
     const { rows } = await db.query(
       `INSERT INTO platform_rating_location_rules (
          state_id, state_name, lga_name, user_role, rating_context,
@@ -830,6 +957,15 @@ exports.adminCreateRule = async (req, res) => {
       ]
     );
 
+    await recordOperation({
+      entityType: 'rule',
+      entityId: rows[0].id,
+      actor: req.user,
+      eventType: 'rating_rule_created',
+      note,
+      metadata: rows[0],
+    });
+
     res.status(201).json({ success: true, data: rows[0] });
   } catch (error) {
     console.error('Create platform rating rule error:', error);
@@ -848,7 +984,13 @@ exports.adminUpdateRule = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid rule id' });
     }
 
+    const existing = await db.query('SELECT * FROM platform_rating_location_rules WHERE id = $1', [ruleId]);
+    if (!existing.rows.length) {
+      return res.status(404).json({ success: false, message: 'Rule not found' });
+    }
+
     const rule = await normalizeRulePayload(req.body || {});
+    const note = String(req.body?.reason || req.body?.note || rule.notes || '').trim() || null;
     const { rows } = await db.query(
       `UPDATE platform_rating_location_rules
        SET state_id = $2,
@@ -877,9 +1019,17 @@ exports.adminUpdateRule = async (req, res) => {
       ]
     );
 
-    if (!rows.length) {
-      return res.status(404).json({ success: false, message: 'Rule not found' });
-    }
+    await recordOperation({
+      entityType: 'rule',
+      entityId: ruleId,
+      actor: req.user,
+      eventType: 'rating_rule_updated',
+      note,
+      metadata: {
+        previous: existing.rows[0],
+        next: rows[0],
+      },
+    });
 
     res.json({ success: true, data: rows[0] });
   } catch (error) {
@@ -898,15 +1048,33 @@ exports.adminDeleteRule = async (req, res) => {
     if (!Number.isInteger(ruleId) || ruleId <= 0) {
       return res.status(400).json({ success: false, message: 'Invalid rule id' });
     }
+    const note = requireActionNote(req.body, 'A deletion reason is required');
+
+    const existing = await db.query('SELECT * FROM platform_rating_location_rules WHERE id = $1', [ruleId]);
+    if (!existing.rows.length) {
+      return res.status(404).json({ success: false, message: 'Rule not found' });
+    }
 
     const result = await db.query('DELETE FROM platform_rating_location_rules WHERE id = $1 RETURNING id', [ruleId]);
     if (!result.rows.length) {
       return res.status(404).json({ success: false, message: 'Rule not found' });
     }
 
+    await recordOperation({
+      entityType: 'rule',
+      entityId: ruleId,
+      actor: req.user,
+      eventType: 'rating_rule_deleted',
+      note,
+      metadata: existing.rows[0],
+    });
+
     res.json({ success: true });
   } catch (error) {
     console.error('Delete platform rating rule error:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete rating rule' });
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to delete rating rule',
+    });
   }
 };

@@ -14,6 +14,7 @@ import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import InternalNotesPanel from '../../components/common/InternalNotesPanel';
 import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
+import SupportReplyActionModal from '../../components/common/SupportReplyActionModal';
 
 const badgeClass = (status) => {
   if (status === 'approved') return 'bg-green-100 text-green-700';
@@ -58,6 +59,7 @@ const StateSupportAdminDashboard = () => {
   const typingTimer = useRef(null);
   const [chatTab, setChatTab] = useState('user');
   const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
+  const [replyAction, setReplyAction] = useState({ open: false, action: '', reply: null });
   const activeTab = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab') || 'overview';
     return ['overview', 'queue', 'property_requests', 'tenancy', 'tickets', 'escalations'].includes(tab) ? tab : 'overview';
@@ -137,7 +139,7 @@ const StateSupportAdminDashboard = () => {
       socket.off('ticket:typing', typingHandler);
       socket.off('ticket:internal_note', internalNoteHandler);
     };
-  }, [socket, selectedTicket, fetchUnreadInternalNotes]);
+  }, [socket, selectedTicket, fetchUnreadInternalNotes, loadConversation]);
 
   const loadConversation = useCallback(async (ticketId) => {
     setLoadingConversation(true);
@@ -215,6 +217,14 @@ const StateSupportAdminDashboard = () => {
 
   const handleDeleteReply = (replyId) => {
     setConversation((prev) => prev.filter((r) => r.id !== replyId));
+  };
+
+  const openReplyAction = (action, reply) => {
+    setReplyAction({ open: true, action, reply });
+  };
+
+  const closeReplyAction = () => {
+    setReplyAction({ open: false, action: '', reply: null });
   };
 
   const handleTicketUpdated = (updatedTicket) => {
@@ -603,20 +613,10 @@ const StateSupportAdminDashboard = () => {
                             {reply.edited_at && <span className="italic">(edited)</span>}
                           </div>
                           <div className="flex items-center gap-2">
-                            {reply.is_admin && (
+                            {reply.is_admin && Number(reply.user_id) === Number(user.id) && (
                               <>
-                                <button onClick={async () => {
-                                  const newMsg = prompt('Edit message:', reply.message);
-                                  if (newMsg && newMsg.trim()) {
-                                    try { const res = await api.patch(`/support/tickets/${selectedTicket.id}/reply/${reply.id}`, { message: newMsg.trim() }); handleEditReply(reply.id, res.data.data); }
-                                    catch (e) { toast.error('Failed to edit'); }
-                                  }
-                                }} className="text-gray-400 hover:text-gray-600"><FaEdit size={11} /></button>
-                                <button onClick={async () => {
-                                  if (!window.confirm('Delete this message?')) return;
-                                  try { await api.delete(`/support/tickets/${selectedTicket.id}/reply/${reply.id}`); handleDeleteReply(reply.id); }
-                                  catch (e) { toast.error('Failed to delete'); }
-                                }} className="text-gray-400 hover:text-red-500"><FaTrash size={11} /></button>
+                                <button onClick={() => openReplyAction('edit', reply)} className="text-gray-400 hover:text-gray-600"><FaEdit size={11} /></button>
+                                <button onClick={() => openReplyAction('delete', reply)} className="text-gray-400 hover:text-red-500"><FaTrash size={11} /></button>
                               </>
                             )}
                           </div>
@@ -680,6 +680,16 @@ const StateSupportAdminDashboard = () => {
           </div>
         </div>
       )}
+
+      <SupportReplyActionModal
+        isOpen={replyAction.open}
+        action={replyAction.action}
+        ticketId={selectedTicket?.id}
+        reply={replyAction.reply}
+        onClose={closeReplyAction}
+        onEdited={handleEditReply}
+        onDeleted={handleDeleteReply}
+      />
 
       <InputDialog
         isOpen={showReviewDialog}

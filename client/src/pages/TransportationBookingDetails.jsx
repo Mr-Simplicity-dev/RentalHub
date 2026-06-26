@@ -18,6 +18,7 @@ import {
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import BackToDashboard from '../components/common/BackToDashboard';
+import BookingCancelModal from '../components/common/BookingCancelModal';
 
 const TransportationBookingDetails = () => {
   const { bookingId } = useParams();
@@ -26,6 +27,8 @@ const TransportationBookingDetails = () => {
   
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   
   // Load booking details
   useEffect(() => {
@@ -112,14 +115,16 @@ const TransportationBookingDetails = () => {
     window.print();
   };
   
-  const handleCancelBooking = async () => {
-    if (!window.confirm('Are you sure you want to cancel this booking?')) return;
-    
+  const handleCancelBooking = async (reason) => {
+    setCancelling(true);
     try {
-      const response = await api.delete(`/transportation/bookings/${bookingId}/cancel`);
+      const response = await api.delete(`/transportation/bookings/${bookingId}/cancel`, {
+        data: { cancellation_reason: reason }
+      });
       
       if (response.data?.success) {
         toast.success('Booking cancelled successfully');
+        setShowCancelModal(false);
         // Refresh booking details
         const bookingRes = await api.get(`/transportation/bookings/${bookingId}`);
         if (bookingRes.data?.success) {
@@ -131,6 +136,8 @@ const TransportationBookingDetails = () => {
     } catch (error) {
       console.error('Error cancelling booking:', error);
       toast.error(error.response?.data?.message || 'Failed to cancel booking');
+    } finally {
+      setCancelling(false);
     }
   };
   
@@ -212,7 +219,7 @@ const TransportationBookingDetails = () => {
               
               {booking.booking_status === 'pending' && booking.payment_status === 'pending' && (
                 <button
-                  onClick={handleCancelBooking}
+                  onClick={() => setShowCancelModal(true)}
                   className="btn btn-gray w-full print:hidden sm:w-auto"
                 >
                   Cancel Booking
@@ -579,6 +586,15 @@ const TransportationBookingDetails = () => {
           }
         `}</style>
       </div>
+      <BookingCancelModal
+        isOpen={showCancelModal}
+        title="Cancel Transportation Booking"
+        message="Please share why you are cancelling this transportation booking."
+        warning="Cancellation may affect refunds depending on how close the booking date is."
+        loading={cancelling}
+        onClose={() => !cancelling && setShowCancelModal(false)}
+        onConfirm={handleCancelBooking}
+      />
     </div>
   );
 };

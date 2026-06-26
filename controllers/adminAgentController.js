@@ -1,5 +1,15 @@
 const AdminAgentService = require('../services/adminAgentService');
 
+const requireGovernanceNote = (body) => {
+  const note = String(body?.reason || body?.note || body?.governance_note || '').trim();
+  if (!note) {
+    const error = new Error('A governance note is required');
+    error.statusCode = 400;
+    throw error;
+  }
+  return note;
+};
+
 class AdminAgentController {
   /**
    * Get all assignments
@@ -129,8 +139,9 @@ class AdminAgentController {
       }
 
       const { assignmentId } = req.params;
+      const note = requireGovernanceNote(req.body);
 
-      const assignment = await AdminAgentService.revokeAssignment(parseInt(assignmentId), req.user.id);
+      const assignment = await AdminAgentService.revokeAssignment(parseInt(assignmentId), req.user.id, note);
 
       res.json({
         success: true,
@@ -139,7 +150,7 @@ class AdminAgentController {
       });
     } catch (error) {
       console.error(`Error revoking assignment: ${error.message}`);
-      res.status(400).json({
+      res.status(error.statusCode || 400).json({
         success: false,
         message: error.message || 'Failed to revoke assignment',
       });
@@ -188,8 +199,9 @@ class AdminAgentController {
       }
 
       const { assignmentId } = req.params;
+      const note = requireGovernanceNote(req.body);
 
-      const assignment = await AdminAgentService.deactivateAssignment(parseInt(assignmentId));
+      const assignment = await AdminAgentService.deactivateAssignment(parseInt(assignmentId), req.user.id, note);
 
       res.json({
         success: true,
@@ -198,7 +210,7 @@ class AdminAgentController {
       });
     } catch (error) {
       console.error(`Error deactivating assignment: ${error.message}`);
-      res.status(400).json({
+      res.status(error.statusCode || 400).json({
         success: false,
         message: error.message || 'Failed to deactivate assignment',
       });
@@ -218,8 +230,9 @@ class AdminAgentController {
       }
 
       const { assignmentId } = req.params;
+      const note = requireGovernanceNote(req.body);
 
-      const assignment = await AdminAgentService.reactivateAssignment(parseInt(assignmentId));
+      const assignment = await AdminAgentService.reactivateAssignment(parseInt(assignmentId), req.user.id, note);
 
       res.json({
         success: true,
@@ -228,7 +241,7 @@ class AdminAgentController {
       });
     } catch (error) {
       console.error(`Error reactivating assignment: ${error.message}`);
-      res.status(400).json({
+      res.status(error.statusCode || 400).json({
         success: false,
         message: error.message || 'Failed to reactivate assignment',
       });

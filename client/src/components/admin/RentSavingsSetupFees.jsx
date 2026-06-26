@@ -19,7 +19,14 @@ export default function RentSavingsSetupFees() {
     // Form state
   const [showForm, setShowForm]  = useState(false);
   const [editId, setEditId]      = useState(null);
-  const [formData, setFormData]  = useState({ state_id: '', state_name: '', lga_id: '', setup_fee: '' });
+  const [formData, setFormData]  = useState({ state_id: '', state_name: '', lga_id: '', setup_fee: '', governance_note: '' });
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    fee: null,
+    reason: '',
+    loading: false,
+    error: '',
+  });
 
   // Locations data for dropdowns
   const [states, setStates]      = useState([]);
@@ -90,7 +97,7 @@ export default function RentSavingsSetupFees() {
   // ── Handlers ─────────────────────────────────────────
   const openCreate = () => {
     setEditId(null);
-    setFormData({ state_id: '', lga_id: '', setup_fee: '' });
+    setFormData({ state_id: '', state_name: '', lga_id: '', setup_fee: '', governance_note: '' });
     setShowForm(true);
   };
 
@@ -98,8 +105,10 @@ export default function RentSavingsSetupFees() {
     setEditId(fee.id);
     setFormData({
       state_id: fee.state_id || '',
+      state_name: fee.state_name || '',
       lga_id: fee.lga_id || '',
       setup_fee: fee.setup_fee || '',
+      governance_note: '',
     });
     setShowForm(true);
   };
@@ -107,13 +116,17 @@ export default function RentSavingsSetupFees() {
   const closeForm = () => {
     setShowForm(false);
     setEditId(null);
-    setFormData({ state_id: '', lga_id: '', setup_fee: '' });
+    setFormData({ state_id: '', state_name: '', lga_id: '', setup_fee: '', governance_note: '' });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.state_id || !formData.setup_fee) {
       toast.error('State and setup fee are required');
+      return;
+    }
+    if (!formData.governance_note.trim()) {
+      toast.error('Add a governance note before saving this setup fee');
       return;
     }
 
@@ -123,6 +136,7 @@ export default function RentSavingsSetupFees() {
         state_id: parseInt(formData.state_id),
         lga_id: formData.lga_id ? parseInt(formData.lga_id) : null,
         setup_fee: parseFloat(formData.setup_fee),
+        governance_note: formData.governance_note.trim(),
       });
 
       if (data.success) {
@@ -137,19 +151,50 @@ export default function RentSavingsSetupFees() {
     }
   };
 
-  const handleDelete = async (id, stateName, lgaName) => {
-    if (!window.confirm(
-      `Delete setup fee for ${stateName}${lgaName ? ` - ${lgaName}` : ''}? This action cannot be undone.`
-    )) return;
+  const openDeleteDialog = (fee) => {
+    setDeleteDialog({
+      open: true,
+      fee,
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialog({
+      open: false,
+      fee: null,
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const handleDelete = async () => {
+    const reason = deleteDialog.reason.trim();
+    if (!reason) {
+      setDeleteDialog((prev) => ({ ...prev, error: 'A deletion reason is required' }));
+      return;
+    }
 
     try {
-      const { data } = await api.delete(`/rent-savings/admin/setup-fees/${id}`);
+      setDeleteDialog((prev) => ({ ...prev, loading: true, error: '' }));
+      const { data } = await api.delete(`/rent-savings/admin/setup-fees/${deleteDialog.fee.id}`, {
+        data: { reason },
+      });
       if (data.success) {
         toast.success(data.message);
+        closeDeleteDialog();
         loadFees();
       }
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to delete setup fee');
+      setDeleteDialog((prev) => ({
+        ...prev,
+        loading: false,
+        error: 'Delete failed. Check the message above and try again.',
+      }));
     }
   };
 
@@ -230,13 +275,27 @@ export default function RentSavingsSetupFees() {
                           <FaEdit className="text-sm" />
                         </button>
                         <button
-                          onClick={() => handleDelete(fee.id, fee.state_name, fee.lga_name)}
+                          onClick={() => openDeleteDialog(fee)}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete"
                         >
                           <FaTrash className="text-sm" />
                         </button>
                       </div>
+                      {fee.operations?.length ? (
+                        <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-2 text-left text-xs text-gray-600">
+                          <p className="font-semibold text-gray-800">
+                            {String(fee.operations[0].event_type || '').replace(/_/g, ' ')}
+                            {' '}
+                            <span className="font-normal text-gray-500">
+                              by {fee.operations[0].actor_name || 'Admin'}
+                            </span>
+                          </p>
+                          <p className="mt-1 line-clamp-2">
+                            {fee.operations[0].note || 'No note recorded'}
+                          </p>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -342,6 +401,19 @@ export default function RentSavingsSetupFees() {
                 </div>
               )}
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Governance note <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={formData.governance_note}
+                  onChange={(e) => setFormData(prev => ({ ...prev, governance_note: e.target.value }))}
+                  className="input w-full min-h-[96px]"
+                  placeholder="Explain why this setup fee is being created or changed"
+                  required
+                />
+              </div>
+
               {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={closeForm} className="btn w-full" disabled={submitting}>
@@ -360,6 +432,66 @@ export default function RentSavingsSetupFees() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">
+                Rent savings governance
+              </p>
+              <h3 className="mt-1 text-lg font-bold text-gray-800">
+                Delete setup fee
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                {deleteDialog.fee?.state_name || `State #${deleteDialog.fee?.state_id}`}
+                {deleteDialog.fee?.lga_name ? ` - ${deleteDialog.fee.lga_name}` : ' - State-wide'}
+              </p>
+            </div>
+
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Deletion reason
+            </label>
+            <textarea
+              value={deleteDialog.reason}
+              onChange={(e) =>
+                setDeleteDialog((prev) => ({
+                  ...prev,
+                  reason: e.target.value,
+                  error: '',
+                }))
+              }
+              className="input w-full min-h-[120px]"
+              placeholder="Explain why this setup fee is being removed"
+            />
+
+            {deleteDialog.error ? (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {deleteDialog.error}
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeDeleteDialog}
+                disabled={deleteDialog.loading}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteDialog.loading}
+                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {deleteDialog.loading ? 'Deleting...' : 'Delete Setup Fee'}
+              </button>
+            </div>
           </div>
         </div>
       )}

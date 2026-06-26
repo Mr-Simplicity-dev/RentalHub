@@ -2064,9 +2064,64 @@ const createPlatformLawyerApplicationOperation = async ({
   );
 };
 
+const ensurePlatformLawyerOperationSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS platform_lawyer_operations (
+      id SERIAL PRIMARY KEY,
+      platform_lawyer_id INTEGER,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_platform_lawyer_operations_lawyer
+      ON platform_lawyer_operations(platform_lawyer_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_platform_lawyer_operations_created
+      ON platform_lawyer_operations(created_at DESC);
+  `);
+};
+
+const createPlatformLawyerOperation = async ({
+  platformLawyerId,
+  actor,
+  eventType,
+  note,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO platform_lawyer_operations (
+       platform_lawyer_id, actor_id, actor_name, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      platformLawyerId || null,
+      actor?.id || null,
+      getPlatformLawyerActorName(actor),
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
+const requirePlatformLawyerReason = (req, message) => {
+  const reason = String(req.body?.reason || req.body?.note || '').trim();
+  if (!reason) {
+    const error = new Error(message);
+    error.statusCode = 400;
+    throw error;
+  }
+  return reason;
+};
+
 const getPlatformLawyerManagementData = async (req, res) => {
   try {
     await ensurePlatformLawyerSchema();
+    await ensurePlatformLawyerOperationSchema();
 
     const [entriesResult, applicationsResult, broadcastsResult] = await Promise.all([
       db.query(
@@ -2084,7 +2139,8 @@ const getPlatformLawyerManagementData = async (req, res) => {
            li.expires_at AS latest_invite_expires_at,
            li.accepted_at AS latest_invite_accepted_at,
            li.last_sent_at AS latest_invite_last_sent_at,
-           li.resent_count AS latest_invite_resent_count
+           li.resent_count AS latest_invite_resent_count,
+           COALESCE(ops.operations, '[]'::json) AS operations
          FROM platform_lawyers pl
          LEFT JOIN users u ON u.id = pl.lawyer_user_id
          LEFT JOIN LATERAL (
@@ -2094,6 +2150,16 @@ const getPlatformLawyerManagementData = async (req, res) => {
            ORDER BY pli.created_at DESC
            LIMIT 1
          ) li ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+           FROM (
+             SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+             FROM platform_lawyer_operations
+             WHERE platform_lawyer_id = pl.id
+             ORDER BY created_at DESC, id DESC
+             LIMIT 3
+           ) operation_rows
+         ) ops ON TRUE
          ORDER BY pl.is_active DESC, pl.created_at DESC`
       ),
       db.query(
@@ -2359,6 +2425,7 @@ const resendManualPlatformLawyerInvite = async (req, res) => {
 const updatePlatformLawyer = async (req, res) => {
   try {
     await ensurePlatformLawyerSchema();
+    await ensurePlatformLawyerOperationSchema();
 
     const entryResult = await db.query(
       `SELECT *
@@ -2375,6 +2442,15 @@ const updatePlatformLawyer = async (req, res) => {
     const entry = entryResult.rows[0];
     const nextIsActive =
       typeof req.body.is_active === 'boolean' ? req.body.is_active : entry.is_active;
+    const statusChanged = entry.is_active !== nextIsActive;
+    const statusReason = statusChanged
+      ? requirePlatformLawyerReason(
+          req,
+          nextIsActive
+            ? 'An activation reason is required'
+            : 'A deactivation reason is required'
+        )
+      : String(req.body?.reason || req.body?.note || '').trim();
 
     if (entry.source_type !== 'manual') {
       const result = await db.query(
@@ -2386,6 +2462,26 @@ const updatePlatformLawyer = async (req, res) => {
          RETURNING *`,
         [entry.id, nextIsActive, req.user.id]
       );
+
+      if (statusChanged || statusReason) {
+        await createPlatformLawyerOperation({
+          platformLawyerId: entry.id,
+          actor: req.user,
+          eventType: statusChanged
+            ? nextIsActive
+              ? 'platform_lawyer_activated'
+              : 'platform_lawyer_deactivated'
+            : 'platform_lawyer_updated',
+          note: statusReason || null,
+          metadata: {
+            full_name: entry.full_name,
+            email: entry.email,
+            source_type: entry.source_type,
+            previous_is_active: entry.is_active,
+            new_is_active: result.rows[0].is_active,
+          },
+        });
+      }
 
       await logAction(req.user.id, 'UPDATE_PLATFORM_LAWYER', 'platform_lawyer', entry.id);
 
@@ -2471,18 +2567,57 @@ const updatePlatformLawyer = async (req, res) => {
       ]
     );
 
+    if (statusChanged || statusReason) {
+      await createPlatformLawyerOperation({
+        platformLawyerId: entry.id,
+        actor: req.user,
+        eventType: statusChanged
+          ? nextIsActive
+            ? 'platform_lawyer_activated'
+            : 'platform_lawyer_deactivated'
+          : 'platform_lawyer_updated',
+        note: statusReason || null,
+        metadata: {
+          full_name: result.rows[0].full_name,
+          email: result.rows[0].email,
+          source_type: result.rows[0].source_type,
+          previous_is_active: entry.is_active,
+          new_is_active: result.rows[0].is_active,
+        },
+      });
+    }
+
     await logAction(req.user.id, 'UPDATE_PLATFORM_LAWYER', 'platform_lawyer', entry.id);
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Update platform lawyer error:', error);
-    res.status(500).json({ message: 'Failed to update platform lawyer' });
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to update platform lawyer',
+    });
   }
 };
 
 const deletePlatformLawyer = async (req, res) => {
   try {
     await ensurePlatformLawyerSchema();
+    await ensurePlatformLawyerOperationSchema();
+    const reason = requirePlatformLawyerReason(req, 'A deletion reason is required');
+
+    const entryResult = await db.query(
+      `SELECT *
+       FROM platform_lawyers
+       WHERE id = $1
+         AND source_type = 'manual'
+       LIMIT 1`,
+      [req.params.lawyerId]
+    );
+
+    if (!entryResult.rows.length) {
+      return res.status(404).json({
+        message: 'Manual platform lawyer record not found',
+      });
+    }
 
     const result = await db.query(
       `DELETE FROM platform_lawyers
@@ -2498,12 +2633,28 @@ const deletePlatformLawyer = async (req, res) => {
       });
     }
 
+    await createPlatformLawyerOperation({
+      platformLawyerId: Number(req.params.lawyerId),
+      actor: req.user,
+      eventType: 'platform_lawyer_deleted',
+      note: reason,
+      metadata: {
+        full_name: entryResult.rows[0].full_name,
+        email: entryResult.rows[0].email,
+        phone: entryResult.rows[0].phone,
+        chamber_name: entryResult.rows[0].chamber_name,
+        was_active: entryResult.rows[0].is_active,
+      },
+    });
+
     await logAction(req.user.id, 'DELETE_PLATFORM_LAWYER', 'platform_lawyer', req.params.lawyerId);
 
     res.json({ success: true });
   } catch (error) {
     console.error('Delete platform lawyer error:', error);
-    res.status(500).json({ message: 'Failed to delete platform lawyer' });
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Failed to delete platform lawyer',
+    });
   }
 };
 
@@ -2965,7 +3116,7 @@ const updatePlatformAgent = async (req, res) => {
     }
 
     const nextActive = req.body.is_active !== false;
-    const governanceNote = String(req.body.governance_note || '').trim();
+    const governanceNote = String(req.body.governance_note || req.body.reason || req.body.note || '').trim();
 
     const existingResult = await db.query(
       `SELECT *
@@ -2980,8 +3131,12 @@ const updatePlatformAgent = async (req, res) => {
 
     const existing = existingResult.rows[0];
 
-    if (existing.is_active && !nextActive && !governanceNote) {
-      return res.status(400).json({ message: 'A deactivation reason is required' });
+    if (existing.is_active !== nextActive && !governanceNote) {
+      return res.status(400).json({
+        message: nextActive
+          ? 'An activation reason is required'
+          : 'A deactivation reason is required',
+      });
     }
 
     const result = await db.query(
@@ -3027,7 +3182,7 @@ const deletePlatformAgent = async (req, res) => {
       return res.status(400).json({ message: 'Invalid platform agent id' });
     }
 
-    const governanceNote = String(req.body.governance_note || '').trim();
+    const governanceNote = String(req.body.governance_note || req.body.reason || req.body.note || '').trim();
 
     if (!governanceNote) {
       return res.status(400).json({ message: 'A deletion reason is required' });
@@ -3387,15 +3542,18 @@ const updateFeatureFlag = async (req, res) => {
 
 const getPricingRules = async (req, res) => {
   try {
+    await ensurePricingRuleOperationSchema();
     const [rules, locations] = await Promise.all([
       listLocationPricingRules(),
       getLocationOptions(),
     ]);
 
+    const rulesWithOperations = await attachPricingRuleOperations(rules);
+
     res.json({
       success: true,
       data: {
-        rules,
+        rules: rulesWithOperations,
         targets: getPricingTargets(),
         locations,
       },
@@ -3406,14 +3564,117 @@ const getPricingRules = async (req, res) => {
   }
 };
 
+const ensurePricingRuleOperationSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS pricing_rule_operations (
+      id SERIAL PRIMARY KEY,
+      pricing_rule_id INTEGER,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pricing_rule_operations_rule
+      ON pricing_rule_operations(pricing_rule_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_pricing_rule_operations_created
+      ON pricing_rule_operations(created_at DESC);
+  `);
+};
+
+const createPricingRuleOperation = async ({
+  pricingRuleId,
+  actor,
+  eventType,
+  note,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO pricing_rule_operations (
+       pricing_rule_id, actor_id, actor_name, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      pricingRuleId || null,
+      actor?.id || null,
+      getAdminOperationActorName(actor),
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
+const attachPricingRuleOperations = async (rules = []) => {
+  if (!rules.length) return rules;
+
+  const ruleIds = rules.map((rule) => Number(rule.id)).filter(Boolean);
+  if (!ruleIds.length) return rules;
+
+  const { rows } = await db.query(
+    `SELECT pricing_rule_id,
+            json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+     FROM (
+       SELECT id, pricing_rule_id, actor_id, actor_name, event_type, note, metadata, created_at
+       FROM pricing_rule_operations
+       WHERE pricing_rule_id = ANY($1::int[])
+       ORDER BY created_at DESC, id DESC
+     ) operation_rows
+     GROUP BY pricing_rule_id`,
+    [ruleIds]
+  );
+
+  const operationsByRule = new Map(
+    rows.map((row) => [Number(row.pricing_rule_id), (row.operations || []).slice(0, 3)])
+  );
+
+  return rules.map((rule) => ({
+    ...rule,
+    operations: operationsByRule.get(Number(rule.id)) || [],
+  }));
+};
+
+const requirePricingRuleReason = (req, message) => {
+  const reason = String(req.body?.reason || req.body?.note || '').trim();
+  if (!reason) {
+    const error = new Error(message);
+    error.statusCode = 400;
+    throw error;
+  }
+  return reason;
+};
+
+const getPricingRuleSnapshot = async (ruleId) => {
+  const rules = await listLocationPricingRules();
+  return rules.find((rule) => Number(rule.id) === Number(ruleId)) || null;
+};
+
 const createPricingRule = async (req, res) => {
   try {
+    await ensurePricingRuleOperationSchema();
     const rule = await createLocationPricingRule({
       appliesTo: req.body.applies_to,
       stateId: req.body.state_id,
       lgaName: req.body.lga_name,
       amount: req.body.amount,
       isActive: req.body.is_active !== false,
+    });
+
+    await createPricingRuleOperation({
+      pricingRuleId: rule.id,
+      actor: req.user,
+      eventType: 'pricing_rule_created',
+      note: String(req.body?.reason || req.body?.note || '').trim() || null,
+      metadata: {
+        applies_to: rule.applies_to,
+        state_name: rule.state_name,
+        lga_name: rule.lga_name,
+        amount: rule.amount,
+        is_active: rule.is_active,
+      },
     });
 
     await logAction(req.user.id, 'CREATE_PRICING_RULE', 'pricing_rule', rule.id);
@@ -3439,6 +3700,23 @@ const createPricingRule = async (req, res) => {
 
 const updatePricingRule = async (req, res) => {
   try {
+    await ensurePricingRuleOperationSchema();
+    const previousRule = await getPricingRuleSnapshot(req.params.ruleId);
+    if (!previousRule) {
+      return res.status(404).json({ message: 'Pricing rule not found' });
+    }
+
+    const nextIsActive = req.body.is_active !== false;
+    const statusChanged = previousRule.is_active !== nextIsActive;
+    const reason = statusChanged
+      ? requirePricingRuleReason(
+          req,
+          nextIsActive
+            ? 'An enable reason is required'
+            : 'A disable reason is required'
+        )
+      : String(req.body?.reason || req.body?.note || '').trim();
+
     const rule = await updateLocationPricingRule(req.params.ruleId, {
       appliesTo: req.body.applies_to,
       stateId: req.body.state_id,
@@ -3446,6 +3724,28 @@ const updatePricingRule = async (req, res) => {
       amount: req.body.amount,
       isActive: req.body.is_active !== false,
     });
+
+    if (statusChanged || reason) {
+      await createPricingRuleOperation({
+        pricingRuleId: rule.id,
+        actor: req.user,
+        eventType: statusChanged
+          ? nextIsActive
+            ? 'pricing_rule_enabled'
+            : 'pricing_rule_disabled'
+          : 'pricing_rule_updated',
+        note: reason || null,
+        metadata: {
+          previous_amount: previousRule.amount,
+          new_amount: rule.amount,
+          previous_is_active: previousRule.is_active,
+          new_is_active: rule.is_active,
+          applies_to: rule.applies_to,
+          state_name: rule.state_name,
+          lga_name: rule.lga_name,
+        },
+      });
+    }
 
     await logAction(req.user.id, 'UPDATE_PRICING_RULE', 'pricing_rule', rule.id);
 
@@ -3470,7 +3770,28 @@ const updatePricingRule = async (req, res) => {
 
 const removePricingRule = async (req, res) => {
   try {
+    await ensurePricingRuleOperationSchema();
+    const reason = requirePricingRuleReason(req, 'A deletion reason is required');
+    const existingRule = await getPricingRuleSnapshot(req.params.ruleId);
+    if (!existingRule) {
+      return res.status(404).json({ message: 'Pricing rule not found' });
+    }
+
     await deleteLocationPricingRule(req.params.ruleId);
+
+    await createPricingRuleOperation({
+      pricingRuleId: Number(req.params.ruleId),
+      actor: req.user,
+      eventType: 'pricing_rule_deleted',
+      note: reason,
+      metadata: {
+        applies_to: existingRule.applies_to,
+        state_name: existingRule.state_name,
+        lga_name: existingRule.lga_name,
+        amount: existingRule.amount,
+        was_active: existingRule.is_active,
+      },
+    });
 
     await logAction(req.user.id, 'DELETE_PRICING_RULE', 'pricing_rule', req.params.ruleId);
 
@@ -3485,15 +3806,17 @@ const removePricingRule = async (req, res) => {
 
 const getRegistrationAccessRules = async (req, res) => {
   try {
+    await ensureRegistrationAccessRuleOperationSchema();
     const [rules, locations] = await Promise.all([
       listRegistrationAccessRules(),
       getLocationOptions(),
     ]);
+    const rulesWithOperations = await attachRegistrationAccessRuleOperations(rules);
 
     res.json({
       success: true,
       data: {
-        rules,
+        rules: rulesWithOperations,
         targets: getRegistrationAccessTargets(),
         locations,
       },
@@ -3504,13 +3827,115 @@ const getRegistrationAccessRules = async (req, res) => {
   }
 };
 
+const ensureRegistrationAccessRuleOperationSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS registration_access_rule_operations (
+      id SERIAL PRIMARY KEY,
+      registration_access_rule_id INTEGER,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_registration_access_rule_ops_rule
+      ON registration_access_rule_operations(registration_access_rule_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_registration_access_rule_ops_created
+      ON registration_access_rule_operations(created_at DESC);
+  `);
+};
+
+const createRegistrationAccessRuleOperation = async ({
+  ruleId,
+  actor,
+  eventType,
+  note,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO registration_access_rule_operations (
+       registration_access_rule_id, actor_id, actor_name, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      ruleId || null,
+      actor?.id || null,
+      getAdminOperationActorName(actor),
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
+const attachRegistrationAccessRuleOperations = async (rules = []) => {
+  if (!rules.length) return rules;
+
+  const ruleIds = rules.map((rule) => Number(rule.id)).filter(Boolean);
+  if (!ruleIds.length) return rules;
+
+  const { rows } = await db.query(
+    `SELECT registration_access_rule_id,
+            json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+     FROM (
+       SELECT id, registration_access_rule_id, actor_id, actor_name, event_type, note, metadata, created_at
+       FROM registration_access_rule_operations
+       WHERE registration_access_rule_id = ANY($1::int[])
+       ORDER BY created_at DESC, id DESC
+     ) operation_rows
+     GROUP BY registration_access_rule_id`,
+    [ruleIds]
+  );
+
+  const operationsByRule = new Map(
+    rows.map((row) => [Number(row.registration_access_rule_id), (row.operations || []).slice(0, 3)])
+  );
+
+  return rules.map((rule) => ({
+    ...rule,
+    operations: operationsByRule.get(Number(rule.id)) || [],
+  }));
+};
+
+const requireRegistrationAccessRuleReason = (req, message) => {
+  const reason = String(req.body?.reason || req.body?.note || '').trim();
+  if (!reason) {
+    const error = new Error(message);
+    error.statusCode = 400;
+    throw error;
+  }
+  return reason;
+};
+
+const getRegistrationAccessRuleSnapshot = async (ruleId) => {
+  const rules = await listRegistrationAccessRules();
+  return rules.find((rule) => Number(rule.id) === Number(ruleId)) || null;
+};
+
 const createRegistrationAccessRuleHandler = async (req, res) => {
   try {
+    await ensureRegistrationAccessRuleOperationSchema();
     const rule = await createRegistrationAccessRule({
       appliesTo: req.body.applies_to,
       stateId: req.body.state_id,
       lgaName: req.body.lga_name,
       isActive: req.body.is_active !== false,
+    });
+
+    await createRegistrationAccessRuleOperation({
+      ruleId: rule.id,
+      actor: req.user,
+      eventType: 'registration_access_rule_created',
+      note: String(req.body?.reason || req.body?.note || '').trim() || null,
+      metadata: {
+        applies_to: rule.applies_to,
+        state_name: rule.state_name,
+        lga_name: rule.lga_name,
+        is_active: rule.is_active,
+      },
     });
 
     await logAction(
@@ -3542,12 +3967,46 @@ const createRegistrationAccessRuleHandler = async (req, res) => {
 
 const updateRegistrationAccessRuleHandler = async (req, res) => {
   try {
+    await ensureRegistrationAccessRuleOperationSchema();
+    const previousRule = await getRegistrationAccessRuleSnapshot(req.params.ruleId);
+    if (!previousRule) {
+      return res.status(404).json({ message: 'Registration access rule not found' });
+    }
+
+    const nextIsActive = req.body.is_active !== false;
+    const statusChanged = previousRule.is_active !== nextIsActive;
+    const reason = statusChanged
+      ? requireRegistrationAccessRuleReason(
+          req,
+          nextIsActive
+            ? 'An enable reason is required'
+            : 'A disable reason is required'
+        )
+      : String(req.body?.reason || req.body?.note || '').trim();
+
     const rule = await updateRegistrationAccessRule(req.params.ruleId, {
       appliesTo: req.body.applies_to,
       stateId: req.body.state_id,
       lgaName: req.body.lga_name,
       isActive: req.body.is_active !== false,
     });
+
+    if (statusChanged || reason) {
+      await createRegistrationAccessRuleOperation({
+        ruleId: rule.id,
+        actor: req.user,
+        eventType: statusChanged
+          ? nextIsActive
+            ? 'registration_access_rule_enabled'
+            : 'registration_access_rule_disabled'
+          : 'registration_access_rule_updated',
+        note: reason || null,
+        metadata: {
+          previous: previousRule,
+          next: rule,
+        },
+      });
+    }
 
     await logAction(
       req.user.id,
@@ -3578,7 +4037,27 @@ const updateRegistrationAccessRuleHandler = async (req, res) => {
 
 const removeRegistrationAccessRule = async (req, res) => {
   try {
+    await ensureRegistrationAccessRuleOperationSchema();
+    const reason = requireRegistrationAccessRuleReason(req, 'A deletion reason is required');
+    const existingRule = await getRegistrationAccessRuleSnapshot(req.params.ruleId);
+    if (!existingRule) {
+      return res.status(404).json({ message: 'Registration access rule not found' });
+    }
+
     await deleteRegistrationAccessRule(req.params.ruleId);
+
+    await createRegistrationAccessRuleOperation({
+      ruleId: Number(req.params.ruleId),
+      actor: req.user,
+      eventType: 'registration_access_rule_deleted',
+      note: reason,
+      metadata: {
+        applies_to: existingRule.applies_to,
+        state_name: existingRule.state_name,
+        lga_name: existingRule.lga_name,
+        was_active: existingRule.is_active,
+      },
+    });
 
     await logAction(
       req.user.id,

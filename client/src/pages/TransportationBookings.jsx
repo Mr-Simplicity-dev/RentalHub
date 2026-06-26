@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import BackToDashboard from '../components/common/BackToDashboard';
+import BookingCancelModal from '../components/common/BookingCancelModal';
 
 const TransportationBookings = () => {
   const { user } = useAuth();
@@ -26,6 +27,8 @@ const TransportationBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [filter, setFilter] = useState('all'); // all, pending, confirmed, completed, cancelled
   const [stats, setStats] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
   
   // Load bookings and stats
   useEffect(() => {
@@ -124,25 +127,34 @@ const TransportationBookings = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
   
-  const handleCancelBooking = async (bookingId) => {
-    if (!window.confirm('Are you sure you want to cancel this booking?')) return;
-    
+  const refreshBookings = async () => {
+    const bookingsRes = await api.get('/transportation/bookings');
+    if (bookingsRes.data?.success) {
+      setBookings(bookingsRes.data.data);
+    }
+  };
+
+  const handleCancelBooking = async (reason) => {
+    if (!cancelTarget) return;
+
+    setCancelling(true);
     try {
-      const response = await api.delete(`/transportation/bookings/${bookingId}/cancel`);
+      const response = await api.delete(`/transportation/bookings/${cancelTarget.id}/cancel`, {
+        data: { cancellation_reason: reason }
+      });
       
       if (response.data?.success) {
         toast.success('Booking cancelled successfully');
-        // Refresh bookings
-        const bookingsRes = await api.get('/transportation/bookings');
-        if (bookingsRes.data?.success) {
-          setBookings(bookingsRes.data.data);
-        }
+        setCancelTarget(null);
+        await refreshBookings();
       } else {
         toast.error(response.data?.message || 'Failed to cancel booking');
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
       toast.error(error.response?.data?.message || 'Failed to cancel booking');
+    } finally {
+      setCancelling(false);
     }
   };
   
@@ -388,7 +400,7 @@ const TransportationBookings = () => {
                           
                           {booking.booking_status === 'pending' && booking.payment_status === 'pending' && (
                             <button
-                              onClick={() => handleCancelBooking(booking.id)}
+                              onClick={() => setCancelTarget(booking)}
                               className="btn btn-sm btn-gray"
                             >
                               Cancel
@@ -434,6 +446,15 @@ const TransportationBookings = () => {
           </div>
         </div>
       </div>
+      <BookingCancelModal
+        isOpen={!!cancelTarget}
+        title="Cancel Transportation Booking"
+        message="Please share why you are cancelling this transportation booking."
+        warning="Cancellation may affect refunds depending on how close the booking date is."
+        loading={cancelling}
+        onClose={() => !cancelling && setCancelTarget(null)}
+        onConfirm={handleCancelBooking}
+      />
     </div>
   );
 };

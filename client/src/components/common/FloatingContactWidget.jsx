@@ -93,9 +93,39 @@ const FloatingContactWidget = () => {
   const widgetRef = useRef(null);
   const typingTimer = useRef(null);
   const typingThrottleRef = useRef(null);
+  const guestTypingThrottleRef = useRef(null);
   const guestSocketRef = useRef(null);
   const activeTicketRef = useRef(null);
   const viewingContactRef = useRef(null);
+  // Focus trap
+  useEffect(() => {
+    if (!open) return;
+    const el = widgetRef.current;
+    if (!el) return;
+    const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length) focusable[0].focus();
+    const handleKeyDown = (e) => {
+      if (e.key !== 'Tab') return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    el.addEventListener('keydown', handleKeyDown);
+    return () => el.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
+  useEffect(() => {
+    return () => {
+      clearTimeout(resetTimerRef.current);
+      clearTimeout(typingTimer.current);
+    };
+  }, []);
+
   const [showGreeting, setShowGreeting] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
 
@@ -144,11 +174,12 @@ const FloatingContactWidget = () => {
   // Click-outside close
   useEffect(() => {
     if (!open) return;
+    let mounted = true;
     const handler = (e) => {
       if (widgetRef.current && !widgetRef.current.contains(e.target)) handleClose();
     };
-    setTimeout(() => document.addEventListener('mousedown', handler), 0);
-    return () => document.removeEventListener('mousedown', handler);
+    const timer = setTimeout(() => { if (mounted) document.addEventListener('mousedown', handler); }, 0);
+    return () => { mounted = false; clearTimeout(timer); document.removeEventListener('mousedown', handler); };
   }, [open]);
 
   // Load locations
@@ -281,9 +312,11 @@ const FloatingContactWidget = () => {
     if (typingPollRef.current) clearInterval(typingPollRef.current);
   };
 
+  const resetTimerRef = useRef(null);
   const handleClose = () => {
     setOpen(false);
-    setTimeout(reset, 300);
+    clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(reset, 300);
   };
 
   // ── Contact form submit ──
@@ -311,16 +344,19 @@ const FloatingContactWidget = () => {
     const msg = replyText.trim();
     if (!msg && !attachmentFile) return;
     const tempId = `temp_${Date.now()}`;
+    const voiceFile = authRecorder.recordedFile;
+    const fileToSend = attachmentFile || voiceFile;
     const optimist = { id: tempId, message: msg, is_admin: false, author_name: user?.full_name, created_at: new Date().toISOString(), _temp: true };
-    if (attachmentFile) optimist.attachment_name = attachmentFile.name;
+    if (fileToSend) optimist.attachment_name = fileToSend.name;
     setConversation((prev) => [...prev, optimist]);
     setReplyText('');
     setAttachmentFile(null);
+    authRecorder.reset();
     setSendingReply(true);
     try {
       const fd = new FormData();
       if (msg) fd.append('message', msg);
-      if (attachmentFile) fd.append('attachment', attachmentFile);
+      if (fileToSend) fd.append('attachment', fileToSend);
       const res = await api.post(`/support/tickets/${activeTicket.id}/reply`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -350,7 +386,7 @@ const FloatingContactWidget = () => {
     try {
       const res = await api.post('/support/tickets/contact-lookup', { email: lookupEmail.trim() });
       setLookupTickets(res.data?.data || []);
-    } catch {} finally { setLookupLoading(false); }
+    } catch { setError(t('widget.lookup_failed', 'Could not find tickets. Please check your email.')); } finally { setLookupLoading(false); }
   };
 
   const viewContactConversation = async (ticket) => {
@@ -358,7 +394,7 @@ const FloatingContactWidget = () => {
     try {
       const res = await api.post('/support/tickets/contact-conversation', { ticketId: ticket.id, email: lookupEmail.trim() });
       setContactConv(res.data?.data || []);
-    } catch {}
+    } catch { setError(t('widget.conversation_failed', 'Could not load conversation.')); }
   };
 
   const [contactReplyText, setContactReplyText] = useState('');
@@ -427,20 +463,23 @@ const FloatingContactWidget = () => {
 
   const handleContactReply = async () => {
     const msg = contactReplyText.trim();
-    if (!msg && !contactReplyFile) return;
+    const voiceFile = contactRecorder.recordedFile;
+    const fileToSend = contactReplyFile || voiceFile;
+    if (!msg && !fileToSend) return;
     setSendingContactReply(true);
     try {
       const fd = new FormData();
       fd.append('ticketId', viewingContactTicket.id);
       fd.append('email', lookupEmail.trim());
       if (msg) fd.append('message', msg);
-      if (contactReplyFile) fd.append('attachment', contactReplyFile);
+      if (fileToSend) fd.append('attachment', fileToSend);
       const res = await api.post('/support/tickets/contact-reply', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setContactConv((prev) => [...prev, res.data.data]);
       setContactReplyText('');
       setContactReplyFile(null);
+      contactRecorder.reset();
     } catch (err) {
       setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
     } finally { setSendingContactReply(false); }
@@ -887,7 +926,7 @@ const FloatingContactWidget = () => {
                                     setContactReplyFile(f);
                                   }} />
                                 </label>
-                                <textarea value={contactReplyText} onChange={(e) => { setContactReplyText(e.target.value); guestSocketRef.current?.emit('ticket:typing'); }}
+                                <textarea value={contactReplyText} onChange={(e) => { setContactReplyText(e.target.value); if (!guestTypingThrottleRef.current) { guestTypingThrottleRef.current = setTimeout(() => { guestTypingThrottleRef.current = null; }, 2000); guestSocketRef.current?.emit('ticket:typing'); } }}
                                   placeholder={t('widget.type_reply', 'Type a reply...')} rows={1}
                                   className="flex-1 resize-none rounded border border-slate-300 px-2 py-2 text-xs outline-none focus:border-indigo-400"
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />

@@ -61,6 +61,14 @@ const AdSpacesTab = () => {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [imageUploading, setImageUploading] = useState(false);
+  const [adAction, setAdAction] = useState({
+    open: false,
+    ad: null,
+    action: '',
+    reason: '',
+    loading: false,
+    error: '',
+  });
 
   const placementLabelMap = useMemo(
     () => new Map(placements.map((placement) => [placement.value, placement.label])),
@@ -246,40 +254,97 @@ const AdSpacesTab = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const toggleActive = async (ad) => {
+  const openAdAction = (ad, action) => {
+    setAdAction({
+      open: true,
+      ad,
+      action,
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const closeAdAction = () => {
+    setAdAction({
+      open: false,
+      ad: null,
+      action: '',
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const toggleActive = async (ad, reason) => {
     try {
       setLoading(true);
       await api.patch(`/super/ad-spaces/${ad.id}`, {
         ...ad,
         is_active: !ad.is_active,
+        reason,
       });
       toast.success(`Ad space ${ad.is_active ? 'paused' : 'activated'}`);
       await loadAds();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update ad space');
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteAd = async (adId) => {
-    if (!window.confirm('Delete this ad space?')) return;
-
+  const deleteAd = async (ad, reason) => {
     try {
       setLoading(true);
-      await api.delete(`/super/ad-spaces/${adId}`);
+      await api.delete(`/super/ad-spaces/${ad.id}`, { data: { reason } });
       toast.success('Ad space deleted');
 
-      if (editingId === adId) {
+      if (editingId === ad.id) {
         resetForm();
       }
 
       await loadAds();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to delete ad space');
+      throw error;
     } finally {
       setLoading(false);
     }
+  };
+
+  const submitAdAction = async () => {
+    const reason = adAction.reason.trim();
+    if (!reason) {
+      setAdAction((prev) => ({ ...prev, error: 'A reason is required' }));
+      return;
+    }
+
+    try {
+      setAdAction((prev) => ({ ...prev, loading: true, error: '' }));
+      if (adAction.action === 'delete') {
+        await deleteAd(adAction.ad, reason);
+      } else {
+        await toggleActive(adAction.ad, reason);
+      }
+      closeAdAction();
+    } catch {
+      setAdAction((prev) => ({
+        ...prev,
+        loading: false,
+        error: 'Action failed. Check the message above and try again.',
+      }));
+    }
+  };
+
+  const formatOperationLabel = (eventType) => {
+    const labels = {
+      ad_space_activated: 'Activated',
+      ad_space_paused: 'Paused',
+      ad_space_deleted: 'Deleted',
+      ad_space_updated: 'Updated',
+    };
+    return labels[eventType] || String(eventType || 'Updated').replace(/_/g, ' ');
   };
 
   const previewStyle = {
@@ -711,6 +776,29 @@ const AdSpacesTab = () => {
                   )}
                 </div>
 
+                {Array.isArray(ad.operations) && ad.operations.length > 0 && (
+                  <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Recent governance
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {ad.operations.slice(0, 2).map((operation) => (
+                        <div key={operation.id} className="text-xs text-gray-600">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold text-gray-800">
+                              {formatOperationLabel(operation.event_type)}
+                            </span>
+                            <span>{formatDate(operation.created_at)}</span>
+                          </div>
+                          <p className="mt-1 line-clamp-2">
+                            {operation.note || 'No note recorded'} by {operation.actor_name || 'Admin'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -722,7 +810,7 @@ const AdSpacesTab = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => toggleActive(ad)}
+                    onClick={() => openAdAction(ad, ad.is_active ? 'pause' : 'activate')}
                     className="btn btn-secondary px-3 py-2 text-xs"
                   >
                     {ad.is_active ? 'Pause' : 'Activate'}
@@ -740,7 +828,7 @@ const AdSpacesTab = () => {
                   )}
                   <button
                     type="button"
-                    onClick={() => deleteAd(ad.id)}
+                    onClick={() => openAdAction(ad, 'delete')}
                     className="btn btn-danger px-3 py-2 text-xs"
                   >
                     <FaTrash className="mr-2" />
@@ -752,6 +840,75 @@ const AdSpacesTab = () => {
           </div>
         )}
       </section>
+
+      {adAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl2 bg-white p-6 shadow-xl">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
+                Ad space governance
+              </p>
+              <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                {adAction.action === 'delete'
+                  ? 'Delete ad space'
+                  : adAction.action === 'pause'
+                    ? 'Pause ad space'
+                    : 'Activate ad space'}
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                {adAction.ad?.title || 'This ad space'} will be recorded with your reason.
+              </p>
+            </div>
+
+            <label className="text-sm font-medium text-gray-700">
+              Reason
+              <textarea
+                value={adAction.reason}
+                onChange={(event) =>
+                  setAdAction((prev) => ({
+                    ...prev,
+                    reason: event.target.value,
+                    error: '',
+                  }))
+                }
+                className="input mt-1 min-h-[120px]"
+                placeholder="Explain why this action is being taken"
+              />
+            </label>
+
+            {adAction.error && (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {adAction.error}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeAdAction}
+                className="btn btn-secondary"
+                disabled={adAction.loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitAdAction}
+                className={adAction.action === 'delete' ? 'btn btn-danger' : 'btn btn-primary'}
+                disabled={adAction.loading}
+              >
+                {adAction.loading
+                  ? 'Saving...'
+                  : adAction.action === 'delete'
+                    ? 'Delete Ad'
+                    : adAction.action === 'pause'
+                      ? 'Pause Ad'
+                      : 'Activate Ad'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

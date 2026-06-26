@@ -533,6 +533,14 @@ class TransportationController {
     try {
       const { bookingId } = req.params;
       const tenantId = req.user.id;
+      const cancellationReason = String(req.body?.cancellation_reason || req.body?.reason || '').trim();
+
+      if (!cancellationReason) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cancellation reason is required'
+        });
+      }
       
       const booking = await TransportationService.getBookingById(bookingId);
       
@@ -574,7 +582,10 @@ class TransportationController {
       }
       
       // Update booking status to cancelled
-      const updatedBooking = await TransportationService.updateBookingStatus(bookingId, 'cancelled');
+      const updatedBooking = await TransportationService.updateBookingStatus(bookingId, 'cancelled', {
+        cancellation_reason: cancellationReason,
+        cancelled_by: 'tenant'
+      });
       
       res.json({
         success: true,

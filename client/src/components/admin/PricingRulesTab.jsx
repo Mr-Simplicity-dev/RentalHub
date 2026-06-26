@@ -17,6 +17,14 @@ const PricingRulesTab = () => {
   const [locations, setLocations] = useState([]);
   const [editingRuleId, setEditingRuleId] = useState(null);
   const [form, setForm] = useState(defaultForm);
+  const [ruleAction, setRuleAction] = useState({
+    open: false,
+    rule: null,
+    action: '',
+    reason: '',
+    loading: false,
+    error: '',
+  });
 
   const loadPricingData = async () => {
     try {
@@ -118,17 +126,35 @@ const PricingRulesTab = () => {
     });
   };
 
-  const handleDelete = async (ruleId) => {
-    if (!window.confirm('Delete this pricing rule?')) {
-      return;
-    }
+  const openRuleAction = (rule, action) => {
+    setRuleAction({
+      open: true,
+      rule,
+      action,
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
 
+  const closeRuleAction = () => {
+    setRuleAction({
+      open: false,
+      rule: null,
+      action: '',
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const handleDelete = async (rule, reason) => {
     try {
       setLoading(true);
-      await api.delete(`/super/pricing-rules/${ruleId}`);
+      await api.delete(`/super/pricing-rules/${rule.id}`, { data: { reason } });
       toast.success('Pricing rule deleted');
 
-      if (editingRuleId === ruleId) {
+      if (editingRuleId === rule.id) {
         resetForm();
       }
 
@@ -138,12 +164,13 @@ const PricingRulesTab = () => {
       toast.error(
         error.response?.data?.message || 'Failed to delete pricing rule'
       );
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleActive = async (rule) => {
+  const toggleActive = async (rule, reason) => {
     try {
       setLoading(true);
       await api.patch(`/super/pricing-rules/${rule.id}`, {
@@ -152,6 +179,7 @@ const PricingRulesTab = () => {
         lga_name: rule.lga_name || undefined,
         amount: rule.amount,
         is_active: !rule.is_active,
+        reason,
       });
       toast.success(
         `Pricing rule ${rule.is_active ? 'disabled' : 'enabled'}`
@@ -162,9 +190,45 @@ const PricingRulesTab = () => {
       toast.error(
         error.response?.data?.message || 'Failed to update pricing rule'
       );
+      throw error;
     } finally {
       setLoading(false);
     }
+  };
+
+  const submitRuleAction = async () => {
+    const reason = ruleAction.reason.trim();
+    if (!reason) {
+      setRuleAction((prev) => ({ ...prev, error: 'A reason is required' }));
+      return;
+    }
+
+    try {
+      setRuleAction((prev) => ({ ...prev, loading: true, error: '' }));
+      if (ruleAction.action === 'delete') {
+        await handleDelete(ruleAction.rule, reason);
+      } else {
+        await toggleActive(ruleAction.rule, reason);
+      }
+      closeRuleAction();
+    } catch {
+      setRuleAction((prev) => ({
+        ...prev,
+        loading: false,
+        error: 'Action failed. Check the message above and try again.',
+      }));
+    }
+  };
+
+  const formatOperationLabel = (eventType) => {
+    const labels = {
+      pricing_rule_created: 'Created',
+      pricing_rule_updated: 'Updated',
+      pricing_rule_enabled: 'Enabled',
+      pricing_rule_disabled: 'Disabled',
+      pricing_rule_deleted: 'Deleted',
+    };
+    return labels[eventType] || String(eventType || 'Updated').replace(/_/g, ' ');
   };
 
   return (
@@ -388,19 +452,33 @@ const PricingRulesTab = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => toggleActive(rule)}
+                          onClick={() => openRuleAction(rule, rule.is_active ? 'disable' : 'enable')}
                           className="rounded-lg bg-amber-600 px-3 py-1 text-xs text-white transition hover:bg-amber-700"
                         >
                           {rule.is_active ? 'Disable' : 'Enable'}
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(rule.id)}
+                          onClick={() => openRuleAction(rule, 'delete')}
                           className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white transition hover:bg-red-700"
                         >
                           Delete
                         </button>
                       </div>
+                      {Array.isArray(rule.operations) && rule.operations.length > 0 && (
+                        <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-2 text-left text-xs text-gray-600">
+                          <p className="font-semibold text-gray-800">
+                            {formatOperationLabel(rule.operations[0].event_type)}
+                            {' '}
+                            <span className="font-normal text-gray-500">
+                              by {rule.operations[0].actor_name || 'Admin'}
+                            </span>
+                          </p>
+                          <p className="mt-1 line-clamp-2">
+                            {rule.operations[0].note || 'No note recorded'}
+                          </p>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -409,6 +487,78 @@ const PricingRulesTab = () => {
           </table>
         </div>
       </div>
+
+      {ruleAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl2 bg-white p-6 shadow-xl">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
+                Pricing governance
+              </p>
+              <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                {ruleAction.action === 'delete'
+                  ? 'Delete pricing rule'
+                  : ruleAction.action === 'disable'
+                    ? 'Disable pricing rule'
+                    : 'Enable pricing rule'}
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                This affects what customers are charged for{' '}
+                {targets.find((item) => item.key === ruleAction.rule?.applies_to)?.label ||
+                  ruleAction.rule?.applies_to ||
+                  'this target'}.
+              </p>
+            </div>
+
+            <label className="text-sm font-medium text-gray-700">
+              Reason
+              <textarea
+                value={ruleAction.reason}
+                onChange={(event) =>
+                  setRuleAction((prev) => ({
+                    ...prev,
+                    reason: event.target.value,
+                    error: '',
+                  }))
+                }
+                className="input mt-1 min-h-[120px]"
+                placeholder="Explain the pricing decision"
+              />
+            </label>
+
+            {ruleAction.error && (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {ruleAction.error}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeRuleAction}
+                disabled={ruleAction.loading}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitRuleAction}
+                disabled={ruleAction.loading}
+                className={ruleAction.action === 'delete' ? 'btn btn-danger' : 'btn btn-primary'}
+              >
+                {ruleAction.loading
+                  ? 'Saving...'
+                  : ruleAction.action === 'delete'
+                    ? 'Delete Rule'
+                    : ruleAction.action === 'disable'
+                      ? 'Disable Rule'
+                      : 'Enable Rule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

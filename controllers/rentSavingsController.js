@@ -1,6 +1,63 @@
 const db = require('../config/middleware/database');
 const NotificationService = require('../services/NotificationService');
 
+const ensureSetupFeeOperationSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS rent_savings_setup_fee_operations (
+      id SERIAL PRIMARY KEY,
+      setup_fee_id INTEGER,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_rent_savings_setup_fee_ops_fee
+      ON rent_savings_setup_fee_operations(setup_fee_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_rent_savings_setup_fee_ops_created
+      ON rent_savings_setup_fee_operations(created_at DESC);
+  `);
+};
+
+const getActorName = (user = {}) =>
+  user.full_name || user.name || user.email || user.username || `Admin #${user.id || 'unknown'}`;
+
+const requireSetupFeeNote = (body, message) => {
+  const note = String(body?.governance_note || body?.reason || body?.note || '').trim();
+  if (!note) {
+    const error = new Error(message);
+    error.statusCode = 400;
+    throw error;
+  }
+  return note;
+};
+
+const recordSetupFeeOperation = async ({
+  setupFeeId,
+  actor,
+  eventType,
+  note,
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO rent_savings_setup_fee_operations (
+       setup_fee_id, actor_id, actor_name, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      setupFeeId || null,
+      actor?.id || null,
+      getActorName(actor),
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+};
+
 // ============================================================
 // RENT SAVINGS CONTROLLER
 // Covers every table defined in Migration 034:
@@ -1158,13 +1215,25 @@ exports.adminRejectEarlyWithdrawal = async (req, res) => {
 // ── ADMIN: GET SETUP FEES ────────────────────────────────────
 exports.adminGetSetupFees = async (req, res) => {
   try {
+    await ensureSetupFeeOperationSchema();
     const result = await db.query(`
       SELECT rsf.*,
              ls.name AS state_name,
-             ll.name AS lga_name
+             ll.name AS lga_name,
+             COALESCE(ops.operations, '[]'::json) AS operations
       FROM rent_savings_setup_fees rsf
       LEFT JOIN locations ls ON rsf.state_id = ls.id
       LEFT JOIN locations ll ON rsf.lga_id   = ll.id
+      LEFT JOIN LATERAL (
+        SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+        FROM (
+          SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+          FROM rent_savings_setup_fee_operations
+          WHERE setup_fee_id = rsf.id
+          ORDER BY created_at DESC, id DESC
+          LIMIT 3
+        ) operation_rows
+      ) ops ON TRUE
       ORDER BY rsf.state_id, rsf.lga_id NULLS FIRST
     `);
 
@@ -1178,7 +1247,9 @@ exports.adminGetSetupFees = async (req, res) => {
 // ── ADMIN: CREATE OR UPDATE SETUP FEE ───────────────────────
 exports.adminCreateSetupFee = async (req, res) => {
   try {
+    await ensureSetupFeeOperationSchema();
     const { state_id, lga_id, setup_fee } = req.body;
+    const governanceNote = requireSetupFeeNote(req.body, 'A setup fee governance note is required');
 
     if (!state_id || setup_fee === undefined) {
       return res.status(400).json({ success: false, message: 'state_id and setup_fee are required' });
@@ -1196,6 +1267,17 @@ exports.adminCreateSetupFee = async (req, res) => {
         `UPDATE rent_savings_setup_fees SET setup_fee = $1 WHERE id = $2 RETURNING *`,
         [setup_fee, existing.rows[0].id]
       );
+      await recordSetupFeeOperation({
+        setupFeeId: result.rows[0].id,
+        actor: req.user,
+        eventType: 'setup_fee_updated',
+        note: governanceNote,
+        metadata: {
+          state_id,
+          lga_id: lga_id || null,
+          setup_fee: result.rows[0].setup_fee,
+        },
+      });
       return res.json({ success: true, message: 'Setup fee updated', data: result.rows[0] });
     }
 
@@ -1206,10 +1288,25 @@ exports.adminCreateSetupFee = async (req, res) => {
       [state_id, lga_id || null, setup_fee]
     );
 
+    await recordSetupFeeOperation({
+      setupFeeId: result.rows[0].id,
+      actor: req.user,
+      eventType: 'setup_fee_created',
+      note: governanceNote,
+      metadata: {
+        state_id,
+        lga_id: lga_id || null,
+        setup_fee: result.rows[0].setup_fee,
+      },
+    });
+
     res.status(201).json({ success: true, message: 'Setup fee created', data: result.rows[0] });
   } catch (error) {
     console.error('Error creating/updating setup fee:', error);
-    res.status(500).json({ success: false, message: 'Failed to create setup fee' });
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to create setup fee',
+    });
   }
 };
 
@@ -1217,10 +1314,16 @@ exports.adminCreateSetupFee = async (req, res) => {
 // (Was broken/incomplete in original — fully implemented)
 exports.adminDeleteSetupFee = async (req, res) => {
   try {
+    await ensureSetupFeeOperationSchema();
     const { id } = req.params;
+    const governanceNote = requireSetupFeeNote(req.body, 'A deletion reason is required');
 
     const existing = await db.query(
-      `SELECT id FROM rent_savings_setup_fees WHERE id = $1`,
+      `SELECT rsf.*, ls.name AS state_name, ll.name AS lga_name
+       FROM rent_savings_setup_fees rsf
+       LEFT JOIN locations ls ON rsf.state_id = ls.id
+       LEFT JOIN locations ll ON rsf.lga_id = ll.id
+       WHERE rsf.id = $1`,
       [id]
     );
 
@@ -1230,10 +1333,27 @@ exports.adminDeleteSetupFee = async (req, res) => {
 
     await db.query(`DELETE FROM rent_savings_setup_fees WHERE id = $1`, [id]);
 
+    await recordSetupFeeOperation({
+      setupFeeId: Number(id),
+      actor: req.user,
+      eventType: 'setup_fee_deleted',
+      note: governanceNote,
+      metadata: {
+        state_id: existing.rows[0].state_id,
+        state_name: existing.rows[0].state_name,
+        lga_id: existing.rows[0].lga_id,
+        lga_name: existing.rows[0].lga_name,
+        setup_fee: existing.rows[0].setup_fee,
+      },
+    });
+
     res.json({ success: true, message: 'Setup fee deleted' });
   } catch (error) {
     console.error('Error deleting setup fee:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete setup fee' });
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to delete setup fee',
+    });
   }
 };
 

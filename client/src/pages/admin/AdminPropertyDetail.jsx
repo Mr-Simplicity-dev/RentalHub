@@ -11,6 +11,13 @@ const AdminPropertyDetail = () => {
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [actionDialog, setActionDialog] = useState({
+    open: false,
+    action: "",
+    title: "",
+    reason: "",
+    error: "",
+  });
 
   const loadProperty = useCallback(async () => {
 
@@ -37,60 +44,57 @@ const AdminPropertyDetail = () => {
   }, [loadProperty]);
 
 
-  const unlist = async () => {
+  const openActionDialog = (action) => {
+    const labels = {
+      unlist: "Unlist Property",
+      relist: "Relist Property",
+      feature: "Feature Property",
+      unfeature: "Unfeature Property",
+    };
+    setActionDialog({
+      open: true,
+      action,
+      title: labels[action] || "Update Property",
+      reason: "",
+      error: "",
+    });
+  };
 
-    if (!window.confirm("Unlist this property?")) return;
+  const closeActionDialog = () => {
+    setActionDialog({
+      open: false,
+      action: "",
+      title: "",
+      reason: "",
+      error: "",
+    });
+  };
+
+  const submitPropertyAction = async () => {
+    const reason = actionDialog.reason.trim();
+    if (!reason) {
+      setActionDialog((prev) => ({ ...prev, error: "A reason is required" }));
+      return;
+    }
 
     setWorking(true);
 
     try {
-
-      await api.patch(`/admin/properties/${id}/unlist`);
+      await api.patch(`/admin/properties/${id}/${actionDialog.action}`, { reason });
+      closeActionDialog();
       await loadProperty();
-
-    } finally {
-      setWorking(false);
-    }
-
-  };
-
-
-  const relist = async () => {
-
-    if (!window.confirm("Relist this property?")) return;
-
-    setWorking(true);
-
-    try {
-
-      await api.patch(`/admin/properties/${id}/relist`);
-      await loadProperty();
-
-    } finally {
-      setWorking(false);
-    }
-
-  };
-
-  const toggleFeatured = async () => {
-
-    if (!window.confirm(
-      property.featured
-        ? "Remove this property from featured listings?"
-        : "Add this property to featured listings?"
-    )) return;
-
-    setWorking(true);
-
-    try {
-      await api.patch(
-        `/admin/properties/${id}/${property.featured ? "unfeature" : "feature"}`
-      );
-      await loadProperty();
+    } catch (err) {
+      setActionDialog((prev) => ({
+        ...prev,
+        error: err.response?.data?.message || "Action failed",
+      }));
     } finally {
       setWorking(false);
     }
   };
+
+  const formatOperationLabel = (eventType) =>
+    String(eventType || "updated").replace(/^property_/, "").replace(/_/g, " ");
 
 
   if (loading) return <Loader fullScreen />;
@@ -159,7 +163,7 @@ const AdminPropertyDetail = () => {
             {isActive ? (
 
               <button
-                onClick={unlist}
+                onClick={() => openActionDialog("unlist")}
                 disabled={working}
                 className="px-3 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
@@ -169,7 +173,7 @@ const AdminPropertyDetail = () => {
             ) : (
 
               <button
-                onClick={relist}
+                onClick={() => openActionDialog("relist")}
                 disabled={working}
                 className="px-3 py-2 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
               >
@@ -179,7 +183,7 @@ const AdminPropertyDetail = () => {
             )}
 
             <button
-              onClick={toggleFeatured}
+              onClick={() => openActionDialog(property.featured ? "unfeature" : "feature")}
               disabled={working}
               className={`px-3 py-2 text-sm rounded-lg disabled:opacity-50 ${
                 property.featured
@@ -268,6 +272,105 @@ const AdminPropertyDetail = () => {
   </div>
 
 )}
+
+      <div className="bg-white border border-soft rounded-xl2 shadow-card p-6">
+        <h3 className="text-lg font-semibold mb-4 text-center">
+          Governance History
+        </h3>
+
+        {Array.isArray(property.operations) && property.operations.length > 0 ? (
+          <div className="space-y-3">
+            {property.operations.map((operation) => (
+              <div
+                key={operation.id}
+                className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold capitalize text-gray-800">
+                    {formatOperationLabel(operation.event_type)}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(operation.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <p className="mt-1 text-gray-600">
+                  {operation.note || "No note recorded"}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  By {operation.actor_name || "Admin"}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-center text-sm text-gray-500">
+            No property governance actions recorded yet.
+          </p>
+        )}
+      </div>
+
+      {actionDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl2 bg-white p-6 shadow-xl">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
+                Property governance
+              </p>
+              <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                {actionDialog.title}
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                This action affects the marketplace visibility of {property.title}.
+              </p>
+            </div>
+
+            <label className="text-sm font-medium text-gray-700">
+              Reason
+              <textarea
+                value={actionDialog.reason}
+                onChange={(event) =>
+                  setActionDialog((prev) => ({
+                    ...prev,
+                    reason: event.target.value,
+                    error: "",
+                  }))
+                }
+                className="input mt-1 min-h-[120px]"
+                placeholder="Explain why this property action is being taken"
+              />
+            </label>
+
+            {actionDialog.error && (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {actionDialog.error}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeActionDialog}
+                disabled={working}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitPropertyAction}
+                disabled={working}
+                className={
+                  actionDialog.action === "unlist"
+                    ? "btn btn-danger"
+                    : "btn btn-primary"
+                }
+              >
+                {working ? "Saving..." : actionDialog.title}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
 
