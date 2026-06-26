@@ -41,6 +41,7 @@ import InternalNotesPanel from '../../components/common/InternalNotesPanel';
 import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 import SupportGovernancePanel from '../../components/admin/SupportGovernancePanel';
+import SupportReplyActionModal from '../../components/common/SupportReplyActionModal';
 
 // Utility functions
 const badgeClass = (status) => {
@@ -116,6 +117,7 @@ const SuperSupportAdminDashboard = () => {
   const [replyText, setReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [loadingConversation, setLoadingConversation] = useState(false);
+  const [replyAction, setReplyAction] = useState({ open: false, action: '', reply: null });
   const isModalOpen = showModal;
 
   const loadConversation = useCallback(async (ticketId) => {
@@ -355,6 +357,14 @@ const SuperSupportAdminDashboard = () => {
 
   const handleDeleteReply = (replyId) => {
     setConversation((prev) => prev.filter((r) => r.id !== replyId));
+  };
+
+  const openReplyAction = (action, reply) => {
+    setReplyAction({ open: true, action, reply });
+  };
+
+  const closeReplyAction = () => {
+    setReplyAction({ open: false, action: '', reply: null });
   };
 
   const handleTicketUpdated = (updatedTicket) => {
@@ -1347,7 +1357,7 @@ const SuperSupportAdminDashboard = () => {
 
         {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className={`w-full rounded-xl bg-white p-6 shadow-xl ${modalType === 'view-ticket' ? 'max-w-2xl' : 'max-w-md'}`}>
             {modalType === 'view-details' && selectedItem && (
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Migration Request Details</h3>
@@ -1525,22 +1535,10 @@ const SuperSupportAdminDashboard = () => {
                                 {!reply.is_admin && reply.read_at && (
                                   <span className="flex items-center gap-1 text-[10px] text-green-600"><FaCheck size={8} /> Read {new Date(reply.read_at).toLocaleString()}</span>
                                 )}
-                                {reply.is_admin && (
+                                {reply.is_admin && Number(reply.user_id) === Number(user.id) && (
                                   <>
-                                    <button onClick={async () => {
-                                      const newMsg = prompt('Edit message:', reply.message);
-                                      if (newMsg && newMsg.trim()) {
-                                        try {
-                                          const res = await api.patch(`/support/tickets/${selectedItem.id}/reply/${reply.id}`, { message: newMsg.trim() });
-                                          handleEditReply(reply.id, res.data.data);
-                                        } catch (e) { toast.error('Failed to edit'); }
-                                      }
-                                    }} className="text-slate-400 hover:text-slate-600"><FaEdit size={11} /></button>
-                                    <button onClick={async () => {
-                                      if (!window.confirm('Delete this message?')) return;
-                                      try { await api.delete(`/support/tickets/${selectedItem.id}/reply/${reply.id}`); handleDeleteReply(reply.id); }
-                                      catch (e) { toast.error('Failed to delete'); }
-                                    }} className="text-slate-400 hover:text-red-500"><FaTrash size={11} /></button>
+                                    <button onClick={() => openReplyAction('edit', reply)} className="text-slate-400 hover:text-slate-600"><FaEdit size={11} /></button>
+                                    <button onClick={() => openReplyAction('delete', reply)} className="text-slate-400 hover:text-red-500"><FaTrash size={11} /></button>
                                   </>
                                 )}
                               </div>
@@ -1635,6 +1633,15 @@ const SuperSupportAdminDashboard = () => {
           </div>
         </div>
             )}
+      <SupportReplyActionModal
+        isOpen={replyAction.open}
+        action={replyAction.action}
+        ticketId={selectedItem?.id}
+        reply={replyAction.reply}
+        onClose={closeReplyAction}
+        onEdited={handleEditReply}
+        onDeleted={handleDeleteReply}
+      />
         </div>
       </div>
     </div>

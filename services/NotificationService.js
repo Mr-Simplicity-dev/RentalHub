@@ -1,4 +1,34 @@
 const db = require('../config/middleware/database');
+const { sendEmail } = require('../config/utils/mailer');
+const { getFrontendUrl } = require('../config/utils/frontendUrl');
+
+const money = (value) =>
+  new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency: 'NGN',
+    minimumFractionDigits: 0,
+  }).format(Number(value || 0));
+
+const sendTenantEmail = async ({ to, name, subject, message, path = '/fumigation-cleaning/bookings' }) => {
+  if (!to) return;
+  try {
+    const url = `${getFrontendUrl()}${path}`;
+    await sendEmail({
+      to,
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+          <h2 style="margin-bottom: 8px;">${subject}</h2>
+          <p>Hello ${name || 'there'},</p>
+          <p>${message}</p>
+          <p><a href="${url}" style="color: #2563eb;">Open your booking</a></p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error('Fumigation notification email error (non-fatal):', error.message || error);
+  }
+};
 
 class NotificationService {
   // Send booking confirmation notification
@@ -39,9 +69,13 @@ class NotificationService {
         ]
       );
       
-      // Log the notification (in production, you would send email/SMS here)
-      console.log(`Booking confirmation sent to tenant ${tenant.full_name} (${tenant.email})`);
-      console.log(`Booking ID: ${bookingId}, Reference: ${bookingReference}`);
+      await sendTenantEmail({
+        to: tenant.email,
+        name: tenant.full_name,
+        subject: 'Fumigation/Cleaning booking received',
+        message: `Your ${serviceType?.replace(/_/g, ' ') || 'fumigation/cleaning'} booking #${bookingReference} has been received. Our operations team will confirm the schedule and provider assignment.`,
+        path: `/fumigation-cleaning/bookings/${bookingId}`,
+      });
       
       return true;
     } catch (error) {
@@ -90,7 +124,15 @@ class NotificationService {
         ]
       );
       
-      console.log(`Booking cancellation sent to tenant ${tenant.full_name}`);
+      await sendTenantEmail({
+        to: tenant.email,
+        name: tenant.full_name,
+        subject: 'Fumigation/Cleaning booking cancelled',
+        message: cancellationFee > 0
+          ? `Your booking #${bookingReference} has been cancelled. A cancellation fee of ${money(cancellationFee)} applies.`
+          : `Your booking #${bookingReference} has been cancelled successfully.`,
+        path: `/fumigation-cleaning/bookings/${bookingId}`,
+      });
       
       return true;
     } catch (error) {
@@ -137,7 +179,13 @@ class NotificationService {
         ]
       );
       
-      console.log(`Payment confirmation sent to tenant ${tenant.full_name}`);
+      await sendTenantEmail({
+        to: tenant.email,
+        name: tenant.full_name,
+        subject: 'Fumigation/Cleaning payment confirmed',
+        message: `Your payment of ${money(amount)} for booking #${bookingId} has been confirmed. Reference: ${paymentReference}.`,
+        path: `/fumigation-cleaning/bookings/${bookingId}`,
+      });
       
       return true;
     } catch (error) {
@@ -194,7 +242,13 @@ class NotificationService {
         ]
       );
       
-      console.log(`Booking status update sent to tenant ${tenant.full_name}: ${newStatus}`);
+      await sendTenantEmail({
+        to: tenant.email,
+        name: tenant.full_name,
+        subject: 'Fumigation/Cleaning booking update',
+        message: `Your booking #${bookingReference} ${message}.${updateDetails?.admin_note ? ` Note: ${updateDetails.admin_note}` : ''}`,
+        path: `/fumigation-cleaning/bookings/${bookingId}`,
+      });
       
       return true;
     } catch (error) {
@@ -241,7 +295,13 @@ class NotificationService {
         ]
       );
       
-      console.log(`Provider assignment sent to tenant ${tenant.full_name}`);
+      await sendTenantEmail({
+        to: tenant.email,
+        name: tenant.full_name,
+        subject: 'Fumigation/Cleaning provider assigned',
+        message: `Provider ${providerName} has been assigned to your booking #${bookingReference}. Contact: ${contactPerson}${contactPhone ? ` (${contactPhone})` : ''}.`,
+        path: `/fumigation-cleaning/bookings/${bookingId}`,
+      });
       
       return true;
     } catch (error) {
@@ -265,7 +325,6 @@ class NotificationService {
         [userId, title, message, type, relatedId, relatedType]
       );
       
-      console.log(`Notification sent to user ${userId}: ${title}`);
       return true;
     } catch (error) {
       console.error('Error sending notification:', error);

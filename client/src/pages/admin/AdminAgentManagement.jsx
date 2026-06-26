@@ -9,6 +9,14 @@ const AdminAgentManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [filters, setFilters] = useState({ status: 'active' });
+  const [assignmentAction, setAssignmentAction] = useState({
+    open: false,
+    action: '',
+    assignment: null,
+    note: '',
+    error: '',
+    working: false,
+  });
   const [formData, setFormData] = useState({
     landlordId: '',
     agentId: '',
@@ -78,44 +86,62 @@ const AdminAgentManagement = () => {
     }
   };
 
-  const handleRevoke = async (assignmentId) => {
-    if (!window.confirm('Are you sure you want to revoke this assignment?')) return;
-
-    try {
-      const response = await api.post(`/admin/agents/assignments/${assignmentId}/revoke`, {});
-      
-      if (response.data?.success) {
-        toast.success('Assignment revoked successfully');
-        loadAssignments();
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to revoke assignment');
-    }
+  const openAssignmentAction = (action, assignment) => {
+    setAssignmentAction({
+      open: true,
+      action,
+      assignment,
+      note: '',
+      error: '',
+      working: false,
+    });
   };
 
-  const handleDeactivate = async (assignmentId) => {
-    try {
-      const response = await api.post(`/admin/agents/assignments/${assignmentId}/deactivate`, {});
-      
-      if (response.data?.success) {
-        toast.success('Assignment deactivated');
-        loadAssignments();
-      }
-    } catch (error) {
-      toast.error('Failed to deactivate assignment');
-    }
+  const closeAssignmentAction = () => {
+    if (assignmentAction.working) return;
+    setAssignmentAction({
+      open: false,
+      action: '',
+      assignment: null,
+      note: '',
+      error: '',
+      working: false,
+    });
   };
 
-  const handleReactivate = async (assignmentId) => {
+  const submitAssignmentAction = async (e) => {
+    e.preventDefault();
+
+    const note = assignmentAction.note.trim();
+    if (!note) {
+      setAssignmentAction((prev) => ({ ...prev, error: 'A governance note is required.' }));
+      return;
+    }
+
+    const assignmentId = assignmentAction.assignment?.id;
+    if (!assignmentId || !assignmentAction.action) return;
+
+    setAssignmentAction((prev) => ({ ...prev, working: true, error: '' }));
     try {
-      const response = await api.post(`/admin/agents/assignments/${assignmentId}/reactivate`, {});
+      const response = await api.post(`/admin/agents/assignments/${assignmentId}/${assignmentAction.action}`, {
+        reason: note,
+      });
       
       if (response.data?.success) {
-        toast.success('Assignment reactivated');
-        loadAssignments();
+        toast.success(response.data.message || 'Assignment updated');
+        setAssignmentAction({
+          open: false,
+          action: '',
+          assignment: null,
+          note: '',
+          error: '',
+          working: false,
+        });
+        await loadAssignments();
       }
     } catch (error) {
-      toast.error('Failed to reactivate assignment');
+      toast.error(error.response?.data?.message || 'Failed to update assignment');
+      setAssignmentAction((prev) => ({ ...prev, working: false }));
     }
   };
 
@@ -219,19 +245,40 @@ const AdminAgentManagement = () => {
                       </div>
                     </div>
                   </div>
+
+                  {assignment.latest_operation && (
+                    <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50 p-3">
+                      <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                          {formatOperation(assignment.latest_operation.event_type)}
+                        </p>
+                        <p className="text-xs text-indigo-500">
+                          {assignment.latest_operation.created_at
+                            ? new Date(assignment.latest_operation.created_at).toLocaleString()
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <p className="mt-1 text-sm text-indigo-900">
+                        {assignment.latest_operation.note || 'No note recorded'}
+                      </p>
+                      <p className="mt-1 text-xs text-indigo-600">
+                        By {assignment.latest_operation.actor_name || 'System'}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   {assignment.status === 'active' ? (
                     <>
                       <button
-                        onClick={() => handleDeactivate(assignment.id)}
+                        onClick={() => openAssignmentAction('deactivate', assignment)}
                         className="btn btn-sm btn-outline"
                       >
                         Deactivate
                       </button>
                       <button
-                        onClick={() => handleRevoke(assignment.id)}
+                        onClick={() => openAssignmentAction('revoke', assignment)}
                         className="btn btn-sm btn-danger"
                       >
                         Revoke
@@ -239,7 +286,7 @@ const AdminAgentManagement = () => {
                     </>
                   ) : assignment.status === 'inactive' ? (
                     <button
-                      onClick={() => handleReactivate(assignment.id)}
+                      onClick={() => openAssignmentAction('reactivate', assignment)}
                       className="btn btn-sm btn-primary"
                     >
                       Reactivate
@@ -322,8 +369,59 @@ const AdminAgentManagement = () => {
           </div>
         </div>
       )}
+
+      {assignmentAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <form onSubmit={submitAssignmentAction} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-xl font-bold text-gray-900">
+              {formatOperation(`assignment_${assignmentAction.action}d`)}
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Add the reason for this agent assignment decision.
+            </p>
+            <div className="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+              <p><span className="font-medium">Agent:</span> {assignmentAction.assignment?.agent_name || 'N/A'}</p>
+              <p><span className="font-medium">Landlord:</span> {assignmentAction.assignment?.landlord_name || 'N/A'}</p>
+            </div>
+            <label className="mt-5 block text-sm font-medium text-gray-700">Governance Note</label>
+            <textarea
+              value={assignmentAction.note}
+              onChange={(e) => setAssignmentAction((prev) => ({ ...prev, note: e.target.value, error: '' }))}
+              rows={4}
+              className="mt-2 w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              placeholder="Explain why this assignment is being changed..."
+            />
+            {assignmentAction.error && (
+              <p className="mt-2 text-sm text-red-600">{assignmentAction.error}</p>
+            )}
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={closeAssignmentAction}
+                disabled={assignmentAction.working}
+                className="btn btn-outline flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={assignmentAction.working}
+                className="btn btn-primary flex-1"
+              >
+                {assignmentAction.working ? 'Saving...' : 'Save Action'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
+
+const formatOperation = (eventType) =>
+  String(eventType || 'assignment_action')
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
 export default AdminAgentManagement;

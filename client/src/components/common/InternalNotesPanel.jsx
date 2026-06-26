@@ -12,6 +12,8 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const listRef = useRef(null);
 
   const loadNotes = useCallback(async () => {
@@ -70,13 +72,18 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
     }
   };
 
-  const handleDelete = async (noteId) => {
-    if (!window.confirm('Delete this internal note?')) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+
+    setDeleting(true);
     try {
-      await api.delete(`/support/tickets/${ticketId}/internal-notes/${noteId}`);
-      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      await api.delete(`/support/tickets/${ticketId}/internal-notes/${deleteTarget.id}`);
+      setNotes((prev) => prev.filter((n) => n.id !== deleteTarget.id));
+      setDeleteTarget(null);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -102,7 +109,7 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
                     {editingId !== note.id && (
                       <button onClick={() => { setEditingId(note.id); setEditText(note.message); }} className="text-slate-400 hover:text-slate-600"><FaEdit size={10} /></button>
                     )}
-                    <button onClick={() => handleDelete(note.id)} className="text-slate-400 hover:text-red-500"><FaTrash size={10} /></button>
+                    <button onClick={() => setDeleteTarget(note)} className="text-slate-400 hover:text-red-500"><FaTrash size={10} /></button>
                   </div>
                 )}
               </div>
@@ -138,6 +145,39 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
           {sending ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaCommentDots size={12} />}
         </button>
       </div>
+      )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">Delete Internal Note</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              This removes your internal admin note from the ticket thread.
+            </p>
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="line-clamp-4 whitespace-pre-wrap text-sm text-amber-900">
+                {deleteTarget.message}
+              </p>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Keep Note
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete Note'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

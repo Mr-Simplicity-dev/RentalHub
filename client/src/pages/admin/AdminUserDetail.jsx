@@ -12,6 +12,13 @@ const AdminUserDetail = () => {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [assigningAgent, setAssigningAgent] = useState(false);
+  const [accountAction, setAccountAction] = useState({
+    open: false,
+    action: '',
+    title: '',
+    reason: '',
+    error: '',
+  });
   const [agentForm, setAgentForm] = useState({
     agent_full_name: '',
     agent_email: '',
@@ -36,33 +43,63 @@ const AdminUserDetail = () => {
     loadUser();
   }, [loadUser]);
 
-  const disableUser = async () => {
-    if (!window.confirm('Disable this user?')) return;
+  const openAccountAction = (action) => {
+    const actionMap = {
+      verify: 'Verify User',
+      disable: 'Disable User',
+    };
 
-    setWorking(true);
-    try {
-      const res = await api.delete(`/admin/users/${id}`);
-      toast.success(res.data?.message || 'User disabled successfully');
-      navigate('/admin/users');
-    } catch (err) {
-      console.error('Failed to disable user:', err);
-      toast.error(err.response?.data?.message || 'Failed to disable user');
-    } finally {
-      setWorking(false);
-    }
+    setAccountAction({
+      open: true,
+      action,
+      title: actionMap[action] || 'Account Action',
+      reason: '',
+      error: '',
+    });
   };
 
-  const verifyUser = async () => {
-    if (!['tenant', 'landlord'].includes(user?.user_type)) return;
+  const closeAccountAction = () => {
+    if (working) return;
+    setAccountAction({
+      open: false,
+      action: '',
+      title: '',
+      reason: '',
+      error: '',
+    });
+  };
+
+  const submitAccountAction = async (e) => {
+    e.preventDefault();
+
+    const reason = accountAction.reason.trim();
+    if (!reason) {
+      setAccountAction((prev) => ({ ...prev, error: 'A governance note is required.' }));
+      return;
+    }
+
+    if (accountAction.action === 'verify' && !['tenant', 'landlord'].includes(user?.user_type)) {
+      return;
+    }
 
     setWorking(true);
     try {
-      const res = await api.patch(`/admin/users/${id}/verify`);
-      toast.success(res.data?.message || 'User verified successfully');
-      await loadUser();
+      if (accountAction.action === 'disable') {
+        const res = await api.delete(`/admin/users/${id}`, { data: { reason } });
+        toast.success(res.data?.message || 'User disabled successfully');
+        navigate('/admin/users');
+        return;
+      }
+
+      if (accountAction.action === 'verify') {
+        const res = await api.patch(`/admin/users/${id}/verify`, { reason });
+        toast.success(res.data?.message || 'User verified successfully');
+        closeAccountAction();
+        await loadUser();
+      }
     } catch (err) {
-      console.error('Verification failed:', err);
-      toast.error(err.response?.data?.message || 'Verification failed');
+      console.error('Account action failed:', err);
+      toast.error(err.response?.data?.message || 'Account action failed');
     } finally {
       setWorking(false);
     }
@@ -122,7 +159,7 @@ const AdminUserDetail = () => {
             {!user.identity_verified &&
               ['tenant', 'landlord'].includes(user.user_type) && (
                 <button
-                  onClick={verifyUser}
+                  onClick={() => openAccountAction('verify')}
                   disabled={working}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
                 >
@@ -131,7 +168,7 @@ const AdminUserDetail = () => {
               )}
 
             <button
-              onClick={disableUser}
+              onClick={() => openAccountAction('disable')}
               disabled={working}
               className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50"
             >
@@ -151,6 +188,34 @@ const AdminUserDetail = () => {
           <Status label="Email Verified" status={user.email_verified} />
           <Status label="Phone Verified" status={user.phone_verified} />
           <Status label="Identity Verified" status={user.identity_verified} />
+        </div>
+
+        <div className="mt-8 border-t pt-6">
+          <h3 className="text-lg font-semibold text-gray-800">Account Governance</h3>
+          <div className="mt-4 space-y-3">
+            {(user.account_operations || []).length ? (
+              user.account_operations.map((operation) => (
+                <div key={operation.id} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {formatEventType(operation.event_type)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {operation.created_at ? new Date(operation.created_at).toLocaleString() : 'N/A'}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-700">{operation.note || 'No note recorded'}</p>
+                  <p className="mt-2 text-xs text-gray-500">
+                    By {operation.actor_name || 'System'}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                No account governance actions have been recorded yet.
+              </div>
+            )}
+          </div>
         </div>
 
         {user.user_type === 'landlord' && (
@@ -230,6 +295,65 @@ const AdminUserDetail = () => {
           </div>
         )}
       </div>
+
+      {accountAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <form onSubmit={submitAccountAction} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{accountAction.title}</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Record a clear reason so this account decision can be audited later.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAccountAction}
+                disabled={working}
+                className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+              >
+                &times;
+              </button>
+            </div>
+
+            <label className="mt-5 block text-sm font-medium text-gray-700">
+              Governance Note
+            </label>
+            <textarea
+              value={accountAction.reason}
+              onChange={(e) => setAccountAction((prev) => ({
+                ...prev,
+                reason: e.target.value,
+                error: '',
+              }))}
+              rows={4}
+              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              placeholder="Explain the account decision..."
+            />
+            {accountAction.error && (
+              <p className="mt-2 text-sm text-red-600">{accountAction.error}</p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeAccountAction}
+                disabled={working}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={working}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {working ? 'Saving...' : 'Save Action'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
@@ -261,5 +385,11 @@ const Status = ({ label, status }) => (
     </p>
   </div>
 );
+
+const formatEventType = (eventType) =>
+  String(eventType || 'account_action')
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
 export default AdminUserDetail;

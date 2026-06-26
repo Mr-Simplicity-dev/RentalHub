@@ -26,6 +26,7 @@ import {
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import BackToDashboard from '../components/common/BackToDashboard';
+import BookingCancelModal from '../components/common/BookingCancelModal';
 
 const FumigationCleaningBookings = () => {
   const { user } = useAuth();
@@ -34,6 +35,8 @@ const FumigationCleaningBookings = () => {
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState([]);
   const [filter, setFilter] = useState('all'); // all, pending, confirmed, in_progress, completed, cancelled
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
   const [stats, setStats] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('created_at');
@@ -193,25 +196,34 @@ const FumigationCleaningBookings = () => {
     return timeString;
   };
   
-  const handleCancelBooking = async (bookingId) => {
-    if (!window.confirm('Are you sure you want to cancel this booking? Cancellations within 12 hours of service may incur a 50% fee.')) return;
-    
+  const refreshBookings = async () => {
+    const bookingsRes = await api.get('/fumigation-cleaning/bookings');
+    if (bookingsRes.data?.success) {
+      setBookings(bookingsRes.data.data);
+    }
+  };
+
+  const handleCancelBooking = async (reason) => {
+    if (!cancelTarget) return;
+
+    setCancelling(true);
     try {
-      const response = await api.delete(`/fumigation-cleaning/bookings/${bookingId}/cancel`);
+      const response = await api.delete(`/fumigation-cleaning/bookings/${cancelTarget.id}/cancel`, {
+        data: { cancellation_reason: reason }
+      });
       
       if (response.data?.success) {
         toast.success('Booking cancelled successfully');
-        // Refresh bookings
-        const bookingsRes = await api.get('/fumigation-cleaning/bookings');
-        if (bookingsRes.data?.success) {
-          setBookings(bookingsRes.data.data);
-        }
+        setCancelTarget(null);
+        await refreshBookings();
       } else {
         toast.error(response.data?.message || 'Failed to cancel booking');
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
       toast.error(error.response?.data?.message || 'Failed to cancel booking');
+    } finally {
+      setCancelling(false);
     }
   };
   
@@ -534,7 +546,7 @@ const FumigationCleaningBookings = () => {
                           
                           {booking.booking_status === 'pending' && booking.payment_status === 'completed' && (
                             <button
-                              onClick={() => handleCancelBooking(booking.id)}
+                              onClick={() => setCancelTarget(booking)}
                               className="btn btn-sm btn-gray"
                             >
                               Cancel
@@ -649,6 +661,15 @@ const FumigationCleaningBookings = () => {
           </div>
         </div>
       </div>
+      <BookingCancelModal
+        isOpen={!!cancelTarget}
+        title="Cancel Fumigation or Cleaning Booking"
+        message="Please share why you are cancelling this service booking."
+        warning="Cancellations close to the service date may include a cancellation fee."
+        loading={cancelling}
+        onClose={() => !cancelling && setCancelTarget(null)}
+        onConfirm={handleCancelBooking}
+      />
     </div>
   );
 };

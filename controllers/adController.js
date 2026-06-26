@@ -161,6 +161,23 @@ const ensureAdSpacesSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_ad_spaces_schedule
       ON ad_spaces (starts_at, ends_at);
+
+    CREATE TABLE IF NOT EXISTS ad_space_operations (
+      id SERIAL PRIMARY KEY,
+      ad_space_id INTEGER,
+      actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name VARCHAR(255),
+      event_type VARCHAR(80) NOT NULL,
+      note TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ad_space_operations_ad_space
+      ON ad_space_operations (ad_space_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_ad_space_operations_created
+      ON ad_space_operations (created_at DESC);
   `);
 
   adSpacesSchemaReady = true;
@@ -242,6 +259,40 @@ const normalizeId = (value) => {
     throwValidation('Invalid ad space id');
   }
   return id;
+};
+
+const getActorName = (user = {}) =>
+  user.full_name || user.name || user.email || user.username || `Admin #${user.id || 'unknown'}`;
+
+const normalizeActionNote = (payload, message) => {
+  const note = String(payload?.reason || payload?.note || payload?.approval_note || '').trim();
+  if (!note) {
+    throwValidation(message);
+  }
+  return note;
+};
+
+const recordAdSpaceOperation = async ({
+  adSpaceId,
+  actor,
+  eventType,
+  note = '',
+  metadata = {},
+}) => {
+  await db.query(
+    `INSERT INTO ad_space_operations (
+       ad_space_id, actor_id, actor_name, event_type, note, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+    [
+      adSpaceId || null,
+      actor?.id || null,
+      getActorName(actor),
+      eventType,
+      note || null,
+      JSON.stringify(metadata || {}),
+    ]
+  );
 };
 
 const normalizeAdPayload = (payload) => {
@@ -385,10 +436,21 @@ const adminListAds = async (req, res) => {
     const { rows } = await db.query(
       `SELECT a.*,
               creator.full_name AS created_by_name,
-              updater.full_name AS updated_by_name
+              updater.full_name AS updated_by_name,
+              COALESCE(ops.operations, '[]'::json) AS operations
        FROM ad_spaces a
        LEFT JOIN users creator ON creator.id = a.created_by
        LEFT JOIN users updater ON updater.id = a.updated_by
+       LEFT JOIN LATERAL (
+         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
+         FROM (
+           SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
+           FROM ad_space_operations
+           WHERE ad_space_id = a.id
+           ORDER BY created_at DESC, id DESC
+           LIMIT 3
+         ) operation_rows
+       ) ops ON TRUE
        ORDER BY a.placement ASC, a.sort_order ASC, a.created_at DESC`
     );
 
@@ -462,10 +524,20 @@ const updateAd = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ad space not found' });
     }
 
+    const existingAd = existingResult.rows[0];
     const ad = normalizeAdPayload({
-      ...existingResult.rows[0],
+      ...existingAd,
       ...(req.body || {}),
     });
+    const statusChanged = existingAd.is_active !== ad.is_active;
+    const actionNote = statusChanged
+      ? normalizeActionNote(
+          req.body,
+          ad.is_active
+            ? 'An activation reason is required'
+            : 'A pause reason is required'
+        )
+      : String(req.body?.reason || req.body?.note || '').trim();
 
     const { rows } = await db.query(
       `UPDATE ad_spaces
@@ -515,6 +587,32 @@ const updateAd = async (req, res) => {
       ]
     );
 
+    if (statusChanged) {
+      await recordAdSpaceOperation({
+        adSpaceId: adId,
+        actor: req.user,
+        eventType: ad.is_active ? 'ad_space_activated' : 'ad_space_paused',
+        note: actionNote,
+        metadata: {
+          title: rows[0].title,
+          placement: rows[0].placement,
+          previous_is_active: existingAd.is_active,
+          new_is_active: rows[0].is_active,
+        },
+      });
+    } else if (actionNote) {
+      await recordAdSpaceOperation({
+        adSpaceId: adId,
+        actor: req.user,
+        eventType: 'ad_space_updated',
+        note: actionNote,
+        metadata: {
+          title: rows[0].title,
+          placement: rows[0].placement,
+        },
+      });
+    }
+
     res.json({ success: true, data: rows[0] });
   } catch (error) {
     handleControllerError(res, error, 'Failed to update ad space');
@@ -525,6 +623,16 @@ const deleteAd = async (req, res) => {
   try {
     await ensureAdSpacesSchema();
     const adId = normalizeId(req.params.id);
+    const actionNote = normalizeActionNote(req.body, 'A deletion reason is required');
+
+    const existingResult = await db.query(
+      `SELECT * FROM ad_spaces WHERE id = $1`,
+      [adId]
+    );
+
+    if (!existingResult.rows.length) {
+      return res.status(404).json({ success: false, message: 'Ad space not found' });
+    }
 
     const result = await db.query(
       `DELETE FROM ad_spaces WHERE id = $1 RETURNING id`,
@@ -534,6 +642,20 @@ const deleteAd = async (req, res) => {
     if (!result.rows.length) {
       return res.status(404).json({ success: false, message: 'Ad space not found' });
     }
+
+    await recordAdSpaceOperation({
+      adSpaceId: adId,
+      actor: req.user,
+      eventType: 'ad_space_deleted',
+      note: actionNote,
+      metadata: {
+        title: existingResult.rows[0].title,
+        placement: existingResult.rows[0].placement,
+        sponsor_name: existingResult.rows[0].sponsor_name,
+        target_url: existingResult.rows[0].target_url,
+        was_active: existingResult.rows[0].is_active,
+      },
+    });
 
     res.json({ success: true });
   } catch (error) {

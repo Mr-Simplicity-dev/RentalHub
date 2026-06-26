@@ -16,6 +16,14 @@ const RegistrationAccessRulesTab = () => {
   const [locations, setLocations] = useState([]);
   const [editingRuleId, setEditingRuleId] = useState(null);
   const [form, setForm] = useState(defaultForm);
+  const [ruleAction, setRuleAction] = useState({
+    open: false,
+    rule: null,
+    action: '',
+    reason: '',
+    loading: false,
+    error: '',
+  });
 
   const loadRegistrationAccessData = async () => {
     try {
@@ -115,17 +123,37 @@ const RegistrationAccessRulesTab = () => {
     });
   };
 
-  const handleDelete = async (ruleId) => {
-    if (!window.confirm('Delete this registration access rule?')) {
-      return;
-    }
+  const openRuleAction = (rule, action) => {
+    setRuleAction({
+      open: true,
+      rule,
+      action,
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
 
+  const closeRuleAction = () => {
+    setRuleAction({
+      open: false,
+      rule: null,
+      action: '',
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const handleDelete = async (rule, reason) => {
     try {
       setLoading(true);
-      await api.delete(`/super/registration-access-rules/${ruleId}`);
+      await api.delete(`/super/registration-access-rules/${rule.id}`, {
+        data: { reason },
+      });
       toast.success('Registration access rule deleted');
 
-      if (editingRuleId === ruleId) {
+      if (editingRuleId === rule.id) {
         resetForm();
       }
 
@@ -136,12 +164,13 @@ const RegistrationAccessRulesTab = () => {
         error.response?.data?.message ||
           'Failed to delete registration access rule'
       );
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleActive = async (rule) => {
+  const toggleActive = async (rule, reason) => {
     try {
       setLoading(true);
       await api.patch(`/super/registration-access-rules/${rule.id}`, {
@@ -149,6 +178,7 @@ const RegistrationAccessRulesTab = () => {
         state_id: rule.state_id,
         lga_name: rule.lga_name || undefined,
         is_active: !rule.is_active,
+        reason,
       });
       toast.success(
         `Registration access rule ${rule.is_active ? 'disabled' : 'enabled'}`
@@ -160,9 +190,45 @@ const RegistrationAccessRulesTab = () => {
         error.response?.data?.message ||
           'Failed to update registration access rule'
       );
+      throw error;
     } finally {
       setLoading(false);
     }
+  };
+
+  const submitRuleAction = async () => {
+    const reason = ruleAction.reason.trim();
+    if (!reason) {
+      setRuleAction((prev) => ({ ...prev, error: 'A reason is required' }));
+      return;
+    }
+
+    try {
+      setRuleAction((prev) => ({ ...prev, loading: true, error: '' }));
+      if (ruleAction.action === 'delete') {
+        await handleDelete(ruleAction.rule, reason);
+      } else {
+        await toggleActive(ruleAction.rule, reason);
+      }
+      closeRuleAction();
+    } catch {
+      setRuleAction((prev) => ({
+        ...prev,
+        loading: false,
+        error: 'Action failed. Check the message above and try again.',
+      }));
+    }
+  };
+
+  const formatOperationLabel = (eventType) => {
+    const labels = {
+      registration_access_rule_created: 'Created',
+      registration_access_rule_updated: 'Updated',
+      registration_access_rule_enabled: 'Enabled',
+      registration_access_rule_disabled: 'Disabled',
+      registration_access_rule_deleted: 'Deleted',
+    };
+    return labels[eventType] || String(eventType || 'Updated').replace(/_/g, ' ');
   };
 
   return (
@@ -367,19 +433,33 @@ const RegistrationAccessRulesTab = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => toggleActive(rule)}
+                          onClick={() => openRuleAction(rule, rule.is_active ? 'disable' : 'enable')}
                           className="rounded-lg bg-amber-600 px-3 py-1 text-xs text-white transition hover:bg-amber-700"
                         >
                           {rule.is_active ? 'Disable' : 'Enable'}
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(rule.id)}
+                          onClick={() => openRuleAction(rule, 'delete')}
                           className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white transition hover:bg-red-700"
                         >
                           Delete
                         </button>
                       </div>
+                      {Array.isArray(rule.operations) && rule.operations.length > 0 && (
+                        <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-2 text-left text-xs text-gray-600">
+                          <p className="font-semibold text-gray-800">
+                            {formatOperationLabel(rule.operations[0].event_type)}
+                            {' '}
+                            <span className="font-normal text-gray-500">
+                              by {rule.operations[0].actor_name || 'Admin'}
+                            </span>
+                          </p>
+                          <p className="mt-1 line-clamp-2">
+                            {rule.operations[0].note || 'No note recorded'}
+                          </p>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -388,6 +468,75 @@ const RegistrationAccessRulesTab = () => {
           </table>
         </div>
       </div>
+
+      {ruleAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl2 bg-white p-6 shadow-xl">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
+                Registration access governance
+              </p>
+              <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                {ruleAction.action === 'delete'
+                  ? 'Delete access rule'
+                  : ruleAction.action === 'disable'
+                    ? 'Disable access rule'
+                    : 'Enable access rule'}
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                This can change where users are allowed to create accounts.
+              </p>
+            </div>
+
+            <label className="text-sm font-medium text-gray-700">
+              Reason
+              <textarea
+                value={ruleAction.reason}
+                onChange={(event) =>
+                  setRuleAction((prev) => ({
+                    ...prev,
+                    reason: event.target.value,
+                    error: '',
+                  }))
+                }
+                className="input mt-1 min-h-[120px]"
+                placeholder="Explain the registration access decision"
+              />
+            </label>
+
+            {ruleAction.error && (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {ruleAction.error}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeRuleAction}
+                disabled={ruleAction.loading}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitRuleAction}
+                disabled={ruleAction.loading}
+                className={ruleAction.action === 'delete' ? 'btn btn-danger' : 'btn btn-primary'}
+              >
+                {ruleAction.loading
+                  ? 'Saving...'
+                  : ruleAction.action === 'delete'
+                    ? 'Delete Rule'
+                    : ruleAction.action === 'disable'
+                      ? 'Disable Rule'
+                      : 'Enable Rule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -22,6 +22,13 @@ const DepartmentSupportEscalations = ({ department = '', title = 'Support Escala
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState([]);
   const [actionId, setActionId] = useState('');
+  const [statusDialog, setStatusDialog] = useState({
+    open: false,
+    ticket: null,
+    status: '',
+    note: '',
+    error: '',
+  });
 
   const loadEscalations = useCallback(async () => {
     setLoading(true);
@@ -48,8 +55,39 @@ const DepartmentSupportEscalations = ({ department = '', title = 'Support Escala
     resolved: tickets.filter((ticket) => ticket.escalation_status === 'resolved').length,
   }), [tickets]);
 
-  const updateStatus = async (ticket, status) => {
-    const note = window.prompt(`Add a note for ${label(status)}:`, '');
+  const openStatusDialog = (ticket, status) => {
+    setStatusDialog({
+      open: true,
+      ticket,
+      status,
+      note: '',
+      error: '',
+    });
+  };
+
+  const closeStatusDialog = () => {
+    if (actionId) return;
+    setStatusDialog({
+      open: false,
+      ticket: null,
+      status: '',
+      note: '',
+      error: '',
+    });
+  };
+
+  const updateStatus = async (event) => {
+    event.preventDefault();
+
+    const { ticket, status } = statusDialog;
+    if (!ticket || !status) return;
+
+    const note = statusDialog.note.trim();
+    if (['action_required', 'resolved'].includes(status) && !note) {
+      setStatusDialog((prev) => ({ ...prev, error: 'A note is required for this status.' }));
+      return;
+    }
+
     setActionId(`${ticket.id}-${status}`);
     try {
       await api.patch(`/support/department-escalations/${ticket.id}/status`, {
@@ -57,6 +95,7 @@ const DepartmentSupportEscalations = ({ department = '', title = 'Support Escala
         note: note || undefined,
       });
       toast.success('Escalation updated');
+      closeStatusDialog();
       await loadEscalations();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update escalation');
@@ -114,18 +153,64 @@ const DepartmentSupportEscalations = ({ department = '', title = 'Support Escala
                     <FaExternalLinkAlt /> Open Related Work
                   </a>
                 )}
-                <button disabled={Boolean(actionId)} onClick={() => updateStatus(ticket, 'acknowledged')} className="inline-flex items-center gap-2 rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">
+                <button disabled={Boolean(actionId)} onClick={() => openStatusDialog(ticket, 'acknowledged')} className="inline-flex items-center gap-2 rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">
                   <FaClipboardCheck /> Acknowledge
                 </button>
-                <button disabled={Boolean(actionId)} onClick={() => updateStatus(ticket, 'action_required')} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50">
+                <button disabled={Boolean(actionId)} onClick={() => openStatusDialog(ticket, 'action_required')} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50">
                   <FaExclamationTriangle /> Action Required
                 </button>
-                <button disabled={Boolean(actionId)} onClick={() => updateStatus(ticket, 'resolved')} className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50">
+                <button disabled={Boolean(actionId)} onClick={() => openStatusDialog(ticket, 'resolved')} className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50">
                   <FaCheckCircle /> Department Resolved
                 </button>
               </div>
             </article>
           ))}
+        </div>
+      )}
+      {statusDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <form onSubmit={updateStatus} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Mark as {label(statusDialog.status)}
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Add context for ticket #{statusDialog.ticket?.id}. This note is saved to the support escalation timeline.
+            </p>
+            <label className="mt-5 block text-sm font-medium text-gray-700">
+              Department Note {statusDialog.status === 'acknowledged' ? '(Optional)' : ''}
+            </label>
+            <textarea
+              value={statusDialog.note}
+              onChange={(event) => setStatusDialog((prev) => ({
+                ...prev,
+                note: event.target.value,
+                error: '',
+              }))}
+              rows={4}
+              className="mt-2 w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              placeholder="What did the department review, decide, or complete?"
+            />
+            {statusDialog.error && (
+              <p className="mt-2 text-sm text-red-600">{statusDialog.error}</p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeStatusDialog}
+                disabled={Boolean(actionId)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={Boolean(actionId)}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {actionId ? 'Saving...' : 'Save Status'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </section>

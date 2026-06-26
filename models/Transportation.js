@@ -162,6 +162,16 @@ class TransportationService {
       updates.push(`completed_at = CURRENT_TIMESTAMP`);
     } else if (status === 'cancelled') {
       updates.push(`cancelled_at = CURRENT_TIMESTAMP`);
+      if (updateData.cancellation_reason) {
+        updates.push(`cancellation_reason = $${paramCount}`);
+        params.push(updateData.cancellation_reason);
+        paramCount++;
+      }
+      if (updateData.cancelled_by) {
+        updates.push(`cancelled_by = $${paramCount}`);
+        params.push(updateData.cancelled_by);
+        paramCount++;
+      }
     }
     
     updates.push(`updated_at = CURRENT_TIMESTAMP`);

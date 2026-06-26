@@ -10,10 +10,12 @@ import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import InternalNotesPanel from '../../components/common/InternalNotesPanel';
 import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
+import SupportReplyActionModal from '../../components/common/SupportReplyActionModal';
 
 const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(reply.message);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const handleSaveEdit = async () => {
     if (!editText.trim()) return;
@@ -23,16 +25,6 @@ const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
       setEditing(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to edit');
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!window.confirm('Delete this message?')) return;
-    try {
-      await api.delete(`/support/tickets/${ticketId}/reply/${reply.id}`);
-      onDelete(reply.id);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
     }
   };
 
@@ -53,7 +45,7 @@ const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
           {isOwn && (
             <>
               {!editing && <button onClick={() => setEditing(true)} className="text-gray-400 hover:text-gray-600"><FaEdit size={11} /></button>}
-              <button onClick={handleDelete} className="text-gray-400 hover:text-red-500"><FaTrash size={11} /></button>
+              <button onClick={() => setDeleteOpen(true)} className="text-gray-400 hover:text-red-500"><FaTrash size={11} /></button>
             </>
           )}
         </div>
@@ -80,6 +72,14 @@ const ChatMessage = ({ reply, isOwn, onEdit, onDelete, ticketId }) => {
           <FaFile size={12} /> {reply.attachment_name || 'Attachment'}
         </a>
       ) : null}
+      <SupportReplyActionModal
+        isOpen={deleteOpen}
+        action="delete"
+        ticketId={ticketId}
+        reply={reply}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={onDelete}
+      />
     </div>
   );
 };
@@ -168,7 +168,7 @@ const LgaSupportAdminDashboard = () => {
       socket.off('ticket:typing', typingHandler);
       socket.off('ticket:internal_note', internalNoteHandler);
     };
-  }, [socket, selectedTicket, fetchUnreadInternalNotes]);
+  }, [socket, selectedTicket, fetchUnreadInternalNotes, loadConversation]);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -365,7 +365,7 @@ const LgaSupportAdminDashboard = () => {
                 <div className="py-4 text-center text-sm text-gray-400">No replies yet.</div>
               ) : (
                 conversation.map((reply) => (
-                  <ChatMessage key={reply.id} reply={reply} isOwn={reply.is_admin} ticketId={selectedTicket.id}
+                  <ChatMessage key={reply.id} reply={reply} isOwn={reply.is_admin && Number(reply.user_id) === Number(user.id)} ticketId={selectedTicket.id}
                     onEdit={(rid, updated) => handleEditReply(rid, updated)}
                     onDelete={(rid) => handleDeleteReply(rid)} />
                 ))

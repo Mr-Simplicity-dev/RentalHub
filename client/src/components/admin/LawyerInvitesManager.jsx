@@ -15,6 +15,13 @@ const LawyerInvitesManager = ({
   const [invitePage, setInvitePage] = useState(1);
   const [selectedLawyer, setSelectedLawyer] = useState(null);
   const [showLawyerModal, setShowLawyerModal] = useState(false);
+  const [emailDialog, setEmailDialog] = useState({
+    open: false,
+    invite: null,
+    email: "",
+    error: "",
+    saving: false,
+  });
 
   const loadInvites = async (query = "") => {
     try {
@@ -68,17 +75,47 @@ const LawyerInvitesManager = ({
     }
   };
 
-  const changeEmail = async (invite) => {
-    const nextEmail = window.prompt(
-      "Enter the new lawyer email",
-      invite.lawyer_email || ""
-    );
+  const openEmailDialog = (invite) => {
+    setEmailDialog({
+      open: true,
+      invite,
+      email: invite.lawyer_email || "",
+      error: "",
+      saving: false,
+    });
+  };
 
-    if (!nextEmail) return;
+  const closeEmailDialog = () => {
+    if (emailDialog.saving) return;
+    setEmailDialog({
+      open: false,
+      invite: null,
+      email: "",
+      error: "",
+      saving: false,
+    });
+  };
 
+  const changeEmail = async (event) => {
+    event.preventDefault();
+
+    const nextEmail = emailDialog.email.trim().toLowerCase();
+    if (!nextEmail) {
+      setEmailDialog((prev) => ({ ...prev, error: "Lawyer email is required" }));
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+      setEmailDialog((prev) => ({ ...prev, error: "Enter a valid email address" }));
+      return;
+    }
+
+    if (!emailDialog.invite) return;
+
+    setEmailDialog((prev) => ({ ...prev, saving: true, error: "" }));
     try {
-      const res = await api.patch(`/auth/lawyer-invites/${invite.id}/email`, {
-        lawyer_email: nextEmail.trim(),
+      const res = await api.patch(`/auth/lawyer-invites/${emailDialog.invite.id}/email`, {
+        lawyer_email: nextEmail,
       });
       const emailSent = res.data?.data?.email_sent !== false;
       const errorMessage = res.data?.data?.email_error;
@@ -92,6 +129,13 @@ const LawyerInvitesManager = ({
         toast.error(message);
       }
 
+      setEmailDialog({
+        open: false,
+        invite: null,
+        email: "",
+        error: "",
+        saving: false,
+      });
       loadInvites(search.trim());
     } catch (error) {
       console.error("Failed to update lawyer email:", error);
@@ -100,6 +144,7 @@ const LawyerInvitesManager = ({
           error.response?.data?.message ||
           "Failed to update lawyer email"
       );
+      setEmailDialog((prev) => ({ ...prev, saving: false }));
     }
   };
 
@@ -253,7 +298,7 @@ const LawyerInvitesManager = ({
                           </button>
 
                           <button
-                            onClick={() => changeEmail(invite)}
+                            onClick={() => openEmailDialog(invite)}
                             className="rounded-lg bg-gray-700 px-3 py-1 text-xs text-white transition-colors hover:bg-gray-800"
                           >
                             Change Email
@@ -275,6 +320,55 @@ const LawyerInvitesManager = ({
           summary={`Showing ${invites.length === 0 ? 0 : inviteStart + 1}-${Math.min(invitePage * INVITES_PAGE_SIZE, invites.length)} of ${invites.length}`}
         />
       </div>
+
+      {emailDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <form onSubmit={changeEmail} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">Change Lawyer Invite Email</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Update the invited lawyer email. A fresh invite will be sent to the new address.
+            </p>
+            <div className="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+              <p><span className="font-medium">Client:</span> {emailDialog.invite?.client_name || "-"}</p>
+              <p><span className="font-medium">Current email:</span> {emailDialog.invite?.lawyer_email || "-"}</p>
+            </div>
+            <label className="mt-5 block text-sm font-medium text-gray-700">
+              New Lawyer Email
+            </label>
+            <input
+              type="email"
+              value={emailDialog.email}
+              onChange={(event) => setEmailDialog((prev) => ({
+                ...prev,
+                email: event.target.value,
+                error: "",
+              }))}
+              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              placeholder="lawyer@example.com"
+            />
+            {emailDialog.error && (
+              <p className="mt-2 text-sm text-red-600">{emailDialog.error}</p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeEmailDialog}
+                disabled={emailDialog.saving}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={emailDialog.saving}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {emailDialog.saving ? "Saving..." : "Update Email"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Lawyer Details Modal */}
       {showLawyerModal && selectedLawyer && (

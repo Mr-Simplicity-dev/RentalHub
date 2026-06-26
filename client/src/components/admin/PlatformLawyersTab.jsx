@@ -48,6 +48,14 @@ const PlatformLawyersTab = () => {
     action: '',
     note: '',
   });
+  const [entryAction, setEntryAction] = useState({
+    open: false,
+    entry: null,
+    action: '',
+    reason: '',
+    loading: false,
+    error: '',
+  });
   const [reviewSaving, setReviewSaving] = useState(false);
 
   const loadData = async () => {
@@ -118,10 +126,33 @@ const PlatformLawyersTab = () => {
     }
   };
 
-  const toggleEntry = async (entry) => {
+  const openEntryAction = (entry, action) => {
+    setEntryAction({
+      open: true,
+      entry,
+      action,
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const closeEntryAction = () => {
+    setEntryAction({
+      open: false,
+      entry: null,
+      action: '',
+      reason: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const toggleEntry = async (entry, reason) => {
     try {
       await api.patch(`/super/platform-lawyers/${entry.id}`, {
         is_active: !entry.is_active,
+        reason,
       });
       toast.success(
         entry.is_active ? 'Lawyer removed from public directory' : 'Lawyer activated in public directory'
@@ -129,21 +160,55 @@ const PlatformLawyersTab = () => {
       await loadData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update lawyer record');
+      throw error;
     }
   };
 
-  const deleteEntry = async (entry) => {
-    if (!window.confirm(`Delete ${entry.display_name || entry.full_name}?`)) {
-      return;
-    }
-
+  const deleteEntry = async (entry, reason) => {
     try {
-      await api.delete(`/super/platform-lawyers/${entry.id}`);
+      await api.delete(`/super/platform-lawyers/${entry.id}`, {
+        data: { reason },
+      });
       toast.success('Manual lawyer record deleted');
       await loadData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to delete lawyer record');
+      throw error;
     }
+  };
+
+  const submitEntryAction = async () => {
+    const reason = entryAction.reason.trim();
+    if (!reason) {
+      setEntryAction((prev) => ({ ...prev, error: 'A reason is required' }));
+      return;
+    }
+
+    try {
+      setEntryAction((prev) => ({ ...prev, loading: true, error: '' }));
+      if (entryAction.action === 'delete') {
+        await deleteEntry(entryAction.entry, reason);
+      } else {
+        await toggleEntry(entryAction.entry, reason);
+      }
+      closeEntryAction();
+    } catch {
+      setEntryAction((prev) => ({
+        ...prev,
+        loading: false,
+        error: 'Action failed. Check the message above and try again.',
+      }));
+    }
+  };
+
+  const formatOperationLabel = (eventType) => {
+    const labels = {
+      platform_lawyer_activated: 'Activated',
+      platform_lawyer_deactivated: 'Deactivated',
+      platform_lawyer_updated: 'Updated',
+      platform_lawyer_deleted: 'Deleted',
+    };
+    return labels[eventType] || String(eventType || 'Updated').replace(/_/g, ' ');
   };
 
   const sendRecruitmentBroadcast = async (e) => {
@@ -395,7 +460,7 @@ const PlatformLawyersTab = () => {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => toggleEntry(entry)}
+                      onClick={() => openEntryAction(entry, entry.is_active ? 'deactivate' : 'activate')}
                       className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                     >
                       {entry.is_active ? 'Deactivate' : 'Activate'}
@@ -412,7 +477,7 @@ const PlatformLawyersTab = () => {
                     {entry.source_type === 'manual' ? (
                       <button
                         type="button"
-                        onClick={() => deleteEntry(entry)}
+                        onClick={() => openEntryAction(entry, 'delete')}
                         className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
                       >
                         Delete
@@ -420,6 +485,19 @@ const PlatformLawyersTab = () => {
                     ) : null}
                   </div>
                 </div>
+                {Array.isArray(entry.operations) && entry.operations.length > 0 ? (
+                  <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-gray-800">
+                        {formatOperationLabel(entry.operations[0].event_type)}
+                      </span>
+                      <span>{new Date(entry.operations[0].created_at).toLocaleString()}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2">
+                      {entry.operations[0].note || 'No note recorded'} by {entry.operations[0].actor_name || 'Admin'}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -432,6 +510,75 @@ const PlatformLawyersTab = () => {
           summary={`Showing ${entries.length === 0 ? 0 : entriesStart + 1}-${Math.min(entriesPage * ENTRIES_PAGE_SIZE, entries.length)} of ${entries.length}`}
         />
       </div>
+
+      {entryAction.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl2 bg-white p-6 shadow-xl">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
+                Platform lawyer governance
+              </p>
+              <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                {entryAction.action === 'delete'
+                  ? 'Delete lawyer record'
+                  : entryAction.action === 'deactivate'
+                    ? 'Deactivate lawyer'
+                    : 'Activate lawyer'}
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                {entryAction.entry?.display_name || entryAction.entry?.full_name || 'This lawyer'} will be recorded with your reason.
+              </p>
+            </div>
+
+            <label className="text-sm font-medium text-gray-700">
+              Reason
+              <textarea
+                value={entryAction.reason}
+                onChange={(event) =>
+                  setEntryAction((prev) => ({
+                    ...prev,
+                    reason: event.target.value,
+                    error: '',
+                  }))
+                }
+                className="input mt-1 min-h-[120px]"
+                placeholder="Explain the directory decision"
+              />
+            </label>
+
+            {entryAction.error ? (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {entryAction.error}
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeEntryAction}
+                disabled={entryAction.loading}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitEntryAction}
+                disabled={entryAction.loading}
+                className={entryAction.action === 'delete' ? 'btn btn-danger' : 'btn btn-primary'}
+              >
+                {entryAction.loading
+                  ? 'Saving...'
+                  : entryAction.action === 'delete'
+                    ? 'Delete Record'
+                    : entryAction.action === 'deactivate'
+                      ? 'Deactivate Lawyer'
+                      : 'Activate Lawyer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-xl2 border border-soft bg-white p-6 shadow-card">
         <h3 className="mb-4 font-semibold">Lawyer Applications</h3>

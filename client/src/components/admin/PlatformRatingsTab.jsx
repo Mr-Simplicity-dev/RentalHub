@@ -52,6 +52,22 @@ const PlatformRatingsTab = () => {
   const [ruleForm, setRuleForm] = useState(emptyRuleForm);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingRule, setSavingRule] = useState(false);
+  const [settingsNote, setSettingsNote] = useState('');
+  const [ratingAction, setRatingAction] = useState({
+    open: false,
+    rating: null,
+    status: '',
+    note: '',
+    loading: false,
+    error: '',
+  });
+  const [ruleAction, setRuleAction] = useState({
+    open: false,
+    rule: null,
+    note: '',
+    loading: false,
+    error: '',
+  });
 
   const contextOptions = useMemo(
     () => [{ value: 'all', label: 'All rating categories' }, ...contexts],
@@ -107,10 +123,18 @@ const PlatformRatingsTab = () => {
 
   const saveSettings = async () => {
     if (!settings) return;
+    if (!settingsNote.trim()) {
+      toast.error('Add a reason before saving rating controls');
+      return;
+    }
     try {
       setSavingSettings(true);
-      const response = await api.patch('/super/platform-ratings/settings', settings);
+      const response = await api.patch('/super/platform-ratings/settings', {
+        ...settings,
+        reason: settingsNote.trim(),
+      });
       setSettings(response.data?.data || settings);
+      setSettingsNote('');
       toast.success('Rating settings updated');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update rating settings');
@@ -119,13 +143,39 @@ const PlatformRatingsTab = () => {
     }
   };
 
-  const moderateRating = async (ratingId, status) => {
+  const openRatingAction = (rating, status) => {
+    setRatingAction({
+      open: true,
+      rating,
+      status,
+      note: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const closeRatingAction = () => {
+    setRatingAction({
+      open: false,
+      rating: null,
+      status: '',
+      note: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const moderateRating = async (rating, status, note) => {
     try {
-      await api.patch(`/super/platform-ratings/${ratingId}/moderate`, { status });
+      await api.patch(`/super/platform-ratings/${rating.id}/moderate`, {
+        status,
+        admin_note: note,
+      });
       toast.success(`Rating ${status}`);
       await loadRatings();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to moderate rating');
+      throw error;
     }
   };
 
@@ -152,16 +202,81 @@ const PlatformRatingsTab = () => {
     }
   };
 
-  const deleteRule = async (ruleId) => {
-    if (!window.confirm('Delete this rating location rule?')) return;
+  const openRuleAction = (rule) => {
+    setRuleAction({
+      open: true,
+      rule,
+      note: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const closeRuleAction = () => {
+    setRuleAction({
+      open: false,
+      rule: null,
+      note: '',
+      loading: false,
+      error: '',
+    });
+  };
+
+  const deleteRule = async (rule, note) => {
     try {
-      await api.delete(`/super/platform-ratings/rules/${ruleId}`);
+      await api.delete(`/super/platform-ratings/rules/${rule.id}`, {
+        data: { reason: note },
+      });
       toast.success('Location rule deleted');
       await loadRatings();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to delete location rule');
+      throw error;
     }
   };
+
+  const submitRatingAction = async () => {
+    const note = ratingAction.note.trim();
+    if (!note) {
+      setRatingAction((prev) => ({ ...prev, error: 'A moderation note is required' }));
+      return;
+    }
+
+    try {
+      setRatingAction((prev) => ({ ...prev, loading: true, error: '' }));
+      await moderateRating(ratingAction.rating, ratingAction.status, note);
+      closeRatingAction();
+    } catch {
+      setRatingAction((prev) => ({
+        ...prev,
+        loading: false,
+        error: 'Action failed. Check the message above and try again.',
+      }));
+    }
+  };
+
+  const submitRuleAction = async () => {
+    const note = ruleAction.note.trim();
+    if (!note) {
+      setRuleAction((prev) => ({ ...prev, error: 'A deletion reason is required' }));
+      return;
+    }
+
+    try {
+      setRuleAction((prev) => ({ ...prev, loading: true, error: '' }));
+      await deleteRule(ruleAction.rule, note);
+      closeRuleAction();
+    } catch {
+      setRuleAction((prev) => ({
+        ...prev,
+        loading: false,
+        error: 'Action failed. Check the message above and try again.',
+      }));
+    }
+  };
+
+  const formatOperationLabel = (eventType) =>
+    String(eventType || 'updated').replace(/^rating_/, '').replace(/_/g, ' ');
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -299,14 +414,25 @@ const PlatformRatingsTab = () => {
           </div>
 
           <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              onClick={saveSettings}
-              disabled={savingSettings}
-              className="btn btn-primary w-full justify-center sm:w-auto"
-            >
-              {savingSettings ? 'Saving...' : 'Save Controls'}
-            </button>
+            <div className="w-full space-y-3 sm:max-w-lg">
+              <label className="block text-sm font-medium text-gray-700">
+                Change reason
+                <textarea
+                  value={settingsNote}
+                  onChange={(event) => setSettingsNote(event.target.value)}
+                  className="input mt-1 min-h-[88px]"
+                  placeholder="Explain why these public rating controls are changing"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={saveSettings}
+                disabled={savingSettings}
+                className="btn btn-primary w-full justify-center sm:w-auto"
+              >
+                {savingSettings ? 'Saving...' : 'Save Controls'}
+              </button>
+            </div>
           </div>
         </section>
       )}
@@ -431,7 +557,7 @@ const PlatformRatingsTab = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => deleteRule(rule.id)}
+                    onClick={() => openRuleAction(rule)}
                     className="rounded-full p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
                     aria-label="Delete rating location rule"
                   >
@@ -449,6 +575,19 @@ const PlatformRatingsTab = () => {
                 </div>
 
                 {rule.notes && <p className="mt-2 text-sm text-gray-500">{rule.notes}</p>}
+                {Array.isArray(rule.operations) && rule.operations.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold capitalize text-gray-800">
+                        {formatOperationLabel(rule.operations[0].event_type)}
+                      </span>
+                      <span>{formatDate(rule.operations[0].created_at)}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2">
+                      {rule.operations[0].note || 'No note recorded'} by {rule.operations[0].actor_name || 'Admin'}
+                    </p>
+                  </div>
+                )}
               </article>
             ))
           )}
@@ -515,7 +654,7 @@ const PlatformRatingsTab = () => {
                   <div className="flex flex-wrap gap-2 lg:justify-end">
                     <button
                       type="button"
-                      onClick={() => moderateRating(rating.id, 'approved')}
+                      onClick={() => openRatingAction(rating, 'approved')}
                       className="btn btn-secondary px-3 py-2 text-xs"
                     >
                       <FaCheck className="mr-2 text-green-600" />
@@ -523,7 +662,7 @@ const PlatformRatingsTab = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => moderateRating(rating.id, 'hidden')}
+                      onClick={() => openRatingAction(rating, 'hidden')}
                       className="btn btn-secondary px-3 py-2 text-xs"
                     >
                       <FaEyeSlash className="mr-2 text-gray-600" />
@@ -531,7 +670,7 @@ const PlatformRatingsTab = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => moderateRating(rating.id, 'rejected')}
+                      onClick={() => openRatingAction(rating, 'rejected')}
                       className="btn btn-danger px-3 py-2 text-xs"
                     >
                       <FaTimes className="mr-2" />
@@ -539,11 +678,142 @@ const PlatformRatingsTab = () => {
                     </button>
                   </div>
                 </div>
+                {Array.isArray(rating.operations) && rating.operations.length > 0 && (
+                  <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold capitalize text-gray-800">
+                        {formatOperationLabel(rating.operations[0].event_type)}
+                      </span>
+                      <span>{formatDate(rating.operations[0].created_at)}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2">
+                      {rating.operations[0].note || 'No note recorded'} by {rating.operations[0].actor_name || 'Admin'}
+                    </p>
+                  </div>
+                )}
               </article>
             ))
           )}
         </div>
       </section>
+
+      {ratingAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl2 bg-white p-6 shadow-xl">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
+                Rating governance
+              </p>
+              <h3 className="mt-1 text-lg font-semibold capitalize text-gray-900">
+                {ratingAction.status} rating
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                This decision affects whether the rating can appear in public trust signals.
+              </p>
+            </div>
+
+            <label className="text-sm font-medium text-gray-700">
+              Moderation note
+              <textarea
+                value={ratingAction.note}
+                onChange={(event) =>
+                  setRatingAction((prev) => ({
+                    ...prev,
+                    note: event.target.value,
+                    error: '',
+                  }))
+                }
+                className="input mt-1 min-h-[120px]"
+                placeholder="Explain the moderation decision"
+              />
+            </label>
+
+            {ratingAction.error && (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {ratingAction.error}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeRatingAction}
+                disabled={ratingAction.loading}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitRatingAction}
+                disabled={ratingAction.loading}
+                className={ratingAction.status === 'rejected' ? 'btn btn-danger' : 'btn btn-primary'}
+              >
+                {ratingAction.loading ? 'Saving...' : 'Save Decision'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ruleAction.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl2 bg-white p-6 shadow-xl">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
+                Rating rule governance
+              </p>
+              <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                Delete location rule
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                Removing this rule can change where rating prompts and fly-ins are allowed.
+              </p>
+            </div>
+
+            <label className="text-sm font-medium text-gray-700">
+              Deletion reason
+              <textarea
+                value={ruleAction.note}
+                onChange={(event) =>
+                  setRuleAction((prev) => ({
+                    ...prev,
+                    note: event.target.value,
+                    error: '',
+                  }))
+                }
+                className="input mt-1 min-h-[120px]"
+                placeholder="Explain why this location rule is being removed"
+              />
+            </label>
+
+            {ruleAction.error && (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {ruleAction.error}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeRuleAction}
+                disabled={ruleAction.loading}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitRuleAction}
+                disabled={ruleAction.loading}
+                className="btn btn-danger"
+              >
+                {ruleAction.loading ? 'Deleting...' : 'Delete Rule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

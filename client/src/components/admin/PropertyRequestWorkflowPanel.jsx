@@ -62,6 +62,16 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
   );
   const [actionId, setActionId] = useState(null);
   const [notificationForms, setNotificationForms] = useState({});
+  const [actionDialog, setActionDialog] = useState({
+    open: false,
+    request: null,
+    type: '',
+    action: '',
+    title: '',
+    note: '',
+    error: '',
+    required: false,
+  });
 
   const statusOptions = useMemo(() => {
     if (resolvedMode === 'support') {
@@ -103,51 +113,104 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
     loadRequests();
   }, [loadRequests]);
 
-  const reviewRequest = async (request, decision) => {
-    const reviewNote = window.prompt(
-      decision === 'approved'
-        ? 'Optional note for the state admin'
-        : 'Reason for rejecting this request'
-    );
-
-    if (reviewNote === null) return;
-
-    try {
-      setActionId(request.id);
-      await api.patch(`/property-alerts/admin/requests/${request.id}/support-review`, {
-        decision,
-        review_note: reviewNote || undefined,
-      });
-      toast.success(
-        decision === 'approved'
-          ? 'Request approved and sent to the state team'
-          : 'Request rejected'
-      );
-      await loadRequests();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Request review failed');
-    } finally {
-      setActionId(null);
-    }
+  const openReviewDialog = (request, decision) => {
+    setActionDialog({
+      open: true,
+      request,
+      type: 'support_review',
+      action: decision,
+      title: decision === 'approved' ? 'Approve Property Request' : 'Reject Property Request',
+      note: '',
+      error: '',
+      required: decision === 'rejected',
+    });
   };
 
-  const updateStateAction = async (request, action) => {
-    const promptByAction = {
-      sourcing: 'Add sourcing note for this request',
-      lga_missing: 'Explain the LGA coverage issue',
-      fulfilled: 'Add fulfillment note',
+  const openStateActionDialog = (request, action) => {
+    const actionMeta = {
+      sourcing: {
+        title: 'Mark Request as Sourcing',
+        required: false,
+      },
+      lga_missing: {
+        title: 'Mark LGA Coverage Missing',
+        required: true,
+      },
+      fulfilled: {
+        title: 'Mark Request Fulfilled',
+        required: true,
+      },
     };
-    const note = window.prompt(promptByAction[action] || 'Add note');
 
-    if (note === null) return;
+    setActionDialog({
+      open: true,
+      request,
+      type: 'state_action',
+      action,
+      title: actionMeta[action]?.title || 'Update Property Request',
+      note: '',
+      error: '',
+      required: actionMeta[action]?.required || false,
+    });
+  };
+
+  const closeActionDialog = () => {
+    if (actionId) return;
+    setActionDialog({
+      open: false,
+      request: null,
+      type: '',
+      action: '',
+      title: '',
+      note: '',
+      error: '',
+      required: false,
+    });
+  };
+
+  const submitActionDialog = async (event) => {
+    event.preventDefault();
+
+    const { request, type, action, required } = actionDialog;
+    if (!request || !type || !action) return;
+
+    const note = actionDialog.note.trim();
+    if (required && !note) {
+      setActionDialog((prev) => ({ ...prev, error: 'A note is required for this action.' }));
+      return;
+    }
 
     try {
       setActionId(request.id);
-      await api.patch(`/property-alerts/admin/requests/${request.id}/state-action`, {
-        action,
-        note: note || undefined,
+
+      if (type === 'support_review') {
+        await api.patch(`/property-alerts/admin/requests/${request.id}/support-review`, {
+          decision: action,
+          review_note: note || undefined,
+        });
+        toast.success(
+          action === 'approved'
+            ? 'Request approved and sent to the state team'
+            : 'Request rejected'
+        );
+      } else {
+        await api.patch(`/property-alerts/admin/requests/${request.id}/state-action`, {
+          action,
+          note: note || undefined,
+        });
+        toast.success('Property request updated');
+      }
+
+      setActionDialog({
+        open: false,
+        request: null,
+        type: '',
+        action: '',
+        title: '',
+        note: '',
+        error: '',
+        required: false,
       });
-      toast.success('Property request updated');
       await loadRequests();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Could not update property request');
@@ -342,7 +405,7 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
                   <button
                     type="button"
                     disabled={actionId === request.id}
-                    onClick={() => reviewRequest(request, 'approved')}
+                    onClick={() => openReviewDialog(request, 'approved')}
                     className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
                   >
                     <FaCheckCircle /> Approve and Send to State
@@ -350,7 +413,7 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
                   <button
                     type="button"
                     disabled={actionId === request.id}
-                    onClick={() => reviewRequest(request, 'rejected')}
+                    onClick={() => openReviewDialog(request, 'rejected')}
                     className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                   >
                     <FaTimesCircle /> Reject
@@ -363,7 +426,7 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
                   <button
                     type="button"
                     disabled={actionId === request.id}
-                    onClick={() => updateStateAction(request, 'sourcing')}
+                    onClick={() => openStateActionDialog(request, 'sourcing')}
                     className="inline-flex items-center gap-2 rounded-lg border border-blue-600 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
                   >
                     <FaSearch /> Mark Sourcing
@@ -371,7 +434,7 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
                   <button
                     type="button"
                     disabled={actionId === request.id}
-                    onClick={() => updateStateAction(request, 'lga_missing')}
+                    onClick={() => openStateActionDialog(request, 'lga_missing')}
                     className="inline-flex items-center gap-2 rounded-lg border border-orange-500 px-3 py-2 text-xs font-semibold text-orange-700 hover:bg-orange-50 disabled:opacity-60"
                   >
                     <FaExclamationTriangle /> LGA Coverage Missing
@@ -379,7 +442,7 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
                   <button
                     type="button"
                     disabled={actionId === request.id}
-                    onClick={() => updateStateAction(request, 'fulfilled')}
+                    onClick={() => openStateActionDialog(request, 'fulfilled')}
                     className="inline-flex items-center gap-2 rounded-lg border border-green-600 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-60"
                   >
                     <FaMapMarkerAlt /> Mark Fulfilled
@@ -455,6 +518,56 @@ const PropertyRequestWorkflowPanel = ({ mode = 'auto', title = 'Tenant Property 
           </article>
         ))}
       </div>
+      {actionDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <form onSubmit={submitActionDialog} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">{actionDialog.title}</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Add context for this tenant property request. The note will be saved with the workflow action.
+            </p>
+            {actionDialog.request && (
+              <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                <p className="font-medium text-slate-900">{actionDialog.request.preferred_location || 'Requested location'}</p>
+                <p>{actionDialog.request.property_type || 'Any property type'} &middot; {formatCurrency(actionDialog.request.max_budget)}</p>
+              </div>
+            )}
+            <label className="mt-5 block text-sm font-medium text-slate-700">
+              Action Note {actionDialog.required ? '' : '(Optional)'}
+            </label>
+            <textarea
+              value={actionDialog.note}
+              onChange={(event) => setActionDialog((prev) => ({
+                ...prev,
+                note: event.target.value,
+                error: '',
+              }))}
+              rows={4}
+              className="mt-2 w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-100"
+              placeholder="Explain the review decision or next action..."
+            />
+            {actionDialog.error && (
+              <p className="mt-2 text-sm text-red-600">{actionDialog.error}</p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeActionDialog}
+                disabled={Boolean(actionId)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={Boolean(actionId)}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                {actionId ? 'Saving...' : 'Save Action'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </section>
   );
 };
