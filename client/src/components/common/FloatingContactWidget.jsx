@@ -615,7 +615,7 @@ const FloatingContactWidget = () => {
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
             className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
-            style={{ maxHeight: '560px' }}
+            style={{ maxHeight: '360px' }}
           >
           {renderHeader()}
 
