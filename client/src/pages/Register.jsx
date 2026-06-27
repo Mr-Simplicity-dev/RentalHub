@@ -5,6 +5,8 @@ import { toast } from 'react-toastify';
 import { FaUser, FaEnvelope, FaPhone, FaLock, FaEye, FaEyeSlash, FaGift } from 'react-icons/fa';
 import api from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import FloatingContactWidget from '../components/common/FloatingContactWidget';
+import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import { setAuthSession } from '../services/authStorage';
 
 const LAWYER_ACCESS_FEE = 2000; // Fee for using RentalHub NG lawyers during registration
@@ -1733,9 +1735,10 @@ return (
 
       </div>
     </div>
+      <FloatingContactWidget />
+      <WhatsAppBotWidget />
   </div>
 );
-
 };
 
 export default Register;

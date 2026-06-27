@@ -546,10 +546,14 @@ const SuperSupportAdminDashboard = () => {
         ))}
       </div>
 
+      {/* Always-mounted governance panel (hidden when not on overview tab) */}
+      <div className={activeTab === 'overview' ? '' : 'hidden'}>
+        <SupportGovernancePanel />
+      </div>
+
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <div className="super-support-overview-section space-y-6">
-          <SupportGovernancePanel />
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>

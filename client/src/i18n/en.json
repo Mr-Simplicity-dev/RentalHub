@@ -1,4 +1,4 @@
-{
+﻿{
   "login": {
     "title": "Sign in to your account",
     "or": "Or",
@@ -228,7 +228,7 @@
       "city": "City *",
       "area": "Area / Estate",
       "type": "Property Type *",
-      "rent": "Rent Amount (₦) *",
+      "rent": "Rent Amount (Γéª) *",
       "yearly": "Per Year",
       "monthly": "Per Month",
       "bedrooms": "Bedrooms",
@@ -298,7 +298,7 @@
   "role": "Role",
 
   "verify_title": "Identity Verification",
-  "verified": "Success ✔",
+  "verified": "Success Γ£ö",
   "verify_text": "Upload a passport photograph for verification.",
 
   "select_image": "Please select an image",
@@ -384,8 +384,8 @@
   "request_success": "Request submitted successfully. Support admin will review it before the state team starts sourcing.",
   "request_submit_failed": "Failed to submit notification request",
 
-  "prev": "← Previous",
-  "next": "Next →"
+  "prev": "ΓåÉ Previous",
+  "next": "Next ΓåÆ"
 },
 
 "property_detail": {
@@ -533,6 +533,27 @@
     "under_review": "Under Review",
     "approved": "Approved",
     "rejected": "Rejected"
+  },
+
+  "whatsapp": {
+    "title": "RentalHub Assistant",
+    "subtitle": "Auto-reply \u2022 FAQ bot",
+    "bot_greeting": "Hi! I'm RentalHub\u2019s virtual assistant. How can I help you today?",
+    "greeting_bubble": "Got questions? I\u2019m here to help!",
+    "open": "Open WhatsApp assistant",
+    "close": "Close",
+    "input_placeholder": "Type your question...",
+    "send": "Send",
+    "bot_label": "Bot",
+    "no_match": "I'm not sure I have the answer to that. Would you like to speak with a human agent?",
+    "talk_to_agent": "Talk to a human agent \u2192",
+    "connected": "Connected to agent on WhatsApp",
+    "connected_sub": "Continue your conversation there",
+    "suggested": "Suggested questions:",
+    "qr_find": "How do I find a property?",
+    "qr_list": "How do I list my property?",
+    "qr_legal": "Tell me about Legal Protection",
+    "qr_payment": "How does payment work?"
   },
 
   "widget": {

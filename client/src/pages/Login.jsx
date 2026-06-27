@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import FloatingContactWidget from '../components/common/FloatingContactWidget';
+import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import { toast } from 'react-toastify';
 import { FaEnvelope, FaEye, FaEyeSlash, FaLock } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -286,6 +288,8 @@ const Login = () => {
         </form>
       </div>
     </div>
+      <FloatingContactWidget />
+      <WhatsAppBotWidget />
   </div>
 );
 };

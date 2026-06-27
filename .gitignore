@@ -1,3 +1,6 @@
+# opencode config
+opencode.json
+
 # Environment variables
 .env
 .env.local
