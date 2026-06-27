@@ -552,7 +552,8 @@
     "anything_else": "Puis-je vous aider avec autre chose?",
     "menu_prompt": "Bien sûr! Que voulez-vous savoir?",
     "menu_btn": "Menu",
-    "dismissed": "D\u2019accord! N\u2019h\u00e9sitez pas \u00e0 revenir quand vous voulez."
+    "dismissed": "D\u2019accord! N\u2019h\u00e9sitez pas \u00e0 revenir quand vous voulez.",
+    "youre_welcome": "De rien! Ravi d\u2019avoir pu aider."
   },
 
   "widget": {

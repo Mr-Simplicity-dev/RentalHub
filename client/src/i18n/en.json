@@ -557,7 +557,8 @@
     "anything_else": "Is there anything else I can help you with?",
     "menu_prompt": "Sure! What would you like to know about?",
     "menu_btn": "Menu",
-    "dismissed": "Alright! Feel free to come back anytime."
+    "dismissed": "Alright! Feel free to come back anytime.",
+    "youre_welcome": "You\u2019re welcome! Happy to help."
   },
 
   "widget": {
