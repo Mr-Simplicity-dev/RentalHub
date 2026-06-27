@@ -10,6 +10,7 @@ const GREETING_DELAY = 6000;
 
 const CONFIRM_WORDS = ['yes', 'yeah', 'yep', 'okay', 'ok', 'sure', 'alright', 'please', 'yea', 'go ahead'];
 const MENU_WORDS = ['menu', 'options', 'back', 'show options', 'show menu', 'what can you do', 'help'];
+const NO_WORDS = ['no', 'nope', 'nah', 'not really', 'nothing', 'that\'s all', 'that is all', 'no thanks', 'all good', 'im good', 'i\'m good', 'not now'];
 
 const isConfirmation = (text) => {
   const clean = text.toLowerCase().replace(/[^a-z ]/g, '').trim();
@@ -19,6 +20,11 @@ const isConfirmation = (text) => {
 const isMenuRequest = (text) => {
   const clean = text.toLowerCase().replace(/[^a-z ]/g, '').trim();
   return MENU_WORDS.some((w) => clean === w || clean.startsWith(w + ' ') || clean.endsWith(' ' + w));
+};
+
+const isNegative = (text) => {
+  const clean = text.toLowerCase().replace(/[^a-z ]/g, '').trim();
+  return NO_WORDS.some((w) => clean === w || clean.startsWith(w + ' ') || clean.endsWith(' ' + w));
 };
 
 const WhatsAppBotWidget = () => {
@@ -177,6 +183,15 @@ const WhatsAppBotWidget = () => {
         setAwaitingResponse(null);
         botReplyWithTyping(() => {
           addBotMessage(t('messages.whatsapp.menu_prompt', 'Sure! What would you like to know about?'));
+        });
+        return;
+      }
+
+      if (isNegative(msg)) {
+        setAwaitingResponse(null);
+        setShowQuickReplies(false);
+        botReplyWithTyping(() => {
+          addBotMessage(t('messages.whatsapp.dismissed', 'Alright! Feel free to come back anytime.'));
         });
         return;
       }
