@@ -1452,7 +1452,7 @@ const getAllProperties = async (req, res) => {
       `SELECT p.*, u.full_name AS landlord_name,
               COALESCE(ops.operations, '[]'::json) AS operations
        FROM properties p
-       LEFT JOIN users u ON u.id = COALESCE(p.landlord_id, p.user_id)
+       LEFT JOIN users u ON u.id = p.landlord_id
        LEFT JOIN LATERAL (
          SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
          FROM (
