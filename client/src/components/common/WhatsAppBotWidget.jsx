@@ -140,6 +140,7 @@ const WhatsAppBotWidget = () => {
   const showMenu = useCallback(() => {
     setShowQuickReplies(true);
     setAwaitingResponse(null);
+    inputRef.current?.blur();
     botReplyWithTyping(() => {
       addBotMessage(t('messages.whatsapp.menu_prompt', 'Sure! What would you like to know about?'));
     });
@@ -447,8 +448,8 @@ const WhatsAppBotWidget = () => {
                 <div className="mt-2 text-center">
                   <button
                     type="button"
-                    onClick={() => showMenu()}
-                    className="text-xs text-green-600 hover:text-green-700 underline underline-offset-2 transition-colors"
+                    onPointerDown={(e) => { e.preventDefault(); showMenu(); }}
+                    className="text-xs text-green-600 hover:text-green-700 underline underline-offset-2 transition-colors touch-action-manipulation cursor-pointer select-none"
                   >
                     <FaListUl className="w-3 h-3 inline mr-1" />
                     {t('messages.whatsapp.menu_btn', 'Menu')}
