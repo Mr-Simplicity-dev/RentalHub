@@ -90,9 +90,13 @@ const adVideoUpload = multer({
   limits: { fileSize: AD_VIDEO_MAX_SIZE_BYTES },
   fileFilter: (req, file, cb) => {
     const isAllowedVideo = Boolean(AD_VIDEO_MIME_EXTENSIONS[file.mimetype]);
-    if (!isAllowedVideo) {
+    const extension = path.extname(file.originalname || '').toLowerCase();
+    const hasAllowedExtension = !extension || AD_VIDEO_ALLOWED_EXTENSIONS.has(extension);
+
+    if (!isAllowedVideo || !hasAllowedExtension) {
       return cb(new Error('Upload an MP4, WebM, OGG, MOV, or AVI video'));
     }
+
     return cb(null, true);
   },
 }).single('video');
@@ -739,6 +743,31 @@ const uploadAdVideo = async (req, res) => {
   }
 };
 
+const serveAdFile = async (req, res) => {
+  try {
+    const { filename } = req.params;
+
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(403).json({ success: false, message: 'Invalid filename' });
+    }
+
+    const filePath = path.join(AD_IMAGE_UPLOAD_DIR, filename);
+    const resolvedPath = path.resolve(filePath);
+
+    if (!resolvedPath.startsWith(path.resolve(AD_IMAGE_UPLOAD_DIR))) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    res.sendFile(resolvedPath);
+  } catch (error) {
+    handleControllerError(res, error, 'Failed to serve ad file');
+  }
+};
+
 module.exports = {
   AD_PLACEMENTS,
   ensureAdSpacesSchema,
@@ -753,4 +782,5 @@ module.exports = {
   uploadAdImage,
   uploadAdVideoFile,
   uploadAdVideo,
+  serveAdFile,
 };
