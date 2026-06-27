@@ -2928,6 +2928,115 @@ router.get('/tickets/:id/typing-status', async (req, res) => {
   }
 });
 
+// ─── Support Governance ─────────────────────────────────────────────────────
+
+const governanceDefaults = {
+  sla_due_soon_hours: 2,
+  escalation_acknowledgement_hours: 4,
+  department_resolution_hours: 24,
+  notify_super_admin_on_breach: true,
+};
+
+let governancePolicy = { ...governanceDefaults };
+
+router.get('/governance/policies', authenticate, async (req, res) => {
+  try {
+    const result = await db.query("SELECT config_value FROM app_config WHERE config_key = 'support_governance_policy'");
+    if (result.rows.length) {
+      governancePolicy = { ...governanceDefaults, ...JSON.parse(result.rows[0].config_value) };
+    }
+    res.json({ success: true, data: governancePolicy });
+  } catch (error) {
+    console.error('Governance policies error:', error);
+    res.status(500).json({ success: false, message: 'Failed to load policies' });
+  }
+});
+
+router.put('/governance/policies', authenticate, async (req, res) => {
+  try {
+    const policy = { ...governanceDefaults, ...req.body };
+    try {
+      const result = await db.query(
+        `INSERT INTO app_config (config_key, config_value) VALUES ($1, $2)
+         ON CONFLICT (config_key) DO UPDATE SET config_value = $2 RETURNING config_value`,
+        ['support_governance_policy', JSON.stringify(policy)]
+      );
+    } catch (dbErr) {
+      console.warn('Could not persist governance policy (non-fatal):', dbErr.message);
+    }
+    governancePolicy = policy;
+    res.json({ success: true, data: policy });
+  } catch (error) {
+    console.error('Governance policies save error:', error);
+    res.status(500).json({ success: false, message: 'Failed to save policies' });
+  }
+});
+
+router.get('/governance/summary', authenticate, async (req, res) => {
+  try {
+    const [totalRes, activeRes, escalatedRes, breachedRes, unassignedRes, deptRes, recentEscRes] = await Promise.all([
+      db.query('SELECT COUNT(*)::int AS count FROM support_tickets'),
+      db.query("SELECT COUNT(*)::int AS count FROM support_tickets WHERE status NOT IN ('resolved','closed')"),
+      db.query("SELECT COUNT(*)::int AS count FROM support_tickets WHERE escalation_status NOT IN ('none','resolved')"),
+      db.query("SELECT COUNT(*)::int AS count FROM support_tickets WHERE sla_due_at IS NOT NULL AND sla_due_at < CURRENT_TIMESTAMP AND status NOT IN ('resolved','closed')"),
+      db.query("SELECT COUNT(*)::int AS count FROM support_tickets WHERE assigned_to IS NULL AND status NOT IN ('resolved','closed')"),
+      db.query(`SELECT COALESCE(NULLIF(escalation_department,''), 'unassigned') AS department,
+                       COUNT(*)::int AS total,
+                       COUNT(*) FILTER (WHERE escalation_status NOT IN ('none','resolved'))::int AS needs_action,
+                       COUNT(*) FILTER (WHERE sla_due_at IS NOT NULL AND sla_due_at < CURRENT_TIMESTAMP)::int AS breached_sla
+                FROM support_tickets GROUP BY escalation_department ORDER BY total DESC`),
+      db.query(`SELECT id, subject, escalation_department, escalation_status, category, created_at
+                FROM support_tickets
+                WHERE escalation_status NOT IN ('none','resolved')
+                ORDER BY created_at DESC LIMIT 10`),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          total_tickets: totalRes.rows[0].count,
+          active_tickets: activeRes.rows[0].count,
+          escalated_tickets: escalatedRes.rows[0].count,
+          breached_sla: breachedRes.rows[0].count,
+          unassigned_active: unassignedRes.rows[0].count,
+        },
+        by_department: deptRes.rows,
+        recent_escalations: recentEscRes.rows,
+      },
+    });
+  } catch (error) {
+    console.error('Governance summary error:', error);
+    res.status(500).json({ success: false, message: 'Failed to load governance summary' });
+  }
+});
+
+router.get('/governance/export', authenticate, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT st.id, st.subject, st.status, st.priority, st.state, st.lga, st.escalation_department,
+              st.escalation_status, st.sla_due_at, st.created_at, st.resolved_at,
+              u.email AS user_email, a.email AS assigned_email
+       FROM support_tickets st
+       LEFT JOIN users u ON u.id = st.user_id
+       LEFT JOIN users a ON a.id = st.assigned_to
+       ORDER BY st.created_at DESC`
+    );
+    const csv = [
+      'ID,Subject,Status,Priority,State,LGA,Department,Escalation,User,Assigned,Created,Resolved,SLA Due',
+      ...result.rows.map((r) =>
+        `${r.id},"${(r.subject||'').replace(/"/g,'""')}",${r.status},${r.priority},${r.state||''},${r.lga||''},${r.escalation_department||''},${r.escalation_status||''},${r.user_email||''},${r.assigned_email||''},${r.created_at},${r.resolved_at||''},${r.sla_due_at||''}`
+      ),
+    ].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="support-governance.csv"');
+    res.send(csv);
+  } catch (error) {
+    console.error('Governance export error:', error);
+    res.status(500).json({ success: false, message: 'Failed to export governance data' });
+  }
+});
+
 router._supportScopeForTest = {
   canSupportAdminAccessTicket,
   normalizeSupportCategory,

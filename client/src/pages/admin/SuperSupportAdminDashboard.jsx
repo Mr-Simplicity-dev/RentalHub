@@ -90,6 +90,7 @@ const SuperSupportAdminDashboard = () => {
   useEffect(() => { fetchUnreadInternalNotes(); }, [fetchUnreadInternalNotes]);
   // State management
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dashboardData, setDashboardData] = useState({
     overview: {},
     migrationQueue: [],
@@ -183,13 +184,17 @@ const SuperSupportAdminDashboard = () => {
   }, [dashboardData?.migrationQueue]);
 
   // Load dashboard data
-  const loadDashboardData = useCallback(async () => {
-    setLoading(true);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+
+  const loadDashboardData = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true); else setRefreshing(true);
+    const f = filtersRef.current;
     try {
       // Load multiple data sources in parallel
       const [queueRes, auditRes, ticketsRes, alertsRes, metricsRes] = await Promise.all([
-        api.get(`/state-migrations/support/queue?stage=all&status=${filters.status}`),
-        api.get(`/state-migrations/support/audit?status=${filters.status}`),
+        api.get(`/state-migrations/support/queue?stage=all&status=${f.status}`),
+        api.get(`/state-migrations/support/audit?status=${f.status}`),
         api.get('/support/tickets'),
         api.get('/system/alerts'),
         api.get('/dashboard/metrics'),
@@ -221,12 +226,12 @@ const SuperSupportAdminDashboard = () => {
       toast.error('Failed to load dashboard data');
       console.error('Dashboard load error:', error);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false); else setRefreshing(false);
     }
-  }, [filters]);
+  }, []);
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboardData(true);
   }, [loadDashboardData]);
 
   useEffect(() => {
@@ -467,13 +472,15 @@ const SuperSupportAdminDashboard = () => {
         <p className="mt-1 text-gray-600">
           Operational overview for queue approvals, ticket resolution, and system alert monitoring.
         </p>
-        <div className="mt-4">
+        <div className="mt-4 flex items-center gap-3">
           <button
-            onClick={loadDashboardData}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            onClick={() => loadDashboardData()}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
-            <FaSyncAlt size={14} /> Refresh
+            <FaSyncAlt size={14} className={refreshing ? 'animate-spin' : ''} /> {refreshing ? 'Refreshing...' : 'Refresh'}
           </button>
+          {refreshing && <span className="text-xs text-slate-400 animate-pulse">Syncing data...</span>}
         </div>
       </div>
 
