@@ -43,7 +43,9 @@
     "link_copied": "Ad link copied",
     "copy_failed": "Unable to copy ad link right now",
     "share_failed": "Unable to open the share sheet right now",
-    "share_on": "Share on {{platform}}"
+    "share_on": "Share on {{platform}}",
+    "video_unavailable": "Video unavailable",
+    "image_unavailable": "Image unavailable"
   },
 
   "platform_ratings": {

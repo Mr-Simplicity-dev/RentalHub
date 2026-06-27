@@ -417,6 +417,7 @@ router.post('/ad-spaces/video', authenticate, requireSuperAdmin, adCtrl.uploadAd
 router.post('/ad-spaces', authenticate, requireSuperAdmin, adCtrl.createAd);
 router.patch('/ad-spaces/:id', authenticate, requireSuperAdmin, adCtrl.updateAd);
 router.delete('/ad-spaces/:id', authenticate, requireSuperAdmin, adCtrl.deleteAd);
+router.get('/ad-spaces/file/:filename', authenticate, requireSuperAdmin, adCtrl.serveAdFile);
 
 router.get('/platform-ratings', authenticate, requireSuperAdmin, platformRatingCtrl.adminListRatings);
 router.patch('/platform-ratings/settings', authenticate, requireSuperAdmin, platformRatingCtrl.adminUpdateSettings);

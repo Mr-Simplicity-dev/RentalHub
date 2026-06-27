@@ -374,9 +374,19 @@ const authenticatedUploadsStaticOptions = {
   },
 };
 
-// NOTE: These static directories are intentionally not mounted here.
-// File serving must go through authenticated route handlers in routes/.
-// See routes/users.js for passport uploads and routes/admin.js for ad-spaces.
+// Ad-space uploads are served publicly since ad content is inherently public.
+// Passport uploads remain authenticated-only via routes/users.js.
+const adSpacesUploadPath = path.join(__dirname, 'uploads', 'ad-spaces');
+if (fs.existsSync(adSpacesUploadPath)) {
+  app.use('/uploads/ad-spaces', express.static(adSpacesUploadPath, {
+    dotfiles: 'deny',
+    index: false,
+    maxAge: '1d',
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    },
+  }));
+}
 
 const limiter = rateLimit({
   windowMs: apiRateLimitWindowMs,

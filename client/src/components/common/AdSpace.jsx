@@ -208,6 +208,19 @@ const AdShareButton = ({ ad, targetUrl }) => {
   );
 };
 
+const Skeleton = ({ className = '' }) => (
+  <div className={`animate-pulse rounded-lg bg-gray-100 ${className}`} aria-hidden="true" />
+);
+
+const MediaErrorFallback = ({ type, title }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-gray-100 p-4 text-center text-xs text-gray-400">
+      {type === 'video' ? t('ads.video_unavailable', 'Video unavailable') : t('ads.image_unavailable', 'Image unavailable')}
+    </div>
+  );
+};
+
 const AdSpace = ({
   placement,
   className = '',
@@ -218,11 +231,15 @@ const AdSpace = ({
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [ads, setAds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [failedMedia, setFailedMedia] = useState({});
+  const trackedImpressions = useRef(new Set());
   const requestLimit = useMemo(() => normalizeLimit(limit), [limit]);
   const isMarquee = variant === 'marquee';
 
   useEffect(() => {
     let isMounted = true;
+    setLoading(true);
 
     const loadAd = async () => {
       try {
@@ -240,6 +257,8 @@ const AdSpace = ({
         if (isMounted) {
           setAds([]);
         }
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
@@ -251,17 +270,36 @@ const AdSpace = ({
   }, [placement, requestLimit]);
 
   const adIds = useMemo(
-    () => ads.map((item) => item.id).filter(Boolean).join(','),
+    () => ads.map((item) => item.id).filter(Boolean),
     [ads]
   );
 
   useEffect(() => {
-    if (!adIds) return;
-
-    adIds.split(',').forEach((id) => {
-      api.post(`/ads/${id}/impression`).catch(() => {});
+    adIds.forEach((id) => {
+      if (!trackedImpressions.current.has(id)) {
+        trackedImpressions.current.add(id);
+        api.post(`/ads/${id}/impression`).catch(() => {});
+      }
     });
   }, [adIds]);
+
+  const handleMediaError = (adId) => {
+    setFailedMedia((prev) => ({ ...prev, [adId]: true }));
+  };
+
+  if (loading) {
+    return (
+      <section className={className}>
+        <div className={contained ? 'container mx-auto px-4' : ''}>
+          <div className={`grid gap-4 ${isMarquee ? '' : 'lg:grid-cols-2'}`}>
+            {[1, 2].map((i) => (
+              <Skeleton key={i} className={isMarquee ? 'h-28 w-72' : 'h-48'} />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (ads.length === 0) return null;
 
@@ -307,7 +345,7 @@ const AdSpace = ({
               : `flex-col ${hasMultipleAds ? '' : 'md:flex-row md:items-stretch'}`
           }`}
         >
-          {ad.media_type === 'video' && ad.video_url ? (
+          {ad.media_type === 'video' && ad.video_url && !failedMedia[ad.id] ? (
             <div
               className={`w-full shrink-0 overflow-hidden bg-gray-100 ${
                 isMarquee
@@ -325,9 +363,15 @@ const AdSpace = ({
                 loop
                 playsInline
                 className="h-full w-full object-cover"
+                aria-label={ad.title}
+                onError={() => handleMediaError(ad.id)}
               />
             </div>
-          ) : ad.image_url ? (
+          ) : ad.media_type === 'video' && failedMedia[ad.id] ? (
+            <div className={`w-full shrink-0 overflow-hidden ${isMarquee ? 'hidden w-32 sm:block md:w-44' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
+              <MediaErrorFallback type="video" title={ad.title} />
+            </div>
+          ) : ad.image_url && !failedMedia[ad.id] ? (
             <div
               className={`w-full shrink-0 overflow-hidden bg-gray-100 ${
                 isMarquee
@@ -342,7 +386,12 @@ const AdSpace = ({
                 alt={ad.title}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 loading="lazy"
+                onError={() => handleMediaError(ad.id)}
               />
+            </div>
+          ) : ad.image_url && failedMedia[ad.id] ? (
+            <div className={`w-full shrink-0 overflow-hidden ${isMarquee ? 'hidden w-32 sm:block md:w-44' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
+              <MediaErrorFallback type="image" title={ad.title} />
             </div>
           ) : null}
 
