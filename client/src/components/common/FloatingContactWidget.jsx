@@ -148,15 +148,15 @@ const FloatingContactWidget = () => {
   const [showGreeting, setShowGreeting] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
 
-  // Greeting bubble: appear after delay, auto-hide after 7s
+  // Greeting bubble: appears while WhatsApp bubble fades out
   useEffect(() => {
     if (open) { setShowGreeting(false); return; }
     const showTimer = setTimeout(() => {
       if (!open) setShowGreeting(true);
-    }, 7500); // appears after WhatsAppBot bubble (6s delayed + buffer)
+    }, 10000); // appears exactly when WhatsApp bubble starts its exit
     const hideTimer = setTimeout(() => {
       setShowGreeting(false);
-    }, 14000); // disappears ~7s after appearing
+    }, 17000); // disappears 7s after appearing
     return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
   }, [open]);
 

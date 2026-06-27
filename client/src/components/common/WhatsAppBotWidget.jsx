@@ -71,7 +71,7 @@ const WhatsAppBotWidget = () => {
     greetingTimerRef.current = setTimeout(() => {
       if (mountedRef.current && !open) {
         setShowGreeting(true);
-        setTimeout(() => { if (mountedRef.current) setShowGreeting(false); }, 7000);
+        setTimeout(() => { if (mountedRef.current) setShowGreeting(false); }, 4000);
       }
     }, GREETING_DELAY);
     return () => {
