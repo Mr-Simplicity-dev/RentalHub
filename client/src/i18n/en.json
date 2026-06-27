@@ -554,7 +554,9 @@
     "qr_list": "How do I list my property?",
     "qr_legal": "Tell me about Legal Protection",
     "qr_payment": "How does payment work?",
-    "anything_else": "Is there anything else I can help you with?"
+    "anything_else": "Is there anything else I can help you with?",
+    "menu_prompt": "Sure! What would you like to know about?",
+    "menu_btn": "Menu"
   },
 
   "widget": {
