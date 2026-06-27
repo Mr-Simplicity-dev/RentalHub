@@ -11,6 +11,7 @@ const GREETING_DELAY = 6000;
 const CONFIRM_WORDS = ['yes', 'yeah', 'yep', 'okay', 'ok', 'sure', 'alright', 'please', 'yea', 'go ahead'];
 const MENU_WORDS = ['menu', 'options', 'back', 'show options', 'show menu', 'what can you do', 'help'];
 const NO_WORDS = ['no', 'nope', 'nah', 'not really', 'nothing', 'that\'s all', 'that is all', 'no thanks', 'all good', 'im good', 'i\'m good', 'not now'];
+const THANKS_WORDS = ['thanks', 'thank you', 'thank', 'thx', 'cool', 'ok thanks', 'okay thanks', 'alright thanks', 'got it', 'understood', 'i see'];
 
 const isConfirmation = (text) => {
   const clean = text.toLowerCase().replace(/[^a-z ]/g, '').trim();
@@ -25,6 +26,11 @@ const isMenuRequest = (text) => {
 const isNegative = (text) => {
   const clean = text.toLowerCase().replace(/[^a-z ]/g, '').trim();
   return NO_WORDS.some((w) => clean === w || clean.startsWith(w + ' ') || clean.endsWith(' ' + w));
+};
+
+const isAcknowledgment = (text) => {
+  const clean = text.toLowerCase().replace(/[^a-z ]/g, '').trim();
+  return THANKS_WORDS.some((w) => clean === w || clean.startsWith(w + ' ') || clean.endsWith(' ' + w));
 };
 
 const WhatsAppBotWidget = () => {
@@ -199,6 +205,15 @@ const WhatsAppBotWidget = () => {
       if (currentAwaiting === 'handoff' && isConfirmation(msg)) {
         botReplyWithTyping(() => {
           handleTalkToAgent();
+        });
+        return;
+      }
+
+      if (isAcknowledgment(msg)) {
+        setAwaitingResponse(null);
+        setShowQuickReplies(false);
+        botReplyWithTyping(() => {
+          addBotMessage(t('messages.whatsapp.youre_welcome', 'You\u2019re welcome! Happy to help.'));
         });
         return;
       }
