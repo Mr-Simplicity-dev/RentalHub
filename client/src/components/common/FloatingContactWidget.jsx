@@ -599,10 +599,10 @@ const FloatingContactWidget = () => {
           className={`tour-support-widget flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${!open ? 'animate-bounce' : ''}`}
           aria-label={t('widget.contact_support', 'Contact support')}
         >
-          {unreadCount > 0 && (
+          {unreadCount > 0 && !open && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{unreadCount}</span>
           )}
-          <FaCommentAlt className="w-5 h-5" />
+          {open ? <FaTimes className="w-5 h-5" /> : <FaCommentAlt className="w-5 h-5" />}
         </button>
       </div>
 
@@ -615,7 +615,7 @@ const FloatingContactWidget = () => {
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
             className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
-            style={{ maxHeight: '360px' }}
+            style={{ maxHeight: '480px' }}
           >
           {renderHeader()}
 
