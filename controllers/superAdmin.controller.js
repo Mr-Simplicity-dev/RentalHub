@@ -1441,6 +1441,13 @@ const getAllProperties = async (req, res) => {
   try {
     await ensurePropertyOperationSchema();
 
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const countResult = await db.query('SELECT COUNT(*) AS total FROM properties');
+    const total = parseInt(countResult.rows[0]?.total || 0, 10);
+
     const { rows } = await db.query(
       `SELECT p.*, u.full_name AS landlord_name,
               COALESCE(ops.operations, '[]'::json) AS operations
@@ -1456,10 +1463,12 @@ const getAllProperties = async (req, res) => {
            LIMIT 3
          ) operation_rows
        ) ops ON TRUE
-       ORDER BY p.created_at DESC`
+       ORDER BY p.created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
     );
 
-    res.json({ success: true, properties: rows });
+    res.json({ success: true, properties: rows, total });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to load properties' });
