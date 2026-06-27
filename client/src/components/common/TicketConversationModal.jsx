@@ -21,6 +21,7 @@ const TicketConversationModal = ({
   onEscalate,
   onResolve,
   accentColor = 'amber',
+  adminLabel = 'Support',
 }) => {
   const c = THEMES[accentColor] || THEMES.amber;
   const [conversation, setConversation] = useState([]);
@@ -195,7 +196,7 @@ const TicketConversationModal = ({
                       <div className="flex items-center gap-2">
                         {reply.is_admin ? <FaShieldAlt size={10} className={c.text} /> : <FaUser size={10} />}
                         <span className={reply.is_admin ? `font-medium ${c.text}` : ''}>{reply.author_name || reply.user_email || 'User'}</span>
-                        {reply.is_admin && <span className={`rounded ${c.badge} px-1.5 py-0.5 text-[10px] font-medium`}>Support</span>}
+                        {reply.is_admin && <span className={`rounded ${c.badge} px-1.5 py-0.5 text-[10px] font-medium`}>{adminLabel}</span>}
                         <span>&middot; {new Date(reply.created_at).toLocaleString()}</span>
                         {reply.edited_at && <span className="italic">(edited)</span>}
                       </div>

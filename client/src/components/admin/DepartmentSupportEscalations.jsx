@@ -1,7 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FaCheckCircle, FaClipboardCheck, FaExternalLinkAlt, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { FaCheckCircle, FaClipboardCheck, FaExternalLinkAlt, FaExclamationTriangle, FaEye, FaSyncAlt, FaUserPlus } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import TicketConversationModal from '../common/TicketConversationModal';
+import { AuthContext } from '../../context/AuthContext';
+import { SocketContext } from '../../context/SocketContext';
 
 const statusClass = (status) => {
   if (status === 'action_required' || status === 'escalated') return 'bg-red-100 text-red-700';
@@ -19,9 +22,12 @@ const slaClass = (status) => {
 const label = (value) => String(value || 'not set').replace(/_/g, ' ');
 
 const DepartmentSupportEscalations = ({ department = '', title = 'Support Escalations' }) => {
+  const { user } = useContext(AuthContext);
+  const { socket } = useContext(SocketContext);
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState([]);
   const [actionId, setActionId] = useState('');
+  const [conversationTicket, setConversationTicket] = useState(null);
   const [statusDialog, setStatusDialog] = useState({
     open: false,
     ticket: null,
@@ -104,6 +110,21 @@ const DepartmentSupportEscalations = ({ department = '', title = 'Support Escala
     }
   };
 
+  const handleTakeover = async (ticket) => {
+    setActionId(`takeover-${ticket.id}`);
+    try {
+      await api.post(`/support/tickets/${ticket.id}/takeover`);
+      toast.success('You have taken over this escalation');
+      await loadEscalations();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to take over');
+    } finally {
+      setActionId('');
+    }
+  };
+
+  const statusLabel = department ? `${department.charAt(0).toUpperCase() + department.slice(1)} Dept` : 'Support';
+
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -152,6 +173,21 @@ const DepartmentSupportEscalations = ({ department = '', title = 'Support Escala
                   <a href={ticket.related_admin_path} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
                     <FaExternalLinkAlt /> Open Related Work
                   </a>
+                )}
+                <button
+                  onClick={() => setConversationTicket(ticket)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <FaEye /> View Conversation
+                </button>
+                {!ticket.assigned_to && (
+                  <button
+                    disabled={Boolean(actionId)}
+                    onClick={() => handleTakeover(ticket)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-indigo-300 px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+                  >
+                    <FaUserPlus /> Take Over
+                  </button>
                 )}
                 <button disabled={Boolean(actionId)} onClick={() => openStatusDialog(ticket, 'acknowledged')} className="inline-flex items-center gap-2 rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">
                   <FaClipboardCheck /> Acknowledge
@@ -212,6 +248,16 @@ const DepartmentSupportEscalations = ({ department = '', title = 'Support Escala
             </div>
           </form>
         </div>
+      )}
+      {conversationTicket && (
+        <TicketConversationModal
+          ticket={conversationTicket}
+          user={user}
+          socket={socket}
+          adminLabel={statusLabel}
+          onClose={() => setConversationTicket(null)}
+          onTicketUpdated={loadEscalations}
+        />
       )}
     </section>
   );

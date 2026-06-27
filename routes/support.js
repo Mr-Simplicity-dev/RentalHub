@@ -1541,6 +1541,52 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
   }
 });
 
+// POST /tickets/:id/takeover — department admin takes ownership of an escalated ticket
+router.post('/tickets/:id/takeover', authenticate, async (req, res) => {
+  try {
+    await ensureSupportSchema();
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
+    }
+
+    const ticketResult = await db.query('SELECT * FROM support_tickets WHERE id = $1', [ticketId]);
+    if (!ticketResult.rows.length) return res.status(404).json({ success: false, message: 'Ticket not found' });
+
+    const ticket = ticketResult.rows[0];
+    if (!canAccessDepartmentEscalation(req.user, ticket)) {
+      return res.status(403).json({ success: false, message: 'You cannot take over this ticket' });
+    }
+
+    if (ticket.escalation_status === 'none') {
+      return res.status(400).json({ success: false, message: 'Ticket is not escalated to a department' });
+    }
+
+    const result = await db.query(
+      `UPDATE support_tickets
+       SET assigned_to = $1,
+           escalation_status = 'acknowledged',
+           status = 'in_progress',
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING *`,
+      [req.user.id, ticketId]
+    );
+
+    await addTicketTimeline(ticketId, req.user, 'ticket_taken_over', `${req.user.full_name || 'Department admin'} took over this ticket`, {
+      department: ticket.escalation_department,
+      previous_assignee: ticket.assigned_to,
+    });
+
+    emitTicketUpdated(result.rows[0]);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Takeover ticket error:', error);
+    res.status(500).json({ success: false, message: 'Failed to take over ticket' });
+  }
+});
+
 router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (req, res) => {
   try {
     await ensureSupportSchema();
@@ -1829,6 +1875,40 @@ router.patch('/department-escalations/:id/status', authenticate, async (req, res
       department: ticket.escalation_department,
     });
 
+    // When department resolves, notify the assigned support admin and auto-reply to the user
+    if (escalationStatus === 'resolved') {
+      const deptLabel = (ticket.escalation_department || '').replace(/_/g, ' ');
+      const departmentName = deptLabel.charAt(0).toUpperCase() + deptLabel.slice(1);
+      const adminName = req.user.full_name || 'Department Admin';
+      const resolveMessage = note
+        ? `Your issue has been resolved by the ${departmentName} team.\n\nResolution note: ${note}\n\nA support agent will follow up if needed.`
+        : `Your issue has been resolved by the ${departmentName} team.\n\nA support agent will follow up if needed.`;
+
+      // Auto-reply to the ticket visible to the user
+      await db.query(
+        `INSERT INTO support_ticket_replies (ticket_id, user_id, author_name, message, is_admin, created_at)
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+        [ticketId, req.user.id, `${adminName} (${departmentName})`, resolveMessage, true]
+      );
+
+      // Notify the assigned support admin
+      if (ticket.assigned_to && ticket.assigned_to !== req.user.id) {
+        try {
+          const { createNotification } = require('../config/utils/notificationService');
+          await createNotification(
+            ticket.assigned_to,
+            'support_department_resolved',
+            'Department resolved a ticket',
+            `Ticket #${ticketId} "${ticket.subject}" was resolved by ${departmentName}. Please follow up with the user.`,
+            `/super-admin`
+          );
+          emitToUser(ticket.assigned_to, 'ticket:department_resolved', { ticketId, ticket: result.rows[0], department: ticket.escalation_department });
+        } catch (notifyErr) {
+          console.error('Failed to notify support admin of department resolution:', notifyErr);
+        }
+      }
+    }
+
     emitTicketUpdated(result.rows[0]);
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -2032,11 +2112,13 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
     } else {
-      const ownerCheck = await db.query(
-        'SELECT id FROM support_tickets WHERE id = $1 AND user_id = $2',
-        [ticketId, req.user.id]
-      );
-      if (!ownerCheck.rows.length) {
+      // Check if user is ticket owner or a department admin with escalation access
+      const ticketResult = await db.query('SELECT * FROM support_tickets WHERE id = $1', [ticketId]);
+      if (!ticketResult.rows.length) return res.status(404).json({ success: false, message: 'Ticket not found' });
+      const ticket = ticketResult.rows[0];
+      const isOwner = ticket.user_id === req.user.id;
+      const isDeptAdmin = canAccessDepartmentEscalation(req.user, ticket);
+      if (!isOwner && !isDeptAdmin) {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
     }
@@ -2137,14 +2219,17 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
     const role = String(req.user.user_type || '').toLowerCase();
     const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
     const isOwner = ticket.user_id === req.user.id;
+    const isDeptAdmin = !isSupportAdmin && !isOwner && canAccessDepartmentEscalation(req.user, ticket);
 
     if (isSupportAdmin && !canSupportAdminAccessTicket(req.user, ticket)) {
       return res.status(403).json({ success: false, message: 'You cannot reply to this ticket' });
     }
 
-    if (!isSupportAdmin && !isOwner) {
+    if (!isSupportAdmin && !isOwner && !isDeptAdmin) {
       return res.status(403).json({ success: false, message: 'You cannot reply to this ticket' });
     }
+
+    const isAdminReply = isSupportAdmin || isDeptAdmin;
 
     // Insert reply
     const result = await db.query(
@@ -2154,9 +2239,9 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
       [
         ticketId,
         req.user.id,
-        isSupportAdmin ? (req.user.full_name || 'Support Team') : (req.user.full_name || req.user.email),
+        isAdminReply ? (req.user.full_name || 'Support Team') : (req.user.full_name || req.user.email),
         message || '',
-        isSupportAdmin,
+        isAdminReply,
         req.file ? `/uploads/tickets/${req.file.filename}` : null,
         req.file ? req.file.originalname : null,
         req.file ? req.file.mimetype : null,
@@ -2568,7 +2653,7 @@ router.post('/tickets/contact-conversation', async (req, res) => {
 // ─── Internal Notes (admin-to-admin) ──────────────────────────────────────
 
 // GET /tickets/:id/internal-notes — fetch internal notes for a ticket
-router.get('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, async (req, res) => {
+router.get('/tickets/:id/internal-notes', authenticate, async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -2577,16 +2662,23 @@ router.get('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, asy
       return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
     }
 
+    const role = String(req.user.user_type || '').toLowerCase();
+    const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
+
+    if (isSupportAdmin) {
+      const { status } = await getScopedTicket(ticketId, req.user);
+      if (status === 404) return res.status(404).json({ success: false, message: 'Ticket not found' });
+      if (status === 403) return res.status(403).json({ success: false, message: 'Access denied' });
+    } else {
+      const ticketResult = await db.query('SELECT * FROM support_tickets WHERE id = $1', [ticketId]);
+      if (!ticketResult.rows.length) return res.status(404).json({ success: false, message: 'Ticket not found' });
+      if (!canAccessDepartmentEscalation(req.user, ticketResult.rows[0])) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    }
+
     const limit = Math.min(Number(req.query.limit) || 200, 500);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
-
-    const { status } = await getScopedTicket(ticketId, req.user);
-    if (status === 404) {
-      return res.status(404).json({ success: false, message: 'Ticket not found' });
-    }
-    if (status === 403) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
 
     const result = await db.query(
       `SELECT sin.id, sin.ticket_id, sin.user_id, sin.author_name, sin.author_role, sin.message, sin.read_at, sin.created_at,
@@ -2619,7 +2711,7 @@ router.get('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, asy
 });
 
 // POST /tickets/:id/internal-notes — add internal note
-router.post('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, async (req, res) => {
+router.post('/tickets/:id/internal-notes', authenticate, async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -2635,7 +2727,7 @@ router.post('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, as
 
     // Verify ticket exists
     const ticketResult = await db.query(
-      'SELECT id, subject, assigned_to, state, lga FROM support_tickets WHERE id = $1',
+      'SELECT * FROM support_tickets WHERE id = $1',
       [ticketId]
     );
     if (!ticketResult.rows.length) {
@@ -2643,7 +2735,13 @@ router.post('/tickets/:id/internal-notes', authenticate, requireSupportAdmin, as
     }
 
     const ticket = ticketResult.rows[0];
-    if (!canSupportAdminAccessTicket(req.user, ticket)) {
+    const role = String(req.user.user_type || '').toLowerCase();
+    const isSupportAdmin = SUPPORT_ADMIN_ROLES.has(role);
+    if (isSupportAdmin) {
+      if (!canSupportAdminAccessTicket(req.user, ticket)) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+    } else if (!canAccessDepartmentEscalation(req.user, ticket)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
