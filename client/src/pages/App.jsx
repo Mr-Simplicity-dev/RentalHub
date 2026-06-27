@@ -17,7 +17,7 @@ import Footer from '../components/common/Footer';
 import TourManager from '../components/tour/TourManager';
 import LiveRatingFlyIn from '../components/ratings/LiveRatingFlyIn';
 import PlatformRatingPrompt from '../components/ratings/PlatformRatingPrompt';
-import FloatingContactWidget from '../components/common/FloatingContactWidget';
+
 
 import Home from './Home';
 import Login from './Login';
@@ -661,7 +661,6 @@ function Layout({ children }) {
       <LiveRatingFlyIn disabled={isDashboardShell} />
       <PlatformRatingPrompt disabled={isDashboardShell} />
 
-      {!isDashboardShell && <FloatingContactWidget />}
 
       {showPublicHeaderFooter && <Footer />}
     </div>
