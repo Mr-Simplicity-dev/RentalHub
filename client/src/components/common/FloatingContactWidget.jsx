@@ -145,8 +145,20 @@ const FloatingContactWidget = () => {
     };
   }, []);
 
-  const [showGreeting, setShowGreeting] = useState(true);
+  const [showGreeting, setShowGreeting] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
+
+  // Greeting bubble: appear after delay, auto-hide after 7s
+  useEffect(() => {
+    if (open) { setShowGreeting(false); return; }
+    const showTimer = setTimeout(() => {
+      if (!open) setShowGreeting(true);
+    }, 7500); // appears after WhatsAppBot bubble (6s delayed + buffer)
+    const hideTimer = setTimeout(() => {
+      setShowGreeting(false);
+    }, 14000); // disappears ~7s after appearing
+    return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
+  }, [open]);
 
   // Scroll management
   useEffect(() => {
@@ -200,6 +212,22 @@ const FloatingContactWidget = () => {
     const timer = setTimeout(() => { if (mounted) document.addEventListener('mousedown', handler); }, 0);
     return () => { mounted = false; clearTimeout(timer); document.removeEventListener('mousedown', handler); };
   }, [open]);
+
+  // Close other widget on mobile when this opens
+  const widgetInstanceId = useRef(`fcw-${Date.now()}`);
+  useEffect(() => {
+    if (!open) return;
+    if (window.innerWidth < 640) {
+      window.dispatchEvent(new CustomEvent('widget:close-other', { detail: { id: widgetInstanceId.current } }));
+    }
+  }, [open]);
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.id !== widgetInstanceId.current) setOpen(false);
+    };
+    window.addEventListener('widget:close-other', handler);
+    return () => window.removeEventListener('widget:close-other', handler);
+  }, []);
 
   // Load locations
   useEffect(() => {
@@ -605,15 +633,20 @@ const FloatingContactWidget = () => {
 
   return (
     <WidgetErrorBoundary name="FloatingContactWidget">
-      <div className="fixed bottom-6 right-6 z-50 flex sm:flex-col flex-col-reverse items-end gap-2">
-        {!open && showGreeting && (
-          <div className="animate-fadeIn">
-            <div className="relative bg-white rounded-xl shadow-xl p-3 max-w-[200px]">
-              <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white rotate-45" />
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+        <AnimatePresence>
+          {!open && showGreeting && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="relative bg-white rounded-xl shadow-xl p-3 max-w-[220px]"
+            >
+              <div className="absolute -bottom-1.5 right-5 w-3 h-3 bg-white rotate-45" />
               <p className="text-sm text-gray-700 font-medium">{t('widget.need_help', 'Need help? Chat with us!')}</p>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
         <button
           onClick={() => { setOpen((p) => !p); setShowGreeting(false); }}
           className={`tour-support-widget flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${!open ? 'animate-bounce' : ''}`}
