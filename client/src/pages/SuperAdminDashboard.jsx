@@ -219,6 +219,7 @@ export default function SuperAdminDashboard() {
   const [selectedProps, setSelectedProps] = useState([]);
   const [usersPage, setUsersPage] = useState(1);
   const [propertiesPage, setPropertiesPage] = useState(1);
+  const [propertiesTotal, setPropertiesTotal] = useState(0);
   const [reportsPage, setReportsPage] = useState(1);
   const [logsPage, setLogsPage] = useState(1);
   const [fraudPage, setFraudPage] = useState(1);
@@ -289,10 +290,13 @@ export default function SuperAdminDashboard() {
     setSelectedUsers([]);
   }, []);
 
-  const loadProperties = useCallback(async () => {
-    const res = await api.get("/super/properties");
+  const loadProperties = useCallback(async (page = 1) => {
+    const res = await api.get("/super/properties", {
+      params: { page, limit: PAGE_LIMITS.properties },
+    });
     setProperties(res.data.properties || []);
-    setPropertiesPage(1);
+    setPropertiesTotal(res.data.total || 0);
+    setPropertiesPage(page);
     setSelectedProps([]);
   }, []);
 
@@ -800,48 +804,64 @@ export default function SuperAdminDashboard() {
   };
 
   const unlistProperty = async (id, reason = "") => {
-    await api.patch(`/super/properties/${id}/unlist`, {
-      reason: String(reason || "").trim(),
-    });
-    toast.success("Property unlisted");
-    loadProperties();
+    try {
+      await api.patch(`/super/properties/${id}/unlist`, {
+        reason: String(reason || "").trim(),
+      });
+      toast.success("Property unlisted");
+      loadProperties(propertiesPage);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to unlist property");
+    }
   };
 
   const toggleFeaturedProperty = async (id, shouldFeature, reason = "") => {
-    await api.patch(
-      `/super/properties/${id}/${shouldFeature ? "feature" : "unfeature"}`,
-      {
-        reason: String(reason || "").trim(),
-      }
-    );
-    toast.success(
-      shouldFeature ? "Property featured" : "Property removed from featured"
-    );
-    loadProperties();
+    try {
+      await api.patch(
+        `/super/properties/${id}/${shouldFeature ? "feature" : "unfeature"}`,
+        {
+          reason: String(reason || "").trim(),
+        }
+      );
+      toast.success(
+        shouldFeature ? "Property featured" : "Property removed from featured"
+      );
+      loadProperties(propertiesPage);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update featured status");
+    }
   };
 
   const bulkUsers = async (action, reason = "") => {
-    await api.post("/super/users/bulk", {
-      ids: selectedUsers,
-      action,
-      reason: String(reason || "").trim(),
-    });
-    toast.success("Bulk action completed");
-    loadUsers();
-    if (action === "verify" || action === "promote") {
-      loadVerifications(verificationPage);
-      loadAdminPerformance();
+    try {
+      await api.post("/super/users/bulk", {
+        ids: selectedUsers,
+        action,
+        reason: String(reason || "").trim(),
+      });
+      toast.success("Bulk action completed");
+      loadUsers();
+      if (action === "verify" || action === "promote") {
+        loadVerifications(verificationPage);
+        loadAdminPerformance();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Bulk action failed");
     }
   };
 
   const bulkProps = async (reason = "") => {
-    await api.post("/super/properties/bulk", {
-      ids: selectedProps,
-      action: "unlist",
-      reason: String(reason || "").trim(),
-    });
-    toast.success("Bulk unlist completed");
-    loadProperties();
+    try {
+      await api.post("/super/properties/bulk", {
+        ids: selectedProps,
+        action: "unlist",
+        reason: String(reason || "").trim(),
+      });
+      toast.success("Bulk unlist completed");
+      loadProperties(propertiesPage);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Bulk unlist failed");
+    }
   };
 
   const updateReport = async (id, status, note = "") => {
@@ -939,14 +959,10 @@ export default function SuperAdminDashboard() {
   const pagedUsers = getPageSlice(users, usersPage, PAGE_LIMITS.users);
 
   const propertiesTotalPages = getTotalPages(
-    properties.length,
+    propertiesTotal,
     PAGE_LIMITS.properties
   );
-  const pagedProperties = getPageSlice(
-    properties,
-    propertiesPage,
-    PAGE_LIMITS.properties
-  );
+  const pagedProperties = properties;
 
   const reportsTotalPages = getTotalPages(reports.length, PAGE_LIMITS.reports);
   const pagedReports = getPageSlice(reports, reportsPage, PAGE_LIMITS.reports);
@@ -1192,11 +1208,11 @@ export default function SuperAdminDashboard() {
           <PaginationControls
             currentPage={propertiesPage}
             totalPages={propertiesTotalPages}
-            onPageChange={setPropertiesPage}
+            onPageChange={(page) => loadProperties(page)}
             summary={getPageSummary(
               propertiesPage,
               PAGE_LIMITS.properties,
-              properties.length
+              propertiesTotal
             )}
           />
         </>

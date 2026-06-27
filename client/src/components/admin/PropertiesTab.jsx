@@ -14,6 +14,7 @@ const PropertiesTab = ({
     action: "",
     reason: "",
     error: "",
+    submitting: false,
   });
 
   const toggleProperty = (id) => {
@@ -39,6 +40,7 @@ const PropertiesTab = ({
       action,
       reason: "",
       error: "",
+      submitting: false,
     });
   };
 
@@ -49,6 +51,7 @@ const PropertiesTab = ({
       action: "",
       reason: "",
       error: "",
+      submitting: false,
     });
   };
 
@@ -77,6 +80,8 @@ const PropertiesTab = ({
       return;
     }
 
+    setPropertyAction((prev) => ({ ...prev, submitting: true, error: "" }));
+
     try {
       if (propertyAction.action === "bulk_unlist") {
         await bulkProps(reason);
@@ -93,6 +98,7 @@ const PropertiesTab = ({
     } catch (err) {
       setPropertyAction((prev) => ({
         ...prev,
+        submitting: false,
         error: err.response?.data?.message || "Property action failed.",
       }));
     }
@@ -197,12 +203,12 @@ const PropertiesTab = ({
                   <span
                     className={`px-2 py-1 text-xs rounded-full
                     ${
-                      (p.is_available ?? p.is_active)
+                      p.is_available !== false
                         ? "bg-green-100 text-green-700"
                         : "bg-red-100 text-red-700"
                     }`}
                   >
-                    {(p.is_available ?? p.is_active) ? "Active" : "Unlisted"}
+                    {p.is_available !== false ? "Active" : "Unlisted"}
                   </span>
 
                   {p.featured && (
@@ -219,7 +225,7 @@ const PropertiesTab = ({
 
                   <div className="flex justify-center gap-2">
 
-                    {(p.is_available ?? p.is_active) && (
+                    {p.is_available !== false && (
                       <button
                         onClick={() => openPropertyAction(p, "unlist")}
                         className="rounded-lg bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
@@ -326,13 +332,14 @@ const PropertiesTab = ({
               <button
                 type="button"
                 onClick={submitPropertyAction}
+                disabled={propertyAction.submitting}
                 className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
                   propertyAction.action === "feature"
                     ? "bg-amber-600 hover:bg-amber-700"
                     : "bg-red-600 hover:bg-red-700"
-                }`}
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                Confirm
+                {propertyAction.submitting ? "Processing..." : "Confirm"}
               </button>
             </div>
           </div>
