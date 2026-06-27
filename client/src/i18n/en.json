@@ -553,7 +553,8 @@
     "qr_find": "How do I find a property?",
     "qr_list": "How do I list my property?",
     "qr_legal": "Tell me about Legal Protection",
-    "qr_payment": "How does payment work?"
+    "qr_payment": "How does payment work?",
+    "anything_else": "Is there anything else I can help you with?"
   },
 
   "widget": {

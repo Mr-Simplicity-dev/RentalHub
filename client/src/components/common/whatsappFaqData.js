@@ -3,8 +3,8 @@ const whatsappFaqData = [
     id: 'find-property',
     keywords: ['find', 'property', 'search', 'apartment', 'house', 'home', 'rent', 'looking', 'available', 'listing'],
     answer: 'You can search for properties by State and LGA right on our homepage. Each listing shows photos, price, features, and the landlord\'s verification status. You can also request a physical or virtual tour directly from the property page.',
-    link: null,
-    linkText: null,
+    link: '/',
+    linkText: 'Search properties',
   },
   {
     id: 'list-property',

@@ -1,12 +1,19 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaWhatsapp, FaTimes, FaPaperPlane, FaRobot, FaHeadset } from 'react-icons/fa';
+import { FaWhatsapp, FaTimes, FaPaperPlane, FaRobot, FaHeadset, FaExternalLinkAlt } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { findBestMatch } from './whatsappFaqData';
 
 const WHATSAPP_NUMBER = '2348030601238';
 const BOT_DELAY = 1000;
 const GREETING_DELAY = 6000;
+
+const CONFIRM_WORDS = ['yes', 'yeah', 'yep', 'okay', 'ok', 'sure', 'alright', 'please', 'yea', 'go ahead'];
+
+const isConfirmation = (text) => {
+  const clean = text.toLowerCase().replace(/[^a-z ]/g, '').trim();
+  return CONFIRM_WORDS.some((w) => clean === w || clean.startsWith(w + ' ') || clean.endsWith(' ' + w));
+};
 
 const WhatsAppBotWidget = () => {
   const { t } = useTranslation();
@@ -18,11 +25,17 @@ const WhatsAppBotWidget = () => {
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [connectedToAgent, setConnectedToAgent] = useState(false);
   const [askedQuestion, setAskedQuestion] = useState(false);
+  const [handoffSuggested, setHandoffSuggested] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const greetingTimerRef = useRef(null);
   const mountedRef = useRef(true);
+  const handoffSuggestedRef = useRef(false);
+
+  useEffect(() => {
+    handoffSuggestedRef.current = handoffSuggested;
+  }, [handoffSuggested]);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -50,13 +63,11 @@ const WhatsAppBotWidget = () => {
         setIsBotTyping(true);
         setTimeout(() => {
           if (mountedRef.current) {
-            setMessages([
-              {
-                id: 'bot-greeting',
-                type: 'bot',
-                text: t('messages.whatsapp.bot_greeting', "Hi! I'm RentalHub\u2019s virtual assistant. How can I help you today?"),
-              },
-            ]);
+            setMessages([{
+              id: 'bot-greeting',
+              type: 'bot',
+              text: t('messages.whatsapp.bot_greeting', "Hi! I'm RentalHub\u2019s virtual assistant. How can I help you today?"),
+            }]);
             setIsBotTyping(false);
             setShowQuickReplies(true);
             setAskedQuestion(true);
@@ -76,10 +87,16 @@ const WhatsAppBotWidget = () => {
     }
   }, [open]);
 
-  const addBotMessage = useCallback((text) => {
+  const addBotMessage = useCallback((text, faq) => {
     setMessages((prev) => [
       ...prev,
-      { id: `bot-${Date.now()}`, type: 'bot', text },
+      {
+        id: `bot-${Date.now()}`,
+        type: 'bot',
+        text,
+        link: faq?.link || null,
+        linkText: faq?.linkText || null,
+      },
     ]);
   }, []);
 
@@ -90,6 +107,38 @@ const WhatsAppBotWidget = () => {
     ]);
   }, []);
 
+  const botReplyWithTyping = useCallback((callback) => {
+    setTimeout(() => {
+      if (!mountedRef.current) return;
+      setIsBotTyping(true);
+    }, 200);
+    setTimeout(() => {
+      if (!mountedRef.current) return;
+      setIsBotTyping(false);
+      callback();
+    }, BOT_DELAY + 500);
+  }, []);
+
+  const askAnythingElse = useCallback(() => {
+    setTimeout(() => {
+      if (!mountedRef.current) return;
+      setIsBotTyping(true);
+      setTimeout(() => {
+        if (!mountedRef.current) return;
+        setIsBotTyping(false);
+        addBotMessage(t('messages.whatsapp.anything_else', 'Is there anything else I can help you with?'));
+      }, 600);
+    }, 600);
+  }, [addBotMessage, t]);
+
+  const handleTalkToAgent = useCallback(() => {
+    setConnectedToAgent(true);
+    setHandoffSuggested(false);
+    const waMsg = t('home.whatsapp_message', 'Hello RentalHub NG, I need help finding a home.');
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(waMsg)}%0A%0A${encodeURIComponent(window.location.href)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, [t]);
+
   const handleSend = useCallback(
     (text) => {
       const msg = (text || input).trim();
@@ -98,33 +147,46 @@ const WhatsAppBotWidget = () => {
       addUserMessage(msg);
       setInput('');
 
-      setTimeout(() => {
-        if (!mountedRef.current) return;
-        setIsBotTyping(true);
-      }, 200);
+      if (handoffSuggestedRef.current && isConfirmation(msg)) {
+        botReplyWithTyping(() => {
+          handleTalkToAgent();
+        });
+        return;
+      }
 
-      setTimeout(() => {
-        if (!mountedRef.current) return;
-        setIsBotTyping(false);
-
-        const match = findBestMatch(msg);
-        if (match) {
-          let reply = match.answer;
-          if (match.link) {
-            reply += `\n\n${match.linkText}: ${window.location.origin}${match.link}`;
-          }
-          addBotMessage(reply);
-        } else {
+      const match = findBestMatch(msg);
+      if (match) {
+        botReplyWithTyping(() => {
+          addBotMessage(match.answer, match);
+          askAnythingElse();
+        });
+      } else {
+        setHandoffSuggested(true);
+        botReplyWithTyping(() => {
           addBotMessage(
-            t(
-              'messages.whatsapp.no_match',
-              "I'm not sure I have the answer to that. Would you like to speak with a human agent?"
-            )
+            t('messages.whatsapp.no_match', "I\u2019m not sure I have the answer to that. Would you like to speak with a human agent? Just say yes.")
           );
-        }
-      }, BOT_DELAY + 500);
+        });
+      }
     },
-    [input, addUserMessage, addBotMessage, t]
+    [input, addUserMessage, addBotMessage, botReplyWithTyping, t, askAnythingElse, handleTalkToAgent]
+  );
+
+  const handleQuickReply = useCallback(
+    (question) => {
+      addUserMessage(question);
+      setShowQuickReplies(false);
+      setHandoffSuggested(false);
+
+      const match = findBestMatch(question);
+      if (match) {
+        botReplyWithTyping(() => {
+          addBotMessage(match.answer, match);
+          askAnythingElse();
+        });
+      }
+    },
+    [addUserMessage, addBotMessage, botReplyWithTyping, askAnythingElse]
   );
 
   const handleKeyDown = (e) => {
@@ -132,33 +194,6 @@ const WhatsAppBotWidget = () => {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const handleQuickReply = (question) => {
-    addUserMessage(question);
-    setShowQuickReplies(false);
-
-    setTimeout(() => {
-      if (!mountedRef.current) return;
-      setIsBotTyping(true);
-    }, 200);
-
-    setTimeout(() => {
-      if (!mountedRef.current) return;
-      setIsBotTyping(false);
-
-      const match = findBestMatch(question);
-      if (match) {
-        addBotMessage(match.answer);
-      }
-    }, BOT_DELAY + 500);
-  };
-
-  const handleTalkToAgent = () => {
-    setConnectedToAgent(true);
-    const msg = t('home.whatsapp_message', 'Hello RentalHub NG, I need help finding a home.');
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}%0A%0A${encodeURIComponent(window.location.href)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const quickReplies = [
@@ -237,10 +272,7 @@ const WhatsAppBotWidget = () => {
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
               {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
+                <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
                     className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line ${
                       msg.type === 'user'
@@ -257,6 +289,17 @@ const WhatsAppBotWidget = () => {
                       </span>
                     )}
                     <p className="text-sm">{msg.text}</p>
+                    {msg.link && (
+                      <a
+                        href={msg.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs bg-green-100 text-green-700 rounded-full px-3 py-1.5 hover:bg-green-200 transition-colors font-medium"
+                      >
+                        <FaExternalLinkAlt className="w-2.5 h-2.5" />
+                        {msg.linkText || 'Visit page'}
+                      </a>
+                    )}
                   </div>
                 </div>
               ))}
@@ -336,7 +379,7 @@ const WhatsAppBotWidget = () => {
               <div className="mt-2 text-center">
                 <button
                   type="button"
-                  onClick={handleTalkToAgent}
+                  onClick={() => handleTalkToAgent()}
                   disabled={connectedToAgent}
                   className="text-xs text-green-600 hover:text-green-700 underline underline-offset-2 transition-colors disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
                 >

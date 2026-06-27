@@ -547,7 +547,8 @@
         "qr_find": "如何找房源？",
         "qr_list": "如何发布房源？",
         "qr_legal": "介绍法律保护服务",
-        "qr_payment": "支付如何运作？"
+        "qr_payment": "支付如何运作？",
+        "anything_else": "还有什么我可以帮助您的吗？"
       },
 
       "widget": {
