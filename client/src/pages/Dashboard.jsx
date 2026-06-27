@@ -3310,6 +3310,7 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+      <FloatingContactWidget />
     </div>
   );
 };
