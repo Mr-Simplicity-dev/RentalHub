@@ -850,7 +850,7 @@ const FloatingContactWidget = () => {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                 <button onClick={handleLookup} disabled={lookupLoading}
                   className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
-                  {lookupLoading ? t('widget.searching', 'Searching...') : t('widget.lookup', 'Look up my tickets')}
+                  {lookupLoading ? t('widget.searching', 'Searching...') : t('widget.lookup', 'Check Tickets Status')}
                 </button>
                 {lookupTickets.length > 0 && (
                   <div className="space-y-2 mt-3">
