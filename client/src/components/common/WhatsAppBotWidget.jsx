@@ -454,14 +454,16 @@ const WhatsAppBotWidget = () => {
                     {t('messages.whatsapp.menu_btn', 'Menu')}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => handleTalkToAgent()}
-                  disabled={connectedToAgent}
-                  className="text-xs text-green-600 hover:text-green-700 underline underline-offset-2 transition-colors disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
-                >
-                  {t('messages.whatsapp.talk_to_agent', 'Talk to a human agent \u2192')}
-                </button>
+                {(awaitingResponse === 'handoff' || connectedToAgent) && (
+                  <button
+                    type="button"
+                    onClick={() => handleTalkToAgent()}
+                    disabled={connectedToAgent}
+                    className="text-xs text-green-600 hover:text-green-700 underline underline-offset-2 transition-colors disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
+                  >
+                    {t('messages.whatsapp.talk_to_agent', 'Talk to a human agent \u2192')}
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
