@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { io as socketIO } from 'socket.io-client';
 import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaMicrophone, FaStopCircle, FaCheck } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
 import useVoiceRecorder from '../../hooks/useVoiceRecorder';
+import WidgetErrorBoundary from './WidgetErrorBoundary';
 
 const LS_EMAIL = 'contact_widget_email';
 const LS_TICKET_ID = 'contact_widget_ticket_id';
@@ -97,6 +98,24 @@ const FloatingContactWidget = () => {
   const guestSocketRef = useRef(null);
   const activeTicketRef = useRef(null);
   const viewingContactRef = useRef(null);
+  const openRef = useRef(open);
+  useEffect(() => { openRef.current = open; }, [open]);
+  const prefersReducedMotion = useReducedMotion();
+  const playNotification = useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 660;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    } catch {}
+  }, []);
   // Focus trap
   useEffect(() => {
     if (!open) return;
@@ -235,6 +254,7 @@ const FloatingContactWidget = () => {
     if (!socket || !isAuthenticated) return;
     const replyHandler = (data) => {
       fetchMyTickets();
+      if (!openRef.current) playNotification();
       if (activeTicketRef.current?.id === data.ticketId && data.reply) {
         setConversation((prev) => {
           if (prev.some((r) => r.id === data.reply.id)) return prev;
@@ -584,7 +604,7 @@ const FloatingContactWidget = () => {
   );
 
   return (
-    <>
+    <WidgetErrorBoundary name="FloatingContactWidget">
       <div className="fixed bottom-6 right-6 z-50 flex sm:flex-col flex-col-reverse items-end gap-2">
         {!open && showGreeting && (
           <div className="animate-fadeIn">
@@ -610,9 +630,12 @@ const FloatingContactWidget = () => {
         {open && (
           <motion.div
             ref={widgetRef}
-            initial={{ opacity: 0, y: 20 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('widget.support_title', 'RentalHub Support')}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
             className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
             style={{ maxHeight: '480px' }}
@@ -1026,7 +1049,7 @@ const FloatingContactWidget = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </WidgetErrorBoundary>
   );
 };
 

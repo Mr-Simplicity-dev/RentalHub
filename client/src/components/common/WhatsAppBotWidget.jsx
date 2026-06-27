@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { FaWhatsapp, FaTimes, FaPaperPlane, FaHeadset, FaExternalLinkAlt, FaListUl } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { findBestMatch } from './whatsappFaqData';
+import WidgetErrorBoundary from './WidgetErrorBoundary';
 
 const WHATSAPP_NUMBER = '2348030601238';
 const BOT_DELAY = 1000;
@@ -49,6 +50,11 @@ const WhatsAppBotWidget = () => {
   const greetingTimerRef = useRef(null);
   const mountedRef = useRef(true);
   const awaitingRef = useRef(null);
+  const widgetRef = useRef(null);
+  const openRef = useRef(open);
+  useEffect(() => { openRef.current = open; }, [open]);
+  const prefersReducedMotion = useReducedMotion();
+  const formatTime = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   useEffect(() => {
     awaitingRef.current = awaitingResponse;
@@ -85,6 +91,7 @@ const WhatsAppBotWidget = () => {
               type: 'bot',
               text: t('messages.whatsapp.bot_greeting', "Hi! I'm RentalHub\u2019s virtual assistant. How can I help you today?"),
               showQuickReplies: true,
+              created_at: new Date().toISOString(),
             }]);
             setIsBotTyping(false);
             setAskedQuestion(true);
@@ -104,6 +111,33 @@ const WhatsAppBotWidget = () => {
     }
   }, [open]);
 
+  // Focus trap + Escape + click-outside
+  useEffect(() => {
+    if (!open) return;
+    const el = widgetRef.current;
+    if (!el) return;
+    const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length) focusable[0].focus();
+    const handleTab = (e) => {
+      if (e.key !== 'Tab') return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    el.addEventListener('keydown', handleTab);
+    const handleEscape = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('keydown', handleEscape);
+    const handleOutside = (e) => { if (widgetRef.current && !widgetRef.current.contains(e.target)) setOpen(false); };
+    const timer = setTimeout(() => document.addEventListener('mousedown', handleOutside), 0);
+    return () => {
+      el.removeEventListener('keydown', handleTab);
+      document.removeEventListener('keydown', handleEscape);
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleOutside);
+    };
+  }, [open]);
+
   const addBotMessage = useCallback((text, faq, showQR) => {
     setMessages((prev) => [
       ...prev,
@@ -111,6 +145,7 @@ const WhatsAppBotWidget = () => {
         id: `bot-${Date.now()}`,
         type: 'bot',
         text,
+        created_at: new Date().toISOString(),
         link: faq?.link || null,
         linkText: faq?.linkText || null,
         showQuickReplies: showQR || false,
@@ -121,7 +156,7 @@ const WhatsAppBotWidget = () => {
   const addUserMessage = useCallback((text) => {
     setMessages((prev) => [
       ...prev,
-      { id: `user-${Date.now()}`, type: 'user', text },
+      { id: `user-${Date.now()}`, type: 'user', text, created_at: new Date().toISOString() },
     ]);
   }, []);
 
@@ -265,7 +300,7 @@ const WhatsAppBotWidget = () => {
   ];
 
   return (
-    <>
+    <WidgetErrorBoundary name="WhatsAppBotWidget">
       <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2">
         <AnimatePresence>
           {showGreeting && (
@@ -302,9 +337,13 @@ const WhatsAppBotWidget = () => {
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            ref={widgetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('messages.whatsapp.title', 'RentalHub Assistant')}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
             className="fixed bottom-24 left-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
             style={{ maxHeight: '480px' }}
@@ -350,6 +389,11 @@ const WhatsAppBotWidget = () => {
                       </span>
                     )}
                     <p className="text-sm">{msg.text}</p>
+                    {msg.created_at && (
+                      <p className={`text-[10px] mt-1 ${msg.type === 'user' ? 'text-green-200' : 'text-gray-400'}`}>
+                        {formatTime(new Date(msg.created_at))}
+                      </p>
+                    )}
                     {msg.link && (
                       <a
                         href={msg.link}
@@ -447,7 +491,7 @@ const WhatsAppBotWidget = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </WidgetErrorBoundary>
   );
 };
 
