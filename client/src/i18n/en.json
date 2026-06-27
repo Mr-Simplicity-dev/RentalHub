@@ -544,7 +544,7 @@
     "close": "Close",
     "input_placeholder": "Type your question...",
     "send": "Send",
-    "bot_label": "Bot",
+    "bot_label": "RentalHub",
     "no_match": "I'm not sure I have the answer to that. Would you like to speak with a human agent?",
     "talk_to_agent": "Talk to a human agent \u2192",
     "connected": "Connected to agent on WhatsApp",

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaWhatsapp, FaTimes, FaPaperPlane, FaRobot, FaHeadset, FaExternalLinkAlt, FaListUl } from 'react-icons/fa';
+import { FaWhatsapp, FaTimes, FaPaperPlane, FaHeadset, FaExternalLinkAlt, FaListUl } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { findBestMatch } from './whatsappFaqData';
 
@@ -349,9 +349,9 @@ const WhatsAppBotWidget = () => {
                   >
                     {msg.type === 'bot' && (
                       <span className="flex items-center gap-1.5 mb-1">
-                        <FaRobot className="w-3 h-3 text-green-600 shrink-0" />
-                        <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">
-                          {t('messages.whatsapp.bot_label', 'Bot')}
+                        <img src="/rentalhub-mark.svg" alt="" className="w-4 h-4 shrink-0" />
+                        <span className="text-xs font-semibold text-green-700 tracking-wide">
+                          {t('messages.whatsapp.bot_label', 'RentalHub')}
                         </span>
                       </span>
                     )}
