@@ -548,7 +548,8 @@
     "qr_find": "Comment trouver une propri\u00e9t\u00e9?",
     "qr_list": "Comment publier ma propri\u00e9t\u00e9?",
     "qr_legal": "Parlez-moi de la protection juridique",
-    "qr_payment": "Comment fonctionne le paiement?"
+    "qr_payment": "Comment fonctionne le paiement?",
+    "anything_else": "Puis-je vous aider avec autre chose?"
   },
 
   "widget": {
