@@ -71,6 +71,7 @@ const WhatsAppBotWidget = () => {
     greetingTimerRef.current = setTimeout(() => {
       if (mountedRef.current && !open) {
         setShowGreeting(true);
+        setTimeout(() => { if (mountedRef.current) setShowGreeting(false); }, 7000);
       }
     }, GREETING_DELAY);
     return () => {
@@ -110,6 +111,22 @@ const WhatsAppBotWidget = () => {
       setTimeout(() => inputRef.current?.focus(), 400);
     }
   }, [open]);
+
+  // Close other widget on mobile when this opens
+  const widgetInstanceId = useRef(`wbw-${Date.now()}`);
+  useEffect(() => {
+    if (!open) return;
+    if (window.innerWidth < 640) {
+      window.dispatchEvent(new CustomEvent('widget:close-other', { detail: { id: widgetInstanceId.current } }));
+    }
+  }, [open]);
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.id !== widgetInstanceId.current) setOpen(false);
+    };
+    window.addEventListener('widget:close-other', handler);
+    return () => window.removeEventListener('widget:close-other', handler);
+  }, []);
 
   // Focus trap + Escape + click-outside
   useEffect(() => {
