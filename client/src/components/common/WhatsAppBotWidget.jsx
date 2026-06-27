@@ -39,7 +39,6 @@ const WhatsAppBotWidget = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [showGreeting, setShowGreeting] = useState(false);
-  const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [connectedToAgent, setConnectedToAgent] = useState(false);
   const [askedQuestion, setAskedQuestion] = useState(false);
@@ -85,9 +84,9 @@ const WhatsAppBotWidget = () => {
               id: 'bot-greeting',
               type: 'bot',
               text: t('messages.whatsapp.bot_greeting', "Hi! I'm RentalHub\u2019s virtual assistant. How can I help you today?"),
+              showQuickReplies: true,
             }]);
             setIsBotTyping(false);
-            setShowQuickReplies(true);
             setAskedQuestion(true);
           }
         }, BOT_DELAY);
@@ -105,7 +104,7 @@ const WhatsAppBotWidget = () => {
     }
   }, [open]);
 
-  const addBotMessage = useCallback((text, faq) => {
+  const addBotMessage = useCallback((text, faq, showQR) => {
     setMessages((prev) => [
       ...prev,
       {
@@ -114,6 +113,7 @@ const WhatsAppBotWidget = () => {
         text,
         link: faq?.link || null,
         linkText: faq?.linkText || null,
+        showQuickReplies: showQR || false,
       },
     ]);
   }, []);
@@ -138,11 +138,10 @@ const WhatsAppBotWidget = () => {
   }, []);
 
   const showMenu = useCallback(() => {
-    setShowQuickReplies(true);
     setAwaitingResponse(null);
     inputRef.current?.blur();
     botReplyWithTyping(() => {
-      addBotMessage(t('messages.whatsapp.menu_prompt', 'Sure! What would you like to know about?'));
+      addBotMessage(t('messages.whatsapp.menu_prompt', 'Sure! What would you like to know about?'), null, true);
     });
   }, [addBotMessage, botReplyWithTyping, t]);
 
@@ -177,26 +176,23 @@ const WhatsAppBotWidget = () => {
       const currentAwaiting = awaitingRef.current;
 
       if (currentAwaiting === 'anything_else' && isConfirmation(msg)) {
-        setShowQuickReplies(true);
         setAwaitingResponse(null);
         botReplyWithTyping(() => {
-          addBotMessage(t('messages.whatsapp.menu_prompt', 'Sure! What would you like to know about?'));
+          addBotMessage(t('messages.whatsapp.menu_prompt', 'Sure! What would you like to know about?'), null, true);
         });
         return;
       }
 
       if (isMenuRequest(msg)) {
-        setShowQuickReplies(true);
         setAwaitingResponse(null);
         botReplyWithTyping(() => {
-          addBotMessage(t('messages.whatsapp.menu_prompt', 'Sure! What would you like to know about?'));
+          addBotMessage(t('messages.whatsapp.menu_prompt', 'Sure! What would you like to know about?'), null, true);
         });
         return;
       }
 
       if (isNegative(msg)) {
         setAwaitingResponse(null);
-        setShowQuickReplies(false);
         botReplyWithTyping(() => {
           addBotMessage(t('messages.whatsapp.dismissed', 'Alright! Feel free to come back anytime.'));
         });
@@ -212,7 +208,6 @@ const WhatsAppBotWidget = () => {
 
       if (isAcknowledgment(msg)) {
         setAwaitingResponse(null);
-        setShowQuickReplies(false);
         botReplyWithTyping(() => {
           addBotMessage(t('messages.whatsapp.youre_welcome', 'You\u2019re welcome! Happy to help.'));
         });
@@ -220,7 +215,6 @@ const WhatsAppBotWidget = () => {
       }
 
       setAwaitingResponse(null);
-      setShowQuickReplies(false);
 
       const match = findBestMatch(msg);
       if (match) {
@@ -243,7 +237,6 @@ const WhatsAppBotWidget = () => {
   const handleQuickReply = useCallback(
     (question) => {
       addUserMessage(question);
-      setShowQuickReplies(false);
       setAwaitingResponse(null);
 
       const match = findBestMatch(question);
@@ -325,7 +318,7 @@ const WhatsAppBotWidget = () => {
                   {t('messages.whatsapp.title', 'RentalHub Assistant')}
                 </h3>
                 <p className="text-green-200 text-xs">
-                  {t('messages.whatsapp.subtitle', 'We typically reply within minutes')}
+                  {t('messages.whatsapp.subtitle', 'Need help? Chat with us!')}
                 </p>
               </div>
               <button
@@ -342,7 +335,7 @@ const WhatsAppBotWidget = () => {
               {messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line ${
+                    className={`max-w-[90%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line ${
                       msg.type === 'user'
                         ? 'bg-green-500 text-white rounded-br-sm'
                         : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-sm'
@@ -367,6 +360,20 @@ const WhatsAppBotWidget = () => {
                         <FaExternalLinkAlt className="w-2.5 h-2.5" />
                         {msg.linkText || 'Visit page'}
                       </a>
+                    )}
+                    {msg.showQuickReplies && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {quickReplies.map((qr, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onPointerDown={(e) => { e.preventDefault(); handleQuickReply(qr); }}
+                            className="text-xs bg-white border border-green-300 text-green-700 rounded-full px-3 py-1.5 hover:bg-green-50 hover:border-green-400 transition-colors touch-action-manipulation cursor-pointer select-none"
+                          >
+                            {qr}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -401,26 +408,6 @@ const WhatsAppBotWidget = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {showQuickReplies && (
-              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 shrink-0">
-                <p className="text-xs text-gray-500 mb-2 font-medium">
-                  {t('messages.whatsapp.suggested', 'Suggested questions:')}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {quickReplies.map((qr, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => handleQuickReply(qr)}
-                      className="text-xs bg-white border border-green-300 text-green-700 rounded-full px-3 py-1.5 hover:bg-green-50 hover:border-green-400 transition-colors"
-                    >
-                      {qr}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="border-t border-gray-200 p-3 bg-white shrink-0">
               <div className="flex items-center gap-2">
                 <input
@@ -444,7 +431,7 @@ const WhatsAppBotWidget = () => {
                 </button>
               </div>
 
-              {!showQuickReplies && !connectedToAgent && (
+              {!connectedToAgent && (
                 <div className="mt-2 text-center">
                   <button
                     type="button"

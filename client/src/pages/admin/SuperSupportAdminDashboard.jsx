@@ -16,19 +16,9 @@ import {
   FaMoneyBill,
   FaRandom,
   FaRegStar,
-  FaPaperPlane,
   FaSyncAlt,
   FaTimesCircle,
   FaUserShield,
-  FaPaperclip,
-  FaFile,
-  FaEdit,
-  FaTrash,
-  FaCheck,
-  FaTimes,
-  FaUser,
-  FaShieldAlt,
-  FaCommentDots,
 } from 'react-icons/fa';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -37,11 +27,9 @@ import { useSocket } from '../../hooks/useSocket';
 import { useAuth } from '../../hooks/useAuth';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
-import InternalNotesPanel from '../../components/common/InternalNotesPanel';
-import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 import SupportGovernancePanel from '../../components/admin/SupportGovernancePanel';
-import SupportReplyActionModal from '../../components/common/SupportReplyActionModal';
+import TicketConversationModal from '../../components/common/TicketConversationModal';
 
 // Utility functions
 const badgeClass = (status) => {
@@ -74,20 +62,6 @@ const SuperSupportAdminDashboard = () => {
   const previousTabRef = useRef('');
   const { socket } = useSocket();
   const { user } = useAuth();
-  const [attachmentFile, setAttachmentFile] = useState(null);
-  const [typingUser, setTypingUser] = useState(null);
-  const typingTimer = useRef(null);
-  const [chatTab, setChatTab] = useState('user');
-  const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
-
-  const fetchUnreadInternalNotes = useCallback(async () => {
-    try {
-      const res = await api.get('/support/tickets/internal-notes/unread-count');
-      setUnreadInternalNotes(res.data?.count || 0);
-    } catch {}
-  }, []);
-
-  useEffect(() => { fetchUnreadInternalNotes(); }, [fetchUnreadInternalNotes]);
   // State management
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -114,24 +88,10 @@ const SuperSupportAdminDashboard = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
-  const [conversation, setConversation] = useState([]);
-  const [replyText, setReplyText] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
-  const [loadingConversation, setLoadingConversation] = useState(false);
-  const [replyAction, setReplyAction] = useState({ open: false, action: '', reply: null });
+
   const isModalOpen = showModal;
 
-  const loadConversation = useCallback(async (ticketId) => {
-    setLoadingConversation(true);
-    try {
-      const res = await api.get(`/support/tickets/${ticketId}/conversation`);
-      setConversation(res.data?.data || []);
-    } catch {
-      setConversation([]);
-    } finally {
-      setLoadingConversation(false);
-    }
-  }, []);
+
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -152,23 +112,12 @@ const SuperSupportAdminDashboard = () => {
     setModalType(type);
     setSelectedItem(item);
     setShowModal(true);
-    setReplyText('');
-    setAttachmentFile(null);
-    setTypingUser(null);
-    setChatTab('user');
-    if (type === 'view-ticket' && item) {
-      loadConversation(item.id);
-    }
   };
 
   const closeModal = () => {
     setShowModal(false);
     setModalType('');
     setSelectedItem(null);
-    setConversation([]);
-    setReplyText('');
-    setAttachmentFile(null);
-    setTypingUser(null);
   };
 
   const queueStats = useMemo(() => {
@@ -257,40 +206,16 @@ const SuperSupportAdminDashboard = () => {
   // Socket listeners for real-time ticket updates
   useEffect(() => {
     if (!socket) return;
-    const replyHandler = (data) => {
-      loadDashboardData();
-      if (selectedItem?.id === data.ticketId && modalType === 'view-ticket') {
-        if (data.reply) {
-          setConversation((prev) => {
-            if (prev.some((reply) => reply.id === data.reply.id)) return prev;
-            return [...prev, data.reply];
-          });
-        } else {
-          loadConversation(data.ticketId);
-        }
-      }
-    };
-    const typingHandler = (data) => {
-      if (selectedItem?.id === data.ticketId && !data.isAdmin) {
-        setTypingUser(data);
-        clearTimeout(typingTimer.current);
-        typingTimer.current = setTimeout(() => setTypingUser(null), 3000);
-      }
-    };
-    socket.on('ticket:new_reply', replyHandler);
-    socket.on('ticket:created', loadDashboardData);
-    socket.on('ticket:updated', loadDashboardData);
-    socket.on('ticket:typing', typingHandler);
-    const internalNoteHandler = () => { fetchUnreadInternalNotes(); };
-    socket.on('ticket:internal_note', internalNoteHandler);
+    const refresh = () => loadDashboardData();
+    socket.on('ticket:new_reply', refresh);
+    socket.on('ticket:created', refresh);
+    socket.on('ticket:updated', refresh);
     return () => {
-      socket.off('ticket:new_reply', replyHandler);
-      socket.off('ticket:created', loadDashboardData);
-      socket.off('ticket:updated', loadDashboardData);
-      socket.off('ticket:typing', typingHandler);
-      socket.off('ticket:internal_note', internalNoteHandler);
+      socket.off('ticket:new_reply', refresh);
+      socket.off('ticket:created', refresh);
+      socket.off('ticket:updated', refresh);
     };
-  }, [socket, selectedItem, modalType, fetchUnreadInternalNotes, loadDashboardData, loadConversation]);
+  }, [socket, loadDashboardData]);
 
   // Quick action handlers
   const handleQuickAction = async (action, data) => {
@@ -327,53 +252,8 @@ const SuperSupportAdminDashboard = () => {
     }
   };
 
-  const handleSendReply = async () => {
-    const msg = replyText.trim();
-    if (!msg && !attachmentFile) return;
-    setSendingReply(true);
-    try {
-      const formData = new FormData();
-      if (msg) formData.append('message', msg);
-      if (attachmentFile) formData.append('attachment', attachmentFile);
-
-      const res = await api.post(`/support/tickets/${selectedItem.id}/reply`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setConversation((prev) => [...prev, res.data.data]);
-      setReplyText('');
-      setAttachmentFile(null);
-      loadDashboardData();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send reply');
-    } finally {
-      setSendingReply(false);
-    }
-  };
-
-  const emitTyping = () => {
-    if (!socket || !selectedItem) return;
-    socket.emit('ticket:typing', { ticketId: selectedItem.id });
-  };
-
-  const handleEditReply = (replyId, updated) => {
-    setConversation((prev) => prev.map((r) => r.id === replyId ? updated : r));
-  };
-
-  const handleDeleteReply = (replyId) => {
-    setConversation((prev) => prev.filter((r) => r.id !== replyId));
-  };
-
-  const openReplyAction = (action, reply) => {
-    setReplyAction({ open: true, action, reply });
-  };
-
-  const closeReplyAction = () => {
-    setReplyAction({ open: false, action: '', reply: null });
-  };
-
   const handleTicketUpdated = (updatedTicket) => {
     if (!updatedTicket) return;
-    setSelectedItem((prev) => prev?.id === updatedTicket.id ? { ...prev, ...updatedTicket } : prev);
     loadDashboardData();
   };
 
@@ -1391,9 +1271,21 @@ const SuperSupportAdminDashboard = () => {
           
         )}
 
-        {isModalOpen && (
+        {modalType === 'view-ticket' && selectedItem && (
+          <TicketConversationModal
+            ticket={selectedItem}
+            user={user}
+            socket={socket}
+            onClose={closeModal}
+            onTicketUpdated={handleTicketUpdated}
+            onResolve={(t) => { handleQuickAction('resolve', t); closeModal(); }}
+            accentColor="indigo"
+          />
+        )}
+
+        {isModalOpen && modalType !== 'view-ticket' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className={`w-full rounded-xl bg-white p-6 shadow-xl ${modalType === 'view-ticket' ? 'max-w-2xl' : 'max-w-md'}`}>
+          <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             {modalType === 'view-details' && selectedItem && (
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Migration Request Details</h3>
@@ -1413,246 +1305,19 @@ const SuperSupportAdminDashboard = () => {
                   <div>
                     <p className="text-xs font-medium text-slate-500">Status</p>
                     <div className="flex gap-2 mt-1">
-                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(selectedItem.status)}`}>
-                        Final: {selectedItem.status}
-                      </span>
-                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(selectedItem.outgoing_status)}`}>
-                        Outgoing: {selectedItem.outgoing_status}
-                      </span>
-                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(selectedItem.incoming_status)}`}>
-                        Incoming: {selectedItem.incoming_status}
-                      </span>
+                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(selectedItem.status)}`}>Final: {selectedItem.status}</span>
+                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(selectedItem.outgoing_status)}`}>Outgoing: {selectedItem.outgoing_status}</span>
+                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(selectedItem.incoming_status)}`}>Incoming: {selectedItem.incoming_status}</span>
                     </div>
                   </div>
                 </div>
-                <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    onClick={closeModal}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Close
-                  </button>
-                  {selectedItem.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          handleQuickAction('approve', selectedItem);
-                          closeModal();
-                        }}
-                        className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleQuickAction('reject', selectedItem);
-                          closeModal();
-                        }}
-                        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {modalType === 'view-ticket' && selectedItem && (
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Support Ticket Details</h3>
-                <div className="mt-4 space-y-3">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Ticket ID</p>
-                    <p className="text-sm font-medium text-slate-900">#{selectedItem.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Subject</p>
-                    <p className="text-sm text-slate-900">{selectedItem.subject}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Location</p>
-                    <p className="text-sm text-slate-900">{selectedItem.state}{selectedItem.lga ? ` / ${selectedItem.lga}` : ''}</p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <p className="text-xs font-medium text-slate-500">Priority</p>
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        selectedItem.priority === 'high' || selectedItem.priority === 'urgent'
-                          ? 'bg-red-100 text-red-800'
-                          : selectedItem.priority === 'medium'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {selectedItem.priority}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-500">Status</p>
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        selectedItem.status === 'open'
-                          ? 'bg-amber-100 text-amber-800'
-                          : selectedItem.status === 'in_progress'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {selectedItem.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Chat tab toggle */}
-                <div className="mt-6 flex border-b border-slate-200">
-                  <button
-                    onClick={() => setChatTab('user')}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      chatTab === 'user' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    <FaPaperPlane size={12} /> User Conversation
-                  </button>
-                  <button
-                    onClick={() => setChatTab('service')}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      chatTab === 'service' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    Service Context
-                  </button>
-                  <button
-                    onClick={() => setChatTab('timeline')}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      chatTab === 'timeline' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    Timeline
-                  </button>
-                  <button
-                    onClick={() => { setChatTab('internal'); fetchUnreadInternalNotes(); }}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      chatTab === 'internal' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    <FaCommentDots size={12} /> Internal Notes
-                    {unreadInternalNotes > 0 && chatTab !== 'internal' && (
-                      <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-medium text-white">{unreadInternalNotes}</span>
-                    )}
-                  </button>
-                </div>
-
-                {chatTab === 'user' ? (
-                  <>
-                    <div className="mt-4 max-h-72 space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <div className="rounded-lg bg-white p-3 shadow-sm">
-                        <p className="text-xs text-slate-400">
-                          {selectedItem.user_name || selectedItem.user_email || 'Anonymous'} &middot; {new Date(selectedItem.created_at).toLocaleString()}
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{selectedItem.description}</p>
-                      </div>
-
-                      {loadingConversation ? (
-                        <div className="py-4 text-center text-sm text-slate-400">Loading messages...</div>
-                      ) : conversation.length === 0 ? (
-                        <div className="py-4 text-center text-sm text-slate-400">No replies yet.</div>
-                      ) : (
-                        conversation.map((reply) => (
-                          <div key={reply.id} className={`rounded-lg p-3 shadow-sm ${reply.is_admin ? 'ml-4 border-l-4 border-indigo-400 bg-indigo-50' : 'bg-white'}`}>
-                            <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
-                              <div className="flex items-center gap-2">
-                                <span className={reply.is_admin ? 'font-medium text-indigo-600' : ''}>
-                                  {reply.author_name || reply.user_email || 'User'}
-                                </span>
-                                {reply.is_admin && <span className="rounded bg-indigo-200 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">Support</span>}
-                                <span>&middot; {new Date(reply.created_at).toLocaleString()}</span>
-                                {reply.edited_at && <span className="italic">(edited)</span>}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {!reply.is_admin && reply.read_at && (
-                                  <span className="flex items-center gap-1 text-[10px] text-green-600"><FaCheck size={8} /> Read {new Date(reply.read_at).toLocaleString()}</span>
-                                )}
-                                {reply.is_admin && Number(reply.user_id) === Number(user.id) && (
-                                  <>
-                                    <button onClick={() => openReplyAction('edit', reply)} className="text-slate-400 hover:text-slate-600"><FaEdit size={11} /></button>
-                                    <button onClick={() => openReplyAction('delete', reply)} className="text-slate-400 hover:text-red-500"><FaTrash size={11} /></button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{reply.message}</p>
-                            {reply.attachment_url && reply.attachment_type && reply.attachment_type.startsWith('audio/') ? (
-                              <div className="mt-2 rounded-lg bg-slate-200 p-1">
-                                <audio controls className="w-full h-9" src={reply.attachment_url} preload="none" />
-                              </div>
-                            ) : reply.attachment_url ? (
-                              <a href={reply.attachment_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-300">
-                                <FaFile size={12} /> {reply.attachment_name || 'Attachment'}
-                              </a>
-                            ) : null}
-                          </div>
-                        ))
-                      )}
-
-                      {typingUser && (
-                        <div className="text-xs italic text-slate-400">{typingUser.userName} is typing...</div>
-                      )}
-                    </div>
-
-                    {/* Reply form */}
-                    {selectedItem.status !== 'resolved' && selectedItem.status !== 'closed' && (
-                      <div className="mt-4">
-                        {attachmentFile && (
-                          <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
-                            <FaPaperclip size={12} /> {attachmentFile.name}
-                            <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={12} /></button>
-                          </div>
-                        )}
-                        <div className="flex items-end gap-2">
-                          <label className="flex h-[42px] w-[42px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50">
-                            <FaPaperclip size={14} />
-                            <input type="file" className="hidden" onChange={(e) => setAttachmentFile(e.target.files[0])} />
-                          </label>
-                          <textarea
-                            value={replyText}
-                            onChange={(e) => { setReplyText(e.target.value); emitTyping(); }}
-                            placeholder="Type your reply..."
-                            rows={2}
-                            className="flex-1 resize-none rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSendReply();
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={handleSendReply}
-                            disabled={(!replyText.trim() && !attachmentFile) || sendingReply}
-                            className="flex h-[42px] w-[42px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40"
-                          >
-                            {sendingReply ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={14} />}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : chatTab === 'service' || chatTab === 'timeline' ? (
-                  <div className="mt-4 max-h-96 overflow-y-auto">
-                    <SupportTicketServicePanel ticket={selectedItem} onTicketUpdated={handleTicketUpdated} />
-                  </div>
-                ) : (
-                  <div className="mt-4">
-                    <p className="mb-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Internal Admin Notes</p>
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <InternalNotesPanel ticketId={selectedItem.id} currentUser={user} readOnly={selectedItem.status === 'resolved'} />
-                    </div>
-                  </div>
-                )}
-
                 <div className="mt-6 flex justify-end gap-3">
                   <button onClick={closeModal} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Close</button>
-                  {selectedItem.status !== 'resolved' && selectedItem.status !== 'closed' && (
-                    <button onClick={() => { handleQuickAction('resolve', selectedItem); closeModal(); }} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Mark as Resolved</button>
+                  {selectedItem.status === 'pending' && (
+                    <>
+                      <button onClick={() => { handleQuickAction('approve', selectedItem); closeModal(); }} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Approve</button>
+                      <button onClick={() => { handleQuickAction('reject', selectedItem); closeModal(); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Reject</button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1660,24 +1325,12 @@ const SuperSupportAdminDashboard = () => {
 
             {/* Add other modal types as needed */}
 
-            <button
-              onClick={closeModal}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
-            >
+            <button onClick={closeModal} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
               <FaTimesCircle size={20} />
             </button>
           </div>
         </div>
-            )}
-      <SupportReplyActionModal
-        isOpen={replyAction.open}
-        action={replyAction.action}
-        ticketId={selectedItem?.id}
-        reply={replyAction.reply}
-        onClose={closeReplyAction}
-        onEdited={handleEditReply}
-        onDeleted={handleDeleteReply}
-      />
+        )}
         </div>
       </div>
     </div>
