@@ -1470,8 +1470,8 @@ const getAllProperties = async (req, res) => {
 
     res.json({ success: true, properties: rows, total });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Failed to load properties' });
+    console.error('getAllProperties error:', err);
+    res.status(500).json({ message: 'Failed to load properties', error: err.message });
   }
 };
 
