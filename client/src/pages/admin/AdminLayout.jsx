@@ -3,7 +3,7 @@ import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import RoleBadge from '../../components/common/RoleBadge';
-import FloatingContactWidget from '../../components/common/FloatingContactWidget';
+
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import {
@@ -1511,7 +1511,6 @@ const AdminLayout = () => {
         </main>
       </div>
 
-    <FloatingContactWidget />
     </div>
   );
 };
