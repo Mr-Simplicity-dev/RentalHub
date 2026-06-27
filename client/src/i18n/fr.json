@@ -551,7 +551,8 @@
     "qr_payment": "Comment fonctionne le paiement?",
     "anything_else": "Puis-je vous aider avec autre chose?",
     "menu_prompt": "Bien sûr! Que voulez-vous savoir?",
-    "menu_btn": "Menu"
+    "menu_btn": "Menu",
+    "dismissed": "D\u2019accord! N\u2019h\u00e9sitez pas \u00e0 revenir quand vous voulez."
   },
 
   "widget": {

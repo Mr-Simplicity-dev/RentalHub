@@ -550,7 +550,8 @@
         "qr_payment": "支付如何运作？",
         "anything_else": "还有什么我可以帮助您的吗？",
         "menu_prompt": "当然！您想了解什么？",
-        "menu_btn": "菜单"
+        "menu_btn": "菜单",
+        "dismissed": "好的！随时欢迎回来。"
       },
 
       "widget": {
