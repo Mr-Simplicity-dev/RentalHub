@@ -195,6 +195,23 @@
   @media (prefers-reduced-motion: reduce) {
     .ad-marquee {
       overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+      scrollbar-width: auto;
+    }
+
+    .ad-marquee::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .ad-marquee::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .ad-marquee::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 4px;
     }
 
     .ad-marquee-track {

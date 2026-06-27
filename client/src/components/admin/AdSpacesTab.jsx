@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { FaEdit, FaExternalLinkAlt, FaFilm, FaImage, FaPlus, FaShareAlt, FaTrash, FaUpload } from 'react-icons/fa';
 import api from '../../services/api';
@@ -54,13 +54,29 @@ const getUploadErrorMessage = (error) => {
   return error.message || 'Failed to upload ad image';
 };
 
+const getVideoDuration = (file) => new Promise((resolve) => {
+  const url = URL.createObjectURL(file);
+  const video = document.createElement('video');
+  video.preload = 'metadata';
+  video.onloadedmetadata = () => {
+    URL.revokeObjectURL(url);
+    resolve(Math.round(video.duration));
+  };
+  video.onerror = () => {
+    URL.revokeObjectURL(url);
+    resolve(null);
+  };
+  video.src = url;
+});
+
 const AdSpacesTab = () => {
   const [loading, setLoading] = useState(false);
   const [ads, setAds] = useState([]);
   const [placements, setPlacements] = useState(fallbackPlacements);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [imageUploading, setImageUploading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const formDirty = useRef(false);
   const [adAction, setAdAction] = useState({
     open: false,
     ad: null,
@@ -94,12 +110,15 @@ const AdSpacesTab = () => {
   }, []);
 
   const resetForm = () => {
+    if (formDirty.current && !window.confirm('Discard unsaved changes?')) return;
+    formDirty.current = false;
     setEditingId(null);
     setForm(emptyForm);
   };
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
+    formDirty.current = true;
     setForm((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -121,7 +140,7 @@ const AdSpacesTab = () => {
     formData.append('image', file);
 
     try {
-      setImageUploading(true);
+      setUploading(true);
       const response = await api.post('/super/ad-spaces/image', formData);
       const url = response.data?.data?.url;
 
@@ -136,7 +155,7 @@ const AdSpacesTab = () => {
       console.error('Ad image upload failed:', error.response || error);
       toast.error(getUploadErrorMessage(error));
     } finally {
-      setImageUploading(false);
+      setUploading(false);
     }
   };
 
@@ -151,11 +170,17 @@ const AdSpacesTab = () => {
       return;
     }
 
+    getVideoDuration(file).then((duration) => {
+      if (duration) {
+        setForm((prev) => ({ ...prev, video_duration: String(duration) }));
+      }
+    });
+
     const formData = new FormData();
     formData.append('video', file);
 
     try {
-      setImageUploading(true);
+      setUploading(true);
       const response = await api.post('/super/ad-spaces/video', formData);
       const url = response.data?.data?.url;
 
@@ -170,7 +195,7 @@ const AdSpacesTab = () => {
       console.error('Ad video upload failed:', error.response || error);
       toast.error(getUploadErrorMessage(error));
     } finally {
-      setImageUploading(false);
+      setUploading(false);
     }
   };
 
@@ -230,6 +255,8 @@ const AdSpacesTab = () => {
   };
 
   const startEdit = (ad) => {
+    if (formDirty.current && !window.confirm('Discard unsaved changes?')) return;
+    formDirty.current = false;
     setEditingId(ad.id);
     setForm({
       placement: ad.placement || 'home_top',
@@ -495,12 +522,12 @@ const AdSpacesTab = () => {
                   />
                   <label className="btn btn-secondary shrink-0 cursor-pointer gap-2">
                     <FaUpload className="text-xs" />
-                    {imageUploading ? 'Uploading...' : 'Upload'}
+                    {uploading ? 'Uploading...' : 'Upload'}
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp,image/gif"
                       onChange={handleImageUpload}
-                      disabled={imageUploading || loading}
+                      disabled={uploading || loading}
                       className="sr-only"
                     />
                   </label>
@@ -524,12 +551,12 @@ const AdSpacesTab = () => {
                     />
                     <label className="btn btn-secondary shrink-0 cursor-pointer gap-2">
                       <FaUpload className="text-xs" />
-                      {imageUploading ? 'Uploading...' : 'Upload'}
+                      {uploading ? 'Uploading...' : 'Upload'}
                       <input
                         type="file"
                         accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-msvideo"
                         onChange={handleVideoUpload}
-                        disabled={imageUploading || loading}
+                        disabled={uploading || loading}
                         className="sr-only"
                       />
                     </label>
