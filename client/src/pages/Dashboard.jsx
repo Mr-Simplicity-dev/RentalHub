@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
+import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import {
@@ -3310,6 +3311,7 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+      <WhatsAppBotWidget />
       <FloatingContactWidget />
     </div>
   );

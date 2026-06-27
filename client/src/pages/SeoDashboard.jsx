@@ -9,70 +9,63 @@ import api from '../services/api';
 
 const SeoDashboard = () => {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [sitemapXml, setSitemapXml] = useState(null);
   const [showSitemap, setShowSitemap] = useState(false);
   const [stateSearch, setStateSearch] = useState('');
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true); else setRefreshing(true);
     try {
-      setLoading(true);
-      const res = await fetch('/admin/seo');
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload?.message || 'Failed to load SEO dashboard');
-      setData(payload);
+      const res = await api.get('/admin/seo');
+      setData(res.data?.data || null);
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.message || 'Failed to load SEO dashboard');
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false); else setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadData(true); }, [loadData]);
 
   const handleRegenerate = async () => {
     if (!window.confirm('Regenerate sitemap? This will recalculate all SEO URLs.')) return;
     try {
-      setLoading(true);
-      const res = await fetch('/admin/seo/regenerate-sitemap', { method: 'POST' });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload?.message || 'Failed to regenerate');
-      toast.success(`Sitemap regenerated — ${payload.data.urlCount} URLs`);
-      loadData();
+      setRefreshing(true);
+      const res = await api.post('/admin/seo/regenerate-sitemap');
+      toast.success(`Sitemap regenerated — ${res.data?.data?.urlCount || 0} URLs`);
+      await loadData();
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.message || 'Failed to regenerate');
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
   const handleViewSitemap = async () => {
     try {
-      setLoading(true);
-      const res = await fetch('/admin/seo/sitemap-xml');
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload?.message || 'Failed to fetch sitemap');
-      setSitemapXml(payload.data.xml);
+      setRefreshing(true);
+      const res = await api.get('/admin/seo/sitemap-xml');
+      setSitemapXml(res.data?.data?.xml);
       setShowSitemap(true);
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.message || 'Failed to fetch sitemap');
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
   const handlePingGoogle = async () => {
     try {
-      const res = await fetch('/admin/seo/ping-google', { method: 'POST' });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload?.message || 'Failed to ping Google');
-      toast.success(payload.data.success ? 'Google pinged successfully' : 'Google ping completed (check logs)');
+      const res = await api.post('/admin/seo/ping-google');
+      toast.success(res.data?.data?.success ? 'Google pinged successfully' : 'Google ping completed (check logs)');
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.message || 'Failed to ping Google');
     }
   };
 
-  if (loading && !data) {
+  if (loading) {
     return <div className="flex items-center justify-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" /></div>;
   }
 
@@ -106,11 +99,12 @@ const SeoDashboard = () => {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">SEO Dashboard</h1>
-        <div className="flex gap-2">
-          <button onClick={handleRegenerate} disabled={loading} className="btn btn-secondary gap-2">
-            <FaSyncAlt className={loading ? 'animate-spin' : ''} /> Regenerate Sitemap
+        <div className="flex flex-wrap items-center gap-2">
+          {refreshing && <span className="text-xs text-slate-400 animate-pulse">Syncing...</span>}
+          <button onClick={handleRegenerate} disabled={refreshing} className="btn btn-secondary gap-2">
+            <FaSyncAlt className={refreshing ? 'animate-spin' : ''} /> Regenerate Sitemap
           </button>
-          <button onClick={handleViewSitemap} disabled={loading} className="btn btn-secondary gap-2">
+          <button onClick={handleViewSitemap} disabled={refreshing} className="btn btn-secondary gap-2">
             <FaSearch /> View Sitemap XML
           </button>
           <button onClick={handlePingGoogle} className="btn btn-primary gap-2">
