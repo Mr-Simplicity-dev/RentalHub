@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import {
