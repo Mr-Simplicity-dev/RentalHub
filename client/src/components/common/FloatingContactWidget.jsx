@@ -640,6 +640,7 @@ const FloatingContactWidget = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
               className="relative bg-white rounded-xl shadow-xl p-3 max-w-[220px]"
             >
               <div className="absolute -bottom-1.5 right-5 w-3 h-3 bg-white rotate-45" />
