@@ -537,9 +537,9 @@
 
   "whatsapp": {
     "title": "RentalHub Assistant",
-    "subtitle": "Auto-reply \u2022 FAQ bot",
+    "subtitle": "We typically reply within minutes",
     "bot_greeting": "Hi! I'm RentalHub\u2019s virtual assistant. How can I help you today?",
-    "greeting_bubble": "Got questions? I\u2019m here to help!",
+    "greeting_bubble": "Need help? Chat with us!",
     "open": "Open WhatsApp assistant",
     "close": "Close",
     "input_placeholder": "Type your question...",
