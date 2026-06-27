@@ -153,10 +153,10 @@ const FloatingContactWidget = () => {
     if (open) { setShowGreeting(false); return; }
     const showTimer = setTimeout(() => {
       if (!open) setShowGreeting(true);
-    }, 10000); // appears exactly when WhatsApp bubble starts its exit
+    }, 9000); // appears as WhatsApp bubble fades out (fades in at 6s + 3s visible)
     const hideTimer = setTimeout(() => {
       setShowGreeting(false);
-    }, 17000); // disappears 7s after appearing
+    }, 16000); // disappears 7s after appearing
     return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
   }, [open]);
 
