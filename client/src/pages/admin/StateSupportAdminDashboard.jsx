@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FaArrowDown, FaArrowUp, FaCheckCircle, FaSyncAlt, FaTimesCircle, FaReply, FaPaperPlane, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaEdit, FaTrash, FaCheck, FaTimes, FaCommentDots } from 'react-icons/fa';
+import { FaArrowDown, FaArrowUp, FaCheckCircle, FaSyncAlt } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import InputDialog from '../../components/common/InputDialog';
@@ -11,10 +11,8 @@ import api from '../../services/api';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
-import InternalNotesPanel from '../../components/common/InternalNotesPanel';
-import SupportTicketServicePanel from '../../components/admin/SupportTicketServicePanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
-import SupportReplyActionModal from '../../components/common/SupportReplyActionModal';
+import TicketConversationModal from '../../components/common/TicketConversationModal';
 
 const badgeClass = (status) => {
   if (status === 'approved') return 'bg-green-100 text-green-700';
@@ -50,16 +48,6 @@ const StateSupportAdminDashboard = () => {
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [tickets, setTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
-  const [conversation, setConversation] = useState([]);
-  const [replyText, setReplyText] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
-  const [loadingConversation, setLoadingConversation] = useState(false);
-  const [attachmentFile, setAttachmentFile] = useState(null);
-  const [typingUser, setTypingUser] = useState(null);
-  const typingTimer = useRef(null);
-  const [chatTab, setChatTab] = useState('user');
-  const [unreadInternalNotes, setUnreadInternalNotes] = useState(0);
-  const [replyAction, setReplyAction] = useState({ open: false, action: '', reply: null });
   const activeTab = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab') || 'overview';
     return ['overview', 'queue', 'property_requests', 'tenancy', 'tickets', 'escalations'].includes(tab) ? tab : 'overview';
@@ -73,15 +61,6 @@ const StateSupportAdminDashboard = () => {
     { key: 'tickets', label: 'Support Tickets', to: '/admin/state-support-dashboard?tab=tickets' },
     { key: 'escalations', label: 'Escalations', to: '/admin/state-support-dashboard?tab=escalations' },
   ];
-
-  const fetchUnreadInternalNotes = useCallback(async () => {
-    try {
-      const res = await api.get('/support/tickets/internal-notes/unread-count');
-      setUnreadInternalNotes(res.data?.count || 0);
-    } catch {}
-  }, []);
-
-  useEffect(() => { fetchUnreadInternalNotes(); }, [fetchUnreadInternalNotes]);
 
   const loadTickets = useCallback(async () => {
     setTicketsLoading(true);
@@ -106,69 +85,22 @@ const StateSupportAdminDashboard = () => {
         setTickets(res.data?.data || []);
       } catch {}
     };
-    const replyHandler = (data) => {
-      refreshTickets();
-      if (selectedTicket?.id === data.ticketId) {
-        if (data.reply) {
-          setConversation((prev) => {
-            if (prev.some((reply) => reply.id === data.reply.id)) return prev;
-            return [...prev, data.reply];
-          });
-        } else {
-          loadConversation(data.ticketId);
-        }
-      }
-    };
-    const typingHandler = (data) => {
-      if (selectedTicket?.id === data.ticketId && !data.isAdmin) {
-        setTypingUser(data);
-        clearTimeout(typingTimer.current);
-        typingTimer.current = setTimeout(() => setTypingUser(null), 3000);
-      }
-    };
-    socket.on('ticket:new_reply', replyHandler);
+    socket.on('ticket:new_reply', refreshTickets);
     socket.on('ticket:created', refreshTickets);
     socket.on('ticket:updated', refreshTickets);
-    socket.on('ticket:typing', typingHandler);
-    const internalNoteHandler = () => { fetchUnreadInternalNotes(); };
-    socket.on('ticket:internal_note', internalNoteHandler);
     return () => {
-      socket.off('ticket:new_reply', replyHandler);
+      socket.off('ticket:new_reply', refreshTickets);
       socket.off('ticket:created', refreshTickets);
       socket.off('ticket:updated', refreshTickets);
-      socket.off('ticket:typing', typingHandler);
-      socket.off('ticket:internal_note', internalNoteHandler);
     };
-  }, [socket, selectedTicket, fetchUnreadInternalNotes, loadConversation]);
-
-  const loadConversation = useCallback(async (ticketId) => {
-    setLoadingConversation(true);
-    try {
-      const res = await api.get(`/support/tickets/${ticketId}/conversation?limit=200`);
-      setConversation(res.data?.data || []);
-    } catch {
-      toast.error('Failed to load conversation');
-      setConversation([]);
-    } finally {
-      setLoadingConversation(false);
-    }
-  }, []);
+  }, [socket]);
 
   const openTicket = (ticket) => {
     setSelectedTicket(ticket);
-    setReplyText('');
-    setAttachmentFile(null);
-    setChatTab('user');
-    loadConversation(ticket.id);
   };
 
   const closeTicketModal = () => {
     setSelectedTicket(null);
-    setConversation([]);
-    setReplyText('');
-    setAttachmentFile(null);
-    setTypingUser(null);
-    setChatTab('user');
   };
 
   const handleTicketAction = async (action, ticket) => {
@@ -189,53 +121,9 @@ const StateSupportAdminDashboard = () => {
     }
   };
 
-  const handleSendReply = async () => {
-    const msg = replyText.trim();
-    if (!msg && !attachmentFile) return;
-    setSendingReply(true);
-    try {
-      const formData = new FormData();
-      if (msg) formData.append('message', msg);
-      if (attachmentFile) formData.append('attachment', attachmentFile);
-      const res = await api.post(`/support/tickets/${selectedTicket.id}/reply`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setConversation((prev) => [...prev, res.data.data]);
-      setReplyText('');
-      setAttachmentFile(null);
-      loadTickets();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send reply');
-    } finally {
-      setSendingReply(false);
-    }
-  };
-
-  const handleEditReply = (replyId, updated) => {
-    setConversation((prev) => prev.map((r) => r.id === replyId ? updated : r));
-  };
-
-  const handleDeleteReply = (replyId) => {
-    setConversation((prev) => prev.filter((r) => r.id !== replyId));
-  };
-
-  const openReplyAction = (action, reply) => {
-    setReplyAction({ open: true, action, reply });
-  };
-
-  const closeReplyAction = () => {
-    setReplyAction({ open: false, action: '', reply: null });
-  };
-
   const handleTicketUpdated = (updatedTicket) => {
     if (!updatedTicket) return;
-    setSelectedTicket((prev) => prev?.id === updatedTicket.id ? { ...prev, ...updatedTicket } : prev);
     loadTickets();
-  };
-
-  const emitTyping = () => {
-    if (!socket || !selectedTicket) return;
-    socket.emit('ticket:typing', { ticketId: selectedTicket.id });
   };
 
   const reviewAction = useRetryableAction(
@@ -560,136 +448,19 @@ const StateSupportAdminDashboard = () => {
         <SupportTicketWorkspace tickets={tickets} loading={ticketsLoading} user={user} onOpenTicket={openTicket} onTicketAction={handleTicketAction} mode="escalations" />
       )}
 
-      {/* Ticket Conversation Modal */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">{selectedTicket.subject}</h3>
-                <p className="text-sm text-gray-500">
-                  Ticket #{selectedTicket.id} &middot; {selectedTicket.state && `State: ${selectedTicket.state}`}{selectedTicket.lga && ` / LGA: ${selectedTicket.lga}`}
-                </p>
-              </div>
-              <button onClick={closeTicketModal} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><FaTimesCircle size={18} /></button>
-            </div>
-
-            {/* Tab toggle */}
-            <div className="flex border-b border-gray-200 px-6">
-              <button onClick={() => setChatTab('user')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'user' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><FaReply size={12} /> User Conversation</button>
-              <button onClick={() => setChatTab('service')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'service' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Service Context</button>
-              <button onClick={() => setChatTab('timeline')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'timeline' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Timeline</button>
-              <button onClick={() => { setChatTab('internal'); fetchUnreadInternalNotes(); }} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${chatTab === 'internal' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                <FaCommentDots size={12} /> Internal Notes
-                {unreadInternalNotes > 0 && chatTab !== 'internal' && (
-                  <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-medium text-white">{unreadInternalNotes}</span>
-                )}
-              </button>
-            </div>
-
-            {chatTab === 'user' ? (
-              <>
-                <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <div className="mb-1 flex items-center gap-2 text-xs text-gray-500">
-                      <FaUser size={10} /> {selectedTicket.user_name || selectedTicket.user_email || 'Anonymous'}
-                      <span>&middot; opened &middot; {new Date(selectedTicket.created_at).toLocaleString()}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap text-sm text-gray-800">{selectedTicket.description}</p>
-                  </div>
-                  {loadingConversation ? (
-                    <div className="py-4 text-center text-sm text-gray-400">Loading messages...</div>
-                  ) : conversation.length === 0 ? (
-                    <div className="py-4 text-center text-sm text-gray-400">No replies yet.</div>
-                  ) : (
-                    conversation.map((reply) => (
-                      <div key={reply.id} className={`rounded-lg p-3 shadow-sm ${reply.is_admin ? 'ml-4 border-l-4 border-indigo-400 bg-indigo-50' : 'bg-white'}`}>
-                        <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
-                          <div className="flex items-center gap-2">
-                            {reply.is_admin ? <FaShieldAlt size={10} className="text-indigo-600" /> : <FaUser size={10} />}
-                            <span className={reply.is_admin ? 'font-medium text-indigo-700' : ''}>{reply.author_name || reply.user_email || 'User'}</span>
-                            {reply.is_admin && <span className="rounded bg-indigo-200 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">Support</span>}
-                            <span>&middot; {new Date(reply.created_at).toLocaleString()}</span>
-                            {reply.edited_at && <span className="italic">(edited)</span>}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {reply.is_admin && Number(reply.user_id) === Number(user.id) && (
-                              <>
-                                <button onClick={() => openReplyAction('edit', reply)} className="text-gray-400 hover:text-gray-600"><FaEdit size={11} /></button>
-                                <button onClick={() => openReplyAction('delete', reply)} className="text-gray-400 hover:text-red-500"><FaTrash size={11} /></button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{reply.message}</p>
-                        {reply.attachment_url && reply.attachment_type && reply.attachment_type.startsWith('audio/') ? (
-                          <div className="mt-2 rounded-lg bg-gray-200 p-1">
-                            <audio controls className="w-full h-9" src={reply.attachment_url} preload="none" />
-                          </div>
-                        ) : reply.attachment_url ? (
-                          <a href={reply.attachment_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-300">
-                            <FaFile size={12} /> {reply.attachment_name || 'Attachment'}
-                          </a>
-                        ) : null}
-                      </div>
-                    ))
-                  )}
-
-                  {typingUser && (
-                    <div className="text-xs italic text-slate-400">{typingUser.userName} is typing...</div>
-                  )}
-                </div>
-                {selectedTicket.status !== 'resolved' && (
-                  <div className="border-t border-gray-200 px-6 py-4">
-                    {attachmentFile && (
-                      <div className="mb-2 flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600">
-                        <FaPaperclip size={12} /> {attachmentFile.name}
-                        <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={12} /></button>
-                      </div>
-                    )}
-                    <div className="flex items-end gap-2">
-                      <label className="flex h-[42px] w-[42px] cursor-pointer items-center justify-center rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50">
-                        <FaPaperclip size={14} />
-                        <input type="file" className="hidden" onChange={(e) => setAttachmentFile(e.target.files[0])} />
-                      </label>
-                      <textarea value={replyText} onChange={(e) => { setReplyText(e.target.value); emitTyping(); }} placeholder="Type your reply..." rows={2}
-                        className="flex-1 resize-none rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }} />
-                      <button onClick={handleSendReply} disabled={(!replyText.trim() && !attachmentFile) || sendingReply}
-                        className="flex h-[42px] w-[42px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40">
-                        {sendingReply ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={14} />}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : chatTab === 'service' || chatTab === 'timeline' ? (
-              <div className="flex-1 overflow-y-auto px-6 py-4">
-                <SupportTicketServicePanel ticket={selectedTicket} onTicketUpdated={handleTicketUpdated} />
-              </div>
-            ) : (
-              <div className="flex-1 px-6 py-4">
-                <p className="mb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Internal Admin Notes</p>
-                <InternalNotesPanel ticketId={selectedTicket.id} currentUser={user} readOnly={selectedTicket.status === 'resolved'} />
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-3">
-              <button onClick={closeTicketModal} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Close</button>
-            </div>
-          </div>
-        </div>
+        <TicketConversationModal
+          ticket={selectedTicket}
+          user={user}
+          socket={socket}
+          onClose={closeTicketModal}
+          onTicketUpdated={handleTicketUpdated}
+          onAssign={(t) => handleTicketAction('assign_me', t)}
+          onEscalate={(t) => handleTicketAction('escalate', t)}
+          onResolve={(t) => handleTicketAction('resolve', t)}
+          accentColor="indigo"
+        />
       )}
-
-      <SupportReplyActionModal
-        isOpen={replyAction.open}
-        action={replyAction.action}
-        ticketId={selectedTicket?.id}
-        reply={replyAction.reply}
-        onClose={closeReplyAction}
-        onEdited={handleEditReply}
-        onDeleted={handleDeleteReply}
-      />
 
       <InputDialog
         isOpen={showReviewDialog}
