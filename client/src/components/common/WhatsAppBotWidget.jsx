@@ -443,8 +443,8 @@ const WhatsAppBotWidget = () => {
                 </button>
               </div>
 
-              <div className="mt-2 flex items-center justify-center gap-3">
-                {!showQuickReplies && !connectedToAgent && (
+              {!showQuickReplies && !connectedToAgent && (
+                <div className="mt-2 text-center">
                   <button
                     type="button"
                     onClick={() => showMenu()}
@@ -453,18 +453,8 @@ const WhatsAppBotWidget = () => {
                     <FaListUl className="w-3 h-3 inline mr-1" />
                     {t('messages.whatsapp.menu_btn', 'Menu')}
                   </button>
-                )}
-                {(awaitingResponse === 'handoff' || connectedToAgent) && (
-                  <button
-                    type="button"
-                    onClick={() => handleTalkToAgent()}
-                    disabled={connectedToAgent}
-                    className="text-xs text-green-600 hover:text-green-700 underline underline-offset-2 transition-colors disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
-                  >
-                    {t('messages.whatsapp.talk_to_agent', 'Talk to a human agent \u2192')}
-                  </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
