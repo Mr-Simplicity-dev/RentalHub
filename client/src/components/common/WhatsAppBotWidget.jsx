@@ -307,7 +307,7 @@ const WhatsAppBotWidget = () => {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
             className="fixed bottom-24 left-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
-            style={{ maxHeight: '360px' }}
+            style={{ maxHeight: '480px' }}
           >
             <div className="bg-gradient-to-r from-green-600 to-green-700 px-4 py-3 flex items-center gap-3 shrink-0">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
