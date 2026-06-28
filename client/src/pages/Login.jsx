@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 const LOGIN_EMAIL_HISTORY_KEY = 'loginEmailHistory';
 const MAX_LOGIN_EMAIL_SUGGESTIONS = 8;
+const REMEMBERED_CREDENTIALS_KEY = 'rememberedCredentials';
 
 const getStoredLoginEmails = () => {
   try {
@@ -61,14 +62,25 @@ const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Load saved email if user previously checked Remember Me
+  // Load saved credentials if user previously checked Remember Me
   useEffect(() => {
-    const savedEmail = localStorage.getItem('rememberedEmail');
     setLoginEmailSuggestions(getStoredLoginEmails());
 
+    try {
+      const saved = JSON.parse(localStorage.getItem(REMEMBERED_CREDENTIALS_KEY));
+      if (saved && saved.email) {
+        setEmail(saved.email);
+        if (saved.password) setPassword(saved.password);
+        setRememberMe(true);
+        return;
+      }
+    } catch {}
+
+    // Fallback: legacy rememberedEmail
+    const savedEmail = localStorage.getItem('rememberedEmail');
     if (savedEmail) {
       setEmail(savedEmail);
-      setRememberMe(true);
+      localStorage.removeItem('rememberedEmail');
     }
   }, []);
 
@@ -87,11 +99,11 @@ const Login = () => {
       if (response.success) {
         toast.success(t('login.success'));
 
-        // Persist or clear remembered email
+        // Persist or clear remembered credentials
         if (rememberMe) {
-          localStorage.setItem('rememberedEmail', email);
+          localStorage.setItem(REMEMBERED_CREDENTIALS_KEY, JSON.stringify({ email, password }));
         } else {
-          localStorage.removeItem('rememberedEmail');
+          localStorage.removeItem(REMEMBERED_CREDENTIALS_KEY);
         }
 
         setLoginEmailSuggestions(saveLoginEmailSuggestion(email));

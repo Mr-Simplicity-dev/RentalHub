@@ -42,6 +42,7 @@ export const authService = {
   clearLocalSession: () => {
     clearAuthSession();
     delete api.defaults.headers.common['Authorization'];
+    localStorage.removeItem('rememberedCredentials');
   },
 
   // Logout (NO redirect here)
