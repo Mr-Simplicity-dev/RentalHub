@@ -5,6 +5,7 @@ import api from '../services/api';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import BackToDashboard from '../components/common/BackToDashboard';
+import AppealModal from '../components/common/AppealModal';
 import { useTour } from '../hooks/useTour';
 import { getTourDashboardType, getTourStepsByUserRole } from '../config/tourConfig';
 
@@ -81,6 +82,7 @@ const Profile = () => {
   const [liveCaptureToken, setLiveCaptureToken] = useState('');
   const [editingProfile, setEditingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [showAppealModal, setShowAppealModal] = useState(false);
   const [profileForm, setProfileForm] = useState({
     full_name: '',
     phone: '',
@@ -777,6 +779,18 @@ const Profile = () => {
           </div>
         )}
 
+        {user?.identity_verification_status === 'rejected' && (
+          <div className="mb-4">
+            <button
+              onClick={() => setShowAppealModal(true)}
+              className="btn btn-warning w-full sm:w-72"
+              type="button"
+            >
+              Appeal Rejection
+            </button>
+          </div>
+        )}
+
         {user?.identity_verified ? (
           <div className="text-green-600 font-semibold">
             {t('profile.verified')}
@@ -925,6 +939,14 @@ const Profile = () => {
             </div>
           </div>
         </div>
+      )}
+      {showAppealModal && (
+        <AppealModal
+          appealType="verification"
+          targetId={user.id}
+          onClose={() => setShowAppealModal(false)}
+          onSuccess={() => {}}
+        />
       )}
     </div>
   );

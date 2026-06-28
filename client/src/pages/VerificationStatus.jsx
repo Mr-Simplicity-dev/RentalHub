@@ -4,12 +4,14 @@ import { FaCheckCircle, FaClock, FaExclamationTriangle, FaUserCircle } from 'rea
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import BackToDashboard from '../components/common/BackToDashboard';
+import AppealModal from '../components/common/AppealModal';
 
 const VerificationStatus = () => {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [showAppealModal, setShowAppealModal] = useState(false);
   const hasLoadedOnMount = useRef(false);
 
   const loadLatestStatus = useCallback(async () => {
@@ -137,10 +139,29 @@ const VerificationStatus = () => {
               </button>
             )}
 
+            {verificationStatus === 'rejected' && (
+              <button
+                onClick={() => setShowAppealModal(true)}
+                className="btn btn-warning"
+                type="button"
+              >
+                Appeal Rejection
+              </button>
+            )}
+
             <BackToDashboard />
           </div>
         </div>
       </div>
+
+      {showAppealModal && (
+        <AppealModal
+          appealType="verification"
+          targetId={user.id}
+          onClose={() => setShowAppealModal(false)}
+          onSuccess={() => loadLatestStatus()}
+        />
+      )}
     </div>
   );
 };
