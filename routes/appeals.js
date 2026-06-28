@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/middleware/database');
 const { authenticate } = require('../config/middleware/auth');
+const { body } = require('express-validator');
+const validateRequest = require('../config/middleware/validateRequest');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdmin');
 const { isStateAdmin, isSuperAdmin } = require('../config/utils/roleScopes');
 const { createNotification } = require('../config/utils/notificationService');
@@ -26,16 +28,19 @@ const canReviewForState = async (user, appealState) => {
   return result.rows.length > 0;
 };
 
-router.post('/appeals', authenticate, async (req, res) => {
+const stripTags = (v) => (v ? String(v).replace(/<[^>]*>/g, '') : v);
+
+router.post('/appeals', authenticate, [
+  body('appeal_type').isIn(['property', 'verification']),
+  body('appeal_reason').trim().notEmpty().customSanitizer(stripTags).isLength({ max: 5000 }),
+  body('additional_info').optional({ checkFalsy: true }).trim().customSanitizer(stripTags).isLength({ max: 10000 }),
+  body('property_id').optional({ checkFalsy: true }).isInt(),
+  body('target_user_id').optional({ checkFalsy: true }).isInt(),
+  validateRequest,
+], async (req, res) => {
   try {
     const { appeal_type, property_id, target_user_id, appeal_reason, additional_info } = req.body;
 
-    if (!appeal_type || !appeal_reason) {
-      return res.status(400).json({ message: 'appeal_type and appeal_reason are required' });
-    }
-    if (!['property', 'verification'].includes(appeal_type)) {
-      return res.status(400).json({ message: 'appeal_type must be property or verification' });
-    }
     if (appeal_type === 'property' && !property_id) {
       return res.status(400).json({ message: 'property_id is required for property appeals' });
     }

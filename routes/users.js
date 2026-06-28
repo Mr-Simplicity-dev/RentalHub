@@ -704,6 +704,7 @@ router.get('/:userId', async (req, res) => {
 router.put('/profile', authenticate, [
   body('full_name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 255 }).withMessage('Full name must be 2-255 characters'),
   body('phone').optional({ checkFalsy: true }).trim().customSanitizer((value) => String(value || '').replace(/\s+/g, '')).matches(/^\+?\d{10,15}$/).withMessage('Phone must be 10-15 digits, optional +'),
+  body('bio').optional({ checkFalsy: true }).trim().customSanitizer(v => v ? v.replace(/<[^>]*>/g, '') : v).isLength({ max: 5000 }).withMessage('Bio must be under 5000 characters'),
   validateRequest,
 ], async (req, res) => {
   try {

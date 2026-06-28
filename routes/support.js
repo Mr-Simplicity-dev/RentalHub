@@ -5,6 +5,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { body } = require('express-validator');
+const validateRequest = require('../config/middleware/validateRequest');
 
 const router = express.Router();
 
@@ -721,15 +723,20 @@ const sendSupportAlertEmails = async (recipientIds, subject, message, path = '/a
     const { getFrontendUrl } = require('../config/utils/frontendUrl');
     const url = `${getFrontendUrl()}${path}`;
 
+    const esc = (str) => {
+      if (str == null) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+    
     for (const recipient of recipients.rows) {
       await sendEmail({
         to: recipient.email,
         subject,
         html: `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-            <h2 style="margin-bottom: 8px;">${subject}</h2>
-            <p>Hello ${recipient.full_name || 'Admin'},</p>
-            <p>${message}</p>
+            <h2 style="margin-bottom: 8px;">${esc(subject)}</h2>
+            <p>Hello ${esc(recipient.full_name) || 'Admin'},</p>
+            <p>${esc(message)}</p>
             <p><a href="${url}" style="color: #2563eb;">Open support dashboard</a></p>
           </div>
         `,
@@ -1058,7 +1065,21 @@ const sendReplyEmail = async (reply, ticket, sender) => {
 
 // ─── Public contact form ───────────────────────────────────────────────────
 
-router.post('/contact', contactFormLimiter, async (req, res) => {
+const stripTags = (v) => (v ? String(v).replace(/<[^>]*>/g, '') : v);
+
+router.post('/contact', contactFormLimiter, [
+  body('name').trim().notEmpty().customSanitizer(stripTags).isLength({ max: 255 }),
+  body('email').trim().isEmail().normalizeEmail(),
+  body('state').trim().notEmpty().customSanitizer(stripTags),
+  body('lga').optional({ checkFalsy: true }).trim().customSanitizer(stripTags),
+  body('subject').optional({ checkFalsy: true }).trim().customSanitizer(stripTags).isLength({ max: 255 }),
+  body('message').trim().notEmpty().customSanitizer(stripTags).isLength({ max: 10000 }),
+  body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
+  body('related_type').optional().trim(),
+  body('category').optional().trim(),
+  body('related_id').optional().isInt(),
+  validateRequest,
+], async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -1066,17 +1087,6 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
     const relatedType = normalizeRelatedType(req.body.related_type);
     const category = normalizeSupportCategory(req.body.category, relatedType);
     const relatedId = relatedType && Number.isInteger(Number(related_id)) ? Number(related_id) : null;
-
-    if (!name || !name.trim() || !email || !email.trim() || !state || !message || !message.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name, email, state, and message are required',
-      });
-    }
-
-    if (priority && !['low', 'medium', 'high', 'urgent'].includes(priority)) {
-      return res.status(400).json({ success: false, message: 'Priority must be one of: low, medium, high, urgent' });
-    }
     const normalizedPriority = priority || 'medium';
     const escalationDepartment = normalizeDepartment(req.body.escalation_department, category, relatedType);
     const slaDueAt = resolveSlaDueAt(category, normalizedPriority);
@@ -1205,7 +1215,18 @@ router.post('/contact', contactFormLimiter, async (req, res) => {
 
 // ─── Authenticated ticket CRUD ─────────────────────────────────────────────
 
-router.post('/tickets', authenticate, async (req, res) => {
+router.post('/tickets', authenticate, [
+  body('subject').trim().notEmpty().customSanitizer(stripTags).isLength({ max: 255 }),
+  body('description').optional({ checkFalsy: true }).trim().customSanitizer(stripTags).isLength({ max: 10000 }),
+  body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
+  body('state').optional({ checkFalsy: true }).trim().customSanitizer(stripTags),
+  body('lga').optional({ checkFalsy: true }).trim().customSanitizer(stripTags),
+  body('related_type').optional().trim(),
+  body('category').optional().trim(),
+  body('related_id').optional().isInt(),
+  body('escalation_department').optional().trim(),
+  validateRequest,
+], async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -1213,9 +1234,6 @@ router.post('/tickets', authenticate, async (req, res) => {
     const relatedType = normalizeRelatedType(req.body.related_type);
     const category = normalizeSupportCategory(req.body.category, relatedType);
     const relatedId = relatedType && Number.isInteger(Number(related_id)) ? Number(related_id) : null;
-    if (!subject || !subject.trim()) {
-      return res.status(400).json({ success: false, message: 'Subject is required' });
-    }
 
     const normalizedPriority = ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium';
     const escalationDepartment = normalizeDepartment(req.body.escalation_department, category, relatedType);

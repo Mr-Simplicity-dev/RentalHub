@@ -75,7 +75,7 @@ router.post(
   isTenant,
   [
     body('rating').isInt({ min: 1, max: 5 }),
-    body('review_text').optional().trim(),
+    body('review_text').optional().trim().customSanitizer(v => v ? v.replace(/<[^>]*>/g, '') : v).isLength({ max: 10000 }),
   ],
   propertyController.addReview
 );
@@ -168,6 +168,27 @@ router.put(
   '/:propertyId',
   authenticate,
   isLandlordOrAgent,
+  [
+    body('state_id').optional().isInt(),
+    body('lga_name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
+    body('city').optional({ checkFalsy: true }).trim().notEmpty(),
+    body('area').optional({ checkFalsy: true }).trim().notEmpty(),
+    body('full_address').optional({ checkFalsy: true }).trim().notEmpty(),
+    body('latitude').optional().isFloat({ min: -90, max: 90 }),
+    body('longitude').optional().isFloat({ min: -180, max: 180 }),
+    body('property_type').optional().isIn([
+      'apartment', 'house', 'duplex', 'studio', 'bungalow', 'flat', 'room',
+    ]),
+    body('bedrooms').optional().isInt({ min: 0 }),
+    body('bathrooms').optional().isInt({ min: 0 }),
+    body('rent_amount').optional().isFloat({ min: 0 }),
+    body('payment_frequency').optional().isIn(['monthly', 'yearly']),
+    body('caution_deposit').optional().isFloat({ min: 0 }),
+    body('title').optional({ checkFalsy: true }).trim().notEmpty(),
+    body('description').optional({ checkFalsy: true }).trim().notEmpty(),
+    body('amenities').optional().isArray(),
+    validateRequest,
+  ],
   propertyController.updateProperty
 );
 

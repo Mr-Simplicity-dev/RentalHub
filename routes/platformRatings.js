@@ -17,7 +17,7 @@ router.post(
     body('rating_context').isString().trim(),
     body('source_type').isString().trim(),
     body('source_ref').isString().trim(),
-    body('comment').optional({ checkFalsy: true }).trim(),
+    body('comment').optional({ checkFalsy: true }).trim().customSanitizer(v => v ? v.replace(/<[^>]*>/g, '') : v).isLength({ max: 5000 }),
   ],
   platformRatingCtrl.submitRating
 );

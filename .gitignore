@@ -76,6 +76,9 @@ sessions/
 auth/
 media/
 
+# User uploads (passports, property images, evidence)
+uploads/
+
 # Temporary files
 tmp/
 temp/
