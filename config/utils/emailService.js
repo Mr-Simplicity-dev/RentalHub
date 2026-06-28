@@ -3,6 +3,16 @@ const { getFrontendUrl } = require('./frontendUrl');
 
 const FRONTEND_URL = getFrontendUrl();
 
+const esc = (str) => {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
 // Send verification email
 exports.sendVerificationEmail = async (email, verificationToken) => {
   const verificationUrl = `${FRONTEND_URL}/verify-email?token=${verificationToken}`;
@@ -39,7 +49,7 @@ exports.sendWelcomeEmail = async (email, fullName, userType) => {
       subject: 'Welcome to Rental Hub NG',
       html: `
         <div style="font-family: sans-serif; line-height: 1.6;">
-          <h2>Welcome ${fullName}!</h2>
+          <h2>Welcome ${esc(fullName)}!</h2>
           <p>Your ${userType} account has been successfully created.</p>
           <p>Please complete your identity verification by uploading your NIN and passport photo.</p>
         </div>
@@ -282,10 +292,10 @@ exports.sendMessageNotification = async (
       html: `
         <div style="font-family: sans-serif; line-height: 1.6;">
           <h2>New Message</h2>
-          <p>Hello ${receiverName},</p>
-          <p>You have received a new message from <strong>${senderName}</strong>:</p>
+          <p>Hello ${esc(receiverName)},</p>
+          <p>You have received a new message from <strong>${esc(senderName)}</strong>:</p>
           <blockquote style="background: #f5f5f5; padding: 15px; border-left: 4px solid #0284c7;">
-            ${truncatedMessage}
+            ${esc(truncatedMessage)}
           </blockquote>
           <p>Log in to read and reply to the message.</p>
           <a href="${FRONTEND_URL}/messages">View Messages</a>
@@ -323,7 +333,7 @@ exports.sendFraudAlertEmail = async ({
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
             <tr style="background: #f9f9f9;">
               <td style="padding: 8px; border: 1px solid #ddd;"><strong>Time:</strong></td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${alertTime}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${esc(alertTime)}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border: 1px solid #ddd;"><strong>Alert Type:</strong></td>
@@ -333,25 +343,25 @@ exports.sendFraudAlertEmail = async ({
 
           <h3>Lawyer Account (Attempting to Register):</h3>
           <ul style="background: #f0f8ff; padding: 15px; border-left: 4px solid #0284c7; border-radius: 4px;">
-            <li><strong>Name:</strong> ${lawyerName}</li>
-            <li><strong>Email:</strong> ${lawyerEmail}</li>
+            <li><strong>Name:</strong> ${esc(lawyerName)}</li>
+            <li><strong>Email:</strong> ${esc(lawyerEmail)}</li>
             <li><strong>Status:</strong> Flagged for fraud verification</li>
           </ul>
 
           <h3>Matched Account (Existing User):</h3>
           <ul style="background: #f0f0f0; padding: 15px; border-left: 4px solid #999; border-radius: 4px;">
-            <li><strong>Name:</strong> ${matchedUserName}</li>
-            <li><strong>Email:</strong> ${matchedUserEmail}</li>
-            <li><strong>User Type:</strong> ${matchedUserType}</li>
+            <li><strong>Name:</strong> ${esc(matchedUserName)}</li>
+            <li><strong>Email:</strong> ${esc(matchedUserEmail)}</li>
+            <li><strong>User Type:</strong> ${esc(matchedUserType)}</li>
             <li><strong>Issue:</strong> Same passport photo used in multiple accounts</li>
           </ul>
 
           <h3>Recommended Actions:</h3>
           <ol>
-            <li>Investigate the lawyer account: ${lawyerEmail}</li>
+            <li>Investigate the lawyer account: ${esc(lawyerEmail)}</li>
             <li>Compare both passport photos in admin panel</li>
             <li>Contact lawyer for explanation</li>
-            <li>Contact original ${matchedUserType}: ${matchedUserEmail}</li>
+            <li>Contact original ${esc(matchedUserType)}: ${esc(matchedUserEmail)}</li>
             <li>Suspend lawyer account if fraud confirmed</li>
             <li>Mark alert as resolved/false-positive when investigation complete</li>
           </ol>

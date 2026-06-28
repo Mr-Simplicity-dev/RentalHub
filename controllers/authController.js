@@ -507,7 +507,7 @@ const attachAuthSession = (res, data) => {
   // Decode it to mint a 1h access token for the Bearer header
   let accessToken = data.token;
   try {
-    const decoded = jwt.verify(data.token, process.env.JWT_SECRET, { ignoreExpiration: true });
+    const decoded = jwt.verify(data.token, process.env.JWT_SECRET, { algorithms: ['HS256'], ignoreExpiration: true });
     if (decoded?.userId) {
       accessToken = generateAccessToken(decoded.userId, decoded.userType);
     }
@@ -3141,7 +3141,7 @@ exports.verifyEmail = async (req, res) => {
     const { token } = req.params;
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
     // Update user email verification status and return user
     const result = await db.query(
@@ -3451,7 +3451,7 @@ exports.refreshToken = async (req, res) => {
     }
 
     // Verify the session token (should still be valid since it's 7d)
-    const decoded = jwt.verify(sessionToken, process.env.JWT_SECRET);
+    const decoded = jwt.verify(sessionToken, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     
     // Mint a new session token (rotate) and let attachAuthSession derive the access token
     const newSessionToken = generateToken(decoded.userId, decoded.userType);
@@ -3556,7 +3556,7 @@ exports.resetPassword = async (req, res) => {
     // Verify the JWT reset token
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     } catch (err) {
       return res.status(400).json({
         success: false,

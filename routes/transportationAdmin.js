@@ -2412,7 +2412,9 @@ router.get('/state-admin/bookings', async (req, res) => {
       
       const admin = adminResult.rows[0];
       
-      const { period = '30 days' } = req.query;
+      const { period: rawPeriod = '30 days' } = req.query;
+      const allowedPeriods = ['7 days', '14 days', '30 days', '60 days', '90 days', '1 year'];
+      const period = allowedPeriods.includes(rawPeriod) ? rawPeriod : '30 days';
       
       const [overviewStats, revenueTrends, serviceBreakdown, topProperties] = await Promise.all([
         // Overview statistics
@@ -2430,8 +2432,8 @@ router.get('/state-admin/bookings', async (req, res) => {
           JOIN properties p ON tb.property_id = p.id
           LEFT JOIN states s ON s.id = p.state_id
           WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
-            AND tb.created_at >= CURRENT_DATE - INTERVAL '${period}'
-        `, [admin.assigned_state]),
+            AND tb.created_at >= CURRENT_DATE - $2::interval
+        `, [admin.assigned_state, period]),
         
         // Revenue trends
         db.query(`
@@ -2462,10 +2464,10 @@ router.get('/state-admin/bookings', async (req, res) => {
           JOIN properties p ON tb.property_id = p.id
           LEFT JOIN states s ON s.id = p.state_id
           WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
-            AND tb.created_at >= CURRENT_DATE - INTERVAL '${period}'
+            AND tb.created_at >= CURRENT_DATE - $2::interval
           GROUP BY ts.service_type, ts.service_name
           ORDER BY booking_count DESC
-        `, [admin.assigned_state]),
+        `, [admin.assigned_state, period]),
         
         // Top properties
         db.query(`
@@ -2480,11 +2482,11 @@ router.get('/state-admin/bookings', async (req, res) => {
           JOIN properties p ON tb.property_id = p.id
           LEFT JOIN states s ON s.id = p.state_id
           WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
-            AND tb.created_at >= CURRENT_DATE - INTERVAL '${period}'
+            AND tb.created_at >= CURRENT_DATE - $2::interval
           GROUP BY p.id, p.title, p.city, p.area
           ORDER BY booking_count DESC
           LIMIT 10
-        `, [admin.assigned_state])
+        `, [admin.assigned_state, period])
       ]);
       
       res.json({
@@ -3441,15 +3443,17 @@ router.get('/super-admin/dashboard', async (req, res) => {
    */
   router.get('/super-admin/system-health', async (req, res) => {
     try {
-      const { days = 30 } = req.query;
+      const rawDays = req.query.days;
+      const days = rawDays && /^\d+$/.test(rawDays) ? parseInt(rawDays, 10) : 30;
+      const intervalStr = `${days} days`;
       
       const [healthData, currentStats, alertSummary, performanceTrends] = await Promise.all([
         // System health data
         db.query(`
           SELECT * FROM transportation_system_health_view
-          WHERE health_date >= CURRENT_DATE - INTERVAL '${days} days'
+          WHERE health_date >= CURRENT_DATE - $1::interval
           ORDER BY health_date DESC
-        `),
+        `, [intervalStr]),
         
         // Current system statistics
         db.query(`
@@ -3525,8 +3529,29 @@ router.get('/super-admin/dashboard', async (req, res) => {
       } = req.body;
       
       // Validate date range
-      const reportStartDate = start_date || 'CURRENT_DATE - INTERVAL \'30 days\'';
-      const reportEndDate = end_date || 'CURRENT_DATE';
+      let startDateParam = null;
+      let endDateParam = null;
+      
+      if (start_date) {
+        const d = new Date(start_date);
+        if (!isNaN(d.getTime())) {
+          startDateParam = d.toISOString();
+        } else {
+          return res.status(400).json({ success: false, message: 'Invalid start_date format' });
+        }
+      }
+      
+      if (end_date) {
+        const d = new Date(end_date);
+        if (!isNaN(d.getTime())) {
+          endDateParam = d.toISOString();
+        } else {
+          return res.status(400).json({ success: false, message: 'Invalid end_date format' });
+        }
+      }
+      
+      // Parameterized: $1 = states (or NULL), $2 = start (or NULL), $3 = end (or NULL)
+      const statesParam = include_states.length > 0 ? include_states : null;
       
       // Generate report based on type
       let reportData = {};
@@ -3541,17 +3566,15 @@ router.get('/super-admin/dashboard', async (req, res) => {
             COUNT(DISTINCT tb.tenant_id) as unique_tenants,
             COUNT(DISTINCT tb.property_id) as unique_properties
           FROM transportation_bookings tb
-          ${include_states.length > 0 ? 
-            `JOIN properties p ON tb.property_id = p.id
-            LEFT JOIN states s ON s.id = p.state_id
-             WHERE s.state_name = ANY($1) AND ` : 
-            'WHERE '}
-          tb.created_at >= ${reportStartDate}
-            AND tb.created_at <= ${reportEndDate}
+          LEFT JOIN properties p ON tb.property_id = p.id
+          LEFT JOIN states s ON s.id = p.state_id
+          WHERE (s.state_name = ANY($1) OR $1 IS NULL)
+            AND tb.created_at >= COALESCE($2::timestamptz, CURRENT_DATE - INTERVAL '30 days')
+            AND tb.created_at <= COALESCE($3::timestamptz, CURRENT_DATE)
             AND tb.payment_status = 'completed'
           GROUP BY DATE(tb.created_at)
           ORDER BY report_date DESC
-        `, include_states.length > 0 ? [include_states] : []);
+        `, [statesParam, startDateParam, endDateParam]);
         
         reportData.revenue = revenueReport.rows;
       }
@@ -3569,16 +3592,14 @@ router.get('/super-admin/dashboard', async (req, res) => {
             AVG(EXTRACT(EPOCH FROM (tb.completed_at - tb.started_at))) as avg_duration_seconds
           FROM transportation_bookings tb
           JOIN transportation_services ts ON tb.service_id = ts.id
-          ${include_states.length > 0 ? 
-            `JOIN properties p ON tb.property_id = p.id
-            LEFT JOIN states s ON s.id = p.state_id
-             WHERE s.state_name = ANY($1) AND ` : 
-            'WHERE '}
-          tb.created_at >= ${reportStartDate}
-            AND tb.created_at <= ${reportEndDate}
+          LEFT JOIN properties p ON tb.property_id = p.id
+          LEFT JOIN states s ON s.id = p.state_id
+          WHERE (s.state_name = ANY($1) OR $1 IS NULL)
+            AND tb.created_at >= COALESCE($2::timestamptz, CURRENT_DATE - INTERVAL '30 days')
+            AND tb.created_at <= COALESCE($3::timestamptz, CURRENT_DATE)
           GROUP BY ts.service_type, ts.service_name
           ORDER BY total_bookings DESC
-        `, include_states.length > 0 ? [include_states] : []);
+        `, [statesParam, startDateParam, endDateParam]);
         
         reportData.bookings = bookingsReport.rows;
       }
@@ -3594,17 +3615,15 @@ router.get('/super-admin/dashboard', async (req, res) => {
             MIN(ta.created_at) as first_alert_date,
             MAX(ta.created_at) as last_alert_date
           FROM transportation_alerts ta
-          ${include_states.length > 0 ? 
-            `LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
-             LEFT JOIN properties p ON tb.property_id = p.id
-             LEFT JOIN states s ON s.id = p.state_id
-             WHERE s.state_name = ANY($1) AND ` : 
-            'WHERE '}
-          ta.created_at >= ${reportStartDate}
-            AND ta.created_at <= ${reportEndDate}
+          LEFT JOIN transportation_bookings tb ON ta.related_booking_id = tb.id
+          LEFT JOIN properties p ON tb.property_id = p.id
+          LEFT JOIN states s ON s.id = p.state_id
+          WHERE (s.state_name = ANY($1) OR $1 IS NULL)
+            AND ta.created_at >= COALESCE($2::timestamptz, CURRENT_DATE - INTERVAL '30 days')
+            AND ta.created_at <= COALESCE($3::timestamptz, CURRENT_DATE)
           GROUP BY ta.alert_type, ta.alert_level
           ORDER BY total_alerts DESC
-        `, include_states.length > 0 ? [include_states] : []);
+        `, [statesParam, startDateParam, endDateParam]);
         
         reportData.alerts = alertsReport.rows;
       }
@@ -3618,11 +3637,11 @@ router.get('/super-admin/dashboard', async (req, res) => {
             MAX(metric_value) as max_value,
             COUNT(*) as data_points
           FROM transportation_performance_metrics
-          WHERE metric_date >= ${reportStartDate}
-            AND metric_date <= ${reportEndDate}
+          WHERE metric_date >= COALESCE($1::timestamptz, CURRENT_DATE - INTERVAL '30 days')
+            AND metric_date <= COALESCE($2::timestamptz, CURRENT_DATE)
           GROUP BY metric_type
           ORDER BY metric_type
-        `);
+        `, [startDateParam, endDateParam]);
         
         reportData.performance = performanceReport.rows;
       }
@@ -4331,11 +4350,13 @@ router.get('/super-admin/dashboard', async (req, res) => {
       const adminId = req.user.id;
       const adminType = req.user.user_type;
       
-      const { days = 7 } = req.query;
+      const rawDays = req.query.days;
+      const days = rawDays && /^\d+$/.test(rawDays) ? parseInt(rawDays, 10) : 7;
+      const intervalStr = `${days} days`;
       
       let query = `
         SELECT * FROM transportation_system_health_view
-        WHERE health_date >= CURRENT_DATE - INTERVAL '${days} days'
+        WHERE health_date >= CURRENT_DATE - $1::interval
         ORDER BY health_date DESC
       `;
       
@@ -4366,12 +4387,12 @@ router.get('/super-admin/dashboard', async (req, res) => {
             JOIN properties p ON tb.property_id = p.id
             LEFT JOIN states s ON s.id = p.state_id
             WHERE LOWER(TRIM(s.state_name)) = LOWER(TRIM($1))
-              AND tb.created_at >= CURRENT_DATE - INTERVAL '${days} days'
+              AND tb.created_at >= CURRENT_DATE - $2::interval
             GROUP BY DATE(tb.created_at)
             ORDER BY health_date DESC
           `;
           
-          const result = await db.query(query, [adminResult.rows[0].assigned_state]);
+          const result = await db.query(query, [adminResult.rows[0].assigned_state, intervalStr]);
           
           return res.json({
             success: true,
@@ -5172,10 +5193,12 @@ router.get('/super-admin/dashboard', async (req, res) => {
       }
       
       const { 
-        older_than_days = 365,
+        older_than_days: rawDays = 365,
         max_records = 10000,
         dry_run = true 
       } = req.body;
+      const older_than_days = rawDays && /^\d+$/.test(String(rawDays)) ? parseInt(String(rawDays), 10) : 365;
+      const intervalStr = `${older_than_days} days`;
       
       // Get counts before cleanup
            const [oldBookingsCount, oldAlertsCount, oldActionsCount] = await Promise.all([
@@ -5183,25 +5206,25 @@ router.get('/super-admin/dashboard', async (req, res) => {
         db.query(`
           SELECT COUNT(*) as count 
           FROM transportation_bookings 
-          WHERE created_at < CURRENT_DATE - INTERVAL '${older_than_days} days'
+          WHERE created_at < CURRENT_DATE - $1::interval
             AND booking_status = 'completed'
             AND payment_status = 'completed'
-        `),
+        `, [intervalStr]),
         
         // Count old alerts
         db.query(`
           SELECT COUNT(*) as count 
           FROM transportation_alerts 
-          WHERE created_at < CURRENT_DATE - INTERVAL '${older_than_days} days'
+          WHERE created_at < CURRENT_DATE - $1::interval
             AND is_resolved = TRUE
-        `),
+        `, [intervalStr]),
         
         // Count old actions
         db.query(`
           SELECT COUNT(*) as count 
           FROM admin_transportation_actions 
-          WHERE created_at < CURRENT_DATE - INTERVAL '${older_than_days} days'
-        `)
+          WHERE created_at < CURRENT_DATE - $1::interval
+        `, [intervalStr])
       ]);
       
       const cleanupSummary = {
@@ -5236,14 +5259,14 @@ router.get('/super-admin/dashboard', async (req, res) => {
               WHERE id IN (
                 SELECT id 
                 FROM transportation_bookings 
-                WHERE created_at < CURRENT_DATE - INTERVAL '${older_than_days} days'
+                WHERE created_at < CURRENT_DATE - $2::interval
                   AND booking_status = 'completed'
                   AND payment_status = 'completed'
                 ORDER BY created_at ASC
                 LIMIT $1
               )
               RETURNING COUNT(*) as deleted_count
-            `, [Math.min(max_records, cleanupSummary.records_to_delete.bookings)])
+            `, [Math.min(max_records, cleanupSummary.records_to_delete.bookings), intervalStr])
             .then(result => {
               deletedRecords.bookings = parseInt(result.rows[0].deleted_count);
             })
@@ -5258,13 +5281,13 @@ router.get('/super-admin/dashboard', async (req, res) => {
               WHERE id IN (
                 SELECT id 
                 FROM transportation_alerts 
-                WHERE created_at < CURRENT_DATE - INTERVAL '${older_than_days} days'
+                WHERE created_at < CURRENT_DATE - $2::interval
                   AND is_resolved = TRUE
                 ORDER BY created_at ASC
                 LIMIT $1
               )
               RETURNING COUNT(*) as deleted_count
-            `, [Math.min(max_records, cleanupSummary.records_to_delete.alerts)])
+            `, [Math.min(max_records, cleanupSummary.records_to_delete.alerts), intervalStr])
             .then(result => {
               deletedRecords.alerts = parseInt(result.rows[0].deleted_count);
             })
@@ -5279,12 +5302,12 @@ router.get('/super-admin/dashboard', async (req, res) => {
               WHERE id IN (
                 SELECT id 
                 FROM admin_transportation_actions 
-                WHERE created_at < CURRENT_DATE - INTERVAL '${older_than_days} days'
+                WHERE created_at < CURRENT_DATE - $2::interval
                 ORDER BY created_at ASC
                 LIMIT $1
               )
               RETURNING COUNT(*) as deleted_count
-            `, [Math.min(max_records, cleanupSummary.records_to_delete.actions)])
+            `, [Math.min(max_records, cleanupSummary.records_to_delete.actions), intervalStr])
             .then(result => {
               deletedRecords.actions = parseInt(result.rows[0].deleted_count);
             })

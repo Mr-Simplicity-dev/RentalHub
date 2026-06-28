@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const { uploadPassport } = require('../config/middleware/upload');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
+const { authSensitiveLimiter } = require('../config/middleware/securityRateLimiters');
 
 const router = express.Router();
 
@@ -250,6 +251,7 @@ router.post('/logout', authenticate, authController.logout);
 
 router.post(
   '/forgot-password',
+  authSensitiveLimiter,
   [body('email').isEmail().normalizeEmail()],
   authController.forgotPassword
 );
