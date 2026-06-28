@@ -35,6 +35,7 @@ import TenancyWorkflowPanel from "../components/admin/TenancyWorkflowPanel";
 import RecruitmentAdminTab from "../components/admin/RecruitmentAdminTab";
 import AdminMonitorTab from "../components/admin/AdminMonitorTab";
 import CommissionConfigTab from "../components/admin/CommissionConfigTab";
+import AppealsTab from "../components/admin/AppealsTab";
 
 const tabs = [
   "overview",
@@ -63,6 +64,7 @@ const tabs = [
   "admin_monitor",
   "pending_approvals",
   "commission_config",
+  "appeals",
 ];
 
 const tabLabels = {
@@ -92,6 +94,7 @@ const tabLabels = {
   admin_monitor: "Admin Monitor",
   pending_approvals: "Pending Approvals",
   commission_config: "Commission Config",
+  appeals: "Appeals",
 };
 
 const shortcutCategories = [
@@ -1354,6 +1357,10 @@ export default function SuperAdminDashboard() {
 
         {tab === "commission_config" && (
           <CommissionConfigTab />
+        )}
+
+        {tab === "appeals" && (
+          <AppealsTab />
         )}
 
       <InputDialog

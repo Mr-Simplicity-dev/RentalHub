@@ -70,6 +70,7 @@ const systemRoutes = require('./routes/system');
 const damageReportRoutes = require('./routes/damageReports');
 const rentSavingsRoutes = require('./routes/rentSavings');
 const adminInspectionRoutes = require('./routes/adminInspections');
+const appealRoutes = require('./routes/appeals');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 const { startRentSavingsJobs } = require('./jobs/rentSavingsJobs');
 const { startSmsDeliveryJobs } = require('./jobs/smsDeliveryJobs');
@@ -565,6 +566,7 @@ app.use('/api/system', adminLimiter, systemRoutes);
 app.use('/api/damage-reports', generalOpsLimiter, damageReportRoutes);
 app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
 app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
+app.use('/api', generalOpsLimiter, appealRoutes);
 
 app.use('/api/downloads', generalOpsLimiter, downloadsRoutes);
 
