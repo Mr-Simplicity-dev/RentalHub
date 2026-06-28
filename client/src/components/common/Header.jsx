@@ -10,6 +10,7 @@ import {
   clearImpersonationOriginalSession,
   setAuthSession,
 } from '../../services/authStorage';
+import { playNotificationSound } from '../../utils/notificationSound';
 
 const scrollToLinkedRoute = (to) => {
   if (typeof window === 'undefined') return;
@@ -53,6 +54,7 @@ const Header = () => {
     const [selectedNotification, setSelectedNotification] = useState(null);
     const [showAvatarPopup, setShowAvatarPopup] = useState(false);
     const notifRef = useRef(null);
+    const prevUnreadRef = useRef(0);
   const { t } = useTranslation();
   const impersonationSession = getImpersonationOriginalSession();
   const isImpersonating = Boolean(impersonationSession);
@@ -204,6 +206,13 @@ const Header = () => {
     const intervalId = setInterval(fetchNotifications, 30000);
     return () => clearInterval(intervalId);
   }, [fetchNotifications]);
+
+  useEffect(() => {
+    if (notifUnreadCount > prevUnreadRef.current) {
+      playNotificationSound();
+    }
+    prevUnreadRef.current = notifUnreadCount;
+  }, [notifUnreadCount]);
 
   const markNotifAsRead = async (notifId) => {
     try {
@@ -748,7 +757,11 @@ return (
 
                   {(notifUnreadCount > 0 ||
                     headerAttentionCount > 0) && (
-                    <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white animate-pulse-soft" />
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white animate-scaleIn">
+                      {notifUnreadCount + headerAttentionCount > 99
+                        ? '99+'
+                        : notifUnreadCount + headerAttentionCount}
+                    </span>
                   )}
                 </button>
 
