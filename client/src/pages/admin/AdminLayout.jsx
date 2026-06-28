@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
+import { playNotificationSound } from '../../utils/notificationSound';
 import RoleBadge from '../../components/common/RoleBadge';
 
 import { useTranslation } from 'react-i18next';
@@ -136,6 +137,7 @@ const AdminLayout = () => {
   const [selectedNotification, setSelectedNotification] = useState(null);
   const notifRef = useRef(null);
   const notifRefMobile = useRef(null);
+  const prevUnreadRef = useRef(0);
   const [activeLanguage, setActiveLanguage] = useState(i18n.language?.split('-')[0] || 'en');
 
   useEffect(() => {
@@ -282,6 +284,13 @@ const AdminLayout = () => {
     }, 30000);
     return () => clearInterval(intervalId);
   }, [fetchNotifications, fetchUnreadMessages]);
+
+  useEffect(() => {
+    if (notifUnreadCount > prevUnreadRef.current) {
+      playNotificationSound();
+    }
+    prevUnreadRef.current = notifUnreadCount;
+  }, [notifUnreadCount]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -1277,7 +1286,9 @@ const AdminLayout = () => {
               >
                 <FaBell className="text-lg" />
                 {notifUnreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white" />
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                    {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
+                  </span>
                 )}
               </button>
             </div>
@@ -1384,7 +1395,9 @@ const AdminLayout = () => {
               >
                 <FaBell className="text-base" />
                 {notifUnreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white ring-2 ring-white">
+                    {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
+                  </span>
                 )}
               </button>
             </div>
