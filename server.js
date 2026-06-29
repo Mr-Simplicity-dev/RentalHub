@@ -24,6 +24,22 @@ if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
   process.exit(1);
 }
 
+// Security startup warnings
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.NIN_ENCRYPTION_KEY || process.env.NIN_ENCRYPTION_KEY.length < 64) {
+    console.warn('WARNING: NIN_ENCRYPTION_KEY is missing or too short — stored NINs cannot be encrypted/decrypted');
+  }
+  if (!process.env.SMS_WEBHOOK_SECRET) {
+    console.warn('WARNING: SMS_WEBHOOK_SECRET not set — SMS delivery webhook is blocked');
+  }
+  if (!process.env.PREMBLY_API_KEY || process.env.PREMBLY_API_KEY === 'your_key_here') {
+    console.warn('WARNING: PREMBLY_API_KEY is not configured — NIN verification will fail');
+  }
+  if (!process.env.MONGODB_URI) {
+    console.warn('WARNING: MONGODB_URI not set — blog generation and other cron jobs disabled');
+  }
+}
+
 const db = require('./config/middleware/database');
 
 const authRoutes = require('./routes/auth');
@@ -100,6 +116,15 @@ const mongoose = require('mongoose');
 
 // Enable strict query mode to suppress Mongoose deprecation warning
 mongoose.set('strictQuery', true);
+
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI).catch((err) => {
+    console.error('FATAL: MongoDB connection failed:', err.message);
+    process.exit(1);
+  });
+} else {
+  console.warn('WARNING: MONGODB_URI not set — MongoDB-dependent features (blogs, cron) will not work');
+}
 
 const Blog = require('./models/Blog');
 const locations = require('./data/nigeriaLocations');
@@ -334,7 +359,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "unpkg.com", "js-eu1.hs-scripts.com", "js.hs-scripts.com"],
+      scriptSrc: ["'self'", "cdn.jsdelivr.net", "unpkg.com", "js-eu1.hs-scripts.com", "js.hs-scripts.com"],
       imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:", "js-eu1.hs-scripts.com"],
       connectSrc: ["'self'", "api.paystack.co", "api.hubspot.com", "forms.hubspot.com"],
       fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com"],
@@ -417,13 +442,17 @@ app.use('/api/', limiter);
 
 app.use(
   express.json({
-    limit: '10mb',
+    limit: '1mb',
     verify: (req, _res, buf) => {
       req.rawBody = Buffer.from(buf);
     },
   })
 );
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+const hpp = require('hpp');
+app.use(hpp());
+const inputSanitizer = require('./config/middleware/inputSanitizer');
+app.use(inputSanitizer);
 app.use(securityAlertMiddleware);
 app.use(csrfProtection);
 
@@ -699,7 +728,7 @@ io.use(async (socket, next) => {
     }
 
     const userResult = await db.query(
-      `SELECT id, user_type, is_active, deleted_at
+      `SELECT id, user_type, is_active, deleted_at, token_version
        FROM users WHERE id = $1 LIMIT 1`,
       [userId]
     );
@@ -708,8 +737,15 @@ io.use(async (socket, next) => {
       return next(new Error('User account is not active'));
     }
 
+    const userData = userResult.rows[0];
+    const tokenVersion = decoded.tv || 1;
+    const dbVersion = userData.token_version || 1;
+    if (tokenVersion < dbVersion) {
+      return next(new Error('Session expired. Please log in again.'));
+    }
+
     socket.userId = userId;
-    socket.userType = userResult.rows[0].user_type;
+    socket.userType = userData.user_type;
     next();
   } catch (err) {
     return next(new Error('Invalid or expired token'));

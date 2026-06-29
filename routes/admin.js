@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { body, param } = require('express-validator');
 const { authenticate } = require("../config/middleware/auth");
 const { requireAdmin } = require('../config/middleware/requireAdmin');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
@@ -7,6 +8,7 @@ const adminController = require('../controllers/adminController');
 const evidenceVerificationController = require('../controllers/evidenceVerification.controller');
 const { allowRoles } = require('../config/middleware/roleMiddleware');
 const superAdminOnly = require('../config/middleware/superAdminOnly');
+const validateRequest = require('../config/middleware/validateRequest');
 
 
 /**
@@ -29,9 +31,18 @@ router.get('/stats', requireAdminOrSuperAdmin, adminController.getStats);
   */
 router.get('/users', requireAdminOrSuperAdmin, adminController.getAllUsers);
 router.get('/users/:id', requireAdminOrSuperAdmin, adminController.getUserById);
-router.post('/users/:id/assign-agent', requireAdminOrSuperAdmin, adminController.assignAgentToLandlord);
-router.patch('/users/:id/verify', requireAdminOrSuperAdmin, adminController.verifyUser);
-router.delete('/users/:id', requireAdminOrSuperAdmin, adminController.deleteUser);
+router.post('/users/:id/assign-agent',
+  [param('id').isInt(), body('agent_email').isEmail(), body('agent_full_name').isString().trim().isLength({ min: 1, max: 200 }), body('agent_phone').isString().trim().isLength({ min: 5, max: 20 })],
+  validateRequest,
+  requireAdminOrSuperAdmin, adminController.assignAgentToLandlord);
+router.patch('/users/:id/verify',
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })],
+  validateRequest,
+  requireAdminOrSuperAdmin, adminController.verifyUser);
+router.delete('/users/:id',
+  [param('id').isInt()],
+  validateRequest,
+  requireAdminOrSuperAdmin, adminController.deleteUser);
 
 /**
  * =========================
@@ -99,24 +110,32 @@ router.patch(
 
 router.patch(
   '/properties/:id/unlist',
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })],
+  validateRequest,
   requireAdminOrSuperAdmin,
   adminController.unlistProperty
 );
 
 router.patch(
   '/properties/:id/relist',
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })],
+  validateRequest,
   requireAdminOrSuperAdmin,
   adminController.relistProperty
 );
 
 router.patch(
   '/properties/:id/feature',
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })],
+  validateRequest,
   requireAdminOrSuperAdmin,
   adminController.featureProperty
 );
 
 router.patch(
   '/properties/:id/unfeature',
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })],
+  validateRequest,
   requireAdminOrSuperAdmin,
   adminController.unfeatureProperty
 );
@@ -140,12 +159,16 @@ router.get(
 
 router.post(
   '/applications/:id/approve',
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })],
+  validateRequest,
   requireAdminOrSuperAdmin,
   adminController.approveApplication
 );
 
 router.post(
   '/applications/:id/reject',
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })],
+  validateRequest,
   requireAdminOrSuperAdmin,
   adminController.rejectApplication
 );
@@ -160,6 +183,16 @@ router.get(
 
 router.post(
   '/create-admin',
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('phone').isString().trim().isLength({ min: 5, max: 20 }),
+    body('full_name').isString().trim().isLength({ min: 1, max: 200 }),
+    body('password').isString().isLength({ min: 8, max: 128 }),
+    body('user_type').isString().trim().isIn(['admin', 'lga_admin', 'state_admin', 'state_financial_admin']),
+    body('assigned_state').optional().isString().trim().isLength({ max: 200 }),
+    body('assigned_city').optional().isString().trim().isLength({ max: 200 }),
+  ],
+  validateRequest,
   authenticate,
   superAdminOnly,
   adminController.createAdmin

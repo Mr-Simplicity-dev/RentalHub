@@ -38,7 +38,8 @@ const authenticate = async (req, res, next) => {
               assigned_state, assigned_city,
               preferred_state_id, preferred_lga_name,
               deleted_at, is_active,
-              account_suspended_reason
+              account_suspended_reason,
+              token_version
        FROM users
        WHERE id = $1`,
       [userId]
@@ -52,6 +53,15 @@ const authenticate = async (req, res, next) => {
     }
 
     const currentUser = result.rows[0];
+
+    const tokenVersion = decoded.tv || 1;
+    const dbVersion = currentUser.token_version || 1;
+    if (tokenVersion < dbVersion) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired. Please log in again.',
+      });
+    }
 
     if (currentUser.deleted_at) {
       return res.status(403).json({

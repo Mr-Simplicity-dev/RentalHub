@@ -3,11 +3,16 @@ const bcrypt = require('bcryptjs');
 const db = require('./config/middleware/database');
 
 async function createAdmin() {
-  const email = 'admin@yourapp.com';
-  const phone = '08000000000';
-  const fullName = 'System Administrator';
-  const nin = '00000000000';
-  const password = 'Admin@12345'; // change after first login
+  const email = process.env.ADMIN_EMAIL || 'admin@yourapp.com';
+  const phone = process.env.ADMIN_PHONE || '08000000000';
+  const fullName = process.env.ADMIN_NAME || 'System Administrator';
+  const nin = process.env.ADMIN_NIN || '00000000000';
+  const password = process.env.ADMIN_PASSWORD;
+
+  if (!password || password.length < 8) {
+    console.error('FATAL: Set ADMIN_PASSWORD env var (min 8 chars)');
+    process.exit(1);
+  }
 
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash(password, salt);
