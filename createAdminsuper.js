@@ -5,7 +5,6 @@ const db = require('./config/middleware/database');
 
 const DEFAULT_EMAIL = 'admin@usayddomain.com';
 const DEFAULT_PHONE = '07067012884';
-const DEFAULT_PASSWORD = 'Admin@12345';
 
 const ensureSuperAdminColumns = async () => {
   await db.query(`
@@ -34,10 +33,10 @@ async function createOrRepairSuperAdmin() {
   const phone = String(process.env.SUPER_ADMIN_PHONE || DEFAULT_PHONE).trim();
   const fullName = String(process.env.SUPER_ADMIN_NAME || 'Super Admin').trim();
   const nin = String(process.env.SUPER_ADMIN_NIN || '00000000000').trim();
-  const password = String(process.env.SUPER_ADMIN_PASSWORD || DEFAULT_PASSWORD);
+  const password = String(process.env.SUPER_ADMIN_PASSWORD || '');
 
-  if (!email || !phone || !password) {
-    throw new Error('SUPER_ADMIN_EMAIL, SUPER_ADMIN_PHONE, and SUPER_ADMIN_PASSWORD are required');
+  if (!email || !phone || !password || password.length < 8) {
+    throw new Error('SUPER_ADMIN_EMAIL, SUPER_ADMIN_PHONE, and SUPER_ADMIN_PASSWORD (min 8 chars) are required');
   }
 
   await ensureSuperAdminColumns();
@@ -90,7 +89,7 @@ async function createOrRepairSuperAdmin() {
 
   console.log('Super admin ready:', result.rows[0]);
   console.log('Login email:', email);
-  console.log('Password source:', process.env.SUPER_ADMIN_PASSWORD ? 'SUPER_ADMIN_PASSWORD env' : 'default development password');
+  console.log('Password source: SUPER_ADMIN_PASSWORD env');
 }
 
 createOrRepairSuperAdmin()

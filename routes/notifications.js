@@ -1,6 +1,8 @@
 const express = require('express');
+const { param } = require('express-validator');
 const router = express.Router();
 const { authenticate } = require('../config/middleware/auth');
+const validateRequest = require('../config/middleware/validateRequest');
 const {
   getUserNotifications,
   markAsRead,
@@ -54,7 +56,7 @@ router.get('/unread/count', authenticate, async (req, res) => {
 });
 
 // Mark notification as read
-router.patch('/:notificationId/read', authenticate, async (req, res) => {
+router.patch('/:notificationId/read', [param('notificationId').isInt()], validateRequest, authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const { notificationId } = req.params;

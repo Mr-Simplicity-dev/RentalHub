@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const { uploadPassport } = require('../config/middleware/upload');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
+const { checkLoginRateLimit } = require('../config/middleware/loginRateLimiter');
 const { authSensitiveLimiter } = require('../config/middleware/securityRateLimiters');
 
 const router = express.Router();
@@ -124,6 +125,7 @@ router.post(
 
 router.post(
   '/login',
+  checkLoginRateLimit,
   [
     body('email').isEmail().normalizeEmail(),
     body('password').notEmpty(),

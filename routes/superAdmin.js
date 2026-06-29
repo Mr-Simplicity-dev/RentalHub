@@ -1,4 +1,5 @@
 const express = require('express');
+const { body, param, query } = require('express-validator');
 const { authenticate, requireSuperAdmin } = require('../config/middleware/auth');
 const { requireSuperAdminOrDelegatedDirectWithdraw } = require('../config/middleware/requireFinancialAdmin');
 const superCtrl = require('../controllers/superAdmin.controller');
@@ -9,6 +10,7 @@ const db = require('../config/middleware/database');
 const bcrypt = require('bcryptjs');
 const commissionService = require('../services/commissionService');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
+const validateRequest = require('../config/middleware/validateRequest');
 
 const router = express.Router();
 
@@ -379,8 +381,8 @@ router.post('/withdraw/direct', authenticate, requireSuperAdminOrDelegatedDirect
 });
 
 router.get('/users', authenticate, requireSuperAdmin, superCtrl.getAllUsers);
-router.patch('/users/:id/ban', authenticate, requireSuperAdmin, superCtrl.banUser);
-router.patch('/users/:id/unban', authenticate, requireSuperAdmin, superCtrl.unbanUser);
+router.patch('/users/:id/ban', [param('id').isInt(), body('reason').isString().trim().isLength({ min: 1, max: 1000 })], validateRequest, authenticate, requireSuperAdmin, superCtrl.banUser);
+router.patch('/users/:id/unban', [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })], validateRequest, authenticate, requireSuperAdmin, superCtrl.unbanUser);
 router.delete('/users/:id', authenticate, requireSuperAdmin, superCtrl.deleteUser);
 router.patch('/users/:id/promote', authenticate, requireSuperAdmin, superCtrl.promoteToAdmin);
 

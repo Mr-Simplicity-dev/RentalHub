@@ -78,7 +78,7 @@ const fetchSocketUser = async (token) => {
   }
 
   const result = await db.query(
-    `SELECT id, full_name, email, user_type, deleted_at, is_active
+    `SELECT id, full_name, email, user_type, deleted_at, is_active, token_version
      FROM users
      WHERE id = $1
      LIMIT 1`,
@@ -86,6 +86,12 @@ const fetchSocketUser = async (token) => {
   );
 
   const user = result.rows[0];
+
+  const tokenVersion = decoded.tv || 1;
+  const dbVersion = user.token_version || 1;
+  if (tokenVersion < dbVersion) {
+    throw new Error('Session expired. Please log in again.');
+  }
 
   if (!user || user.deleted_at || user.is_active === false) {
     throw new Error('User is not active');

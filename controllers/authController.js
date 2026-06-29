@@ -6,6 +6,7 @@ const { validationResult } = require('express-validator');
 const db = require('../config/middleware/database');
 const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+const { recordFailedLogin, clearLoginAttempts } = require('../config/middleware/loginRateLimiter');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
 const { getLocationPricingQuote } = require('../config/utils/locationPricing');
 const {
@@ -492,7 +493,7 @@ const normalizeOptionalAgentInvite = async ({
 
 const generateToken = (userId, userType, options = {}) => {
   return jwt.sign(
-    { userId, userType },
+    { userId, userType, tv: options.tokenVersion || 1 },
     process.env.JWT_SECRET,
     { expiresIn: options.expiresIn || '7d' }
   );
@@ -1841,7 +1842,8 @@ exports.login = async (req, res) => {
               u.deleted_at,
               u.is_active, u.account_suspended_reason,
               COALESCE(u.approval_status, 'approved') AS approval_status,
-              COALESCE(u.is_recruitment_admin, FALSE) AS is_recruitment_admin
+              COALESCE(u.is_recruitment_admin, FALSE) AS is_recruitment_admin,
+              u.token_version
        FROM users u
        LEFT JOIN states s ON s.id = u.preferred_state_id
        WHERE u.email = $1`,
@@ -1860,11 +1862,14 @@ exports.login = async (req, res) => {
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
+      recordFailedLogin(email);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
+
+    clearLoginAttempts(email);
 
     if (user.deleted_at) {
       return res.status(403).json({
@@ -1890,8 +1895,8 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Generate token
-    const token = generateToken(user.id, user.user_type);
+    // Generate token with current token_version
+    const token = generateToken(user.id, user.user_type, { tokenVersion: user.token_version || 1 });
 
     // Remove password from response
     delete user.password_hash;
@@ -2609,22 +2614,25 @@ exports.acceptAgentInvite = async (req, res) => {
       [invite.id, agentUserId]
     );
 
-    const authToken = generateToken(agentUserId, 'agent');
     const userResult = await db.query(
       `SELECT id, user_type, email, phone, full_name, email_verified, phone_verified,
-              identity_verified, identity_verification_status, passport_photo_url, created_at
+              identity_verified, identity_verification_status, passport_photo_url, created_at,
+              token_version
        FROM users
        WHERE id = $1
        LIMIT 1`,
       [agentUserId]
     );
 
+    const agentUser = userResult.rows[0];
+    const authToken = generateToken(agentUserId, 'agent', { tokenVersion: agentUser.token_version || 1 });
+
     return res.json({
       success: true,
       message: 'Agent account activated successfully',
       data: {
         token: authToken,
-        user: userResult.rows[0],
+        user: agentUser,
       },
     });
   } catch (error) {
@@ -2690,13 +2698,14 @@ exports.verifyLawyerOtp = async (req, res) => {
     // Fetch lawyer user and return auth token
     const userResult = await db.query(
       `SELECT id, email, full_name, user_type, email_verified, phone_verified,
-              created_at, chamber_name, chamber_phone
+              created_at, chamber_name, chamber_phone,
+              token_version
        FROM users WHERE id = $1`,
       [storedOTP.lawyerUserId]
     );
 
     const user = userResult.rows[0];
-    const authToken = generateToken(user.id, user.user_type);
+    const authToken = generateToken(user.id, user.user_type, { tokenVersion: user.token_version || 1 });
 
     return res.json({
       success: true,
@@ -3145,12 +3154,10 @@ exports.verifyEmail = async (req, res) => {
 
     // Update user email verification status and return user
     const result = await db.query(
-      `
-      UPDATE users
-      SET email_verified = TRUE, updated_at = NOW()
-      WHERE id = $1
-      RETURNING id, email, user_type, email_verified
-      `,
+      `UPDATE users
+       SET email_verified = TRUE, updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, email, user_type, email_verified, token_version`,
       [decoded.userId]
     );
 
@@ -3163,9 +3170,9 @@ exports.verifyEmail = async (req, res) => {
 
     const user = result.rows[0];
 
-    // 🔐 Auto-login token
+    // 🔐 Auto-login token with current token_version
     const authToken = jwt.sign(
-      { id: user.id, user_type: user.user_type },
+      { id: user.id, user_type: user.user_type, tv: user.token_version || 1 },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -3452,9 +3459,31 @@ exports.refreshToken = async (req, res) => {
 
     // Verify the session token (should still be valid since it's 7d)
     const decoded = jwt.verify(sessionToken, process.env.JWT_SECRET, { algorithms: ['HS256'] });
-    
-    // Mint a new session token (rotate) and let attachAuthSession derive the access token
-    const newSessionToken = generateToken(decoded.userId, decoded.userType);
+
+    // Fetch current token_version from DB
+    const userResult = await db.query(
+      `SELECT token_version FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [decoded.userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found or deactivated',
+      });
+    }
+
+    const tokenVersion = userResult.rows[0].token_version || 1;
+    // Verify the token version in the old token is still valid
+    const oldTv = decoded.tv || 1;
+    if (oldTv < tokenVersion) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired. Please log in again.',
+      });
+    }
+
+    // Mint a new session token with current token_version
+    const newSessionToken = generateToken(decoded.userId, decoded.userType, { tokenVersion });
 
     res.json({
       success: true,
@@ -3472,6 +3501,13 @@ exports.refreshToken = async (req, res) => {
 // ================= LOGOUT =================
 exports.logout = async (req, res) => {
   try {
+    // Invalidate all existing tokens by incrementing token_version
+    if (req.user && req.user.id) {
+      await db.query(
+        `UPDATE users SET token_version = token_version + 1 WHERE id = $1`,
+        [req.user.id]
+      );
+    }
     clearAuthCookies(res);
     res.json({
       success: true,
@@ -3587,9 +3623,9 @@ exports.resetPassword = async (req, res) => {
     // Hash the new password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Update password
+    // Update password and invalidate all existing tokens
     await db.query(
-      `UPDATE users SET password_hash = $1 WHERE id = $2`,
+      `UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2`,
       [passwordHash, decoded.userId]
     );
 
