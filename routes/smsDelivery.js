@@ -1,5 +1,7 @@
 const express = require('express');
+const { param } = require('express-validator');
 const { processSmsDeliveryStatus } = require('../config/utils/smsService');
+const validateRequest = require('../config/middleware/validateRequest');
 
 const router = express.Router();
 
@@ -9,7 +11,7 @@ function isWebhookAuthorized(req) {
   const webhookSecret = clean(process.env.SMS_WEBHOOK_SECRET);
 
   if (!webhookSecret) {
-    return true;
+    return false;
   }
 
   return [
@@ -45,7 +47,7 @@ async function handleStatusCallback(req, res) {
   }
 }
 
-router.post('/status/:provider', handleStatusCallback);
-router.get('/status/:provider', handleStatusCallback);
+router.post('/status/:provider', [param('provider').isString().trim().isLength({ min: 1 })], validateRequest, handleStatusCallback);
+router.get('/status/:provider', [param('provider').isString().trim().isLength({ min: 1 })], validateRequest, handleStatusCallback);
 
 module.exports = router;

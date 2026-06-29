@@ -1,4 +1,5 @@
 const express = require('express');
+const { body, param } = require('express-validator');
 const AgentCommissionController = require('../controllers/agentCommissionController');
 const { authenticate } = require('../config/middleware/auth');
 const validateRequest = require('../config/middleware/validateRequest');
@@ -19,13 +20,13 @@ router.get('/agents/:agentId/earnings', AgentCommissionController.getEarnings);
 router.get('/agents/:agentId/history', AgentCommissionController.getHistory);
 
 // Record a commission
-router.post('/agents/:agentId/commissions', AgentCommissionController.recordCommission);
+router.post('/agents/:agentId/commissions', [param('agentId').isInt(), body('amount').isFloat({ min: 0 }), body('description').optional().isString().trim().isLength({ max: 2000 })], validateRequest, AgentCommissionController.recordCommission);
 
 // Verify a commission (admin only)
-router.put('/commissions/:commissionId/verify', AgentCommissionController.verifyCommission);
+router.put('/commissions/:commissionId/verify', [param('commissionId').isInt()], validateRequest, AgentCommissionController.verifyCommission);
 
 // Reverse/Adjust a commission (admin only)
-router.post('/commissions/:commissionId/reverse', AgentCommissionController.reverseCommission);
+router.post('/commissions/:commissionId/reverse', [param('commissionId').isInt(), body('reason').optional().isString().trim().isLength({ max: 2000 })], validateRequest, AgentCommissionController.reverseCommission);
 
 // Set commission rates
 router.post(
@@ -44,6 +45,6 @@ router.get(
 );
 
 // Process payout (admin only)
-router.post('/payouts', AgentCommissionController.processPayout);
+router.post('/payouts', [body('agentIds').isArray({ min: 1 }), body('agentIds.*').isInt(), body('payoutDate').optional().isString().trim()], validateRequest, AgentCommissionController.processPayout);
 
 module.exports = router;

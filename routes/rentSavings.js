@@ -1,7 +1,9 @@
 const express = require('express');
+const { body, param } = require('express-validator');
 const router = express.Router();
 const { authenticate, isTenant, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const rentSavingsController = require('../controllers/rentSavingsController');
+const validateRequest = require('../config/middleware/validateRequest');
 
 // ============================================================
 // RENT SAVINGS ROUTES
@@ -31,6 +33,8 @@ router.get(
 router.patch(
   '/admin/plans/:id/cancel',
   authenticate, requireAdminOrSuperAdmin,
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 2000 })],
+  validateRequest,
   rentSavingsController.adminCancelPlan
 );
 
@@ -55,17 +59,21 @@ router.get(
   rentSavingsController.adminGetEarlyWithdrawalRequests
 );
 
-// Approve a pending early withdrawal — PATCH because it mutates the request status
+// Approve a pending early withdrawal
 router.patch(
   '/admin/early-withdrawal-requests/:id/approve',
   authenticate, requireAdminOrSuperAdmin,
+  [param('id').isInt(), body('note').optional().isString().trim().isLength({ max: 1000 })],
+  validateRequest,
   rentSavingsController.adminApproveEarlyWithdrawal
 );
 
-// Reject a pending early withdrawal — PATCH for same reason
+// Reject a pending early withdrawal
 router.patch(
   '/admin/early-withdrawal-requests/:id/reject',
   authenticate, requireAdminOrSuperAdmin,
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })],
+  validateRequest,
   rentSavingsController.adminRejectEarlyWithdrawal
 );
 
@@ -80,6 +88,8 @@ router.get(
 router.post(
   '/admin/setup-fees',
   authenticate, requireAdminOrSuperAdmin,
+  [body('state_id').isInt(), body('lga_id').isInt(), body('amount').isFloat({ min: 0 })],
+  validateRequest,
   rentSavingsController.adminCreateSetupFee
 );
 
@@ -87,6 +97,8 @@ router.post(
 router.delete(
   '/admin/setup-fees/:id',
   authenticate, requireAdminOrSuperAdmin,
+  [param('id').isInt()],
+  validateRequest,
   rentSavingsController.adminDeleteSetupFee
 );
 
@@ -126,6 +138,8 @@ router.get(
 router.post(
   '/plans',
   authenticate, isTenant,
+  [body('property_id').isInt(), body('target_amount').isFloat({ min: 0 }), body('duration_months').optional().isInt({ min: 1 })],
+  validateRequest,
   rentSavingsController.createPlan
 );
 
@@ -140,6 +154,8 @@ router.get(
 router.patch(
   '/plans/:id/toggle',
   authenticate, isTenant,
+  [param('id').isInt()],
+  validateRequest,
   rentSavingsController.togglePlan
 );
 
@@ -156,6 +172,8 @@ router.get(
 router.post(
   '/plans/:id/contributions',
   authenticate, isTenant,
+  [param('id').isInt(), body('amount').optional().isFloat({ min: 0 })],
+  validateRequest,
   rentSavingsController.makeContribution
 );
 
@@ -172,6 +190,8 @@ router.get(
 router.post(
   '/plans/:id/withdraw-maturity',
   authenticate, isTenant,
+  [param('id').isInt()],
+  validateRequest,
   rentSavingsController.withdrawAtMaturity
 );
 
@@ -179,6 +199,8 @@ router.post(
 router.post(
   '/plans/:id/withdraw-early',
   authenticate, isTenant,
+  [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 2000 })],
+  validateRequest,
   rentSavingsController.requestEarlyWithdrawal
 );
 
