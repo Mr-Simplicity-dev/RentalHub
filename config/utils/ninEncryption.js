@@ -9,11 +9,8 @@ const ALGORITHM = 'aes-256-gcm';
 const getEncryptionKey = () => {
   const key = process.env.NIN_ENCRYPTION_KEY;
   if (!key || key.length < 64) {
-    throw new Error(
-      'NIN_ENCRYPTION_KEY must be set to at least 64 hex characters (32+ bytes)'
-    );
+    return null;
   }
-  // Use first 32 bytes (64 hex chars) of the key
   return Buffer.from(key.slice(0, 64), 'hex');
 };
 
@@ -25,6 +22,8 @@ const encryptNIN = (nin) => {
   if (!nin || typeof nin !== 'string') return null;
 
   const key = getEncryptionKey();
+  if (!key) return null;
+
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
@@ -49,6 +48,7 @@ const decryptNIN = (encrypted) => {
 
   try {
     const key = getEncryptionKey();
+    if (!key) return encrypted;
     const decipher = crypto.createDecipheriv(
       ALGORITHM,
       key,
