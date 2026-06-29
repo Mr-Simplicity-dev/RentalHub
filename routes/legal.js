@@ -1,4 +1,5 @@
 const express = require('express');
+const { body, param } = require('express-validator');
 const router = express.Router();
 
 const disputeController = require('../controllers/disputeController');
@@ -40,6 +41,8 @@ router.post(
   '/platform-lawyer-program/apply',
   authenticate,
   allowRoles(...LAWYER_ROLES),
+  [body('experience').optional().isString().trim().isLength({ max: 5000 }), body('reason').optional().isString().trim().isLength({ max: 5000 })],
+  validateRequest,
   legalController.applyToPlatformLawyerProgram
 );
 
@@ -80,6 +83,8 @@ router.patch(
   authenticate,
   allowRoles(...LAWYER_ROLES),
   audit('resolve_dispute', 'dispute'),
+  [param('disputeId').isInt(), body('resolution').optional().isString().trim().isLength({ max: 5000 })],
+  validateRequest,
   legalController.resolveDispute
 );
 
@@ -113,6 +118,8 @@ router.patch(
   authenticate,
   allowRoles(...LAWYER_ROLES),
   audit('verify_evidence', 'evidence'),
+  [param('disputeId').isInt(), param('evidenceId').isInt(), body('status').optional().isString().trim().isLength({ max: 50 })],
+  validateRequest,
   legalController.verifyEvidence
 );
 
@@ -133,6 +140,8 @@ router.post(
   authenticate,
   allowRoles(...LAWYER_ROLES),
   audit('create_case_note', 'dispute'),
+  [param('disputeId').isInt(), body('content').isString().trim().isLength({ min: 1, max: 10000 })],
+  validateRequest,
   legalController.createCaseNote
 );
 
@@ -149,6 +158,8 @@ router.patch(
   authenticate,
   allowRoles(...LAWYER_ROLES),
   audit('update_case_note', 'dispute'),
+  [param('disputeId').isInt(), param('noteId').isInt(), body('content').optional().isString().trim().isLength({ max: 10000 })],
+  validateRequest,
   legalController.updateCaseNote
 );
 
@@ -157,6 +168,8 @@ router.delete(
   authenticate,
   allowRoles(...LAWYER_ROLES),
   audit('delete_case_note', 'dispute'),
+  [param('disputeId').isInt(), param('noteId').isInt()],
+  validateRequest,
   legalController.deleteCaseNote
 );
 
@@ -165,6 +178,8 @@ router.patch(
   authenticate,
   allowRoles(...LAWYER_ROLES),
   audit('update_dispute_summary', 'dispute'),
+  [param('disputeId').isInt(), body('summary').optional().isString().trim().isLength({ max: 10000 })],
+  validateRequest,
   legalController.updateDisputeSummary
 );
 
@@ -187,6 +202,8 @@ router.get(
 router.post(
   '/request-help',
   authenticate,
+  [body('message').isString().trim().isLength({ min: 1, max: 5000 }), body('subject').optional().isString().trim().isLength({ max: 500 })],
+  validateRequest,
   legalController.submitSupportRequest
 );
 

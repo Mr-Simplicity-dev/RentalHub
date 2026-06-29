@@ -1,11 +1,16 @@
 const express = require('express');
+const { param } = require('express-validator');
 const db = require('../config/middleware/database');
 const nigeriaLocations = require('../data/nigeriaLocations');
 const { getSitemapUrls } = require('../config/utils/seoPageService');
 const { generateSitemap } = require('../config/utils/sitemapGenerator');
 const { pingGoogle } = require('../config/utils/pingGoogle');
+const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
+const validateRequest = require('../config/middleware/validateRequest');
 
 const router = express.Router();
+
+router.use(authenticate, requireAdminOrSuperAdmin);
 
 router.get('/admin/seo', async (req, res) => {
   try {
@@ -86,7 +91,7 @@ router.get('/admin/seo', async (req, res) => {
   }
 });
 
-router.post('/admin/seo/regenerate-sitemap', async (req, res) => {
+router.post('/admin/seo/regenerate-sitemap', validateRequest, async (req, res) => {
   try {
     const sitemapUrls = await getSitemapUrls();
     const urlCount = sitemapUrls.length;
@@ -107,7 +112,7 @@ router.get('/admin/seo/sitemap-xml', async (req, res) => {
   }
 });
 
-router.post('/admin/seo/ping-google', async (req, res) => {
+router.post('/admin/seo/ping-google', validateRequest, async (req, res) => {
   try {
     const result = await pingGoogle();
     res.json({ success: true, data: result });

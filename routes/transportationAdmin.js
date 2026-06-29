@@ -1,7 +1,9 @@
 const express = require('express');
+const { body, param } = require('express-validator');
 const router = express.Router();
 const { authenticate } = require('../config/middleware/auth');
 const db = require('../config/middleware/database');
+const validateRequest = require('../config/middleware/validateRequest');
 
 const TRANSPORTATION_ADMIN_ROLES = new Set([
   'admin',
@@ -509,7 +511,7 @@ router.get('/bookings/:bookingId/operations', async (req, res) => {
 /**
  * Update transportation dispatch lifecycle
  */
-router.patch('/bookings/:bookingId/dispatch', async (req, res) => {
+router.patch('/bookings/:bookingId/dispatch', [param('bookingId').isInt(), body('action').isString().trim().isIn(['assign_driver', 'pickup_confirmed', 'dropoff_confirmed', 'cancelled']), body('driver_name').optional().isString().trim().isLength({ max: 255 }), body('driver_phone').optional().isString().trim().isLength({ max: 20 }), body('vehicle_number').optional().isString().trim().isLength({ max: 50 }), body('note').optional().isString().trim().isLength({ max: 2000 }), body('proof_url').optional().isString().trim().isLength({ max: 2000 })], validateRequest, async (req, res) => {
   try {
     await ensureTransportationOperationsSchema();
     const { bookingId } = req.params;
@@ -682,7 +684,7 @@ router.patch('/bookings/:bookingId/dispatch', async (req, res) => {
 /**
  * Update transportation booking status (admin override)
  */
-router.patch('/bookings/:bookingId/status', async (req, res) => {
+router.patch('/bookings/:bookingId/status', [param('bookingId').isInt(), body('booking_status').isString().trim().isIn(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled']), body('admin_notes').optional().isString().trim().isLength({ max: 2000 })], validateRequest, async (req, res) => {
   try {
     await ensureTransportationOperationsSchema();
     const { bookingId } = req.params;
@@ -803,7 +805,7 @@ router.patch('/bookings/:bookingId/status', async (req, res) => {
 /**
  * Update transportation booking payment status (admin override)
  */
-router.patch('/bookings/:bookingId/payment-status', async (req, res) => {
+router.patch('/bookings/:bookingId/payment-status', [param('bookingId').isInt(), body('payment_status').isString().trim().isIn(['pending', 'completed', 'failed', 'refunded']), body('payment_id').optional().isString().trim().isLength({ max: 255 }), body('admin_notes').optional().isString().trim().isLength({ max: 2000 })], validateRequest, async (req, res) => {
   try {
     const { bookingId } = req.params;
     const { payment_status, payment_id, admin_notes } = req.body;
@@ -969,7 +971,7 @@ router.get('/services', async (req, res) => {
 /**
  * Create new transportation service
  */
-router.post('/services', async (req, res) => {
+router.post('/services', [body('service_name').isString().trim().isLength({ min: 1 }), body('service_type').isString().trim().isLength({ min: 1 }), body('provider_name').isString().trim().isLength({ min: 1 }), body('base_price').isFloat({ min: 0 }), body('price_per_km').isFloat({ min: 0 }), body('provider_phone').optional().isString().trim().isLength({ max: 20 }), body('capacity_kg').optional().isFloat({ min: 0 }), body('description').optional().isString().trim().isLength({ max: 5000 }), body('is_active').optional().isBoolean()], validateRequest, async (req, res) => {
   try {
     const {
       service_name,
@@ -1045,7 +1047,7 @@ router.post('/services', async (req, res) => {
 /**
  * Update transportation service
  */
-router.patch('/services/:serviceId', async (req, res) => {
+router.patch('/services/:serviceId', [param('serviceId').isInt(), body('service_name').optional().isString().trim().isLength({ min: 1 }), body('service_type').optional().isString().trim().isLength({ min: 1 }), body('provider_name').optional().isString().trim().isLength({ min: 1 }), body('base_price').optional().isFloat({ min: 0 }), body('price_per_km').optional().isFloat({ min: 0 }), body('provider_phone').optional().isString().trim().isLength({ max: 20 }), body('capacity_kg').optional().isFloat({ min: 0 }), body('description').optional().isString().trim().isLength({ max: 5000 }), body('is_active').optional().isBoolean()], validateRequest, async (req, res) => {
   try {
     const { serviceId } = req.params;
     const updates = req.body;
@@ -1146,7 +1148,7 @@ router.patch('/services/:serviceId', async (req, res) => {
 /**
  * Delete transportation service (soft delete)
  */
-router.delete('/services/:serviceId', async (req, res) => {
+router.delete('/services/:serviceId', [param('serviceId').isInt()], validateRequest, async (req, res) => {
   try {
     const { serviceId } = req.params;
     const adminId = req.user.id;
