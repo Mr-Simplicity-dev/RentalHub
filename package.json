@@ -13,8 +13,8 @@
     "migrate:dry-run": "node scripts/runMigrations.js --dry-run",
     "migrate:down": "node scripts/runMigrations.js --down",
     "migrate:reset": "node scripts/runMigrations.js --reset",
-"audit": "npm audit",
-"security:check": "npm audit && node -e \"try { require('helmet'); require('hpp'); require('express-rate-limit'); console.log('All security dependencies present'); } catch(e) { console.error('MISSING:', e.message); process.exit(1); }\""
+    "audit": "npm audit",
+    "security:check": "npm audit && node -e \"try { require('helmet'); require('hpp'); require('express-rate-limit'); console.log('All security dependencies present'); } catch(e) { console.error('MISSING:', e.message); process.exit(1); }\""
   },
   "dependencies": {
     "archiver": "^8.0.0",
