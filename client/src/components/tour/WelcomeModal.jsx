@@ -20,9 +20,9 @@ const WelcomeModal = ({ isOpen, onStartTour, onSkip, isReturningUser = false }) 
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md bg-white rounded-2xl shadow-2xl z-50 flex flex-col overflow-y-auto"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div className="relative p-5 sm:p-8">
+            <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl max-h-[85vh] overflow-y-auto p-5 sm:p-8">
               <button
                 onClick={onSkip}
                 className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
