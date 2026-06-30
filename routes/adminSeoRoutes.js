@@ -10,9 +10,7 @@ const validateRequest = require('../config/middleware/validateRequest');
 
 const router = express.Router();
 
-router.use(authenticate, requireAdminOrSuperAdmin);
-
-router.get('/admin/seo', async (req, res) => {
+router.get('/admin/seo', authenticate, requireAdminOrSuperAdmin, async (req, res) => {
   try {
     const [propertyResult, stateResult, stateBreakdown, sitemapUrls] = await Promise.all([
       db.query(
@@ -91,7 +89,7 @@ router.get('/admin/seo', async (req, res) => {
   }
 });
 
-router.post('/admin/seo/regenerate-sitemap', validateRequest, async (req, res) => {
+router.post('/admin/seo/regenerate-sitemap', authenticate, requireAdminOrSuperAdmin, validateRequest, async (req, res) => {
   try {
     const sitemapUrls = await getSitemapUrls();
     const urlCount = sitemapUrls.length;
@@ -102,7 +100,7 @@ router.post('/admin/seo/regenerate-sitemap', validateRequest, async (req, res) =
   }
 });
 
-router.get('/admin/seo/sitemap-xml', async (req, res) => {
+router.get('/admin/seo/sitemap-xml', authenticate, requireAdminOrSuperAdmin, async (req, res) => {
   try {
     const xml = await generateSitemap();
     res.json({ success: true, data: { xml, generatedAt: new Date().toISOString() } });
@@ -112,7 +110,7 @@ router.get('/admin/seo/sitemap-xml', async (req, res) => {
   }
 });
 
-router.post('/admin/seo/ping-google', validateRequest, async (req, res) => {
+router.post('/admin/seo/ping-google', authenticate, requireAdminOrSuperAdmin, validateRequest, async (req, res) => {
   try {
     const result = await pingGoogle();
     res.json({ success: true, data: result });
