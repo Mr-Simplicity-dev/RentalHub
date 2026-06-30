@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const authController = require('../controllers/authController');
-const { uploadPassport } = require('../config/middleware/upload');
+const { uploadPassportLocal } = require('../config/middleware/upload');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const { checkLoginRateLimit } = require('../config/middleware/loginRateLimiter');
 const { authSensitiveLimiter } = require('../config/middleware/securityRateLimiters');
@@ -236,14 +236,14 @@ router.post('/verify-phone', authenticate, authController.verifyPhone);
 router.post(
   '/upload-passport',
   authenticate,
-  uploadPassport,
+  uploadPassportLocal,
   authController.uploadPassport
 );
 
 router.post(
   '/check-lawyer-passport-fraud',
   authenticate,
-  uploadPassport,
+  uploadPassportLocal,
   authController.checkLawyerPassportForFraud
 );
 

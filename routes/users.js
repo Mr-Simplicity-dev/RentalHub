@@ -3,12 +3,12 @@ const router = express.Router();
 const db = require('../config/middleware/database');
 const { authenticate } = require('../config/middleware/auth');
 const bcrypt = require('bcryptjs');
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { body, query } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
+const { uploadPassportLocal } = require('../config/middleware/upload');
 const { sensitiveActionLimiter } = require('../config/middleware/securityRateLimiters');
 const { decryptNIN } = require('../config/utils/ninEncryption');
 
@@ -17,37 +17,6 @@ const uploadDir = path.join(__dirname, '..', 'uploads', 'passports');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
-
-// Only allow safe image extensions
-const ALLOWED_PASSPORT_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_PASSPORT_EXTENSIONS.has(ext)) {
-      return cb(new Error(`Invalid file extension "${ext}". Allowed: ${Array.from(ALLOWED_PASSPORT_EXTENSIONS).join(', ')}`));
-    }
-    cb(null, `passport_${req.user.id}_${Date.now()}${ext}`);
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) {
-      return cb(new Error('Only image files are allowed'));
-    }
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_PASSPORT_EXTENSIONS.has(ext)) {
-      return cb(new Error('Invalid image file type'));
-    }
-    cb(null, true);
-  }
-});
 
 const LIVE_CAPTURE_SESSION_TTL_MS = 10 * 60 * 1000;
 const REQUIRE_LIVE_CAPTURE_SESSION = process.env.REQUIRE_LIVE_CAPTURE_SESSION === 'true';
@@ -1040,7 +1009,7 @@ router.post('/verify-password', authenticate, sensitiveActionLimiter, async (req
 });
 
 // Upload passport photo
-router.post('/upload-passport', authenticate, upload.single('passport'), async (req, res) => {
+router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, res) => {
   try {
     await ensureIdentitySchema();
 
@@ -1076,25 +1045,44 @@ router.post('/upload-passport', authenticate, upload.single('passport'), async (
 
     const relativePath = `/uploads/passports/${req.file.filename}`;
 
+    // Check if identity is already verified via Prembly
+    const currentUser = await db.query(
+      `SELECT nin_verified, identity_document_type
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    const hasVerifiedIdentity = currentUser.rows.length > 0 &&
+      currentUser.rows[0].nin_verified === true;
+
+    const hasIdentityNumber = currentUser.rows.length > 0 &&
+      (
+        currentUser.rows[0].identity_document_type === 'passport'
+          ? true
+          : true
+      );
+
+    const autoVerified = hasVerifiedIdentity && hasIdentityNumber;
+
     await db.query(
       `UPDATE users
        SET passport_photo_url = $1,
-           identity_verified = FALSE,
+           identity_verified = $2,
            identity_verified_by = NULL,
-           identity_verified_at = NULL,
+           identity_verified_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
            identity_verification_status = CASE
-             WHEN (
-               CASE
-                 WHEN COALESCE(identity_document_type, 'nin') = 'passport'
-                 THEN international_passport_number IS NOT NULL
-                 ELSE nin IS NOT NULL
-               END
-             ) THEN 'pending'
+             WHEN $2 THEN 'verified'
+             WHEN $3 THEN 'pending'
              ELSE NULL
            END,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [relativePath, userId]
+       WHERE id = $4`,
+      [
+        relativePath,
+        autoVerified,              // $2: identity_verified (auto by system)
+        hasIdentityNumber,         // $3: set pending if identity number exists
+        userId                     // $4: WHERE clause
+      ]
     );
 
     const userResult = await db.query(

@@ -5,15 +5,15 @@ const axios = require('axios');
  * Unified NIN and Passport verification with advanced KYC/AML features
  * 
  * Environment Variables Required:
- * - PREMBLY_API_KEY: Your Prembly API key
- * - PREMBLY_APP_ID: Your Prembly App ID
+ * - PREMBLY_SECRET_KEY: Your Prembly secret key (used as Bearer token)
+ * - PREMBLY_PUBLIC_KEY: Your Prembly public key (used as x-app-id)
  * - PREMBLY_API_URL: (optional) Base URL for Prembly API (default: https://api.prembly.com)
  * - PREMBLY_API_TIMEOUT_MS: (optional) Request timeout in milliseconds (default: 15000)
  */
 
 const PREMBLY_BASE_URL = process.env.PREMBLY_API_URL || 'https://api.prembly.com';
-const PREMBLY_API_KEY = process.env.PREMBLY_API_KEY;
-const PREMBLY_APP_ID = process.env.PREMBLY_APP_ID;
+const PREMBLY_SECRET_KEY = process.env.PREMBLY_SECRET_KEY || process.env.PREMBLY_API_KEY;
+const PREMBLY_PUBLIC_KEY = process.env.PREMBLY_PUBLIC_KEY || process.env.PREMBLY_APP_ID;
 const PREMBLY_TIMEOUT_MS = Number(process.env.PREMBLY_API_TIMEOUT_MS || 15000);
 
 /**
@@ -77,11 +77,11 @@ exports.validateInternationalPassport = (passportNumber) => {
  * @returns {Promise<Object>} Verification result with verified status
  */
 exports.verifyNINWithPrembly = async (nin, firstName, lastName, dateOfBirth) => {
-  if (!PREMBLY_API_KEY || !PREMBLY_APP_ID) {
+  if (!PREMBLY_SECRET_KEY || !PREMBLY_PUBLIC_KEY) {
     return {
       verified: false,
       status: 'not_configured',
-      message: 'Prembly integration is not configured. Set PREMBLY_API_KEY and PREMBLY_APP_ID'
+      message: 'Prembly integration is not configured. Set PREMBLY_SECRET_KEY and PREMBLY_PUBLIC_KEY'
     };
   }
 
@@ -98,8 +98,8 @@ exports.verifyNINWithPrembly = async (nin, firstName, lastName, dateOfBirth) => 
       {
         timeout: PREMBLY_TIMEOUT_MS,
         headers: {
-          'Authorization': `Bearer ${PREMBLY_API_KEY}`,
-          'x-app-id': PREMBLY_APP_ID,
+          'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
+          'x-app-id': PREMBLY_PUBLIC_KEY,
           'Content-Type': 'application/json'
         }
       }
@@ -164,11 +164,11 @@ exports.verifyInternationalPassportWithPrembly = async (
   nationality,
   dateOfBirth
 ) => {
-  if (!PREMBLY_API_KEY || !PREMBLY_APP_ID) {
+  if (!PREMBLY_SECRET_KEY || !PREMBLY_PUBLIC_KEY) {
     return {
       verified: false,
       status: 'not_configured',
-      message: 'Prembly integration is not configured. Set PREMBLY_API_KEY and PREMBLY_APP_ID'
+      message: 'Prembly integration is not configured. Set PREMBLY_SECRET_KEY and PREMBLY_PUBLIC_KEY'
     };
   }
 
@@ -185,8 +185,8 @@ exports.verifyInternationalPassportWithPrembly = async (
       {
         timeout: PREMBLY_TIMEOUT_MS,
         headers: {
-          'Authorization': `Bearer ${PREMBLY_API_KEY}`,
-          'x-app-id': PREMBLY_APP_ID,
+          'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
+          'x-app-id': PREMBLY_PUBLIC_KEY,
           'Content-Type': 'application/json'
         }
       }
@@ -255,7 +255,7 @@ exports.performKYCCheckWithPrembly = async (
   idNumber,
   idType = 'nin'
 ) => {
-  if (!PREMBLY_API_KEY || !PREMBLY_APP_ID) {
+  if (!PREMBLY_SECRET_KEY || !PREMBLY_PUBLIC_KEY) {
     return {
       status: 'not_configured',
       message: 'Prembly integration is not configured',
@@ -284,8 +284,8 @@ exports.performKYCCheckWithPrembly = async (
     const response = await axios.post(endpoint, payload, {
       timeout: PREMBLY_TIMEOUT_MS,
       headers: {
-        'Authorization': `Bearer ${PREMBLY_API_KEY}`,
-        'x-app-id': PREMBLY_APP_ID,
+        'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
+        'x-app-id': PREMBLY_PUBLIC_KEY,
         'Content-Type': 'application/json'
       }
     });
@@ -330,7 +330,7 @@ exports.performKYCCheckWithPrembly = async (
  * @returns {Promise<Object>} Liveness check result
  */
 exports.performLivenessCheckWithPrembly = async (imageBuffer, fullName) => {
-  if (!PREMBLY_API_KEY || !PREMBLY_APP_ID) {
+  if (!PREMBLY_SECRET_KEY || !PREMBLY_PUBLIC_KEY) {
     return {
       status: 'not_configured',
       message: 'Prembly integration is not configured',
@@ -349,8 +349,8 @@ exports.performLivenessCheckWithPrembly = async (imageBuffer, fullName) => {
       {
         timeout: PREMBLY_TIMEOUT_MS,
         headers: {
-          'Authorization': `Bearer ${PREMBLY_API_KEY}`,
-          'x-app-id': PREMBLY_APP_ID,
+          'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
+          'x-app-id': PREMBLY_PUBLIC_KEY,
           ...formData.getHeaders()
         }
       }
@@ -392,7 +392,7 @@ exports.performLivenessCheckWithPrembly = async (imageBuffer, fullName) => {
  * @returns {Promise<Object>} Current verification status
  */
 exports.getVerificationStatusWithPrembly = async (referenceId) => {
-  if (!PREMBLY_API_KEY || !PREMBLY_APP_ID) {
+  if (!PREMBLY_SECRET_KEY || !PREMBLY_PUBLIC_KEY) {
     return {
       status: 'not_configured',
       message: 'Prembly integration is not configured'
@@ -405,8 +405,8 @@ exports.getVerificationStatusWithPrembly = async (referenceId) => {
       {
         timeout: PREMBLY_TIMEOUT_MS,
         headers: {
-          'Authorization': `Bearer ${PREMBLY_API_KEY}`,
-          'x-app-id': PREMBLY_APP_ID
+          'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
+          'x-app-id': PREMBLY_PUBLIC_KEY
         }
       }
     );

@@ -1,4 +1,6 @@
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
 
 // Handle both old and new versions of multer-storage-cloudinary
@@ -124,8 +126,46 @@ const uploadPropertyPhotos = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 }).array('photos', 20);
 
+// ---------------- LOCAL PASSPORT STORAGE (primary) ----------------
+
+const passportUploadDir = path.join(__dirname, '..', '..', 'uploads', 'passports');
+if (!fs.existsSync(passportUploadDir)) {
+  fs.mkdirSync(passportUploadDir, { recursive: true });
+}
+
+const ALLOWED_PASSPORT_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+
+const passportDiskStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, passportUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_PASSPORT_EXTENSIONS.has(ext)) {
+      return cb(new Error(`Invalid file extension "${ext}". Allowed: ${Array.from(ALLOWED_PASSPORT_EXTENSIONS).join(', ')}`));
+    }
+    cb(null, `passport_${req.user ? req.user.id : 'anon'}_${Date.now()}${ext}`);
+  }
+});
+
+const uploadPassportLocal = multer({
+  storage: passportDiskStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_PASSPORT_EXTENSIONS.has(ext)) {
+      return cb(new Error('Invalid image file type'));
+    }
+    cb(null, true);
+  }
+}).single('passport');
+
 module.exports = {
   uploadPassport: withCloudinaryConfig(uploadPassport),
+  uploadPassportLocal,
   uploadPropertyMedia: withCloudinaryConfig(uploadPropertyMedia),
   uploadPropertyPhotos: withCloudinaryConfig(uploadPropertyPhotos),
   cloudinary,
