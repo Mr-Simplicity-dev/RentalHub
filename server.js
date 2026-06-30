@@ -122,8 +122,7 @@ mongoose.set('strictQuery', true);
 
 if (process.env.MONGODB_URI) {
   mongoose.connect(process.env.MONGODB_URI).catch((err) => {
-    console.error('FATAL: MongoDB connection failed:', err.message);
-    process.exit(1);
+    console.error('MongoDB connection failed — MongoDB-dependent features (blogs, cron) disabled:', err.message);
   });
 } else {
   console.warn('WARNING: MONGODB_URI not set — MongoDB-dependent features (blogs, cron) will not work');
