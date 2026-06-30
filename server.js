@@ -32,8 +32,11 @@ if (process.env.NODE_ENV === 'production') {
   if (!process.env.SMS_WEBHOOK_SECRET) {
     console.warn('WARNING: SMS_WEBHOOK_SECRET not set — SMS delivery webhook is blocked');
   }
-  if (!process.env.PREMBLY_API_KEY || process.env.PREMBLY_API_KEY === 'your_key_here') {
-    console.warn('WARNING: PREMBLY_API_KEY is not configured — NIN verification will fail');
+  if ((!process.env.PREMBLY_SECRET_KEY && !process.env.PREMBLY_API_KEY) || process.env.PREMBLY_SECRET_KEY === 'your_secret_here') {
+    console.warn('WARNING: PREMBLY_SECRET_KEY is not configured — NIN verification will fail');
+  }
+  if ((!process.env.PREMBLY_PUBLIC_KEY && !process.env.PREMBLY_APP_ID) || process.env.PREMBLY_PUBLIC_KEY === 'your_public_here') {
+    console.warn('WARNING: PREMBLY_PUBLIC_KEY is not configured — NIN verification will fail');
   }
   if (!process.env.MONGODB_URI) {
     console.warn('WARNING: MONGODB_URI not set — blog generation and other cron jobs disabled');
