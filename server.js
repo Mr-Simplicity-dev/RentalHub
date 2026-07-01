@@ -352,7 +352,6 @@ const allowedOrigins = new Set(getAllowedFrontendOrigins());
 
 app.use('/', locationRoutes);
 app.use('/', blogRoutes);
-app.use('/', adminSeoRoutes);
 app.use('/.well-known', appLinksRoutes);
 
 app.set('trust proxy', Number(process.env.TRUST_PROXY_COUNT) || 2);
@@ -498,6 +497,17 @@ app.get('/sitemap.xml', async (req, res) => {
   }
 });
 
+const publicDownloadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 100 : 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many download requests. Please try again later.' },
+});
+
+// Mobile release downloads must stay public and available even when database-backed
+// feature flag checks are unavailable.
+app.use('/api/downloads', publicDownloadLimiter, downloadsRoutes);
 app.use('/api/sms', smsDeliveryRoutes);
 app.use('/api', enforceFlags);
 
@@ -564,6 +574,7 @@ app.use('/api/applications', generalOpsLimiter, applicationRoutes);
 app.use('/api/messages', generalOpsLimiter, messageRoutes);
 app.use('/api/users', generalOpsLimiter, userRoutes);
 app.use('/api/admin', adminLimiter, adminRoutes);
+app.use('/api/admin/seo', adminLimiter, adminSeoRoutes);
 app.use('/api/dashboard', generalOpsLimiter, dashboardRoutes);
 app.use('/api/notifications', generalOpsLimiter, notificationRoutes);
 app.use('/api/super', adminLimiter, superAdminRoutes);
@@ -598,8 +609,6 @@ app.use('/api/damage-reports', generalOpsLimiter, damageReportRoutes);
 app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
 app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
 app.use('/api', generalOpsLimiter, appealRoutes);
-
-app.use('/api/downloads', generalOpsLimiter, downloadsRoutes);
 
 if (hasClientBuild) {
   app.use(express.static(clientBuildPath));
