@@ -14,7 +14,6 @@ import {
   SectionTabs,
   StatusPill,
 } from '../../components/admin/TransportationAdminUi';
-import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
 
 const tabs = [
@@ -241,11 +240,6 @@ export default function TransportationSuperAdminDashboard() {
           </div>
         }
       />
-
-      {/* Commission Withdrawal Banner */}
-      <div className="mb-6">
-        <CommissionWithdrawalBanner />
-      </div>
 
       <SectionTabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 

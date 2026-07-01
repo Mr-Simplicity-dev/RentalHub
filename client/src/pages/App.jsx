@@ -100,10 +100,10 @@ const VerificationStatus = React.lazy(() => import('./VerificationStatus'));
 const TransportationAdminDashboard = React.lazy(() => import('./admin/TransportationAdminDashboard'));
 const TransportationAdminStateDashboard = React.lazy(() => import('./admin/TransportationAdminStateDashboard'));
 const TransportationSuperAdminDashboard = React.lazy(() => import('./admin/TransportationSuperAdminDashboard'));
+const FumigationOversightPanel = React.lazy(() => import('../components/admin/FumigationOversightPanel'));
 const LgaFumigationAdminDashboard = React.lazy(() => import('./admin/LgaFumigationAdminDashboard'));
 const LgaSupportAdminDashboard = React.lazy(() => import('./admin/LgaSupportAdminDashboard'));
 const StateFumigationAdminDashboard = React.lazy(() => import('./admin/StateFumigationAdminDashboard'));
-const SuperFumigationAdminDashboard = React.lazy(() => import('./admin/SuperFumigationAdminDashboard'));
 const FinancialAdminDashboard = React.lazy(() => import('./admin/FinancialAdminDashboard'));
 const SuperFinancialAdminDashboard = React.lazy(() => import('./admin/SuperFinancialAdminDashboard'));
 const StateAdminDashboard = React.lazy(() => import('./admin/StateAdminDashboard'));
@@ -731,28 +731,14 @@ function App() {
                 <Route index element={<SuperAdminDashboard />} />
                 <Route path="seo" element={<SeoDashboard />} />
                 <Route path="support-governance" element={<SupportGovernancePanel />} />
+                <Route path="transportation" element={<TransportationSuperAdminDashboard />} />
+                <Route path="fumigation-cleaning" element={<FumigationOversightPanel />} />
               </Route>
               <Route
                 path="/admin/seo"
                 element={
                   <SuperAdminRoute>
                     <Navigate to="/super-admin/seo" replace />
-                  </SuperAdminRoute>
-                }
-              />
-              <Route
-                path="/super-admin/transportation"
-                element={
-                  <SuperAdminRoute>
-                    <TransportationSuperAdminDashboard />
-                  </SuperAdminRoute>
-                }
-              />
-              <Route
-                path="/super-admin/fumigation-cleaning"
-                element={
-                  <SuperAdminRoute>
-                    <SuperFumigationAdminDashboard />
                   </SuperAdminRoute>
                 }
               />

@@ -4,6 +4,8 @@ import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import { playNotificationSound } from '../../utils/notificationSound';
 import RoleBadge from '../../components/common/RoleBadge';
+import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
+import BackToSuperAdminOverview from '../../components/admin/BackToSuperAdminOverview';
 
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
@@ -414,6 +416,8 @@ const AdminLayout = () => {
 
   const supportTab = new URLSearchParams(location.search).get('tab') || 'overview';
   const superAdminTab = new URLSearchParams(location.search).get('tab') || 'overview';
+  const isSuperAdminOverview =
+    location.pathname === '/super-admin' && superAdminTab === 'overview';
   const supportDashboardPath = isSuperSupportAdmin
     ? '/admin/super-support-dashboard'
     : isStateSupportAdmin
@@ -735,12 +739,12 @@ const AdminLayout = () => {
 
                 <NavLink to="/super-admin/transportation" className={() => superAdminNavItem('transportation')}>
                   <FaTruck className="mr-3" />
-                  Transportation
+                  Transportation Oversight
                 </NavLink>
 
                 <NavLink to="/super-admin/fumigation-cleaning" className={() => superAdminNavItem('fumigation-cleaning')}>
                   <FaSprayCan className="mr-3" />
-                  Fumigation
+                  Fumigation Oversight
                 </NavLink>
 
                 <NavLink to="/super-admin?tab=admin_monitor" className={() => superAdminNavItem('admin_monitor')}>
@@ -1515,6 +1519,16 @@ const AdminLayout = () => {
           </label>
         </div>
         <main ref={mainContentRef} className="min-w-0 flex-1 overflow-x-hidden p-4 animate-fadeIn sm:p-6 lg:overflow-y-auto">
+          {isSuperAdmin && !isSuperAdminOverview && (
+            <div className="mb-4">
+              <BackToSuperAdminOverview />
+            </div>
+          )}
+          {isSuperAdmin && location.pathname.startsWith('/super-admin/') && (
+            <div className="mb-6">
+              <CommissionWithdrawalBanner />
+            </div>
+          )}
           {isStateScopedAdmin && (
             <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-800">
               You are viewing scoped admin data for <span className="font-semibold">{assignedStateLabel}{assignedLgaLabel ? `, ${assignedLgaLabel}` : ''}</span>.

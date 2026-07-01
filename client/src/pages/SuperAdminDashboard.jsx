@@ -205,7 +205,10 @@ export default function SuperAdminDashboard() {
   const hasInitializedDashboard = useRef(false);
   const skipUrlSyncRef = useRef(false);
 
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(() => {
+    const requestedTab = searchParams.get("tab");
+    return tabs.includes(requestedTab) ? requestedTab : "overview";
+  });
   const [loading, setLoading] = useState(false);
 
   const [users, setUsers] = useState([]);
@@ -1085,8 +1088,9 @@ export default function SuperAdminDashboard() {
           </div>
         </section>
 
-        <section className="super-admin-platform-section mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
+        {tab === "overview" && (
+          <section className="super-admin-platform-section mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                 Quick Navigation
@@ -1113,9 +1117,9 @@ export default function SuperAdminDashboard() {
 
               return (
                 <div key={cat.key}>
-                  <div className="mb-2 flex items-center gap-2 px-1">
+                  <div className={`mb-3 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${c.border} ${c.bg}`}>
                     <span className={`inline-block h-2 w-2 rounded-full ${c.dot}`} />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{cat.label}</span>
+                    <span className={`text-[11px] font-bold uppercase tracking-widest ${c.text}`}>{cat.label}</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {cat.items.map((item) => {
@@ -1148,7 +1152,8 @@ export default function SuperAdminDashboard() {
               );
             })}
           </div>
-        </section>
+          </section>
+        )}
 
       <div id="super-admin-content" className="scroll-mt-6" />
 
