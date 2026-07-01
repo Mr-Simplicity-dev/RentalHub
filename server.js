@@ -136,33 +136,34 @@ const { generateAIContent } = require('./utils/aiContentGenerator');
 const configureRealtimeSocket = require('./config/utils/realtimeSocket');
 const { generateTitles } = require('./config/utils/pageGenerator');
 const { generateKeywords } = require('./config/utils/keywordGenerator');
-const { saveRanking } = require('./config/utils/rankChecker');
+const { runConfiguredRankingChecks } = require('./config/utils/rankChecker');
 const { generateBacklinks } = require('./utils/backlinkEngine');
 const adminSeoRoutes = require('./routes/adminSeoRoutes');
-const { checkRanking } = require('./config/utils/serpTracker');
+const { getSerpApiKey } = require('./config/utils/serpTracker');
 const {
   runEvidenceIntegrityMonitor,
 } = require('./services/evidenceIntegrityMonitor.service');
 const { runPayoutRetryCycle } = require('./services/payoutRetry.service');
 
-async function runInitialSeoCheck() {
-  const hasSerpApiKey =
-    typeof process.env.SERP_API_KEY === 'string' &&
-    process.env.SERP_API_KEY.trim() &&
-    process.env.SERP_API_KEY.trim() !== '...';
-
-  if (!hasSerpApiKey) {
-    console.log('Skipping initial ranking check: SERP_API_KEY is not configured');
+const scheduleSeoRankingChecks = () => {
+  if (!getSerpApiKey()) {
+    console.log('SEO ranking tracker disabled: SERP_API_KEY is not configured');
     return;
   }
 
-  try {
-    const results = await checkRanking('houses for rent in ikeja');
-    console.log('Initial ranking check results:', results);
-  } catch (err) {
-    console.error('Initial ranking check failed:', err.message);
-  }
-}
+  const cronExpression = process.env.SEO_RANKING_CRON?.trim() || '0 3 * * *';
+  const runChecks = async () => {
+    try {
+      const rankings = await runConfiguredRankingChecks();
+      console.log(`SEO ranking tracker completed ${rankings.length} check(s)`);
+    } catch (err) {
+      console.error('SEO ranking tracker failed:', err.message);
+    }
+  };
+
+  cron.schedule(cronExpression, runChecks);
+  console.log(`SEO ranking tracker scheduled (${cronExpression})`);
+};
 
 const scheduleEvidenceIntegrityMonitoring = () => {
   const cronExpression =
@@ -203,6 +204,8 @@ const schedulePayoutRetries = () => {
   console.log(`Payout retry scheduler started (${cronExpression})`);
 };
 
+let mongoCronJobsStarted = false;
+
 // MongoDB connection monitoring
 mongoose.connection.on('connected', () => {
   console.log('MongoDB connected for cron jobs');
@@ -218,6 +221,13 @@ mongoose.connection.on('disconnected', () => {
 });
 
 const startMongoCronJobs = () => {
+  if (mongoCronJobsStarted) {
+    return;
+  }
+  mongoCronJobsStarted = true;
+
+  scheduleSeoRankingChecks();
+
   // AI blog generation (reduced from 20 to 3 per day for quality and cost)
   cron.schedule('0 1 * * *', async () => {
     const DAILY_BUDGET_CENTS = Number(process.env.AI_BLOG_DAILY_BUDGET_CENTS) || 30;
@@ -307,8 +317,6 @@ Start your search today and find the best home in ${location}.
             content: fullContent,
             keywords: keywordsList,
           });
-
-          await saveRanking(keywordsList[0], `${frontendUrl}/nigeria/${slug}`);
 
           created++;
           createdPost = true;
@@ -676,7 +684,6 @@ const startBackgroundServices = () => {
   }
 
   backgroundServicesStarted = true;
-  runInitialSeoCheck();
   startPaymentJobs();
   startPropertyJobs();
   startRentSavingsJobs();

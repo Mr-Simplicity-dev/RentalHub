@@ -5,6 +5,8 @@ const nigeriaLocations = require('../data/nigeriaLocations');
 const { getSitemapUrls } = require('../config/utils/seoPageService');
 const { generateSitemap } = require('../config/utils/sitemapGenerator');
 const { pingGoogle } = require('../config/utils/pingGoogle');
+const Ranking = require('../models/Ranking');
+const { runConfiguredRankingChecks } = require('../config/utils/rankChecker');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const validateRequest = require('../config/middleware/validateRequest');
 
@@ -85,6 +87,61 @@ router.get('/', authenticate, requireAdminOrSuperAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to load SEO summary',
+    });
+  }
+});
+
+router.get('/rankings', authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 200);
+    const keyword = String(req.query.keyword || '').trim();
+    // Exclude legacy records created by the old random-number generator.
+    const filter = keyword
+      ? { keyword, source: 'serpapi' }
+      : { source: 'serpapi' };
+    const rankings = await Ranking.find(filter)
+      .sort({ checkedAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const latestByKeyword = [];
+    const seenKeywords = new Set();
+    for (const ranking of rankings) {
+      if (!seenKeywords.has(ranking.keyword)) {
+        seenKeywords.add(ranking.keyword);
+        latestByKeyword.push(ranking);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        latestByKeyword,
+        history: rankings,
+      },
+    });
+  } catch (error) {
+    console.error('SEO ranking history error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load SEO ranking history',
+    });
+  }
+});
+
+router.post('/rankings/check', authenticate, requireAdminOrSuperAdmin, validateRequest, async (req, res) => {
+  try {
+    const rankings = await runConfiguredRankingChecks();
+    res.json({
+      success: true,
+      data: rankings,
+      message: `Completed ${rankings.length} ranking check(s)`,
+    });
+  } catch (error) {
+    console.error('Manual SEO ranking check error:', error.message);
+    res.status(502).json({
+      success: false,
+      message: error.message || 'Failed to check SEO rankings',
     });
   }
 });
