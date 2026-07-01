@@ -643,7 +643,7 @@ const AdminLayout = () => {
                   Property Requests
                 </NavLink>
 
-                <NavLink to="/admin/super-support-dashboard?tab=overview" className={navItem}>
+                <NavLink to="/super-admin/support-governance?tab=overview" className={navItem}>
                   <FaHeadset className="mr-3" />
                   Support Governance
                 </NavLink>
@@ -712,7 +712,7 @@ const AdminLayout = () => {
                   Flags
                 </NavLink>
 
-                <NavLink to="/admin/seo" className={navItem}>
+                <NavLink to="/super-admin/seo" className={navItem}>
                   <FaGlobe className="mr-3" />
                   SEO Dashboard
                 </NavLink>
