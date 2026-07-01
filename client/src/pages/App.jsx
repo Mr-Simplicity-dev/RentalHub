@@ -138,6 +138,7 @@ const SUPER_FUMIGATION_ADMIN_ROLES = ['super_admin', 'super_fumigation_admin'];
 const isRecruitmentAdminUser = (user) =>
   RECRUITMENT_ADMIN_ROLES.includes(user?.user_type) || user?.is_recruitment_admin === true;
 const ADMIN_SHELL_ROLES = [
+  ...SUPER_ADMIN_ROLES,
   'admin',
   'lga_admin',
   ...FINANCIAL_ADMIN_ROLES,
@@ -246,7 +247,11 @@ const SuperSupportAdminRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+  if (
+    ![...SUPER_ADMIN_ROLES, ...SUPER_SUPPORT_ADMIN_ROLES].includes(user?.user_type)
+  ) {
+    return <Navigate to="/admin" />;
+  }
 
   return children;
 };
