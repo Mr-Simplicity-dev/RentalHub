@@ -14,12 +14,14 @@ const SeoDashboard = () => {
   const [sitemapXml, setSitemapXml] = useState(null);
   const [showSitemap, setShowSitemap] = useState(false);
   const [stateSearch, setStateSearch] = useState('');
+  const [rankings, setRankings] = useState({ latestByKeyword: [], history: [] });
+  const [checkingRankings, setCheckingRankings] = useState(false);
 
   const loadData = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true); else setRefreshing(true);
     try {
       const res = await api.get('/admin/seo');
-      setData(res.data?.data || null);
+      setData(res.data?.data || res.data || null);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to load SEO dashboard');
     } finally {
@@ -27,7 +29,19 @@ const SeoDashboard = () => {
     }
   }, []);
 
-  useEffect(() => { loadData(true); }, [loadData]);
+  const loadRankings = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/seo/rankings');
+      setRankings(res.data?.data || { latestByKeyword: [], history: [] });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load Google rankings');
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData(true);
+    loadRankings();
+  }, [loadData, loadRankings]);
 
   const handleRegenerate = async () => {
     if (!window.confirm('Regenerate sitemap? This will recalculate all SEO URLs.')) return;
@@ -62,6 +76,21 @@ const SeoDashboard = () => {
       toast.success(res.data?.data?.success ? 'Google pinged successfully' : 'Google ping completed (check logs)');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to ping Google');
+    }
+  };
+
+  const handleRankingCheck = async () => {
+    if (!window.confirm('Check Google rankings now? This uses one SerpAPI credit per configured keyword.')) return;
+
+    try {
+      setCheckingRankings(true);
+      const res = await api.post('/admin/seo/rankings/check');
+      toast.success(res.data?.message || 'Google ranking check completed');
+      await loadRankings();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to check Google rankings');
+    } finally {
+      setCheckingRankings(false);
     }
   };
 
@@ -194,6 +223,92 @@ const SeoDashboard = () => {
               <span className="text-teal-600">{summary.sitemapUrls}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-soft bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+              <FaChartBar className="text-primary-600" /> Google Ranking History
+            </h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Real Nigerian Google results recorded through SerpAPI
+            </p>
+          </div>
+          <button
+            onClick={handleRankingCheck}
+            disabled={checkingRankings}
+            className="btn btn-primary gap-2"
+          >
+            <FaSyncAlt className={checkingRankings ? 'animate-spin' : ''} />
+            {checkingRankings ? 'Checking Google...' : 'Check Google Now'}
+          </button>
+        </div>
+
+        {rankings.latestByKeyword.length > 0 && (
+          <div className="grid gap-3 border-b border-gray-100 p-5 sm:grid-cols-2 xl:grid-cols-3">
+            {rankings.latestByKeyword.map((ranking) => (
+              <div key={ranking._id} className="rounded-lg bg-gray-50 p-4">
+                <p className="truncate text-xs font-medium text-gray-600" title={ranking.keyword}>
+                  {ranking.keyword}
+                </p>
+                <p className={`mt-2 text-2xl font-bold ${ranking.found ? 'text-green-600' : 'text-gray-500'}`}>
+                  {ranking.found ? `#${ranking.position}` : `Not in top ${ranking.searchDepth || 100}`}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+                <th className="px-5 py-3">Keyword</th>
+                <th className="px-5 py-3">Position</th>
+                <th className="px-5 py-3">Google Result</th>
+                <th className="px-5 py-3">Checked</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rankings.history.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-5 py-8 text-center text-gray-500">
+                    No verified rankings yet. Run the first Google check to begin tracking.
+                  </td>
+                </tr>
+              ) : rankings.history.map((ranking) => (
+                <tr key={ranking._id} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className="px-5 py-3 font-medium text-gray-900">{ranking.keyword}</td>
+                  <td className="px-5 py-3">
+                    <span className={`font-semibold ${ranking.found ? 'text-green-600' : 'text-gray-500'}`}>
+                      {ranking.found ? `#${ranking.position}` : `Not found (top ${ranking.searchDepth || 100})`}
+                    </span>
+                  </td>
+                  <td className="max-w-xs px-5 py-3">
+                    {ranking.resultUrl ? (
+                      <a
+                        href={ranking.resultUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 truncate text-primary-600 hover:underline"
+                        title={ranking.resultTitle || ranking.resultUrl}
+                      >
+                        {ranking.resultTitle || ranking.resultUrl}
+                        <FaExternalLinkAlt className="shrink-0 text-[10px]" />
+                      </a>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3 text-gray-500">
+                    {ranking.checkedAt ? new Date(ranking.checkedAt).toLocaleString() : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
