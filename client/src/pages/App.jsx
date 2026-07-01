@@ -74,6 +74,7 @@ const AdminPropertyDetail = React.lazy(() => import('./admin/AdminPropertyDetail
 const AdminApplicationDetail = React.lazy(() => import('./admin/AdminApplicationDetail'));
 const AdminCompliance = React.lazy(() => import('./admin/AdminCompliance'));
 const SeoDashboard = React.lazy(() => import('./SeoDashboard'));
+const SupportGovernancePanel = React.lazy(() => import('../components/admin/SupportGovernancePanel'));
 const LawyerDashboard = React.lazy(() => import('./lawyer/LawyerDashboard'));
 const LawyerLayout = React.lazy(() => import('./lawyer/LawyerLayout'));
 const StateLawyerDashboard = React.lazy(() => import('./lawyer/StateLawyerDashboard'));
@@ -729,7 +730,7 @@ function App() {
               >
                 <Route index element={<SuperAdminDashboard />} />
                 <Route path="seo" element={<SeoDashboard />} />
-                <Route path="support-governance" element={<SuperSupportAdminDashboard />} />
+                <Route path="support-governance" element={<SupportGovernancePanel />} />
               </Route>
               <Route
                 path="/admin/seo"

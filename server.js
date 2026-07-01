@@ -136,34 +136,12 @@ const { generateAIContent } = require('./utils/aiContentGenerator');
 const configureRealtimeSocket = require('./config/utils/realtimeSocket');
 const { generateTitles } = require('./config/utils/pageGenerator');
 const { generateKeywords } = require('./config/utils/keywordGenerator');
-const { runConfiguredRankingChecks } = require('./config/utils/rankChecker');
 const { generateBacklinks } = require('./utils/backlinkEngine');
 const adminSeoRoutes = require('./routes/adminSeoRoutes');
-const { getSerpApiKey } = require('./config/utils/serpTracker');
 const {
   runEvidenceIntegrityMonitor,
 } = require('./services/evidenceIntegrityMonitor.service');
 const { runPayoutRetryCycle } = require('./services/payoutRetry.service');
-
-const scheduleSeoRankingChecks = () => {
-  if (!getSerpApiKey()) {
-    console.log('SEO ranking tracker disabled: SERP_API_KEY is not configured');
-    return;
-  }
-
-  const cronExpression = process.env.SEO_RANKING_CRON?.trim() || '0 3 * * *';
-  const runChecks = async () => {
-    try {
-      const rankings = await runConfiguredRankingChecks();
-      console.log(`SEO ranking tracker completed ${rankings.length} check(s)`);
-    } catch (err) {
-      console.error('SEO ranking tracker failed:', err.message);
-    }
-  };
-
-  cron.schedule(cronExpression, runChecks);
-  console.log(`SEO ranking tracker scheduled (${cronExpression})`);
-};
 
 const scheduleEvidenceIntegrityMonitoring = () => {
   const cronExpression =
@@ -225,8 +203,6 @@ const startMongoCronJobs = () => {
     return;
   }
   mongoCronJobsStarted = true;
-
-  scheduleSeoRankingChecks();
 
   // AI blog generation (reduced from 20 to 3 per day for quality and cost)
   cron.schedule('0 1 * * *', async () => {
