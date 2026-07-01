@@ -233,7 +233,7 @@ const SeoDashboard = () => {
               <FaChartBar className="text-primary-600" /> Google Ranking History
             </h3>
             <p className="mt-1 text-xs text-gray-500">
-              Real Nigerian Google results recorded through SerpAPI
+              Manual-only Google checks through SerpAPI—no automatic credit usage
             </p>
           </div>
           <button
