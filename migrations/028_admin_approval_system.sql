@@ -117,7 +117,8 @@ ALTER TABLE users
       'fumigation_admin',
       'lga_fumigation_admin',
       'state_fumigation_admin',
-      'super_fumigation_admin'
+      'super_fumigation_admin',
+      'recruitment_admin'
     )
   );
 

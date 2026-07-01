@@ -43,8 +43,9 @@ CREATE TABLE IF NOT EXISTS rent_savings_contributions (
 -- 3. Rent Savings Setup Fees Table (Location-based one-time fee)
 CREATE TABLE IF NOT EXISTS rent_savings_setup_fees (
     id SERIAL PRIMARY KEY,
-    state_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
-    lga_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
+    state_id INTEGER REFERENCES states(id) ON DELETE CASCADE,
+    lga_id INTEGER,
+    lga_name VARCHAR(120),
     setup_fee NUMERIC(12, 2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

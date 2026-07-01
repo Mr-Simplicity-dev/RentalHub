@@ -88,7 +88,11 @@ router.get(
 router.post(
   '/admin/setup-fees',
   authenticate, requireAdminOrSuperAdmin,
-  [body('state_id').isInt(), body('lga_id').isInt(), body('amount').isFloat({ min: 0 })],
+  [
+    body('state_id').isInt(),
+    body('lga_id').optional({ nullable: true, checkFalsy: true }).isInt({ min: 1 }),
+    body('setup_fee').isFloat({ min: 0 }),
+  ],
   validateRequest,
   rentSavingsController.adminCreateSetupFee
 );

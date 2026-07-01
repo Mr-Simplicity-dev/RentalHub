@@ -53,6 +53,7 @@ ALTER TABLE payments
       'tenant_subscription',
       'landlord_listing',
       'rent_payment',
+      'wallet_funding',
       'property_unlock',
       'general_platform_fee'
     )
