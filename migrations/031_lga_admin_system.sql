@@ -23,19 +23,15 @@ ALTER TABLE users
   ADD CONSTRAINT users_user_type_check
   CHECK (
     user_type IN (
-      'tenant',
-      'landlord',
-      'lawyer',
-      'admin',
-      'state_admin',
-      'state_financial_admin',
-      'state_support_admin',
-      'super_admin',
-      'financial_admin',
-      'super_financial_admin',
-      'super_support_admin',
-      'agent',
-      'lga_admin'  -- New role for Local Government Area administration
+      'tenant', 'landlord', 'lawyer', 'state_lawyer', 'super_lawyer',
+      'admin', 'lga_admin', 'lga_support_admin', 'state_admin',
+      'lga_financial_admin', 'lga_transportation_admin',
+      'state_transportation_admin', 'super_transportation_admin',
+      'lga_fumigation_admin', 'state_fumigation_admin',
+      'super_fumigation_admin', 'state_financial_admin',
+      'state_support_admin', 'super_admin', 'financial_admin',
+      'super_financial_admin', 'super_support_admin', 'recruitment_admin',
+      'agent', 'fumigation_admin', 'transportation_admin'
     )
   );
 
@@ -224,6 +220,8 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_log_lga_admin_activity ON users;
 
 CREATE TRIGGER trigger_log_lga_admin_activity
 AFTER INSERT OR UPDATE ON users

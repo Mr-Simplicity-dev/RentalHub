@@ -1,5 +1,17 @@
 const db = require('../config/middleware/database');
 const NotificationService = require('../services/NotificationService');
+const nigeriaLocations = require('../data/nigeriaLocations');
+
+const resolveLgaName = (stateName, lgaId) => {
+  const numericLgaId = Number(lgaId);
+  if (!stateName || !Number.isInteger(numericLgaId) || numericLgaId < 1) return null;
+
+  const state = nigeriaLocations.find((location) =>
+    [location.state, location.displayName, location.slug]
+      .some((value) => String(value || '').toLowerCase() === String(stateName).toLowerCase())
+  );
+  return state?.lgas?.[numericLgaId - 1] || null;
+};
 
 const ensureSetupFeeOperationSchema = async () => {
   await db.query(`
@@ -102,11 +114,9 @@ exports.getSetupFees = async (req, res) => {
       // Return all setup fees with location names
       const result = await db.query(`
         SELECT rsf.*,
-               loc_state.name AS state_name,
-               loc_lga.name   AS lga_name
+               s.state_name
         FROM rent_savings_setup_fees rsf
-        LEFT JOIN locations loc_state ON rsf.state_id = loc_state.id
-        LEFT JOIN locations loc_lga   ON rsf.lga_id   = loc_lga.id
+        LEFT JOIN states s ON rsf.state_id = s.id
         ORDER BY rsf.created_at DESC
       `);
       return res.json({ success: true, data: result.rows });
@@ -1218,12 +1228,10 @@ exports.adminGetSetupFees = async (req, res) => {
     await ensureSetupFeeOperationSchema();
     const result = await db.query(`
       SELECT rsf.*,
-             ls.name AS state_name,
-             ll.name AS lga_name,
+             s.state_name,
              COALESCE(ops.operations, '[]'::json) AS operations
       FROM rent_savings_setup_fees rsf
-      LEFT JOIN locations ls ON rsf.state_id = ls.id
-      LEFT JOIN locations ll ON rsf.lga_id   = ll.id
+      LEFT JOIN states s ON rsf.state_id = s.id
       LEFT JOIN LATERAL (
         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
         FROM (
@@ -1255,6 +1263,19 @@ exports.adminCreateSetupFee = async (req, res) => {
       return res.status(400).json({ success: false, message: 'state_id and setup_fee are required' });
     }
 
+    const stateResult = await db.query(
+      'SELECT state_name FROM states WHERE id = $1',
+      [state_id]
+    );
+    if (stateResult.rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid state_id' });
+    }
+
+    const lgaName = lga_id ? resolveLgaName(stateResult.rows[0].state_name, lga_id) : null;
+    if (lga_id && !lgaName) {
+      return res.status(400).json({ success: false, message: 'Invalid lga_id for the selected state' });
+    }
+
     // Upsert: update if exists, insert if not
     const existing = await db.query(
       `SELECT id FROM rent_savings_setup_fees
@@ -1264,8 +1285,11 @@ exports.adminCreateSetupFee = async (req, res) => {
 
     if (existing.rows.length > 0) {
       const result = await db.query(
-        `UPDATE rent_savings_setup_fees SET setup_fee = $1 WHERE id = $2 RETURNING *`,
-        [setup_fee, existing.rows[0].id]
+        `UPDATE rent_savings_setup_fees
+         SET setup_fee = $1, lga_name = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3
+         RETURNING *`,
+        [setup_fee, lgaName, existing.rows[0].id]
       );
       await recordSetupFeeOperation({
         setupFeeId: result.rows[0].id,
@@ -1282,10 +1306,10 @@ exports.adminCreateSetupFee = async (req, res) => {
     }
 
     const result = await db.query(
-      `INSERT INTO rent_savings_setup_fees (state_id, lga_id, setup_fee)
-       VALUES ($1, $2, $3)
+      `INSERT INTO rent_savings_setup_fees (state_id, lga_id, lga_name, setup_fee)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [state_id, lga_id || null, setup_fee]
+      [state_id, lga_id || null, lgaName, setup_fee]
     );
 
     await recordSetupFeeOperation({
@@ -1319,10 +1343,9 @@ exports.adminDeleteSetupFee = async (req, res) => {
     const governanceNote = requireSetupFeeNote(req.body, 'A deletion reason is required');
 
     const existing = await db.query(
-      `SELECT rsf.*, ls.name AS state_name, ll.name AS lga_name
+      `SELECT rsf.*, s.state_name
        FROM rent_savings_setup_fees rsf
-       LEFT JOIN locations ls ON rsf.state_id = ls.id
-       LEFT JOIN locations ll ON rsf.lga_id = ll.id
+       LEFT JOIN states s ON rsf.state_id = s.id
        WHERE rsf.id = $1`,
       [id]
     );

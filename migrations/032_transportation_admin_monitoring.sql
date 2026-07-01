@@ -138,7 +138,7 @@ SELECT
   COUNT(DISTINCT ts.id) as available_services
 FROM state_admin_transportation_jurisdiction saj
 JOIN users u ON saj.state_admin_id = u.id
-LEFT JOIN states state_lookup ON state_lookup.name = saj.state
+LEFT JOIN states state_lookup ON state_lookup.state_name = saj.state
 LEFT JOIN properties p ON (
   p.state_id = state_lookup.id
   AND (saj.city IS NULL OR p.city = saj.city)
@@ -165,7 +165,7 @@ SELECT
   u.full_name as super_admin_name,
   u.email as super_admin_email,
   COUNT(DISTINCT CASE WHEN sao.oversight_level = 'national' THEN tb.id 
-                      WHEN sao.oversight_level = 'state' AND booking_state.name = sao.state THEN tb.id
+                      WHEN sao.oversight_level = 'state' AND booking_state.state_name = sao.state THEN tb.id
                  END) as oversight_bookings,
   COUNT(DISTINCT CASE WHEN sao.oversight_level = 'national' THEN ts.id 
                       WHEN sao.oversight_level = 'state' THEN ts.id
