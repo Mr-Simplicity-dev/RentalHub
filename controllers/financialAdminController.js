@@ -15,6 +15,7 @@ exports.getAllTransactions = async (req, res) => {
       state,
       city,
       payment_type,
+      payment_status,
       start_date,
       end_date,
       page = 1,
@@ -104,6 +105,14 @@ exports.getAllTransactions = async (req, res) => {
       countQuery += ` AND p.payment_type = $${paramCount}`;
       params.push(payment_type);
       countParams.push(payment_type);
+      paramCount++;
+    }
+
+    if (payment_status) {
+      query += ` AND p.payment_status = $${paramCount}`;
+      countQuery += ` AND p.payment_status = $${paramCount}`;
+      params.push(payment_status);
+      countParams.push(payment_status);
       paramCount++;
     }
     

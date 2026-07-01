@@ -13,6 +13,8 @@
     "migrate:dry-run": "node scripts/runMigrations.js --dry-run",
     "migrate:down": "node scripts/runMigrations.js --down",
     "migrate:reset": "node scripts/runMigrations.js --reset",
+    "check:mobile-api": "node scripts/checkMobileApiContracts.js",
+    "check:mobile-api:all": "node scripts/checkMobileApiContracts.js --all",
     "audit": "npm audit",
     "security:check": "npm audit && node -e \"try { require('helmet'); require('hpp'); require('express-rate-limit'); console.log('All security dependencies present'); } catch(e) { console.error('MISSING:', e.message); process.exit(1); }\""
   },

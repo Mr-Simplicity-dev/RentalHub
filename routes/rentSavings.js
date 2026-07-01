@@ -142,7 +142,13 @@ router.get(
 router.post(
   '/plans',
   authenticate, isTenant,
-  [body('property_id').isInt(), body('target_amount').isFloat({ min: 0 }), body('duration_months').optional().isInt({ min: 1 })],
+  [
+    body('property_id').isInt({ min: 1 }),
+    body('rent_due_date').isISO8601(),
+    body('monthly_rent_amount').isFloat({ min: 1 }),
+    body('state_id').optional({ nullable: true }).isInt({ min: 1 }),
+    body('lga_id').optional({ nullable: true }).isInt({ min: 1 }),
+  ],
   validateRequest,
   rentSavingsController.createPlan
 );
@@ -176,7 +182,11 @@ router.get(
 router.post(
   '/plans/:id/contributions',
   authenticate, isTenant,
-  [param('id').isInt(), body('amount').optional().isFloat({ min: 0 })],
+  [
+    param('id').isInt(),
+    body('amount').isFloat({ min: 1 }),
+    body('month').matches(/^\d{4}-\d{2}$/),
+  ],
   validateRequest,
   rentSavingsController.makeContribution
 );
