@@ -723,7 +723,17 @@ function App() {
                 }
               >
                 <Route index element={<SuperAdminDashboard />} />
+                <Route path="seo" element={<SeoDashboard />} />
+                <Route path="support-governance" element={<SuperSupportAdminDashboard />} />
               </Route>
+              <Route
+                path="/admin/seo"
+                element={
+                  <SuperAdminRoute>
+                    <Navigate to="/super-admin/seo" replace />
+                  </SuperAdminRoute>
+                }
+              />
               <Route
                 path="/super-admin/transportation"
                 element={
@@ -823,7 +833,6 @@ function App() {
                 <Route path="inspections" element={<AdminInspections />} />
                 <Route path="evidence-verifications" element={<AdminEvidenceVerifications />} />
                 <Route path="ledger" element={<AdminLedger />} />
-                <Route path="seo" element={<SuperAdminRoute><SeoDashboard /></SuperAdminRoute>} />
                 <Route path="compliance" element={<AdminCompliance />} />
                 <Route
                   path="transportation"
