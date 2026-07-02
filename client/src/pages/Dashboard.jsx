@@ -1363,6 +1363,24 @@ const Dashboard = () => {
         <AdSpace placement="dashboard_top" contained={false} className="mb-8" />
 
         {/* Verification Alert */}
+        {!user?.identity_verified && verificationReviewStatus === 'revalidation_required' && (
+          <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-6 text-center">
+            <div className="flex flex-col items-center">
+              <FaClock className="mb-3 text-2xl text-amber-600" />
+              <h3 className="font-semibold text-amber-900">Credential Revalidation Required</h3>
+              <p className="mt-2 text-sm text-amber-800">
+                A super administrator requested updated identity credentials. Review the exact request and submit the required information.
+              </p>
+              <button
+                onClick={() => navigate('/verification-status')}
+                className="mt-3 text-sm font-semibold text-amber-900 hover:text-amber-950"
+              >
+                Complete Revalidation {'>'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {!user?.identity_verified && verificationReviewStatus === 'not_submitted' && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
             <div className="flex flex-col items-center">

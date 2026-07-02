@@ -11,6 +11,7 @@ const validateRequest = require('../config/middleware/validateRequest');
 const { uploadPassportLocal } = require('../config/middleware/upload');
 const { sensitiveActionLimiter } = require('../config/middleware/securityRateLimiters');
 const { decryptNIN } = require('../config/utils/ninEncryption');
+const credentialRevalidationCtrl = require('../controllers/credentialRevalidationController');
 
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, '..', 'uploads', 'passports');
@@ -21,6 +22,9 @@ if (!fs.existsSync(uploadDir)) {
 const LIVE_CAPTURE_SESSION_TTL_MS = 10 * 60 * 1000;
 const REQUIRE_LIVE_CAPTURE_SESSION = process.env.REQUIRE_LIVE_CAPTURE_SESSION === 'true';
 const liveCaptureSessions = new Map();
+
+router.get('/credential-revalidations', authenticate, credentialRevalidationCtrl.getMyRequests);
+router.post('/credential-revalidations/:requestId/submit', authenticate, sensitiveActionLimiter, credentialRevalidationCtrl.submitRequest);
 
 const getSessionKey = (userId, token) => `${userId}:${token}`;
 
@@ -1010,6 +1014,8 @@ router.post('/verify-password', authenticate, sensitiveActionLimiter, async (req
 
 // Upload passport photo
 router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, res) => {
+  let uploadPersisted = false;
+
   try {
     await ensureIdentitySchema();
 
@@ -1047,22 +1053,29 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, r
 
     // Check if identity is already verified via Prembly
     const currentUser = await db.query(
-      `SELECT nin_verified, identity_document_type
-       FROM users WHERE id = $1`,
+      `SELECT u.nin_verified, u.identity_document_type, u.nin,
+              u.international_passport_number,
+              EXISTS (
+                SELECT 1
+                FROM credential_revalidation_requests crr
+                WHERE crr.user_id = u.id
+                  AND crr.status IN ('requested', 'submitted', 'rejected')
+              ) AS has_active_revalidation
+       FROM users u WHERE u.id = $1`,
       [userId]
     );
 
     const hasVerifiedIdentity = currentUser.rows.length > 0 &&
       currentUser.rows[0].nin_verified === true;
 
-    const hasIdentityNumber = currentUser.rows.length > 0 &&
-      (
-        currentUser.rows[0].identity_document_type === 'passport'
-          ? true
-          : true
-      );
+    const currentIdentity = currentUser.rows[0] || {};
+    const hasIdentityNumber =
+      currentIdentity.identity_document_type === 'passport'
+        ? Boolean(currentIdentity.international_passport_number)
+        : Boolean(currentIdentity.nin);
+    const hasActiveRevalidation = currentIdentity.has_active_revalidation === true;
 
-    const autoVerified = hasVerifiedIdentity && hasIdentityNumber;
+    const autoVerified = hasVerifiedIdentity && hasIdentityNumber && !hasActiveRevalidation;
 
     await db.query(
       `UPDATE users
@@ -1070,20 +1083,23 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, r
            identity_verified = $2,
            identity_verified_by = NULL,
            identity_verified_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
-           identity_verification_status = CASE
-             WHEN $2 THEN 'verified'
-             WHEN $3 THEN 'pending'
-             ELSE NULL
-           END,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4`,
+            identity_verification_status = CASE
+              WHEN $2 THEN 'verified'
+              WHEN $4 THEN 'revalidation_required'
+              WHEN $3 THEN 'pending'
+              ELSE NULL
+            END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $5`,
       [
         relativePath,
         autoVerified,              // $2: identity_verified (auto by system)
         hasIdentityNumber,         // $3: set pending if identity number exists
-        userId                     // $4: WHERE clause
+        hasActiveRevalidation,     // $4: preserve active revalidation task
+        userId                     // $5: WHERE clause
       ]
     );
+    uploadPersisted = true;
 
     const userResult = await db.query(
       `SELECT id, user_type, email, phone, full_name, nin,
@@ -1109,6 +1125,9 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, r
     });
 
   } catch (error) {
+    if (!uploadPersisted) {
+      cleanupUploadedFile(req.file);
+    }
     console.error('Upload passport error:', error);
     res.status(500).json({
       success: false,
