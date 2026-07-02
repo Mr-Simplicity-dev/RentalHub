@@ -69,6 +69,7 @@ const referralRoutes = require('./routes/referrals');
 const smsDeliveryRoutes = require('./routes/smsDelivery');
 const appLinksRoutes = require('./routes/appLinks');
 const downloadsRoutes = require('./routes/downloads');
+const premblyRecoveryRoutes = require('./routes/premblyRecovery');
 
 const disputesRoutes = require('./routes/disputes');
 const disputeRoutes = require('./routes/disputeRoutes');
@@ -95,6 +96,7 @@ const { startRentSavingsJobs } = require('./jobs/rentSavingsJobs');
 const { startSmsDeliveryJobs } = require('./jobs/smsDeliveryJobs');
 const { startSmsMarketingJobs } = require('./jobs/smsMarketingJobs');
 const { startRecruitmentJobs } = require('./jobs/recruitmentJobs');
+const { startPremblyRecoveryJobs } = require('./jobs/premblyRecoveryJobs');
 const csrfProtection = require('./config/middleware/csrfProtection');
 const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
 const {
@@ -493,6 +495,7 @@ const publicDownloadLimiter = rateLimit({
 // feature flag checks are unavailable.
 app.use('/api/downloads', publicDownloadLimiter, downloadsRoutes);
 app.use('/api/sms', smsDeliveryRoutes);
+app.use('/api/prembly', premblyRecoveryRoutes);
 app.use('/api', enforceFlags);
 
 app.get('/api/auth/verify-email', async (req, res) => {
@@ -666,6 +669,7 @@ const startBackgroundServices = () => {
   startSmsDeliveryJobs();
   startSmsMarketingJobs();
   startRecruitmentJobs();
+  startPremblyRecoveryJobs();
   startScheduler();
   scheduleEvidenceIntegrityMonitoring();
   schedulePayoutRetries();
