@@ -13,9 +13,20 @@ const UsersTab = ({
   banUser,
   unbanUser,
   deleteUser,
+  onRevalidationCreated,
 }) => {
   const [selectedUserForModal, setSelectedUserForModal] = useState(null);
   const [sendingNotification, setSendingNotification] = useState(false);
+  const [revalidationAction, setRevalidationAction] = useState({
+    open: false,
+    user: null,
+    fields: [],
+    reason: "",
+    instructions: "",
+    due_at: "",
+    submitting: false,
+    error: "",
+  });
   const [accountAction, setAccountAction] = useState({
     open: false,
     user: null,
@@ -44,6 +55,79 @@ const UsersTab = ({
       toast.error(err.response?.data?.message || "Failed to send verification reminder");
     } finally {
       setSendingNotification(false);
+    }
+  };
+
+  const toggleRevalidationField = (field) => {
+    setRevalidationAction((previous) => ({
+      ...previous,
+      error: "",
+      fields: previous.fields.includes(field)
+        ? previous.fields.filter((item) => item !== field)
+        : [
+            ...previous.fields.filter((item) =>
+              field === "nin"
+                ? item !== "international_passport"
+                : field === "international_passport"
+                ? item !== "nin"
+                : true
+            ),
+            field,
+          ],
+    }));
+  };
+
+  const openRevalidationRequest = (user) => {
+    setRevalidationAction({
+      open: true,
+      user,
+      fields: user?.passport_photo_url ? [] : ["live_photo"],
+      reason: "",
+      instructions: "",
+      due_at: "",
+      submitting: false,
+      error: "",
+    });
+  };
+
+  const submitRevalidationRequest = async () => {
+    const reason = revalidationAction.reason.trim();
+    if (!revalidationAction.fields.length) {
+      setRevalidationAction((previous) => ({ ...previous, error: "Select at least one credential." }));
+      return;
+    }
+    if (reason.length < 5) {
+      setRevalidationAction((previous) => ({ ...previous, error: "Provide a clear reason." }));
+      return;
+    }
+
+    setRevalidationAction((previous) => ({ ...previous, submitting: true, error: "" }));
+    try {
+      await api.post(`/super/users/${revalidationAction.user.id}/credential-revalidation`, {
+        requested_fields: revalidationAction.fields,
+        reason,
+        instructions: revalidationAction.instructions.trim(),
+        due_at: revalidationAction.due_at || null,
+      });
+      toast.success("Credential revalidation request sent");
+      onRevalidationCreated?.();
+      setRevalidationAction({
+        open: false,
+        user: null,
+        fields: [],
+        reason: "",
+        instructions: "",
+        due_at: "",
+        submitting: false,
+        error: "",
+      });
+      setSelectedUserForModal(null);
+    } catch (error) {
+      setRevalidationAction((previous) => ({
+        ...previous,
+        submitting: false,
+        error: error.response?.data?.message || "Failed to create revalidation request",
+      }));
     }
   };
 
@@ -585,6 +669,8 @@ const UsersTab = ({
                         ? "bg-green-100 text-green-700"
                         : selectedUserForModal.identity_verification_status === "pending"
                         ? "bg-yellow-100 text-yellow-700"
+                        : selectedUserForModal.identity_verification_status === "revalidation_required"
+                        ? "bg-amber-100 text-amber-800"
                         : selectedUserForModal.identity_verification_status === "rejected"
                         ? "bg-red-100 text-red-700"
                         : "bg-gray-100 text-gray-600"
@@ -594,6 +680,8 @@ const UsersTab = ({
                       ? "Verified"
                       : selectedUserForModal.identity_verification_status === "pending"
                       ? "Pending Review"
+                      : selectedUserForModal.identity_verification_status === "revalidation_required"
+                      ? "Revalidation Required"
                       : selectedUserForModal.identity_verification_status === "rejected"
                       ? "Rejected"
                       : "Not Submitted"}
@@ -604,6 +692,8 @@ const UsersTab = ({
                       ? "User has not submitted identity documents for admin review."
                       : selectedUserForModal.identity_verification_status === "pending"
                       ? "User has submitted identity documents and is awaiting admin review."
+                      : selectedUserForModal.identity_verification_status === "revalidation_required"
+                      ? "A super administrator requested updated credentials from this user."
                       : selectedUserForModal.identity_verification_status === "rejected"
                       ? "Identity verification was rejected by an admin. The user may need to resubmit."
                       : selectedUserForModal.identity_verification_status === "verified"
@@ -644,8 +734,15 @@ const UsersTab = ({
 
             </div>
 
-            {/* Footer — Notify User Button */}
-            <div className="border-t border-soft px-6 py-4">
+            {/* Footer — verification actions */}
+            <div className="space-y-2 border-t border-soft px-6 py-4">
+              <button
+                type="button"
+                onClick={() => openRevalidationRequest(selectedUserForModal)}
+                className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
+              >
+                Request Credential Revalidation
+              </button>
               <button
                 onClick={() => notifyUser(selectedUserForModal)}
                 disabled={sendingNotification}
@@ -673,8 +770,91 @@ const UsersTab = ({
                 )}
               </button>
               <p className="text-xs text-gray-400 text-center mt-2">
-                The user will receive this reminder in their dashboard notification bell.
+                Revalidation creates a tracked task; reminder only resends missing-step guidance.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {revalidationAction.open && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
+            <div className="border-b px-6 py-4">
+              <h3 className="text-lg font-bold text-gray-900">Request Credential Revalidation</h3>
+              <p className="text-sm text-gray-500">{revalidationAction.user?.full_name} · {revalidationAction.user?.email}</p>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <fieldset>
+                <legend className="text-sm font-semibold text-gray-800">Credentials required</legend>
+                {!revalidationAction.user?.passport_photo_url && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    This user has no live passport photo, so a new live photo is required.
+                  </p>
+                )}
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {[
+                    ["nin", "NIN"],
+                    ["international_passport", "International passport"],
+                    ["live_photo", "New live passport photo"],
+                  ].map(([value, label]) => (
+                    <label key={value} className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={revalidationAction.fields.includes(value)}
+                        onChange={() => toggleRevalidationField(value)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="block text-sm font-medium text-gray-700">
+                Reason
+                <textarea
+                  value={revalidationAction.reason}
+                  onChange={(event) => setRevalidationAction((previous) => ({ ...previous, reason: event.target.value, error: "" }))}
+                  className="input mt-1 min-h-[90px]"
+                  placeholder="Explain exactly why these credentials must be provided again"
+                />
+              </label>
+              <label className="block text-sm font-medium text-gray-700">
+                Additional instructions
+                <textarea
+                  value={revalidationAction.instructions}
+                  onChange={(event) => setRevalidationAction((previous) => ({ ...previous, instructions: event.target.value }))}
+                  className="input mt-1 min-h-[70px]"
+                />
+              </label>
+              <label className="block text-sm font-medium text-gray-700">
+                Due date (optional)
+                <input
+                  type="date"
+                  value={revalidationAction.due_at}
+                  min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+                  onChange={(event) => setRevalidationAction((previous) => ({ ...previous, due_at: event.target.value }))}
+                  className="input mt-1"
+                />
+              </label>
+              {revalidationAction.error && <p className="text-sm text-red-600">{revalidationAction.error}</p>}
+            </div>
+            <div className="flex justify-end gap-2 border-t px-6 py-4">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setRevalidationAction((previous) => ({ ...previous, open: false }))}
+                disabled={revalidationAction.submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={submitRevalidationRequest}
+                disabled={revalidationAction.submitting}
+              >
+                {revalidationAction.submitting ? "Sending..." : "Create Revalidation Request"}
+              </button>
             </div>
           </div>
         </div>

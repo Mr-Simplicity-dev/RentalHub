@@ -11,6 +11,7 @@ const bcrypt = require('bcryptjs');
 const commissionService = require('../services/commissionService');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 const validateRequest = require('../config/middleware/validateRequest');
+const credentialRevalidationCtrl = require('../controllers/credentialRevalidationController');
 
 const router = express.Router();
 
@@ -396,6 +397,9 @@ router.get('/verifications', authenticate, requireSuperAdmin, superCtrl.getIdent
 router.patch('/verifications/:userId/approve', authenticate, requireSuperAdmin, superCtrl.approveIdentityVerification);
 router.patch('/verifications/:userId/reject', authenticate, requireSuperAdmin, superCtrl.rejectIdentityVerification);
 router.delete('/verifications/:userId', authenticate, requireSuperAdmin, superCtrl.deleteRejectedVerification);
+router.get('/credential-revalidations', authenticate, requireSuperAdmin, credentialRevalidationCtrl.listRequests);
+router.post('/users/:userId/credential-revalidation', authenticate, requireSuperAdmin, credentialRevalidationCtrl.createRequest);
+router.patch('/credential-revalidations/:requestId/review', authenticate, requireSuperAdmin, credentialRevalidationCtrl.reviewRequest);
 router.get('/admins/performance', authenticate, requireSuperAdmin, superCtrl.getAdminPerformance);
 router.post('/admins/:id/impersonate', authenticate, requireSuperAdmin, superCtrl.impersonateAdmin);
 router.get('/admins/:adminId/state-users', authenticate, requireSuperAdmin, superCtrl.getAdminStateUsers);

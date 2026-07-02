@@ -25,6 +25,7 @@ import ModerationOverview from "../components/admin/ModerationOverview";
 import LiveModerationQueue from "../components/admin/LiveModerationQueue";
 import AdminNotifications from "../components/admin/AdminNotifications";
 import AdminManagementTab from "../components/admin/AdminManagementTab";
+import CredentialRevalidationAdminPanel from "../components/admin/CredentialRevalidationAdminPanel";
 import LawyerInvitesManager from "../components/admin/LawyerInvitesManager";
 import PlatformLawyersTab from "../components/admin/PlatformLawyersTab";
 import PlatformAgentsTab from "../components/admin/PlatformAgentsTab";
@@ -1173,6 +1174,12 @@ export default function SuperAdminDashboard() {
             banUser={banUser}
             unbanUser={unbanUser}
             deleteUser={deleteUser}
+            onRevalidationCreated={() => {
+              guardedLoad(
+                () => Promise.all([loadUsers(), loadVerifications(verificationPage)]),
+                "Revalidation was created, but the dashboard could not refresh"
+              );
+            }}
           />
           <PaginationControls
             currentPage={usersPage}
@@ -1184,23 +1191,33 @@ export default function SuperAdminDashboard() {
       )}
 
       {tab === "verifications" && (
-        <VerificationsTab
-          verifications={verifications}
-          verificationSearch={verificationSearch}
-          setVerificationSearch={setVerificationSearch}
-          verificationStatus={verificationStatus}
-          setVerificationStatus={setVerificationStatus}
-          verificationUserType={verificationUserType}
-          setVerificationUserType={setVerificationUserType}
-          verificationPagination={verificationPagination}
-          loadVerifications={applyVerificationFilters}
-          verificationPage={verificationPage}
-          onVerificationPageChange={handleVerificationPageChange}
-          verifyIdentity={verifyIdentity}
-          rejectIdentity={rejectIdentity}
-          deleteRejectedVerification={deleteRejectedVerification}
-          adminPerformance={adminPerformance}
-        />
+        <>
+          <CredentialRevalidationAdminPanel
+            onReviewed={() => {
+              guardedLoad(
+                () => Promise.all([loadUsers(), loadVerifications(verificationPage)]),
+                "Review was saved, but the dashboard could not refresh"
+              );
+            }}
+          />
+          <VerificationsTab
+            verifications={verifications}
+            verificationSearch={verificationSearch}
+            setVerificationSearch={setVerificationSearch}
+            verificationStatus={verificationStatus}
+            setVerificationStatus={setVerificationStatus}
+            verificationUserType={verificationUserType}
+            setVerificationUserType={setVerificationUserType}
+            verificationPagination={verificationPagination}
+            loadVerifications={applyVerificationFilters}
+            verificationPage={verificationPage}
+            onVerificationPageChange={handleVerificationPageChange}
+            verifyIdentity={verifyIdentity}
+            rejectIdentity={rejectIdentity}
+            deleteRejectedVerification={deleteRejectedVerification}
+            adminPerformance={adminPerformance}
+          />
+        </>
       )}
 
       {tab === "properties" && (

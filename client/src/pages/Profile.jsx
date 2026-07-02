@@ -773,6 +773,22 @@ const Profile = () => {
       <div className="card">
         <h2 className="font-semibold mb-4">{t('profile.verify_title')}</h2>
 
+        {user?.identity_verification_status === 'revalidation_required' && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <p className="font-semibold">Credential revalidation is in progress.</p>
+            <p className="mt-1">
+              Capture and upload the new live photo if it was requested, then return to the revalidation form.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/verification-status')}
+              className="mt-3 font-semibold text-amber-900 underline"
+            >
+              Return to Revalidation Request
+            </button>
+          </div>
+        )}
+
         {user?.identity_verification_status === 'rejected' && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {t('profile.rejected_text')}
