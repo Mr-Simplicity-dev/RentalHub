@@ -55,6 +55,9 @@ const {
   normalizeReferralCode,
 } = require('../services/referralService');
 const {
+  executeRegistrationVerificationWithRecovery,
+} = require('../services/premblyRecoveryService');
+const {
   AUTH_COOKIE_NAME,
   clearAuthCookies,
   getAuthTokenFromRequest,
@@ -692,16 +695,26 @@ const validateAndPrepareRegistration = async (payload) => {
           message: 'Test NIN bypass enabled'
         };
       } else {
-        const nimcResult = await verifyNINWithPrembly(
-          cleanNIN,
-          firstName,
-          lastName,
-          date_of_birth
-        );
+        const nimcResult = await executeRegistrationVerificationWithRecovery({
+          identityType: 'nin',
+          identityValue: cleanNIN,
+          email: cleanEmail,
+          phone: cleanPhone,
+          verify: (callbackUrl) => verifyNINWithPrembly(
+            cleanNIN,
+            firstName,
+            lastName,
+            date_of_birth,
+            { callbackUrl }
+          ),
+        });
 
         verificationMeta = {
           status: nimcResult.status,
-          message: nimcResult.message
+          message: nimcResult.message,
+          reference: nimcResult.reference_id || null,
+          response_code: nimcResult.response_code || null,
+          billing_status: nimcResult.billing_status,
         };
 
         if (nimcResult.status === 'not_configured') {
@@ -713,6 +726,19 @@ const validateAndPrepareRegistration = async (payload) => {
         if (nimcResult.status === 'service_error') {
           const error = new Error(nimcResult.message);
           error.statusCode = 503;
+          throw error;
+        }
+
+        if (nimcResult.status === 'provider_pending') {
+          const error = new Error(
+            'Prembly is temporarily unavailable or still processing this NIN. RentalHub saved the transaction and will check it automatically without submitting another paid verification.'
+          );
+          error.statusCode = 202;
+          error.code = 'PREMBLY_VERIFICATION_PENDING';
+          error.data = {
+            attempt_id: nimcResult.attempt_id,
+            identity_type: 'nin',
+          };
           throw error;
         }
 
@@ -764,12 +790,19 @@ const validateAndPrepareRegistration = async (payload) => {
       identityType = 'passport';
       cleanPassportNumber = passportValidation.value;
 
-      const passportResult = await verifyInternationalPassportWithPrembly(
-        cleanPassportNumber,
-        cleanFullName,
-        cleanNationality,
-        date_of_birth
-      );
+      const passportResult = await executeRegistrationVerificationWithRecovery({
+        identityType: 'passport',
+        identityValue: cleanPassportNumber,
+        email: cleanEmail,
+        phone: cleanPhone,
+        verify: (callbackUrl) => verifyInternationalPassportWithPrembly(
+          cleanPassportNumber,
+          cleanFullName,
+          cleanNationality,
+          date_of_birth,
+          { callbackUrl }
+        ),
+      });
 
       if (passportResult.status === 'not_configured') {
         const error = new Error('Passport verification API is required but not configured on the server');
@@ -780,6 +813,19 @@ const validateAndPrepareRegistration = async (payload) => {
       if (passportResult.status === 'service_error') {
         const error = new Error(passportResult.message);
         error.statusCode = 503;
+        throw error;
+      }
+
+      if (passportResult.status === 'provider_pending') {
+        const error = new Error(
+          'Prembly is temporarily unavailable or still processing this passport. RentalHub saved the transaction and will check it automatically without submitting another paid verification.'
+        );
+        error.statusCode = 202;
+        error.code = 'PREMBLY_VERIFICATION_PENDING';
+        error.data = {
+          attempt_id: passportResult.attempt_id,
+          identity_type: 'passport',
+        };
         throw error;
       }
 
@@ -1524,7 +1570,9 @@ exports.register = async (req, res) => {
     const statusCode = error.statusCode || 500;
     res.status(statusCode).json({
       success: false,
-      message: statusCode >= 500 ? 'Registration failed' : error.message || 'Registration failed'
+      message: statusCode >= 500 ? 'Registration failed' : error.message || 'Registration failed',
+      code: error.code || undefined,
+      data: error.data || undefined,
     });
   }
 };
@@ -1702,7 +1750,9 @@ exports.initializeRegistrationPayment = async (req, res) => {
     console.error('Registration payment initialization error:', error);
     res.status(error.statusCode || 500).json({
       success: false,
-      message: error.message || 'Failed to initialize registration payment'
+      message: error.message || 'Failed to initialize registration payment',
+      code: error.code || undefined,
+      data: error.data || undefined,
     });
   }
 };

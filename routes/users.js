@@ -1055,12 +1055,14 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, r
     const currentUser = await db.query(
       `SELECT u.nin_verified, u.identity_document_type, u.nin,
               u.international_passport_number,
-              EXISTS (
-                SELECT 1
+              (
+                SELECT crr.status
                 FROM credential_revalidation_requests crr
                 WHERE crr.user_id = u.id
-                  AND crr.status IN ('requested', 'submitted', 'rejected')
-              ) AS has_active_revalidation
+                  AND crr.status IN ('requested', 'provider_pending', 'submitted', 'rejected')
+                ORDER BY crr.created_at DESC
+                LIMIT 1
+              ) AS active_revalidation_status
        FROM users u WHERE u.id = $1`,
       [userId]
     );
@@ -1073,7 +1075,16 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, r
       currentIdentity.identity_document_type === 'passport'
         ? Boolean(currentIdentity.international_passport_number)
         : Boolean(currentIdentity.nin);
-    const hasActiveRevalidation = currentIdentity.has_active_revalidation === true;
+    const activeRevalidationStatus = currentIdentity.active_revalidation_status || null;
+    const hasActiveRevalidation = Boolean(activeRevalidationStatus);
+    const preservedReviewStatus =
+      activeRevalidationStatus === 'provider_pending'
+        ? 'provider_pending'
+        : activeRevalidationStatus === 'submitted'
+          ? 'pending'
+          : activeRevalidationStatus
+            ? 'revalidation_required'
+            : null;
 
     const autoVerified = hasVerifiedIdentity && hasIdentityNumber && !hasActiveRevalidation;
 
@@ -1085,7 +1096,7 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, r
            identity_verified_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE NULL END,
             identity_verification_status = CASE
               WHEN $2 THEN 'verified'
-              WHEN $4 THEN 'revalidation_required'
+              WHEN $4::text IS NOT NULL THEN $4
               WHEN $3 THEN 'pending'
               ELSE NULL
             END,
@@ -1095,7 +1106,7 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, r
         relativePath,
         autoVerified,              // $2: identity_verified (auto by system)
         hasIdentityNumber,         // $3: set pending if identity number exists
-        hasActiveRevalidation,     // $4: preserve active revalidation task
+        preservedReviewStatus,    // $4: preserve active revalidation task
         userId                     // $5: WHERE clause
       ]
     );

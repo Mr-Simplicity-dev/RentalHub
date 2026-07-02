@@ -7,13 +7,20 @@ const {
   validateInternationalPassport,
   verifyNINWithPrembly,
   verifyInternationalPassportWithPrembly,
+  isPremblyConfigured,
 } = require('../config/utils/premblyValidator');
+const { buildPremblyRequestKey } = require('../config/utils/premblyResponse');
+const {
+  attemptToResult,
+  beginPremblyVerificationAttempt,
+  processPremblyAttemptResult,
+} = require('../services/premblyRecoveryService');
 const {
   normalizeCredentialRevalidationFields: normalizeFields,
   maskCredentialValue: maskValue,
   isValidCredentialBirthDate: isValidBirthDate,
 } = require('../config/utils/credentialRevalidation');
-const ACTIVE_STATUSES = ['requested', 'submitted', 'rejected'];
+const ACTIVE_STATUSES = ['requested', 'provider_pending', 'submitted', 'rejected'];
 const ALL_STATUSES = [...ACTIVE_STATUSES, 'approved', 'cancelled'];
 
 const rollbackQuietly = async (client) => {
@@ -24,9 +31,6 @@ const rollbackQuietly = async (client) => {
     console.warn('Credential revalidation rollback failed:', error.message);
   }
 };
-
-const getVerificationFailureStatus = (verification) =>
-  ['not_configured', 'service_error'].includes(verification?.status) ? 503 : 422;
 
 const serializeRequest = (row) => {
   if (!row) return null;
@@ -246,7 +250,7 @@ exports.getMyRequests = async (req, res) => {
     const result = await db.query(
       `SELECT id, requested_fields, reason, instructions, status, due_at,
               baseline_snapshot, submitted_summary, submitted_at,
-              review_note, reviewed_at, created_at, updated_at
+              verification_metadata, review_note, reviewed_at, created_at, updated_at
        FROM credential_revalidation_requests
        WHERE user_id = $1
        ORDER BY created_at DESC
@@ -267,10 +271,14 @@ exports.submitRequest = async (req, res) => {
   }
 
   let client;
+  let request;
+  let providerPlan = null;
+  let startedAttempt = null;
+  let submittedWithoutProvider = null;
   try {
     client = await db.connect();
     await client.query('BEGIN');
-    const request = await findRequestForUpdate(client, requestId, req.user.id);
+    request = await findRequestForUpdate(client, requestId, req.user.id);
     if (!request) {
       await client.query('ROLLBACK');
       return res.status(404).json({ success: false, message: 'Revalidation request not found' });
@@ -313,25 +321,6 @@ exports.submitRequest = async (req, res) => {
       const allowTestBypass =
         process.env.ALLOW_TEST_NIN_BYPASS === 'true' ||
         (process.env.NODE_ENV !== 'production' && process.env.ALLOW_TEST_NIN_BYPASS !== 'false');
-      let verification;
-      if (validation.value === testNin && allowTestBypass) {
-        verification = { verified: true, status: 'test_bypass', message: 'Test NIN bypass enabled' };
-      } else {
-        const names = String(request.full_name || '').trim().split(/\s+/);
-        verification = await verifyNINWithPrembly(
-          validation.value,
-          names[0] || '',
-          names.slice(1).join(' ') || names[0] || '',
-          dateOfBirth
-        );
-      }
-      if (!verification?.verified) {
-        await client.query('ROLLBACK');
-        return res.status(getVerificationFailureStatus(verification)).json({
-          success: false,
-          message: verification?.message || 'NIN could not be verified',
-        });
-      }
 
       encryptedIdentity = encryptNIN(validation.value);
       if (!encryptedIdentity) {
@@ -341,11 +330,33 @@ exports.submitRequest = async (req, res) => {
       identityHash = crypto.createHash('sha256').update(validation.value).digest('hex');
       identityType = 'nin';
       submittedSummary.nin = maskValue(validation.value);
-      verificationMetadata = {
-        provider: 'prembly',
-        status: verification.status || 'verified',
-        verified: true,
-      };
+
+      if (validation.value === testNin && allowTestBypass) {
+        verificationMetadata = {
+          provider: 'test_bypass',
+          status: 'verified',
+          verified: true,
+        };
+      } else {
+        if (!isPremblyConfigured()) {
+          await client.query('ROLLBACK');
+          return res.status(503).json({
+            success: false,
+            message: 'Prembly verification is required but is not configured on the server',
+          });
+        }
+        const names = String(request.full_name || '').trim().split(/\s+/);
+        providerPlan = {
+          identityType: 'nin',
+          verify: (callbackUrl) => verifyNINWithPrembly(
+            validation.value,
+            names[0] || '',
+            names.slice(1).join(' ') || names[0] || '',
+            dateOfBirth,
+            { callbackUrl }
+          ),
+        };
+      }
     }
 
     if (fields.includes('international_passport')) {
@@ -373,19 +384,6 @@ exports.submitRequest = async (req, res) => {
         await client.query('ROLLBACK');
         return res.status(400).json({ success: false, message: 'A valid past date of birth is required for passport verification' });
       }
-      const passportVerification = await verifyInternationalPassportWithPrembly(
-        validation.value,
-        request.full_name,
-        nationality,
-        dateOfBirth
-      );
-      if (!passportVerification?.verified) {
-        await client.query('ROLLBACK');
-        return res.status(getVerificationFailureStatus(passportVerification)).json({
-          success: false,
-          message: passportVerification?.message || 'Passport could not be verified',
-        });
-      }
       encryptedIdentity = encryptNIN(validation.value);
       if (!encryptedIdentity) {
         await client.query('ROLLBACK');
@@ -395,10 +393,22 @@ exports.submitRequest = async (req, res) => {
       identityType = 'passport';
       submittedSummary.international_passport = maskValue(validation.value);
       submittedSummary.nationality = nationality;
-      verificationMetadata = {
-        provider: 'prembly',
-        status: passportVerification.status || 'verified',
-        verified: true,
+      if (!isPremblyConfigured()) {
+        await client.query('ROLLBACK');
+        return res.status(503).json({
+          success: false,
+          message: 'Prembly passport verification is required but is not configured on the server',
+        });
+      }
+      providerPlan = {
+        identityType: 'passport',
+        verify: (callbackUrl) => verifyInternationalPassportWithPrembly(
+          validation.value,
+          request.full_name,
+          nationality,
+          dateOfBirth,
+          { callbackUrl }
+        ),
       };
     }
 
@@ -414,16 +424,41 @@ exports.submitRequest = async (req, res) => {
       submittedSummary.live_photo = 'new_capture_uploaded';
     }
 
+    let requestStatus = 'submitted';
+    if (providerPlan) {
+      const requestKeyHash = buildPremblyRequestKey({
+        contextType: 'credential_revalidation',
+        contextId: requestId,
+        identityType,
+        subjectHash: identityHash,
+      });
+      startedAttempt = await beginPremblyVerificationAttempt({
+        client,
+        contextType: 'credential_revalidation',
+        contextId: requestId,
+        identityType,
+        subjectHash: identityHash,
+        requestKeyHash,
+      });
+      requestStatus = 'provider_pending';
+      verificationMetadata = {
+        provider: 'prembly',
+        status: 'initiating',
+        verified: false,
+        attempt_id: startedAttempt.attempt.id,
+      };
+    }
+
     const result = await client.query(
       `UPDATE credential_revalidation_requests
-       SET status = 'submitted',
-           submitted_summary = $2::jsonb,
-           pending_identity_value = $3,
-           pending_identity_hash = $4,
-           pending_identity_type = $5,
-           pending_nationality = $6,
-           verification_metadata = $7::jsonb,
-           submitted_at = NOW(),
+       SET status = $2,
+           submitted_summary = $3::jsonb,
+           pending_identity_value = $4,
+           pending_identity_hash = $5,
+           pending_identity_type = $6,
+           pending_nationality = $7,
+           verification_metadata = $8::jsonb,
+           submitted_at = CASE WHEN $2 = 'submitted' THEN NOW() ELSE NULL END,
            review_note = NULL,
            reviewed_by = NULL,
            reviewed_at = NULL,
@@ -432,6 +467,7 @@ exports.submitRequest = async (req, res) => {
        RETURNING *`,
       [
         requestId,
+        requestStatus,
         JSON.stringify(submittedSummary),
         encryptedIdentity,
         identityHash,
@@ -443,15 +479,27 @@ exports.submitRequest = async (req, res) => {
     await client.query(
       `UPDATE users
        SET identity_verified = FALSE,
-           identity_verification_status = 'pending',
+           identity_verification_status = $2,
            identity_verified_by = NULL,
            identity_verified_at = NULL,
            updated_at = NOW()
        WHERE id = $1`,
-      [req.user.id]
+      [
+        req.user.id,
+        providerPlan ? 'provider_pending' : 'pending',
+      ]
     );
     await client.query('COMMIT');
+    submittedWithoutProvider = result.rows[0];
+  } catch (error) {
+    await rollbackQuietly(client);
+    console.error('Prepare credential revalidation submission error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to prepare credential revalidation' });
+  } finally {
+    client?.release();
+  }
 
+  if (!providerPlan) {
     if (request.requested_by) {
       await createNotification(
         request.requested_by,
@@ -461,14 +509,88 @@ exports.submitRequest = async (req, res) => {
         '/super-admin?tab=verifications'
       );
     }
-    return res.json({ success: true, data: serializeRequest(result.rows[0]) });
-  } catch (error) {
-    await rollbackQuietly(client);
-    console.error('Submit credential revalidation error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to submit credential revalidation' });
-  } finally {
-    client?.release();
+    return res.json({
+      success: true,
+      message: 'Credentials submitted for super-admin review',
+      data: serializeRequest(submittedWithoutProvider),
+    });
   }
+
+  let verificationResult;
+  if (!startedAttempt.isNew) {
+    verificationResult = attemptToResult(startedAttempt.attempt);
+  } else {
+    try {
+      verificationResult = await providerPlan.verify(startedAttempt.callbackUrl);
+    } catch (error) {
+      verificationResult = {
+        verified: false,
+        pending: true,
+        status: 'service_error',
+        message: `Prembly did not return a final response: ${error.message}`,
+      };
+    }
+  }
+
+  let updatedAttempt = startedAttempt.attempt;
+  if (startedAttempt.isNew) {
+    try {
+      updatedAttempt = await processPremblyAttemptResult({
+        attemptId: startedAttempt.attempt.id,
+        result: verificationResult,
+      });
+    } catch (error) {
+      console.error('Save Prembly verification result error:', error);
+      verificationResult = {
+        ...verificationResult,
+        verified: false,
+        pending: true,
+        status: 'provider_pending',
+        message: 'Prembly received the check. RentalHub is waiting for its signed callback.',
+      };
+    }
+  }
+
+  const finalResult = updatedAttempt
+    ? attemptToResult(updatedAttempt)
+    : verificationResult;
+  const refreshed = await db.query(
+    'SELECT * FROM credential_revalidation_requests WHERE id = $1',
+    [requestId]
+  );
+  const serialized = serializeRequest(refreshed.rows[0] || submittedWithoutProvider);
+
+  if (finalResult.status === 'verified') {
+    return res.json({
+      success: true,
+      message: 'Prembly verified the credential. It is now awaiting super-admin review.',
+      data: serialized,
+    });
+  }
+  if (finalResult.status === 'not_verified') {
+    return res.status(422).json({
+      success: false,
+      code: 'PREMBLY_NOT_VERIFIED',
+      message: finalResult.message || 'Prembly could not verify this credential',
+      data: serialized,
+    });
+  }
+
+  if (startedAttempt.isNew) {
+    await createNotification(
+      req.user.id,
+      'credential_provider_pending',
+      'Credential check is still processing',
+      'Prembly is temporarily unavailable or still processing. RentalHub saved this check and will recover the result automatically without submitting another paid verification.',
+      '/verification-status'
+    );
+  }
+  return res.status(202).json({
+    success: true,
+    code: 'PREMBLY_VERIFICATION_PENDING',
+    message: 'Prembly is temporarily unavailable or still processing. RentalHub will check the same transaction automatically; do not resubmit the credential.',
+    data: serialized,
+  });
 };
 
 exports.reviewRequest = async (req, res) => {
