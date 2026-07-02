@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { normalizePremblyResponse } = require('./premblyResponse');
 
 /**
  * Prembly Identity Verification Service
@@ -15,6 +16,32 @@ const PREMBLY_BASE_URL = process.env.PREMBLY_API_URL || 'https://api.prembly.com
 const PREMBLY_SECRET_KEY = process.env.PREMBLY_SECRET_KEY || process.env.PREMBLY_API_KEY;
 const PREMBLY_PUBLIC_KEY = process.env.PREMBLY_PUBLIC_KEY || process.env.PREMBLY_APP_ID;
 const PREMBLY_TIMEOUT_MS = Number(process.env.PREMBLY_API_TIMEOUT_MS || 15000);
+
+const getPremblyHeaders = (includeJson = false) => ({
+  'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
+  'x-app-id': PREMBLY_PUBLIC_KEY,
+  'app-id': PREMBLY_PUBLIC_KEY,
+  'x-api-key': PREMBLY_SECRET_KEY,
+  ...(includeJson ? { 'Content-Type': 'application/json' } : {}),
+});
+
+const addCallbackUrl = (payload, options = {}) => {
+  const callbackUrl = String(options.callbackUrl || '').trim();
+  return callbackUrl ? { ...payload, callback_url: callbackUrl } : payload;
+};
+
+const normalizeVerificationResponse = (body, fallbackMessage, fallbackReference = null) => {
+  const result = normalizePremblyResponse(body, fallbackReference);
+  return {
+    ...result,
+    message:
+      result.message === 'Prembly verification response received'
+        ? fallbackMessage
+        : result.message,
+  };
+};
+
+exports.isPremblyConfigured = () => Boolean(PREMBLY_SECRET_KEY && PREMBLY_PUBLIC_KEY);
 
 /**
  * Validate NIN format (11 digits)
@@ -76,7 +103,13 @@ exports.validateInternationalPassport = (passportNumber) => {
  * @param {string} dateOfBirth - ISO date (YYYY-MM-DD)
  * @returns {Promise<Object>} Verification result with verified status
  */
-exports.verifyNINWithPrembly = async (nin, firstName, lastName, dateOfBirth) => {
+exports.verifyNINWithPrembly = async (
+  nin,
+  firstName,
+  lastName,
+  dateOfBirth,
+  options = {}
+) => {
   if (!PREMBLY_SECRET_KEY || !PREMBLY_PUBLIC_KEY) {
     return {
       verified: false,
@@ -89,51 +122,34 @@ exports.verifyNINWithPrembly = async (nin, firstName, lastName, dateOfBirth) => 
     // Prembly National ID endpoint
     const response = await axios.post(
       `${PREMBLY_BASE_URL}/identityverification/verify/national_id`,
-      {
+      addCallbackUrl({
         id_number: nin,
         first_name: firstName,
         last_name: lastName,
         date_of_birth: dateOfBirth,
-      },
+      }, options),
       {
         timeout: PREMBLY_TIMEOUT_MS,
-        headers: {
-          'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
-          'x-app-id': PREMBLY_PUBLIC_KEY,
-          'Content-Type': 'application/json'
-        }
+        headers: getPremblyHeaders(true)
       }
     );
 
     const body = response.data || {};
-    const status = body.status || 'error';
-    const data = body.data || body.result || {};
-
-    // Prembly returns status: "success" for verified identities
-    const verified = status === 'success' && data.verification_status === 'verified';
-
-    if (!verified) {
-      return {
-        verified: false,
-        status: 'not_verified',
-        message: body.message || data.message || 'NIN could not be verified',
-        prembly_status: status
-      };
+    return normalizeVerificationResponse(body, 'NIN verification response received');
+  } catch (error) {
+    if (error.response?.data) {
+      const result = normalizeVerificationResponse(
+        error.response.data,
+        'NIN verification response received'
+      );
+      if (result.status !== 'service_error' || result.reference_id) {
+        return {
+          ...result,
+          error_code: error.response?.status || error.code,
+        };
+      }
     }
 
-    return {
-      verified: true,
-      status: 'verified',
-      message: body.message || 'NIN verified successfully',
-      raw: data,
-      details: {
-        nin: data.id_number,
-        name: data.name,
-        date_of_birth: data.date_of_birth,
-        verification_status: data.verification_status
-      }
-    };
-  } catch (error) {
     const apiMessage =
       error.response?.data?.message ||
       error.response?.data?.error ||
@@ -162,7 +178,8 @@ exports.verifyInternationalPassportWithPrembly = async (
   passportNumber,
   fullName,
   nationality,
-  dateOfBirth
+  dateOfBirth,
+  options = {}
 ) => {
   if (!PREMBLY_SECRET_KEY || !PREMBLY_PUBLIC_KEY) {
     return {
@@ -176,53 +193,34 @@ exports.verifyInternationalPassportWithPrembly = async (
     // Prembly International Passport endpoint
     const response = await axios.post(
       `${PREMBLY_BASE_URL}/identityverification/verify/international_passport`,
-      {
+      addCallbackUrl({
         passport_number: passportNumber,
         full_name: fullName,
         country: nationality,
         date_of_birth: dateOfBirth,
-      },
+      }, options),
       {
         timeout: PREMBLY_TIMEOUT_MS,
-        headers: {
-          'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
-          'x-app-id': PREMBLY_PUBLIC_KEY,
-          'Content-Type': 'application/json'
-        }
+        headers: getPremblyHeaders(true)
       }
     );
 
     const body = response.data || {};
-    const status = body.status || 'error';
-    const data = body.data || body.result || {};
-
-    // Prembly returns status: "success" for verified passports
-    const verified = status === 'success' && data.verification_status === 'verified';
-
-    if (!verified) {
-      return {
-        verified: false,
-        status: 'not_verified',
-        message: body.message || data.message || 'Passport could not be verified',
-        prembly_status: status
-      };
+    return normalizeVerificationResponse(body, 'Passport verification response received');
+  } catch (error) {
+    if (error.response?.data) {
+      const result = normalizeVerificationResponse(
+        error.response.data,
+        'Passport verification response received'
+      );
+      if (result.status !== 'service_error' || result.reference_id) {
+        return {
+          ...result,
+          error_code: error.response?.status || error.code,
+        };
+      }
     }
 
-    return {
-      verified: true,
-      status: 'verified',
-      message: body.message || 'Passport verified successfully',
-      raw: data,
-      details: {
-        passport_number: data.passport_number,
-        name: data.name,
-        nationality: data.nationality,
-        date_of_birth: data.date_of_birth,
-        expiry_date: data.expiry_date,
-        verification_status: data.verification_status
-      }
-    };
-  } catch (error) {
     const apiMessage =
       error.response?.data?.message ||
       error.response?.data?.error ||
@@ -401,27 +399,34 @@ exports.getVerificationStatusWithPrembly = async (referenceId) => {
 
   try {
     const response = await axios.get(
-      `${PREMBLY_BASE_URL}/identityverification/verify/status/${referenceId}`,
+      `${PREMBLY_BASE_URL}/verification/${encodeURIComponent(referenceId)}/status`,
       {
         timeout: PREMBLY_TIMEOUT_MS,
-        headers: {
-          'Authorization': `Bearer ${PREMBLY_SECRET_KEY}`,
-          'x-app-id': PREMBLY_PUBLIC_KEY
-        }
+        headers: getPremblyHeaders(false)
       }
     );
 
     const body = response.data || {};
-    const data = body.data || {};
-
-    return {
-      status: body.status || 'unknown',
-      verified: data.verification_status === 'verified',
-      reference_id: referenceId,
-      message: body.message,
-      details: data
-    };
+    return normalizeVerificationResponse(
+      body,
+      'Prembly verification status retrieved',
+      referenceId
+    );
   } catch (error) {
+    if (error.response?.data) {
+      const result = normalizeVerificationResponse(
+        error.response.data,
+        'Prembly verification status retrieved',
+        referenceId
+      );
+      if (result.status !== 'service_error') {
+        return {
+          ...result,
+          error_code: error.response?.status || error.code,
+        };
+      }
+    }
+
     const apiMessage =
       error.response?.data?.message ||
       error.response?.data?.error ||
