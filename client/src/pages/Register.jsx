@@ -95,6 +95,7 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showRegistrationFeeModal, setShowRegistrationFeeModal] = useState(!registrationReference);
+  const [premblyPending, setPremblyPending] = useState(null);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -394,12 +395,60 @@ const Register = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
+    if (['nin', 'international_passport_number', 'email', 'phone'].includes(name)) {
+      setPremblyPending(null);
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: value,
       ...(name === 'state_id' ? { lga_name: '' } : {}),
     }));
   };
+
+  useEffect(() => {
+    const attemptId = premblyPending?.attempt_id;
+    if (!attemptId || premblyPending.status !== 'pending') return undefined;
+
+    let cancelled = false;
+    let timer;
+    const checkStatus = async () => {
+      try {
+        const response = await api.get(`/prembly/attempts/${encodeURIComponent(attemptId)}`);
+        const result = response.data?.data;
+        if (cancelled || !result) return;
+
+        if (result.status === 'verified') {
+          setPremblyPending((previous) => ({
+            ...previous,
+            status: 'verified',
+            message: 'Prembly verification completed. Continue registration; RentalHub will reuse this result without another paid check.',
+          }));
+          toast.success('Identity verification completed. You can continue registration.');
+          return;
+        }
+        if (result.status === 'not_verified') {
+          setPremblyPending((previous) => ({
+            ...previous,
+            status: 'not_verified',
+            message: result.message || 'Prembly could not verify this credential. Check the number before continuing.',
+          }));
+          return;
+        }
+      } catch (error) {
+        console.error('Prembly status check failed:', error.response?.data || error.message);
+      }
+
+      if (!cancelled) {
+        timer = window.setTimeout(checkStatus, 15000);
+      }
+    };
+
+    timer = window.setTimeout(checkStatus, 5000);
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [premblyPending?.attempt_id, premblyPending?.status]);
 
   const setApplicantType = (isForeigner) => {
     setFormData((prev) => ({
@@ -543,6 +592,16 @@ const Register = () => {
         registrationData
       );
 
+      if (paymentResponse.data?.code === 'PREMBLY_VERIFICATION_PENDING') {
+        setPremblyPending({
+          attempt_id: paymentResponse.data?.data?.attempt_id,
+          status: 'pending',
+          message: paymentResponse.data?.message,
+        });
+        toast.info('Prembly is still processing. RentalHub will check the same transaction automatically.');
+        return;
+      }
+
       if (
         paymentResponse.data?.success &&
         paymentResponse.data?.data?.authorization_url
@@ -568,6 +627,13 @@ const Register = () => {
         response.data?.user?.user_type || registrationData.user_type;
 
       navigate(role === "tenant" ? "/tenant/dashboard" : "/dashboard");
+    } else if (response.code === 'PREMBLY_VERIFICATION_PENDING') {
+      setPremblyPending({
+        attempt_id: response.data?.attempt_id,
+        status: 'pending',
+        message: response.message,
+      });
+      toast.info('Prembly is still processing. RentalHub will check the same transaction automatically.');
     } else {
       const firstError = response.errors?.[0];
 
@@ -581,6 +647,16 @@ const Register = () => {
   } catch (error) {
     const serverError = error.response?.data;
     const firstError = serverError?.errors?.[0];
+
+    if (serverError?.code === 'PREMBLY_VERIFICATION_PENDING') {
+      setPremblyPending({
+        attempt_id: serverError.data?.attempt_id,
+        status: 'pending',
+        message: serverError.message,
+      });
+      toast.info('Prembly is still processing. RentalHub will check the same transaction automatically.');
+      return;
+    }
 
     toast.error(
       firstError?.msg ||
@@ -805,6 +881,7 @@ const isStepFourComplete =
 
 const submitDisabled =
   loading ||
+  premblyPending?.status === 'pending' ||
   !registrationFlags.loaded ||
   !registrationFlags.registration_allowed ||
   (requiresPayment && !registrationPricing.location_complete) ||

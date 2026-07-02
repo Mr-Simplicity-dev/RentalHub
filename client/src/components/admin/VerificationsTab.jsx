@@ -242,6 +242,8 @@ const VerificationsTab = ({
                               ? "bg-green-100 text-green-700"
                               : reviewStatus === "rejected"
                                 ? "bg-red-100 text-red-700"
+                                : reviewStatus === "revalidation_required"
+                                  ? "bg-amber-100 text-amber-800"
                                 : "bg-yellow-100 text-yellow-700"
                           }`}
                       >
@@ -249,6 +251,8 @@ const VerificationsTab = ({
                           ? "Verified"
                           : reviewStatus === "rejected"
                             ? "Rejected"
+                            : reviewStatus === "revalidation_required"
+                              ? "Revalidation Required"
                             : "Pending"}
                       </span>
 

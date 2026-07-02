@@ -23,7 +23,10 @@ const maybeCookieAuth = (cookies) => {
 };
 
 const csrfProtection = (req, res, next) => {
-  if (CSRF_EXEMPT_PATHS.has(req.path)) {
+  if (
+    CSRF_EXEMPT_PATHS.has(req.path) ||
+    req.path.startsWith('/api/prembly/webhook/')
+  ) {
     return next();
   }
 
