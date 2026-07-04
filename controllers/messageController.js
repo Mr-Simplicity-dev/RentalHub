@@ -1,6 +1,7 @@
 const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
 const { sendMessageNotification } = require('../config/utils/emailService');
+const { detectPhoneNumber } = require('../config/utils/phoneNumberFilter');
 
 let messageSchemaReady = false;
 const ESCALATION_TICKET_STATUSES = ['approval_pending', 'under_review', 'approved', 'rejected'];
@@ -133,6 +134,14 @@ exports.sendMessage = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'You are not allowed to send messages to this user',
+      });
+    }
+
+    // Block messages containing phone numbers (security: prevent contact exchange)
+    if (detectPhoneNumber(message_text).detected || (subject && detectPhoneNumber(subject).detected)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Messages cannot contain phone numbers. Please remove any phone numbers and try again.',
       });
     }
 
