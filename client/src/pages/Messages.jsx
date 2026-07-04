@@ -52,7 +52,8 @@ const Messages = () => {
 
   const userRole = String(user?.user_type || '').trim().toLowerCase();
   const isLgaAdmin = ['admin', 'lga_admin'].includes(userRole);
-  const canCompose = isLgaAdmin || userRole === 'super_admin';
+  const isTenantOrLandlord = ['tenant', 'landlord'].includes(userRole);
+  const canCompose = isLgaAdmin || userRole === 'super_admin' || isTenantOrLandlord;
   const canUseEscalation = isLgaAdmin;
   const canViewEscalations = isLgaAdmin || userRole === 'super_admin';
 
@@ -64,8 +65,11 @@ const Messages = () => {
     if (isLgaAdmin) {
       return ['', 'tenant', 'landlord', 'super_admin'];
     }
+    if (isTenantOrLandlord) {
+      return ['', 'admin', 'lga_admin', 'super_admin'];
+    }
     return [];
-  }, [canCompose, isLgaAdmin, userRole]);
+  }, [canCompose, isLgaAdmin, userRole, isTenantOrLandlord]);
 
   /* ---------------- LOADERS ---------------- */
 

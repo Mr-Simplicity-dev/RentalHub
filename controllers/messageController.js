@@ -68,8 +68,10 @@ const canSendMessage = (senderRole, receiverRole, messageType) => {
     return ['tenant', 'landlord'].includes(receiverRole);
   }
 
-  // Tenant and landlord are receive-only in internal messaging.
-  if (['tenant', 'landlord'].includes(senderRole)) return false;
+  // Tenant and landlord can message admins for support.
+  if (['tenant', 'landlord'].includes(senderRole)) {
+    return ['admin', 'lga_admin', 'super_admin'].includes(receiverRole);
+  }
 
   return false;
 };
