@@ -18,14 +18,30 @@ const WORD_MAP = {
 
 const WORD_SET = new Set(Object.keys(WORD_MAP));
 
+// Leet/visual character to digit mapping (case-insensitive)
+const LEET_MAP = {
+  o: '0', q: '0', d: '0',
+  l: '1', i: '1', '|': '1', '!': '1',
+  z: '2',
+  e: '3',
+  a: '4', h: '4',
+  s: '5', '$': '5',
+  g: '9', t: '7', b: '8',
+};
+
+const LEET_SET = new Set(Object.keys(LEET_MAP));
+
 const tokenize = (text) => {
   return text.toLowerCase().split(/[\s,;:!?()]+/).filter(Boolean);
 };
 
+const isNigerianPhone = (digits) => {
+  return /^0[789]\d{9}$/.test(digits) || /^234[789]\d{9}$/.test(digits) || (digits.length >= 11 && digits.length <= 15 && /^\d+$/.test(digits));
+};
+
 const findDigitPhone = (text) => {
   for (const p of DIGIT_PATTERNS) {
-    const m = text.match(p);
-    if (m) return true;
+    if (p.test(text)) return true;
   }
   return false;
 };
@@ -42,14 +58,12 @@ const findWordPhone = (text) => {
       if (buf.length > 15) buf.shift();
       if (buf.length >= 10) {
         const s = buf.join('');
-        if (/^0[789]\d{9}$/.test(s)) return true;
-        if (/^\d{11,15}$/.test(s)) return true;
+        if (isNigerianPhone(s)) return true;
       }
     } else {
       if (buf.length >= 10) {
         const s = buf.join('');
-        if (/^0[789]\d{9}$/.test(s)) return true;
-        if (/^\d{11,15}$/.test(s)) return true;
+        if (isNigerianPhone(s)) return true;
       }
       buf = [];
     }
@@ -57,8 +71,70 @@ const findWordPhone = (text) => {
 
   if (buf.length >= 10) {
     const s = buf.join('');
-    if (/^0[789]\d{9}$/.test(s)) return true;
-    if (/^\d{11,15}$/.test(s)) return true;
+    if (isNigerianPhone(s)) return true;
+  }
+
+  return false;
+};
+
+const findListBypassPhone = (text) => {
+  const lines = text.split('\n');
+  const leadingDigits = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const m = trimmed.match(/^(\d+)\s*[.):\]>\-]/);
+    if (m) {
+      leadingDigits.push(m[1]);
+    }
+  }
+
+  if (leadingDigits.length < 11) return false;
+
+  // Check sequential leading number groups as-is
+  for (let start = 0; start <= leadingDigits.length - 11; start++) {
+    const chunk = leadingDigits.slice(start, start + 11).join('');
+    if (isNigerianPhone(chunk)) return true;
+  }
+
+  // Also try first digit of each number group (avoids "10." being treated as "10")
+  for (let start = 0; start <= leadingDigits.length - 11; start++) {
+    const chunk = leadingDigits.slice(start, start + 11).map(d => d[0]).join('');
+    if (isNigerianPhone(chunk)) return true;
+  }
+
+  return false;
+};
+
+const findLeetEncodedPhone = (text) => {
+  // Find sequences where all chars are digits or leet chars
+  const leetChars = [...LEET_SET].concat(['0','1','2','3','4','5','6','7','8','9']).join('');
+  const leetWords = text.toLowerCase().split(/[\s,;:!?()]+/).filter(Boolean);
+
+  let buf = [];
+  for (const word of leetWords) {
+    // Check if every char in word is a leet char OR a digit
+    const allLeet = [...word].every(c => LEET_SET.has(c) || /^\d$/.test(c));
+    if (allLeet && word.length > 0) {
+      const decoded = [...word].map(c => LEET_MAP[c] || c).join('');
+      buf.push(decoded);
+      if (buf.join('').length >= 10) {
+        const s = buf.join('');
+        if (isNigerianPhone(s)) return true;
+      }
+    } else {
+      // Still check if the current buffer has a phone number
+      if (buf.length > 0) {
+        const s = buf.join('');
+        if (s.length >= 10 && isNigerianPhone(s)) return true;
+      }
+      buf = [];
+    }
+  }
+
+  if (buf.length > 0) {
+    const s = buf.join('');
+    if (s.length >= 10 && isNigerianPhone(s)) return true;
   }
 
   return false;
@@ -68,7 +144,9 @@ const detectPhoneNumber = (text) => {
   if (!text || typeof text !== 'string') return { detected: false };
   const digitFound = findDigitPhone(text);
   const wordFound = findWordPhone(text);
-  return { detected: digitFound || wordFound };
+  const listFound = findListBypassPhone(text);
+  const leetFound = findLeetEncodedPhone(text);
+  return { detected: digitFound || wordFound || listFound || leetFound };
 };
 
 module.exports = { detectPhoneNumber };

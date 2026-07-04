@@ -7,19 +7,84 @@ let messageSchemaReady = false;
 const ESCALATION_TICKET_STATUSES = ['approval_pending', 'under_review', 'approved', 'rejected'];
 const isLgaAdminRole = (role) => ['admin', 'lga_admin'].includes(String(role || '').trim().toLowerCase());
 
+// In-memory rate limiter for failed phone detection attempts
+const failedAttempts = new Map(); // userId -> { count, resetAt }
+
+const RATE_LIMIT = {
+  MAX_MSG_PER_HOUR: 20,
+  MAX_MSG_PER_CONVERSATION_PER_HOUR: 10,
+  MAX_FAILURES_BEFORE_FLAG: 3,
+  FAILURE_WINDOW_MS: 3600000, // 1 hour
+};
+
+const checkRateLimit = async (senderId, receiverId) => {
+  const [totalResult, convResult] = await Promise.all([
+    db.query(
+      `SELECT COUNT(*) as count FROM messages
+       WHERE sender_id = $1 AND created_at > NOW() - INTERVAL '1 hour'`,
+      [senderId]
+    ),
+    db.query(
+      `SELECT COUNT(*) as count FROM messages
+       WHERE sender_id = $1 AND receiver_id = $2 AND created_at > NOW() - INTERVAL '1 hour'`,
+      [senderId, receiverId]
+    ),
+  ]);
+
+  const totalCount = parseInt(totalResult.rows[0].count, 10);
+  const convCount = parseInt(convResult.rows[0].count, 10);
+
+  if (totalCount >= RATE_LIMIT.MAX_MSG_PER_HOUR) {
+    return { allowed: false, reason: `You've sent too many messages. Please wait before sending more.` };
+  }
+  if (convCount >= RATE_LIMIT.MAX_MSG_PER_CONVERSATION_PER_HOUR) {
+    return { allowed: false, reason: `Too many messages in this conversation. Please wait before sending more.` };
+  }
+
+  // Near limit — flag the message
+  const shouldFlag = totalCount >= RATE_LIMIT.MAX_MSG_PER_HOUR * 0.75 || convCount >= RATE_LIMIT.MAX_MSG_PER_CONVERSATION_PER_HOUR * 0.75;
+
+  return { allowed: true, shouldFlag };
+};
+
+const trackFailedAttempt = (userId) => {
+  const now = Date.now();
+  const entry = failedAttempts.get(userId);
+
+  if (!entry || now > entry.resetAt) {
+    failedAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT.FAILURE_WINDOW_MS });
+    return false;
+  }
+
+  entry.count += 1;
+  if (entry.count >= RATE_LIMIT.MAX_FAILURES_BEFORE_FLAG) {
+    return true; // should flag user
+  }
+  return false;
+};
+
+const clearFailedAttempts = (userId) => {
+  failedAttempts.delete(userId);
+};
+
 const ensureMessageSchema = async () => {
   if (messageSchemaReady) return;
 
   await db.query(`
     ALTER TABLE messages
     ADD COLUMN IF NOT EXISTS subject VARCHAR(180),
-    ADD COLUMN IF NOT EXISTS message_type VARCHAR(20) NOT NULL DEFAULT 'general';
+    ADD COLUMN IF NOT EXISTS message_type VARCHAR(20) NOT NULL DEFAULT 'general',
+    ADD COLUMN IF NOT EXISTS flagged BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS flagged_reason VARCHAR(255);
 
     CREATE INDEX IF NOT EXISTS idx_messages_receiver_unread
       ON messages(receiver_id, is_read);
 
     CREATE INDEX IF NOT EXISTS idx_messages_message_type
       ON messages(message_type);
+
+    CREATE INDEX IF NOT EXISTS idx_messages_flagged
+      ON messages(flagged) WHERE flagged = TRUE;
 
     CREATE TABLE IF NOT EXISTS escalation_tickets (
       id SERIAL PRIMARY KEY,
@@ -139,9 +204,27 @@ exports.sendMessage = async (req, res) => {
 
     // Block messages containing phone numbers (security: prevent contact exchange)
     if (detectPhoneNumber(message_text).detected || (subject && detectPhoneNumber(subject).detected)) {
+      const shouldFlag = trackFailedAttempt(senderId);
+      if (shouldFlag) {
+        // User has repeatedly tried to send phone numbers — flag for admin
+        await db.query(
+          `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
+           VALUES ($1, $2, $3, $4)`,
+          [senderId, 'REPEATED_PHONE_BLOCK', 'user', senderId]
+        );
+      }
       return res.status(400).json({
         success: false,
         message: 'Messages cannot contain phone numbers. Please remove any phone numbers and try again.',
+      });
+    }
+
+    // Rate limiting
+    const rateCheck = await checkRateLimit(senderId, receiver_id);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        message: rateCheck.reason,
       });
     }
 
@@ -167,10 +250,17 @@ exports.sendMessage = async (req, res) => {
       }
     }
 
+    // Clear failed attempt tracking on successful send
+    clearFailedAttempts(senderId);
+
+    // Flag message if near rate limit
+    const flagged = rateCheck.shouldFlag;
+    const flaggedReason = flagged ? 'High message volume — possible number exchange' : null;
+
     // Insert message
     const result = await db.query(
-      `INSERT INTO messages (sender_id, receiver_id, property_id, message_text, subject, message_type, is_read)
-       VALUES ($1, $2, $3, $4, $5, $6, FALSE)
+      `INSERT INTO messages (sender_id, receiver_id, property_id, message_text, subject, message_type, is_read, flagged, flagged_reason)
+       VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7, $8)
        RETURNING *`,
       [
         senderId,
@@ -179,6 +269,8 @@ exports.sendMessage = async (req, res) => {
         message_text,
         subject ? String(subject).trim() : null,
         messageType,
+        flagged,
+        flaggedReason,
       ]
     );
 
@@ -860,6 +952,35 @@ exports.updateEscalationTicketStatus = async (req, res) => {
       success: false,
       message: 'Failed to update escalation ticket status',
     });
+  }
+};
+
+// Get flagged messages (admin review for suspicious activity)
+exports.getFlaggedMessages = async (req, res) => {
+  try {
+    await ensureMessageSchema();
+
+    const userRole = String(req.user.user_type || '').trim().toLowerCase();
+    if (!isLgaAdminRole(userRole) && userRole !== 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const result = await db.query(
+      `SELECT m.id, m.message_text, m.subject, m.flagged_reason, m.created_at,
+              s.id AS sender_id, s.full_name AS sender_name, s.user_type AS sender_type,
+              r.id AS receiver_id, r.full_name AS receiver_name, r.user_type AS receiver_type
+       FROM messages m
+       JOIN users s ON m.sender_id = s.id
+       JOIN users r ON m.receiver_id = r.id
+       WHERE m.flagged = TRUE
+       ORDER BY m.created_at DESC
+       LIMIT 200`
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get flagged messages error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch flagged messages' });
   }
 };
 
