@@ -95,4 +95,10 @@ router.patch('/escalations/:messageId/ticket-status',
   messageController.updateEscalationTicketStatus
 );
 
+// Get flagged messages (admin review for suspicious activity)
+router.get('/flagged',
+  authenticate,
+  messageController.getFlaggedMessages
+);
+
 module.exports = router;

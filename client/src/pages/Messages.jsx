@@ -4,31 +4,64 @@ import { messageService } from '../services/messageService';
 import { toast } from 'react-toastify';
 import BackToDashboard from '../components/common/BackToDashboard';
 import { useTranslation } from 'react-i18next';
-import { FaMicrophone, FaPaperclip, FaFile, FaTimes } from 'react-icons/fa';
+import { FaPaperclip, FaFile, FaTimes } from 'react-icons/fa';
 
 const PHONE_DIGIT_RE = /(?:\+?234[\s\-.]?0?|0)[789]\d[\s\-.]?\d{3}[\s\-.]?\d{3}[\s\-.]?\d{3,4}|\b0\d{10}\b|\+\d{1,3}[\s\-.]?\d{4,}[\s\-.]?\d{4,}/;
 const WORD_NUM = { zero:0,oh:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9 };
 const WORD_SET = new Set(Object.keys(WORD_NUM));
+const LEET_MAP = { o:'0',q:'0',d:'0',l:'1',i:'1','|':'1','!':'1',z:'2',e:'3',a:'4',h:'4',s:'5','$':'5',g:'9',t:'7',b:'8' };
+const LEET_SET = new Set(Object.keys(LEET_MAP));
+
+const isNigerianPhone = (s) => /^0[789]\d{9}$/.test(s) || /^\d{11,15}$/.test(s);
 
 const detectPhone = (text) => {
   if (!text) return false;
   if (PHONE_DIGIT_RE.test(text)) return true;
+
   const tokens = text.toLowerCase().split(/[\s,;:!?()]+/).filter(Boolean);
+
+  // Word-form phone detection
   let buf = [];
   for (const t of tokens) {
     if (WORD_SET.has(t) || /^\d+$/.test(t)) {
       buf.push(WORD_SET.has(t) ? String(WORD_NUM[t]) : t);
       if (buf.length > 15) buf.shift();
       const s = buf.join('');
-      if (/^0[789]\d{9}$/.test(s) || /^\d{11,15}$/.test(s)) return true;
+      if (isNigerianPhone(s)) return true;
     } else {
       const s = buf.join('');
-      if ((/^0[789]\d{9}$/.test(s) || /^\d{11,15}$/.test(s)) && buf.length >= 10) return true;
+      if (isNigerianPhone(s) && buf.length >= 10) return true;
       buf = [];
     }
   }
-  const s = buf.join('');
-  return (/^0[789]\d{9}$/.test(s) || /^\d{11,15}$/.test(s)) && buf.length >= 10;
+  if (isNigerianPhone(buf.join('')) && buf.length >= 10) return true;
+
+  // List bypass detection: extract leading digits from numbered lines
+  const lines = text.split('\n');
+  const leadingDigits = [];
+  for (const line of lines) {
+    const m = line.trim().match(/^(\d+)\s*[.):\]>\-]/);
+    if (m) leadingDigits.push(m[1][0]);
+  }
+  for (let i = 0; i <= leadingDigits.length - 11; i++) {
+    if (isNigerianPhone(leadingDigits.slice(i, i + 11).join(''))) return true;
+  }
+
+  // Leet encoding detection: words where every char is leet-encodable
+  let leetBuf = [];
+  for (const word of tokens) {
+    const allLeet = [...word].every(c => LEET_SET.has(c) || /^\d$/.test(c));
+    if (allLeet && word.length > 0) {
+      leetBuf.push([...word].map(c => LEET_MAP[c] || c).join(''));
+      if (leetBuf.join('').length >= 10 && isNigerianPhone(leetBuf.join(''))) return true;
+    } else {
+      if (leetBuf.length > 0 && leetBuf.join('').length >= 10 && isNigerianPhone(leetBuf.join(''))) return true;
+      leetBuf = [];
+    }
+  }
+  if (leetBuf.length > 0 && leetBuf.join('').length >= 10 && isNigerianPhone(leetBuf.join(''))) return true;
+
+  return false;
 };
 
 const roleLabel = (role, t) => {
@@ -76,10 +109,7 @@ const Messages = () => {
     message_type: 'general',
   });
   const [attachedFiles, setAttachedFiles] = useState([]);
-  const [recording, setRecording] = useState(false);
-  const [audioBlob, setAudioBlob] = useState(null);
   const fileInputRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
 
   const userRole = String(user?.user_type || '').trim().toLowerCase();
   const isLgaAdmin = ['admin', 'lga_admin'].includes(userRole);
@@ -258,32 +288,6 @@ const Messages = () => {
 
   const removeAttachedFile = (index) => {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleStartRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks = [];
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        setAudioBlob(blob);
-        stream.getTracks().forEach((t) => t.stop());
-      };
-      mediaRecorderRef.current = recorder;
-      recorder.start();
-      setRecording(true);
-    } catch {
-      toast.error('Microphone access denied or unavailable.');
-    }
-  };
-
-  const handleStopRecording = () => {
-    if (mediaRecorderRef.current && recording) {
-      mediaRecorderRef.current.stop();
-      setRecording(false);
-    }
   };
 
   const handleOpenEscalationThread = async (item) => {
@@ -515,18 +519,6 @@ const Messages = () => {
                     >
                       <FaPaperclip size={16} />
                     </button>
-                    <button
-                      type="button"
-                      onMouseDown={handleStartRecording}
-                      onMouseUp={handleStopRecording}
-                      onMouseLeave={recording ? handleStopRecording : undefined}
-                      className={`p-2 rounded-lg transition-colors ${
-                        recording ? 'text-red-600 bg-red-50 animate-pulse' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
-                      }`}
-                      title={recording ? 'Release to stop recording' : 'Hold to record audio'}
-                    >
-                      <FaMicrophone size={16} />
-                    </button>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -535,8 +527,6 @@ const Messages = () => {
                       className="hidden"
                       onChange={handleFileSelect}
                     />
-                    {recording && <span className="text-xs text-red-600">Recording... release to stop</span>}
-                    {audioBlob && <span className="text-xs text-green-600">Audio recorded</span>}
                   </div>
                   {attachedFiles.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
