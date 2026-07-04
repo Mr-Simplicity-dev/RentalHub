@@ -1,9 +1,35 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { messageService } from '../services/messageService';
 import { toast } from 'react-toastify';
 import BackToDashboard from '../components/common/BackToDashboard';
 import { useTranslation } from 'react-i18next';
+import { FaMicrophone, FaPaperclip, FaFile, FaTimes } from 'react-icons/fa';
+
+const PHONE_DIGIT_RE = /(?:\+?234[\s\-.]?0?|0)[789]\d[\s\-.]?\d{3}[\s\-.]?\d{3}[\s\-.]?\d{3,4}|\b0\d{10}\b|\+\d{1,3}[\s\-.]?\d{4,}[\s\-.]?\d{4,}/;
+const WORD_NUM = { zero:0,oh:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9 };
+const WORD_SET = new Set(Object.keys(WORD_NUM));
+
+const detectPhone = (text) => {
+  if (!text) return false;
+  if (PHONE_DIGIT_RE.test(text)) return true;
+  const tokens = text.toLowerCase().split(/[\s,;:!?()]+/).filter(Boolean);
+  let buf = [];
+  for (const t of tokens) {
+    if (WORD_SET.has(t) || /^\d+$/.test(t)) {
+      buf.push(WORD_SET.has(t) ? String(WORD_NUM[t]) : t);
+      if (buf.length > 15) buf.shift();
+      const s = buf.join('');
+      if (/^0[789]\d{9}$/.test(s) || /^\d{11,15}$/.test(s)) return true;
+    } else {
+      const s = buf.join('');
+      if ((/^0[789]\d{9}$/.test(s) || /^\d{11,15}$/.test(s)) && buf.length >= 10) return true;
+      buf = [];
+    }
+  }
+  const s = buf.join('');
+  return (/^0[789]\d{9}$/.test(s) || /^\d{11,15}$/.test(s)) && buf.length >= 10;
+};
 
 const roleLabel = (role, t) => {
   if (role === 'super_admin') return t('messages.roles.super_admin');
@@ -49,6 +75,11 @@ const Messages = () => {
     message_text: '',
     message_type: 'general',
   });
+  const [attachedFiles, setAttachedFiles] = useState([]);
+  const [recording, setRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const fileInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
 
   const userRole = String(user?.user_type || '').trim().toLowerCase();
   const isLgaAdmin = ['admin', 'lga_admin'].includes(userRole);
@@ -179,6 +210,10 @@ const Messages = () => {
     if (compose.message_type === 'escalation' && !compose.subject.trim())
       return toast.error(t('messages.escalation_subject_required'));
 
+    if (detectPhone(compose.message_text) || detectPhone(compose.subject)) {
+      return toast.error('Messages cannot contain phone numbers for security reasons.');
+    }
+
     setSending(true);
 
     try {
@@ -212,6 +247,42 @@ const Messages = () => {
       toast.error(error?.response?.data?.message || error.message || t('messages.send_failed'));
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    setAttachedFiles((prev) => [...prev, ...files].slice(0, 3));
+    e.target.value = '';
+  };
+
+  const removeAttachedFile = (index) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleStartRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+    } catch {
+      toast.error('Microphone access denied or unavailable.');
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
     }
   };
 
@@ -435,6 +506,51 @@ const Messages = () => {
                     onChange={(e) => setCompose((prev) => ({ ...prev, message_text: e.target.value }))}
                     placeholder={t('messages.type_message')}
                   />
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Attach file"
+                    >
+                      <FaPaperclip size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={handleStartRecording}
+                      onMouseUp={handleStopRecording}
+                      onMouseLeave={recording ? handleStopRecording : undefined}
+                      className={`p-2 rounded-lg transition-colors ${
+                        recording ? 'text-red-600 bg-red-50 animate-pulse' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+                      }`}
+                      title={recording ? 'Release to stop recording' : 'Hold to record audio'}
+                    >
+                      <FaMicrophone size={16} />
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx,.txt"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    />
+                    {recording && <span className="text-xs text-red-600">Recording... release to stop</span>}
+                    {audioBlob && <span className="text-xs text-green-600">Audio recorded</span>}
+                  </div>
+                  {attachedFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {attachedFiles.map((file, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-xs text-gray-700">
+                          <FaFile size={12} />
+                          {file.name.length > 20 ? file.name.slice(0, 17) + '...' : file.name}
+                          <button type="button" onClick={() => removeAttachedFile(i)} className="text-gray-400 hover:text-red-500 ml-1">
+                            <FaTimes size={10} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end">
