@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -340,19 +341,45 @@ app.use('/', locationRoutes);
 app.use('/', blogRoutes);
 app.use('/.well-known', appLinksRoutes);
 
-app.set('trust proxy', Number(process.env.TRUST_PROXY_COUNT) || 2);
+const TRUST_PROXY_COUNT = Number(process.env.TRUST_PROXY_COUNT);
+// Default 1 because nginx is the only reverse proxy in Contabo setup.
+// Set to 0 if Node is exposed directly, or higher for multi-proxy chains.
+app.set('trust proxy', Number.isFinite(TRUST_PROXY_COUNT) ? TRUST_PROXY_COUNT : 1);
+
+// CSP nonce — generated per-request for inline scripts (production React SPA served by Express)
+app.use((req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  next();
+});
 
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "cdn.jsdelivr.net", "unpkg.com", "js-eu1.hs-scripts.com", "js.hs-scripts.com"],
+      scriptSrc: [
+        "'self'",
+        (req, res) => `'nonce-${res.locals.cspNonce}'`,
+        "cdn.jsdelivr.net",
+        "unpkg.com",
+        "js-eu1.hs-scripts.com",
+        "js.hs-scripts.com",
+      ],
       imgSrc: ["'self'", "res.cloudinary.com", "data:", "blob:", "js-eu1.hs-scripts.com"],
       connectSrc: ["'self'", "api.paystack.co", "api.hubspot.com", "forms.hubspot.com"],
       fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com"],
       styleSrc: ["'self'", "fonts.googleapis.com"],
       mediaSrc: ["'self'", "res.cloudinary.com", "blob:"],
       frameSrc: ["'self'", "app.hubspot.com"],
+    },
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  permissionsPolicy: {
+    features: {
+      camera: ["'none'"],
+      microphone: ["'none'"],
+      geolocation: ["'none'"],
+      fullscreen: ["'self'"],
+      payment: ["'self'"],
     },
   },
   hsts: {
@@ -653,7 +680,10 @@ if (hasClientBuild) {
   app.use(express.static(clientBuildPath));
 
   app.get(/^\/(?!api\/|socket\.io\/|uploads\/).*/, (req, res) => {
-    res.sendFile(clientIndexPath);
+    if (!res.locals.cspNonce) return res.sendFile(clientIndexPath);
+    const html = fs.readFileSync(clientIndexPath, 'utf8');
+    const patched = html.replace(/<script\s/g, `<script nonce="${res.locals.cspNonce}" `);
+    res.type('html').send(patched);
   });
 }
 

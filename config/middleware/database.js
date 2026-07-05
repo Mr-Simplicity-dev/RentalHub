@@ -14,6 +14,7 @@ const poolConfig = {
   max: Math.max(Number(process.env.DB_POOL_MAX) || 20, 1),
   idleTimeoutMillis: Math.max(Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000, 1000),
   connectionTimeoutMillis: Math.max(Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 10000, 1000),
+  query_timeout: Math.max(Number(process.env.DB_QUERY_TIMEOUT_MS) || 15000, 1000),
 };
 
 if (DB_SSL) {
