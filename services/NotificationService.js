@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const db = require('../config/middleware/database');
 const { sendEmail } = require('../config/utils/mailer');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
@@ -26,7 +27,7 @@ const sendTenantEmail = async ({ to, name, subject, message, path = '/fumigation
       `,
     });
   } catch (error) {
-    console.error('Fumigation notification email error (non-fatal):', error.message || error);
+    logger.error('Fumigation notification email error (non-fatal):', error.message || error);
   }
 };
 
@@ -43,7 +44,7 @@ class NotificationService {
       );
       
       if (tenantResult.rows.length === 0) {
-        console.error('Tenant not found for notification:', tenantId);
+        logger.error('Tenant not found for notification:', tenantId);
         return false;
       }
       
@@ -79,7 +80,7 @@ class NotificationService {
       
       return true;
     } catch (error) {
-      console.error('Error sending booking confirmation notification:', error);
+      logger.error('Error sending booking confirmation notification:', error);
       return false;
     }
   }
@@ -96,7 +97,7 @@ class NotificationService {
       );
       
       if (tenantResult.rows.length === 0) {
-        console.error('Tenant not found for cancellation notification:', tenantId);
+        logger.error('Tenant not found for cancellation notification:', tenantId);
         return false;
       }
       
@@ -136,7 +137,7 @@ class NotificationService {
       
       return true;
     } catch (error) {
-      console.error('Error sending booking cancellation notification:', error);
+      logger.error('Error sending booking cancellation notification:', error);
       return false;
     }
   }
@@ -153,7 +154,7 @@ class NotificationService {
       );
       
       if (tenantResult.rows.length === 0) {
-        console.error('Tenant not found for payment notification:', tenantId);
+        logger.error('Tenant not found for payment notification:', tenantId);
         return false;
       }
       
@@ -189,7 +190,7 @@ class NotificationService {
       
       return true;
     } catch (error) {
-      console.error('Error sending payment confirmation notification:', error);
+      logger.error('Error sending payment confirmation notification:', error);
       return false;
     }
   }
@@ -206,7 +207,7 @@ class NotificationService {
       );
       
       if (tenantResult.rows.length === 0) {
-        console.error('Tenant not found for status update notification:', tenantId);
+        logger.error('Tenant not found for status update notification:', tenantId);
         return false;
       }
       
@@ -252,7 +253,7 @@ class NotificationService {
       
       return true;
     } catch (error) {
-      console.error('Error sending booking status update notification:', error);
+      logger.error('Error sending booking status update notification:', error);
       return false;
     }
   }
@@ -269,7 +270,7 @@ class NotificationService {
       );
       
       if (tenantResult.rows.length === 0) {
-        console.error('Tenant not found for provider assignment notification:', tenantId);
+        logger.error('Tenant not found for provider assignment notification:', tenantId);
         return false;
       }
       
@@ -305,7 +306,7 @@ class NotificationService {
       
       return true;
     } catch (error) {
-      console.error('Error sending provider assignment notification:', error);
+      logger.error('Error sending provider assignment notification:', error);
       return false;
     }
   }
@@ -327,7 +328,7 @@ class NotificationService {
       
       return true;
     } catch (error) {
-      console.error('Error sending notification:', error);
+      logger.error('Error sending notification:', error);
       return false;
     }
   }
@@ -345,7 +346,7 @@ class NotificationService {
       
       return result.rows;
     } catch (error) {
-      console.error('Error getting user notifications:', error);
+      logger.error('Error getting user notifications:', error);
       return [];
     }
   }
@@ -363,7 +364,7 @@ class NotificationService {
       
       return result.rows[0];
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      logger.error('Error marking notification as read:', error);
       return null;
     }
   }
@@ -381,7 +382,7 @@ class NotificationService {
       
       return parseInt(result.rows[0].count);
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      logger.error('Error marking all notifications as read:', error);
       return 0;
     }
   }
@@ -397,7 +398,7 @@ class NotificationService {
       
       return parseInt(result.rows[0].count);
     } catch (error) {
-      console.error('Error getting unread notification count:', error);
+      logger.error('Error getting unread notification count:', error);
       return 0;
     }
   }
