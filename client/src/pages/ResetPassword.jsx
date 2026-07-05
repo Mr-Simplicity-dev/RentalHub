@@ -7,15 +7,20 @@ const ResetPassword = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
+    if (loading) return;
+    setLoading(true);
     try {
       await api.post(`/auth/reset-password/${token}`, { password });
       toast.success('Password reset successful');
       navigate('/login');
     } catch {
       toast.error('Reset failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -30,7 +35,7 @@ const ResetPassword = () => {
           value={password}
           onChange={e => setPassword(e.target.value)}
         />
-        <button className="btn btn-primary w-full">Reset</button>
+        <button className="btn btn-primary w-full" disabled={loading}>{loading ? 'Resetting...' : 'Reset'}</button>
       </form>
     </div>
   );

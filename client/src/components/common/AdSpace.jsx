@@ -278,7 +278,7 @@ const AdSpace = ({
     adIds.forEach((id) => {
       if (!trackedImpressions.current.has(id)) {
         trackedImpressions.current.add(id);
-        api.post(`/ads/${id}/impression`).catch(() => {});
+        api.post(`/ads/${id}/impression`).catch(() => { console.warn('Impression track failed for ad:', id); });
       }
     });
   }, [adIds]);
@@ -317,7 +317,7 @@ const AdSpace = ({
 
     const handleClick = () => {
       if (ad?.id) {
-        api.post(`/ads/${ad.id}/click`).catch(() => {});
+        api.post(`/ads/${ad.id}/click`).catch(() => { console.warn('Click track failed for ad:', ad.id); });
       }
     };
 

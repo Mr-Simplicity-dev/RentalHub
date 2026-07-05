@@ -395,8 +395,13 @@ if (fs.existsSync(adSpacesUploadPath)) {
     dotfiles: 'deny',
     index: false,
     maxAge: '1d',
-    setHeaders: (res) => {
+    setHeaders: (res, filePath) => {
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      const ext = path.extname(filePath).toLowerCase();
+      const ALLOWED_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+      if (!ALLOWED_IMAGE_EXTS.has(ext)) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+      }
     },
   }));
 }
@@ -450,7 +455,17 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 const hpp = require('hpp');
-app.use(hpp());
+app.use(hpp({
+  whitelist: [
+    'page', 'limit', 'offset', 'sort', 'order',
+    'status', 'type', 'category', 'role',
+    'search', 'q', 'keyword',
+    'min_price', 'max_price', 'min_rent', 'max_rent',
+    'state_id', 'lga', 'city', 'bedrooms',
+    'start_date', 'end_date', 'from', 'to',
+    'days', 'filter',
+  ],
+}));
 const inputSanitizer = require('./config/middleware/inputSanitizer');
 app.use(inputSanitizer);
 app.use(securityAlertMiddleware);
@@ -546,7 +561,7 @@ app.get('/api/auth/verify-email', async (req, res) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
     const result = await db.query(
       `UPDATE users
@@ -773,6 +788,15 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Rejection:', reason instanceof Error ? reason.message : reason);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error.message);
+  process.exit(1);
+});
+
 const io = new Server(server, {
   cors: {
     origin: Array.from(allowedOrigins),
@@ -793,7 +817,7 @@ io.use(async (socket, next) => {
       return next(new Error('Authentication required'));
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     const userId = decoded.userId || decoded.id || decoded.user_id;
 
     if (!userId) {

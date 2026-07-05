@@ -57,6 +57,7 @@ const {
 const {
   executeRegistrationVerificationWithRecovery,
 } = require('../services/premblyRecoveryService');
+const { checkPasswordBreached } = require('../config/utils/breachCheck');
 const {
   AUTH_COOKIE_NAME,
   clearAuthCookies,
@@ -1552,6 +1553,11 @@ exports.register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(plainPassword, salt);
 
+    // Non-blocking password breach check (async, result logged only)
+    checkPasswordBreached(plainPassword).then(breached => {
+      if (breached) req.logger.warn('Breached password used for registration', { email: preparedRegistration.email });
+    }).catch(() => {});
+
     const data = await createUserFromPreparedRegistration({
       preparedRegistration: preparedRegistrationWithLocation,
       passwordHash,
@@ -2712,14 +2718,19 @@ exports.acceptAgentInvite = async (req, res) => {
     const agentUser = userResult.rows[0];
     const authToken = generateToken(agentUserId, 'agent', { tokenVersion: agentUser.token_version || 1 });
 
-    return res.json({
+    const csrfToken = setAuthCookies(res, authToken);
+    const responseData = {
       success: true,
       message: 'Agent account activated successfully',
       data: {
-        token: authToken,
         user: agentUser,
+        csrf_token: csrfToken,
       },
-    });
+    };
+    if (shouldReturnTokenInBody()) {
+      responseData.data.token = authToken;
+    }
+    return res.json(responseData);
   } catch (error) {
     req.logger.error('Accept agent invite error:', error);
     return res.status(error.statusCode || 500).json({
@@ -2792,14 +2803,19 @@ exports.verifyLawyerOtp = async (req, res) => {
     const user = userResult.rows[0];
     const authToken = generateToken(user.id, user.user_type, { tokenVersion: user.token_version || 1 });
 
-    return res.json({
+    const csrfToken = setAuthCookies(res, authToken);
+    const responseData = {
       success: true,
       message: 'Phone verified. Lawyer account activated successfully!',
       data: {
-        token: authToken,
-        user
-      }
-    });
+        user,
+        csrf_token: csrfToken,
+      },
+    };
+    if (shouldReturnTokenInBody()) {
+      responseData.data.token = authToken;
+    }
+    return res.json(responseData);
   } catch (error) {
     req.logger.error('Verify lawyer OTP error:', error);
     return res.status(500).json({
@@ -3336,12 +3352,17 @@ exports.verifyEmail = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.json({
+    const csrfToken = setAuthCookies(res, authToken);
+    const responseData = {
       success: true,
       message: 'Email verified successfully!',
-      token: authToken,
-      user
-    });
+      user,
+      csrf_token: csrfToken,
+    };
+    if (shouldReturnTokenInBody()) {
+      responseData.token = authToken;
+    }
+    res.json(responseData);
 
   } catch (error) {
     req.logger.error('Verify email error:', error.message);

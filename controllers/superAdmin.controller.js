@@ -1,4 +1,4 @@
-const superAdminService = require('../services/superAdminService');
+const superAdminService = require('../services/superAdmin');
 
 module.exports = {
   getAllUsers: superAdminService.getAllUsers,

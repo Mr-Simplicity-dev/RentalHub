@@ -8,9 +8,10 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { body, query } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
-const { uploadPassportLocal } = require('../config/middleware/upload');
+const { uploadPassportLocal, validateFileMagicBytesMiddleware } = require('../config/middleware/upload');
 const { sensitiveActionLimiter } = require('../config/middleware/securityRateLimiters');
 const { decryptNIN } = require('../config/utils/ninEncryption');
+const { checkPasswordBreached } = require('../config/utils/breachCheck');
 const credentialRevalidationCtrl = require('../controllers/credentialRevalidationController');
 
 // Ensure uploads directory exists
@@ -765,13 +766,18 @@ router.put('/change-password', authenticate, sensitiveActionLimiter, [
       });
     }
 
+    // Non-blocking breach check
+    checkPasswordBreached(new_password).then(breached => {
+      if (breached) req.logger.warn('Breached password used during password change', { userId });
+    }).catch(() => {});
+
     // Hash new password
     const salt = await bcrypt.genSalt(10);
     const new_password_hash = await bcrypt.hash(new_password, salt);
 
-    // Update password
+    // Update password and invalidate existing tokens
     await db.query(
-      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE users SET password_hash = $1, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [new_password_hash, userId]
     );
 
@@ -1013,7 +1019,7 @@ router.post('/verify-password', authenticate, sensitiveActionLimiter, async (req
 });
 
 // Upload passport photo
-router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, res) => {
+router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileMagicBytesMiddleware, async (req, res) => {
   let uploadPersisted = false;
 
   try {

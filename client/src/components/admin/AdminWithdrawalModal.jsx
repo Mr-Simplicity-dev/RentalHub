@@ -38,7 +38,7 @@ export default function AdminWithdrawalModal({
     if (!isOpen) return;
     api.get("/payments/banks")
       .then((res) => { if (res.data?.success) setBanks(res.data.data || []); })
-      .catch(() => {});
+      .catch(() => { console.warn('Failed to load bank list'); });
     // Reset form when opening
     setForm({ amount: "", bank_name: "", bank_code: "", account_number: "", account_name: "" });
     setAccountNameError("");

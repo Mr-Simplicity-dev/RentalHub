@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
@@ -224,6 +224,7 @@ const Dashboard = () => {
   const [consentChecked, setConsentChecked] = useState(false);
   const [banks, setBanks] = useState([]);
   const [banksLoading, setBanksLoading] = useState(false);
+  const accountLookupTimerRef = useRef(null);
 
   // Rent Savings state (tenant only)
   const [showRentSavingsModal, setShowRentSavingsModal] = useState(false);
@@ -648,10 +649,10 @@ const Dashboard = () => {
     }
 
     if (value.length === 10 && withdrawForm.bank_name) {
-      const timeoutId = setTimeout(() => {
+      if (accountLookupTimerRef.current) clearTimeout(accountLookupTimerRef.current);
+      accountLookupTimerRef.current = setTimeout(() => {
         fetchAccountName(withdrawForm.bank_name, value);
       }, 500);
-      return () => clearTimeout(timeoutId);
     }
   };
 

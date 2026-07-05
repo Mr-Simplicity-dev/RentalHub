@@ -96,8 +96,9 @@ router.get('/rankings', authenticate, requireAdminOrSuperAdmin, async (req, res)
     const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 200);
     const keyword = String(req.query.keyword || '').trim();
     // Exclude legacy records created by the old random-number generator.
+    // Cast to string to prevent NoSQL injection via $regex/$where operators
     const filter = keyword
-      ? { keyword, source: 'serpapi' }
+      ? { keyword: String(keyword), source: 'serpapi' }
       : { source: 'serpapi' };
     const rankings = await Ranking.find(filter)
       .sort({ checkedAt: -1 })
