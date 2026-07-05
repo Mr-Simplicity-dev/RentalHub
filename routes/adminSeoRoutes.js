@@ -83,7 +83,7 @@ router.get('/', authenticate, requireAdminOrSuperAdmin, async (req, res) => {
       stateBreakdown: stateBreakdown.rows,
     });
   } catch (error) {
-    console.error('SEO summary error:', error);
+    req.logger.error('SEO summary error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to load SEO summary',
@@ -121,7 +121,7 @@ router.get('/rankings', authenticate, requireAdminOrSuperAdmin, async (req, res)
       },
     });
   } catch (error) {
-    console.error('SEO ranking history error:', error.message);
+    req.logger.error('SEO ranking history error:', error.message);
     res.status(500).json({
       success: false,
       message: 'Failed to load SEO ranking history',
@@ -138,7 +138,7 @@ router.post('/rankings/check', authenticate, requireAdminOrSuperAdmin, validateR
       message: `Completed ${rankings.length} ranking check(s)`,
     });
   } catch (error) {
-    console.error('Manual SEO ranking check error:', error.message);
+    req.logger.error('Manual SEO ranking check error:', error.message);
     res.status(502).json({
       success: false,
       message: error.message || 'Failed to check SEO rankings',
@@ -152,7 +152,7 @@ router.post('/regenerate-sitemap', authenticate, requireAdminOrSuperAdmin, valid
     const urlCount = sitemapUrls.length;
     res.json({ success: true, data: { urlCount, generatedAt: new Date().toISOString() } });
   } catch (error) {
-    console.error('Sitemap regenerate error:', error);
+    req.logger.error('Sitemap regenerate error:', error);
     res.status(500).json({ success: false, message: 'Failed to regenerate sitemap' });
   }
 });
@@ -162,7 +162,7 @@ router.get('/sitemap-xml', authenticate, requireAdminOrSuperAdmin, async (req, r
     const xml = await generateSitemap();
     res.json({ success: true, data: { xml, generatedAt: new Date().toISOString() } });
   } catch (error) {
-    console.error('Sitemap fetch error:', error);
+    req.logger.error('Sitemap fetch error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch sitemap' });
   }
 });
@@ -172,7 +172,7 @@ router.post('/ping-google', authenticate, requireAdminOrSuperAdmin, validateRequ
     const result = await pingGoogle();
     res.json({ success: true, data: result });
   } catch (error) {
-    console.error('Ping Google error:', error);
+    req.logger.error('Ping Google error:', error);
     res.status(500).json({ success: false, message: 'Failed to ping Google' });
   }
 });

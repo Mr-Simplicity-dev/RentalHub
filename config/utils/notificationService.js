@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const db = require("../middleware/database");
 
 // Create notification table
@@ -31,7 +32,7 @@ exports.createNotification = async (userId, type, title, message, link = null) =
 
     return result.rows[0];
   } catch (error) {
-    console.error('Create notification error:', error);
+    logger.error('Create notification error:', error);
     return null;
   }
 };
@@ -52,7 +53,7 @@ exports.getUserNotifications = async (userId, limit = 20, unreadOnly = false) =>
     const result = await db.query(query, params);
     return result.rows;
   } catch (error) {
-    console.error('Get notifications error:', error);
+    logger.error('Get notifications error:', error);
     return [];
   }
 };
@@ -66,7 +67,7 @@ exports.markAsRead = async (notificationId, userId) => {
     );
     return true;
   } catch (error) {
-    console.error('Mark notification as read error:', error);
+    logger.error('Mark notification as read error:', error);
     return false;
   }
 };
@@ -80,7 +81,7 @@ exports.markAllAsRead = async (userId) => {
     );
     return true;
   } catch (error) {
-    console.error('Mark all notifications as read error:', error);
+    logger.error('Mark all notifications as read error:', error);
     return false;
   }
 };
@@ -94,7 +95,7 @@ exports.deleteNotification = async (notificationId, userId) => {
     );
     return true;
   } catch (error) {
-    console.error('Delete notification error:', error);
+    logger.error('Delete notification error:', error);
     return false;
   }
 };
@@ -108,7 +109,7 @@ exports.getUnreadCount = async (userId) => {
     );
     return parseInt(result.rows[0].count);
   } catch (error) {
-    console.error('Get unread count error:', error);
+    logger.error('Get unread count error:', error);
     return 0;
   }
 };

@@ -15,7 +15,7 @@ router.get('/me', authenticate, async (req, res) => {
 
     res.json({ success: true, data });
   } catch (error) {
-    console.error('Get referral program error:', error);
+    req.logger.error('Get referral program error:', error);
     res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || 'Failed to load referral invite',

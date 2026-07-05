@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const db = require('../middleware/database');
 const crypto = require('crypto');
 
@@ -56,6 +57,6 @@ exports.logAction = async ({
     );
 
   } catch (err) {
-    console.error('Audit log failed:', err.message);
+    logger.error('Audit log failed:', err.message);
   }
 };

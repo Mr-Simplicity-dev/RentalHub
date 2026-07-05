@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const db = require('../middleware/database');
 const { sendEmail } = require('./mailer');
 const { getFrontendUrl } = require('./frontendUrl');
@@ -407,7 +408,7 @@ const sendManualFulfillmentNotification = async (alert, note = '') => {
       `,
     });
   } catch (error) {
-    console.error('Manual property request fulfillment email failed:', error.message);
+    logger.error('Manual property request fulfillment email failed:', error.message);
   }
 
   if (alert.phone) {
@@ -416,7 +417,7 @@ const sendManualFulfillmentNotification = async (alert, note = '') => {
       message,
     });
     if (!waResult.success) {
-      console.error('Manual property request fulfillment WhatsApp failed:', waResult.message);
+      logger.error('Manual property request fulfillment WhatsApp failed:', waResult.message);
     }
   }
 };
@@ -445,7 +446,7 @@ exports.notifyAlertsForProperty = async (property) => {
           `,
         });
       } catch (error) {
-        console.error('Property alert email failed:', error.message);
+        logger.error('Property alert email failed:', error.message);
       }
 
       if (alert.phone) {
@@ -454,7 +455,7 @@ exports.notifyAlertsForProperty = async (property) => {
           message,
         });
         if (!waResult.success) {
-          console.error('Property alert WhatsApp failed:', waResult.message);
+          logger.error('Property alert WhatsApp failed:', waResult.message);
         }
       }
 
@@ -473,7 +474,7 @@ exports.notifyAlertsForProperty = async (property) => {
 
     return { matched: alerts.length, notified };
   } catch (error) {
-    console.error('Property alert dispatch error:', error.message);
+    logger.error('Property alert dispatch error:', error.message);
     return { matched: 0, notified: 0 };
   }
 };
@@ -1028,7 +1029,7 @@ exports.reviewTenantPropertyRequest = async ({
         <p>Please open your dashboard and begin sourcing or posting a matching property.</p>
       `,
     }).catch((error) => {
-      console.error('Property request assignment email failed:', error.message);
+      logger.error('Property request assignment email failed:', error.message);
     });
   }
 
@@ -1052,7 +1053,7 @@ exports.reviewTenantPropertyRequest = async ({
       force: false,
     });
   } catch (notificationError) {
-    console.error('Property request approval notification failed:', notificationError.message);
+    logger.error('Property request approval notification failed:', notificationError.message);
   }
 
   return mapAlertRow(result.rows[0]);

@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 // ====================== IMPORTS ======================
 const db = require('../config/middleware/database');
 
@@ -169,7 +170,7 @@ exports.filterPropertiesByAdminLocation = async (adminId, queryParams = {}) => {
     };
     
   } catch (error) {
-    console.error('Filter properties by admin location error:', error);
+    logger.error('Filter properties by admin location error:', error);
     throw error;
   }
 };
@@ -322,7 +323,7 @@ exports.filterTransactionsByAdminLocation = async (adminId, queryParams = {}) =>
     };
     
   } catch (error) {
-    console.error('Filter transactions by admin location error:', error);
+    logger.error('Filter transactions by admin location error:', error);
     throw error;
   }
 };
@@ -414,7 +415,7 @@ exports.getManagedUsers = async (adminId, queryParams = {}) => {
     };
     
   } catch (error) {
-    console.error('Get managed users error:', error);
+    logger.error('Get managed users error:', error);
     throw error;
   }
 };
@@ -518,7 +519,7 @@ exports.getLocationStatistics = async (adminId) => {
     };
     
   } catch (error) {
-    console.error('Get location statistics error:', error);
+    logger.error('Get location statistics error:', error);
     throw error;
   }
 };

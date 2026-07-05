@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const crypto = require('crypto');
 
 const ALGORITHM = 'aes-256-gcm';
@@ -61,7 +62,7 @@ const decryptNIN = (encrypted) => {
 
     return decrypted;
   } catch (error) {
-    console.error('NIN decryption failed:', error.message);
+    logger.error('NIN decryption failed:', error.message);
     return null;
   }
 };

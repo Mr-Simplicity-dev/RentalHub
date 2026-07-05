@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const cron = require("node-cron");
 const {
   checkExpiredSubscriptions,
@@ -15,13 +16,13 @@ const CRON_TIMEZONE = process.env.CRON_TIMEZONE || "Africa/Lagos";
 exports.startPaymentJobs = () => {
   // Check expired subscriptions daily at 00:00
   cron.schedule("0 0 * * *", async () => {
-    console.log("Running expired subscriptions check...");
+    logger.info("Running expired subscriptions check...");
     await checkExpiredSubscriptions();
   });
 
   // Check expired listings daily at 00:30
   cron.schedule("30 0 * * *", async () => {
-    console.log("Running expired listings check...");
+    logger.info("Running expired listings check...");
     await checkExpiredListings();
   });
 
@@ -29,7 +30,7 @@ exports.startPaymentJobs = () => {
 
   // Check expired tenancy periods daily and email tenant/landlord once.
   cron.schedule(tenancyReminderCron, async () => {
-    console.log("Running expired tenancy reminder check...");
+    logger.info("Running expired tenancy reminder check...");
     await checkExpiredTenancyReminders({
       limit: process.env.TENANCY_EXPIRY_REMINDER_BATCH_LIMIT || 50,
     });
@@ -39,15 +40,15 @@ exports.startPaymentJobs = () => {
 
   cron.schedule(walletClearingCron, async () => {
     try {
-      console.log("Running landlord rent wallet clearing check...");
+      logger.info("Running landlord rent wallet clearing check...");
       const result = await clearMaturedLandlordRentCredits({
         limit: Number(process.env.RENT_WALLET_CLEARING_BATCH_LIMIT || 500),
       });
-      console.log(
+      logger.info(
         `Landlord rent wallet clearing complete: ${result.cleared_count} credits, ${result.cleared_amount} total`
       );
     } catch (error) {
-      console.error("Landlord rent wallet clearing failed:", error);
+      logger.error("Landlord rent wallet clearing failed:", error);
     }
   }, { timezone: CRON_TIMEZONE });
 
@@ -57,14 +58,14 @@ exports.startPaymentJobs = () => {
       const { processAutoPayouts } = require("../services/commissionService");
       const result = await processAutoPayouts();
       if (result?.processed > 0) {
-        console.log(`Auto-payout complete: ${result.processed} admins, ₦${result.total_amount}`);
+        logger.info(`Auto-payout complete: ${result.processed} admins, ₦${result.total_amount}`);
       }
     } catch (error) {
-      console.error("Auto-payout error:", error);
+      logger.error("Auto-payout error:", error);
     }
   });
 
-  console.log("✅ Payment cron jobs started");
+  logger.info("✅ Payment cron jobs started");
 };
 
 // =====================================================
@@ -73,9 +74,9 @@ exports.startPaymentJobs = () => {
 exports.startPropertyJobs = () => {
   // Check expired properties daily at 01:00
   cron.schedule("0 1 * * *", async () => {
-    console.log("Running expired properties check...");
+    logger.info("Running expired properties check...");
     await expireProperties();
   });
 
-  console.log("✅ Property cron jobs started");
+  logger.info("✅ Property cron jobs started");
 };

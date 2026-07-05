@@ -39,7 +39,7 @@ async function handleStatusCallback(req, res) {
 
     return res.json(result);
   } catch (error) {
-    console.error('SMS delivery status callback error:', error);
+    req.logger.error('SMS delivery status callback error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to process SMS delivery status',

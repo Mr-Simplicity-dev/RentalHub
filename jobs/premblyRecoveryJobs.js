@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const { runPremblyRecoveryCycle } = require('../services/premblyRecoveryService');
 
 let started = false;
@@ -22,10 +23,10 @@ const startPremblyRecoveryJobs = () => {
     try {
       const summary = await runPremblyRecoveryCycle({ limit: batchSize });
       if (summary.claimed > 0) {
-        console.log('Prembly recovery cycle completed', summary);
+        logger.info('Prembly recovery cycle completed', summary);
       }
     } catch (error) {
-      console.error('Prembly recovery cycle failed:', error.message);
+      logger.error('Prembly recovery cycle failed:', error.message);
     } finally {
       running = false;
     }
@@ -35,7 +36,7 @@ const startPremblyRecoveryJobs = () => {
   initialTimer.unref?.();
   const interval = setInterval(run, intervalMs);
   interval.unref?.();
-  console.log(`Prembly recovery scheduler started (${intervalMs}ms)`);
+  logger.info(`Prembly recovery scheduler started (${intervalMs}ms)`);
 };
 
 module.exports = { startPremblyRecoveryJobs };

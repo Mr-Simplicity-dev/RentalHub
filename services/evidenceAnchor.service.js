@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const axios = require('axios');
 const db = require('../config/middleware/database');
 
@@ -29,7 +30,7 @@ exports.anchorEvidence = async (disputeId, merkleRoot) => {
 
   } catch (error) {
 
-    console.error('Evidence anchoring failed:', error.message);
+    logger.error('Evidence anchoring failed:', error.message);
     return null;
 
   }

@@ -530,7 +530,7 @@ const addTicketTimeline = async (ticketId, actor, eventType, message, metadata =
       ]
     );
   } catch (err) {
-    console.error('Support ticket timeline error (non-fatal):', err);
+    req.logger.error('Support ticket timeline error (non-fatal):', err);
   }
 };
 
@@ -699,7 +699,7 @@ const notifyDepartmentEscalation = async (ticket, department, note = '') => {
       emitToUser(user.id, 'ticket:department_escalated', { ticketId: ticket.id, ticket, department });
     }
   } catch (err) {
-    console.error('Department escalation notification error:', err);
+    req.logger.error('Department escalation notification error:', err);
   }
 };
 
@@ -743,7 +743,7 @@ const sendSupportAlertEmails = async (recipientIds, subject, message, path = '/a
       });
     }
   } catch (err) {
-    console.error('Support alert email error (non-fatal):', err.message || err);
+    req.logger.error('Support alert email error (non-fatal):', err.message || err);
   }
 };
 
@@ -840,7 +840,7 @@ const addReplyNotification = async (reply, ticket, senderId, recipientId) => {
       preview: (reply.message || '').substring(0, 100),
     });
   } catch (err) {
-    console.error('Add reply notification error:', err);
+    req.logger.error('Add reply notification error:', err);
   }
 };
 
@@ -872,7 +872,7 @@ const notifySlaRisk = async (ticket, severity, policies = {}) => {
       await sendSupportAlertEmails(recipientIds, title, message, link);
     }
   } catch (err) {
-    console.error('Support SLA notification error:', err);
+    req.logger.error('Support SLA notification error:', err);
   }
 };
 
@@ -907,7 +907,7 @@ const notifyPolicyRisk = async (ticket, severity, policies = {}) => {
 
     await notifyDepartmentEscalation(ticket, ticket.escalation_department, message);
   } catch (err) {
-    console.error('Support policy notification error:', err);
+    req.logger.error('Support policy notification error:', err);
   }
 };
 
@@ -1016,7 +1016,7 @@ const runSupportSlaMonitor = async () => {
       emitTicketUpdated(ticket);
     }
   } catch (err) {
-    console.error('Support SLA monitor error:', err);
+    req.logger.error('Support SLA monitor error:', err);
   }
 };
 
@@ -1059,7 +1059,7 @@ const sendReplyEmail = async (reply, ticket, sender) => {
       }
     }
   } catch (err) {
-    console.error('Reply email error:', err);
+    req.logger.error('Reply email error:', err);
   }
 };
 
@@ -1126,7 +1126,7 @@ router.post('/contact', contactFormLimiter, [
         [ticketId, name.trim(), initialMsg]
       );
     } catch (replyErr) {
-      console.error('Failed to store initial contact reply (non-fatal):', replyErr);
+      req.logger.error('Failed to store initial contact reply (non-fatal):', replyErr);
     }
 
     await addTicketTimeline(
@@ -1180,7 +1180,7 @@ router.post('/contact', contactFormLimiter, [
         await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticketId]);
       }
     } catch (assignErr) {
-      console.error('Ticket auto-assignment error (non-fatal):', assignErr);
+      req.logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
     }
 
     emitTicketToAdmins('ticket:created', {
@@ -1208,7 +1208,7 @@ router.post('/contact', contactFormLimiter, [
 
     res.status(201).json({ success: true, message: 'Message sent successfully', data: { ticketId } });
   } catch (error) {
-    console.error('Contact form error:', error);
+    req.logger.error('Contact form error:', error);
     res.status(500).json({ success: false, message: 'Failed to send message' });
   }
 });
@@ -1311,7 +1311,7 @@ router.post('/tickets', authenticate, [
           ticket.assigned_to = assignedTo;
         }
       } catch (assignErr) {
-        console.error('Ticket auto-assignment error (non-fatal):', assignErr);
+        req.logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
       }
     }
 
@@ -1322,7 +1322,7 @@ router.post('/tickets', authenticate, [
 
     res.status(201).json({ success: true, data: ticket });
   } catch (error) {
-    console.error('Create support ticket error:', error);
+    req.logger.error('Create support ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to create support ticket' });
   }
 });
@@ -1345,7 +1345,7 @@ router.get('/tickets/my', authenticate, async (req, res) => {
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('My support tickets error:', error);
+    req.logger.error('My support tickets error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch your tickets' });
   }
 });
@@ -1400,7 +1400,7 @@ router.get('/tickets', authenticate, requireSupportAdmin, async (req, res) => {
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Support tickets error:', error);
+    req.logger.error('Support tickets error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch support tickets' });
   }
 });
@@ -1497,7 +1497,7 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
       data: { assigned_to: nextAssigneeId, escalation_note: escalationNote },
     });
   } catch (error) {
-    console.error('Escalate support ticket error:', error);
+    req.logger.error('Escalate support ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to escalate support ticket' });
   }
 });
@@ -1554,7 +1554,7 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Assign support ticket error:', error);
+    req.logger.error('Assign support ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to assign support ticket' });
   }
 });
@@ -1600,7 +1600,7 @@ router.post('/tickets/:id/takeover', authenticate, async (req, res) => {
     emitTicketUpdated(result.rows[0]);
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Takeover ticket error:', error);
+    req.logger.error('Takeover ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to take over ticket' });
   }
 });
@@ -1646,7 +1646,7 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Resolve support ticket error:', error);
+    req.logger.error('Resolve support ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to resolve support ticket' });
   }
 });
@@ -1685,7 +1685,7 @@ router.get('/tickets/:id/context', authenticate, async (req, res) => {
     try {
       relatedContext = await getRelatedServiceContext(ticket);
     } catch (contextErr) {
-      console.error('Support related context error (non-fatal):', contextErr);
+      req.logger.error('Support related context error (non-fatal):', contextErr);
     }
 
     const timelineResult = await db.query(
@@ -1705,7 +1705,7 @@ router.get('/tickets/:id/context', authenticate, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Support ticket context error:', error);
+    req.logger.error('Support ticket context error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch ticket context' });
   }
 });
@@ -1753,7 +1753,7 @@ router.post('/tickets/:id/escalate-department', authenticate, requireSupportAdmi
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Support department escalation error:', error);
+    req.logger.error('Support department escalation error:', error);
     res.status(500).json({ success: false, message: 'Failed to escalate ticket to department' });
   }
 });
@@ -1788,7 +1788,7 @@ router.patch('/tickets/:id/escalation-status', authenticate, requireSupportAdmin
     emitTicketUpdated(result.rows[0]);
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Support escalation status error:', error);
+    req.logger.error('Support escalation status error:', error);
     res.status(500).json({ success: false, message: 'Failed to update escalation status' });
   }
 });
@@ -1850,7 +1850,7 @@ router.get('/department-escalations', authenticate, async (req, res) => {
 
     res.json({ success: true, data: rows });
   } catch (error) {
-    console.error('Department escalations error:', error);
+    req.logger.error('Department escalations error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch department escalations' });
   }
 });
@@ -1922,7 +1922,7 @@ router.patch('/department-escalations/:id/status', authenticate, async (req, res
           );
           emitToUser(ticket.assigned_to, 'ticket:department_resolved', { ticketId, ticket: result.rows[0], department: ticket.escalation_department });
         } catch (notifyErr) {
-          console.error('Failed to notify support admin of department resolution:', notifyErr);
+          req.logger.error('Failed to notify support admin of department resolution:', notifyErr);
         }
       }
     }
@@ -1930,7 +1930,7 @@ router.patch('/department-escalations/:id/status', authenticate, async (req, res
     emitTicketUpdated(result.rows[0]);
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Department escalation status error:', error);
+    req.logger.error('Department escalation status error:', error);
     res.status(500).json({ success: false, message: 'Failed to update department escalation' });
   }
 });
@@ -1998,7 +1998,7 @@ router.get('/governance/summary', authenticate, requireSupportAdmin, async (req,
       },
     });
   } catch (error) {
-    console.error('Support governance summary error:', error);
+    req.logger.error('Support governance summary error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch support governance summary' });
   }
 });
@@ -2051,7 +2051,7 @@ router.get('/governance/export', authenticate, requireSupportAdmin, async (req, 
     res.setHeader('Content-Disposition', `attachment; filename="support-governance-${new Date().toISOString().slice(0, 10)}.csv"`);
     res.send(csv);
   } catch (error) {
-    console.error('Support governance export error:', error);
+    req.logger.error('Support governance export error:', error);
     res.status(500).json({ success: false, message: 'Failed to export support governance report' });
   }
 });
@@ -2073,7 +2073,7 @@ router.get('/governance/policies', authenticate, requireSupportAdmin, async (req
     };
     res.json({ success: true, data: result.rows[0]?.value || defaults, updated_at: result.rows[0]?.updated_at || null });
   } catch (error) {
-    console.error('Support governance policies error:', error);
+    req.logger.error('Support governance policies error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch support governance policies' });
   }
 });
@@ -2103,7 +2103,7 @@ router.put('/governance/policies', authenticate, requireSupportAdmin, async (req
 
     res.json({ success: true, data: result.rows[0].value, updated_at: result.rows[0].updated_at });
   } catch (error) {
-    console.error('Support governance policy update error:', error);
+    req.logger.error('Support governance policy update error:', error);
     res.status(500).json({ success: false, message: 'Failed to update support governance policies' });
   }
 });
@@ -2202,7 +2202,7 @@ router.get('/tickets/:id/conversation', authenticate, async (req, res) => {
       meta: { total: parseInt(countResult.rows[0].count), limit, offset },
     });
   } catch (error) {
-    console.error('Get conversation error:', error);
+    req.logger.error('Get conversation error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch conversation' });
   }
 });
@@ -2345,7 +2345,7 @@ router.post('/tickets/:id/reply', authenticate, uploadAttachment.single('attachm
 
     res.status(201).json({ success: true, data: reply });
   } catch (error) {
-    console.error('Reply error:', error);
+    req.logger.error('Reply error:', error);
     res.status(500).json({ success: false, message: 'Failed to send reply' });
   }
 });
@@ -2383,7 +2383,7 @@ router.patch('/tickets/:ticketId/reply/:replyId/read', authenticate, async (req,
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Mark reply read error:', error);
+    req.logger.error('Mark reply read error:', error);
     res.status(500).json({ success: false, message: 'Failed to mark as read' });
   }
 });
@@ -2428,7 +2428,7 @@ router.patch('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res)
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Edit reply error:', error);
+    req.logger.error('Edit reply error:', error);
     res.status(500).json({ success: false, message: 'Failed to edit reply' });
   }
 });
@@ -2479,7 +2479,7 @@ router.delete('/tickets/:ticketId/reply/:replyId', authenticate, async (req, res
 
     res.json({ success: true, message: 'Reply deleted' });
   } catch (error) {
-    console.error('Delete reply error:', error);
+    req.logger.error('Delete reply error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete reply' });
   }
 });
@@ -2527,7 +2527,7 @@ router.post('/tickets/:id/typing', authenticate, typingLimiter, async (req, res)
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Typing indicator error:', error);
+    req.logger.error('Typing indicator error:', error);
     res.status(500).json({ success: false, message: 'Failed to send typing indicator' });
   }
 });
@@ -2576,7 +2576,7 @@ router.get('/tickets/unread/count', authenticate, async (req, res) => {
 
     res.json({ success: true, count: parseInt(result.rows[0].cnt) });
   } catch (error) {
-    console.error('Unread count error:', error);
+    req.logger.error('Unread count error:', error);
     res.status(500).json({ success: false, message: 'Failed to get unread count' });
   }
 });
@@ -2602,7 +2602,7 @@ router.get('/tickets/internal-notes/unread-count', authenticate, requireSupportA
 
     res.json({ success: true, count: parseInt(result.rows[0].cnt) });
   } catch (error) {
-    console.error('Unread internal notes count error:', error);
+    req.logger.error('Unread internal notes count error:', error);
     res.status(500).json({ success: false, message: 'Failed to get unread count' });
   }
 });
@@ -2626,7 +2626,7 @@ router.post('/tickets/contact-lookup', async (req, res) => {
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Contact lookup error:', error);
+    req.logger.error('Contact lookup error:', error);
     res.status(500).json({ success: false, message: 'Lookup failed' });
   }
 });
@@ -2663,7 +2663,7 @@ router.post('/tickets/contact-conversation', async (req, res) => {
 
     res.json({ success: true, data: result.rows, ticket: { id: ticketResult.rows[0].id, contact_email: ticketResult.rows[0].contact_email } });
   } catch (error) {
-    console.error('Contact conversation error:', error);
+    req.logger.error('Contact conversation error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch conversation' });
   }
 });
@@ -2723,7 +2723,7 @@ router.get('/tickets/:id/internal-notes', authenticate, async (req, res) => {
 
     res.json({ success: true, data: result.rows, meta: { total: parseInt(countResult.rows[0].count), limit, offset } });
   } catch (error) {
-    console.error('Get internal notes error:', error);
+    req.logger.error('Get internal notes error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch internal notes' });
   }
 });
@@ -2814,12 +2814,12 @@ router.post('/tickets/:id/internal-notes', authenticate, async (req, res) => {
         });
       }
     } catch (notifyErr) {
-      console.error('Internal note notification error (non-fatal):', notifyErr);
+      req.logger.error('Internal note notification error (non-fatal):', notifyErr);
     }
 
     res.status(201).json({ success: true, data: note });
   } catch (error) {
-    console.error('Create internal note error:', error);
+    req.logger.error('Create internal note error:', error);
     res.status(500).json({ success: false, message: 'Failed to create internal note' });
   }
 });
@@ -2859,7 +2859,7 @@ router.patch('/tickets/:ticketId/internal-notes/:noteId', authenticate, requireS
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Edit internal note error:', error);
+    req.logger.error('Edit internal note error:', error);
     res.status(500).json({ success: false, message: 'Failed to edit internal note' });
   }
 });
@@ -2894,7 +2894,7 @@ router.delete('/tickets/:ticketId/internal-notes/:noteId', authenticate, require
 
     res.json({ success: true, message: 'Note deleted' });
   } catch (error) {
-    console.error('Delete internal note error:', error);
+    req.logger.error('Delete internal note error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete internal note' });
   }
 });
@@ -2986,7 +2986,7 @@ router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), ver
           );
         }
       } catch (notifyErr) {
-        console.error('Contact reply notification error:', notifyErr);
+        req.logger.error('Contact reply notification error:', notifyErr);
       }
     } else {
       // Not assigned — notify scoped admin role rooms
@@ -2998,7 +2998,7 @@ router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), ver
 
     res.status(201).json({ success: true, data: reply });
   } catch (error) {
-    console.error('Contact reply error:', error);
+    req.logger.error('Contact reply error:', error);
     res.status(500).json({ success: false, message: 'Failed to send reply' });
   }
 });
@@ -3039,7 +3039,7 @@ router.get('/tickets/:id/typing-status', async (req, res) => {
         : null,
     });
   } catch (error) {
-    console.error('Typing status error:', error);
+    req.logger.error('Typing status error:', error);
     res.status(500).json({ success: false, message: 'Failed to get typing status' });
   }
 });
@@ -3063,7 +3063,7 @@ router.get('/governance/policies', authenticate, async (req, res) => {
     }
     res.json({ success: true, data: governancePolicy });
   } catch (error) {
-    console.error('Governance policies error:', error);
+    req.logger.error('Governance policies error:', error);
     res.status(500).json({ success: false, message: 'Failed to load policies' });
   }
 });
@@ -3078,12 +3078,12 @@ router.put('/governance/policies', authenticate, async (req, res) => {
         ['support_governance_policy', JSON.stringify(policy)]
       );
     } catch (dbErr) {
-      console.warn('Could not persist governance policy (non-fatal):', dbErr.message);
+      req.logger.warn('Could not persist governance policy (non-fatal):', dbErr.message);
     }
     governancePolicy = policy;
     res.json({ success: true, data: policy });
   } catch (error) {
-    console.error('Governance policies save error:', error);
+    req.logger.error('Governance policies save error:', error);
     res.status(500).json({ success: false, message: 'Failed to save policies' });
   }
 });
@@ -3122,7 +3122,7 @@ router.get('/governance/summary', authenticate, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Governance summary error:', error);
+    req.logger.error('Governance summary error:', error);
     res.status(500).json({ success: false, message: 'Failed to load governance summary' });
   }
 });
@@ -3148,7 +3148,7 @@ router.get('/governance/export', authenticate, async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="support-governance.csv"');
     res.send(csv);
   } catch (error) {
-    console.error('Governance export error:', error);
+    req.logger.error('Governance export error:', error);
     res.status(500).json({ success: false, message: 'Failed to export governance data' });
   }
 });

@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const db = require('./database');
 const crypto = require('crypto');
 
@@ -100,7 +101,7 @@ const audit = (action, targetType) => {
           ]
         );
       } catch (err) {
-        console.error('Audit middleware error:', err.message);
+        logger.error('Audit middleware error:', err.message);
       }
     });
 

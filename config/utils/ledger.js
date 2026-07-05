@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const crypto = require('crypto');
 const db = require('../config/middleware/database');
 
@@ -54,6 +55,6 @@ exports.addLedgerEntry = async ({
     );
 
   } catch (error) {
-    console.error('Ledger logging error:', error);
+    logger.error('Ledger logging error:', error);
   }
 };

@@ -87,7 +87,7 @@ router.get('/location-options', async (req, res) => {
       data: locations,
     });
   } catch (error) {
-    console.error('Load location options error:', error);
+    req.logger.error('Load location options error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch location options',

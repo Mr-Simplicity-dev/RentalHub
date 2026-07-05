@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const db = require('./database');
 const { statesMatch } = require('../utils/stateScope');
 
@@ -56,7 +57,7 @@ exports.canLawyerAccessProperty = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Legal access check error:', error);
+    logger.error('Legal access check error:', error);
     res.status(500).json({
       success: false,
       message: 'Legal access validation failed'

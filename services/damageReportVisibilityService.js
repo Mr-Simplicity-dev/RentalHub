@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const db = require('../config/middleware/database');
 
 class DamageReportVisibilityService {
@@ -22,7 +23,7 @@ class DamageReportVisibilityService {
 
       return null;
     } catch (error) {
-      console.error(`Error fetching latest published report: ${error.message}`);
+      logger.error(`Error fetching latest published report: ${error.message}`);
       throw error;
     }
   }
@@ -56,7 +57,7 @@ class DamageReportVisibilityService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      console.error(`Error fetching property reports: ${error.message}`);
+      logger.error(`Error fetching property reports: ${error.message}`);
       throw error;
     }
   }
@@ -84,7 +85,7 @@ class DamageReportVisibilityService {
 
       throw new Error('Report not found');
     } catch (error) {
-      console.error(`Error publishing report: ${error.message}`);
+      logger.error(`Error publishing report: ${error.message}`);
       throw error;
     }
   }
@@ -110,7 +111,7 @@ class DamageReportVisibilityService {
 
       throw new Error('Report not found');
     } catch (error) {
-      console.error(`Error unpublishing report: ${error.message}`);
+      logger.error(`Error unpublishing report: ${error.message}`);
       throw error;
     }
   }
@@ -216,7 +217,7 @@ class DamageReportVisibilityService {
 
       throw new Error('Report not found');
     } catch (error) {
-      console.error(`Error updating report: ${error.message}`);
+      logger.error(`Error updating report: ${error.message}`);
       throw error;
     }
   }
@@ -237,7 +238,7 @@ class DamageReportVisibilityService {
 
       throw new Error('Report not found');
     } catch (error) {
-      console.error(`Error deleting report: ${error.message}`);
+      logger.error(`Error deleting report: ${error.message}`);
       throw error;
     }
   }
@@ -260,7 +261,7 @@ class DamageReportVisibilityService {
 
       return result.rows[0] || {};
     } catch (error) {
-      console.error(`Error fetching report summary: ${error.message}`);
+      logger.error(`Error fetching report summary: ${error.message}`);
       throw error;
     }
   }

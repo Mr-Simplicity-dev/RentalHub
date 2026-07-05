@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const db = require('../middleware/database');
 
 const clampLimit = (limit, fallback = 10) => {
@@ -29,7 +30,7 @@ const getPopularLocations = async (limit = 10) => {
 
     return result.rows;
   } catch (error) {
-    console.error('Error getting popular locations:', error);
+    logger.error('Error getting popular locations:', error);
     return [];
   }
 };
@@ -52,7 +53,7 @@ const getPriceStatsByState = async (stateId) => {
 
     return result.rows[0] || null;
   } catch (error) {
-    console.error('Error getting price stats:', error);
+    logger.error('Error getting price stats:', error);
     return null;
   }
 };
@@ -108,7 +109,7 @@ const getSimilarProperties = async (propertyId, limit = 5) => {
 
     return result.rows;
   } catch (error) {
-    console.error('Error getting similar properties:', error);
+    logger.error('Error getting similar properties:', error);
     return [];
   }
 };
@@ -125,10 +126,10 @@ const expireProperties = async () => {
        RETURNING id, title, landlord_id`
     );
 
-    console.log(`Expired ${result.rows.length} properties`);
+    logger.info(`Expired ${result.rows.length} properties`);
     return result.rows;
   } catch (error) {
-    console.error('Error expiring properties:', error);
+    logger.error('Error expiring properties:', error);
     return [];
   }
 };
@@ -214,7 +215,7 @@ const getRecommendations = async (userId, limit = 10) => {
 
     return result.rows;
   } catch (error) {
-    console.error('Error getting recommendations:', error);
+    logger.error('Error getting recommendations:', error);
     return [];
   }
 };

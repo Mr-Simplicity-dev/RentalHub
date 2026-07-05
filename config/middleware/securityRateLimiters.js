@@ -78,6 +78,31 @@ const typingLimiter = buildLimiter({
   message: 'Too many typing indicator requests. Please slow down.',
 });
 
+// Dedicated OTP brute-force protection — very tight limits
+const otpLimiter = buildLimiter({
+  windowMs: Number(process.env.OTP_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.OTP_MAX) || 5,
+  message: 'Too many OTP verification attempts. Please wait 15 minutes and try again.',
+});
+
+const otpSendLimiter = buildLimiter({
+  windowMs: Number(process.env.OTP_SEND_WINDOW_MS) || 10 * 60 * 1000,
+  max: Number(process.env.OTP_SEND_MAX) || 3,
+  message: 'Too many OTP send requests. Please wait 10 minutes and try again.',
+});
+
+const passwordResetLimiter = buildLimiter({
+  windowMs: Number(process.env.PASSWORD_RESET_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.PASSWORD_RESET_MAX) || 3,
+  message: 'Too many password reset attempts. Please wait 15 minutes and try again.',
+});
+
+const registrationLimiter = buildLimiter({
+  windowMs: Number(process.env.REGISTRATION_WINDOW_MS) || 60 * 60 * 1000,
+  max: Number(process.env.REGISTRATION_MAX) || 5,
+  message: 'Too many registration attempts. Please wait an hour and try again.',
+});
+
 module.exports = {
   authSensitiveLimiter,
   paymentOpsLimiter,
@@ -90,4 +115,8 @@ module.exports = {
   recruitmentInterviewLimiter,
   contactFormLimiter,
   typingLimiter,
+  otpLimiter,
+  otpSendLimiter,
+  passwordResetLimiter,
+  registrationLimiter,
 };

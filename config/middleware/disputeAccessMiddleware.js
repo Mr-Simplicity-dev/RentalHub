@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const db = require('./database');
 
 exports.canAccessDispute = async (req, res, next) => {
@@ -46,7 +47,7 @@ exports.canAccessDispute = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Dispute access error:', error);
+    logger.error('Dispute access error:', error);
     res.status(500).json({
       success: false,
       message: 'Permission check failed'

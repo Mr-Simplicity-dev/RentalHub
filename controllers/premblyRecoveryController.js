@@ -25,7 +25,7 @@ exports.receiveWebhook = async (req, res) => {
     return res.status(401).json({ success: false, message: 'Missing Prembly security headers' });
   }
   if (!publicKey) {
-    console.error('Prembly webhook rejected because PREMBLY_PUBLIC_KEY is not configured');
+    req.logger.error('Prembly webhook rejected because PREMBLY_PUBLIC_KEY is not configured');
     return res.status(503).json({ success: false, message: 'Webhook verification is unavailable' });
   }
   if (!verifyPremblyWebhookSignature({ rawBody, signature, publicKey })) {
@@ -54,7 +54,7 @@ exports.receiveWebhook = async (req, res) => {
       status: processed.attempt?.status || result.status,
     });
   } catch (error) {
-    console.error('Prembly webhook processing error:', error);
+    req.logger.error('Prembly webhook processing error:', error);
     return res.status(500).json({ success: false, message: 'Webhook processing failed' });
   }
 };
@@ -72,7 +72,7 @@ exports.getRegistrationAttempt = async (req, res) => {
     }
     return res.json({ success: true, data: attempt });
   } catch (error) {
-    console.error('Get Prembly registration attempt error:', error);
+    req.logger.error('Get Prembly registration attempt error:', error);
     return res.status(500).json({ success: false, message: 'Failed to load verification status' });
   }
 };

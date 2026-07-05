@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const db = require('../middleware/database');
 const { sendEmail } = require('./mailer');
 const { getFrontendUrl } = require('./frontendUrl');
@@ -12,7 +13,7 @@ const sendEmailsSafely = async (messages) => {
       try {
         await sendEmail(message);
       } catch (error) {
-        console.error('Failed to send expiration email:', error.message);
+        logger.error('Failed to send expiration email:', error.message);
       }
     })
   );
@@ -145,7 +146,7 @@ exports.checkExpiredSubscriptions = async () => {
        RETURNING id, email, full_name`
     );
 
-    console.log(`Deactivated ${result.rows.length} expired subscriptions`);
+    logger.info(`Deactivated ${result.rows.length} expired subscriptions`);
 
     if (result.rows.length) {
       const messages = result.rows
@@ -166,7 +167,7 @@ exports.checkExpiredSubscriptions = async () => {
     return result.rows;
 
   } catch (error) {
-    console.error('Error checking expired subscriptions:', error);
+    logger.error('Error checking expired subscriptions:', error);
     return [];
   }
 };
@@ -182,7 +183,7 @@ exports.checkExpiredListings = async () => {
        RETURNING id, title, landlord_id`
     );
 
-    console.log(`Deactivated ${result.rows.length} expired listings`);
+    logger.info(`Deactivated ${result.rows.length} expired listings`);
 
     if (result.rows.length) {
       const landlordIds = [
@@ -229,7 +230,7 @@ exports.checkExpiredListings = async () => {
     return result.rows;
 
   } catch (error) {
-    console.error('Error checking expired listings:', error);
+    logger.error('Error checking expired listings:', error);
     return [];
   }
 };
@@ -333,7 +334,7 @@ exports.checkExpiredTenancyReminders = async ({ limit = 50 } = {}) => {
             );
           }
         } catch (emailError) {
-          console.error('Failed to send tenant tenancy expiry email:', emailError.message);
+          logger.error('Failed to send tenant tenancy expiry email:', emailError.message);
         }
       }
 
@@ -351,12 +352,12 @@ exports.checkExpiredTenancyReminders = async ({ limit = 50 } = {}) => {
             );
           }
         } catch (emailError) {
-          console.error('Failed to send landlord tenancy expiry email:', emailError.message);
+          logger.error('Failed to send landlord tenancy expiry email:', emailError.message);
         }
       }
     }
 
-    console.log(
+    logger.info(
       `Tenancy expiry reminder check complete. Tenant emails: ${tenantEmailsSent}. Landlord emails: ${landlordEmailsSent}.`
     );
 
@@ -366,7 +367,7 @@ exports.checkExpiredTenancyReminders = async ({ limit = 50 } = {}) => {
       landlordEmailsSent,
     };
   } catch (error) {
-    console.error('Error checking expired tenancy reminders:', error);
+    logger.error('Error checking expired tenancy reminders:', error);
     return {
       checked: 0,
       tenantEmailsSent: 0,
@@ -394,7 +395,7 @@ exports.calculateRevenue = async (startDate, endDate) => {
     return result.rows;
 
   } catch (error) {
-    console.error('Error calculating revenue:', error);
+    logger.error('Error calculating revenue:', error);
     return [];
   }
 };
@@ -417,7 +418,7 @@ exports.getPaymentStats = async () => {
     return stats.rows[0];
 
   } catch (error) {
-    console.error('Error getting payment stats:', error);
+    logger.error('Error getting payment stats:', error);
     return null;
   }
 };

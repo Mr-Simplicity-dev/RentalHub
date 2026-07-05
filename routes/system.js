@@ -66,7 +66,7 @@ router.get('/alerts', authenticate, requireSupportAdmin, async (req, res) => {
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('System alerts error:', error);
+    req.logger.error('System alerts error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch system alerts',

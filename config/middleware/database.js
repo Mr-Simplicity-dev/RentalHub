@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const { Pool } = require('pg');
 require('dotenv').config();
 
@@ -22,7 +23,7 @@ if (DB_SSL) {
 }
 
 if (!process.env.DB_HOST || !process.env.DB_NAME || !process.env.DB_USER || !process.env.DB_PASSWORD) {
-  console.error('FATAL: Missing required database environment variables (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD)');
+  logger.error('FATAL: Missing required database environment variables (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD)');
   process.exit(1);
 }
 
@@ -32,13 +33,13 @@ let hasLoggedConnection = false;
 
 pool.on('connect', () => {
   if (!hasLoggedConnection) {
-    console.log('Database connected successfully');
+    logger.info('Database connected successfully');
     hasLoggedConnection = true;
   }
 });
 
 pool.on('error', (err) => {
-  console.error('Database pool error (attempting recovery):', err.message);
+  logger.error('Database pool error (attempting recovery):', err.message);
 });
 
 module.exports = pool;

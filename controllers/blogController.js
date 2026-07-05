@@ -32,7 +32,7 @@ exports.getBlog = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Get blog error:", error);
+    req.logger.error("Get blog error:", error);
 
     res.status(500).json({
       success: false,

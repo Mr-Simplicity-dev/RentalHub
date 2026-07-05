@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const { sendEmail } = require('./mailer');
 const { getFrontendUrl } = require('./frontendUrl');
 
@@ -36,7 +37,7 @@ exports.sendVerificationEmail = async (email, verificationToken) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Email send error:', error);
+    logger.error('Email send error:', error);
     return { success: false, error: error.message };
   }
 };
@@ -56,7 +57,7 @@ exports.sendWelcomeEmail = async (email, fullName, userType) => {
       `,
     });
   } catch (error) {
-    console.error('Welcome email error:', error);
+    logger.error('Welcome email error:', error);
   }
 };
 
@@ -86,7 +87,7 @@ exports.sendLawyerInviteEmail = async ({
     });
     return { success: true };
   } catch (error) {
-    console.error('Lawyer invite email error:', error);
+    logger.error('Lawyer invite email error:', error);
     return { success: false, error: error.message };
   }
 };
@@ -117,7 +118,7 @@ exports.sendPlatformLawyerInviteEmail = async ({
     });
     return { success: true };
   } catch (error) {
-    console.error('Platform lawyer invite email error:', error);
+    logger.error('Platform lawyer invite email error:', error);
     return { success: false, error: error.message };
   }
 };
@@ -149,7 +150,7 @@ exports.sendAgentInviteEmail = async ({
     });
     return { success: true };
   } catch (error) {
-    console.error('Agent invite email error:', error);
+    logger.error('Agent invite email error:', error);
     return { success: false, error: error.message };
   }
 };
@@ -179,7 +180,7 @@ exports.sendAgentAssignmentNoticeEmail = async ({
     });
     return { success: true };
   } catch (error) {
-    console.error('Agent assignment notice email error:', error);
+    logger.error('Agent assignment notice email error:', error);
     return { success: false, error: error.message };
   }
 };
@@ -205,7 +206,7 @@ exports.sendPasswordResetEmail = async (email, resetUrl) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Password reset email error:', error);
+    logger.error('Password reset email error:', error);
     return { success: false, error: error.message };
   }
 };
@@ -236,7 +237,7 @@ exports.sendApplicationNotification = async (
       `,
     });
   } catch (error) {
-    console.error('Application notification email error:', error);
+    logger.error('Application notification email error:', error);
   }
 };
 
@@ -271,7 +272,7 @@ exports.sendApplicationStatusUpdate = async (
       `,
     });
   } catch (error) {
-    console.error('Application status email error:', error);
+    logger.error('Application status email error:', error);
   }
 };
 
@@ -303,7 +304,7 @@ exports.sendMessageNotification = async (
       `,
     });
   } catch (error) {
-    console.error('Message notification email error:', error);
+    logger.error('Message notification email error:', error);
   }
 };
 
@@ -374,7 +375,7 @@ exports.sendFraudAlertEmail = async ({
     });
     return { success: true };
   } catch (error) {
-    console.error('Fraud alert email error:', error);
+    logger.error('Fraud alert email error:', error);
     return { success: false, error: error.message };
   }
 };

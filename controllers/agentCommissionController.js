@@ -29,7 +29,7 @@ class AgentCommissionController {
         data: earnings,
       });
     } catch (error) {
-      console.error(`Error fetching earnings: ${error.message}`);
+      req.logger.error(`Error fetching earnings: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch earnings',
@@ -69,7 +69,7 @@ class AgentCommissionController {
         data: history,
       });
     } catch (error) {
-      console.error(`Error fetching commission history: ${error.message}`);
+      req.logger.error(`Error fetching commission history: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch commission history',
@@ -128,7 +128,7 @@ class AgentCommissionController {
         data: commission,
       });
     } catch (error) {
-      console.error(`Error recording commission: ${error.message}`);
+      req.logger.error(`Error recording commission: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to record commission',
@@ -168,7 +168,7 @@ class AgentCommissionController {
         data: commission,
       });
     } catch (error) {
-      console.error(`Error verifying commission: ${error.message}`);
+      req.logger.error(`Error verifying commission: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to verify commission',
@@ -204,7 +204,7 @@ class AgentCommissionController {
         data: reversal,
       });
     } catch (error) {
-      console.error(`Error reversing commission: ${error.message}`);
+      req.logger.error(`Error reversing commission: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to reverse commission',
@@ -249,7 +249,7 @@ class AgentCommissionController {
         data: commissionRate,
       });
     } catch (error) {
-      console.error(`Error setting commission rate: ${error.message}`);
+      req.logger.error(`Error setting commission rate: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to set commission rate',
@@ -287,7 +287,7 @@ class AgentCommissionController {
         data: rates,
       });
     } catch (error) {
-      console.error(`Error fetching commission rates: ${error.message}`);
+      req.logger.error(`Error fetching commission rates: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch commission rates',
@@ -329,7 +329,7 @@ class AgentCommissionController {
         data: payout,
       });
     } catch (error) {
-      console.error(`Error processing payout: ${error.message}`);
+      req.logger.error(`Error processing payout: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to process payout',

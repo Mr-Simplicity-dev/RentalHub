@@ -1,3 +1,4 @@
+const logger = require('./logger');
 let redis = null;
 
 const REDIS_URL = process.env.REDIS_URL || process.env.UPSTASH_REDIS_URL;
@@ -12,7 +13,7 @@ if (REDIS_URL) {
     });
 
     redis.on('error', (err) => {
-      console.error('Redis connection error (falling back to in-memory):', err.message);
+      logger.error('Redis connection error (falling back to in-memory):', err.message);
       redis = null;
     });
 
@@ -21,7 +22,7 @@ if (REDIS_URL) {
       redis = null;
     });
   } catch (err) {
-    console.error('Failed to initialize Redis (falling back to in-memory):', err.message);
+    logger.error('Failed to initialize Redis (falling back to in-memory):', err.message);
     redis = null;
   }
 }

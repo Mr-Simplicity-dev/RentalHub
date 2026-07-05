@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const ATTEMPT_WINDOW_MS = Number(process.env.SECURITY_ALERT_WINDOW_MS) || 15 * 60 * 1000;
 const ATTEMPT_THRESHOLD = Number(process.env.SECURITY_ALERT_THRESHOLD) || 10;
 
@@ -28,7 +29,7 @@ const securityAlertMiddleware = (req, res, next) => {
     cleanupExpiredAttempts(bucket, now);
 
     if (bucket.length >= ATTEMPT_THRESHOLD) {
-      console.warn('[SECURITY ALERT] Repeated denied access attempts detected', {
+      logger.warn('[SECURITY ALERT] Repeated denied access attempts detected', {
         ip: req.ip || 'unknown',
         actor,
         method: req.method,

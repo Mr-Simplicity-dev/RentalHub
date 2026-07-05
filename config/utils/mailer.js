@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const { Resend } = require('resend');
 
 const FROM = process.env.EMAIL_FROM || 'RentalHub NG <support@rentalhub.com.ng>';
@@ -20,13 +21,13 @@ const extractEmailAddress = (value) => {
 const validateSenderDomain = () => {
   const email = extractEmailAddress(FROM);
   if (!email || !email.includes('@')) {
-    console.error('MAILER WARNING: EMAIL_FROM does not contain a valid email address. Sending will likely fail.');
+    logger.error('MAILER WARNING: EMAIL_FROM does not contain a valid email address. Sending will likely fail.');
     return;
   }
   const domain = email.split('@')[1].toLowerCase();
   const knownVerifiedDomains = ['rentalhub.com.ng'];
   if (!knownVerifiedDomains.includes(domain)) {
-    console.warn(`MAILER WARNING: EMAIL_FROM domain "${domain}" is not in the known verified list. Ensure it is verified with Resend before sending.`);
+    logger.warn(`MAILER WARNING: EMAIL_FROM domain "${domain}" is not in the known verified list. Ensure it is verified with Resend before sending.`);
   }
 };
 validateSenderDomain();

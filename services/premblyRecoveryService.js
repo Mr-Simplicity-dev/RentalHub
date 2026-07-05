@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const crypto = require('crypto');
 const db = require('../config/middleware/database');
 const { createNotification } = require('../config/utils/notificationService');
@@ -17,7 +18,7 @@ const rollbackQuietly = async (client) => {
   try {
     await client.query('ROLLBACK');
   } catch (error) {
-    console.warn('Prembly recovery rollback failed:', error.message);
+    logger.warn('Prembly recovery rollback failed:', error.message);
   }
 };
 
@@ -555,7 +556,7 @@ const runPremblyRecoveryCycle = async ({ limit = 20 } = {}) => {
       else summary.pending += 1;
     } catch (error) {
       summary.failed += 1;
-      console.error(`Prembly recovery failed for attempt ${attempt.id}:`, error.message);
+      logger.error(`Prembly recovery failed for attempt ${attempt.id}:`, error.message);
     }
   }
 

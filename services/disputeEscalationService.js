@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const db = require('../config/middleware/database');
 
 const ESCALATION_DAYS = 14;
@@ -17,7 +18,7 @@ exports.checkAndEscalateDisputes = async () => {
     );
 
     if (result.rows.length > 0) {
-      console.log(`Escalated ${result.rows.length} dispute(s)`);
+      logger.info(`Escalated ${result.rows.length} dispute(s)`);
 
       for (const dispute of result.rows) {
         await db.query(
@@ -29,6 +30,6 @@ exports.checkAndEscalateDisputes = async () => {
     }
 
   } catch (error) {
-    console.error('Escalation engine error:', error);
+    logger.error('Escalation engine error:', error);
   }
 };

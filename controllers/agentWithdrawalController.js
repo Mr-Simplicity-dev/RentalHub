@@ -74,7 +74,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      console.error(`Error creating withdrawal request: ${error.message}`);
+      req.logger.error(`Error creating withdrawal request: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to create withdrawal request',
@@ -119,7 +119,7 @@ class AgentWithdrawalController {
         data: requests,
       });
     } catch (error) {
-      console.error(`Error fetching withdrawal requests: ${error.message}`);
+      req.logger.error(`Error fetching withdrawal requests: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch withdrawal requests',
@@ -165,7 +165,7 @@ class AgentWithdrawalController {
         data: summary,
       });
     } catch (error) {
-      console.error(`Error fetching withdrawal summary: ${error.message}`);
+      req.logger.error(`Error fetching withdrawal summary: ${error.message}`);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch withdrawal summary',
@@ -200,7 +200,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      console.error(`Error approving withdrawal: ${error.message}`);
+      req.logger.error(`Error approving withdrawal: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to approve withdrawal',
@@ -242,7 +242,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      console.error(`Error rejecting withdrawal: ${error.message}`);
+      req.logger.error(`Error rejecting withdrawal: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to reject withdrawal',
@@ -272,7 +272,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      console.error(`Error marking withdrawal as processing: ${error.message}`);
+      req.logger.error(`Error marking withdrawal as processing: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to mark withdrawal as processing',
@@ -307,7 +307,7 @@ class AgentWithdrawalController {
         data: withdrawal,
       });
     } catch (error) {
-      console.error(`Error marking withdrawal as completed: ${error.message}`);
+      req.logger.error(`Error marking withdrawal as completed: ${error.message}`);
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to mark withdrawal as completed',
@@ -358,7 +358,7 @@ class AgentWithdrawalController {
         message: 'Webhook processed',
       });
     } catch (error) {
-      console.error(`Paystack transfer webhook error: ${error.message}`);
+      req.logger.error(`Paystack transfer webhook error: ${error.message}`);
       return res.status(500).json({
         success: false,
         message: 'Failed to process webhook',
