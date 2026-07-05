@@ -3,6 +3,32 @@ const path = require('path');
 const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
 
+const MAGIC_BYTE_CHECKS = {
+  jpeg: { offset: 0, bytes: [0xFF, 0xD8, 0xFF] },
+  png: { offset: 0, bytes: [0x89, 0x50, 0x4E, 0x47] },
+  gif: { offset: 0, bytes: [0x47, 0x49, 0x46, 0x38] },
+  webp: { offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] },
+  mp4: { offset: 4, bytes: [0x66, 0x74, 0x79, 0x70] },
+  webm: { offset: 0, bytes: [0x1A, 0x45, 0xDF, 0xA3] },
+};
+
+const validateFileMagicBytes = (filePath) => {
+  if (!filePath) return false;
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const header = Buffer.alloc(16);
+    const bytesRead = fs.readSync(fd, header, 0, 16, 0);
+    if (bytesRead < 4) return false;
+    for (const [, spec] of Object.entries(MAGIC_BYTE_CHECKS)) {
+      if (bytesRead < spec.offset + spec.bytes.length) continue;
+      if (spec.bytes.every((b, i) => header[spec.offset + i] === b)) return true;
+    }
+    return false;
+  } finally {
+    fs.closeSync(fd);
+  }
+};
+
 // Handle both old and new versions of multer-storage-cloudinary
 const cloudinaryModule = require('multer-storage-cloudinary');
 const CloudinaryStorage =
@@ -163,11 +189,24 @@ const uploadPassportLocal = multer({
   }
 }).single('passport');
 
+const validateFileMagicBytesMiddleware = (req, res, next) => {
+  if (!req.file) return next();
+  if (!validateFileMagicBytes(req.file.path)) {
+    try { fs.unlinkSync(req.file.path); } catch (_) {}
+    return res.status(400).json({
+      success: false,
+      message: 'File content does not match allowed file types. The file may be corrupted or renamed.',
+    });
+  }
+  next();
+};
+
 module.exports = {
   uploadPassport: withCloudinaryConfig(uploadPassport),
   uploadPassportLocal,
   uploadPropertyMedia: withCloudinaryConfig(uploadPropertyMedia),
   uploadPropertyPhotos: withCloudinaryConfig(uploadPropertyPhotos),
+  validateFileMagicBytesMiddleware,
   cloudinary,
 };
 

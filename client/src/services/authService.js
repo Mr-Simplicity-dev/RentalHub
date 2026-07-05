@@ -48,7 +48,7 @@ export const authService = {
   // Logout (NO redirect here)
   logout: ({ remote = true } = {}) => {
     if (remote) {
-      api.post('/auth/logout').catch(() => {});
+      api.post('/auth/logout').catch(() => { console.warn('Logout API call failed — session cleared locally'); });
     }
     authService.clearLocalSession();
   },

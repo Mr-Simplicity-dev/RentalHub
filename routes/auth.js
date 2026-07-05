@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const authController = require('../controllers/authController');
-const { uploadPassportLocal } = require('../config/middleware/upload');
+const { uploadPassportLocal, validateFileMagicBytesMiddleware } = require('../config/middleware/upload');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const { checkLoginRateLimit } = require('../config/middleware/loginRateLimiter');
 const { authSensitiveLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter } = require('../config/middleware/securityRateLimiters');
@@ -241,6 +241,7 @@ router.post(
   '/upload-passport',
   authenticate,
   uploadPassportLocal,
+  validateFileMagicBytesMiddleware,
   authController.uploadPassport
 );
 
@@ -248,6 +249,7 @@ router.post(
   '/check-lawyer-passport-fraud',
   authenticate,
   uploadPassportLocal,
+  validateFileMagicBytesMiddleware,
   authController.checkLawyerPassportForFraud
 );
 

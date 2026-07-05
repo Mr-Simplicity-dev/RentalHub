@@ -234,7 +234,7 @@ const FloatingContactWidget = () => {
     if (!open || locationsLoaded) return;
     api.get('/property-utils/location-options').then((res) => {
       if (res.data?.success) setLocations(res.data.data || []);
-    }).catch(() => {}).finally(() => setLocationsLoaded(true));
+    }).catch(() => { console.warn('Failed to load locations for contact widget'); }).finally(() => setLocationsLoaded(true));
   }, [open, locationsLoaded]);
 
   const states = useMemo(() => {
