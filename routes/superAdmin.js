@@ -139,7 +139,7 @@ router.get('/pending-admins', authenticate, async (req, res, next) => {
       });
     });
   } catch (err) {
-    console.error('Get pending admins error:', err);
+    req.logger.error('Get pending admins error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -196,7 +196,7 @@ router.patch('/pending-admins/:id/approve', authenticate, canManagePendingAdmins
     res.json({ success: true, message: 'Admin account approved successfully' });
   } catch (err) {
     await db.query('ROLLBACK');
-    console.error('Approve pending admin error:', err);
+    req.logger.error('Approve pending admin error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -257,7 +257,7 @@ router.patch('/pending-admins/:id/reject', authenticate, canManagePendingAdmins,
     res.json({ success: true, message: 'Admin account rejected and removed' });
   } catch (err) {
     await db.query('ROLLBACK');
-    console.error('Reject pending admin error:', err);
+    req.logger.error('Reject pending admin error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -281,7 +281,7 @@ router.get('/sfa-permissions', authenticate, requireSuperAdmin, async (req, res)
     );
     res.json({ success: true, data: sfas.rows });
   } catch (err) {
-    console.error('Get SFA permissions error:', err);
+    req.logger.error('Get SFA permissions error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -316,7 +316,7 @@ router.patch('/sfa-permissions/:sfaId', authenticate, requireSuperAdmin, async (
 
     res.json({ success: true, message: 'Permissions updated successfully' });
   } catch (err) {
-    console.error('Update SFA permissions error:', err);
+    req.logger.error('Update SFA permissions error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -376,7 +376,7 @@ router.post('/withdraw/direct', authenticate, requireSuperAdminOrDelegatedDirect
       data: result,
     });
   } catch (err) {
-    console.error('Super admin direct withdrawal error:', err);
+    req.logger.error('Super admin direct withdrawal error:', err);
     res.status(400).json({ success: false, message: 'Withdrawal failed. Please verify the details and try again.' });
   }
 });

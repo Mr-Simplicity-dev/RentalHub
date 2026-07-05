@@ -72,7 +72,7 @@ router.get('/config', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Load property alert config error:', error);
+    req.logger.error('Load property alert config error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to load notification request settings',
@@ -213,7 +213,7 @@ router.post(
         },
       });
     } catch (error) {
-      console.error('Initialize property alert payment error:', error);
+      req.logger.error('Initialize property alert payment error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to initialize notification payment',
@@ -305,7 +305,7 @@ router.post(
         data: alert,
       });
     } catch (error) {
-      console.error('Complete property alert payment error:', error);
+      req.logger.error('Complete property alert payment error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to complete notification request',
@@ -340,7 +340,7 @@ router.get(
         data: requests,
       });
     } catch (error) {
-      console.error('List property requests error:', error);
+      req.logger.error('List property requests error:', error);
       res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Failed to load property requests',
@@ -365,7 +365,7 @@ router.get(
         data: admins,
       });
     } catch (error) {
-      console.error('List assignable property request admins error:', error);
+      req.logger.error('List assignable property request admins error:', error);
       res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Failed to load assignable admins',
@@ -411,7 +411,7 @@ router.patch(
         data: request,
       });
     } catch (error) {
-      console.error('Review property request error:', error);
+      req.logger.error('Review property request error:', error);
       res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Failed to review property request',
@@ -452,7 +452,7 @@ router.patch(
         data: request,
       });
     } catch (error) {
-      console.error('State property request action error:', error);
+      req.logger.error('State property request action error:', error);
       res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Failed to update property request',
@@ -507,7 +507,7 @@ router.post(
         data: result,
       });
     } catch (error) {
-      console.error('Resend property request notifications error:', error);
+      req.logger.error('Resend property request notifications error:', error);
       res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Failed to send request notifications',

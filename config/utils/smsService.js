@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const axios = require('axios');
 const crypto = require('crypto');
 const db = require('../middleware/database');
@@ -353,7 +354,7 @@ async function recordSmsAttemptSafely(attempt) {
   try {
     return await recordSmsAttempt(attempt);
   } catch (error) {
-    console.error('[SMS] Failed to record delivery attempt:', error.message);
+    logger.error('[SMS] Failed to record delivery attempt:', error.message);
     return null;
   }
 }
@@ -636,7 +637,7 @@ async function sendSMS(phoneNumber, message, options = {}) {
         statusCallbackUrl: getSmsStatusCallbackUrl(provider),
       });
       const idSuffix = result.messageId ? ` (message id: ${result.messageId})` : '';
-      console.log(`[SMS] Sent to ${result.to || to} via ${provider} ${result.route || 'sms'}${idSuffix}`);
+      logger.info(`[SMS] Sent to ${result.to || to} via ${provider} ${result.route || 'sms'}${idSuffix}`);
 
       if (trackingContext) {
         const attempt = await recordSmsAttemptSafely({
@@ -670,7 +671,7 @@ async function sendSMS(phoneNumber, message, options = {}) {
     } catch (error) {
       const errorMessage = getProviderErrorMessage(provider, error);
       failures.push({ provider, error: errorMessage });
-      console.error(`[SMS] ${provider} send failed for ${to}: ${errorMessage}`);
+      logger.error(`[SMS] ${provider} send failed for ${to}: ${errorMessage}`);
 
       if (trackingContext) {
         await recordSmsAttemptSafely({
@@ -777,7 +778,7 @@ async function triggerSmsFallbackForAttempt(attempt, reason) {
         expiresAt: attempt.expires_at,
       });
 
-      console.log(
+      logger.info(
         `[SMS] Delivery fallback sent via ${provider} for group ${attempt.delivery_group_id}`
       );
 
@@ -790,7 +791,7 @@ async function triggerSmsFallbackForAttempt(attempt, reason) {
     } catch (error) {
       const errorMessage = getProviderErrorMessage(provider, error);
       failures.push({ provider, error: errorMessage });
-      console.error(`[SMS] Delivery fallback via ${provider} failed: ${errorMessage}`);
+      logger.error(`[SMS] Delivery fallback via ${provider} failed: ${errorMessage}`);
 
       await recordSmsAttemptSafely({
         deliveryGroupId: attempt.delivery_group_id,
@@ -961,7 +962,7 @@ async function processPendingSmsFallbacks() {
       }
     } catch (error) {
       summary.failed += 1;
-      console.error('[SMS] Pending fallback check failed:', error.message);
+      logger.error('[SMS] Pending fallback check failed:', error.message);
     }
   }
 

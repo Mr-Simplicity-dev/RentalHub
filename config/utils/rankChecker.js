@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const Ranking = require('../models/Ranking');
 const { getFrontendUrl } = require('./frontendUrl');
 const {
@@ -63,7 +64,7 @@ const trackRanking = async (keyword, targetUrl = getRankingTargetUrl(), options 
   });
 
   const status = match ? `#${match.position}` : `not found in top ${searchDepth}`;
-  console.log(`SEO ranking checked: "${normalizedKeyword}" — ${status}`);
+  logger.info(`SEO ranking checked: "${normalizedKeyword}" — ${status}`);
 
   return ranking;
 };

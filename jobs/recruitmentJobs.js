@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const cron = require('node-cron');
 const fs = require('fs');
 const db = require('../config/middleware/database');
@@ -10,7 +11,7 @@ try {
   if (error.code !== 'MODULE_NOT_FOUND') {
     throw error;
   }
-  console.error('Recruitment closure ZIP dependency "archiver" is not installed. Document ZIP attachments will be skipped until npm install is run.');
+  logger.error('Recruitment closure ZIP dependency "archiver" is not installed. Document ZIP attachments will be skipped until npm install is run.');
 }
 
 const RECRUITMENT_EMAIL = process.env.RECRUITMENT_EMAIL || 'recruitment@rentalhub.com.ng';
@@ -33,7 +34,7 @@ const createDocumentsZipBuffer = async (docs) =>
     const chunks = [];
 
     archive.on('data', (chunk) => chunks.push(chunk));
-    archive.on('warning', (error) => console.warn('Recruitment ZIP warning:', error.message));
+    archive.on('warning', (error) => logger.warn('Recruitment ZIP warning:', error.message));
     archive.on('error', reject);
     archive.on('end', () => resolve(Buffer.concat(chunks)));
 
@@ -87,7 +88,7 @@ const deleteCycleRecordings = async (cycleId) => {
       try {
         fs.unlinkSync(recording.recording_path);
       } catch (error) {
-        console.error('Failed to delete recruitment recording:', error.message);
+        logger.error('Failed to delete recruitment recording:', error.message);
         continue;
       }
     }
@@ -191,10 +192,10 @@ const runRecruitmentClosureJob = async () => {
     try {
       const result = await emailClosedCycleDocuments(cycle);
       if (result.emailed || result.recordingsDeleted) {
-        console.log('Recruitment closure job completed', { cycleId: cycle.id, ...result });
+        logger.info('Recruitment closure job completed', { cycleId: cycle.id, ...result });
       }
     } catch (error) {
-      console.error(`Recruitment closure job failed for cycle ${cycle.id}:`, error.message);
+      logger.error(`Recruitment closure job failed for cycle ${cycle.id}:`, error.message);
     }
   }
 };
@@ -213,7 +214,7 @@ const cleanupStaleRecruitmentPayments = async () => {
   );
 
   if (result.rowCount) {
-    console.log(`Cleared ${result.rowCount} stale recruitment payment reference(s)`);
+    logger.info(`Cleared ${result.rowCount} stale recruitment payment reference(s)`);
   }
 };
 
@@ -224,7 +225,7 @@ const startRecruitmentJobs = () => {
   };
 
   cron.schedule(RECRUITMENT_CLOSURE_CRON, runJobs);
-  console.log(`Recruitment closure scheduler started (${RECRUITMENT_CLOSURE_CRON})`);
+  logger.info(`Recruitment closure scheduler started (${RECRUITMENT_CLOSURE_CRON})`);
 };
 
 module.exports = {

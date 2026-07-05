@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
 const { getAuthTokenFromRequest } = require('../utils/authCookies');
@@ -84,7 +85,7 @@ const authenticate = async (req, res, next) => {
     req.user = currentUser;
     next();
   } catch (error) {
-    console.error('Auth error:', error);
+    logger.error('Auth error:', error);
     return res.status(401).json({
       success: false,
       message: 'Invalid or expired token.',

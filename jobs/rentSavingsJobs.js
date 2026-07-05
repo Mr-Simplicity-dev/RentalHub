@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const cron = require('node-cron');
 const db = require('../config/middleware/database');
 const NotificationService = require('../services/NotificationService');
@@ -33,7 +34,7 @@ function getMonthName(monthStr) {
  */
 async function checkMissedMonthlyContributions() {
   try {
-    console.log('[RentSavingsJobs] Checking missed monthly contributions...');
+    logger.info('[RentSavingsJobs] Checking missed monthly contributions...');
     const currentMonth = getCurrentMonthStr();
     const now = new Date();
 
@@ -75,13 +76,13 @@ async function checkMissedMonthlyContributions() {
         );
 
         reminderCount++;
-        console.log(`[RentSavingsJobs] Reminder sent to tenant #${plan.tenant_id} for plan #${plan.id}`);
+        logger.info(`[RentSavingsJobs] Reminder sent to tenant #${plan.tenant_id} for plan #${plan.id}`);
       }
     }
 
-    console.log(`[RentSavingsJobs] Monthly check complete. Sent ${reminderCount} reminders.`);
+    logger.info(`[RentSavingsJobs] Monthly check complete. Sent ${reminderCount} reminders.`);
   } catch (error) {
-    console.error('[RentSavingsJobs] Error in monthly check:', error);
+    logger.error('[RentSavingsJobs] Error in monthly check:', error);
   }
 }
 
@@ -90,7 +91,7 @@ async function checkMissedMonthlyContributions() {
  */
 async function checkApproachingDueDates() {
   try {
-    console.log('[RentSavingsJobs] Checking approaching due dates...');
+    logger.info('[RentSavingsJobs] Checking approaching due dates...');
     const now = new Date();
     const sevenDaysFromNow = new Date(now);
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
@@ -125,12 +126,12 @@ async function checkApproachingDueDates() {
       );
 
       withdrawalReminderCount++;
-      console.log(`[RentSavingsJobs] Due date reminder sent to tenant #${plan.tenant_id} for plan #${plan.id}`);
+      logger.info(`[RentSavingsJobs] Due date reminder sent to tenant #${plan.tenant_id} for plan #${plan.id}`);
     }
 
-    console.log(`[RentSavingsJobs] Due date check complete. Sent ${withdrawalReminderCount} reminders.`);
+    logger.info(`[RentSavingsJobs] Due date check complete. Sent ${withdrawalReminderCount} reminders.`);
   } catch (error) {
-    console.error('[RentSavingsJobs] Error in due date check:', error);
+    logger.error('[RentSavingsJobs] Error in due date check:', error);
   }
 }
 
@@ -140,24 +141,24 @@ async function checkApproachingDueDates() {
 function startRentSavingsJobs() {
   // Run on the 1st of every month at 9:00 AM
   cron.schedule('0 9 1 * *', async () => {
-    console.log('[RentSavingsJobs] Running monthly contribution check...');
+    logger.info('[RentSavingsJobs] Running monthly contribution check...');
     await checkMissedMonthlyContributions();
   });
 
   // Run daily at 8:00 AM for approaching due dates
   cron.schedule('0 8 * * *', async () => {
-    console.log('[RentSavingsJobs] Running daily due date check...');
+    logger.info('[RentSavingsJobs] Running daily due date check...');
     await checkApproachingDueDates();
   });
 
   // Also run on startup (after short delay to let DB connect)
   setTimeout(async () => {
-    console.log('[RentSavingsJobs] Running initial checks...');
+    logger.info('[RentSavingsJobs] Running initial checks...');
     await checkMissedMonthlyContributions();
     await checkApproachingDueDates();
   }, 10000);
 
-  console.log('✅ Rent savings cron jobs started');
+  logger.info('✅ Rent savings cron jobs started');
 }
 
 module.exports = { startRentSavingsJobs, checkMissedMonthlyContributions, checkApproachingDueDates };

@@ -307,7 +307,7 @@ router.post('/withdraw/request',
         data: result
       });
     } catch (error) {
-      console.error('Withdrawal request error:', error);
+      req.logger.error('Withdrawal request error:', error);
       res.status(400).json({
         success: false,
         message: 'Withdrawal request could not be completed. Please verify the details and try again.'
@@ -339,7 +339,7 @@ router.get('/commissions/summary',
         data: result
       });
     } catch (error) {
-      console.error('Get commission summary error:', error);
+      req.logger.error('Get commission summary error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch commission summary'
@@ -389,7 +389,7 @@ router.get('/commissions/withdrawable',
         }
       });
     } catch (error) {
-      console.error('Get withdrawable balance snapshot error:', error);
+      req.logger.error('Get withdrawable balance snapshot error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch withdrawable balance'
@@ -426,7 +426,7 @@ router.get('/withdrawals/history',
         data: result.rows
       });
     } catch (error) {
-      console.error('Get withdrawal history error:', error);
+      req.logger.error('Get withdrawal history error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch withdrawal history'
@@ -482,7 +482,7 @@ router.get('/withdrawals/pending',
         }
       });
     } catch (error) {
-      console.error('Get pending withdrawals error:', error);
+      req.logger.error('Get pending withdrawals error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch pending withdrawals'
@@ -627,7 +627,7 @@ router.post('/withdrawals/:withdrawalId/approve',
       });
     } catch (error) {
       await db.query('ROLLBACK');
-      console.error('Approve withdrawal error:', error);
+      req.logger.error('Approve withdrawal error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to approve withdrawal'
@@ -743,7 +743,7 @@ router.post('/withdrawals/:withdrawalId/reject',
       });
     } catch (error) {
       await db.query('ROLLBACK');
-      console.error('Reject withdrawal error:', error);
+      req.logger.error('Reject withdrawal error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to reject withdrawal'
@@ -767,7 +767,7 @@ router.get('/commission-config',
       }
       res.json({ success: true, data: config });
     } catch (error) {
-      console.error('Get commission config error:', error);
+      req.logger.error('Get commission config error:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch commission config' });
     }
   }
@@ -809,7 +809,7 @@ router.put('/commission-config',
 
       res.json({ success: true, message: 'Commission config updated' });
     } catch (error) {
-      console.error('Update commission config error:', error);
+      req.logger.error('Update commission config error:', error);
       res.status(500).json({ success: false, message: 'Failed to update commission config' });
     }
   }

@@ -4,7 +4,7 @@ const authController = require('../controllers/authController');
 const { uploadPassportLocal } = require('../config/middleware/upload');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const { checkLoginRateLimit } = require('../config/middleware/loginRateLimiter');
-const { authSensitiveLimiter } = require('../config/middleware/securityRateLimiters');
+const { authSensitiveLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter } = require('../config/middleware/securityRateLimiters');
 
 const router = express.Router();
 
@@ -95,6 +95,7 @@ router.get('/registration-flags', authController.getRegistrationFlags);
 
 router.post(
   '/register/payment',
+  registrationLimiter,
   registerValidators,
   authController.initializeRegistrationPayment
 );
@@ -106,6 +107,7 @@ router.post(
 
 router.post(
   '/register/tenant-payment',
+  registrationLimiter,
   registerValidators,
   authController.initializeRegistrationPayment
 );
@@ -118,6 +120,7 @@ router.post(
 // Register new user (Landlord or Tenant)
 router.post(
   '/register',
+  registrationLimiter,
   registerValidators,
   authController.register
 );
@@ -220,6 +223,7 @@ router.patch(
 
 router.post(
   '/verify-otp',
+  otpLimiter,
   [
     body('phone').trim().notEmpty(),
     body('otp').trim().notEmpty(),
@@ -228,10 +232,10 @@ router.post(
 );
 
 router.get('/verify-email/:token', authController.verifyEmail);
-router.post('/resend-verification', authController.resendVerification);
+router.post('/resend-verification', authSensitiveLimiter, authController.resendVerification);
 
-router.post('/send-phone-otp', authenticate, authController.sendPhoneOTP);
-router.post('/verify-phone', authenticate, authController.verifyPhone);
+router.post('/send-phone-otp', authenticate, otpSendLimiter, authController.sendPhoneOTP);
+router.post('/verify-phone', authenticate, otpLimiter, authController.verifyPhone);
 
 router.post(
   '/upload-passport',
@@ -260,6 +264,7 @@ router.post(
 
 router.post(
   '/reset-password/:token',
+  passwordResetLimiter,
   [body('password')
     .isLength({ min: 10 })
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/)

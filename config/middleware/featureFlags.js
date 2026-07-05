@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
 const {
@@ -259,7 +260,7 @@ const enforceFlags = async (req, res, next) => {
           });
         }
       } catch (error) {
-        console.error('Registration access evaluation error:', error);
+        logger.error('Registration access evaluation error:', error);
         return res.status(500).json({ message: 'Failed to validate registration access' });
       }
     }
@@ -301,7 +302,7 @@ const enforceFlags = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Feature flag enforcement error:', error);
+    logger.error('Feature flag enforcement error:', error);
     res.status(500).json({ message: 'Failed to enforce feature flags' });
   }
 };

@@ -128,7 +128,7 @@ router.get('/transactions',
       });
       
     } catch (error) {
-      console.error('Get state admin transactions error:', error);
+      req.logger.error('Get state admin transactions error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch transactions'
@@ -199,7 +199,7 @@ router.get('/managed-users',
       });
       
     } catch (error) {
-      console.error('Get managed users error:', error);
+      req.logger.error('Get managed users error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch managed users'
@@ -239,7 +239,7 @@ router.get('/commissions/summary',
       });
       
     } catch (error) {
-      console.error('Get commission summary error:', error);
+      req.logger.error('Get commission summary error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch commission summary'
@@ -312,7 +312,7 @@ router.post('/withdraw',
             return res.status(400).json({ success: false, message: 'Unable to verify account. Please check the account number and try again.' });
           }
         } catch (verifyErr) {
-          console.error('Account verification error:', verifyErr?.response?.data || verifyErr.message);
+          req.logger.error('Account verification error:', verifyErr?.response?.data || verifyErr.message);
           return res.status(400).json({ success: false, message: 'Could not verify account details. Please try again.' });
         }
       }
@@ -370,7 +370,7 @@ router.post('/withdraw',
       });
       
     } catch (error) {
-      console.error('Withdrawal request error:', error);
+      req.logger.error('Withdrawal request error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to submit withdrawal request'
@@ -413,7 +413,7 @@ router.get('/withdrawals',
       });
       
     } catch (error) {
-      console.error('Get withdrawal history error:', error);
+      req.logger.error('Get withdrawal history error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch withdrawal history'

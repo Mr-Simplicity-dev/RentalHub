@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const db = require('./database');
 
 exports.canAccessProperty = async (req, res, next) => {
@@ -21,7 +22,7 @@ exports.canAccessProperty = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Property access error:', error);
+    logger.error('Property access error:', error);
     res.status(500).json({
       success: false,
       message: 'Permission check failed'

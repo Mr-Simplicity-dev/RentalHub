@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const axios = require('axios');
 const db = require('../config/middleware/database');
 const cfg = require('../config/utils/commissionConfig');
@@ -102,7 +103,7 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
     );
     const referredBy = userResult.rows[0]?.referred_by;
     if (!referredBy) {
-      console.log(`No admin referral found for user ${userId}`);
+      logger.info(`No admin referral found for user ${userId}`);
       return null;
     }
 
@@ -114,7 +115,7 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
     );
 
     if (adminCheck.rows.length === 0) {
-      console.log(`Referred user ${referredBy} is not a state admin`);
+      logger.info(`Referred user ${referredBy} is not a state admin`);
       return null;
     }
 
@@ -123,19 +124,19 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
 
     if (propertyState && admin.assigned_state &&
         propertyState.toLowerCase() !== admin.assigned_state.toLowerCase()) {
-      console.log(`Transaction not in admin's assigned state: ${propertyState} vs ${admin.assigned_state}`);
+      logger.info(`Transaction not in admin's assigned state: ${propertyState} vs ${admin.assigned_state}`);
       return null;
     }
 
     if (propertyCity && admin.assigned_city &&
         propertyCity.toLowerCase() !== admin.assigned_city.toLowerCase()) {
-      console.log(`Transaction not in admin's assigned city: ${propertyCity} vs ${admin.assigned_city}`);
+      logger.info(`Transaction not in admin's assigned city: ${propertyCity} vs ${admin.assigned_city}`);
       return null;
     }
 
     const commissionConfig = COMMISSION_RATES[paymentType];
     if (!commissionConfig) {
-      console.log(`No commission config for payment type: ${paymentType}`);
+      logger.info(`No commission config for payment type: ${paymentType}`);
       return null;
     }
 
@@ -155,7 +156,7 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
     const defaultSuperAdminId = superAdminResult.rows[0]?.id || null;
 
     if (isAdminSuspended) {
-      console.log(`Admin ${referralAdminId} is suspended, redistributing commission`);
+      logger.info(`Admin ${referralAdminId} is suspended, redistributing commission`);
 
       const redistPct = suspendedAdminPct;
       const suspendedShare = Math.round(finalCommission * redistPct * 100) / 100;
@@ -215,7 +216,7 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
         );
       }
 
-      console.log(`Commission redistributed: ₦${finalCommission.toLocaleString()} (${Math.round(redistPct*100)}% to state admins, ${Math.round((1-redistPct)*100)}% to super admin) for suspended admin ${referralAdminId}`);
+      logger.info(`Commission redistributed: ₦${finalCommission.toLocaleString()} (${Math.round(redistPct*100)}% to state admins, ${Math.round((1-redistPct)*100)}% to super admin) for suspended admin ${referralAdminId}`);
 
       return {
         commission_id: commissionIds[0] || null, admin_id: null, amount: finalCommission,
@@ -246,7 +247,7 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
     );
 
     const statusNote = isFundsFrozen ? ' (funds frozen - withdrawal blocked)' : '';
-    console.log(`Commission calculated: ₦${finalCommission.toLocaleString()} for admin ${admin.id}${statusNote}`);
+    logger.info(`Commission calculated: ₦${finalCommission.toLocaleString()} for admin ${admin.id}${statusNote}`);
 
     return {
       commission_id: commissionResult.rows[0].id, admin_id: admin.id, amount: finalCommission,
@@ -254,7 +255,7 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
       ...(isFundsFrozen && { funds_frozen: true }),
     };
   } catch (error) {
-    console.error('Calculate commission error:', error);
+    logger.error('Calculate commission error:', error);
     return null;
   }
 };
@@ -271,7 +272,7 @@ exports.processPaymentCommission = async (paymentId) => {
     );
 
     if (paymentResult.rows.length === 0) {
-      console.log(`Payment ${paymentId} not found or not completed`);
+      logger.info(`Payment ${paymentId} not found or not completed`);
       return false;
     }
 
@@ -281,13 +282,13 @@ exports.processPaymentCommission = async (paymentId) => {
     );
 
     if (!commission) {
-      console.log(`No commission calculated for payment ${paymentId}`);
+      logger.info(`No commission calculated for payment ${paymentId}`);
       return false;
     }
 
     return commission;
   } catch (error) {
-    console.error('Process payment commission error:', error);
+    logger.error('Process payment commission error:', error);
     return false;
   }
 };
@@ -351,7 +352,7 @@ exports.calculatePerformanceBonus = async (adminId, month, year) => {
       monthly_volume: monthlyVolume, new_users: newUsers,
     };
   } catch (error) {
-    console.error('Calculate performance bonus error:', error);
+    logger.error('Calculate performance bonus error:', error);
     return null;
   }
 };
@@ -399,7 +400,7 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
         if (verifyErr.message && (verifyErr.message.includes('mismatch') || verifyErr.message.includes('bank') || verifyErr.message.includes('account'))) {
           throw verifyErr;
         }
-        console.error('Account verification error in withdrawal:', verifyErr?.response?.data || verifyErr.message);
+        logger.error('Account verification error in withdrawal:', verifyErr?.response?.data || verifyErr.message);
         throw new Error('Could not verify account details. Please try again.');
       }
     }
@@ -519,7 +520,7 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
       throw directError;
     }
   } catch (error) {
-    console.error('Process admin withdrawal error:', error);
+    logger.error('Process admin withdrawal error:', error);
     throw error;
   }
 };
@@ -549,7 +550,7 @@ exports.getAdminCommissionSummary = async (adminId) => {
 
     return { summary: summaryResult.rows, weekly: weeklyResult.rows, monthly: monthlyResult.rows };
   } catch (error) {
-    console.error('Get admin commission summary error:', error);
+    logger.error('Get admin commission summary error:', error);
     throw error;
   }
 };
@@ -568,7 +569,7 @@ exports.distributeLawyerAccessFee = async ({ paymentId, userId, assignedLawyerId
     const stateNameResult = await client.query('SELECT state_name FROM states WHERE id = $1 LIMIT 1', [stateId]);
     const stateName = stateNameResult.rows[0]?.state_name || null;
     if (!stateName) {
-      console.error(`State not found for state_id ${stateId}`);
+      logger.error(`State not found for state_id ${stateId}`);
       await client.query('ROLLBACK');
       return null;
     }
@@ -698,7 +699,7 @@ exports.distributeLawyerAccessFee = async ({ paymentId, userId, assignedLawyerId
 
     await client.query('COMMIT');
 
-    console.log(`Lawyer access fee distributed: ₦${LAWYER_ACCESS_FEE_TOTAL.toLocaleString()} across ${Object.keys(distribution).length} recipients`);
+    logger.info(`Lawyer access fee distributed: ₦${LAWYER_ACCESS_FEE_TOTAL.toLocaleString()} across ${Object.keys(distribution).length} recipients`);
 
     return {
       distribution_id: distributionRecord.rows[0].id, commission_ids: commissionIds,
@@ -706,7 +707,7 @@ exports.distributeLawyerAccessFee = async ({ paymentId, userId, assignedLawyerId
     };
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Distribute lawyer access fee error:', error);
+    logger.error('Distribute lawyer access fee error:', error);
     throw error;
   } finally {
     client.release();
@@ -729,7 +730,7 @@ exports.distributeAgentAccessFee = async ({ paymentId, userId, assignedAgentId, 
     const stateNameResult = await client.query('SELECT state_name FROM states WHERE id = $1 LIMIT 1', [stateId]);
     const stateName = stateNameResult.rows[0]?.state_name || null;
     if (!stateName) {
-      console.error(`State not found for state_id ${stateId}`);
+      logger.error(`State not found for state_id ${stateId}`);
       await client.query('ROLLBACK');
       return null;
     }
@@ -851,7 +852,7 @@ exports.distributeAgentAccessFee = async ({ paymentId, userId, assignedAgentId, 
 
     await client.query('COMMIT');
 
-    console.log(`Agent access fee distributed: ₦${AGENT_ACCESS_FEE_TOTAL.toLocaleString()} across ${Object.keys(distribution).length} recipients`);
+    logger.info(`Agent access fee distributed: ₦${AGENT_ACCESS_FEE_TOTAL.toLocaleString()} across ${Object.keys(distribution).length} recipients`);
 
     return {
       distribution_id: distributionRecord.rows[0].id, commission_ids: commissionIds,
@@ -859,7 +860,7 @@ exports.distributeAgentAccessFee = async ({ paymentId, userId, assignedAgentId, 
     };
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Distribute agent access fee error:', error);
+    logger.error('Distribute agent access fee error:', error);
     throw error;
   } finally {
     client.release();
@@ -901,11 +902,11 @@ exports.clawbackCommissionsForPayment = async (paymentId, reason = 'payment_refu
     }
 
     await client.query('COMMIT');
-    console.log(`Clawed back ₦${totalClawedBack.toLocaleString()} for payment #${paymentId} (${reason})`);
+    logger.info(`Clawed back ₦${totalClawedBack.toLocaleString()} for payment #${paymentId} (${reason})`);
     return { clawed_back: totalClawedBack, reason, commission_count: commissions.rows.length };
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Clawback error:', error);
+    logger.error('Clawback error:', error);
     throw error;
   } finally {
     client.release();
@@ -917,7 +918,7 @@ exports.processAutoPayouts = async () => {
   const payoutDay = await cfg.get('auto_payout_day_of_week', 1);
   const today = new Date();
   if (today.getDay() !== payoutDay) {
-    console.log(`Auto-payout skipped (today=${today.getDay()}, configured=${payoutDay})`);
+    logger.info(`Auto-payout skipped (today=${today.getDay()}, configured=${payoutDay})`);
     return { skipped: true };
   }
 
@@ -958,9 +959,9 @@ exports.processAutoPayouts = async () => {
       );
 
       results.push({ admin_id: admin.id, amount: total });
-      console.log(`Auto-payout ₦${total.toLocaleString()} for admin ${admin.id}`);
+      logger.info(`Auto-payout ₦${total.toLocaleString()} for admin ${admin.id}`);
     } catch (err) {
-      console.error(`Auto-payout error for admin ${admin.id}:`, err.message);
+      logger.error(`Auto-payout error for admin ${admin.id}:`, err.message);
     }
   }
 

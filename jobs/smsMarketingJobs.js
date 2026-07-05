@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const cron = require('node-cron');
 const db = require('../config/middleware/database');
 const { sendSMS } = require('../config/utils/smsService');
@@ -86,7 +87,7 @@ const processSmsQueue = async () => {
       }
     }
   } catch (err) {
-    console.error('SMS queue processor error:', err.message);
+    logger.error('SMS queue processor error:', err.message);
   }
 };
 
@@ -94,5 +95,5 @@ exports.startSmsMarketingJobs = () => {
   cron.schedule('* * * * *', () => {
     processSmsQueue();
   });
-  console.log('SMS marketing queue processor started');
+  logger.info('SMS marketing queue processor started');
 };

@@ -58,7 +58,17 @@ const csrfProtection = (req, res, next) => {
   }
 
   const csrfHeader = req.headers['x-csrf-token'];
-  if (!csrfHeader || csrfHeader !== existingCsrfCookie) {
+  if (!csrfHeader || !existingCsrfCookie) {
+    return res.status(403).json({
+      success: false,
+      message: 'Invalid CSRF token',
+    });
+  }
+
+  // Timing-safe comparison to prevent timing attacks
+  const buf1 = Buffer.from(String(csrfHeader));
+  const buf2 = Buffer.from(String(existingCsrfCookie));
+  if (buf1.length !== buf2.length || !crypto.timingSafeEqual(buf1, buf2)) {
     return res.status(403).json({
       success: false,
       message: 'Invalid CSRF token',

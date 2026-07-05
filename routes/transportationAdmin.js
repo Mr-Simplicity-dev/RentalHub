@@ -238,7 +238,7 @@ router.get('/dashboard', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get transportation admin dashboard error:', error);
+    req.logger.error('Get transportation admin dashboard error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transportation dashboard data'
@@ -401,7 +401,7 @@ router.get('/bookings', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get transportation bookings error:', error);
+    req.logger.error('Get transportation bookings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transportation bookings'
@@ -459,7 +459,7 @@ router.get('/bookings/:bookingId', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get booking details error:', error);
+    req.logger.error('Get booking details error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch booking details'
@@ -500,7 +500,7 @@ router.get('/bookings/:bookingId/operations', async (req, res) => {
       data: result.rows
     });
   } catch (error) {
-    console.error('Get transportation operations error:', error);
+    req.logger.error('Get transportation operations error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transportation operations'
@@ -673,7 +673,7 @@ router.patch('/bookings/:bookingId/dispatch', [param('bookingId').isInt(), body(
       message: 'Transportation dispatch updated successfully'
     });
   } catch (error) {
-    console.error('Update transportation dispatch error:', error);
+    req.logger.error('Update transportation dispatch error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update transportation dispatch'
@@ -794,7 +794,7 @@ router.patch('/bookings/:bookingId/status', [param('bookingId').isInt(), body('b
     });
     
   } catch (error) {
-    console.error('Update booking status error:', error);
+    req.logger.error('Update booking status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update booking status'
@@ -899,7 +899,7 @@ router.patch('/bookings/:bookingId/payment-status', [param('bookingId').isInt(),
     });
     
   } catch (error) {
-    console.error('Update payment status error:', error);
+    req.logger.error('Update payment status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update payment status'
@@ -960,7 +960,7 @@ router.get('/services', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get transportation services error:', error);
+    req.logger.error('Get transportation services error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transportation services'
@@ -1036,7 +1036,7 @@ router.post('/services', [body('service_name').isString().trim().isLength({ min:
     });
     
   } catch (error) {
-    console.error('Create transportation service error:', error);
+    req.logger.error('Create transportation service error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create transportation service'
@@ -1137,7 +1137,7 @@ router.patch('/services/:serviceId', [param('serviceId').isInt(), body('service_
     });
     
   } catch (error) {
-    console.error('Update transportation service error:', error);
+    req.logger.error('Update transportation service error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update transportation service'
@@ -1211,7 +1211,7 @@ router.delete('/services/:serviceId', [param('serviceId').isInt()], validateRequ
     });
     
   } catch (error) {
-    console.error('Delete transportation service error:', error);
+    req.logger.error('Delete transportation service error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete transportation service'
@@ -1367,7 +1367,7 @@ router.get('/analytics', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get transportation analytics error:', error);
+    req.logger.error('Get transportation analytics error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transportation analytics'
@@ -1469,7 +1469,7 @@ router.get('/actions', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get admin actions error:', error);
+    req.logger.error('Get admin actions error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch admin actions'
@@ -1561,7 +1561,7 @@ router.get('/revenue', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get transportation revenue error:', error);
+    req.logger.error('Get transportation revenue error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transportation revenue data'
@@ -1744,7 +1744,7 @@ router.get('/report', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Generate transportation report error:', error);
+    req.logger.error('Generate transportation report error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to generate transportation report'
@@ -1784,7 +1784,7 @@ router.get('/settings', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get transportation settings error:', error);
+    req.logger.error('Get transportation settings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transportation settings'
@@ -1892,7 +1892,7 @@ router.patch('/settings', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Update transportation settings error:', error);
+    req.logger.error('Update transportation settings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update transportation settings'
@@ -2039,7 +2039,7 @@ router.get('/state-admin/dashboard', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get state admin transportation dashboard error:', error);
+    req.logger.error('Get state admin transportation dashboard error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch state admin dashboard data'
@@ -2212,7 +2212,7 @@ router.get('/state-admin/bookings', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get state admin transportation bookings error:', error);
+    req.logger.error('Get state admin transportation bookings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch state admin bookings'
@@ -2248,7 +2248,7 @@ router.get('/state-admin/bookings', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get state admin jurisdiction error:', error);
+      req.logger.error('Get state admin jurisdiction error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch jurisdiction information'
@@ -2381,7 +2381,7 @@ router.get('/state-admin/bookings', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get state admin services error:', error);
+      req.logger.error('Get state admin services error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch state admin services'
@@ -2502,7 +2502,7 @@ router.get('/state-admin/bookings', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get state admin analytics error:', error);
+      req.logger.error('Get state admin analytics error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch state admin analytics'
@@ -2627,7 +2627,7 @@ router.get('/state-admin/bookings', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get state admin alerts error:', error);
+      req.logger.error('Get state admin alerts error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch state admin alerts'
@@ -2709,7 +2709,7 @@ router.get('/state-admin/bookings', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Resolve state admin alert error:', error);
+      req.logger.error('Resolve state admin alert error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to resolve alert'
@@ -2851,7 +2851,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get super admin transportation dashboard error:', error);
+    req.logger.error('Get super admin transportation dashboard error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch super admin transportation dashboard data'
@@ -2959,7 +2959,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get super admin state admins error:', error);
+      req.logger.error('Get super admin state admins error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch state admins'
@@ -3072,7 +3072,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Assign state admin jurisdiction error:', error);
+      req.logger.error('Assign state admin jurisdiction error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to assign jurisdiction'
@@ -3121,7 +3121,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Remove state admin jurisdiction error:', error);
+      req.logger.error('Remove state admin jurisdiction error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to remove jurisdiction'
@@ -3150,7 +3150,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get super admin oversight error:', error);
+      req.logger.error('Get super admin oversight error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch oversight configuration'
@@ -3235,7 +3235,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Update super admin oversight error:', error);
+      req.logger.error('Update super admin oversight error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to update oversight configuration'
@@ -3362,7 +3362,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get super admin alerts error:', error);
+      req.logger.error('Get super admin alerts error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch system alerts'
@@ -3432,7 +3432,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get performance metrics error:', error);
+      req.logger.error('Get performance metrics error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch performance metrics'
@@ -3508,7 +3508,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get system health error:', error);
+      req.logger.error('Get system health error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch system health report'
@@ -3687,7 +3687,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Generate system report error:', error);
+      req.logger.error('Generate system report error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to generate system report'
@@ -3826,7 +3826,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get alerts error:', error);
+      req.logger.error('Get alerts error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch alerts'
@@ -3920,7 +3920,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Create alert error:', error);
+      req.logger.error('Create alert error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to create alert'
@@ -4007,7 +4007,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Resolve alert error:', error);
+      req.logger.error('Resolve alert error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to resolve alert'
@@ -4067,7 +4067,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Delete alert error:', error);
+      req.logger.error('Delete alert error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to delete alert'
@@ -4146,7 +4146,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get performance metrics error:', error);
+      req.logger.error('Get performance metrics error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch performance metrics'
@@ -4334,7 +4334,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Calculate performance metrics error:', error);
+      req.logger.error('Calculate performance metrics error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to calculate performance metrics'
@@ -4416,7 +4416,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get system health error:', error);
+      req.logger.error('Get system health error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch system health data'
@@ -4523,7 +4523,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get system status error:', error);
+      req.logger.error('Get system status error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch system status'
@@ -4805,7 +4805,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Run system diagnostics error:', error);
+      req.logger.error('Run system diagnostics error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to run system diagnostics'
@@ -4939,7 +4939,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get action logs error:', error);
+      req.logger.error('Get action logs error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch action logs'
@@ -5070,7 +5070,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       }
       
     } catch (error) {
-      console.error('Export action logs error:', error);
+      req.logger.error('Export action logs error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to export action logs'
@@ -5170,7 +5170,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get statistics summary error:', error);
+      req.logger.error('Get statistics summary error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch statistics summary'
@@ -5353,7 +5353,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       res.json(response);
       
     } catch (error) {
-      console.error('Data cleanup error:', error);
+      req.logger.error('Data cleanup error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to perform data cleanup'
@@ -5458,7 +5458,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Data backup error:', error);
+      req.logger.error('Data backup error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to perform data backup'
@@ -5607,7 +5607,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Get configuration error:', error);
+      req.logger.error('Get configuration error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch system configuration'
@@ -5679,7 +5679,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       });
       
     } catch (error) {
-      console.error('Update configuration error:', error);
+      req.logger.error('Update configuration error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to update system configuration'

@@ -144,7 +144,7 @@ router.post('/appeals', authenticate, [
       return res.status(201).json({ message: 'Appeal submitted', data: result.rows[0] });
     }
   } catch (err) {
-    console.error('Submit appeal error:', err);
+    req.logger.error('Submit appeal error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -167,7 +167,7 @@ router.get('/appeals/my', authenticate, async (req, res) => {
     );
     res.json({ data: result.rows, total: parseInt(count.rows[0].total) });
   } catch (err) {
-    console.error('Get my appeals error:', err);
+    req.logger.error('Get my appeals error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -223,7 +223,7 @@ router.get('/admin/appeals', authenticate, async (req, res) => {
     );
     res.json({ data: result.rows, total: parseInt(count.rows[0].total) });
   } catch (err) {
-    console.error('Get appeals error:', err);
+    req.logger.error('Get appeals error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -263,7 +263,7 @@ router.get('/admin/appeals/:id', authenticate, async (req, res) => {
     }
     res.json({ data: appeal });
   } catch (err) {
-    console.error('Get appeal error:', err);
+    req.logger.error('Get appeal error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -347,7 +347,7 @@ router.post('/admin/appeals/:id/review', authenticate, async (req, res) => {
 
     res.json({ message: 'Appeal reviewed', data: result.rows[0] });
   } catch (err) {
-    console.error('Review appeal error:', err);
+    req.logger.error('Review appeal error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -370,7 +370,7 @@ router.patch('/admin/appeals/:id/status', authenticate, async (req, res) => {
     }
     res.json({ message: 'Appeal status updated', data: result.rows[0] });
   } catch (err) {
-    console.error('Update appeal status error:', err);
+    req.logger.error('Update appeal status error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

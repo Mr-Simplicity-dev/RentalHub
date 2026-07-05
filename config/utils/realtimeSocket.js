@@ -214,7 +214,7 @@ const recordCallSession = async (call, status, timestamps = {}) => {
       ]
     );
   } catch (error) {
-    console.error('Call session history failed:', error.message);
+    logger.error('Call session history failed:', error.message);
   }
 };
 
@@ -315,7 +315,7 @@ const configureRealtimeSocket = (io) => {
           }
         }
       } catch (error) {
-        console.error('ticket:typing socket error:', error.message);
+        logger.error('ticket:typing socket error:', error.message);
       }
     });
 

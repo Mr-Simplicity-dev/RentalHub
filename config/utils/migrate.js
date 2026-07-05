@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
 const db = require('../middleware/database'); // <-- correct relative path
@@ -7,7 +8,7 @@ const runMigrations = async () => {
     const migrationsPath = path.join(__dirname, '../../migrations');
 
     if (!fs.existsSync(migrationsPath)) {
-      console.log('No migrations folder found.');
+      logger.info('No migrations folder found.');
       process.exit(0);
     }
 
@@ -39,14 +40,14 @@ const runMigrations = async () => {
         [migrationName]
       );
 
-      console.log(`Migration executed: ${migrationName}`);
+      logger.info(`Migration executed: ${migrationName}`);
     }
 
-    console.log('All migrations completed');
+    logger.info('All migrations completed');
     process.exit(0);
 
   } catch (error) {
-    console.error('Migration error:', error);
+    logger.error('Migration error:', error);
     process.exit(1);
   }
 };

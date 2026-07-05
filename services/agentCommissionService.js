@@ -1,3 +1,4 @@
+const logger = require('../config/utils/logger');
 const db = require('../config/middleware/database');
 
 class AgentCommissionService {
@@ -43,7 +44,7 @@ class AgentCommissionService {
         return result.rows[0];
       }
     } catch (error) {
-      console.error(`Error recording commission: ${error.message}`);
+      logger.error(`Error recording commission: ${error.message}`);
       throw error;
     }
   }
@@ -79,7 +80,7 @@ class AgentCommissionService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      console.error(`Error fetching agent earnings: ${error.message}`);
+      logger.error(`Error fetching agent earnings: ${error.message}`);
       throw error;
     }
   }
@@ -124,7 +125,7 @@ class AgentCommissionService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      console.error(`Error fetching commission history: ${error.message}`);
+      logger.error(`Error fetching commission history: ${error.message}`);
       throw error;
     }
   }
@@ -156,7 +157,7 @@ class AgentCommissionService {
         return commission;
       }
     } catch (error) {
-      console.error(`Error verifying commission: ${error.message}`);
+      logger.error(`Error verifying commission: ${error.message}`);
       throw error;
     }
   }
@@ -219,7 +220,7 @@ class AgentCommissionService {
         return result.rows[0];
       }
     } catch (error) {
-      console.error(`Error reversing commission: ${error.message}`);
+      logger.error(`Error reversing commission: ${error.message}`);
       throw error;
     }
   }
@@ -251,7 +252,7 @@ class AgentCommissionService {
 
       return result.rows[0];
     } catch (error) {
-      console.error(`Error setting commission rate: ${error.message}`);
+      logger.error(`Error setting commission rate: ${error.message}`);
       throw error;
     }
   }
@@ -279,7 +280,7 @@ class AgentCommissionService {
       const result = await db.query(query, params);
       return result.rows;
     } catch (error) {
-      console.error(`Error fetching commission rates: ${error.message}`);
+      logger.error(`Error fetching commission rates: ${error.message}`);
       throw error;
     }
   }
@@ -352,7 +353,7 @@ class AgentCommissionService {
       return updateBatchResult.rows[0];
     } catch (error) {
       await client.query('ROLLBACK');
-      console.error(`Error processing payout: ${error.message}`);
+      logger.error(`Error processing payout: ${error.message}`);
       throw error;
     } finally {
       client.release();
@@ -392,7 +393,7 @@ class AgentCommissionService {
         );
       }
     } catch (error) {
-      console.error(`Error updating earnings summary: ${error.message}`);
+      logger.error(`Error updating earnings summary: ${error.message}`);
       throw error;
     }
   }
@@ -409,7 +410,7 @@ class AgentCommissionService {
         [agentUserId, actionType, affectedCommissionId, JSON.stringify(oldValues), JSON.stringify(newValues), performedByUserId]
       );
     } catch (error) {
-      console.error(`Error logging audit trail: ${error.message}`);
+      logger.error(`Error logging audit trail: ${error.message}`);
       // Don't throw - audit logging shouldn't fail the main operation
     }
   }

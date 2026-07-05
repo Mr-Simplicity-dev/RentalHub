@@ -213,12 +213,12 @@ const startMongoCronJobs = () => {
     const postsPerDay = Math.min(MAX_POSTS_PER_DAY, Math.floor(DAILY_BUDGET_CENTS / 10));
 
     if (postsPerDay < 1) {
-      console.log('AI blog generation skipped: DAILY_BUDGET_CENTS too low');
+      logger.info('AI blog generation skipped: DAILY_BUDGET_CENTS too low');
       return;
     }
 
     try {
-      console.log('Generating AI blogs...');
+      logger.info('Generating AI blogs...');
       let created = 0;
 
       for (let i = 0; i < postsPerDay; i++) {
@@ -242,7 +242,7 @@ const startMongoCronJobs = () => {
 
           const exists = await Blog.findOne({ slug });
           if (exists) {
-            console.log('Duplicate found, retrying...');
+            logger.info('Duplicate found, retrying...');
             continue;
           }
 
@@ -299,24 +299,24 @@ Start your search today and find the best home in ${location}.
           created++;
           createdPost = true;
 
-          console.log('Created:', title);
+          logger.info('Created:', title);
         }
       }
 
-      console.log(`Total blogs created today: ${created}`);
+      logger.info(`Total blogs created today: ${created}`);
     } catch (err) {
-      console.error('AI blog error:', err.message);
+      logger.error('AI blog error:', err.message);
     }
   });
 
   // Daily sitemap submission
   cron.schedule('0 2 * * *', async () => {
     try {
-      console.log('Submitting sitemap to Google...');
+      logger.info('Submitting sitemap to Google...');
       await pingGoogle();
-      console.log('Sitemap submitted');
+      logger.info('Sitemap submitted');
     } catch (err) {
-      console.error('Sitemap submission failed:', err.message);
+      logger.error('Sitemap submission failed:', err.message);
     }
   });
 };
@@ -427,6 +427,19 @@ const authLimiter = rateLimit({
 
 app.use('/api/', limiter);
 
+// Request timeout — prevents hung connections from exhausting resources
+const requestTimeout = (timeoutMs) => (req, res, next) => {
+  const timer = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(408).json({ success: false, message: 'Request timeout' });
+    }
+  }, timeoutMs);
+  res.on('finish', () => clearTimeout(timer));
+  next();
+};
+
+app.use(requestTimeout(Number(process.env.REQUEST_TIMEOUT_MS) || 30000));
+
 app.use(
   express.json({
     limit: '1mb',
@@ -466,11 +479,35 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'Server is running',
-  });
+app.get('/api/health', async (req, res) => {
+  const checks = { status: 'OK', uptime: process.uptime(), timestamp: new Date().toISOString() };
+
+  try {
+    await db.query('SELECT 1');
+    checks.database = 'OK';
+  } catch {
+    checks.database = 'FAIL';
+    checks.status = 'DEGRADED';
+  }
+
+  if (process.env.REDIS_URL) {
+    try {
+      const redis = require('ioredis');
+      const client = new redis(process.env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
+      await client.connect();
+      await client.ping();
+      await client.quit();
+      checks.redis = 'OK';
+    } catch {
+      checks.redis = 'FAIL';
+      if (checks.status === 'OK') checks.status = 'DEGRADED';
+    }
+  } else {
+    checks.redis = 'DISABLED';
+  }
+
+  const statusCode = checks.status === 'OK' ? 200 : 503;
+  res.status(statusCode).json(checks);
 });
 
 app.get('/sitemap.xml', async (req, res) => {
@@ -532,7 +569,7 @@ app.get('/api/auth/verify-email', async (req, res) => {
       message: 'Email verified successfully',
     });
   } catch (err) {
-    console.error('Verify email error:', err);
+    logger.error('Verify email error:', err);
 
     res.status(400).json({
       success: false,
@@ -609,11 +646,11 @@ app.use((err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;
   const isServerError = statusCode >= 500;
 
+  const log = req.logger || logger;
   if (isProduction && isServerError) {
-    console.error('UNHANDLED ERROR (correlationId:', req.correlationId || 'N/A', '):', err.message || err);
-    console.error(err.stack);
+    log.error('UNHANDLED ERROR', { correlationId: req.correlationId, error: err.message, stack: err.stack });
   } else {
-    console.error(`[${req.correlationId || 'N/A'}] Route error (${statusCode}):`, err.message || err);
+    log.error('Route error', { correlationId: req.correlationId, statusCode, error: err.message });
   }
 
   const safeMessage = isProduction && isServerError
@@ -646,7 +683,7 @@ let backgroundServicesStarted = false;
 //   } catch (err) {
 //     // Ignore if already the right type
 //     if (!err.message?.includes('already')) {
-//       console.error('ensureStartupSchema warning:', err.message);
+//       logger.error('ensureStartupSchema warning:', err.message);
 //     }
 //   }
 // };
@@ -677,11 +714,11 @@ const startBackgroundServices = () => {
 
 const handleServerStartupError = (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(
+    logger.error(
       `Port ${PORT} is already in use. Another instance of this server may already be running. Stop the existing process or set APP_PORT to a free port before restarting.`
     );
   } else {
-    console.error('Server startup failed:', err);
+    logger.error('Server startup failed:', err);
   }
 
   process.exit(1);
@@ -691,12 +728,50 @@ const server = http.createServer(app);
 
 server.once('error', handleServerStartupError);
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
   ensureStartupSchema().then(() => startBackgroundServices()).catch((err) => {
-    console.error('Startup schema migration failed:', err.message);
+    logger.error('Startup schema migration failed:', err.message);
     startBackgroundServices();
   });
 });
+
+// Graceful shutdown — drain connections, stop jobs, close DB
+const gracefulShutdown = async (signal) => {
+  logger.info(`\n${signal} received. Starting graceful shutdown...`);
+
+  server.close(() => {
+    logger.info('HTTP server closed. No longer accepting connections.');
+  });
+
+  // Force close remaining sockets after 10s
+  const forceExit = setTimeout(() => {
+    logger.error('Forced exit after shutdown timeout.');
+    process.exit(1);
+  }, 10000);
+
+  try {
+    // Close DB pool
+    await db.end().catch((err) => logger.error('DB pool close error:', err.message));
+    logger.info('Database pool closed.');
+
+    // Close MongoDB connection
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.close();
+      logger.info('MongoDB connection closed.');
+    }
+
+    clearTimeout(forceExit);
+    logger.info('Graceful shutdown completed.');
+    process.exit(0);
+  } catch (err) {
+    logger.error('Shutdown error:', err.message);
+    clearTimeout(forceExit);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 const io = new Server(server, {
   cors: {

@@ -66,7 +66,7 @@ const cleanupUploadedFile = (file) => {
   try {
     fs.unlinkSync(file.path);
   } catch (err) {
-    console.warn('Failed to clean up uploaded file:', err.message);
+    req.logger.warn('Failed to clean up uploaded file:', err.message);
   }
 };
 
@@ -334,7 +334,7 @@ router.get('/commission-password/status', authenticate, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Commission password status error:', error);
+    req.logger.error('Commission password status error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to load commission password status',
@@ -386,7 +386,7 @@ router.post('/commission-password/setup', authenticate, sensitiveActionLimiter, 
       message: 'Commission password set successfully',
     });
   } catch (error) {
-    console.error('Commission password setup error:', error);
+    req.logger.error('Commission password setup error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to set commission password',
@@ -430,7 +430,7 @@ router.post('/commission-password/verify', authenticate, sensitiveActionLimiter,
       message: 'Commission password verified',
     });
   } catch (error) {
-    console.error('Commission password verification error:', error);
+    req.logger.error('Commission password verification error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to verify commission password',
@@ -489,7 +489,7 @@ router.put('/commission-password/change', authenticate, sensitiveActionLimiter, 
       message: 'Commission password changed successfully',
     });
   } catch (error) {
-    console.error('Commission password change error:', error);
+    req.logger.error('Commission password change error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to change commission password',
@@ -533,7 +533,7 @@ router.post('/commission-password/reset', authenticate, sensitiveActionLimiter, 
       message: 'Commission password reset successfully',
     });
   } catch (error) {
-    console.error('Commission password reset error:', error);
+    req.logger.error('Commission password reset error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to reset commission password',
@@ -559,7 +559,7 @@ router.get('/tour', authenticate, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Tour state load error:', error);
+    req.logger.error('Tour state load error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to load tour state',
@@ -576,7 +576,7 @@ router.post('/tour/events', authenticate, async (req, res) => {
       data: state,
     });
   } catch (error) {
-    console.error('Tour event record error:', error);
+    req.logger.error('Tour event record error:', error);
     return res.status(error.status || 500).json({
       success: false,
       message: error.status ? error.message : 'Failed to record tour event',
@@ -632,7 +632,7 @@ router.get('/tour/analytics', authenticate, [
       },
     });
   } catch (error) {
-    console.error('Tour analytics error:', error);
+    req.logger.error('Tour analytics error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to load tour analytics',
@@ -864,7 +864,7 @@ router.post('/verification/live-capture/session', authenticate, async (req, res)
       },
     });
   } catch (error) {
-    console.error('Create live capture session error:', error);
+    req.logger.error('Create live capture session error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create live capture session',
@@ -958,7 +958,7 @@ router.delete('/account', authenticate, sensitiveActionLimiter, async (req, res)
     });
 
   } catch (error) {
-    console.error('Delete account error:', error);
+    req.logger.error('Delete account error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete account'
@@ -1004,7 +1004,7 @@ router.post('/verify-password', authenticate, sensitiveActionLimiter, async (req
       message: 'Password verified',
     });
   } catch (error) {
-    console.error('Password verification error:', error);
+    req.logger.error('Password verification error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to verify password',
@@ -1139,7 +1139,7 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, async (req, r
     if (!uploadPersisted) {
       cleanupUploadedFile(req.file);
     }
-    console.error('Upload passport error:', error);
+    req.logger.error('Upload passport error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to upload passport'
@@ -1185,7 +1185,7 @@ router.get('/passport-photo/:filename', authenticate, async (req, res) => {
 
     res.sendFile(resolvedPath);
   } catch (error) {
-    console.error('Serve passport photo error:', error);
+    req.logger.error('Serve passport photo error:', error);
     res.status(500).json({ success: false, message: 'Failed to serve file' });
   }
 });

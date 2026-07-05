@@ -1,14 +1,15 @@
+const logger = require('./logger');
 const { checkAndEscalateDisputes } = require('../../services/disputeEscalationService');
 
 function startScheduler() {
-  console.log('Dispute escalation scheduler started');
+  logger.info('Dispute escalation scheduler started');
 
   const runEscalation = async () => {
     try {
       await checkAndEscalateDisputes();
-      console.log('Dispute escalation check completed');
+      logger.info('Dispute escalation check completed');
     } catch (err) {
-      console.error('Dispute escalation error:', err.message);
+      logger.error('Dispute escalation error:', err.message);
     }
   };
 

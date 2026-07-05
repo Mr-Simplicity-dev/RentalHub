@@ -190,7 +190,7 @@ router.get("/metrics", authenticate, requireSupportMetricsAccess, async (req, re
       },
     });
   } catch (error) {
-    console.error("Support dashboard metrics error:", error.message);
+    req.logger.error("Support dashboard metrics error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch dashboard metrics",
@@ -296,7 +296,7 @@ router.get("/tenant/stats", authenticate, isTenant, async (req, res) => {
 
     res.json({ success: true, data: stats.rows[0] });
   } catch (error) {
-    console.error("Tenant dashboard stats error:", error.message);
+    req.logger.error("Tenant dashboard stats error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch tenant statistics",
@@ -404,7 +404,7 @@ router.get("/tenant/paid-property-locations", authenticate, isTenant, async (req
       data: locations.rows,
     });
   } catch (error) {
-    console.error("Tenant paid property locations error:", error.message);
+    req.logger.error("Tenant paid property locations error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch paid property locations",
@@ -671,7 +671,7 @@ router.get("/tenant/recent-activities", authenticate, isTenant, async (req, res)
 
     res.json({ success: true, data: activities.rows });
   } catch (error) {
-    console.error("Tenant recent activities error:", error.message);
+    req.logger.error("Tenant recent activities error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch recent activities",
@@ -825,7 +825,7 @@ router.get("/landlord/recent-activities", authenticate, isLandlord, async (req, 
 
     res.json({ success: true, data: activities.rows });
   } catch (error) {
-    console.error("Landlord recent activities error:", error.message);
+    req.logger.error("Landlord recent activities error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch recent activities",
@@ -871,7 +871,7 @@ router.get("/admin/stats", authenticate, async (req, res) => {
 
     res.json({ success: true, data: stats.rows[0] });
   } catch (error) {
-    console.error("Admin dashboard stats error:", error.message);
+    req.logger.error("Admin dashboard stats error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch admin statistics",
