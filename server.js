@@ -137,6 +137,7 @@ const slugify = require('./utils/slugify');
 const { pingGoogle } = require('./utils/pingGoogle');
 const { generateAIContent } = require('./utils/aiContentGenerator');
 const configureRealtimeSocket = require('./config/utils/realtimeSocket');
+const { setRealtimeIo } = require('./config/utils/realtimeEmitter');
 const { generateTitles } = require('./config/utils/pageGenerator');
 const { generateKeywords } = require('./config/utils/keywordGenerator');
 const { generateBacklinks } = require('./utils/backlinkEngine');
@@ -880,5 +881,6 @@ io.use(async (socket, next) => {
 });
 
 // Export io and realtime via a shared module instead of global variables
+setRealtimeIo(io);
 const realtime = configureRealtimeSocket(io);
 module.exports = { io, realtime };

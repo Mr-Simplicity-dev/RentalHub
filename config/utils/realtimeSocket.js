@@ -87,14 +87,14 @@ const fetchSocketUser = async (token) => {
 
   const user = result.rows[0];
 
+  if (!user || user.deleted_at || user.is_active === false) {
+    throw new Error('User is not active');
+  }
+
   const tokenVersion = decoded.tv || 1;
   const dbVersion = user.token_version || 1;
   if (tokenVersion < dbVersion) {
     throw new Error('Session expired. Please log in again.');
-  }
-
-  if (!user || user.deleted_at || user.is_active === false) {
-    throw new Error('User is not active');
   }
 
   return user;
@@ -270,6 +270,58 @@ const configureRealtimeSocket = (io) => {
 
       if (typeof callback === 'function') {
         callback({ success: true, statuses });
+      }
+    });
+
+    socket.on('message:typing', async (payload = {}, callback) => {
+      try {
+        const receiverId = Number(payload.receiverId || payload.receiver_id);
+        if (!Number.isInteger(receiverId) || receiverId <= 0 || receiverId === Number(user.id)) {
+          throw new Error('Select a valid message recipient');
+        }
+
+        const receiverResult = await db.query(
+          `SELECT id, user_type
+           FROM users
+           WHERE id = $1
+             AND deleted_at IS NULL
+             AND COALESCE(is_active, TRUE) = TRUE
+           LIMIT 1`,
+          [receiverId]
+        );
+        const receiver = receiverResult.rows[0];
+        if (!receiver) {
+          throw new Error('Message recipient is not available');
+        }
+
+        const senderRole = String(user.user_type || '').toLowerCase();
+        const receiverRole = String(receiver.user_type || '').toLowerCase();
+        const canMessage =
+          (senderRole === 'super_admin' &&
+            ['admin', 'lga_admin', 'tenant', 'landlord'].includes(receiverRole)) ||
+          (['admin', 'lga_admin'].includes(senderRole) &&
+            ['tenant', 'landlord', 'super_admin'].includes(receiverRole)) ||
+          (['tenant', 'landlord'].includes(senderRole) &&
+            ['admin', 'lga_admin', 'super_admin'].includes(receiverRole));
+
+        if (!canMessage) {
+          throw new Error('You are not allowed to message this user');
+        }
+
+        io.to(toUserRoom(receiverId)).emit('message:typing', {
+          user_id: user.id,
+          user_name: user.full_name || user.email || 'RentalHub user',
+          receiver_id: receiverId,
+          is_typing: Boolean(payload.isTyping ?? payload.is_typing),
+        });
+
+        if (typeof callback === 'function') {
+          callback({ success: true });
+        }
+      } catch (error) {
+        if (typeof callback === 'function') {
+          callback({ success: false, message: error.message });
+        }
       }
     });
 

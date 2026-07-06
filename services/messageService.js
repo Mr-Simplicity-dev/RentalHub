@@ -2,6 +2,8 @@ const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
 const { sendMessageNotification } = require('../config/utils/emailService');
 const { detectPhoneNumber } = require('../config/utils/phoneNumberFilter');
+const { emitToUser } = require('../config/utils/realtimeEmitter');
+const { sendPushToUser } = require('../config/utils/pushNotificationService');
 
 let messageSchemaReady = false;
 const ESCALATION_TICKET_STATUSES = ['approval_pending', 'under_review', 'approved', 'rejected'];
@@ -235,6 +237,8 @@ exports.sendMessage = async (req, res) => {
     );
     const sender = senderResult.rows[0];
 
+    let propertyTitle = null;
+
     // If property_id provided, verify it exists
     if (property_id) {
       const propertyCheck = await db.query(
@@ -248,6 +252,8 @@ exports.sendMessage = async (req, res) => {
           message: 'Property not found'
         });
       }
+
+      propertyTitle = propertyCheck.rows[0].title;
     }
 
     // Clear failed attempt tracking on successful send
@@ -275,6 +281,14 @@ exports.sendMessage = async (req, res) => {
     );
 
     const message = result.rows[0];
+    const realtimeMessage = {
+      ...message,
+      sender_name: sender.full_name,
+      sender_user_type: senderRole,
+      receiver_name: receiver.full_name,
+      receiver_user_type: receiver.user_type,
+      property_title: propertyTitle,
+    };
 
     if (messageType === 'escalation') {
       await db.query(
@@ -292,10 +306,24 @@ exports.sendMessage = async (req, res) => {
       message_text
     );
 
+    emitToUser(receiver_id, 'message:new', realtimeMessage);
+    emitToUser(senderId, 'message:new', realtimeMessage);
+    void sendPushToUser(receiver_id, {
+      title: sender.full_name || 'New RentalHub message',
+      body: message_text,
+      data: {
+        screen: 'Messages',
+        senderId: String(senderId),
+        senderName: sender.full_name || 'RentalHub user',
+        messageId: String(message.id),
+      },
+      channelId: 'messages',
+    }).catch((error) => req.logger.error('Message push notification failed:', error.message));
+
     res.status(201).json({
       success: true,
       message: 'Message sent successfully',
-      data: message
+      data: realtimeMessage
     });
 
   } catch (error) {
@@ -415,14 +443,23 @@ exports.getConversationWithUser = async (req, res) => {
     );
 
     // Mark unread messages as read
-    await db.query(
+    const readResult = await db.query(
       `UPDATE messages 
        SET is_read = TRUE 
        WHERE sender_id = $1 
          AND receiver_id = $2 
-         AND is_read = FALSE`,
+         AND is_read = FALSE
+       RETURNING id`,
       [otherUserId, userId]
     );
+
+    if (readResult.rows.length) {
+      emitToUser(otherUserId, 'message:read', {
+        reader_id: userId,
+        conversation_user_id: otherUserId,
+        message_ids: readResult.rows.map((item) => item.id),
+      });
+    }
 // 🔐 Audit Log
 await db.query(
   `INSERT INTO audit_logs 
@@ -535,6 +572,12 @@ exports.markAsRead = async (req, res) => {
       });
     }
 
+    emitToUser(result.rows[0].sender_id, 'message:read', {
+      reader_id: userId,
+      conversation_user_id: result.rows[0].sender_id,
+      message_ids: [result.rows[0].id],
+    });
+
     res.json({
       success: true,
       message: 'Message marked as read',
@@ -565,6 +608,14 @@ exports.markConversationAsRead = async (req, res) => {
       [otherUserId, userId]
     );
 
+    if (result.rows.length) {
+      emitToUser(otherUserId, 'message:read', {
+        reader_id: userId,
+        conversation_user_id: otherUserId,
+        message_ids: result.rows.map((item) => item.id),
+      });
+    }
+
     res.json({
       success: true,
       message: `${result.rows.length} message(s) marked as read`
@@ -588,7 +639,7 @@ exports.deleteMessage = async (req, res) => {
 
     // Only sender can delete their message
     const result = await db.query(
-      'DELETE FROM messages WHERE id = $1 AND sender_id = $2 RETURNING id',
+      'DELETE FROM messages WHERE id = $1 AND sender_id = $2 RETURNING id, receiver_id',
       [messageId, userId]
     );
 
@@ -598,6 +649,11 @@ exports.deleteMessage = async (req, res) => {
         message: 'Message not found or unauthorized'
       });
     }
+
+    emitToUser(result.rows[0].receiver_id, 'message:deleted', {
+      message_id: result.rows[0].id,
+      deleted_by: userId,
+    });
 
     res.json({
       success: true,
