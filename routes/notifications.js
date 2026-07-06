@@ -10,6 +10,42 @@ const {
   deleteNotification,
   getUnreadCount
 } = require('../config/utils/notificationService');
+const {
+  registerDevice,
+  unregisterDevice,
+} = require('../config/utils/pushNotificationService');
+
+router.post('/devices', authenticate, async (req, res) => {
+  try {
+    const device = await registerDevice({
+      userId: req.user.id,
+      token: req.body?.token,
+      platform: req.body?.platform,
+      deviceId: req.body?.device_id || null,
+    });
+    return res.status(201).json({ success: true, data: device });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Failed to register device',
+    });
+  }
+});
+
+router.delete('/devices', authenticate, async (req, res) => {
+  try {
+    await unregisterDevice({
+      userId: req.user.id,
+      token: req.body?.token,
+    });
+    return res.json({ success: true, message: 'Device unregistered' });
+  } catch {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to unregister device',
+    });
+  }
+});
 
 // Get user notifications
 router.get('/', authenticate, async (req, res) => {

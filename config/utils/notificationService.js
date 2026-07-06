@@ -1,5 +1,6 @@
 const logger = require('./logger');
 const db = require("../middleware/database");
+const { sendPushToUser } = require('./pushNotificationService');
 
 // Create notification table
 const createNotificationTable = async () => {
@@ -30,7 +31,18 @@ exports.createNotification = async (userId, type, title, message, link = null) =
       [userId, type, title, message, link]
     );
 
-    return result.rows[0];
+    const notification = result.rows[0];
+    void sendPushToUser(userId, {
+      title,
+      body: message,
+      data: {
+        notificationId: String(notification.id),
+        type: String(type || ''),
+        link: link || '',
+      },
+      channelId: type === 'message' ? 'messages' : 'general',
+    }).catch((error) => logger.error('Push notification failed:', error.message));
+    return notification;
   } catch (error) {
     logger.error('Create notification error:', error);
     return null;
