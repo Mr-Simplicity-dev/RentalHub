@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   FaSearch,
@@ -25,7 +26,7 @@ import { toast } from 'react-toastify';
 /* ──────────────────────────────────────────────────────────────
    ShareButton
    ────────────────────────────────────────────────────────────── */
-const ShareButton = ({ section, title, description }) => {
+const ShareButton = ({ section, title, description, t }) => {
   const [open, setOpen] = useState(false);
   const pageUrl = typeof window !== 'undefined' ? window.location.href : 'https://rentalhub.com.ng/faq';
   const shareText = `${title}\n\n${description}\n\n${pageUrl}`;
@@ -35,9 +36,9 @@ const ShareButton = ({ section, title, description }) => {
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(pageUrl);
-      toast.success('Link copied to clipboard');
+      toast.success(t('faq.toast_copied'));
     } catch {
-      toast.error('Could not copy link');
+      toast.error(t('faq.toast_copy_failed'));
     }
     setOpen(false);
   };
@@ -48,10 +49,10 @@ const ShareButton = ({ section, title, description }) => {
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-primary-600 hover:border-primary-300 transition-all duration-200 shadow-sm"
-        title={`Share ${section}`}
+        title={t('faq.share_section', { section })}
       >
         <FaShareAlt className="text-[10px]" />
-        Share
+        {t('faq.share')}
       </button>
 
       {open && (
@@ -59,7 +60,7 @@ const ShareButton = ({ section, title, description }) => {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-52 origin-top-right animate-scaleIn rounded-xl border border-gray-100 bg-white py-2 shadow-elevated-lg">
             <div className="px-4 pb-2 mb-1 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-700">Share {section}</p>
+              <p className="text-xs font-semibold text-gray-700">{t('faq.share_section', { section })}</p>
             </div>
 
             <a
@@ -70,7 +71,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaWhatsapp className="text-lg text-green-600" />
-              WhatsApp
+              {t('faq.share_whatsapp')}
             </a>
 
             <a
@@ -81,7 +82,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaFacebook className="text-lg text-blue-600" />
-              Facebook
+              {t('faq.share_facebook')}
             </a>
 
             <a
@@ -92,7 +93,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaTwitter className="text-lg text-sky-500" />
-              Twitter / X
+              {t('faq.share_twitter')}
             </a>
 
             <button
@@ -101,7 +102,7 @@ const ShareButton = ({ section, title, description }) => {
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <FaLink className="text-lg text-gray-500" />
-              Copy Link
+              {t('faq.share_copy')}
             </button>
           </div>
         </>
@@ -117,43 +118,36 @@ const ShareButton = ({ section, title, description }) => {
 const categories = [
   {
     id: 'general',
-    label: 'General',
     icon: <FaStar className="text-white" />,
     color: 'from-primary-500 to-primary-600',
   },
   {
     id: 'tenants',
-    label: 'For Tenants',
     icon: <FaSearch className="text-white" />,
     color: 'from-primary-600 to-primary-700',
   },
   {
     id: 'landlords',
-    label: 'For Landlords',
     icon: <FaBuilding className="text-white" />,
     color: 'from-primary-700 to-primary-800',
   },
   {
     id: 'verification',
-    label: 'Verification',
     icon: <FaUserCheck className="text-white" />,
     color: 'from-primary-500 to-primary-700',
   },
   {
     id: 'pricing',
-    label: 'Pricing & Billing',
     icon: <FaMoneyBillWave className="text-white" />,
     color: 'from-primary-600 to-primary-800',
   },
   {
     id: 'legal',
-    label: 'Legal & Disputes',
     icon: <FaFileContract className="text-white" />,
     color: 'from-primary-700 to-primary-900',
   },
   {
     id: 'account',
-    label: 'Account & Support',
     icon: <FaUsers className="text-white" />,
     color: 'from-primary-500 to-primary-800',
   },
@@ -345,32 +339,24 @@ const faqData = {
    ────────────────────────────────────────────────────────────── */
 const quickLinks = [
   {
+    id: 'list',
     icon: <FaHome className="text-xl text-primary-600" />,
-    title: 'List Your Property',
-    desc: 'Reach thousands of verified tenants across Nigeria.',
     link: '/list-property',
-    label: 'Start Listing',
   },
   {
+    id: 'browse',
     icon: <FaSearch className="text-xl text-primary-600" />,
-    title: 'Browse Properties',
-    desc: 'Find verified properties in all 36 states + FCT.',
     link: '/properties',
-    label: 'Search Now',
   },
   {
+    id: 'pricing',
     icon: <FaMoneyBillWave className="text-xl text-primary-600" />,
-    title: 'View Pricing Plans',
-    desc: 'Free, Basic, and Premium plans available.',
     link: '/pricing',
-    label: 'See Plans',
   },
   {
+    id: 'guide',
     icon: <FaFileContract className="text-xl text-primary-600" />,
-    title: 'Landlord Guide',
-    desc: 'Tips and best practices for successful listings.',
     link: '/landlord-guide',
-    label: 'Read Guide',
   },
 ];
 
@@ -378,16 +364,17 @@ const quickLinks = [
    Stats
    ────────────────────────────────────────────────────────────── */
 const stats = [
-  { label: 'Properties Listed', value: '10,000+' },
-  { label: 'Active Users', value: '50,000+' },
-  { label: 'States Covered', value: '36 + FCT' },
-  { label: 'Verified Landlords', value: '5,000+' },
+  { id: 'properties_listed', value: '10,000+' },
+  { id: 'active_users', value: '50,000+' },
+  { id: 'states_covered', value: '36 + FCT' },
+  { id: 'verified_landlords', value: '5,000+' },
 ];
 
 /* ──────────────────────────────────────────────────────────────
    Page Component
    ────────────────────────────────────────────────────────────── */
 const Faq = () => {
+  const { t } = useTranslation();
   const [activeCategory, setActiveCategory] = useState('general');
   const [openFaq, setOpenFaq] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -410,7 +397,7 @@ const Faq = () => {
       )
     : faqData[activeCategory] || [];
 
-  const currentCategoryLabel = categories.find((c) => c.id === activeCategory)?.label || 'General';
+  const currentCategoryLabel = t(`faq.category_${activeCategory}`);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -424,14 +411,13 @@ const Faq = () => {
         <div className="container mx-auto px-4 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight">
-              Frequently Asked{' '}
+              {t('faq.hero_title_before')}{' '}
               <span className="bg-gradient-to-r from-primary-200 to-primary-400 bg-clip-text text-transparent">
-                Questions
+                {t('faq.hero_title_highlight')}
               </span>
             </h1>
             <p className="text-lg md:text-xl text-primary-100 max-w-3xl mx-auto leading-relaxed">
-              Everything you need to know about RentalHub NG. Find answers to common questions
-              about listing properties, finding rentals, verification, pricing, and more.
+              {t('faq.hero_desc')}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link
@@ -439,19 +425,20 @@ const Faq = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaUsers />
-                Create Free Account
+                {t('faq.hero_cta_create')}
               </Link>
               <Link
                 to="/contact"
                 className="inline-flex items-center gap-2 px-8 py-3.5 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 hover:border-white/50 transition-all duration-300"
               >
                 <FaComments />
-                Contact Support
+                {t('faq.hero_cta_contact')}
               </Link>
               <ShareButton
                 section="FAQ"
                 title="RentalHub NG — Frequently Asked Questions"
                 description="Everything you need to know about RentalHub NG. Find answers about property listings, rentals, verification, pricing, and more."
+                t={t}
               />
             </div>
           </div>
@@ -471,11 +458,12 @@ const Faq = () => {
             {stats.map((stat, idx) => (
               <div key={idx} className="text-center text-white group">
                 <div className="text-3xl md:text-4xl font-extrabold mb-2">{stat.value}</div>
-                <div className="text-primary-200 text-sm md:text-base font-medium mb-2">{stat.label}</div>
+                <div className="text-primary-200 text-sm md:text-base font-medium mb-2">{t(`faq.stats_${stat.id}`)}</div>
                 <ShareButton
-                  section={stat.label}
-                  title={`RentalHub NG — ${stat.value} ${stat.label}`}
-                  description={`RentalHub NG has ${stat.value} ${stat.label.toLowerCase()}.`}
+                  section={t(`faq.stats_${stat.id}`)}
+                  title={`RentalHub NG — ${stat.value} ${t(`faq.stats_${stat.id}`)}`}
+                  description={`RentalHub NG has ${stat.value} ${t(`faq.stats_${stat.id}`).toLowerCase()}.`}
+                  t={t}
                 />
               </div>
             ))}
@@ -496,7 +484,7 @@ const Faq = () => {
                   setSearchQuery(e.target.value);
                   setOpenFaq(null);
                 }}
-                placeholder="Search frequently asked questions..."
+                placeholder={t('faq.search_placeholder')}
                 className="w-full pl-12 pr-4 py-4 border border-gray-200 rounded-2xl bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:outline-none transition-all duration-300 text-base"
               />
               {searchQuery && (
@@ -505,7 +493,7 @@ const Faq = () => {
                   onClick={() => setSearchQuery('')}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm font-medium cursor-pointer"
                 >
-                  Clear
+                  {t('faq.search_clear')}
                 </button>
               )}
             </div>
@@ -535,7 +523,7 @@ const Faq = () => {
                     }`}
                   >
                     <span className="text-base">{cat.icon}</span>
-                    {cat.label}
+                    {t(`faq.category_${cat.id}`)}
                   </button>
                 ))}
               </div>
@@ -547,28 +535,28 @@ const Faq = () => {
                 <div>
                   {searchQuery.trim() ? (
                     <p className="text-gray-500 text-sm">
-                      {filteredFaqs.length} result{filteredFaqs.length !== 1 ? 's' : ''} for "{searchQuery}"
+                      {t('faq.search_results', { count: filteredFaqs.length, query: searchQuery })}
                       <button
                         type="button"
                         onClick={() => setSearchQuery('')}
                         className="ml-2 text-primary-600 hover:text-primary-700 font-medium cursor-pointer"
                       >
-                        Clear search
+                        {t('faq.search_clear_link')}
                       </button>
                     </p>
                   ) : (
                     <>
                       <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">
-                        {currentCategoryLabel}
+                        {t(`faq.category_${activeCategory}`)}
                       </span>
                       <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
-                        {activeCategory === 'general' && 'General Questions'}
-                        {activeCategory === 'tenants' && 'Tenant Questions'}
-                        {activeCategory === 'landlords' && 'Landlord Questions'}
-                        {activeCategory === 'verification' && 'Verification Questions'}
-                        {activeCategory === 'pricing' && 'Pricing & Billing Questions'}
-                        {activeCategory === 'legal' && 'Legal & Dispute Questions'}
-                        {activeCategory === 'account' && 'Account & Support Questions'}
+                        {activeCategory === 'general' && t('faq.section_general')}
+                        {activeCategory === 'tenants' && t('faq.section_tenants')}
+                        {activeCategory === 'landlords' && t('faq.section_landlords')}
+                        {activeCategory === 'verification' && t('faq.section_verification')}
+                        {activeCategory === 'pricing' && t('faq.section_pricing')}
+                        {activeCategory === 'legal' && t('faq.section_legal')}
+                        {activeCategory === 'account' && t('faq.section_account')}
                       </h2>
                     </>
                   )}
@@ -577,6 +565,7 @@ const Faq = () => {
                   section={currentCategoryLabel}
                   title={`RentalHub NG FAQ — ${currentCategoryLabel}`}
                   description={`Frequently asked questions about ${currentCategoryLabel.toLowerCase()} on RentalHub NG.`}
+                  t={t}
                 />
               </div>
             </div>
@@ -626,9 +615,9 @@ const Faq = () => {
                 <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gray-100 flex items-center justify-center">
                   <FaSearch className="text-3xl text-gray-400" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">No results found</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{t('faq.no_results_title')}</h3>
                 <p className="text-gray-500 mb-6">
-                  We could not find any FAQs matching "{searchQuery}". Try a different search term.
+                  {t('faq.no_results_desc', { query: searchQuery })}
                 </p>
                 <button
                   type="button"
@@ -636,7 +625,7 @@ const Faq = () => {
                   className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white font-semibold rounded-xl hover:bg-primary-700 transition-all duration-300 cursor-pointer"
                 >
                   <FaSyncAlt />
-                  Clear Search
+                  {t('faq.no_results_clear')}
                 </button>
               </div>
             )}
@@ -648,12 +637,12 @@ const Faq = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-12">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Quick Links</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('faq.quick_links_title')}</span>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-3 mb-4">
-              Still Have Questions?
+              {t('faq.still_questions')}
             </h2>
             <p className="text-gray-600">
-              Explore these helpful resources or contact our support team directly.
+              {t('faq.still_questions_desc')}
             </p>
           </div>
 
@@ -667,10 +656,10 @@ const Faq = () => {
                 <div className="w-14 h-14 mx-auto mb-5 rounded-xl bg-primary-50 flex items-center justify-center group-hover:bg-primary-100 transition-colors">
                   {link.icon}
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{link.title}</h3>
-                <p className="text-gray-600 text-sm leading-relaxed mb-4">{link.desc}</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{t(`faq.quick_link_${link.id}`)}</h3>
+                <p className="text-gray-600 text-sm leading-relaxed mb-4">{t(`faq.quick_link_${link.id}_desc`)}</p>
                 <span className="inline-flex items-center gap-1 text-primary-600 font-semibold text-sm group-hover:gap-2 transition-all">
-                  {link.label} <FaArrowRight className="text-xs" />
+                  {t(`faq.quick_link_${link.id}_label`)} <FaArrowRight className="text-xs" />
                 </span>
               </Link>
             ))}
@@ -683,11 +672,10 @@ const Faq = () => {
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Still Can not Find What You Are Looking For?
+              {t('faq.cta_heading')}
             </h2>
             <p className="text-primary-100 text-lg mb-10 leading-relaxed">
-              Our support team is ready to help you with any questions. Reach out and we
-              will get back to you within 24 hours.
+              {t('faq.cta_desc')}
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
@@ -695,19 +683,20 @@ const Faq = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaUsers />
-                Create Free Account
+                {t('faq.cta_create')}
               </Link>
               <Link
                 to="/contact"
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-primary-500 text-white font-semibold rounded-xl shadow-lg hover:bg-primary-400 hover:scale-105 transition-all duration-300"
               >
                 <FaComments />
-                Contact Support
+                {t('faq.cta_contact')}
               </Link>
               <ShareButton
                 section="Call to Action"
                 title="Need Help? Contact RentalHub NG Support"
                 description="Our support team is ready to help. Contact RentalHub NG at support@rentalhub.com.ng or call +234 803 060 1238."
+                t={t}
               />
             </div>
           </div>
@@ -719,11 +708,11 @@ const Faq = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-              Get In Touch
+              {t('faq.contact_heading')}
             </h2>
 
             <p className="text-gray-600 mb-12 max-w-2xl mx-auto">
-              Have a question that is not covered here? Our support team is always happy to help.
+              {t('faq.contact_desc')}
             </p>
 
             <div className="flex justify-center mb-10">
@@ -731,6 +720,7 @@ const Faq = () => {
                 section="Contact"
                 title="Contact RentalHub NG Support"
                 description="Have questions about RentalHub NG? Contact us at support@rentalhub.com.ng or call +234 803 060 1238."
+                t={t}
               />
             </div>
 
@@ -744,7 +734,7 @@ const Faq = () => {
                 </div>
 
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Email us</p>
+                  <p className="text-sm text-gray-500">{t('faq.contact_email_label')}</p>
                   <p className="text-gray-900 font-semibold">
                     support@rentalhub.com.ng
                   </p>
@@ -760,7 +750,7 @@ const Faq = () => {
                 </div>
 
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Call us</p>
+                  <p className="text-sm text-gray-500">{t('faq.contact_call_label')}</p>
                   <p className="text-gray-900 font-semibold">
                     +234 803 060 1238
                   </p>

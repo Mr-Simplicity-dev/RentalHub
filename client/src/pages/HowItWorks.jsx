@@ -25,6 +25,7 @@ import {
   FaEnvelope,
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 
 /* ──────────────────────────────────────────────────────────────
    ShareButton
@@ -115,122 +116,6 @@ const ShareButton = ({ section, title, description }) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Tenant Steps
-   ────────────────────────────────────────────────────────────── */
-const tenantSteps = [
-  {
-    icon: <FaUserPlus className="text-2xl text-white" />,
-    title: 'Create Your Account',
-    desc: 'Sign up as a tenant and complete your identity verification using your NIN. This ensures a safe community for everyone.',
-    highlights: ['Free registration', 'NIN-linked verification', 'Profile management'],
-  },
-  {
-    icon: <FaSearch className="text-2xl text-white" />,
-    title: 'Browse Properties',
-    desc: 'Search through thousands of verified properties across all 36 states + FCT. Use filters to find exactly what you need.',
-    highlights: ['Filter by location & budget', 'Virtual property tours', 'Save favorites'],
-  },
-  {
-    icon: <FaLock className="text-2xl text-white" />,
-    title: 'Unlock Full Details',
-    desc: 'Make a one-time payment to unlock full property details, including the landlord contact information and premium media.',
-    highlights: ['Full address revealed', 'Landlord contact info', 'HD photos & video'],
-  },
-  {
-    icon: <FaHeart className="text-2xl text-white" />,
-    title: 'Apply & Connect',
-    desc: 'Submit applications to your preferred properties, chat with landlords directly, and secure your new home.',
-    highlights: ['One-click application', 'In-app messaging', 'Move-in support'],
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Landlord Steps
-   ────────────────────────────────────────────────────────────── */
-const landlordSteps = [
-  {
-    icon: <FaUserPlus className="text-2xl text-white" />,
-    title: 'Register & Verify',
-    desc: 'Create a landlord or agent account and complete profile verification to start listing your properties.',
-    highlights: ['Quick registration', 'Identity verification', 'Agent onboarding'],
-  },
-  {
-    icon: <FaCamera className="text-2xl text-white" />,
-    title: 'List Your Property',
-    desc: 'Add your property with detailed descriptions, high-quality photos, and set your rental terms.',
-    highlights: ['Detailed listings', 'Photo & video upload', 'Flexible pricing'],
-  },
-  {
-    icon: <FaCreditCard className="text-2xl text-white" />,
-    title: 'Choose a Plan',
-    desc: 'Select a listing plan that suits your needs — from free basic listings to premium featured placements.',
-    highlights: ['Free plan available', 'From ₦5,000/year', 'Featured badges'],
-  },
-  {
-    icon: <FaComments className="text-2xl text-white" />,
-    title: 'Manage & Connect',
-    desc: 'Review applications, chat with prospective tenants, and manage all your properties from one dashboard.',
-    highlights: ['Application management', 'Tenant messaging', 'Analytics dashboard'],
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Platform Features
-   ────────────────────────────────────────────────────────────── */
-const platformFeatures = [
-  {
-    icon: <FaShieldAlt className="text-3xl text-primary-500" />,
-    title: 'Identity Verification',
-    desc: 'Every user — tenant, landlord, and agent — goes through NIN-linked identity verification for a trusted ecosystem.',
-  },
-  {
-    icon: <FaHandshake className="text-3xl text-primary-500" />,
-    title: 'Secure Transactions',
-    desc: 'Applications and communications are handled securely within the platform. Clear terms protect all parties.',
-  },
-  {
-    icon: <FaClipboardCheck className="text-3xl text-primary-500" />,
-    title: 'Legal Support',
-    desc: 'Access qualified lawyers, evidence verification, and structured dispute resolution when you need it.',
-  },
-  {
-    icon: <FaStar className="text-3xl text-primary-500" />,
-    title: 'Ratings & Reviews',
-    desc: 'Transparent ratings and verified reviews help tenants and landlords make informed decisions.',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Video Walkthrough Section Data
-   ────────────────────────────────────────────────────────────── */
-const walkthroughSteps = [
-  {
-    step: '01',
-    title: 'Sign Up',
-    desc: 'Register as a tenant or landlord in under 2 minutes.',
-    color: 'from-primary-500 to-primary-600',
-  },
-  {
-    step: '02',
-    title: 'Verify',
-    desc: 'Complete NIN verification to unlock full access.',
-    color: 'from-primary-600 to-primary-700',
-  },
-  {
-    step: '03',
-    title: 'Browse or List',
-    desc: 'Tenants search, landlords list — both with powerful tools.',
-    color: 'from-primary-700 to-primary-800',
-  },
-  {
-    step: '04',
-    title: 'Connect',
-    desc: 'Apply, chat, and close your deal with confidence.',
-    color: 'from-primary-800 to-primary-900',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
    FAQ Data
    ────────────────────────────────────────────────────────────── */
 const faqs = [
@@ -264,7 +149,112 @@ const faqs = [
    Page Component
    ────────────────────────────────────────────────────────────── */
 const HowItWorks = () => {
+  const { t } = useTranslation();
   const [openFaq, setOpenFaq] = useState(null);
+
+  const walkthroughSteps = [
+    {
+      step: '01',
+      title: t('how_it_works.walkthrough_signup'),
+      desc: t('how_it_works.walkthrough_signup_desc'),
+      color: 'from-primary-500 to-primary-600',
+    },
+    {
+      step: '02',
+      title: t('how_it_works.walkthrough_verify'),
+      desc: t('how_it_works.walkthrough_verify_desc'),
+      color: 'from-primary-600 to-primary-700',
+    },
+    {
+      step: '03',
+      title: t('how_it_works.walkthrough_browse'),
+      desc: t('how_it_works.walkthrough_browse_desc'),
+      color: 'from-primary-700 to-primary-800',
+    },
+    {
+      step: '04',
+      title: t('how_it_works.walkthrough_connect'),
+      desc: t('how_it_works.walkthrough_connect_desc'),
+      color: 'from-primary-800 to-primary-900',
+    },
+  ];
+
+  const tenantSteps = [
+    {
+      icon: <FaUserPlus className="text-2xl text-white" />,
+      title: t('how_it_works.tenants_step_1_title'),
+      desc: t('how_it_works.tenants_step_1_desc'),
+      highlights: [t('how_it_works.tenants_step_1_hl_1'), t('how_it_works.tenants_step_1_hl_2'), t('how_it_works.tenants_step_1_hl_3')],
+    },
+    {
+      icon: <FaSearch className="text-2xl text-white" />,
+      title: t('how_it_works.tenants_step_2_title'),
+      desc: t('how_it_works.tenants_step_2_desc'),
+      highlights: [t('how_it_works.tenants_step_2_hl_1'), t('how_it_works.tenants_step_2_hl_2'), t('how_it_works.tenants_step_2_hl_3')],
+    },
+    {
+      icon: <FaLock className="text-2xl text-white" />,
+      title: t('how_it_works.tenants_step_3_title'),
+      desc: t('how_it_works.tenants_step_3_desc'),
+      highlights: [t('how_it_works.tenants_step_3_hl_1'), t('how_it_works.tenants_step_3_hl_2'), t('how_it_works.tenants_step_3_hl_3')],
+    },
+    {
+      icon: <FaHeart className="text-2xl text-white" />,
+      title: t('how_it_works.tenants_step_4_title'),
+      desc: t('how_it_works.tenants_step_4_desc'),
+      highlights: [t('how_it_works.tenants_step_4_hl_1'), t('how_it_works.tenants_step_4_hl_2'), t('how_it_works.tenants_step_4_hl_3')],
+    },
+  ];
+
+  const landlordSteps = [
+    {
+      icon: <FaUserPlus className="text-2xl text-white" />,
+      title: t('how_it_works.landlords_step_1_title'),
+      desc: t('how_it_works.landlords_step_1_desc'),
+      highlights: [t('how_it_works.landlords_step_1_hl_1'), t('how_it_works.landlords_step_1_hl_2'), t('how_it_works.landlords_step_1_hl_3')],
+    },
+    {
+      icon: <FaCamera className="text-2xl text-white" />,
+      title: t('how_it_works.landlords_step_2_title'),
+      desc: t('how_it_works.landlords_step_2_desc'),
+      highlights: [t('how_it_works.landlords_step_2_hl_1'), t('how_it_works.landlords_step_2_hl_2'), t('how_it_works.landlords_step_2_hl_3')],
+    },
+    {
+      icon: <FaCreditCard className="text-2xl text-white" />,
+      title: t('how_it_works.landlords_step_3_title'),
+      desc: t('how_it_works.landlords_step_3_desc'),
+      highlights: [t('how_it_works.landlords_step_3_hl_1'), t('how_it_works.landlords_step_3_hl_2'), t('how_it_works.landlords_step_3_hl_3')],
+    },
+    {
+      icon: <FaComments className="text-2xl text-white" />,
+      title: t('how_it_works.landlords_step_4_title'),
+      desc: t('how_it_works.landlords_step_4_desc'),
+      highlights: [t('how_it_works.landlords_step_4_hl_1'), t('how_it_works.landlords_step_4_hl_2'), t('how_it_works.landlords_step_4_hl_3')],
+    },
+  ];
+
+  const platformFeatures = [
+    {
+      icon: <FaShieldAlt className="text-3xl text-primary-500" />,
+      title: t('how_it_works.features_verification_title'),
+      desc: t('how_it_works.features_verification_desc'),
+    },
+    {
+      icon: <FaHandshake className="text-3xl text-primary-500" />,
+      title: t('how_it_works.features_secure_title'),
+      desc: t('how_it_works.features_secure_desc'),
+    },
+    {
+      icon: <FaClipboardCheck className="text-3xl text-primary-500" />,
+      title: t('how_it_works.features_legal_title'),
+      desc: t('how_it_works.features_legal_desc'),
+    },
+    {
+      icon: <FaStar className="text-3xl text-primary-500" />,
+      title: t('how_it_works.features_ratings_title'),
+      desc: t('how_it_works.features_ratings_desc'),
+    },
+  ];
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -282,15 +272,14 @@ const HowItWorks = () => {
         <div className="container mx-auto px-4 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight">
-              How{' '}
+              {t('how_it_works.hero_title_before')}{' '}
               <span className="bg-gradient-to-r from-primary-200 to-primary-400 bg-clip-text text-transparent">
-                RentalHub NG
+                {t('how_it_works.hero_title_highlight')}
               </span>{' '}
-              Works
+              {t('how_it_works.hero_title_after')}
             </h1>
             <p className="text-lg md:text-xl text-primary-100 max-w-3xl mx-auto leading-relaxed">
-              Whether you are looking for your next home or listing a property for rent,
-              RentalHub NG makes the process simple, secure, and transparent.
+              {t('how_it_works.hero_desc')}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link
@@ -298,19 +287,19 @@ const HowItWorks = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaSearch />
-                Browse Properties
+                {t('how_it_works.hero_cta_browse')}
               </Link>
               <Link
                 to="/list-property"
                 className="inline-flex items-center gap-2 px-8 py-3.5 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 hover:border-white/50 transition-all duration-300"
               >
                 <FaBuilding />
-                List Your Property
+                {t('how_it_works.hero_cta_list')}
               </Link>
               <ShareButton
-                section="How It Works"
-                title="How RentalHub NG Works"
-                description="Whether you are looking for your next home or listing a property for rent, RentalHub NG makes it simple, secure, and transparent."
+                section={t('how_it_works.hero_title_before') + t('how_it_works.hero_title_highlight') + t('how_it_works.hero_title_after')}
+                title={t('how_it_works.hero_title_before') + t('how_it_works.hero_title_highlight') + t('how_it_works.hero_title_after')}
+                description={t('how_it_works.hero_desc')}
               />
             </div>
           </div>
@@ -328,9 +317,9 @@ const HowItWorks = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-10">
-              <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Quick Overview</span>
+              <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('how_it_works.overview_badge')}</span>
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-3">
-                Your Journey in 4 Simple Steps
+                {t('how_it_works.overview_heading')}
               </h2>
             </div>
 
@@ -353,19 +342,19 @@ const HowItWorks = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">For Tenants</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('how_it_works.tenants_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Find Your Perfect Home
+                {t('how_it_works.tenants_heading')}
               </h2>
               <ShareButton
-                section="For Tenants"
-                title="RentalHub NG for Tenants — Find Your Perfect Home"
-                description="Create an account, browse verified properties, unlock full details, and apply to your dream home."
+                section={t('how_it_works.tenants_badge')}
+                title={t('how_it_works.tenants_badge') + ' — ' + t('how_it_works.tenants_heading')}
+                description={t('how_it_works.tenants_desc')}
               />
             </div>
             <p className="text-gray-600">
-              From search to move-in, here is how tenants find their next home on RentalHub NG.
+              {t('how_it_works.tenants_desc')}
             </p>
           </div>
 
@@ -401,8 +390,8 @@ const HowItWorks = () => {
 
                 <div className="shrink-0">
                   <ShareButton
-                    section={`Tenant Step ${idx + 1}`}
-                    title={`RentalHub NG — ${step.title}`}
+                    section={`${t('how_it_works.tenants_badge')} ${idx + 1}`}
+                    title={`${t('how_it_works.tenants_heading')} — ${step.title}`}
                     description={step.desc}
                   />
                 </div>
@@ -416,7 +405,7 @@ const HowItWorks = () => {
               className="inline-flex items-center gap-2 px-8 py-3.5 bg-primary-600 text-white font-semibold rounded-xl shadow-lg hover:bg-primary-700 hover:shadow-xl hover:scale-105 transition-all duration-300"
             >
               <FaUserPlus />
-              Get Started as a Tenant
+              {t('how_it_works.tenants_cta')}
             </Link>
           </div>
         </div>
@@ -429,7 +418,7 @@ const HowItWorks = () => {
         </div>
         <div className="relative flex justify-center">
           <span className="bg-gray-50 px-6 py-2 text-sm font-semibold text-gray-400 rounded-full border border-gray-200">
-            Both tenants and landlords use RentalHub NG
+            {t('how_it_works.divider_label')}
           </span>
         </div>
       </div>
@@ -438,19 +427,19 @@ const HowItWorks = () => {
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">For Landlords & Agents</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('how_it_works.landlords_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                List & Manage Properties
+                {t('how_it_works.landlords_heading')}
               </h2>
               <ShareButton
-                section="For Landlords"
-                title="RentalHub NG for Landlords — List & Manage Properties"
-                description="Register, list your property, choose a plan, and connect with verified tenants through your dashboard."
+                section={t('how_it_works.landlords_badge')}
+                title={t('how_it_works.landlords_badge') + ' — ' + t('how_it_works.landlords_heading')}
+                description={t('how_it_works.landlords_desc')}
               />
             </div>
             <p className="text-gray-600">
-              From registration to tenant connection, here is how landlords succeed on RentalHub NG.
+              {t('how_it_works.landlords_desc')}
             </p>
           </div>
 
@@ -486,8 +475,8 @@ const HowItWorks = () => {
 
                 <div className="shrink-0">
                   <ShareButton
-                    section={`Landlord Step ${idx + 1}`}
-                    title={`RentalHub NG — ${step.title}`}
+                    section={`${t('how_it_works.landlords_badge')} ${idx + 1}`}
+                    title={`${t('how_it_works.landlords_heading')} — ${step.title}`}
                     description={step.desc}
                   />
                 </div>
@@ -501,7 +490,7 @@ const HowItWorks = () => {
               className="inline-flex items-center gap-2 px-8 py-3.5 bg-primary-600 text-white font-semibold rounded-xl shadow-lg hover:bg-primary-700 hover:shadow-xl hover:scale-105 transition-all duration-300"
             >
               <FaBuilding />
-              Start Listing Your Property
+              {t('how_it_works.landlords_cta')}
             </Link>
           </div>
         </div>
@@ -511,19 +500,19 @@ const HowItWorks = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Platform Features</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('how_it_works.features_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                What Makes the Platform Work
+                {t('how_it_works.features_heading')}
               </h2>
               <ShareButton
-                section="Platform Features"
-                title="RentalHub NG Platform Features"
-                description="Identity verification, secure transactions, legal support, and transparent ratings — the pillars of RentalHub NG."
+                section={t('how_it_works.features_badge')}
+                title={t('how_it_works.features_badge') + ' — ' + t('how_it_works.features_heading')}
+                description={t('how_it_works.features_desc')}
               />
             </div>
             <p className="text-gray-600">
-              These features ensure every interaction on RentalHub NG is safe and trustworthy.
+              {t('how_it_works.features_desc')}
             </p>
           </div>
 
@@ -539,7 +528,7 @@ const HowItWorks = () => {
                   </div>
                   <ShareButton
                     section={feature.title}
-                    title={`RentalHub NG — ${feature.title}`}
+                    title={`${t('how_it_works.features_heading')} — ${feature.title}`}
                     description={feature.desc}
                   />
                 </div>
@@ -555,19 +544,19 @@ const HowItWorks = () => {
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">FAQ</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('how_it_works.faq_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Frequently Asked Questions
+                {t('how_it_works.faq_heading')}
               </h2>
               <ShareButton
-                section="FAQ"
-                title="How It Works FAQ — RentalHub NG"
-                description="Common questions about how RentalHub NG works for tenants and landlords."
+                section={t('how_it_works.faq_badge')}
+                title={t('how_it_works.faq_heading') + ' — ' + t('how_it_works.hero_title_highlight')}
+                description={t('how_it_works.faq_desc')}
               />
             </div>
             <p className="text-gray-600">
-              Everything you need to know about using RentalHub NG.
+              {t('how_it_works.faq_desc')}
             </p>
           </div>
 
@@ -607,11 +596,10 @@ const HowItWorks = () => {
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to Get Started?
+              {t('how_it_works.cta_heading')}
             </h2>
             <p className="text-primary-100 text-lg mb-10 leading-relaxed">
-              Join thousands of Nigerians using RentalHub NG to find homes and list properties.
-              Your journey starts here.
+              {t('how_it_works.cta_desc')}
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
@@ -619,19 +607,19 @@ const HowItWorks = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaUsers />
-                Create Free Account
+                {t('how_it_works.cta_create')}
               </Link>
               <Link
                 to="/properties"
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-primary-500 text-white font-semibold rounded-xl shadow-lg hover:bg-primary-400 hover:scale-105 transition-all duration-300"
               >
                 <FaSearch />
-                Browse Properties
+                {t('how_it_works.cta_browse')}
               </Link>
               <ShareButton
-                section="Call to Action"
-                title="Get Started on RentalHub NG"
-                description="Join thousands of Nigerians using RentalHub NG to find homes and list properties. Create your free account today."
+                section={t('how_it_works.cta_heading')}
+                title={t('how_it_works.cta_heading') + ' — ' + t('how_it_works.hero_title_highlight')}
+                description={t('how_it_works.cta_desc')}
               />
             </div>
           </div>
@@ -643,16 +631,16 @@ const HowItWorks = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-              Still Have Questions?
+              {t('how_it_works.contact_heading')}
             </h2>
             <p className="text-gray-600 mb-12 max-w-2xl mx-auto">
-              Our support team is always ready to help you navigate the platform.
+              {t('how_it_works.contact_desc')}
             </p>
             <div className="flex justify-center mb-10">
               <ShareButton
-                section="Contact"
-                title="Contact RentalHub NG Support"
-                description="Have questions about how RentalHub NG works? Contact us at support@rentalhub.com.ng or call +234 803 060 1238."
+                section={t('how_it_works.contact_heading')}
+                title={t('how_it_works.contact_heading') + ' — ' + t('how_it_works.hero_title_highlight') + ' ' + t('how_it_works.faq_badge')}
+                description={t('how_it_works.contact_desc')}
               />
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
@@ -664,7 +652,7 @@ const HowItWorks = () => {
                   <FaEnvelope className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Email us</p>
+                  <p className="text-sm text-gray-500">{t('how_it_works.contact_email')}</p>
                   <p className="text-gray-900 font-semibold">support@rentalhub.com.ng</p>
                 </div>
               </a>
@@ -676,7 +664,7 @@ const HowItWorks = () => {
                   <FaPhoneAlt className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Call us</p>
+                  <p className="text-sm text-gray-500">{t('how_it_works.contact_call')}</p>
                   <p className="text-gray-900 font-semibold">+234 803 060 1238</p>
                 </div>
               </a>

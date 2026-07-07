@@ -87,6 +87,7 @@ const agentWithdrawalRoutes = require('./routes/agentWithdrawals');
 const stateMigrationRoutes = require('./routes/stateMigrations');
 const supportRoutes = require('./routes/support');
 const systemRoutes = require('./routes/system');
+const mobileDiagnosticsRoutes = require('./routes/mobileDiagnostics');
 
 const damageReportRoutes = require('./routes/damageReports');
 const rentSavingsRoutes = require('./routes/rentSavings');
@@ -672,6 +673,7 @@ app.use('/api/withdrawals', financeOpsLimiter, agentWithdrawalRoutes);
 app.use('/api/state-migrations', generalOpsLimiter, stateMigrationRoutes);
 app.use('/api/support', adminLimiter, supportRoutes);
 app.use('/api/system', adminLimiter, systemRoutes);
+app.use('/api/mobile', generalOpsLimiter, mobileDiagnosticsRoutes);
 app.use('/api/damage-reports', generalOpsLimiter, damageReportRoutes);
 app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
 app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);

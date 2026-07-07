@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FaHome,
@@ -26,10 +27,8 @@ import {
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 
-/* ──────────────────────────────────────────────────────────────
-   ShareButton
-   ────────────────────────────────────────────────────────────── */
 const ShareButton = ({ section, title, description }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const pageUrl = typeof window !== 'undefined' ? window.location.href : 'https://rentalhub.com.ng/list-property';
   const shareText = `${title}\n\n${description}\n\n${pageUrl}`;
@@ -39,9 +38,9 @@ const ShareButton = ({ section, title, description }) => {
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(pageUrl);
-      toast.success('Link copied to clipboard');
+      toast.success(t('list_property.share_copied'));
     } catch {
-      toast.error('Could not copy link');
+      toast.error(t('list_property.share_copy_failed'));
     }
     setOpen(false);
   };
@@ -52,10 +51,10 @@ const ShareButton = ({ section, title, description }) => {
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-primary-600 hover:border-primary-300 transition-all duration-200 shadow-sm"
-        title={`Share ${section}`}
+        title={`${t('list_property.share')} ${section}`}
       >
         <FaShareAlt className="text-[10px]" />
-        Share
+        {t('list_property.share')}
       </button>
 
       {open && (
@@ -63,7 +62,7 @@ const ShareButton = ({ section, title, description }) => {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-52 origin-top-right animate-scaleIn rounded-xl border border-gray-100 bg-white py-2 shadow-elevated-lg">
             <div className="px-4 pb-2 mb-1 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-700">Share {section}</p>
+              <p className="text-xs font-semibold text-gray-700">{t('list_property.share')} {section}</p>
             </div>
 
             <a
@@ -74,7 +73,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaWhatsapp className="text-lg text-green-600" />
-              WhatsApp
+              {t('list_property.share_whatsapp')}
             </a>
 
             <a
@@ -85,7 +84,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaFacebook className="text-lg text-blue-600" />
-              Facebook
+              {t('list_property.share_facebook')}
             </a>
 
             <a
@@ -96,7 +95,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaTwitter className="text-lg text-sky-500" />
-              Twitter / X
+              {t('list_property.share_twitter')}
             </a>
 
             <button
@@ -105,7 +104,7 @@ const ShareButton = ({ section, title, description }) => {
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <FaLink className="text-lg text-gray-500" />
-              Copy Link
+              {t('list_property.share_copy_link')}
             </button>
           </div>
         </>
@@ -114,180 +113,163 @@ const ShareButton = ({ section, title, description }) => {
   );
 };
 
-/* ──────────────────────────────────────────────────────────────
-   Plan card
-   ────────────────────────────────────────────────────────────── */
-const plans = [
-  {
-    name: 'Free',
-    price: '₦0',
-    period: 'per listing',
-    popular: false,
-    features: [
-      'List 1 property',
-      'Basic property details',
-      'Up to 3 photos',
-      'Standard visibility',
-      'Email support',
-    ],
-    cta: 'Get Started Free',
-  },
-  {
-    name: 'Basic',
-    price: '₦5,000',
-    period: 'per listing / year',
-    popular: true,
-    features: [
-      'List up to 5 properties',
-      'Detailed property description',
-      'Up to 10 photos',
-      'Priority visibility',
-      'Basic analytics',
-      'Email & WhatsApp support',
-    ],
-    cta: 'Choose Basic',
-  },
-  {
-    name: 'Premium',
-    price: '₦15,000',
-    period: 'per listing / year',
-    popular: false,
-    features: [
-      'Unlimited properties',
-      'Premium property listing',
-      'Up to 30 photos + video tour',
-      'Featured badge & top placement',
-      'Advanced analytics dashboard',
-      'Dedicated agent support',
-      'Legal support access',
-    ],
-    cta: 'Choose Premium',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Steps
-   ────────────────────────────────────────────────────────────── */
-const steps = [
-  {
-    icon: <FaFileContract className="text-3xl text-white" />,
-    title: 'Create Your Account',
-    desc: 'Sign up as a landlord or agent and complete identity verification to get started.',
-  },
-  {
-    icon: <FaCamera className="text-3xl text-white" />,
-    title: 'Add Your Property',
-    desc: 'Fill in property details, upload high-quality photos, and set your rental price.',
-  },
-  {
-    icon: <FaCheckCircle className="text-3xl text-white" />,
-    title: 'Get Verified',
-    desc: 'Your property undergoes verification to ensure authenticity. This builds trust with tenants.',
-  },
-  {
-    icon: <FaUsers className="text-3xl text-white" />,
-    title: 'Connect with Tenants',
-    desc: 'Receive applications, chat with prospective tenants, and manage bookings — all from your dashboard.',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Benefits
-   ────────────────────────────────────────────────────────────── */
-const benefits = [
-  {
-    icon: <FaShieldAlt className="text-2xl text-primary-600" />,
-    title: 'Verified Tenant Pool',
-    desc: 'All prospective tenants go through NIN-linked identity verification, so you know who you are dealing with.',
-  },
-  {
-    icon: <FaBullhorn className="text-2xl text-primary-600" />,
-    title: 'Massive Exposure',
-    desc: 'Your properties reach thousands of active tenants searching across all 36 states + FCT.',
-  },
-  {
-    icon: <FaChartLine className="text-2xl text-primary-600" />,
-    title: 'Smart Analytics',
-    desc: 'Track views, inquiries, and applications in real-time with your landlord dashboard.',
-  },
-  {
-    icon: <FaTachometerAlt className="text-2xl text-primary-600" />,
-    title: 'Easy Management',
-    desc: 'Manage all your properties, applications, and tenant communication from one central dashboard.',
-  },
-  {
-    icon: <FaMoneyBillWave className="text-2xl text-primary-600" />,
-    title: 'Secure Payments',
-    desc: 'Process rental applications, deposits, and subscription payments securely through the platform.',
-  },
-  {
-    icon: <FaBalanceScale className="text-2xl text-primary-600" />,
-    title: 'Dispute Protection',
-    desc: 'Access legal support and structured dispute resolution if any issues arise with tenants.',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Testimonials
-   ────────────────────────────────────────────────────────────── */
-const testimonials = [
-  {
-    name: 'Chukwudi Okonkwo',
-    role: 'Landlord, Lagos',
-    text: 'I listed my three-bedroom flat on RentalHub NG and had a qualified tenant within a week. The verification process gave me confidence.',
-    rating: 5,
-  },
-  {
-    name: 'Folashade Adeyemi',
-    role: 'Property Agent, Abuja',
-    text: 'Managing multiple properties has never been easier. The dashboard is intuitive and my clients love the professional presentation.',
-    rating: 5,
-  },
-  {
-    name: 'Ibrahim Musa',
-    role: 'Landlord, Kano',
-    text: 'The legal support feature is a game-changer. I had a dispute resolved quickly without the usual stress.',
-    rating: 4,
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   FAQ data
-   ────────────────────────────────────────────────────────────── */
-const faqs = [
-  {
-    q: 'Who can list properties on RentalHub NG?',
-    a: 'Verified landlords and registered agents can list properties. You need to complete identity verification and be approved before listing.',
-  },
-  {
-    q: 'Is there a fee to list a property?',
-    a: 'We offer a free plan for a single basic listing. Paid plans start at ₦5,000 per listing per year with additional features and visibility.',
-  },
-  {
-    q: 'How are tenants verified?',
-    a: 'All tenants undergo NIN-linked identity verification before they can apply or contact you. This ensures you only deal with genuine, verified individuals.',
-  },
-  {
-    q: 'Can I list properties in multiple states?',
-    a: 'Yes! RentalHub NG covers all 36 states + FCT. You can list properties anywhere in Nigeria regardless of your location.',
-  },
-  {
-    q: 'How do I get paid?',
-    a: 'Rental payments and deposits are handled directly between you and the tenant. The platform facilitates applications and secure communication.',
-  },
-  {
-    q: 'What if I need help with my listing?',
-    a: 'We offer email and WhatsApp support for all users. Premium plan users get dedicated agent support for personalized assistance.',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Page Component
-   ────────────────────────────────────────────────────────────── */
 const ListProperty = () => {
   const { isAuthenticated, user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState(null);
+
+  const plans = [
+    {
+      name: t('list_property.plan.free.name'),
+      price: '₦0',
+      period: t('list_property.plan.free.period'),
+      popular: false,
+      features: [
+        t('list_property.plan.free.feature_1'),
+        t('list_property.plan.free.feature_2'),
+        t('list_property.plan.free.feature_3'),
+        t('list_property.plan.free.feature_4'),
+        t('list_property.plan.free.feature_5'),
+      ],
+      cta: t('list_property.plan.free.cta'),
+    },
+    {
+      name: t('list_property.plan.basic.name'),
+      price: '₦5,000',
+      period: t('list_property.plan.basic.period'),
+      popular: true,
+      features: [
+        t('list_property.plan.basic.feature_1'),
+        t('list_property.plan.basic.feature_2'),
+        t('list_property.plan.basic.feature_3'),
+        t('list_property.plan.basic.feature_4'),
+        t('list_property.plan.basic.feature_5'),
+        t('list_property.plan.basic.feature_6'),
+      ],
+      cta: t('list_property.plan.basic.cta'),
+    },
+    {
+      name: t('list_property.plan.premium.name'),
+      price: '₦15,000',
+      period: t('list_property.plan.premium.period'),
+      popular: false,
+      features: [
+        t('list_property.plan.premium.feature_1'),
+        t('list_property.plan.premium.feature_2'),
+        t('list_property.plan.premium.feature_3'),
+        t('list_property.plan.premium.feature_4'),
+        t('list_property.plan.premium.feature_5'),
+        t('list_property.plan.premium.feature_6'),
+        t('list_property.plan.premium.feature_7'),
+      ],
+      cta: t('list_property.plan.premium.cta'),
+    },
+  ];
+
+  const steps = [
+    {
+      icon: <FaFileContract className="text-3xl text-white" />,
+      title: t('list_property.step_1.title'),
+      desc: t('list_property.step_1.desc'),
+    },
+    {
+      icon: <FaCamera className="text-3xl text-white" />,
+      title: t('list_property.step_2.title'),
+      desc: t('list_property.step_2.desc'),
+    },
+    {
+      icon: <FaCheckCircle className="text-3xl text-white" />,
+      title: t('list_property.step_3.title'),
+      desc: t('list_property.step_3.desc'),
+    },
+    {
+      icon: <FaUsers className="text-3xl text-white" />,
+      title: t('list_property.step_4.title'),
+      desc: t('list_property.step_4.desc'),
+    },
+  ];
+
+  const benefits = [
+    {
+      icon: <FaShieldAlt className="text-2xl text-primary-600" />,
+      title: t('list_property.benefit_1.title'),
+      desc: t('list_property.benefit_1.desc'),
+    },
+    {
+      icon: <FaBullhorn className="text-2xl text-primary-600" />,
+      title: t('list_property.benefit_2.title'),
+      desc: t('list_property.benefit_2.desc'),
+    },
+    {
+      icon: <FaChartLine className="text-2xl text-primary-600" />,
+      title: t('list_property.benefit_3.title'),
+      desc: t('list_property.benefit_3.desc'),
+    },
+    {
+      icon: <FaTachometerAlt className="text-2xl text-primary-600" />,
+      title: t('list_property.benefit_4.title'),
+      desc: t('list_property.benefit_4.desc'),
+    },
+    {
+      icon: <FaMoneyBillWave className="text-2xl text-primary-600" />,
+      title: t('list_property.benefit_5.title'),
+      desc: t('list_property.benefit_5.desc'),
+    },
+    {
+      icon: <FaBalanceScale className="text-2xl text-primary-600" />,
+      title: t('list_property.benefit_6.title'),
+      desc: t('list_property.benefit_6.desc'),
+    },
+  ];
+
+  const testimonials = [
+    {
+      name: 'Chukwudi Okonkwo',
+      role: t('list_property.testimonial_1.role'),
+      text: t('list_property.testimonial_1.text'),
+      rating: 5,
+    },
+    {
+      name: 'Folashade Adeyemi',
+      role: t('list_property.testimonial_2.role'),
+      text: t('list_property.testimonial_2.text'),
+      rating: 5,
+    },
+    {
+      name: 'Ibrahim Musa',
+      role: t('list_property.testimonial_3.role'),
+      text: t('list_property.testimonial_3.text'),
+      rating: 4,
+    },
+  ];
+
+  const faqs = [
+    {
+      q: t('list_property.faq_1.q'),
+      a: t('list_property.faq_1.a'),
+    },
+    {
+      q: t('list_property.faq_2.q'),
+      a: t('list_property.faq_2.a'),
+    },
+    {
+      q: t('list_property.faq_3.q'),
+      a: t('list_property.faq_3.a'),
+    },
+    {
+      q: t('list_property.faq_4.q'),
+      a: t('list_property.faq_4.a'),
+    },
+    {
+      q: t('list_property.faq_5.q'),
+      a: t('list_property.faq_5.a'),
+    },
+    {
+      q: t('list_property.faq_6.q'),
+      a: t('list_property.faq_6.a'),
+    },
+  ];
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -297,12 +279,12 @@ const ListProperty = () => {
     if (isAuthenticated && ['landlord', 'agent'].includes(user?.user_type)) {
       navigate('/add-property');
     } else if (isAuthenticated) {
-      toast.info('You need a landlord or agent account to list properties.');
+      toast.info(t('list_property.toast.needs_landlord_account'));
       navigate('/dashboard');
     } else {
       navigate('/register');
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, t]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -316,14 +298,10 @@ const ListProperty = () => {
         <div className="container mx-auto px-4 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight">
-              List Your Property on{' '}
-              <span className="bg-gradient-to-r from-primary-200 to-primary-400 bg-clip-text text-transparent">
-                RentalHub NG
-              </span>
+              {t('list_property.hero.title')}
             </h1>
             <p className="text-lg md:text-xl text-primary-100 max-w-3xl mx-auto leading-relaxed">
-              Reach thousands of verified tenants across Nigeria. List your property in minutes
-              and start receiving qualified applications from genuine tenants.
+              {t('list_property.hero.subtitle')}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <button
@@ -332,19 +310,19 @@ const ListProperty = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer"
               >
                 <FaHome />
-                List Your Property Now
+                {t('list_property.hero.list_now')}
               </button>
               <Link
                 to="/pricing"
                 className="inline-flex items-center gap-2 px-8 py-3.5 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 hover:border-white/50 transition-all duration-300"
               >
                 <FaMoneyBillWave />
-                View Pricing Plans
+                {t('list_property.hero.view_pricing')}
               </Link>
               <ShareButton
-                section="List Property"
-                title="List Your Property on RentalHub NG"
-                description="Reach thousands of verified tenants across Nigeria. List your property in minutes on RentalHub NG."
+                section={t('list_property.hero.title')}
+                title={t('list_property.hero.title')}
+                description={t('list_property.hero.subtitle')}
               />
             </div>
           </div>
@@ -362,10 +340,10 @@ const ListProperty = () => {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto">
             {[
-              { value: '10,000+', label: 'Properties Listed' },
-              { value: '50,000+', label: 'Active Tenants' },
-              { value: '36 + FCT', label: 'States Covered' },
-              { value: '5,000+', label: 'Landlords & Agents' },
+              { value: '10,000+', label: t('list_property.stat_1.label') },
+              { value: '50,000+', label: t('list_property.stat_2.label') },
+              { value: '36 + FCT', label: t('list_property.stat_3.label') },
+              { value: '5,000+', label: t('list_property.stat_4.label') },
             ].map((stat, idx) => (
               <div key={idx} className="text-center text-white group">
                 <div className="text-3xl md:text-4xl font-extrabold mb-2">{stat.value}</div>
@@ -385,19 +363,19 @@ const ListProperty = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Simple Process</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('list_property.how_it_works.badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                How It Works
+                {t('list_property.how_it_works.title')}
               </h2>
               <ShareButton
-                section="How It Works"
-                title="List Your Property on RentalHub NG — How It Works"
-                description="Create an account, add your property, get verified, and connect with verified tenants in 4 simple steps."
+                section={t('list_property.how_it_works.title')}
+                title={t('list_property.how_it_works.title')}
+                description={t('list_property.how_it_works.subtitle')}
               />
             </div>
             <p className="text-gray-600">
-              Getting your property listed and in front of qualified tenants takes just a few steps.
+              {t('list_property.how_it_works.subtitle')}
             </p>
           </div>
 
@@ -424,19 +402,19 @@ const ListProperty = () => {
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Why List With Us</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('list_property.benefits.badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Benefits of Listing on RentalHub NG
+                {t('list_property.benefits.title')}
               </h2>
               <ShareButton
-                section="Benefits"
-                title="Benefits of Listing Your Property on RentalHub NG"
-                description="Verified tenants, massive exposure, smart analytics, easy management, secure payments, and dispute protection."
+                section={t('list_property.benefits.title')}
+                title={t('list_property.benefits.title')}
+                description={t('list_property.benefits.subtitle')}
               />
             </div>
             <p className="text-gray-600">
-              Thousands of landlords and agents already trust us. Here is why.
+              {t('list_property.benefits.subtitle')}
             </p>
           </div>
 
@@ -468,19 +446,19 @@ const ListProperty = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Pricing</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('list_property.pricing.badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Choose Your Plan
+                {t('list_property.pricing.title')}
               </h2>
               <ShareButton
-                section="Pricing Plans"
-                title="RentalHub NG — List Property Pricing Plans"
-                description="Choose from Free, Basic (₦5,000), or Premium (₦15,000) plans to list your property on RentalHub NG."
+                section={t('list_property.pricing.title')}
+                title={t('list_property.pricing.title')}
+                description={t('list_property.pricing.subtitle')}
               />
             </div>
             <p className="text-gray-600">
-              Start with a free listing or unlock more features with our affordable paid plans.
+              {t('list_property.pricing.subtitle')}
             </p>
           </div>
 
@@ -497,7 +475,7 @@ const ListProperty = () => {
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-4 py-1 bg-primary-600 text-white text-xs font-bold rounded-full shadow">
                     <FaStar className="text-[10px]" />
-                    Most Popular
+                    {t('list_property.plan.popular_badge')}
                   </div>
                 )}
 
@@ -537,19 +515,19 @@ const ListProperty = () => {
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Testimonials</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('list_property.testimonials.badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                What Landlords Say
+                {t('list_property.testimonials.title')}
               </h2>
               <ShareButton
-                section="Testimonials"
-                title="What Landlords Say About RentalHub NG"
-                description="Hear from landlords and agents who list their properties on RentalHub NG."
+                section={t('list_property.testimonials.title')}
+                title={t('list_property.testimonials.title')}
+                description={t('list_property.testimonials.subtitle')}
               />
             </div>
             <p className="text-gray-600">
-              Join thousands of satisfied landlords who have found great tenants through our platform.
+              {t('list_property.testimonials.subtitle')}
             </p>
           </div>
 
@@ -582,19 +560,19 @@ const ListProperty = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">FAQ</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('list_property.faq.badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Frequently Asked Questions
+                {t('list_property.faq.title')}
               </h2>
               <ShareButton
-                section="FAQ"
-                title="List Property FAQ — RentalHub NG"
-                description="Answers to common questions about listing properties on RentalHub NG."
+                section={t('list_property.faq.title')}
+                title={t('list_property.faq.title')}
+                description={t('list_property.faq.subtitle')}
               />
             </div>
             <p className="text-gray-600">
-              Got questions? We have answers.
+              {t('list_property.faq.subtitle')}
             </p>
           </div>
 
@@ -634,11 +612,10 @@ const ListProperty = () => {
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to List Your Property?
+              {t('list_property.cta.title')}
             </h2>
             <p className="text-primary-100 text-lg mb-10 leading-relaxed">
-              Join over 5,000 landlords and agents already using RentalHub NG to find qualified tenants.
-              List your property today and start receiving applications.
+              {t('list_property.cta.subtitle')}
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <button
@@ -647,19 +624,19 @@ const ListProperty = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer"
               >
                 <FaHome />
-                List Your Property Now
+                {t('list_property.cta.list_now')}
               </button>
               <Link
                 to="/register"
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-primary-500 text-white font-semibold rounded-xl shadow-lg hover:bg-primary-400 hover:scale-105 transition-all duration-300"
               >
                 <FaUsers />
-                Create Free Account
+                {t('list_property.cta.create_account')}
               </Link>
               <ShareButton
-                section="Call to Action"
-                title="List Your Property on RentalHub NG Today"
-                description="Join over 5,000 landlords and agents. List your property and find verified tenants on RentalHub NG."
+                section={t('list_property.cta.title')}
+                title={t('list_property.cta.title')}
+                description={t('list_property.cta.subtitle')}
               />
             </div>
           </div>
@@ -671,16 +648,16 @@ const ListProperty = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-              Need Help?
+              {t('list_property.contact.title')}
             </h2>
             <p className="text-gray-600 mb-12 max-w-2xl mx-auto">
-              Our team is ready to help you get your property listed. Reach out anytime.
+              {t('list_property.contact.subtitle')}
             </p>
             <div className="flex justify-center mb-10">
               <ShareButton
-                section="Contact"
-                title="Contact RentalHub NG About Listing"
-                description="Need help listing your property? Contact RentalHub NG at support@rentalhub.com.ng or call +234 803 060 1238."
+                section={t('list_property.contact.title')}
+                title={t('list_property.contact.title')}
+                description={t('list_property.contact.subtitle')}
               />
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
@@ -692,7 +669,7 @@ const ListProperty = () => {
                   <FaEnvelope className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Email us</p>
+                  <p className="text-sm text-gray-500">{t('list_property.contact.email_label')}</p>
                   <p className="text-gray-900 font-semibold">support@rentalhub.com.ng</p>
                 </div>
               </a>
@@ -704,7 +681,7 @@ const ListProperty = () => {
                   <FaPhoneAlt className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Call us</p>
+                  <p className="text-sm text-gray-500">{t('list_property.contact.phone_label')}</p>
                   <p className="text-gray-900 font-semibold">+234 803 060 1238</p>
                 </div>
               </a>

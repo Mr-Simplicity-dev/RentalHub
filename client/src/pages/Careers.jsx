@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
@@ -134,12 +136,12 @@ const EMPTY_CV_FORM = {
 };
 
 const DOCUMENT_FIELDS = [
-  { name: 'cv', label: 'CV / Resume', required: true },
-  { name: 'cover_letter', label: 'Cover Letter', required: true },
-  { name: 'guarantor_letter', label: "Guarantor's Letter", required: true },
-  { name: 'government_id', label: 'Government ID', required: true },
-  { name: 'proof_of_address', label: 'Proof of Address', required: true },
-  { name: 'certificates', label: 'Certificates', multiple: true },
+  { name: 'cv', label: 'careers.doc_cv', required: true },
+  { name: 'cover_letter', label: 'careers.doc_cover_letter', required: true },
+  { name: 'guarantor_letter', label: 'careers.doc_guarantor_letter', required: true },
+  { name: 'government_id', label: 'careers.doc_government_id', required: true },
+  { name: 'proof_of_address', label: 'careers.doc_proof_of_address', required: true },
+  { name: 'certificates', label: 'careers.doc_certificates', multiple: true },
 ];
 
 const STATUS_STYLES = {
@@ -160,7 +162,7 @@ const formatCurrency = (value) =>
   }).format(Number(value || 0));
 
 const formatDateTime = (value) => {
-  if (!value) return 'Not set';
+  if (!value) return i18n.t('careers.not_set');
   return new Date(value).toLocaleString();
 };
 
@@ -178,6 +180,7 @@ const buildInterviewFingerprint = () => {
 };
 
 export default function Careers() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusLoading, setStatusLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
@@ -289,7 +292,7 @@ export default function Careers() {
         setRoles(rolesRes.data?.data || []);
       }
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to load recruitment information';
+      const message = error.response?.data?.message || t('careers.recruitment_load_failed');
       setStatusError(message);
       toast.error(message);
     } finally {
@@ -411,7 +414,7 @@ export default function Careers() {
         }
         if (code) {
           setVisibleAccessCode(code);
-          toast.success('Payment confirmed. Your access code is ready.');
+          toast.success(t('careers.payment_confirmed'));
         }
         await loadMyApplication(paidApplication?.email_address, paidApplication?.reference_number);
         const nextParams = new URLSearchParams(searchParams);
@@ -419,7 +422,7 @@ export default function Careers() {
         setSearchParams(nextParams, { replace: true });
       } catch (error) {
         verifiedPaymentReferenceRef.current = '';
-        toast.error(error.response?.data?.message || 'Payment verification failed');
+        toast.error(error.response?.data?.message || t('careers.payment_verify_failed'));
       } finally {
         setPaymentBusy(false);
       }
@@ -446,7 +449,7 @@ export default function Careers() {
       setApplication(newApplication);
       window.localStorage?.removeItem(CAREERS_DRAFT_STORAGE_KEY);
       rememberApplication(newApplication);
-      toast.success(res.data?.message || 'Application started');
+      toast.success(res.data?.message || t('careers.application_started'));
       await loadMyApplication(newApplication?.email_address || form.email_address, newApplication?.reference_number);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to start application');
@@ -467,10 +470,10 @@ export default function Careers() {
       if (url) {
         window.location.href = url;
       } else {
-        toast.error('Payment gateway did not return a payment link');
+        toast.error(t('careers.payment_link_error'));
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to initialize payment');
+      toast.error(error.response?.data?.message || t('careers.payment_init_failed'));
     } finally {
       setPaymentBusy(false);
     }
@@ -484,11 +487,11 @@ export default function Careers() {
         access_code: accessCodeInput,
         ...getApplicantAccessPayload(),
       });
-      toast.success('Access code verified. Document upload is now unlocked.');
+      toast.success(t('careers.access_code_verified'));
       setAccessCodeInput('');
       await loadMyApplication();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to verify access code');
+      toast.error(error.response?.data?.message || t('careers.code_verify_failed'));
     }
   };
 
@@ -512,10 +515,10 @@ export default function Careers() {
     setUploading(true);
     try {
       await api.post(`/recruitment/documents/upload/${application.id}`, formData);
-      toast.success('Documents uploaded successfully');
+      toast.success(t('careers.documents_uploaded'));
       await loadMyApplication();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to upload documents');
+      toast.error(error.response?.data?.message || t('careers.upload_failed'));
     } finally {
       setUploading(false);
     }
@@ -533,7 +536,7 @@ export default function Careers() {
       link.remove();
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to download document');
+      toast.error(error.response?.data?.message || t('careers.download_failed'));
     }
   };
 
@@ -563,11 +566,11 @@ export default function Careers() {
         ...cvForm,
         ...getApplicantAccessPayload(),
       });
-      toast.success('Platform CV generated and attached');
+      toast.success(t('careers.cv_generated'));
       setCvModal(false);
       await loadMyApplication();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to generate platform CV');
+      toast.error(error.response?.data?.message || t('careers.cv_generate_failed'));
     } finally {
       setGeneratingCv(false);
     }
@@ -577,17 +580,17 @@ export default function Careers() {
     if (!application?.id) return;
     try {
       await api.post(`/recruitment/applications/${application.id}/submit`, getApplicantAccessPayload());
-      toast.success('Application submitted successfully');
+      toast.success(t('careers.application_submitted'));
       await loadMyApplication();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to submit application');
+      toast.error(error.response?.data?.message || t('careers.submit_failed'));
     }
   };
 
   const copyAccessCode = async () => {
     if (!visibleAccessCode) return;
     await navigator.clipboard?.writeText(visibleAccessCode);
-    toast.success('Access code copied');
+    toast.success(t('careers.access_code_copied'));
   };
 
   // ─── Face Detection ──────────────────────────────────────
@@ -666,9 +669,9 @@ export default function Careers() {
         challenge_token: interviewChallengeToken,
         fingerprint: interviewFingerprintRef.current,
       });
-      toast.error('Interview locked due to detected violation');
+      toast.error(t('careers.interview_locked'));
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Interview violation recorded');
+      toast.error(error.response?.data?.message || t('careers.interview_violation'));
     } finally {
       stopInterviewMedia();
       await loadMyApplication();
@@ -714,19 +717,19 @@ export default function Careers() {
   const startInterview = async () => {
     if (!application) return;
     if (normalize(phoneCheck) !== normalize(application.phone_number)) {
-      toast.error('Enter the same phone number used on your application');
+      toast.error(t('careers.phone_error'));
       return;
     }
 
     setInterviewStarting(true);
-    setInterviewStartupStep('Requesting camera and microphone permission...');
+    setInterviewStartupStep(t('careers.camera_request'));
     try {
       const fingerprint = buildInterviewFingerprint();
       interviewFingerprintRef.current = fingerprint;
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
-      setInterviewStartupStep('Preparing secure interview recording...');
+      setInterviewStartupStep(t('careers.preparing_recording'));
 
       const recorderOptions = MediaRecorder.isTypeSupported?.('video/webm')
         ? { mimeType: 'video/webm' }
@@ -741,7 +744,7 @@ export default function Careers() {
       recorder.start(1000);
 
       // Wait for video to be ready
-      setInterviewStartupStep('Checking camera readiness...');
+      setInterviewStartupStep(t('careers.checking_camera'));
       await new Promise((resolve) => {
         const check = () => {
           if (videoRef.current?.readyState >= 2) resolve();
@@ -751,7 +754,7 @@ export default function Careers() {
       });
 
       // Load face-api
-      setInterviewStartupStep('Loading face monitoring model...');
+      setInterviewStartupStep(t('careers.loading_model'));
       const faceReady = await loadFaceApi();
       setFaceDetectionReady(faceReady);
 
@@ -763,7 +766,7 @@ export default function Careers() {
         setFaceStatus({ faces: 0, status: 'idle' });
       }
 
-      setInterviewStartupStep('Fetching your assigned questions...');
+      setInterviewStartupStep(t('careers.fetching_questions'));
       const res = await api.post('/recruitment/interview/start', {
         application_id: application.id,
         phone_number: phoneCheck,
@@ -780,7 +783,7 @@ export default function Careers() {
       consecutiveNoFaceRef.current = 0;
       consecutiveMultiFaceRef.current = 0;
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message || 'Camera and microphone permission is required');
+      toast.error(error.response?.data?.message || error.message || t('careers.camera_permission'));
       stopInterviewMedia();
     } finally {
       setInterviewStarting(false);
@@ -814,7 +817,7 @@ export default function Careers() {
         fingerprint: interviewFingerprintRef.current,
       });
       setInterviewResult(res.data?.data || null);
-      toast.success('Interview completed successfully');
+      toast.success(t('careers.interview_complete'));
       stopInterviewMedia();
       await new Promise((resolve) => setTimeout(resolve, 500));
       await uploadRecording();
@@ -933,7 +936,7 @@ export default function Careers() {
   const listenForAnswer = () => {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Recognition) {
-      toast.info('Speech recognition is not available on this browser. Tap A, B, C, or D.');
+      toast.info(t('careers.speech_unavailable'));
       return;
     }
     const recognition = new Recognition();
@@ -946,7 +949,7 @@ export default function Careers() {
         setSpokenAnswer(match[1]);
         submitInterviewAnswer(match[1]);
       } else {
-        toast.info('Please say A, B, C, or D clearly');
+        toast.info(t('careers.say_abcd'));
       }
     };
     recognition.start();
@@ -964,13 +967,13 @@ export default function Careers() {
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-400 shadow-inner">
           <FaLock className="text-2xl" />
         </div>
-        <h1 className="text-3xl font-black text-slate-900">Recruitment is currently closed</h1>
+        <h1 className="text-3xl font-black text-slate-900">{t('careers.recruitment_closed_title')}</h1>
         <p className="mt-3 max-w-lg mx-auto text-base leading-7 text-slate-500">
-          Career applications are not open right now. When the recruitment cycle reopens, the Career link will appear in the footer and you'll be able to apply.
+          {t('careers.recruitment_closed_desc')}
         </p>
         <div className="mt-8 flex justify-center gap-3">
           <Link to="/" className="btn btn-secondary">
-            Back to Home
+            {t('careers.back_home')}
           </Link>
         </div>
       </div>
@@ -988,9 +991,9 @@ export default function Careers() {
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 shadow-inner">
           <FaExclamationTriangle className="text-2xl" />
         </div>
-        <h1 className="text-3xl font-black text-slate-900">Recruitment portal could not load</h1>
+        <h1 className="text-3xl font-black text-slate-900">{t('careers.portal_error_title')}</h1>
         <p className="mx-auto mt-3 max-w-lg text-base leading-7 text-slate-600">
-          We could not confirm the recruitment status right now. This is different from recruitment being closed.
+          {t('careers.portal_error_desc')}
         </p>
         {statusError && (
           <p className="mx-auto mt-4 max-w-lg rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-medium text-amber-800">
@@ -999,10 +1002,10 @@ export default function Careers() {
         )}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <button type="button" onClick={loadPublicData} className="btn bg-amber-600 text-white hover:bg-amber-700">
-            Try Again
+            {t('careers.try_again')}
           </button>
           <Link to="/" className="btn btn-secondary">
-            Back to Home
+            {t('careers.back_home')}
           </Link>
         </div>
       </div>
@@ -1017,8 +1020,8 @@ export default function Careers() {
       onSubmit={startApplication}
       className="grid gap-5 lg:grid-cols-2"
     >
-      <SelectField label="Role Applying For" name="role_id" value={form.role_id} onChange={handleFormChange} required>
-        <option value="">Select role</option>
+      <SelectField label={t('careers.role_applying')} name="role_id" value={form.role_id} onChange={handleFormChange} required>
+        <option value="">{t('careers.select_role')}</option>
         {roles.map((role) => (
           <option key={role.id} value={role.id}>
             {role.title} - {formatCurrency(form.application_track === 'premium' ? role.premium_fee : role.application_fee)}
@@ -1026,21 +1029,21 @@ export default function Careers() {
         ))}
       </SelectField>
 
-      <SelectField label="Application Track" name="application_track" value={form.application_track} onChange={handleFormChange}>
-        <option value="standard">Standard - Written application</option>
-        <option value="premium">Premium - Platform CV &amp; digital tools</option>
+      <SelectField label={t('careers.application_track')} name="application_track" value={form.application_track} onChange={handleFormChange}>
+        <option value="standard">{t('careers.track_standard')}</option>
+        <option value="premium">{t('careers.track_premium')}</option>
       </SelectField>
 
       <div className="lg:col-span-2 border-b border-slate-100 pb-1">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Personal Information</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{t('careers.personal_info')}</h3>
       </div>
-      <InputField label="Full Name" name="full_name" value={form.full_name} onChange={handleFormChange} required />
-      <InputField label="Phone Number" name="phone_number" value={form.phone_number} onChange={handleFormChange} required />
-      <InputField label="Email Address" type="email" name="email_address" value={form.email_address} onChange={handleFormChange} required />
-      <InputField label="Date of Birth" type="date" name="date_of_birth" value={form.date_of_birth} onChange={handleFormChange} />
+      <InputField label={t('careers.full_name')} name="full_name" value={form.full_name} onChange={handleFormChange} required />
+      <InputField label={t('careers.phone_number')} name="phone_number" value={form.phone_number} onChange={handleFormChange} required />
+      <InputField label={t('careers.email_address')} type="email" name="email_address" value={form.email_address} onChange={handleFormChange} required />
+      <InputField label={t('careers.date_of_birth')} type="date" name="date_of_birth" value={form.date_of_birth} onChange={handleFormChange} />
 
-      <SelectField label="State of Residence" name="state_name" value={form.state_name} onChange={handleFormChange} required>
-        <option value="">Select state</option>
+      <SelectField label={t('careers.state_residence')} name="state_name" value={form.state_name} onChange={handleFormChange} required>
+        <option value="">{t('careers.select_state')}</option>
         {states.map((state) => (
           <option key={state.name || state.displayName} value={state.displayName || state.name}>
             {state.displayName || state.name}
@@ -1048,25 +1051,25 @@ export default function Careers() {
         ))}
       </SelectField>
 
-      <SelectField label="LGA" name="lga_name" value={form.lga_name} onChange={handleFormChange} required disabled={!form.state_name}>
-        <option value="">Select LGA</option>
+      <SelectField label={t('careers.lga')} name="lga_name" value={form.lga_name} onChange={handleFormChange} required disabled={!form.state_name}>
+        <option value="">{t('careers.select_lga')}</option>
         {lgas.map((lga) => (
           <option key={lga} value={lga}>{lga}</option>
         ))}
       </SelectField>
 
-      <InputField label="Area / Locality" name="area_locality" value={form.area_locality} onChange={handleFormChange} placeholder="e.g. Kutunku, Phase 1, Gwarinpa, Ikeja" required />
+      <InputField label={t('careers.area_locality')} name="area_locality" value={form.area_locality} onChange={handleFormChange} placeholder={t('careers.area_locality_placeholder')} required />
 
       <div className="lg:col-span-2 border-b border-slate-100 pb-1 mt-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Professional Background</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{t('careers.professional_bg')}</h3>
       </div>
-      <InputField label="Highest Education Level" name="highest_education" value={form.highest_education} onChange={handleFormChange} required />
-      <InputField label="Years of Experience" type="number" name="years_of_experience" value={form.years_of_experience} onChange={handleFormChange} min="0" />
-      <InputField label="Current Employment Status" name="current_employment_status" value={form.current_employment_status} onChange={handleFormChange} />
+      <InputField label={t('careers.highest_education')} name="highest_education" value={form.highest_education} onChange={handleFormChange} required />
+      <InputField label={t('careers.years_experience')} type="number" name="years_of_experience" value={form.years_of_experience} onChange={handleFormChange} min="0" />
+      <InputField label={t('careers.employment_status')} name="current_employment_status" value={form.current_employment_status} onChange={handleFormChange} />
 
-      <TextAreaField label="Residential Address" name="residential_address" value={form.residential_address} onChange={handleFormChange} required />
-      <TextAreaField label="Skills / Qualifications" name="skills_qualifications" value={form.skills_qualifications} onChange={handleFormChange} />
-      <TextAreaField label="Why are you suitable for this role?" name="suitability_reason" value={form.suitability_reason} onChange={handleFormChange} required className="lg:col-span-2" />
+      <TextAreaField label={t('careers.residential_address')} name="residential_address" value={form.residential_address} onChange={handleFormChange} required />
+      <TextAreaField label={t('careers.skills_qualifications')} name="skills_qualifications" value={form.skills_qualifications} onChange={handleFormChange} />
+      <TextAreaField label={t('careers.suitability')} name="suitability_reason" value={form.suitability_reason} onChange={handleFormChange} required className="lg:col-span-2" />
 
       <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-primary-50 to-blue-50 border border-primary-200/50 p-5">
         <div className="flex items-start gap-3">
@@ -1074,10 +1077,10 @@ export default function Careers() {
             <FaBriefcase className="text-sm" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-primary-900">Application Access Fee</p>
+            <p className="text-sm font-semibold text-primary-900">{t('careers.access_fee_label')}</p>
             <p className="mt-1 text-3xl font-black text-primary-950">{formatCurrency(effectiveFee || 5000)}</p>
             <p className="mt-1 text-sm text-primary-700">
-              On successful payment, your <strong>access code</strong> is shown on screen and also sent by email/SMS.
+              {t('careers.access_fee_desc')}
             </p>
           </div>
         </div>
@@ -1089,9 +1092,9 @@ export default function Careers() {
         className="btn btn-primary w-full py-3.5 text-base lg:col-span-2"
       >
         {submitting ? (
-          <><FaSpinner className="animate-spin mr-2" /> Saving...</>
+          <><FaSpinner className="animate-spin mr-2" /> {t('careers.saving')}</>
         ) : (
-          'Proceed to Payment'
+          t('careers.proceed_payment')
         )}
       </button>
     </motion.form>
@@ -1114,15 +1117,15 @@ export default function Careers() {
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Applicant Dashboard</p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900">{application.reference_number || 'Draft application'}</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('careers.applicant_dashboard')}</p>
+              <h1 className="mt-1 text-2xl font-bold text-slate-900">{application.reference_number || t('careers.draft_application')}</h1>
               <p className="mt-2 text-sm text-slate-500">
                 <FaBriefcase className="inline mr-1.5 text-primary-500" />
                 {application.role_title} &mdash; {application.state_name}, {application.lga_name}, {application.area_locality}
               </p>
               {draftSaving && (
                 <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
-                  <FaSpinner className="animate-spin" /> Saving draft...
+                  <FaSpinner className="animate-spin" /> {t('careers.saving_draft')}
                 </p>
               )}
             </div>
@@ -1132,10 +1135,10 @@ export default function Careers() {
           </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <InfoTile icon={<FaCheckCircle />} label="Payment" value={application.payment_status} color="emerald" />
-            <InfoTile icon={<FaBriefcase />} label="Track" value={application.application_track} color="blue" />
-            <InfoTile icon={<FaCalendarAlt />} label="Fee" value={formatCurrency(application.application_fee)} color="amber" />
-            <InfoTile icon={<FaCalendarAlt />} label="Interview" value={formatDateTime(application.interview_date)} color="indigo" />
+            <InfoTile icon={<FaCheckCircle />} label={t('careers.payment')} value={application.payment_status} color="emerald" />
+            <InfoTile icon={<FaBriefcase />} label={t('careers.track')} value={application.application_track} color="blue" />
+            <InfoTile icon={<FaCalendarAlt />} label={t('careers.fee')} value={formatCurrency(application.application_fee)} color="amber" />
+            <InfoTile icon={<FaCalendarAlt />} label={t('careers.interview')} value={formatDateTime(application.interview_date)} color="indigo" />
           </div>
         </section>
 
@@ -1148,14 +1151,14 @@ export default function Careers() {
           >
             <div className="flex items-center gap-2 mb-1">
               <FaCheckCircle className="text-emerald-600" />
-              <p className="text-sm font-semibold text-emerald-900">Your Access Code</p>
+              <p className="text-sm font-semibold text-emerald-900">{t('careers.your_access_code')}</p>
             </div>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="rounded-xl bg-white px-5 py-3.5 text-2xl font-black tracking-[0.2em] text-emerald-900 shadow-inner border border-emerald-100">
                 {visibleAccessCode}
               </div>
               <button type="button" onClick={copyAccessCode} className="btn inline-flex items-center justify-center gap-2 bg-emerald-700 text-white hover:bg-emerald-800 shadow-md">
-                <FaCopy /> Copy Code
+                <FaCopy /> {t('careers.copy_code')}
               </button>
             </div>
           </motion.section>
@@ -1169,12 +1172,12 @@ export default function Careers() {
                 <FaBriefcase className="text-sm" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-amber-900">Application Access Fee Required</p>
+                <p className="text-sm font-semibold text-amber-900">{t('careers.access_fee_required')}</p>
                 <p className="mt-1 text-sm text-amber-800">
-                  Pay {formatCurrency(application.application_fee)} to receive your access code and unlock document upload.
+                  {t('careers.access_fee_pay', { amount: formatCurrency(application.application_fee) })}
                 </p>
                 <button type="button" onClick={initiatePayment} disabled={paymentBusy} className="btn mt-4 bg-amber-600 text-white hover:bg-amber-700 shadow-md">
-                  {paymentBusy ? <><FaSpinner className="animate-spin mr-2" /> Opening payment...</> : 'Pay Application Access Fee'}
+                  {paymentBusy ? <><FaSpinner className="animate-spin mr-2" /> {t('careers.opening_payment')}</> : t('careers.pay_access_fee')}
                 </button>
               </div>
             </div>
@@ -1184,17 +1187,17 @@ export default function Careers() {
         {/* Verify Access Code */}
         {application.payment_status === 'paid' && !application.access_code_used && (
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-elevated">
-            <p className="text-sm font-semibold text-slate-900">Unlock Document Upload</p>
-            <p className="mt-1 text-xs text-slate-500">Enter the access code you received via email/SMS after payment.</p>
+            <p className="text-sm font-semibold text-slate-900">{t('careers.unlock_upload')}</p>
+            <p className="mt-1 text-xs text-slate-500">{t('careers.unlock_desc')}</p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <input
                 value={accessCodeInput}
                 onChange={(event) => setAccessCodeInput(event.target.value.toUpperCase())}
                 className="input w-full sm:max-w-xs font-mono tracking-widest"
-                placeholder="RH-CR-8X7K9"
+                placeholder={t('careers.code_placeholder')}
               />
               <button type="button" onClick={verifyAccessCode} className="btn bg-slate-900 text-white hover:bg-slate-800">
-                <FaCheck /> Verify Code
+                <FaCheck /> {t('careers.verify_code')}
               </button>
             </div>
           </section>
@@ -1211,28 +1214,28 @@ export default function Careers() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 text-primary-600">
                 <FaFileUpload />
               </div>
-              <h2 className="text-lg font-bold text-slate-900">Required Documents</h2>
+              <h2 className="text-lg font-bold text-slate-900">{t('careers.required_documents')}</h2>
             </div>
-            <p className="text-xs text-slate-500 mb-4">Upload all required documents below. Accepted formats: PDF, DOC, DOCX, JPG, PNG.</p>
+            <p className="text-xs text-slate-500 mb-4">{t('careers.upload_hint')}</p>
             <div className="mb-4 rounded-2xl border border-primary-100 bg-primary-50/50 p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-bold text-primary-900">CV / Resume option</p>
+                  <p className="text-sm font-bold text-primary-900">{t('careers.cv_option')}</p>
                   <p className="mt-1 text-xs leading-5 text-primary-700">
-                    Use the RentalHub NG CV template to generate a formatted PDF automatically, or upload your own CV below.
+                    {t('careers.cv_option_desc')}
                   </p>
                 </div>
                 <button type="button" onClick={openCvBuilder} className="btn shrink-0 bg-primary-700 text-white hover:bg-primary-800">
-                  Use Platform CV Template
+                  {t('careers.use_cv_template')}
                 </button>
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {DOCUMENT_FIELDS.map((field) => (
                 <label key={field.name} className="rounded-xl border border-slate-200 p-4 hover:border-primary-200 transition-colors cursor-pointer">
-                  <span className="flex items-center justify-between text-sm font-semibold text-slate-800">
-                    {field.label}
-                    {field.required && <span className="badge-danger text-[10px] px-2 py-0.5">Required</span>}
+                    <span className="flex items-center justify-between text-sm font-semibold text-slate-800">
+                    {t(field.label)}
+                    {field.required && <span className="badge-danger text-[10px] px-2 py-0.5">{t('careers.required')}</span>}
                   </span>
                   <input
                     type="file"
@@ -1244,7 +1247,7 @@ export default function Careers() {
                   />
                   {docsByType.has(field.name === 'certificates' ? 'certificate' : field.name) && (
                     <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                      <FaCheckCircle /> Uploaded
+                      <FaCheckCircle /> {t('careers.uploaded')}
                     </span>
                   )}
                 </label>
@@ -1255,7 +1258,7 @@ export default function Careers() {
                 {uploading ? <><FaSpinner className="animate-spin mr-2" /> Uploading...</> : 'Upload Documents'}
               </button>
               <button type="button" onClick={submitApplication} disabled={isSubmitted} className={`btn ${isSubmitted ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
-                {isSubmitted ? <><FaCheckCircle className="mr-2" /> Application Submitted</> : 'Submit Application'}
+                {isSubmitted ? <><FaCheckCircle className="mr-2" /> {t('careers.application_submitted')}</> : t('careers.submit_application')}
               </button>
             </div>
           </motion.section>
@@ -1336,21 +1339,20 @@ export default function Careers() {
                 <FaVideo className="text-lg" />
               </div>
               <div className="flex-1">
-                <h2 className="text-lg font-bold text-indigo-950">Online Interview Scheduled</h2>
+                <h2 className="text-lg font-bold text-indigo-950">{t('careers.interview_section')}</h2>
                 <p className="mt-1 text-sm text-indigo-800">
                   <FaCalendarAlt className="inline mr-1.5" />
                   {formatDateTime(application.interview_date)}
                 </p>
                 <p className="mt-2 text-sm text-indigo-700">
-                  Confirm your application phone number below to join your proctored interview.
-                  Face detection monitoring will be active during the session.
+                  {t('careers.phone_check')}
                 </p>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                   <input
                     value={phoneCheck}
                     onChange={(event) => setPhoneCheck(event.target.value)}
                     className="input w-full sm:max-w-xs"
-                    placeholder="Confirm phone number"
+                    placeholder={t('careers.phone_check_placeholder')}
                   />
                   <button
                     type="button"
@@ -1361,7 +1363,7 @@ export default function Careers() {
                     {interviewStarting ? (
                       <><FaSpinner className="animate-spin mr-2" /> Starting...</>
                     ) : (
-                      <><FaVideo className="mr-2" /> Join Interview</>
+                      <><FaVideo className="mr-2" /> {t('careers.start_interview')}</>
                     )}
                   </button>
                 </div>
@@ -1480,7 +1482,7 @@ export default function Careers() {
                     : 'bg-white/20 text-white backdrop-blur-sm'
                 }`}>
                   <FaHourglassHalf />
-                  {questionTimeLeft}s
+                  {t('careers.time_remaining', { seconds: questionTimeLeft })}
                 </div>
               )}
 
@@ -1512,7 +1514,7 @@ export default function Careers() {
             {/* Progress */}
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Question {Math.min(questionIndex + 1, interviewQuestions.length)} of {interviewQuestions.length}
+                {t('careers.interview_question', { current: Math.min(questionIndex + 1, interviewQuestions.length), total: interviewQuestions.length })}
               </p>
               <span className="text-xs font-bold text-slate-400">
                 {Math.round(((questionIndex) / interviewQuestions.length) * 100)}%
@@ -1564,7 +1566,7 @@ export default function Careers() {
                   disabled={interviewLocked}
                   className="btn mt-5 w-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
                 >
-                  <FaMicrophone className="mr-2" /> Say A, B, C, or D
+                  <FaMicrophone className="mr-2" /> {t('careers.speak_answer')}
                 </button>
 
                 {spokenAnswer && (

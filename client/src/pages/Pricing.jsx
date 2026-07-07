@@ -18,11 +18,13 @@ import {
   FaLink,
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 
 /* ──────────────────────────────────────────────────────────────
    ShareButton
    ────────────────────────────────────────────────────────────── */
 const ShareButton = ({ section, title, description }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const pageUrl = typeof window !== 'undefined' ? window.location.href : 'https://rentalhub.com.ng/pricing';
   const shareText = `${title}\n\n${description}\n\n${pageUrl}`;
@@ -32,9 +34,9 @@ const ShareButton = ({ section, title, description }) => {
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(pageUrl);
-      toast.success('Link copied to clipboard');
+      toast.success(t('pricing.toast_copied'));
     } catch {
-      toast.error('Could not copy link');
+      toast.error(t('pricing.toast_copy_failed'));
     }
     setOpen(false);
   };
@@ -45,10 +47,10 @@ const ShareButton = ({ section, title, description }) => {
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-primary-600 hover:border-primary-300 transition-all duration-200 shadow-sm"
-        title={`Share ${section}`}
+        title={t('pricing.share_section', { section })}
       >
         <FaShareAlt className="text-[10px]" />
-        Share
+        {t('pricing.share')}
       </button>
 
       {open && (
@@ -56,7 +58,7 @@ const ShareButton = ({ section, title, description }) => {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-52 origin-top-right animate-scaleIn rounded-xl border border-gray-100 bg-white py-2 shadow-elevated-lg">
             <div className="px-4 pb-2 mb-1 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-700">Share {section}</p>
+              <p className="text-xs font-semibold text-gray-700">{t('pricing.share_section', { section })}</p>
             </div>
 
             <a
@@ -67,7 +69,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaWhatsapp className="text-lg text-green-600" />
-              WhatsApp
+              {t('pricing.share_whatsapp')}
             </a>
 
             <a
@@ -78,7 +80,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaFacebook className="text-lg text-blue-600" />
-              Facebook
+              {t('pricing.share_facebook')}
             </a>
 
             <a
@@ -89,7 +91,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaTwitter className="text-lg text-sky-500" />
-              Twitter / X
+              {t('pricing.share_twitter')}
             </a>
 
             <button
@@ -98,7 +100,7 @@ const ShareButton = ({ section, title, description }) => {
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <FaLink className="text-lg text-gray-500" />
-              Copy Link
+              {t('pricing.share_copy')}
             </button>
           </div>
         </>
@@ -108,174 +110,175 @@ const ShareButton = ({ section, title, description }) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Pricing Plans
-   ────────────────────────────────────────────────────────────── */
-const plans = [
-  {
-    name: 'Free',
-    subtitle: 'Perfect for trying out',
-    price: '₦0',
-    period: 'per listing',
-    popular: false,
-    description: 'Get started with a basic listing and see what RentalHub NG has to offer.',
-    features: [
-      { text: 'List 1 property', included: true },
-      { text: 'Basic property details', included: true },
-      { text: 'Up to 3 photos', included: true },
-      { text: 'Standard search visibility', included: true },
-      { text: 'Email support', included: true },
-      { text: 'Priority customer support', included: false },
-      { text: 'Featured badge & premium placement', included: false },
-      { text: 'Advanced analytics', included: false },
-    ],
-    cta: 'Get Started Free',
-    ctaLink: '/register',
-  },
-  {
-    name: 'Basic',
-    subtitle: 'Best value for most landlords',
-    price: '₦5,000',
-    period: 'per listing / year',
-    popular: true,
-    description: 'List multiple properties with enhanced visibility and dedicated support.',
-    features: [
-      { text: 'List up to 5 properties', included: true },
-      { text: 'Detailed property description', included: true },
-      { text: 'Up to 10 photos per listing', included: true },
-      { text: 'Priority search visibility', included: true },
-      { text: 'Basic analytics dashboard', included: true },
-      { text: 'Email & WhatsApp support', included: true },
-      { text: 'Featured badge', included: false },
-      { text: 'Advanced analytics', included: false },
-    ],
-    cta: 'Choose Basic',
-    ctaLink: '/register',
-  },
-  {
-    name: 'Premium',
-    subtitle: 'For serious landlords & agents',
-    price: '₦15,000',
-    period: 'per listing / year',
-    popular: false,
-    description: 'Unlimited listings with premium placement, video tours, and dedicated agent support.',
-    features: [
-      { text: 'Unlimited properties', included: true },
-      { text: 'Premium property listing', included: true },
-      { text: 'Up to 30 photos + video tour', included: true },
-      { text: 'Featured badge & top placement', included: true },
-      { text: 'Advanced analytics dashboard', included: true },
-      { text: 'Dedicated agent support', included: true },
-      { text: 'Legal support access', included: true },
-      { text: 'Priority listing reviews', included: true },
-    ],
-    cta: 'Choose Premium',
-    ctaLink: '/register',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Add-ons
-   ────────────────────────────────────────────────────────────── */
-const addOns = [
-  {
-    name: 'Professional Photography',
-    price: '₦25,000',
-    desc: 'Professional photo shoot for your property with 20+ edited high-resolution images.',
-  },
-  {
-    name: 'Video Tour Production',
-    price: '₦50,000',
-    desc: 'Professional video walkthrough of your property, edited and optimized for the platform.',
-  },
-  {
-    name: 'Featured Promotion',
-    price: '₦10,000',
-    desc: 'Boost your listing to the top of search results for 30 days with a featured badge.',
-  },
-  {
-    name: 'Legal Document Review',
-    price: '₦15,000',
-    desc: 'Professional legal review of your tenancy agreement and lease documents.',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Compare Section
-   ────────────────────────────────────────────────────────────── */
-const compareFeatures = [
-  { name: 'Number of properties', free: '1', basic: 'Up to 5', premium: 'Unlimited' },
-  { name: 'Photos per listing', free: '3', basic: '10', premium: '30 + Video' },
-  { name: 'Search visibility', free: 'Standard', basic: 'Priority', premium: 'Top Placement' },
-  { name: 'Featured badge', free: '—', basic: '—', premium: '✓' },
-  { name: 'Analytics', free: 'Basic', basic: 'Basic', premium: 'Advanced' },
-  { name: 'Support', free: 'Email', basic: 'Email & WhatsApp', premium: 'Dedicated Agent' },
-  { name: 'Legal support', free: '—', basic: '—', premium: '✓' },
-  { name: 'Listing reviews', free: 'Standard', basic: 'Standard', premium: 'Priority' },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Testimonials
-   ────────────────────────────────────────────────────────────── */
-const testimonials = [
-  {
-    name: 'Chukwudi Okonkwo',
-    role: 'Landlord, Lagos',
-    text: 'The Premium plan paid for itself within the first week. I had multiple qualified tenants inquiring about my property.',
-    rating: 5,
-    plan: 'Premium',
-  },
-  {
-    name: 'Folashade Adeyemi',
-    role: 'Property Agent, Abuja',
-    text: 'The Basic plan gives me everything I need to manage my properties. The analytics help me understand what tenants are looking for.',
-    rating: 5,
-    plan: 'Basic',
-  },
-  {
-    name: 'Ibrahim Musa',
-    role: 'Landlord, Kano',
-    text: 'Started with the Free plan and upgraded within a month. The visibility and support are well worth the investment.',
-    rating: 4,
-    plan: 'Basic',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   FAQ
-   ────────────────────────────────────────────────────────────── */
-const faqs = [
-  {
-    q: 'Do I need to pay to list a property?',
-    a: 'No! We offer a Free plan that allows you to list 1 property with basic details and up to 3 photos. Paid plans unlock additional features, more listings, and enhanced visibility.',
-  },
-  {
-    q: 'What payment methods are accepted?',
-    a: 'We accept major Nigerian bank cards (Visa, Mastercard, Verve), USSD banking, bank transfers, and mobile money. All payments are processed securely.',
-  },
-  {
-    q: 'Can I upgrade or downgrade my plan?',
-    a: 'Yes! You can upgrade at any time. If you upgrade mid-year, the remaining balance on your current plan will be prorated toward the new plan.',
-  },
-  {
-    q: 'Is there a discount for multi-year plans?',
-    a: 'Yes! We offer a 15% discount on 2-year plans and a 25% discount on 3-year plans. Contact our sales team for customized enterprise pricing.',
-  },
-  {
-    q: 'What happens when my plan expires?',
-    a: 'Your listings remain active but revert to standard visibility. You will receive reminders before expiration so you can renew without interruption.',
-  },
-  {
-    q: 'Can I get a refund if I am not satisfied?',
-    a: 'We offer a 14-day money-back guarantee for all paid plans. If you are not satisfied, contact our support team for a full refund.',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
    Page Component
    ────────────────────────────────────────────────────────────── */
 const Pricing = () => {
+  const { t } = useTranslation();
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState(null);
+
+  /* ──────────────────────────────────────────────────────────────
+     Pricing Plans
+     ────────────────────────────────────────────────────────────── */
+  const plans = [
+    {
+      name: 'Free',
+      subtitle: t('pricing.plan_free_subtitle'),
+      price: '₦0',
+      period: t('pricing.plan_free_period'),
+      popular: false,
+      description: t('pricing.plan_free_desc'),
+      features: [
+        { text: t('pricing.plan_free_feat_1'), included: true },
+        { text: t('pricing.plan_free_feat_2'), included: true },
+        { text: t('pricing.plan_free_feat_3'), included: true },
+        { text: t('pricing.plan_free_feat_4'), included: true },
+        { text: t('pricing.plan_free_feat_5'), included: true },
+        { text: t('pricing.plan_free_feat_6'), included: false },
+        { text: t('pricing.plan_free_feat_7'), included: false },
+        { text: t('pricing.plan_free_feat_8'), included: false },
+      ],
+      cta: t('pricing.plan_free_cta'),
+      ctaLink: '/register',
+    },
+    {
+      name: 'Basic',
+      subtitle: t('pricing.plan_basic_subtitle'),
+      price: '₦5,000',
+      period: t('pricing.plan_basic_period'),
+      popular: true,
+      description: t('pricing.plan_basic_desc'),
+      features: [
+        { text: t('pricing.plan_basic_feat_1'), included: true },
+        { text: t('pricing.plan_basic_feat_2'), included: true },
+        { text: t('pricing.plan_basic_feat_3'), included: true },
+        { text: t('pricing.plan_basic_feat_4'), included: true },
+        { text: t('pricing.plan_basic_feat_5'), included: true },
+        { text: t('pricing.plan_basic_feat_6'), included: true },
+        { text: t('pricing.plan_basic_feat_7'), included: false },
+        { text: t('pricing.plan_basic_feat_8'), included: false },
+      ],
+      cta: t('pricing.plan_basic_cta'),
+      ctaLink: '/register',
+    },
+    {
+      name: 'Premium',
+      subtitle: t('pricing.plan_premium_subtitle'),
+      price: '₦15,000',
+      period: t('pricing.plan_premium_period'),
+      popular: false,
+      description: t('pricing.plan_premium_desc'),
+      features: [
+        { text: t('pricing.plan_premium_feat_1'), included: true },
+        { text: t('pricing.plan_premium_feat_2'), included: true },
+        { text: t('pricing.plan_premium_feat_3'), included: true },
+        { text: t('pricing.plan_premium_feat_4'), included: true },
+        { text: t('pricing.plan_premium_feat_5'), included: true },
+        { text: t('pricing.plan_premium_feat_6'), included: true },
+        { text: t('pricing.plan_premium_feat_7'), included: true },
+        { text: t('pricing.plan_premium_feat_8'), included: true },
+      ],
+      cta: t('pricing.plan_premium_cta'),
+      ctaLink: '/register',
+    },
+  ];
+
+  /* ──────────────────────────────────────────────────────────────
+     Add-ons
+     ────────────────────────────────────────────────────────────── */
+  const addOns = [
+    {
+      name: t('pricing.addons_photo_name'),
+      price: '₦25,000',
+      desc: t('pricing.addons_photo_desc'),
+    },
+    {
+      name: t('pricing.addons_video_name'),
+      price: '₦50,000',
+      desc: t('pricing.addons_video_desc'),
+    },
+    {
+      name: t('pricing.addons_featured_name'),
+      price: '₦10,000',
+      desc: t('pricing.addons_featured_desc'),
+    },
+    {
+      name: t('pricing.addons_legal_name'),
+      price: '₦15,000',
+      desc: t('pricing.addons_legal_desc'),
+    },
+  ];
+
+  /* ──────────────────────────────────────────────────────────────
+     Compare Section
+     ────────────────────────────────────────────────────────────── */
+  const compareFeatures = [
+    { name: t('pricing.compare_row_properties'), free: '1', basic: 'Up to 5', premium: 'Unlimited' },
+    { name: t('pricing.compare_row_photos'), free: '3', basic: '10', premium: '30 + Video' },
+    { name: t('pricing.compare_row_visibility'), free: 'Standard', basic: 'Priority', premium: 'Top Placement' },
+    { name: t('pricing.compare_row_badge'), free: '—', basic: '—', premium: '✓' },
+    { name: t('pricing.compare_row_analytics'), free: 'Basic', basic: 'Basic', premium: 'Advanced' },
+    { name: t('pricing.compare_row_support'), free: 'Email', basic: 'Email & WhatsApp', premium: 'Dedicated Agent' },
+    { name: t('pricing.compare_row_legal'), free: '—', basic: '—', premium: '✓' },
+    { name: t('pricing.compare_row_reviews'), free: 'Standard', basic: 'Standard', premium: 'Priority' },
+  ];
+
+  /* ──────────────────────────────────────────────────────────────
+     Testimonials
+     ────────────────────────────────────────────────────────────── */
+  const testimonials = [
+    {
+      name: 'Chukwudi Okonkwo',
+      role: 'Landlord, Lagos',
+      text: 'The Premium plan paid for itself within the first week. I had multiple qualified tenants inquiring about my property.',
+      rating: 5,
+      plan: 'Premium',
+    },
+    {
+      name: 'Folashade Adeyemi',
+      role: 'Property Agent, Abuja',
+      text: 'The Basic plan gives me everything I need to manage my properties. The analytics help me understand what tenants are looking for.',
+      rating: 5,
+      plan: 'Basic',
+    },
+    {
+      name: 'Ibrahim Musa',
+      role: 'Landlord, Kano',
+      text: 'Started with the Free plan and upgraded within a month. The visibility and support are well worth the investment.',
+      rating: 4,
+      plan: 'Basic',
+    },
+  ];
+
+  /* ──────────────────────────────────────────────────────────────
+     FAQ
+     ────────────────────────────────────────────────────────────── */
+  const faqs = [
+    {
+      q: 'Do I need to pay to list a property?',
+      a: 'No! We offer a Free plan that allows you to list 1 property with basic details and up to 3 photos. Paid plans unlock additional features, more listings, and enhanced visibility.',
+    },
+    {
+      q: 'What payment methods are accepted?',
+      a: 'We accept major Nigerian bank cards (Visa, Mastercard, Verve), USSD banking, bank transfers, and mobile money. All payments are processed securely.',
+    },
+    {
+      q: 'Can I upgrade or downgrade my plan?',
+      a: 'Yes! You can upgrade at any time. If you upgrade mid-year, the remaining balance on your current plan will be prorated toward the new plan.',
+    },
+    {
+      q: 'Is there a discount for multi-year plans?',
+      a: 'Yes! We offer a 15% discount on 2-year plans and a 25% discount on 3-year plans. Contact our sales team for customized enterprise pricing.',
+    },
+    {
+      q: 'What happens when my plan expires?',
+      a: 'Your listings remain active but revert to standard visibility. You will receive reminders before expiration so you can renew without interruption.',
+    },
+    {
+      q: 'Can I get a refund if I am not satisfied?',
+      a: 'We offer a 14-day money-back guarantee for all paid plans. If you are not satisfied, contact our support team for a full refund.',
+    },
+  ];
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -293,14 +296,13 @@ const Pricing = () => {
         <div className="container mx-auto px-4 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight">
-              Simple, Transparent{' '}
+              {t('pricing.hero_title_before')}
               <span className="bg-gradient-to-r from-primary-200 to-primary-400 bg-clip-text text-transparent">
-                Pricing
+                {t('pricing.hero_title_highlight')}
               </span>
             </h1>
             <p className="text-lg md:text-xl text-primary-100 max-w-3xl mx-auto leading-relaxed">
-              Choose the plan that fits your needs. Start for free, upgrade when you are ready.
-              No hidden fees, no surprises.
+              {t('pricing.hero_desc')}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link
@@ -308,19 +310,19 @@ const Pricing = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaHome />
-                Get Started Free
+                {t('pricing.hero_cta_start')}
               </Link>
               <Link
                 to="/list-property"
                 className="inline-flex items-center gap-2 px-8 py-3.5 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 hover:border-white/50 transition-all duration-300"
               >
                 <FaBuilding />
-                List Your Property
+                {t('pricing.hero_cta_list')}
               </Link>
               <ShareButton
                 section="Pricing"
-                title="RentalHub NG — Simple, Transparent Pricing Plans"
-                description="Choose from Free, Basic (₦5,000/year), or Premium (₦15,000/year) plans. Start free, upgrade anytime."
+                title={t('pricing.hero_title_before') + t('pricing.hero_title_highlight') + ' — ' + t('pricing.plans_heading')}
+                description={t('pricing.hero_desc')}
               />
             </div>
           </div>
@@ -337,12 +339,12 @@ const Pricing = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-6">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Pricing Plans</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('pricing.plans_badge')}</span>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-3 mb-4">
-              Choose the Right Plan for You
+              {t('pricing.plans_heading')}
             </h2>
             <p className="text-gray-600">
-              All plans include access to verified tenants, secure messaging, and landlord dashboard.
+              {t('pricing.plans_desc')}
             </p>
           </div>
 
@@ -358,7 +360,7 @@ const Pricing = () => {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                Pay Yearly
+                {t('pricing.toggle_yearly')}
               </button>
               <button
                 type="button"
@@ -369,7 +371,7 @@ const Pricing = () => {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                Pay Monthly
+                {t('pricing.toggle_monthly')}
               </button>
             </div>
           </div>
@@ -392,12 +394,12 @@ const Pricing = () => {
                   {plan.popular && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-4 py-1.5 bg-primary-600 text-white text-xs font-bold rounded-full shadow-lg">
                       <FaStar className="text-[10px]" />
-                      Most Popular
+                      {t('pricing.most_popular')}
                     </div>
                   )}
 
                   <div className="mb-6">
-                    <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
+                    <h3 className="text-xl font-bold text-gray-900">{t('pricing.plan_' + plan.name.toLowerCase() + '_name')}</h3>
                     <p className="text-gray-500 text-sm mt-1">{plan.subtitle}</p>
                   </div>
 
@@ -412,7 +414,7 @@ const Pricing = () => {
                     </div>
                     {plan.name !== 'Free' && isAnnual && (
                       <p className="text-xs text-green-600 font-medium mt-1">
-                        Save 15% with annual billing
+                        {t('pricing.save_annual')}
                       </p>
                     )}
                   </div>
@@ -457,15 +459,15 @@ const Pricing = () => {
           <div className="mt-12 flex flex-wrap justify-center gap-8 text-center">
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <FaShieldAlt className="text-primary-500" />
-              <span>Secure payments</span>
+              <span>{t('pricing.trust_secure')}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <FaCheckCircle className="text-green-500" />
-              <span>14-day money-back guarantee</span>
+              <span>{t('pricing.trust_guarantee')}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <FaUsers className="text-primary-500" />
-              <span>5,000+ happy landlords</span>
+              <span>{t('pricing.trust_landlords')}</span>
             </div>
           </div>
         </div>
@@ -475,19 +477,19 @@ const Pricing = () => {
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Compare Plans</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('pricing.compare_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Side-by-Side Comparison
+                {t('pricing.compare_heading')}
               </h2>
               <ShareButton
                 section="Compare Plans"
-                title="RentalHub NG — Side-by-Side Plan Comparison"
-                description="Compare Free, Basic, and Premium plans to find the right fit for your property listing needs."
+                title={t('pricing.hero_title_before') + t('pricing.hero_title_highlight') + ' — ' + t('pricing.compare_heading')}
+                description={t('pricing.compare_desc')}
               />
             </div>
             <p className="text-gray-600">
-              See exactly what each plan includes to make an informed decision.
+              {t('pricing.compare_desc')}
             </p>
           </div>
 
@@ -495,10 +497,10 @@ const Pricing = () => {
             <table className="w-full bg-white rounded-2xl shadow-sm border border-gray-100">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left px-6 py-5 text-sm font-semibold text-gray-900">Features</th>
-                  <th className="text-center px-6 py-5 text-sm font-semibold text-gray-900">Free</th>
-                  <th className="text-center px-6 py-5 text-sm font-semibold text-primary-600 bg-primary-50/50">Basic</th>
-                  <th className="text-center px-6 py-5 text-sm font-semibold text-primary-600">Premium</th>
+                  <th className="text-left px-6 py-5 text-sm font-semibold text-gray-900">{t('pricing.compare_header_feature')}</th>
+                  <th className="text-center px-6 py-5 text-sm font-semibold text-gray-900">{t('pricing.compare_header_free')}</th>
+                  <th className="text-center px-6 py-5 text-sm font-semibold text-primary-600 bg-primary-50/50">{t('pricing.compare_header_basic')}</th>
+                  <th className="text-center px-6 py-5 text-sm font-semibold text-primary-600">{t('pricing.compare_header_premium')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -520,19 +522,19 @@ const Pricing = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Add-On Services</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('pricing.addons_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Enhance Your Listing
+                {t('pricing.addons_heading')}
               </h2>
               <ShareButton
                 section="Add-On Services"
-                title="RentalHub NG — Add-On Services for Your Listing"
-                description="Professional photography, video tours, featured promotion, and legal document review services to enhance your listing."
+                title={t('pricing.hero_title_before') + t('pricing.hero_title_highlight') + ' — ' + t('pricing.addons_heading')}
+                description={t('pricing.addons_desc')}
               />
             </div>
             <p className="text-gray-600">
-              Optional services to make your property stand out and attract more tenants.
+              {t('pricing.addons_desc')}
             </p>
           </div>
 
@@ -549,7 +551,7 @@ const Pricing = () => {
                   to="/contact"
                   className="inline-flex items-center gap-2 text-primary-600 font-semibold text-sm hover:text-primary-700 transition-colors"
                 >
-                  Inquire Now <FaArrowRight className="text-xs" />
+                  {t('pricing.addons_inquire')} <FaArrowRight className="text-xs" />
                 </Link>
               </div>
             ))}
@@ -561,19 +563,19 @@ const Pricing = () => {
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Testimonials</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('pricing.testimonials_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                What Our Landlords Say
+                {t('pricing.testimonials_heading')}
               </h2>
               <ShareButton
                 section="Testimonials"
-                title="RentalHub NG Pricing — What Landlords Say"
-                description="Hear from landlords who use RentalHub NG plans to list and manage their properties."
+                title={t('pricing.hero_title_before') + t('pricing.hero_title_highlight') + ' — ' + t('pricing.testimonials_heading')}
+                description={t('pricing.testimonials_desc')}
               />
             </div>
             <p className="text-gray-600">
-              Join thousands of satisfied landlords who found the perfect plan for their needs.
+              {t('pricing.testimonials_desc')}
             </p>
           </div>
 
@@ -611,19 +613,19 @@ const Pricing = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">FAQ</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('pricing.faq_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Frequently Asked Questions
+                {t('pricing.faq_heading')}
               </h2>
               <ShareButton
                 section="FAQ"
-                title="Pricing FAQ — RentalHub NG"
-                description="Answers to common questions about RentalHub NG pricing plans, billing, and guarantees."
+                title={t('pricing.hero_title_before') + t('pricing.hero_title_highlight') + ' — ' + t('pricing.faq_heading')}
+                description={t('pricing.faq_desc')}
               />
             </div>
             <p className="text-gray-600">
-              Everything you need to know about our pricing and billing.
+              {t('pricing.faq_desc')}
             </p>
           </div>
 
@@ -663,11 +665,10 @@ const Pricing = () => {
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Start Listing for Free Today
+              {t('pricing.cta_heading')}
             </h2>
             <p className="text-primary-100 text-lg mb-10 leading-relaxed">
-              No credit card required. No risk. Join thousands of landlords who trust
-              RentalHub NG to connect them with verified, quality tenants.
+              {t('pricing.cta_desc')}
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
@@ -675,19 +676,19 @@ const Pricing = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaUsers />
-                Create Free Account
+                {t('pricing.cta_create')}
               </Link>
               <Link
                 to="/list-property"
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-primary-500 text-white font-semibold rounded-xl shadow-lg hover:bg-primary-400 hover:scale-105 transition-all duration-300"
               >
                 <FaBuilding />
-                List Your Property
+                {t('pricing.cta_list')}
               </Link>
               <ShareButton
                 section="Call to Action"
-                title="Start Listing on RentalHub NG — Free Plan Available"
-                description="No credit card required. Join thousands of landlords who trust RentalHub NG to find quality tenants."
+                title={t('pricing.cta_heading')}
+                description={t('pricing.cta_desc')}
               />
             </div>
           </div>
@@ -699,17 +700,16 @@ const Pricing = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-              Questions About Pricing?
+              {t('pricing.contact_heading')}
             </h2>
             <p className="text-gray-600 mb-12 max-w-2xl mx-auto">
-              Our sales team is happy to help you find the perfect plan or create a custom
-              enterprise solution for your portfolio.
+              {t('pricing.contact_desc')}
             </p>
             <div className="flex justify-center mb-10">
               <ShareButton
                 section="Contact"
-                title="Contact RentalHub NG About Pricing"
-                description="Have questions about RentalHub NG pricing? Contact us at support@rentalhub.com.ng or call +234 803 060 1238."
+                title={t('pricing.contact_heading')}
+                description={t('pricing.contact_desc')}
               />
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
@@ -721,7 +721,7 @@ const Pricing = () => {
                   <FaEnvelope className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Email sales</p>
+                  <p className="text-sm text-gray-500">{t('pricing.contact_email')}</p>
                   <p className="text-gray-900 font-semibold">sales@rentalhub.com.ng</p>
                 </div>
               </a>
@@ -733,7 +733,7 @@ const Pricing = () => {
                   <FaPhoneAlt className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Call us</p>
+                  <p className="text-sm text-gray-500">{t('pricing.contact_call')}</p>
                   <p className="text-gray-900 font-semibold">+234 803 060 1238</p>
                 </div>
               </a>
