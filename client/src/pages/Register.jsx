@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import { setAuthSession } from '../services/authStorage';
+import { useTranslation } from 'react-i18next';
 
 const LAWYER_ACCESS_FEE = 2000; // Fee for using RentalHub NG lawyers during registration
 const AGENT_ACCESS_FEE = 5000; // Fee for using RentalHub NG agents during registration
@@ -96,6 +97,7 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showRegistrationFeeModal, setShowRegistrationFeeModal] = useState(!registrationReference);
   const [premblyPending, setPremblyPending] = useState(null);
+  const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -314,7 +316,7 @@ const Register = () => {
           nextProperties = fallbackResponse.data?.data || [];
 
           if (nextProperties.length) {
-            nextNote = `No live listings are matched to ${formData.lga_name} yet. Showing available properties in ${selectedStateOption?.state_name || 'the selected state'} instead.`;
+            nextNote = t('register.location_preview_fallback', { lga: formData.lga_name, state: selectedStateOption?.state_name || t('register.the_selected_state') });
           }
         }
 
@@ -327,7 +329,7 @@ const Register = () => {
 
         console.error('Failed to load registration location preview', error);
         setLocationPreviewProperties([]);
-        setLocationPreviewNote('Unable to load available properties for this location right now.');
+        setLocationPreviewNote(t('register.location_preview_error'));
       } finally {
         if (active) {
           setLocationPreviewLoading(false);
@@ -363,7 +365,7 @@ const Register = () => {
           setAuthSession(token, user);
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-          toast.success('Registration successful. Verify email and phone next.');
+          toast.success(t('register.registration_success'));
           window.location.assign(
             user?.user_type === 'tenant'
               ? '/tenant/dashboard'
@@ -376,7 +378,7 @@ const Register = () => {
         const serverError = error.response?.data;
         toast.error(
           serverError?.message ||
-          'Failed to complete registration after payment'
+          t('register.registration_failed')
         );
       } finally {
         if (active) {
@@ -421,16 +423,16 @@ const Register = () => {
           setPremblyPending((previous) => ({
             ...previous,
             status: 'verified',
-            message: 'Prembly verification completed. Continue registration; RentalHub will reuse this result without another paid check.',
+            message: t('register.prembly_verify_complete'),
           }));
-          toast.success('Identity verification completed. You can continue registration.');
+          toast.success(t('register.prembly_verify'));
           return;
         }
         if (result.status === 'not_verified') {
           setPremblyPending((previous) => ({
             ...previous,
             status: 'not_verified',
-            message: result.message || 'Prembly could not verify this credential. Check the number before continuing.',
+            message: result.message || t('register.prembly_not_verified'),
           }));
           return;
         }
@@ -464,15 +466,15 @@ const Register = () => {
   e.preventDefault();
 
  if (!registrationFlags.registration_master_enabled) {
-    toast.error("Registration is currently disabled");
+    toast.error(t('register.registration_disabled'));
     return;
   }
 
   if (!registrationFlags.registration_global_allowed) {
     toast.error(
       formData.user_type === "landlord"
-        ? "Landlord registration is currently disabled"
-        : "Tenant registration is currently disabled"
+        ? t('register.landlord_disabled')
+        : t('register.tenant_disabled')
     );
     return;
   }
@@ -480,44 +482,44 @@ const Register = () => {
   if (!registrationFlags.registration_allowed) {
     toast.error(
       registrationFlags.registration_access_message ||
-        "Registration is not available for the selected location"
+        t('register.location_blocked')
     );
     return;
   }
 
   if (!registrationFlags.loaded) {
-    toast.error("Registration settings are still loading");
+    toast.error(t('register.settings_loading'));
     return;
   }
 
   if (formData.password !== formData.confirm_password) {
-    toast.error("Passwords do not match");
+    toast.error(t('register.password_mismatch'));
     return;
   }
 
   if (formData.password.length < 8) {
-    toast.error("Password must be at least 8 characters");
+    toast.error(t('register.password_min'));
     return;
   }
 
  if (!formData.use_rentalhub_lawyers && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.lawyer_email || "")) {
-    toast.error("Enter one valid lawyer email or check the box to use RentalHub NG lawyers");
+    toast.error(t('register.lawyer_email_required'));
     return;
   }
 
     if (formData.user_type === 'landlord' && formData.add_agent && !formData.use_rentalhub_agents) {
       if (!String(formData.agent_full_name || '').trim()) {
-        toast.error('Agent full name is required');
+        toast.error(t('register.agent_name_required'));
         return;
       }
   
       if (!emailPattern.test(String(formData.agent_email || '').trim())) {
-        toast.error('Enter a valid agent email');
+        toast.error(t('register.agent_email_required'));
         return;
       }
   
       if (!String(formData.agent_phone || '').trim()) {
-        toast.error('Agent phone number is required');
+        toast.error(t('register.agent_phone_required'));
         return;
       }
   
@@ -525,7 +527,7 @@ const Register = () => {
         String(formData.agent_email || '').trim().toLowerCase() ===
         String(formData.email || '').trim().toLowerCase()
       ) {
-        toast.error('Agent email must be different from landlord email');
+        toast.error(t('register.agent_email_diff'));
         return;
       }
   
@@ -533,20 +535,20 @@ const Register = () => {
         String(formData.agent_phone || '').replace(/\s+/g, '') ===
         String(formData.phone || '').replace(/\s+/g, '')
       ) {
-        toast.error('Agent phone must be different from landlord phone');
+        toast.error(t('register.agent_phone_diff'));
         return;
       }
     }
 
   if (!termsAccepted) {
-    toast.error("You must agree to the terms and privacy policy");
+    toast.error(t('register.terms_required'));
     return;
   }
 
   // Nigerian verification
   if (!formData.is_foreigner && registrationFlags.nin_number) {
     if (!/^\d{11}$/.test(formData.nin || "")) {
-      toast.error("NIN must be exactly 11 digits");
+      toast.error(t('register.nin_required'));
       return;
     }
   }
@@ -554,12 +556,12 @@ const Register = () => {
   // Foreigner verification
   if (formData.is_foreigner && registrationFlags.passport_number) {
     if (!/^[A-Za-z0-9]{6,20}$/.test(formData.international_passport_number || "")) {
-      toast.error("Enter a valid international passport number");
+      toast.error(t('register.passport_required'));
       return;
     }
 
     if (!String(formData.nationality || "").trim()) {
-      toast.error("Nationality is required for passport verification");
+      toast.error(t('register.nationality_required'));
       return;
     }
   }
@@ -571,17 +573,17 @@ const Register = () => {
     const registrationData = buildRegistrationData();
 
     if (requiresPayment && !registrationData.state_id) {
-      toast.error('Select your state to calculate the fee');
+      toast.error(t('register.state_required'));
       return;
     }
 
     if (requiresPayment && !String(registrationData.lga_name || '').trim()) {
-      toast.error('Select your local government area to calculate the fee');
+      toast.error(t('register.lga_required'));
       return;
     }
 
     if (requiresPayment && !registrationPricing.location_complete) {
-      toast.error('Complete your location selection to confirm the exact fee');
+      toast.error(t('register.location_fee'));
       return;
     }
 
@@ -598,7 +600,7 @@ const Register = () => {
           status: 'pending',
           message: paymentResponse.data?.message,
         });
-        toast.info('Prembly is still processing. RentalHub will check the same transaction automatically.');
+        toast.info(t('register.prembly_check'));
         return;
       }
 
@@ -612,7 +614,7 @@ const Register = () => {
 
       toast.error(
         paymentResponse.data?.message ||
-        "Failed to initialize registration payment"
+        t('register.registration_failed')
       );
       return;
     }
@@ -621,7 +623,7 @@ const Register = () => {
     const response = await register(registrationData);
 
     if (response.success) {
-      toast.success("Registration successful. Verify email and phone next.");
+      toast.success(t('register.registration_success'));
 
       const role =
         response.data?.user?.user_type || registrationData.user_type;
@@ -633,14 +635,14 @@ const Register = () => {
         status: 'pending',
         message: response.message,
       });
-      toast.info('Prembly is still processing. RentalHub will check the same transaction automatically.');
+      toast.info(t('register.prembly_check'));
     } else {
       const firstError = response.errors?.[0];
 
       toast.error(
         firstError?.msg ||
         response.message ||
-        "Registration failed"
+        t('register.registration_failed')
       );
     }
 
@@ -654,14 +656,14 @@ const Register = () => {
         status: 'pending',
         message: serverError.message,
       });
-      toast.info('Prembly is still processing. RentalHub will check the same transaction automatically.');
+      toast.info(t('register.prembly_check'));
       return;
     }
 
     toast.error(
       firstError?.msg ||
       serverError?.message ||
-      "Registration failed"
+      t('register.registration_failed')
     );
 
     console.error(
@@ -709,107 +711,107 @@ const getPasswordStrength = (pwd) => {
   if (/[A-Z]/.test(pwd)) score++;
   if (/[0-9]/.test(pwd)) score++;
   if (/[^A-Za-z0-9]/.test(pwd)) score++;
-  if (score <= 1) return { label: 'Weak',   bar: 'w-1/4',  color: 'bg-red-500',    text: 'text-red-500'    };
-  if (score <= 2) return { label: 'Fair',   bar: 'w-2/4',  color: 'bg-orange-400', text: 'text-orange-400' };
-  if (score <= 3) return { label: 'Good',   bar: 'w-3/4',  color: 'bg-yellow-400', text: 'text-yellow-500' };
-                  return { label: 'Strong', bar: 'w-full', color: 'bg-green-500',  text: 'text-green-600'  };
+  if (score <= 1) return { label: t('register.weak'),   bar: 'w-1/4',  color: 'bg-red-500',    text: 'text-red-500'    };
+  if (score <= 2) return { label: t('register.fair'),   bar: 'w-2/4',  color: 'bg-orange-400', text: 'text-orange-400' };
+  if (score <= 3) return { label: t('register.good'),   bar: 'w-3/4',  color: 'bg-yellow-400', text: 'text-yellow-500' };
+                  return { label: t('register.strong'), bar: 'w-full', color: 'bg-green-500',  text: 'text-green-600'  };
 };
 
 const validateStep = () => {
   let newErrors = {};
 
   if (step === 2) {
-    if (!String(formData.full_name || "").trim()) newErrors.full_name = "Full name required";
+    if (!String(formData.full_name || "").trim()) newErrors.full_name = t('register.full_name_required');
     if (!String(formData.email || "").trim()) {
-      newErrors.email = "Email required";
+      newErrors.email = t('register.email_required');
     } else if (!emailPattern.test(String(formData.email || "").trim())) {
-      newErrors.email = "Enter a valid email";
+      newErrors.email = t('register.email_invalid');
     }
-    if (!String(formData.phone || "").trim()) newErrors.phone = "Phone required";
+    if (!String(formData.phone || "").trim()) newErrors.phone = t('register.phone_required');
     if (
       String(formData.referral_code || "").trim() &&
       !referralCodePattern.test(String(formData.referral_code || "").trim())
     ) {
-      newErrors.referral_code = "Referral code can only contain letters, numbers, - or _";
+      newErrors.referral_code = t('register.referral_code_invalid');
     }
     if (!formData.use_rentalhub_lawyers) {
       if (!String(formData.lawyer_email || "").trim()) {
-        newErrors.lawyer_email = "Enter a lawyer email or check to use RentalHub NG lawyers";
+        newErrors.lawyer_email = t('register.lawyer_email_required');
       } else if (!emailPattern.test(String(formData.lawyer_email || "").trim())) {
-        newErrors.lawyer_email = "Enter a valid lawyer email";
+        newErrors.lawyer_email = t('register.lawyer_email_invalid');
       }
     }
 
         if (formData.user_type === 'landlord' && formData.add_agent && !formData.use_rentalhub_agents) {
         if (!String(formData.agent_full_name || '').trim()) {
-          newErrors.agent_full_name = 'Agent full name required';
+          newErrors.agent_full_name = t('register.agent_name_required');
         }
   
         if (!String(formData.agent_email || '').trim()) {
-          newErrors.agent_email = 'Agent email required';
+          newErrors.agent_email = t('register.agent_email_required');
         } else if (!emailPattern.test(String(formData.agent_email || '').trim())) {
-          newErrors.agent_email = 'Enter a valid agent email';
+          newErrors.agent_email = t('register.agent_email_invalid');
         } else if (
           String(formData.agent_email || '').trim().toLowerCase() ===
           String(formData.email || '').trim().toLowerCase()
         ) {
-          newErrors.agent_email = 'Agent email must be different from landlord email';
+          newErrors.agent_email = t('register.agent_email_diff');
         }
   
         if (!String(formData.agent_phone || '').trim()) {
-          newErrors.agent_phone = 'Agent phone required';
+          newErrors.agent_phone = t('register.agent_phone_required');
         } else if (
           String(formData.agent_phone || '').replace(/\s+/g, '') ===
           String(formData.phone || '').replace(/\s+/g, '')
         ) {
-          newErrors.agent_phone = 'Agent phone must be different from landlord phone';
+          newErrors.agent_phone = t('register.agent_phone_diff');
         }
       }
   }
 
   if (step === 3) {
     if (!registrationFlags.loaded) {
-      newErrors.verification = "Loading registration requirements";
+      newErrors.verification = t('register.verification_loading');
     }
 
     if (!formData.is_foreigner && registrationFlags.nin_number) {
       if (!String(formData.nin || "").trim()) {
-        newErrors.nin = "NIN required";
+        newErrors.nin = t('register.nin_required_short');
       } else if (!/^\d{11}$/.test(formData.nin || "")) {
-        newErrors.nin = "NIN must be exactly 11 digits";
+        newErrors.nin = t('register.nin_required');
       }
     }
 
     if (formData.is_foreigner && registrationFlags.passport_number) {
       if (!String(formData.international_passport_number || "").trim())
-        newErrors.passport = "Passport required";
+        newErrors.passport = t('register.passport_required_short');
       else if (!passportPattern.test(formData.international_passport_number || "")) {
-        newErrors.passport = "Enter a valid passport number";
+        newErrors.passport = t('register.passport_required');
       }
       if (!String(formData.nationality || "").trim())
-        newErrors.nationality = "Nationality required";
+        newErrors.nationality = t('register.nationality_required');
     }
 
         if (requiresPayment) {
-      if (!formData.state_id) newErrors.state = "State required";
-      if (!String(formData.lga_name || "").trim()) newErrors.lga = "LGA required";
+      if (!formData.state_id) newErrors.state = t('register.state_required_short');
+      if (!String(formData.lga_name || "").trim()) newErrors.lga = t('register.lga_required_short');
       if (
         formData.state_id &&
         String(formData.lga_name || "").trim() &&
         !registrationPricing.location_complete
       ) {
-        newErrors.lga = "Complete your location selection to confirm the exact fee";
+        newErrors.lga = t('register.location_fee');
       }
     }
   }
 
   if (step === 4) {
-    if (!formData.password) newErrors.password = "Password required";
+    if (!formData.password) newErrors.password = t('register.password_required');
     if (formData.password.length < 8)
-      newErrors.password = "Min 8 characters";
+      newErrors.password = t('register.password_min');
     if (formData.password !== formData.confirm_password)
-      newErrors.confirm = "Passwords do not match";
-    if (!termsAccepted) newErrors.terms = "You must agree to continue";
+      newErrors.confirm = t('register.password_mismatch');
+    if (!termsAccepted) newErrors.terms = t('register.terms_required');
   }
 
   setErrors(newErrors);
@@ -903,17 +905,17 @@ return (
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
-                Before You Register
+                {t('register.modal_before')}
               </p>
               <h2 className="mt-1 text-xl font-bold text-gray-900">
-                Possible registration payments
+                {t('register.modal_title')}
               </h2>
             </div>
             <button
               type="button"
               onClick={() => setShowRegistrationFeeModal(false)}
               className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              aria-label="Close registration payment information"
+              aria-label={t('register.modal_title')}
             >
               ×
             </button>
@@ -921,29 +923,29 @@ return (
 
           <div className="mt-5 space-y-3 text-sm text-gray-700">
             <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
-              <p className="font-semibold text-blue-900">Tenant account</p>
+              <p className="font-semibold text-blue-900">{t('register.modal_tenant')}</p>
               <p className="mt-1">
-                Tenant account creation payment: <strong>{formatNaira(TENANT_REGISTRATION_FEE)}</strong>.
+                {t('register.modal_tenant_desc')} <strong>{formatNaira(TENANT_REGISTRATION_FEE)}</strong>.
               </p>
             </div>
 
             <div className="rounded-lg border border-purple-100 bg-purple-50 p-3">
-              <p className="font-semibold text-purple-900">Landlord account</p>
+              <p className="font-semibold text-purple-900">{t('register.modal_landlord')}</p>
               <p className="mt-1">
-                Landlord account creation payment: <strong>{formatNaira(LANDLORD_REGISTRATION_FEE)}</strong>.
+                {t('register.modal_landlord_desc')} <strong>{formatNaira(LANDLORD_REGISTRATION_FEE)}</strong>.
               </p>
             </div>
 
             <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
-              <p className="font-semibold text-amber-900">Optional access fees</p>
+              <p className="font-semibold text-amber-900">{t('register.modal_optional')}</p>
               <p className="mt-1">
-                RentalHub NG lawyers: <strong>{formatNaira(LAWYER_ACCESS_FEE)}</strong>.
-                Landlords using RentalHub NG agents: <strong>{formatNaira(AGENT_ACCESS_FEE)}</strong>.
+                {t('register.modal_optional_desc')} <strong>{formatNaira(LAWYER_ACCESS_FEE)}</strong>.
+                {t('register.modal_optional_desc_2')} <strong>{formatNaira(AGENT_ACCESS_FEE)}</strong>.
               </p>
             </div>
 
             <p className="text-xs text-gray-500">
-              Exact payment is confirmed by your selected state and local government area before account creation.
+              {t('register.modal_footnote')}
             </p>
           </div>
 
@@ -953,14 +955,14 @@ return (
               onClick={() => setShowRegistrationFeeModal(false)}
               className="btn w-full sm:flex-1"
             >
-              Skip
+              {t('register.modal_skip')}
             </button>
             <button
               type="button"
               onClick={() => setShowRegistrationFeeModal(false)}
               className="btn btn-primary w-full sm:flex-1"
             >
-              I Understand
+              {t('register.modal_understand')}
             </button>
           </div>
         </div>
@@ -972,15 +974,15 @@ return (
       <div className="text-center space-y-6 max-w-md px-10">
         <div className="flex justify-center">
           <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center">
-            <img src="/rentalhub-mark.svg" className="h-12 w-12 rounded-xl object-contain shadow-sm" alt="RentalHub NG" />
+            <img src="/rentalhub-mark.svg" className="h-12 w-12 rounded-xl object-contain shadow-sm" alt={t('register.logo_alt')} />
           </div>
         </div>
-        <h1 className="text-4xl font-bold">Create Your Account</h1>
+        <h1 className="text-4xl font-bold">{t('register.left_panel_title')}</h1>
         <p className="text-white/80">
-          Complete a few steps to start managing rentals and legal services.
+          {t('register.left_panel_desc')}
         </p>
         <p className="text-sm text-white/60">
-          Trusted by landlords, tenants, and legal professionals.
+          {t('register.left_panel_footer')}
         </p>
       </div>
     </div>
@@ -998,9 +1000,9 @@ return (
 
         <div className="space-y-3 text-center">
           <p className="text-sm text-gray-600">
-            Already have an account?{" "}
+            {t('register.already_account')}{" "}
             <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Sign in
+              {t('register.sign_in')}
             </Link>
           </p>
 
@@ -1008,9 +1010,9 @@ return (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-left text-sm text-emerald-800">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-semibold">Invite link applied</p>
+                  <p className="font-semibold">{t('register.invite_applied')}</p>
                   <p className="mt-0.5 text-emerald-700">
-                    Complete registration to reward the person who invited you.
+                    {t('register.invite_desc')}
                   </p>
                 </div>
                 <span className="w-fit rounded-full bg-white px-3 py-1 font-mono text-xs font-semibold text-emerald-700 shadow-sm">
@@ -1028,12 +1030,12 @@ return (
             {/* STEP 1 — Account Type */}
             {step === 1 && (
               <div className="space-y-6">
-                <h2 className="text-xl font-semibold text-center">Account Type</h2>
+                <h2 className="text-xl font-semibold text-center">{t('register.step_1_title')}</h2>
 
                 {/* Registration disabled banner */}
                 {!registrationFlags.registration_master_enabled && (
                   <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    Registration is currently disabled by the platform administrator.
+                    {t('register.disabled_global')}
                   </div>
                 )}
 
@@ -1041,8 +1043,8 @@ return (
                   !registrationFlags.registration_global_allowed && (
                   <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {formData.user_type === "landlord"
-                      ? "Landlord registration is currently disabled by the platform administrator."
-                      : "Tenant registration is currently disabled by the platform administrator."}
+                      ? t('register.disabled_landlord')
+                      : t('register.disabled_tenant')}
                   </div>
                 )}
 
@@ -1057,7 +1059,7 @@ return (
 
                 {/* User type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">I am a:</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('register.account_type_label')}</label>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
@@ -1077,8 +1079,8 @@ return (
                           : 'border-gray-300 hover:border-indigo-300'
                       }`}
                     >
-                      <div className="font-semibold">Tenant</div>
-                      <div className="text-sm text-gray-600">Looking for a property</div>
+                      <div className="font-semibold">{t('register.tenant')}</div>
+                      <div className="text-sm text-gray-600">{t('register.tenant_desc')}</div>
                     </button>
 
                     <button
@@ -1090,15 +1092,15 @@ return (
                           : 'border-gray-300 hover:border-indigo-300'
                       }`}
                     >
-                      <div className="font-semibold">Landlord</div>
-                      <div className="text-sm text-gray-600">Listing a property</div>
+                      <div className="font-semibold">{t('register.landlord')}</div>
+                      <div className="text-sm text-gray-600">{t('register.landlord_desc')}</div>
                     </button>
                   </div>
                 </div>
 
                 {/* Applicant type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Applicant type:</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('register.applicant_type_label')}</label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <button
                       type="button"
@@ -1109,7 +1111,7 @@ return (
                           : 'border-gray-300 hover:border-indigo-300'
                       }`}
                     >
-                      Local (Nigeria)
+                      {t('register.local')}
                     </button>
 
                     <button
@@ -1121,7 +1123,7 @@ return (
                           : 'border-gray-300 hover:border-indigo-300'
                       }`}
                     >
-                      Foreign Applicant
+                      {t('register.foreign')}
                     </button>
                   </div>
                 </div>
@@ -1132,7 +1134,7 @@ return (
                   disabled={!canContinueAccountTypeStep}
                   className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Continue
+                  {t('register.continue')}
                 </button>
               </div>
             )}
@@ -1140,11 +1142,11 @@ return (
             {/* STEP 2 — Personal Info */}
             {step === 2 && (
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-center">Personal Info</h2>
+                <h2 className="text-xl font-semibold text-center">{t('register.step_2_title')}</h2>
 
                 {/* Full Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.full_name')}</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaUser className="text-gray-400" />
@@ -1157,7 +1159,7 @@ return (
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, full_name: null })); }}
                       autoFocus
                       className={`input pl-10 ${errors.full_name ? 'border-red-500' : ''}`}
-                      placeholder="Abdulkareem Ali"
+                      placeholder={t('register.full_name_placeholder')}
                     />
                   </div>
                   {errors.full_name && <p className="text-red-500 text-sm mt-1">{errors.full_name}</p>}
@@ -1165,7 +1167,7 @@ return (
 
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.email')}</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaEnvelope className="text-gray-400" />
@@ -1177,7 +1179,7 @@ return (
                       value={formData.email}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, email: null })); }}
                       className={`input pl-10 ${errors.email ? 'border-red-500' : ''}`}
-                      placeholder="Abdlkal@example.com"
+                      placeholder={t('register.email_placeholder')}
                     />
                   </div>
                   {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
@@ -1185,7 +1187,7 @@ return (
 
                 {/* Phone */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.phone')}</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaPhone className="text-gray-400" />
@@ -1197,7 +1199,7 @@ return (
                       value={formData.phone}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, phone: null })); }}
                       className={`input pl-10 ${errors.phone ? 'border-red-500' : ''}`}
-                      placeholder="+2348012345678"
+                      placeholder={t('register.phone_placeholder')}
                     />
                   </div>
                   {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
@@ -1206,7 +1208,7 @@ return (
                 {/* Referral Code */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Referral Code <span className="text-gray-400">(Optional)</span>
+                    {t('register.referral_code')} <span className="text-gray-400">{t('register.referral_optional')}</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1223,7 +1225,7 @@ return (
                         setErrors((prev) => ({ ...prev, referral_code: null }));
                       }}
                       className={`input pl-10 ${errors.referral_code ? 'border-red-500' : ''}`}
-                      placeholder="RH123ABC"
+                      placeholder={t('register.referral_placeholder')}
                       maxLength={64}
                     />
                   </div>
@@ -1231,14 +1233,14 @@ return (
                     <p className="text-red-500 text-sm mt-1">{errors.referral_code}</p>
                   ) : (
                     <p className="text-xs text-gray-500 mt-1">
-                      Invite links fill this automatically, but you can paste a code here.
+                      {t('register.referral_hint')}
                     </p>
                   )}
                 </div>
 
                 {/* Lawyer Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Lawyer Email {formData.use_rentalhub_lawyers ? '' : '*'}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.lawyer_email')} {formData.use_rentalhub_lawyers ? '' : '*'}</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaEnvelope className="text-gray-400" />
@@ -1251,7 +1253,7 @@ return (
                       disabled={formData.use_rentalhub_lawyers}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, lawyer_email: null })); }}
                       className={`input pl-10 ${errors.lawyer_email ? 'border-red-500' : ''} ${formData.use_rentalhub_lawyers ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      placeholder={formData.use_rentalhub_lawyers ? 'Using RentalHub NG lawyers' : "lawyer@example.com"}
+                      placeholder={formData.use_rentalhub_lawyers ? t('register.lawyer_using_rentalhub') : t('register.lawyer_placeholder')}
                     />
                   </div>
                   {errors.lawyer_email && <p className="text-red-500 text-sm mt-1">{errors.lawyer_email}</p>}
@@ -1272,9 +1274,9 @@ return (
                       className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-0.5 cursor-pointer"
                     />
                     <label htmlFor="use_rentalhub_lawyers" className="ml-2 text-sm text-gray-700 cursor-pointer">
-                      <span>Legal Protection Coverage — <span className="font-semibold">₦2,000 (one-time)</span></span>
+                      <span>{t('register.lawyer_checkbox_label')}</span>
                       <p className="text-xs text-gray-500 mt-1">
-                        Get access to qualified legal assistance anytime you need it. No upfront lawyer search needed — we assign one from your area when you submit a request.
+                        {t('register.lawyer_checkbox_desc')}
                       </p>
                     </label>
                   </div>
@@ -1284,9 +1286,9 @@ return (
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-900">Use your Agent Now</h3>
+                        <h3 className="text-sm font-semibold text-gray-900">{t('register.agent_heading')}</h3>
                         <p className="text-xs text-gray-600 mt-1">
-                          Optional. An agent can help the landlord handle property listing, property updates, and other difficult day-to-day tasks later.
+                          {t('register.agent_desc')}
                         </p>
                       </div>
                       <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -1317,14 +1319,14 @@ return (
                           }}
                           className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
-                        Add agent
+                        {t('register.agent_add')}
                       </label>
                     </div>
 
                     {formData.add_agent && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Agent Full Name *</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.agent_name')}</label>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                               <FaUser className="text-gray-400" />
@@ -1338,14 +1340,14 @@ return (
                                 setErrors((prev) => ({ ...prev, agent_full_name: null }));
                               }}
                               className={`input pl-10 ${errors.agent_full_name ? 'border-red-500' : ''}`}
-                              placeholder="Agent full name"
+                              placeholder={t('register.agent_name_placeholder')}
                             />
                           </div>
                           {errors.agent_full_name && <p className="text-red-500 text-sm mt-1">{errors.agent_full_name}</p>}
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Agent Email *</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.agent_email')}</label>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                               <FaEnvelope className="text-gray-400" />
@@ -1359,14 +1361,14 @@ return (
                                 setErrors((prev) => ({ ...prev, agent_email: null }));
                               }}
                               className={`input pl-10 ${errors.agent_email ? 'border-red-500' : ''}`}
-                              placeholder="agent@example.com"
+                              placeholder={t('register.agent_email_placeholder')}
                             />
                           </div>
                           {errors.agent_email && <p className="text-red-500 text-sm mt-1">{errors.agent_email}</p>}
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Agent Phone *</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.agent_phone')}</label>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                               <FaPhone className="text-gray-400" />
@@ -1380,7 +1382,7 @@ return (
                                 setErrors((prev) => ({ ...prev, agent_phone: null }));
                               }}
                               className={`input pl-10 ${errors.agent_phone ? 'border-red-500' : ''}`}
-                              placeholder="+2348012345678"
+                              placeholder={t('register.agent_phone_placeholder')}
                             />
                           </div>
                           {errors.agent_phone && <p className="text-red-500 text-sm mt-1">{errors.agent_phone}</p>}
@@ -1394,10 +1396,9 @@ return (
                   <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-900">Use RentalHub NG Agents</h3>
+                        <h3 className="text-sm font-semibold text-gray-900">{t('register.use_rentalhub_agents')}</h3>
                         <p className="text-xs text-gray-600 mt-1">
-                          Opt in to have a platform agent automatically assigned to help manage your properties
-                          and handle day-to-day tasks. A one-time agent access fee of {formatNaira(AGENT_ACCESS_FEE)} applies.
+                          {t('register.rentalhub_agent_desc', { fee: formatNaira(AGENT_ACCESS_FEE) })}
                         </p>
                       </div>
                       <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -1423,15 +1424,15 @@ return (
                           }}
                           className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
-                        Use Our agents
+                        {t('register.use_our_agents')}
                       </label>
                     </div>
                     {formData.use_rentalhub_agents && (
                       <div className="mt-2 text-xs text-purple-700">
-                        A platform agent will be auto-assigned to you. No need to manually add an agent.
+                        {t('register.agent_auto_assigned')}
                         {!registrationPricing.location_complete && (
                           <div className="mt-1">
-                            Select your state and local government area to confirm the agent access fee.
+                            {t('register.select_location_agent_fee')}
                           </div>
                         )}
                       </div>
@@ -1440,14 +1441,14 @@ return (
                 )}
 
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setStep(1)} className="btn w-full">Back</button>
+                  <button type="button" onClick={() => setStep(1)} className="btn w-full">{t('register.back')}</button>
                   <button
                     type="button"
                     onClick={() => validateStep() && setStep(3)}
                     disabled={!isStepTwoComplete}
                     className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Continue
+                    {t('register.continue')}
                   </button>
                 </div>
               </div>
@@ -1456,7 +1457,7 @@ return (
             {/* STEP 3 — Verification & Location */}
             {step === 3 && (
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-center">Verification & Location</h2>
+                <h2 className="text-xl font-semibold text-center">{t('register.step_3_title')}</h2>
 
                 {errors.verification && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -1467,13 +1468,13 @@ return (
                 {/* NIN (local applicants) */}
                 {!formData.is_foreigner && registrationFlags.nin_number && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">NIN *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.nin_label')}</label>
                     <input
                       name="nin"
                       value={formData.nin}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, nin: null })); }}
                       className={inputClass('nin')}
-                      placeholder="11-digit NIN"
+                      placeholder={t('register.nin_placeholder')}
                     />
                     {errors.nin && <p className="text-red-500 text-sm mt-1">{errors.nin}</p>}
                   </div>
@@ -1483,25 +1484,25 @@ return (
                 {formData.is_foreigner && registrationFlags.passport_number && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Number *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.passport_label')}</label>
                       <input
                         name="international_passport_number"
                         value={formData.international_passport_number}
                         onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, passport: null })); }}
                         className={inputClass('passport')}
-                        placeholder="Passport Number"
+                        placeholder={t('register.passport_placeholder')}
                       />
                       {errors.passport && <p className="text-red-500 text-sm mt-1">{errors.passport}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nationality *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.nationality_label')}</label>
                       <input
                         name="nationality"
                         value={formData.nationality}
                         onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, nationality: null })); }}
                         className={inputClass('nationality')}
-                        placeholder="Nationality"
+                        placeholder={t('register.nationality_placeholder')}
                       />
                       {errors.nationality && <p className="text-red-500 text-sm mt-1">{errors.nationality}</p>}
                     </div>
@@ -1510,11 +1511,11 @@ return (
 
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Registration Location</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">{t('register.registration_location')}</h3>
                     <p className="mt-1 text-xs text-gray-600">
                       {formData.user_type === 'tenant'
-                        ? 'Choose your preferred registration location so the system can show you available properties in that area.'
-                        : 'Choose your registration location now. It will prefill your property posting flow after signup, and you can still change it later per listing.'}
+                        ? t('register.location_hint_tenant')
+                        : t('register.location_hint_landlord')}
                     </p>
                   </div>
 
@@ -1529,7 +1530,7 @@ return (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        State{requiresRegistrationPayment ? ' *' : ''}
+                        {t('register.state')}{requiresRegistrationPayment ? ' *' : ''}
                       </label>
                       <select
                         name="state_id"
@@ -1537,7 +1538,7 @@ return (
                         onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, state: null })); }}
                         className={inputClass('state')}
                       >
-                        <option value="">Select state</option>
+                        <option value="">{t('register.select_state')}</option>
                         {locationOptions.map(s => (
                           <option key={s.id} value={s.id}>{s.state_name}</option>
                         ))}
@@ -1547,7 +1548,7 @@ return (
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Local Government Area{requiresRegistrationPayment ? ' *' : ''}
+                        {t('register.lga')}{requiresRegistrationPayment ? ' *' : ''}
                       </label>
                       <select
                         name="lga_name"
@@ -1556,14 +1557,14 @@ return (
                         className={inputClass('lga')}
                         disabled={!formData.state_id}
                       >
-                        <option value="">Select local government area</option>
+                        <option value="">{t('register.select_lga')}</option>
                         {availableLgas.map(l => (
                           <option key={l} value={l}>{l}</option>
                         ))}
                       </select>
                       {requiresRegistrationPayment && !registrationPricing.location_complete && formData.state_id && formData.lga_name && (
                         <p className="text-xs text-blue-600 mt-1">
-                          Confirming location pricing...
+                          {t('register.confirming_pricing')}
                         </p>
                       )}
                       {errors.lga && <p className="text-red-500 text-sm mt-1">{errors.lga}</p>}
@@ -1572,7 +1573,7 @@ return (
 
                   {requiresPayment && formData.state_id && formData.lga_name && registrationPricing.location_complete && (
                     <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                      Exact total fee for this location: {formatNaira(displayedRegistrationAmount)}.
+                      {t('register.exact_fee', { amount: formatNaira(displayedRegistrationAmount) })}
                     </div>
                   )}
 
@@ -1581,24 +1582,24 @@ return (
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h4 className="text-sm font-semibold text-emerald-900">
-                            Available Properties Near This Location
+                            {t('register.available_properties')}
                           </h4>
                           <p className="mt-1 text-xs text-emerald-800">
                             {formData.lga_name
-                              ? `Showing live inventory for ${formData.lga_name}, ${selectedStateOption?.state_name || ''}.`
-                              : `Showing live inventory in ${selectedStateOption?.state_name || 'your selected state'}.`}
+                              ? t('register.showing_inventory_lga', { lga: formData.lga_name, state: selectedStateOption?.state_name || '' })
+                              : t('register.showing_inventory_state', { state: selectedStateOption?.state_name || 'your selected state' })}
                           </p>
                         </div>
                         <Link
                           to={registrationLocationBrowseUrl}
                           className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
                         >
-                          Browse all
+                          {t('register.browse_all')}
                         </Link>
                       </div>
 
                       {locationPreviewLoading ? (
-                        <p className="mt-3 text-sm text-emerald-800">Loading available properties...</p>
+                        <p className="mt-3 text-sm text-emerald-800">{t('register.loading_properties')}</p>
                       ) : locationPreviewProperties.length > 0 ? (
                         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                           {locationPreviewProperties.map((property) => (
@@ -1619,7 +1620,7 @@ return (
                         </div>
                       ) : (
                         <p className="mt-3 text-sm text-emerald-800">
-                          No live properties are attached to this location yet.
+                          {t('register.no_properties')}
                         </p>
                       )}
 
@@ -1631,14 +1632,14 @@ return (
                 </div>
 
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setStep(2)} className="btn w-full">Back</button>
+                  <button type="button" onClick={() => setStep(2)} className="btn w-full">{t('register.back')}</button>
                   <button
                     type="button"
                     onClick={() => validateStep() && setStep(4)}
                     disabled={!isStepThreeComplete}
                     className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Continue
+                    {t('register.continue')}
                   </button>
                 </div>
               </div>
@@ -1651,34 +1652,34 @@ return (
                 {/* Payment notice */}
                 {requiresPayment && (
                   <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                    <p className="font-semibold text-blue-900">Registration payment summary</p>
+                    <p className="font-semibold text-blue-900">{t('register.payment_summary')}</p>
                     <div className="mt-2 space-y-1">
                       {requiresRegistrationPayment && (
                         <div className="flex justify-between gap-3">
-                          <span>{formData.user_type === 'tenant' ? 'Tenant' : 'Landlord'} account creation</span>
+                          <span>{formData.user_type === 'tenant' ? t('register.tenant_account_creation') : t('register.landlord_account_creation')}</span>
                           <span className="font-semibold">{formatNaira(baseAmount)}</span>
                         </div>
                       )}
                       {requiresLawyerPayment && (
                         <div className="flex justify-between gap-3">
-                          <span>RentalHub NG lawyer access</span>
+                          <span>{t('register.rentalhub_lawyer_access')}</span>
                           <span className="font-semibold">{formatNaira(LAWYER_ACCESS_FEE)}</span>
                         </div>
                       )}
                       {requiresAgentPayment && (
                         <div className="flex justify-between gap-3">
-                          <span>RentalHub NG agent access</span>
+                          <span>{t('register.rentalhub_agent_access')}</span>
                           <span className="font-semibold">{formatNaira(AGENT_ACCESS_FEE)}</span>
                         </div>
                       )}
                     </div>
                     <div className="mt-3 flex justify-between border-t border-blue-200 pt-2 font-semibold text-blue-900">
-                      <span>Total due before account creation</span>
+                      <span>{t('register.total_due')}</span>
                       <span>{formatNaira(displayedRegistrationAmount)}</span>
                     </div>
                     {!registrationPricing.location_complete && (
                       <div className="mt-2 text-xs text-blue-700">
-                        Select your state and local government area to confirm the exact fee.
+                        {t('register.select_location_exact_fee')}
                       </div>
                     )}
                   </div>
@@ -1686,7 +1687,7 @@ return (
 
                 {/* Password */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.password')}</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaLock className="text-gray-400" />
@@ -1698,7 +1699,7 @@ return (
                       value={formData.password}
                       onChange={(e) => { handleChange(e); setErrors(p => ({ ...p, password: null })); }}
                       className={`input pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
-                      placeholder="Min. 8 characters"
+                      placeholder={t('register.password_placeholder')}
                       autoFocus
                     />
                     <button
@@ -1719,7 +1720,7 @@ return (
                           <div className={`h-full rounded-full transition-all duration-300 ${strength.bar} ${strength.color}`} />
                         </div>
                         <p className={`text-xs font-medium ${strength.text}`}>
-                          Password strength: {strength.label}
+                          {t('register.password_strength')}: {strength.label}
                         </p>
                       </div>
                     );
@@ -1728,7 +1729,7 @@ return (
 
                 {/* Confirm Password */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.confirm_password')}</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaLock className="text-gray-400" />
@@ -1746,7 +1747,7 @@ return (
                           ? 'border-green-500'
                           : errors.confirm ? 'border-red-500' : ''
                       }`}
-                      placeholder="Re-enter password"
+                      placeholder={t('register.confirm_placeholder')}
                     />
                     <button
                       type="button"
@@ -1759,8 +1760,8 @@ return (
                   {/* Live mismatch / match feedback */}
                   {formData.confirm_password && (
                     formData.password !== formData.confirm_password
-                      ? <p className="text-red-500 text-xs mt-1">Passwords do not match</p>
-                      : <p className="text-green-600 text-xs mt-1">Passwords match ✓</p>
+                      ? <p className="text-red-500 text-xs mt-1">{t('register.password_mismatch')}</p>
+                      : <p className="text-green-600 text-xs mt-1">{t('register.passwords_match')}</p>
                   )}
                   {errors.confirm && !formData.confirm_password && (
                     <p className="text-red-500 text-sm mt-1">{errors.confirm}</p>
@@ -1780,16 +1781,16 @@ return (
                     className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-1 cursor-pointer"
                   />
                   <label htmlFor="terms" className="ml-2 block text-sm text-gray-900 cursor-pointer">
-                    I agree to the{' '}
-                    <Link to="/terms" className="text-indigo-600 hover:text-indigo-500">Terms of Service</Link>
-                    {' '}and{' '}
-                    <Link to="/privacy" className="text-indigo-600 hover:text-indigo-500">Privacy Policy</Link>
+                    {t('register.terms')}{' '}
+                    <Link to="/terms" className="text-indigo-600 hover:text-indigo-500">{t('register.terms_link')}</Link>
+                    {' '}{t('register.and')}{' '}
+                    <Link to="/privacy" className="text-indigo-600 hover:text-indigo-500">{t('register.privacy_link')}</Link>
                   </label>
                 </div>
                 {errors.terms && <p className="text-red-500 text-sm mt-1">{errors.terms}</p>}
 
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setStep(3)} className="btn w-full">Back</button>
+                  <button type="button" onClick={() => setStep(3)} className="btn w-full">{t('register.back')}</button>
 
                   <button
                     type="submit"
@@ -1797,10 +1798,10 @@ return (
                     className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                                         {loading
-                      ? 'Processing...'
+                      ? t('register.submitting')
                       : requiresPayment
-                      ? `Pay ${formatNaira(displayedRegistrationAmount)}`
-                      : 'Create Account'}
+                      ? t('register.pay_amount', { amount: formatNaira(displayedRegistrationAmount) })
+                      : t('register.submit')}
                   </button>
                 </div>
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   FaBuilding,
@@ -109,69 +110,6 @@ const ShareButton = ({ section, title, description }) => {
   );
 };
 
-const stats = [
-  { label: 'Properties Listed', value: '10,000+' },
-  { label: 'Active Users', value: '50,000+' },
-  { label: 'States Covered', value: '36 + FCT' },
-  { label: 'Verified Landlords', value: '5,000+' },
-];
-
-const values = [
-  {
-    icon: <FaShieldAlt className="text-3xl text-primary-500" />,
-    title: 'Trust & Verification',
-    desc: 'Every landlord, property, and agent undergoes a rigorous verification process to ensure your peace of mind.',
-  },
-  {
-    icon: <FaBalanceScale className="text-3xl text-primary-500" />,
-    title: 'Fairness & Transparency',
-    desc: 'Clear pricing, no hidden fees, and honest communication between all parties on our platform.',
-  },
-  {
-    icon: <FaUsers className="text-3xl text-primary-500" />,
-    title: 'Community First',
-    desc: 'We build a supportive ecosystem where tenants, landlords, agents, and legal professionals thrive together.',
-  },
-  {
-    icon: <FaMapMarkerAlt className="text-3xl text-primary-500" />,
-    title: 'Nationwide Reach',
-    desc: 'From bustling Lagos to serene rural areas, we connect people with homes across every region of Nigeria.',
-  },
-  {
-    icon: <FaHandshake className="text-3xl text-primary-500" />,
-    title: 'Integrity',
-    desc: 'We uphold the highest ethical standards, ensuring every transaction and interaction is conducted with honesty.',
-  },
-  {
-    icon: <FaCheckCircle className="text-3xl text-primary-500" />,
-    title: 'Innovation',
-    desc: 'Leveraging cutting-edge technology including property verification, digital evidence, and legal support tools.',
-  },
-];
-
-const teamMembers = [
-  {
-    name: 'Zubair Onimisi',
-    role: 'Founder & CEO',
-    bio: 'With over 15 years in real estate and technology, Zubair leads RentalHub NG with a vision to revolutionize property access in Nigeria.',
-  },
-  {
-    name: 'Chioma Eze',
-    role: 'Chief Operating Officer',
-    bio: 'Chioma brings operational excellence from her background in property management and large-scale logistics coordination.',
-  },
-  {
-    name: 'Emeka Okonkwo',
-    role: 'Chief Technology Officer',
-    bio: 'Emeka architects the RentalHub NG platform, driving innovation in property tech, digital verification, and secure transactions.',
-  },
-  {
-    name: 'Fatima Bello',
-    role: 'Head of Legal Services',
-    bio: 'A seasoned legal professional, Fatima ensures that all property transactions comply with Nigerian law and protects all parties involved.',
-  },
-];
-
 const milestones = [
   { year: '2020', event: 'RentalHub NG was founded with a vision to transform the Nigerian rental market.' },
   { year: '2021', event: 'Launched property listing framework to ackwonledge onboarding landlords across Lagos and Abuja by creating a platform.' },
@@ -182,6 +120,70 @@ const milestones = [
 ];
 
 const AboutUs = () => {
+  const { t } = useTranslation();
+
+  const stats = [
+    { label: t('about_us.stats.properties_listed'), value: '10,000+' },
+    { label: t('about_us.stats.active_users'), value: '50,000+' },
+    { label: t('about_us.stats.states_covered'), value: '36 + FCT' },
+    { label: t('about_us.stats.verified_landlords'), value: '5,000+' },
+  ];
+
+  const values = [
+    {
+      icon: <FaShieldAlt className="text-3xl text-primary-500" />,
+      title: t('about_us.value.1.title'),
+      desc: t('about_us.value.1.desc'),
+    },
+    {
+      icon: <FaBalanceScale className="text-3xl text-primary-500" />,
+      title: t('about_us.value.2.title'),
+      desc: t('about_us.value.2.desc'),
+    },
+    {
+      icon: <FaUsers className="text-3xl text-primary-500" />,
+      title: t('about_us.value.3.title'),
+      desc: t('about_us.value.3.desc'),
+    },
+    {
+      icon: <FaMapMarkerAlt className="text-3xl text-primary-500" />,
+      title: t('about_us.value.4.title'),
+      desc: t('about_us.value.4.desc'),
+    },
+    {
+      icon: <FaHandshake className="text-3xl text-primary-500" />,
+      title: t('about_us.value.5.title'),
+      desc: t('about_us.value.5.desc'),
+    },
+    {
+      icon: <FaCheckCircle className="text-3xl text-primary-500" />,
+      title: t('about_us.value.6.title'),
+      desc: t('about_us.value.6.desc'),
+    },
+  ];
+
+  const teamMembers = [
+    {
+      name: 'Zubair Onimisi',
+      role: t('about_us.team.member_1.role'),
+      bio: t('about_us.team.member_1.bio'),
+    },
+    {
+      name: 'Chioma Eze',
+      role: t('about_us.team.member_2.role'),
+      bio: t('about_us.team.member_2.bio'),
+    },
+    {
+      name: 'Emeka Okonkwo',
+      role: t('about_us.team.member_3.role'),
+      bio: t('about_us.team.member_3.bio'),
+    },
+    {
+      name: 'Fatima Bello',
+      role: t('about_us.team.member_4.role'),
+      bio: t('about_us.team.member_4.bio'),
+    },
+  ];
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -199,14 +201,13 @@ const AboutUs = () => {
         <div className="container mx-auto px-4 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight">
-              About{' '}
+              {t('about_us.hero.title_before')}{' '}
               <span className="bg-gradient-to-r from-primary-200 to-primary-400 bg-clip-text text-transparent">
-                RentalHub NG
+                {t('about_us.hero.title_highlight')}
               </span>
             </h1>
             <p className="text-lg md:text-xl text-primary-100 max-w-3xl mx-auto leading-relaxed">
-              Nigeria's most trusted property technology platform — connecting tenants, landlords,
-              agents, and legal professionals across all 36 states and the Federal Capital Territory.
+              {t('about_us.hero.subtitle')}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link
@@ -214,14 +215,14 @@ const AboutUs = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaBuilding />
-                Browse Properties
+                {t('about_us.hero.cta_browse')}
               </Link>
               <Link
                 to="/register"
                 className="inline-flex items-center gap-2 px-8 py-3.5 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 hover:border-white/50 transition-all duration-300"
               >
                 <FaUsers />
-                Join RentalHub NG
+                {t('about_us.hero.cta_join')}
               </Link>
               <ShareButton
                 section="About Us"
@@ -245,10 +246,10 @@ const AboutUs = () => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
             <div>
-              <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Our Mission</span>
+              <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('about_us.mission.section_label')}</span>
               <div className="flex items-center justify-between gap-4 mt-3 mb-6">
                 <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                  Transforming Nigeria's Rental Landscape
+                  {t('about_us.mission.heading')}
                 </h2>
                 <ShareButton
                   section="Our Mission"
@@ -257,31 +258,27 @@ const AboutUs = () => {
                 />
               </div>
               <p className="text-gray-600 leading-relaxed mb-4">
-                At RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free
-                experience when finding a home. Our mission is to eliminate the friction,
-                fraud, and frustration from the Nigerian rental market.
+                {t('about_us.mission.paragraph_1')}
               </p>
               <p className="text-gray-600 leading-relaxed mb-6">
-                By combining technology with rigorous verification processes, legal support,
-                and nationwide coverage, we empower tenants to find verified properties and
-                landlords to connect with qualified tenants — all in one trusted ecosystem.
+                {t('about_us.mission.paragraph_2')}
               </p>
               <div className="flex flex-wrap gap-4">
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <FaCheckCircle className="text-green-500" />
-                  <span>Verified properties</span>
+                  <span>{t('about_us.mission.badge_verified')}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <FaCheckCircle className="text-green-500" />
-                  <span>Secure payments</span>
+                  <span>{t('about_us.mission.badge_secure')}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <FaCheckCircle className="text-green-500" />
-                  <span>Legal protection</span>
+                  <span>{t('about_us.mission.badge_legal')}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <FaCheckCircle className="text-green-500" />
-                  <span>Dispute resolution</span>
+                  <span>{t('about_us.mission.badge_dispute')}</span>
                 </div>
               </div>
             </div>
@@ -292,8 +289,8 @@ const AboutUs = () => {
                     <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-primary-600 flex items-center justify-center">
                       <FaBuilding className="text-3xl text-white" />
                     </div>
-                    <p className="text-primary-800 font-bold text-lg">10,000+ Properties</p>
-                    <p className="text-primary-600 text-sm">Across all 36 states + FCT</p>
+                    <p className="text-primary-800 font-bold text-lg">{t('about_us.mission.image_text')}</p>
+                    <p className="text-primary-600 text-sm">{t('about_us.mission.image_subtext')}</p>
                   </div>
                 </div>
               </div>
@@ -325,10 +322,10 @@ const AboutUs = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Our Journey</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('about_us.journey.section_label')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                From Vision to Reality
+                {t('about_us.journey.heading')}
               </h2>
               <ShareButton
                 section="Our Journey"
@@ -337,8 +334,7 @@ const AboutUs = () => {
               />
             </div>
             <p className="text-gray-600">
-              Every great platform starts with a simple idea. Here is the story of how RentalHub NG
-              grew from a vision into Nigeria's most trusted property marketplace.
+              {t('about_us.journey.subtitle')}
             </p>
           </div>
 
@@ -382,10 +378,10 @@ const AboutUs = () => {
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">What We Stand For</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('about_us.values.section_label')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Our Core Values
+                {t('about_us.values.heading')}
               </h2>
               <ShareButton
                 section="Our Core Values"
@@ -394,7 +390,7 @@ const AboutUs = () => {
               />
             </div>
             <p className="text-gray-600">
-              These principles guide every decision we make and every feature we build.
+              {t('about_us.values.subtitle')}
             </p>
           </div>
 
@@ -426,10 +422,10 @@ const AboutUs = () => {
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Why Choose Us</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('about_us.different.section_label')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                What Makes RentalHub NG Different
+                {t('about_us.different.heading')}
               </h2>
               <ShareButton
                 section="Why Choose Us"
@@ -438,8 +434,7 @@ const AboutUs = () => {
               />
             </div>
             <p className="text-gray-600">
-              We don't just list properties — we build an end-to-end ecosystem for secure, transparent
-              property transactions.
+              {t('about_us.different.subtitle')}
             </p>
           </div>
 
@@ -450,7 +445,7 @@ const AboutUs = () => {
               </div>
               <div className="flex-1">
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Verified Ecosystem</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.ecosystem.title')}</h3>
                   <ShareButton
                     section="Verified Ecosystem"
                     title="RentalHub NG — Verified Ecosystem"
@@ -458,8 +453,7 @@ const AboutUs = () => {
                   />
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  Every landlord, tenant, and property goes through identity verification.
-                  Our superb verification system ensures only genuine participants on the platform.
+                  {t('about_us.different.ecosystem.desc')}
                 </p>
               </div>
             </div>
@@ -470,7 +464,7 @@ const AboutUs = () => {
               </div>
               <div className="flex-1">
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Legal Support & Dispute Resolution</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.legal.title')}</h3>
                   <ShareButton
                     section="Legal Support"
                     title="RentalHub NG — Legal Support & Dispute Resolution"
@@ -478,8 +472,7 @@ const AboutUs = () => {
                   />
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  Access to qualified lawyers, evidence verification, and structured dispute
-                  resolution processes to protect all parties.
+                  {t('about_us.different.legal.desc')}
                 </p>
               </div>
             </div>
@@ -490,7 +483,7 @@ const AboutUs = () => {
               </div>
               <div className="flex-1">
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Full-Service Marketplace</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.marketplace.title')}</h3>
                   <ShareButton
                     section="Full-Service Marketplace"
                     title="RentalHub NG — Full-Service Marketplace"
@@ -498,8 +491,7 @@ const AboutUs = () => {
                   />
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  Beyond rentals, we offer fumigation/cleaning services, transportation support,
-                  and virtual property tours — all in one platform.
+                  {t('about_us.different.marketplace.desc')}
                 </p>
               </div>
             </div>
@@ -510,7 +502,7 @@ const AboutUs = () => {
               </div>
               <div className="flex-1">
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Nationwide Coverage</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{t('about_us.different.coverage.title')}</h3>
                   <ShareButton
                     section="Nationwide Coverage"
                     title="RentalHub NG — Nationwide Coverage"
@@ -518,8 +510,7 @@ const AboutUs = () => {
                   />
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  From Lagos to Maiduguri, Calabar to Sokoto — our platform serves all 36 states
-                  and the FCT with localized admin support.
+                  {t('about_us.different.coverage.desc')}
                 </p>
               </div>
             </div>
@@ -531,10 +522,10 @@ const AboutUs = () => {
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Leadership</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('about_us.team.section_label')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Meet Our Team
+                {t('about_us.team.heading')}
               </h2>
               <ShareButton
                 section="Leadership Team"
@@ -543,7 +534,7 @@ const AboutUs = () => {
               />
             </div>
             <p className="text-gray-600">
-              Passionate professionals dedicated to transforming the Nigerian property experience.
+              {t('about_us.team.subtitle')}
             </p>
           </div>
 
@@ -577,11 +568,10 @@ const AboutUs = () => {
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to Find Your Perfect Home?
+              {t('about_us.cta.heading')}
             </h2>
             <p className="text-primary-100 text-lg mb-10 leading-relaxed">
-              Join over 50,000 Nigerians who trust RentalHub NG for their property needs.
-              Browse verified properties, connect with trusted landlords, and enjoy peace of mind.
+              {t('about_us.cta.subtitle')}
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
@@ -589,14 +579,14 @@ const AboutUs = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaBuilding />
-                Browse Properties
+                {t('about_us.cta.browse')}
               </Link>
               <Link
                 to="/register"
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-primary-500 text-white font-semibold rounded-xl shadow-lg hover:bg-primary-400 hover:scale-105 transition-all duration-300"
               >
                 <FaUsers />
-                Create Account
+                {t('about_us.cta.create_account')}
               </Link>
               <ShareButton
                 section="Call to Action"
@@ -613,10 +603,10 @@ const AboutUs = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-              Get In Touch
+              {t('about_us.contact.heading')}
             </h2>
             <p className="text-gray-600 mb-12 max-w-2xl mx-auto">
-              Have questions, feedback, or partnership ideas? We would love to hear from you.
+              {t('about_us.contact.subtitle')}
             </p>
             <div className="flex justify-center mb-10">
               <ShareButton
@@ -634,7 +624,7 @@ const AboutUs = () => {
                   <FaEnvelope className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Email us</p>
+                  <p className="text-sm text-gray-500">{t('about_us.contact.email_label')}</p>
                   <p className="text-gray-900 font-semibold">support@rentalhub.com.ng</p>
                 </div>
               </a>
@@ -646,7 +636,7 @@ const AboutUs = () => {
                   <FaPhoneAlt className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Call us</p>
+                  <p className="text-sm text-gray-500">{t('about_us.contact.call_label')}</p>
                   <p className="text-gray-900 font-semibold">+234 803 060 1238</p>
                 </div>
               </a>

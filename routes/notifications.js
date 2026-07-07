@@ -1,8 +1,9 @@
 const express = require('express');
-const { param } = require('express-validator');
+const { body, param } = require('express-validator');
 const router = express.Router();
 const { authenticate } = require('../config/middleware/auth');
 const validateRequest = require('../config/middleware/validateRequest');
+const db = require('../config/middleware/database');
 const {
   getUserNotifications,
   markAsRead,
@@ -14,6 +15,44 @@ const {
   registerDevice,
   unregisterDevice,
 } = require('../config/utils/pushNotificationService');
+
+const DEFAULT_NOTIFICATION_PREFERENCES = {
+  pushMessages: true,
+  pushPayments: true,
+  pushApplications: true,
+  pushBookings: true,
+  adminAlerts: true,
+};
+
+const ALLOWED_PREFERENCE_KEYS = Object.keys(DEFAULT_NOTIFICATION_PREFERENCES);
+
+const ensureNotificationPreferenceSchema = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS user_notification_preferences (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+};
+
+const normalizePreferences = (value = {}) =>
+  ALLOWED_PREFERENCE_KEYS.reduce((acc, key) => {
+    acc[key] =
+      typeof value[key] === 'boolean'
+        ? value[key]
+        : DEFAULT_NOTIFICATION_PREFERENCES[key];
+    return acc;
+  }, {});
+
+const pickPreferenceUpdates = (value = {}) =>
+  ALLOWED_PREFERENCE_KEYS.reduce((acc, key) => {
+    if (typeof value[key] === 'boolean') {
+      acc[key] = value[key];
+    }
+    return acc;
+  }, {});
 
 router.post('/devices', authenticate, async (req, res) => {
   try {
@@ -46,6 +85,68 @@ router.delete('/devices', authenticate, async (req, res) => {
     });
   }
 });
+
+router.get('/preferences', authenticate, async (req, res) => {
+  try {
+    await ensureNotificationPreferenceSchema();
+    const result = await db.query(
+      'SELECT preferences FROM user_notification_preferences WHERE user_id = $1',
+      [req.user.id]
+    );
+    const preferences = normalizePreferences(result.rows[0]?.preferences || {});
+    return res.json({ success: true, data: preferences });
+  } catch (error) {
+    req.logger?.error?.('Get notification preferences error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notification preferences',
+    });
+  }
+});
+
+router.patch(
+  '/preferences',
+  [
+    body('preferences').optional().isObject().withMessage('Preferences must be an object'),
+    ...ALLOWED_PREFERENCE_KEYS.map((key) => body(`preferences.${key}`).optional().isBoolean()),
+  ],
+  validateRequest,
+  authenticate,
+  async (req, res) => {
+    try {
+      await ensureNotificationPreferenceSchema();
+      const updates = pickPreferenceUpdates(req.body?.preferences || req.body || {});
+
+      const currentResult = await db.query(
+        'SELECT preferences FROM user_notification_preferences WHERE user_id = $1',
+        [req.user.id]
+      );
+      const current = normalizePreferences(currentResult.rows[0]?.preferences || {});
+      const next = normalizePreferences({ ...current, ...updates });
+
+      const result = await db.query(
+        `INSERT INTO user_notification_preferences (user_id, preferences)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id)
+         DO UPDATE SET preferences = EXCLUDED.preferences, updated_at = CURRENT_TIMESTAMP
+         RETURNING preferences`,
+        [req.user.id, JSON.stringify(next)]
+      );
+
+      return res.json({
+        success: true,
+        data: normalizePreferences(result.rows[0]?.preferences || next),
+        message: 'Notification preferences saved',
+      });
+    } catch (error) {
+      req.logger?.error?.('Update notification preferences error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update notification preferences',
+      });
+    }
+  }
+);
 
 // Get user notifications
 router.get('/', authenticate, async (req, res) => {

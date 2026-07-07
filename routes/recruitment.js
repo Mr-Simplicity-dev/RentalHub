@@ -166,7 +166,11 @@ router.get('/admin/applicants/:id', authenticate, recruitmentController.getAppli
 router.post('/admin/applicants/:id/approve', authenticate, [param('id').isInt(), body('note').optional().isString().trim().isLength({ max: 2000 })], validateRequest, recruitmentController.approveApplicant);
 router.post('/admin/applicants/:id/reject', authenticate, [param('id').isInt(), body('reason').optional().isString().trim().isLength({ max: 2000 })], validateRequest, recruitmentController.rejectApplicant);
 router.post('/admin/applicants/:id/shortlist', authenticate, [param('id').isInt()], validateRequest, recruitmentController.shortlistApplicant);
-router.post('/admin/applicants/bulk-process', authenticate, [body('applicant_ids').isArray({ min: 1 }), body('applicant_ids.*').isInt(), body('action').isString().trim().isIn(['approve', 'reject', 'shortlist'])], validateRequest, recruitmentController.bulkProcessApplicants);
+router.post('/admin/applicants/bulk-process', authenticate, [
+  body('application_ids').isArray({ min: 1 }),
+  body('application_ids.*').isInt(),
+  body('status').isString().trim().isIn(['under_review', 'shortlisted', 'approved', 'rejected', 'disqualified'])
+], validateRequest, recruitmentController.bulkProcessApplicants);
 
 // Interview management
 router.post('/admin/applicants/:id/set-interview', authenticate, [param('id').isInt(), body('interview_date').isString().trim().isLength({ min: 1 })], validateRequest, recruitmentController.setInterviewDate);
@@ -187,7 +191,10 @@ router.get('/admin/reports/area', authenticate, recruitmentController.generateAr
 router.get('/admin/analytics', authenticate, recruitmentController.getAnalytics);
 
 // Email documents
-router.post('/admin/email-documents', authenticate, [body('application_ids').isArray({ min: 1 }), body('application_ids.*').isInt()], validateRequest, recruitmentController.emailDocuments);
+router.post('/admin/email-documents', authenticate, [
+  body('application_ids').optional().isArray(),
+  body('application_ids.*').optional().isInt()
+], validateRequest, recruitmentController.emailDocuments);
 router.post('/admin/email-documents/auto', authenticate, [body('cycle_id').optional().isInt()], validateRequest, recruitmentController.autoEmailDocuments);
 
 // Questions management

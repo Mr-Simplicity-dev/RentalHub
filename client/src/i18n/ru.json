@@ -14,12 +14,10 @@
     "success": "╨Æ╤à╨╛╨┤ ╨▓╤ï╨┐╨╛╨╗╨╜╨╡╨╜ ╤â╤ü╨┐╨╡╤ê╨╜╨╛!",
     "failed": "╨₧╤ê╨╕╨▒╨║╨░ ╨▓╤à╨╛╨┤╨░"
   },
-
   "language": {
     "label": "╨»╨╖╤ï╨║",
     "select": "╨Æ╤ï╨▒╨╡╤Ç╨╕╤é╨╡ ╤Å╨╖╤ï╨║"
   },
-
   "common": {
     "close": "╨ù╨░╨║╤Ç╤ï╤é╤î",
     "processing": "╨₧╨▒╤Ç╨░╨▒╨╛╤é╨║╨░...",
@@ -31,7 +29,6 @@
     "note": "╨ƒ╤Ç╨╕╨╝╨╡╤ç╨░╨╜╨╕╨╡",
     "unknown": "╨¥╨╡╨╕╨╖╨▓╨╡╤ü╤é╨╜╨╛"
   },
-
   "ads": {
     "sponsored": "╨á╨╡╨║╨╗╨░╨╝╨░",
     "default_cta": "╨₧╤é╨║╤Ç╤ï╤é╤î",
@@ -43,9 +40,10 @@
     "link_copied": "╨í╤ü╤ï╨╗╨║╨░ ╨╛╨▒╤è╤Å╨▓╨╗╨╡╨╜╨╕╤Å ╤ü╨║╨╛╨┐╨╕╤Ç╨╛╨▓╨░╨╜╨░",
     "copy_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╤ü╨║╨╛╨┐╨╕╤Ç╨╛╨▓╨░╤é╤î ╤ü╤ü╤ï╨╗╨║╤â ╨╛╨▒╤è╤Å╨▓╨╗╨╡╨╜╨╕╤Å",
     "share_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╨╛╤é╨║╤Ç╤ï╤é╤î ╨╝╨╡╨╜╤Ä ╨╛╤é╨┐╤Ç╨░╨▓╨║╨╕",
-    "share_on": "╨ƒ╨╛╨┤╨╡╨╗╨╕╤é╤î╤ü╤Å ╨▓ {{platform}}"
+    "share_on": "╨ƒ╨╛╨┤╨╡╨╗╨╕╤é╤î╤ü╤Å ╨▓ {{platform}}",
+    "video_unavailable": "Видео недоступно",
+    "image_unavailable": "Изображение недоступно"
   },
-
   "platform_ratings": {
     "verified_experience": "╨ƒ╤Ç╨╛╨▓╨╡╤Ç╨╡╨╜╨╜╤ï╨╣ ╨╛╨┐╤ï╤é",
     "close_prompt": "╨ù╨░╨║╤Ç╤ï╤é╤î ╨╖╨░╨┐╤Ç╨╛╤ü ╨╛╤å╨╡╨╜╨║╨╕",
@@ -105,13 +103,11 @@
       "platform": "╨á╨░╤ü╤ü╨║╨░╨╢╨╕╤é╨╡ ╨╛ ╨▓╨░╤ê╨╡╨╝ ╨╛╨┐╤ï╤é╨╡ ╤ü RentalHub NG."
     }
   },
-
   "home": {
     "hero_title": "╨¥╨░╨╣╨┤╨╕╤é╨╡ ╨╕╨┤╨╡╨░╨╗╤î╨╜╤ï╨╣ ╨┤╨╛╨╝ ╨▓ ╨¥╨╕╨│╨╡╤Ç╨╕╨╕",
     "hero_subtitle": "╨ƒ╤Ç╨╛╤ü╨╝╨░╤é╤Ç╨╕╨▓╨░╨╣╤é╨╡ ╤é╤ï╤ü╤Å╤ç╨╕ ╨┐╤Ç╨╛╨▓╨╡╤Ç╨╡╨╜╨╜╤ï╤à ╨╛╨▒╤è╨╡╨║╤é╨╛╨▓ ╨▓╨╛ ╨▓╤ü╨╡╤à 36 ╤ê╤é╨░╤é╨░╤à + FCT",
     "search_placeholder": "╨ƒ╨╛╨╕╤ü╨║ ╨┐╨╛ ╨╝╨╡╤ü╤é╨╛╨┐╨╛╨╗╨╛╨╢╨╡╨╜╨╕╤Ä, ╤é╨╕╨┐╤â ╨╢╨╕╨╗╤î╤Å...",
     "search": "╨ƒ╨╛╨╕╤ü╨║",
-
     "features": {
       "verified": {
         "title": "╨ƒ╤Ç╨╛╨▓╨╡╤Ç╨╡╨╜╨╜╤ï╨╡ ╨╛╨▒╤è╨╡╨║╤é╤ï",
@@ -126,13 +122,11 @@
         "text": "╨ƒ╤Ç╨╛╤ü╤é╨░╤Å ╨┐╨╛╨┤╨░╤ç╨░ ╨╖╨░╤Å╨▓╨╛╨║ ╨╕ ╨╛╨┐╨╗╨░╤é╨░ ΓÇö ╨┐╨╛╨╗╨╜╨╛╤ü╤é╤î╤Ä ╨╛╨╜╨╗╨░╨╣╨╜"
       }
     },
-
     "featured_title": "╨á╨╡╨║╨╛╨╝╨╡╨╜╨┤╤â╨╡╨╝╤ï╨╡ ╨╛╨▒╤è╨╡╨║╤é╤ï",
     "view_all": "╨í╨╝╨╛╤é╤Ç╨╡╤é╤î ╨▓╤ü╨╡",
     "popular_locations": "╨ƒ╨╛╨┐╤â╨╗╤Å╤Ç╨╜╤ï╨╡ ╨╗╨╛╨║╨░╤å╨╕╨╕",
     "unknown": "╨¥╨╡╨╕╨╖╨▓╨╡╤ü╤é╨╜╨╛",
     "properties": "╨╛╨▒╤è╨╡╨║╤é╨╛╨▓",
-
     "cta_title": "╨ô╨╛╤é╨╛╨▓╤ï ╨╜╨░╨╣╤é╨╕ ╤ü╨▓╨╛╨╣ ╨╜╨╛╨▓╤ï╨╣ ╨┤╨╛╨╝?",
     "cta_text": "╨ƒ╤Ç╨╕╤ü╨╛╨╡╨┤╨╕╨╜╤Å╨╣╤é╨╡╤ü╤î ╨║ ╤é╤ï╤ü╤Å╤ç╨░╨╝ ╨╜╨╕╨│╨╡╤Ç╨╕╨╣╤å╨╡╨▓, ╨╜╨░╤ê╨╡╨┤╤ê╨╕╤à ╨╕╨┤╨╡╨░╨╗╤î╨╜╨╛╨╡ ╨╢╨╕╨╗╤î╤æ",
     "get_started": "╨¥╨░╤ç╨░╤é╤î",
@@ -154,7 +148,6 @@
     "whatsapp_greeting": "╨ù╨┤╤Ç╨░╨▓╤ü╤é╨▓╤â╨╣╤é╨╡! ╨¥╤â╨╢╨╜╨░ ╨┐╨╛╨╝╨╛╤ë╤î ╨▓ ╨┐╨╛╨╕╤ü╨║╨╡ ╨╢╨╕╨╗╤î╤Å?",
     "chat_with_us": "╨¥╨░╨┐╨╕╤ê╨╕╤é╨╡ ╨╜╨░╨╝ ╨▓ WhatsApp"
   },
-
   "footer": {
     "about": "╨¥╨░╨┤╤æ╨╢╨╜╨░╤Å ╨┐╨╗╨░╤é╤ä╨╛╤Ç╨╝╨░ ╨¥╨╕╨│╨╡╤Ç╨╕╨╕ ╨┤╨╗╤Å ╨┐╨╛╨╕╤ü╨║╨░ ╨╕ ╤Ç╨░╨╖╨╝╨╡╤ë╨╡╨╜╨╕╤Å ╨░╤Ç╨╡╨╜╨┤╨╜╨╛╨│╨╛ ╨╢╨╕╨╗╤î╤Å. ╨í╨╛╨╡╨┤╨╕╨╜╤Å╨╡╤é ╨░╤Ç╨╡╨╜╨┤╨╛╨┤╨░╤é╨╡╨╗╨╡╨╣ ╨╕ ╨░╤Ç╨╡╨╜╨┤╨░╤é╨╛╤Ç╨╛╨▓ ╨▓╨╛ ╨▓╤ü╨╡╤à 36 ╤ê╤é╨░╤é╨░╤à + FCT.",
     "quick_links": "╨æ╤ï╤ü╤é╤Ç╤ï╨╡ ╤ü╤ü╤ï╨╗╨║╨╕",
@@ -173,7 +166,6 @@
     "privacy": "╨ƒ╨╛╨╗╨╕╤é╨╕╨║╨░ ╨║╨╛╨╜╤ä╨╕╨┤╨╡╨╜╤å╨╕╨░╨╗╤î╨╜╨╛╤ü╤é╨╕",
     "terms": "╨ú╤ü╨╗╨╛╨▓╨╕╤Å ╨╕╤ü╨┐╨╛╨╗╤î╨╖╨╛╨▓╨░╨╜╨╕╤Å"
   },
-
   "header": {
     "browse": "╨₧╨▒╤è╨╡╨║╤é╤ï",
     "my_properties": "╨£╨╛╨╕ ╨╛╨▒╤è╨╡╨║╤é╤ï",
@@ -192,7 +184,6 @@
     "verification": "╨ƒ╤Ç╨╛╨▓╨╡╤Ç╨║╨░",
     "toggle_mobile_menu": "╨₧╤é╨║╤Ç╤ï╤é╤î ╨╕╨╗╨╕ ╨╖╨░╨║╤Ç╤ï╤é╤î ╨╝╨╛╨▒╨╕╨╗╤î╨╜╨╛╨╡ ╨╝╨╡╨╜╤Ä"
   },
-
   "applications": {
     "load_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╨╖╨░╨│╤Ç╤â╨╖╨╕╤é╤î ╨╖╨░╤Å╨▓╨║╨╕",
     "my_title": "╨£╨╛╨╕ ╨╖╨░╤Å╨▓╨║╨╕",
@@ -206,7 +197,6 @@
       "rejected": "╨₧╤é╨║╨╗╨╛╨╜╨╡╨╜╨╛"
     }
   },
-
   "add_property": {
     "title": "╨ö╨╛╨▒╨░╨▓╨╕╤é╤î ╨╛╨▒╤è╨╡╨║╤é",
     "required": "╨ƒ╨╛╨╢╨░╨╗╤â╨╣╤ü╤é╨░, ╨╖╨░╨┐╨╛╨╗╨╜╨╕╤é╨╡ ╨▓╤ü╨╡ ╨╛╨▒╤Å╨╖╨░╤é╨╡╨╗╤î╨╜╤ï╨╡ ╨┐╨╛╨╗╤Å",
@@ -217,10 +207,8 @@
     "back": "╨¥╨░╨╖╨░╨┤",
     "submitting": "╨₧╤é╨┐╤Ç╨░╨▓╨║╨░...",
     "publish": "╨ƒ╤Ç╨╛╨▓╨╡╤Ç╨╕╤é╤î ╨╕ ╨╛╨┐╤â╨▒╨╗╨╕╨║╨╛╨▓╨░╤é╤î",
-
     "verify_title": "╨Æ╨▓╨╡╨┤╨╕╤é╨╡ ╨║╨╛╨┤ ╨┐╨╛╨┤╤é╨▓╨╡╤Ç╨╢╨┤╨╡╨╜╨╕╤Å",
     "verify_text": "╨Æ╨▓╨╡╨┤╨╕╤é╨╡ 6-╨╖╨╜╨░╤ç╨╜╤ï╨╣ ╨║╨╛╨┤, ╨┐╤Ç╨╡╨┤╨╛╤ü╤é╨░╨▓╨╗╨╡╨╜╨╜╤ï╨╣ ╨▓╨░╨╝, ╤ç╤é╨╛╨▒╤ï ╨░╨║╤é╨╕╨▓╨╕╤Ç╨╛╨▓╨░╤é╤î ╨╛╨▒╤è╤Å╨▓╨╗╨╡╨╜╨╕╨╡.",
-
     "form": {
       "title": "╨¥╨░╨╖╨▓╨░╨╜╨╕╨╡ ╨╛╨▒╤è╨╡╨║╤é╨░ *",
       "description": "╨₧╨┐╨╕╤ü╨░╨╜╨╕╨╡",
@@ -237,45 +225,36 @@
       "available": "╨ö╨╛╤ü╤é╤â╨┐╨╜╨╛"
     }
   },
-
   "dashboard": {
     "welcome": "╨í ╨▓╨╛╨╖╨▓╤Ç╨░╤ë╨╡╨╜╨╕╨╡╨╝, {{name}}!",
     "tenant_subtitle": "╨¥╨░╨╣╨┤╨╕╤é╨╡ ╨╕╨┤╨╡╨░╨╗╤î╨╜╤ï╨╣ ╨┤╨╛╨╝",
     "landlord_subtitle": "╨ú╨┐╤Ç╨░╨▓╨╗╤Å╨╣╤é╨╡ ╤ü╨▓╨╛╨╕╨╝╨╕ ╨╛╨▒╤è╨╡╨║╤é╨░╨╝╨╕",
-
     "verify_title": "╨ù╨░╨▓╨╡╤Ç╤ê╨╕╤é╨╡ ╨┐╤Ç╨╛╨▓╨╡╤Ç╨║╤â",
     "verify_text": "╨ƒ╨╛╨╢╨░╨╗╤â╨╣╤ü╤é╨░, ╨╖╨░╨▓╨╡╤Ç╤ê╨╕╤é╨╡ ╨┐╤Ç╨╛╨▓╨╡╤Ç╨║╤â ╨╗╨╕╤ç╨╜╨╛╤ü╤é╨╕, ╤ç╤é╨╛╨▒╤ï ╨┐╨╛╨╗╤â╤ç╨╕╤é╤î ╨┤╨╛╤ü╤é╤â╨┐ ╨║╨╛ ╨▓╤ü╨╡╨╝ ╤ä╤â╨╜╨║╤å╨╕╤Å╨╝.",
     "verify_action": "╨ù╨░╨▓╨╡╤Ç╤ê╨╕╤é╤î ╨┐╤Ç╨╛╨▓╨╡╤Ç╨║╤â",
-
     "subscribe_title": "╨₧╤ä╨╛╤Ç╨╝╨╕╤é╨╡ ╨┐╨╛╨┤╨┐╨╕╤ü╨║╤â ╨┤╨╗╤Å ╨┤╨╛╤ü╤é╤â╨┐╨░",
     "subscribe_text": "╨ƒ╨╛╨┤╨┐╨╕╤ü╨║╨░ ╨┐╨╛╨╖╨▓╨╛╨╗╤Å╨╡╤é ╨▓╨╕╨┤╨╡╤é╤î ╨┐╨╛╨╗╨╜╤ï╨╡ ╨┤╨░╨╜╨╜╤ï╨╡ ╨╛╨▒╤è╨╡╨║╤é╨╛╨▓ ╨╕ ╤ü╨▓╤Å╨╖╤ï╨▓╨░╤é╤î╤ü╤Å ╤ü ╨░╤Ç╨╡╨╜╨┤╨╛╨┤╨░╤é╨╡╨╗╤Å╨╝╨╕.",
     "subscribe_action": "╨ƒ╨╛╤ü╨╝╨╛╤é╤Ç╨╡╤é╤î ╤é╨░╤Ç╨╕╤ä╤ï",
-
     "saved": "╨í╨╛╤à╤Ç╨░╨╜╤æ╨╜╨╜╤ï╨╡ ╨╛╨▒╤è╨╡╨║╤é╤ï",
     "total_apps": "╨Æ╤ü╨╡╨│╨╛ ╨╖╨░╤Å╨▓╨╛╨║",
     "pending_apps": "╨₧╨╢╨╕╨┤╨░╤Ä╤ë╨╕╨╡ ╨╖╨░╤Å╨▓╨║╨╕",
     "approved_apps": "╨₧╨┤╨╛╨▒╤Ç╨╡╨╜╨╜╤ï╨╡ ╨╖╨░╤Å╨▓╨║╨╕",
-
     "total_props": "╨Æ╤ü╨╡╨│╨╛ ╨╛╨▒╤è╨╡╨║╤é╨╛╨▓",
     "available_props": "╨ö╨╛╤ü╤é╤â╨┐╨╜╤ï╨╡ ╨╛╨▒╤è╨╡╨║╤é╤ï",
     "unread": "╨¥╨╡╨┐╤Ç╨╛╤ç╨╕╤é╨░╨╜╨╜╤ï╨╡ ╤ü╨╛╨╛╨▒╤ë╨╡╨╜╨╕╤Å",
-
     "recent": "╨ƒ╨╛╤ü╨╗╨╡╨┤╨╜╨╕╨╡ ╨┤╨╡╨╣╤ü╤é╨▓╨╕╤Å",
     "no_recent": "╨¥╨╡╤é ╨╜╨╡╨┤╨░╨▓╨╜╨╕╤à ╨┤╨╡╨╣╤ü╤é╨▓╨╕╨╣",
     "user": "╨ƒ╨╛╨╗╤î╨╖╨╛╨▓╨░╤é╨╡╨╗╤î",
-
     "activity_application": "╨ù╨░╤Å╨▓╨║╨░ {{status}} ╨┤╨╗╤Å {{title}}",
     "activity_message": "╨í╨╛╨╛╨▒╤ë╨╡╨╜╨╕╨╡ ╨╛╤é {{name}}",
     "activity_review": "╨¥╨╛╨▓╤ï╨╣ ╨╛╤é╨╖╤ï╨▓ ({{stars}} ╨╖╨▓╤æ╨╖╨┤) ╨┤╨╗╤Å {{title}}",
     "activity_generic": "╨É╨║╤é╨╕╨▓╨╜╨╛╤ü╤é╤î",
-
     "qa_browse": "╨ƒ╤Ç╨╛╤ü╨╝╨╛╤é╤Ç╨╡╤é╤î ╨╛╨▒╤è╨╡╨║╤é╤ï",
     "qa_browse_desc": "╨¥╨░╨╣╨┤╨╕╤é╨╡ ╨╕╨┤╨╡╨░╨╗╤î╨╜╤ï╨╣ ╨┤╨╛╨╝",
     "qa_apps": "╨£╨╛╨╕ ╨╖╨░╤Å╨▓╨║╨╕",
     "qa_apps_desc": "╨₧╤é╤ü╨╗╨╡╨╢╨╕╨▓╨░╨╣╤é╨╡ ╨╖╨░╤Å╨▓╨║╨╕",
     "qa_messages": "╨í╨╛╨╛╨▒╤ë╨╡╨╜╨╕╤Å",
     "qa_messages_desc": "╨º╨░╤é ╤ü ╨░╤Ç╨╡╨╜╨┤╨╛╨┤╨░╤é╨╡╨╗╤Å╨╝╨╕",
-
     "qa_add": "╨ö╨╛╨▒╨░╨▓╨╕╤é╤î ╨╛╨▒╤è╨╡╨║╤é",
     "qa_add_desc": "╨á╨░╨╖╨╝╨╡╤ü╤é╨╕╤é╤î ╨╜╨╛╨▓╤ï╨╣ ╨╛╨▒╤è╨╡╨║╤é",
     "qa_my_props": "╨£╨╛╨╕ ╨╛╨▒╤è╨╡╨║╤é╤ï",
@@ -283,7 +262,6 @@
     "qa_apps_landlord": "╨ù╨░╤Å╨▓╨║╨╕",
     "qa_apps_landlord_desc": "╨ƒ╤Ç╨╛╤ü╨╝╨╛╤é╤Ç ╨╖╨░╤Å╨▓╨╛╨║ ╨░╤Ç╨╡╨╜╨┤╨░╤é╨╛╤Ç╨╛╨▓"
   },
-
   "profile": {
     "title": "╨£╨╛╨╣ ╨┐╤Ç╨╛╤ä╨╕╨╗╤î",
     "account_title": "╨ÿ╨╜╤ä╨╛╤Ç╨╝╨░╤å╨╕╤Å ╨╛╨▒ ╨░╨║╨║╨░╤â╨╜╤é╨╡",
@@ -291,11 +269,9 @@
     "email": "Email",
     "phone": "╨ó╨╡╨╗╨╡╤ä╨╛╨╜",
     "role": "╨á╨╛╨╗╤î",
-
     "verify_title": "╨ƒ╤Ç╨╛╨▓╨╡╤Ç╨║╨░ ╨╗╨╕╤ç╨╜╨╛╤ü╤é╨╕",
     "verified": "╨Æ╨░╤ê╨░ ╨╗╨╕╤ç╨╜╨╛╤ü╤é╤î ╨┐╨╛╨┤╤é╨▓╨╡╤Ç╨╢╨┤╨╡╨╜╨░ Γ£ö",
     "verify_text": "╨ù╨░╨│╤Ç╤â╨╖╨╕╤é╨╡ ╤ä╨╛╤é╨╛╨│╤Ç╨░╤ä╨╕╤Ä ╨┐╨░╤ü╨┐╨╛╤Ç╤é╨░ ╨┤╨╗╤Å ╨┐╤Ç╨╛╨▓╨╡╤Ç╨║╨╕ ╨╗╨╕╤ç╨╜╨╛╤ü╤é╨╕.",
-
     "select_image": "╨ƒ╨╛╨╢╨░╨╗╤â╨╣╤ü╤é╨░, ╨▓╤ï╨▒╨╡╤Ç╨╕╤é╨╡ ╨╕╨╖╨╛╨▒╤Ç╨░╨╢╨╡╨╜╨╕╨╡",
     "upload": "╨ù╨░╨│╤Ç╤â╨╖╨╕╤é╤î ╨┤╨╛╨║╤â╨╝╨╡╨╜╤é",
     "uploading": "╨ù╨░╨│╤Ç╤â╨╖╨║╨░...",
@@ -318,7 +294,6 @@
     "preview_hint": "╨ú╨▒╨╡╨┤╨╕╤é╨╡╤ü╤î, ╤ç╤é╨╛ ╨╗╨╕╤å╨╛ ╤ç╨╡╤é╨║╨╛╨╡ ╨╕ ╨┐╨╛╨╗╨╜╨╛╤ü╤é╤î╤Ä ╨▓╨╕╨┤╨╜╨╛ ╨┐╨╡╤Ç╨╡╨┤ ╨╖╨░╨│╤Ç╤â╨╖╨║╨╛╨╣.",
     "camera_guide": "╨ö╨╡╤Ç╨╢╨╕╤é╨╡ ╨╗╨╕╤å╨╛ ╨▓╨╜╤â╤é╤Ç╨╕ ╤Ç╨░╨╝╨║╨╕ ╨╕ ╨╖╨░╨▓╨╡╤Ç╤ê╨╕╤é╨╡ ╨▓╤ü╨╡ ╨┐╤Ç╨╛╨▓╨╡╤Ç╨║╨╕."
   },
-
   "property_types": {
     "apartment": "╨Ü╨▓╨░╤Ç╤é╨╕╤Ç╨░",
     "house": "╨ö╨╛╨╝",
@@ -328,14 +303,12 @@
     "flat": "╨Ü╨▓╨░╤Ç╤é╨╕╤Ç╨░",
     "room": "╨Ü╨╛╨╝╨╜╨░╤é╨░"
   },
-
   "properties": {
     "title": "╨ƒ╤Ç╨╛╤ü╨╝╨╛╤é╤Ç ╨╛╨▒╤è╨╡╨║╤é╨╛╨▓",
     "featured_title": "╨á╨╡╨║╨╛╨╝╨╡╨╜╨┤╤â╨╡╨╝╤ï╨╡ ╨╛╨▒╤è╨╡╨║╤é╤ï",
     "loading": "╨ù╨░╨│╤Ç╤â╨╖╨║╨░...",
     "found": "╨¥╨░╨╣╨┤╨╡╨╜╨╛ ╨╛╨▒╤è╨╡╨║╤é╨╛╨▓: {{count}}",
     "load_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╨╖╨░╨│╤Ç╤â╨╖╨╕╤é╤î ╨╛╨▒╤è╨╡╨║╤é╤ï",
-
     "saved_favorite": "╨₧╨▒╤è╨╡╨║╤é ╨┤╨╛╨▒╨░╨▓╨╗╨╡╨╜ ╨▓ ╨╕╨╖╨▒╤Ç╨░╨╜╨╜╨╛╨╡",
     "removed_favorite": "╨₧╨▒╤è╨╡╨║╤é ╤â╨┤╨░╨╗╤æ╨╜ ╨╕╨╖ ╨╕╨╖╨▒╤Ç╨░╨╜╨╜╨╛╨│╨╛",
     "save_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╤ü╨╛╤à╤Ç╨░╨╜╨╕╤é╤î ╨╛╨▒╤è╨╡╨║╤é",
@@ -378,11 +351,9 @@
     "request_lga_required": "╨Æ╤ï╨▒╨╡╤Ç╨╕╤é╨╡ LGA, ╤ç╤é╨╛╨▒╤ï ╤Ç╨░╤ü╤ü╤ç╨╕╤é╨░╤é╤î ╤ü╤é╨╛╨╕╨╝╨╛╤ü╤é╤î ╨╖╨░╨┐╤Ç╨╛╤ü╨░",
     "request_success": "╨ù╨░╨┐╤Ç╨╛╤ü ╨╛╤é╨┐╤Ç╨░╨▓╨╗╨╡╨╜. Support admin ╨┐╤Ç╨╛╨▓╨╡╤Ç╨╕╤é ╨╡╨│╨╛ ╨┤╨╛ ╨╜╨░╤ç╨░╨╗╨░ ╨┐╨╛╨╕╤ü╨║╨░ ╨║╨╛╨╝╨░╨╜╨┤╨╛╨╣ ╤ê╤é╨░╤é╨░.",
     "request_submit_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╨╛╤é╨┐╤Ç╨░╨▓╨╕╤é╤î ╨╖╨░╨┐╤Ç╨╛╤ü ╤â╨▓╨╡╨┤╨╛╨╝╨╗╨╡╨╜╨╕╤Å",
-
     "prev": "ΓåÉ ╨¥╨░╨╖╨░╨┤",
     "next": "╨Æ╨┐╨╡╤Ç╤æ╨┤ ΓåÆ"
   },
-
   "property_detail": {
     "load_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╨╖╨░╨│╤Ç╤â╨╖╨╕╤é╤î ╨┤╨╡╤é╨░╨╗╨╕ ╨╛╨▒╤è╨╡╨║╤é╨░",
     "submit_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╨╛╤é╨┐╤Ç╨░╨▓╨╕╤é╤î ╨╖╨░╤Å╨▓╨║╤â",
@@ -441,13 +412,11 @@
     "unlock_start_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╨╜╨░╤ç╨░╤é╤î ╨╛╨┐╨╗╨░╤é╤â ╨┤╨╛╤ü╤é╤â╨┐╨░",
     "complete_payment": "╨ù╨░╨▓╨╡╤Ç╤ê╨╕╤é╨╡ ╨╛╨┐╨╗╨░╤é╤â ╨┐╨╛ ╨┐╤Ç╨╡╨┤╨╛╤ü╤é╨░╨▓╨╗╨╡╨╜╨╜╤ï╨╝ ╨┤╨░╨╜╨╜╤ï╨╝"
   },
-
   "saved_properties": {
     "title": "╨í╨╛╤à╤Ç╨░╨╜╤æ╨╜╨╜╤ï╨╡ ╨╛╨▒╤è╨╡╨║╤é╤ï",
     "empty": "╨Æ╤ï ╨┐╨╛╨║╨░ ╨╜╨╡ ╤ü╨╛╤à╤Ç╨░╨╜╨╕╨╗╨╕ ╨╛╨▒╤è╨╡╨║╤é╤ï",
     "load_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╨╖╨░╨│╤Ç╤â╨╖╨╕╤é╤î ╤ü╨╛╤à╤Ç╨░╨╜╤æ╨╜╨╜╤ï╨╡ ╨╛╨▒╤è╨╡╨║╤é╤ï"
   },
-
   "my_properties": {
     "title": "╨£╨╛╨╕ ╨╛╨▒╤è╨╡╨║╤é╤ï",
     "managed_title": "╨ú╨┐╤Ç╨░╨▓╨╗╤Å╨╡╨╝╤ï╨╡ ╨╛╨▒╤è╨╡╨║╤é╤ï",
@@ -459,7 +428,6 @@
     "empty_agent": "╨í╨╡╨╣╤ç╨░╤ü ╨╜╨╡╤é ╨╛╨▒╤è╨╡╨║╤é╨╛╨▓ ╤â ╨╜╨░╨╖╨╜╨░╤ç╨╡╨╜╨╜╨╛╨│╨╛ ╨▓╨░╨╝ ╨░╤Ç╨╡╨╜╨┤╨╛╨┤╨░╤é╨╡╨╗╤Å.",
     "load_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╨╖╨░╨│╤Ç╤â╨╖╨╕╤é╤î ╨╛╨▒╤è╨╡╨║╤é╤ï"
   },
-
   "messages": {
     "title": "╨Æ╨╜╤â╤é╤Ç╨╡╨╜╨╜╨╕╨╡ ╤ü╨╛╨╛╨▒╤ë╨╡╨╜╨╕╤Å",
     "conversations": "╨á╨░╨╖╨│╨╛╨▓╨╛╤Ç╤ï",
@@ -529,33 +497,32 @@
       "approved": "╨₧╨┤╨╛╨▒╤Ç╨╡╨╜╨╛",
       "rejected": "╨₧╤é╨║╨╗╨╛╨╜╨╡╨╜╨╛"
     },
-      "whatsapp": {
-        "title": "Помощник RentalHub",
-        "subtitle": "Автоответчик \u2022 FAQ бот",
-        "bot_greeting": "Привет! Я виртуальный помощник RentalHub. Чем могу помочь?",
-        "greeting_bubble": "Есть вопросы? Я здесь, чтобы помочь!",
-        "open": "Открыть WhatsApp помощника",
-        "close": "Закрыть",
-        "input_placeholder": "Введите ваш вопрос...",
-        "send": "Отправить",
-        "bot_label": "Бот",
-        "no_match": "Не уверен, что знаю ответ. Хотите поговорить с живым агентом?",
-        "talk_to_agent": "Поговорить с агентом \u2192",
-        "connected": "Подключено к агенту в WhatsApp",
-        "connected_sub": "Продолжите разговор там",
-        "suggested": "Предлагаемые вопросы:",
-        "qr_find": "Как найти недвижимость?",
-        "qr_list": "Как разместить объявление?",
-        "qr_legal": "Расскажите о юр. защите",
-        "qr_payment": "Как работают платежи?",
-        "anything_else": "Могу я еще чем-нибудь помочь?",
-        "menu_prompt": "Конечно! О чем вы хотите узнать?",
-        "menu_btn": "Меню",
-        "dismissed": "Хорошо! Возвращайтесь в любое время.",
-        "youre_welcome": "Пожалуйста! Рад помочь."
-      },
-
-      "widget": {
+    "whatsapp": {
+      "title": "Помощник RentalHub",
+      "subtitle": "Автоответчик • FAQ бот",
+      "bot_greeting": "Привет! Я виртуальный помощник RentalHub. Чем могу помочь?",
+      "greeting_bubble": "Есть вопросы? Я здесь, чтобы помочь!",
+      "open": "Открыть WhatsApp помощника",
+      "close": "Закрыть",
+      "input_placeholder": "Введите ваш вопрос...",
+      "send": "Отправить",
+      "bot_label": "Бот",
+      "no_match": "Не уверен, что знаю ответ. Хотите поговорить с живым агентом?",
+      "talk_to_agent": "Поговорить с агентом →",
+      "connected": "Подключено к агенту в WhatsApp",
+      "connected_sub": "Продолжите разговор там",
+      "suggested": "Предлагаемые вопросы:",
+      "qr_find": "Как найти недвижимость?",
+      "qr_list": "Как разместить объявление?",
+      "qr_legal": "Расскажите о юр. защите",
+      "qr_payment": "Как работают платежи?",
+      "anything_else": "Могу я еще чем-нибудь помочь?",
+      "menu_prompt": "Конечно! О чем вы хотите узнать?",
+      "menu_btn": "Меню",
+      "dismissed": "Хорошо! Возвращайтесь в любое время.",
+      "youre_welcome": "Пожалуйста! Рад помочь."
+    },
+    "widget": {
       "support_title": "╨ƒ╨╛╨┤╨┤╨╡╤Ç╨╢╨║╨░ RentalHub",
       "reply_minutes": "╨£╤ï ╨╛╨▒╤ï╤ç╨╜╨╛ ╨╛╤é╨▓╨╡╤ç╨░╨╡╨╝ ╨▓ ╤é╨╡╤ç╨╡╨╜╨╕╨╡ ╨╜╨╡╤ü╨║╨╛╨╗╤î╨║╨╕╤à ╨╝╨╕╨╜╤â╤é",
       "close": "╨ù╨░╨║╤Ç╤ï╤é╤î",
@@ -615,5 +582,710 @@
       "create_failed": "╨¥╨╡ ╤â╨┤╨░╨╗╨╛╤ü╤î ╤ü╨╛╨╖╨┤╨░╤é╤î ╤é╨╕╨║╨╡╤é",
       "close_btn": "╨ù╨░╨║╤Ç╤ï╤é╤î"
     }
+  },
+  "about_us": {
+    "hero": {
+      "title_before": "About ",
+      "title_highlight": "RentalHub NG",
+      "subtitle": "Nigeria's most trusted property technology platform — connecting tenants, landlords, agents, and legal professionals across all 36 states and the Federal Capital Territory.",
+      "cta_browse": "Browse Properties",
+      "cta_join": "Join RentalHub NG"
+    },
+    "mission": {
+      "section_label": "Our Mission",
+      "heading": "Transforming Nigeria's Rental Landscape",
+      "paragraph_1": "At RentalHub NG, we believe everyone deserves a safe, transparent, and hassle-free experience when finding a home. Our mission is to eliminate the friction, fraud, and frustration from the Nigerian rental market.",
+      "paragraph_2": "By combining technology with rigorous verification processes, legal support, and nationwide coverage, we empower tenants to find verified properties and landlords to connect with qualified tenants — all in one trusted ecosystem.",
+      "badge_verified": "Verified properties",
+      "badge_secure": "Secure payments",
+      "badge_legal": "Legal protection",
+      "badge_dispute": "Dispute resolution",
+      "image_text": "10,000+ Properties",
+      "image_subtext": "Across all 36 states + FCT"
+    },
+    "journey": {
+      "section_label": "Our Journey",
+      "heading": "From Vision to Reality",
+      "subtitle": "Every great platform starts with a simple idea. Here is the story of how RentalHub NG grew from a vision into Nigeria's most trusted property marketplace."
+    },
+    "values": {
+      "section_label": "What We Stand For",
+      "heading": "Our Core Values",
+      "subtitle": "These principles guide every decision we make and every feature we build."
+    },
+    "different": {
+      "section_label": "Why Choose Us",
+      "heading": "What Makes RentalHub NG Different",
+      "subtitle": "We don't just list properties — we build an end-to-end ecosystem for secure, transparent property transactions.",
+      "ecosystem": {
+        "title": "Verified Ecosystem",
+        "desc": "Every landlord, tenant, and property goes through identity verification. Our superb verification system ensures only genuine participants on the platform."
+      },
+      "legal": {
+        "title": "Legal Support & Dispute Resolution",
+        "desc": "Access to qualified lawyers, evidence verification, and structured dispute resolution processes to protect all parties."
+      },
+      "marketplace": {
+        "title": "Full-Service Marketplace",
+        "desc": "Beyond rentals, we offer fumigation/cleaning services, transportation support, and virtual property tours — all in one platform."
+      },
+      "coverage": {
+        "title": "Nationwide Coverage",
+        "desc": "From Lagos to Maiduguri, Calabar to Sokoto — our platform serves all 36 states and the FCT with localized admin support."
+      }
+    },
+    "team": {
+      "section_label": "Leadership",
+      "heading": "Meet Our Team",
+      "subtitle": "Passionate professionals dedicated to transforming the Nigerian property experience.",
+      "member_1": {
+        "role": "Founder & CEO",
+        "bio": "With over 15 years in real estate and technology, Zubair leads RentalHub NG with a vision to revolutionize property access in Nigeria."
+      },
+      "member_2": {
+        "role": "Chief Operating Officer",
+        "bio": "Chioma brings operational excellence from her background in property management and large-scale logistics coordination."
+      },
+      "member_3": {
+        "role": "Chief Technology Officer",
+        "bio": "Emeka architects the RentalHub NG platform, driving innovation in property tech, digital verification, and secure transactions."
+      },
+      "member_4": {
+        "role": "Head of Legal Services",
+        "bio": "A seasoned legal professional, Fatima ensures that all property transactions comply with Nigerian law and protects all parties involved."
+      }
+    },
+    "milestone": {
+      "year_2020": "RentalHub NG was founded with a vision to transform the Nigerian rental market.",
+      "year_2021": "Launched property listing framework to onboard landlords across Lagos and Abuja.",
+      "year_2022": "Expanded to all 36 states + FCT; introduced identity verification.",
+      "year_2023": "Launched legal support services, dispute resolution, and fumigation/cleaning marketplace.",
+      "year_2024": "Introduced transportation services, evidence verification, and virtual property tours.",
+      "year_2025": "Reached 50,000+ active users; launched mobile app with real-time chat and notifications."
+    },
+    "stats": {
+      "properties_listed": "Properties Listed",
+      "active_users": "Active Users",
+      "states_covered": "States Covered",
+      "verified_landlords": "Verified Landlords"
+    },
+    "value": {
+      "1": {
+        "title": "Trust & Verification",
+        "desc": "Every landlord, property, and agent undergoes a rigorous verification process to ensure your peace of mind."
+      },
+      "2": {
+        "title": "Fairness & Transparency",
+        "desc": "Clear pricing, no hidden fees, and honest communication between all parties on our platform."
+      },
+      "3": {
+        "title": "Community First",
+        "desc": "We build a supportive ecosystem where tenants, landlords, agents, and legal professionals thrive together."
+      },
+      "4": {
+        "title": "Nationwide Reach",
+        "desc": "From bustling Lagos to serene rural areas, we connect people with homes across every region of Nigeria."
+      },
+      "5": {
+        "title": "Integrity",
+        "desc": "We uphold the highest ethical standards, ensuring every transaction and interaction is conducted with honesty."
+      },
+      "6": {
+        "title": "Innovation",
+        "desc": "Leveraging cutting-edge technology including property verification, digital evidence, and legal support tools."
+      }
+    },
+    "cta": {
+      "heading": "Ready to Find Your Perfect Home?",
+      "subtitle": "Join over 50,000 Nigerians who trust RentalHub NG for their property needs. Browse verified properties, connect with trusted landlords, and enjoy peace of mind.",
+      "browse": "Browse Properties",
+      "create_account": "Create Account"
+    },
+    "contact": {
+      "heading": "Get In Touch",
+      "subtitle": "Have questions, feedback, or partnership ideas? We would love to hear from you.",
+      "email_label": "Email us",
+      "call_label": "Call us"
+    }
+  },
+  "forgot_password": {
+    "title": "Forgot Password",
+    "email_placeholder": "Email address",
+    "sending": "Sending...",
+    "send_reset_link": "Send Reset Link",
+    "toast": {
+      "success": "Reset link sent to your email",
+      "error": "Failed to send reset link"
+    }
+  },
+  "reset_password": {
+    "title": "Reset Password",
+    "new_password_placeholder": "New password",
+    "resetting": "Resetting...",
+    "reset_button": "Reset",
+    "toast": {
+      "success": "Password reset successful",
+      "error": "Reset failed"
+    }
+  },
+  "not_found": {
+    "title": "Page Not Found",
+    "message": "The page you're looking for doesn't exist or has been moved.",
+    "go_home": "Go Home",
+    "back": "Back"
+  },
+  "mobile_app": {
+    "title": "RentalHub Mobile App",
+    "subtitle": "Manage your rentals, chat with landlords and tenants, and access legal support — all from your phone.",
+    "feature_instant_alerts": "Instant Alerts",
+    "feature_instant_alerts_desc": "Get notified when new properties match your search criteria.",
+    "feature_in_app_chat": "In-App Chat",
+    "feature_in_app_chat_desc": "Message landlords and tenants directly from your phone.",
+    "feature_browse_properties": "Browse Properties",
+    "feature_browse_properties_desc": "Search, filter, and save your favourite listings on the go.",
+    "feature_legal_support": "Legal Support",
+    "feature_legal_support_desc": "Submit legal assistance requests and track case progress.",
+    "features_heading": "Everything in the app",
+    "apk_heading": "APK direct download",
+    "apk_desc": "Download the APK and install it manually on your Android device.",
+    "apk_download_button": "Download RentalHub.apk",
+    "download_android": "Download for Android",
+    "download_ios": "iOS (Coming Soon)"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "body": "Your data protection and privacy details go here."
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "body": "These terms govern use of the platform. Full legal text goes here."
+  },
+  "list_property": {
+    "hero": {
+      "title": "List Your Property on RentalHub NG",
+      "subtitle": "Reach thousands of verified tenants across Nigeria. List your property in minutes and start receiving qualified applications from genuine tenants.",
+      "list_now": "List Your Property Now",
+      "view_pricing": "View Pricing Plans"
+    },
+    "stat_1": {
+      "label": "Properties Listed"
+    },
+    "stat_2": {
+      "label": "Active Tenants"
+    },
+    "stat_3": {
+      "label": "States Covered"
+    },
+    "stat_4": {
+      "label": "Landlords & Agents"
+    },
+    "how_it_works": {
+      "badge": "Simple Process",
+      "title": "How It Works",
+      "subtitle": "Getting your property listed and in front of qualified tenants takes just a few steps."
+    },
+    "benefits": {
+      "badge": "Why List With Us",
+      "title": "Benefits of Listing on RentalHub NG",
+      "subtitle": "Thousands of landlords and agents already trust us. Here is why."
+    },
+    "step_1": {
+      "title": "Create Your Account",
+      "desc": "Sign up as a landlord or agent and complete identity verification to get started."
+    },
+    "step_2": {
+      "title": "Add Your Property",
+      "desc": "Fill in property details, upload high-quality photos, and set your rental price."
+    },
+    "step_3": {
+      "title": "Get Verified",
+      "desc": "Your property undergoes verification to ensure authenticity. This builds trust with tenants."
+    },
+    "step_4": {
+      "title": "Connect with Tenants",
+      "desc": "Receive applications, chat with prospective tenants, and manage bookings — all from your dashboard."
+    },
+    "benefit_1": {
+      "title": "Verified Tenant Pool",
+      "desc": "All prospective tenants go through NIN-linked identity verification, so you know who you are dealing with."
+    },
+    "benefit_2": {
+      "title": "Massive Exposure",
+      "desc": "Your properties reach thousands of active tenants searching across all 36 states + FCT."
+    },
+    "benefit_3": {
+      "title": "Smart Analytics",
+      "desc": "Track views, inquiries, and applications in real-time with your landlord dashboard."
+    },
+    "benefit_4": {
+      "title": "Easy Management",
+      "desc": "Manage all your properties, applications, and tenant communication from one central dashboard."
+    },
+    "benefit_5": {
+      "title": "Secure Payments",
+      "desc": "Process rental applications, deposits, and subscription payments securely through the platform."
+    },
+    "benefit_6": {
+      "title": "Dispute Protection",
+      "desc": "Access legal support and structured dispute resolution if any issues arise with tenants."
+    },
+    "plan": {
+      "free": {
+        "name": "Free",
+        "period": "per listing",
+        "feature_1": "List 1 property",
+        "feature_2": "Basic property details",
+        "feature_3": "Up to 3 photos",
+        "feature_4": "Standard visibility",
+        "feature_5": "Email support",
+        "cta": "Get Started Free"
+      },
+      "basic": {
+        "name": "Basic",
+        "period": "per listing / year",
+        "feature_1": "List up to 5 properties",
+        "feature_2": "Detailed property description",
+        "feature_3": "Up to 10 photos",
+        "feature_4": "Priority visibility",
+        "feature_5": "Basic analytics",
+        "feature_6": "Email & WhatsApp support",
+        "cta": "Choose Basic"
+      },
+      "premium": {
+        "name": "Premium",
+        "period": "per listing / year",
+        "feature_1": "Unlimited properties",
+        "feature_2": "Premium property listing",
+        "feature_3": "Up to 30 photos + video tour",
+        "feature_4": "Featured badge & top placement",
+        "feature_5": "Advanced analytics dashboard",
+        "feature_6": "Dedicated agent support",
+        "feature_7": "Legal support access",
+        "cta": "Choose Premium"
+      },
+      "popular_badge": "Most Popular"
+    },
+    "testimonial_1": {
+      "role": "Landlord, Lagos",
+      "text": "I listed my three-bedroom flat on RentalHub NG and had a qualified tenant within a week. The verification process gave me confidence."
+    },
+    "testimonial_2": {
+      "role": "Property Agent, Abuja",
+      "text": "Managing multiple properties has never been easier. The dashboard is intuitive and my clients love the professional presentation."
+    },
+    "testimonial_3": {
+      "role": "Landlord, Kano",
+      "text": "The legal support feature is a game-changer. I had a dispute resolved quickly without the usual stress."
+    },
+    "faq_1": {
+      "q": "Who can list properties on RentalHub NG?",
+      "a": "Verified landlords and registered agents can list properties. You need to complete identity verification and be approved before listing."
+    },
+    "faq_2": {
+      "q": "Is there a fee to list a property?",
+      "a": "We offer a free plan for a single basic listing. Paid plans start at N5,000 per listing per year with additional features and visibility."
+    },
+    "faq_3": {
+      "q": "How are tenants verified?",
+      "a": "All tenants undergo NIN-linked identity verification before they can apply or contact you. This ensures you only deal with genuine, verified individuals."
+    },
+    "faq_4": {
+      "q": "Can I list properties in multiple states?",
+      "a": "Yes! RentalHub NG covers all 36 states + FCT. You can list properties anywhere in Nigeria regardless of your location."
+    },
+    "faq_5": {
+      "q": "How do I get paid?",
+      "a": "Rental payments and deposits are handled directly between you and the tenant. The platform facilitates applications and secure communication."
+    },
+    "faq_6": {
+      "q": "What if I need help with my listing?",
+      "a": "We offer email and WhatsApp support for all users. Premium plan users get dedicated agent support for personalized assistance."
+    },
+    "pricing": {
+      "badge": "Pricing",
+      "title": "Choose Your Plan",
+      "subtitle": "Start with a free listing or unlock more features with our affordable paid plans."
+    },
+    "testimonials": {
+      "badge": "Testimonials",
+      "title": "What Landlords Say",
+      "subtitle": "Join thousands of satisfied landlords who have found great tenants through our platform."
+    },
+    "faq": {
+      "badge": "FAQ",
+      "title": "Frequently Asked Questions",
+      "subtitle": "Got questions? We have answers."
+    },
+    "cta": {
+      "title": "Ready to List Your Property?",
+      "subtitle": "Join over 5,000 landlords and agents already using RentalHub NG to find qualified tenants. List your property today and start receiving applications.",
+      "list_now": "List Your Property Now",
+      "create_account": "Create Free Account"
+    },
+    "contact": {
+      "title": "Need Help?",
+      "subtitle": "Our team is ready to help you get your property listed. Reach out anytime.",
+      "email_label": "Email us",
+      "phone_label": "Call us"
+    },
+    "toast": {
+      "needs_landlord_account": "You need a landlord or agent account to list properties."
+    }
+  },
+  "faq": {
+    "hero_title_before": "Frequently Asked ",
+    "hero_title_highlight": "Questions",
+    "hero_desc": "Everything you need to know about RentalHub NG. Find answers to common questions about listing properties, finding rentals, verification, pricing, and more.",
+    "hero_cta_create": "Create Free Account",
+    "hero_cta_contact": "Contact Support",
+    "stats_properties_listed": "Properties Listed",
+    "stats_active_users": "Active Users",
+    "stats_states_covered": "States Covered",
+    "stats_verified_landlords": "Verified Landlords",
+    "search_placeholder": "Search frequently asked questions...",
+    "search_clear": "Clear",
+    "search_results": "{{count}} result for \"{{query}}\"",
+    "search_results_plural": "{{count}} results for \"{{query}}\"",
+    "search_clear_link": "Clear search",
+    "search_no_results": "No results found",
+    "search_no_results_desc": "We could not find any FAQs matching \"{{query}}\". Try a different search term.",
+    "search_clear_button": "Clear Search",
+    "section_general": "General Questions",
+    "section_tenants": "Tenant Questions",
+    "section_landlords": "Landlord Questions",
+    "section_verification": "Verification Questions",
+    "section_pricing": "Pricing & Billing Questions",
+    "section_legal": "Legal & Dispute Questions",
+    "section_account": "Account & Support Questions",
+    "quick_links_title": "Quick Links",
+    "still_questions": "Still Have Questions?",
+    "still_questions_desc": "Explore these helpful resources or contact our support team directly.",
+    "quick_link_list": "List Your Property",
+    "quick_link_list_desc": "Reach thousands of verified tenants across Nigeria.",
+    "quick_link_list_label": "Start Listing",
+    "quick_link_browse": "Browse Properties",
+    "quick_link_browse_desc": "Find verified properties in all 36 states + FCT.",
+    "quick_link_browse_label": "Search Now",
+    "quick_link_pricing": "View Pricing Plans",
+    "quick_link_pricing_desc": "Free, Basic, and Premium plans available.",
+    "quick_link_pricing_label": "See Plans",
+    "quick_link_guide": "Landlord Guide",
+    "quick_link_guide_desc": "Tips and best practices for successful listings.",
+    "quick_link_guide_label": "Read Guide",
+    "cta_heading": "Still Can not Find What You Are Looking For?",
+    "cta_desc": "Our support team is ready to help you with any questions. Reach out and we will get back to you within 24 hours.",
+    "cta_create": "Create Free Account",
+    "cta_contact": "Contact Support",
+    "contact_heading": "Get In Touch",
+    "contact_desc": "Have a question that is not covered here? Our support team is always happy to help.",
+    "contact_email": "Email us",
+    "contact_call": "Call us",
+    "share_section": "Share {{section}}",
+    "share_whatsapp": "WhatsApp",
+    "share_facebook": "Facebook",
+    "share_twitter": "Twitter / X",
+    "share_copy": "Copy Link",
+    "toast_link_copied": "Link copied to clipboard",
+    "toast_copy_failed": "Could not copy link"
+  },
+  "how_it_works": {
+    "hero_title_before": "How ",
+    "hero_title_highlight": "RentalHub NG",
+    "hero_title_after": " Works",
+    "hero_desc": "Whether you are looking for your next home or listing a property for rent, RentalHub NG makes the process simple, secure, and transparent.",
+    "hero_cta_browse": "Browse Properties",
+    "hero_cta_list": "List Your Property",
+    "overview_badge": "Quick Overview",
+    "overview_heading": "Your Journey in 4 Simple Steps",
+    "walkthrough_signup": "Sign Up",
+    "walkthrough_signup_desc": "Register as a tenant or landlord in under 2 minutes.",
+    "walkthrough_verify": "Verify",
+    "walkthrough_verify_desc": "Complete NIN verification to unlock full access.",
+    "walkthrough_browse": "Browse or List",
+    "walkthrough_browse_desc": "Tenants search, landlords list — both with powerful tools.",
+    "walkthrough_connect": "Connect",
+    "walkthrough_connect_desc": "Apply, chat, and close your deal with confidence.",
+    "tenants_badge": "For Tenants",
+    "tenants_heading": "Find Your Perfect Home",
+    "tenants_desc": "From search to move-in, here is how tenants find their next home on RentalHub NG.",
+    "tenants_step_1_title": "Create Your Account",
+    "tenants_step_1_desc": "Sign up as a tenant and complete your identity verification using your NIN. This ensures a safe community for everyone.",
+    "tenants_step_1_hl_1": "Free registration",
+    "tenants_step_1_hl_2": "NIN-linked verification",
+    "tenants_step_1_hl_3": "Profile management",
+    "tenants_step_2_title": "Browse Properties",
+    "tenants_step_2_desc": "Search through thousands of verified properties across all 36 states + FCT. Use filters to find exactly what you need.",
+    "tenants_step_2_hl_1": "Filter by location & budget",
+    "tenants_step_2_hl_2": "Virtual property tours",
+    "tenants_step_2_hl_3": "Save favorites",
+    "tenants_step_3_title": "Unlock Full Details",
+    "tenants_step_3_desc": "Make a one-time payment to unlock full property details, including the landlord contact information and premium media.",
+    "tenants_step_3_hl_1": "Full address revealed",
+    "tenants_step_3_hl_2": "Landlord contact info",
+    "tenants_step_3_hl_3": "HD photos & video",
+    "tenants_step_4_title": "Apply & Connect",
+    "tenants_step_4_desc": "Submit applications to your preferred properties, chat with landlords directly, and secure your new home.",
+    "tenants_step_4_hl_1": "One-click application",
+    "tenants_step_4_hl_2": "In-app messaging",
+    "tenants_step_4_hl_3": "Move-in support",
+    "tenants_cta": "Get Started as a Tenant",
+    "divider_label": "Both tenants and landlords use RentalHub NG",
+    "landlords_badge": "For Landlords & Agents",
+    "landlords_heading": "List & Manage Properties",
+    "landlords_desc": "From registration to tenant connection, here is how landlords succeed on RentalHub NG.",
+    "landlords_step_1_title": "Register & Verify",
+    "landlords_step_1_desc": "Create a landlord or agent account and complete profile verification to start listing your properties.",
+    "landlords_step_1_hl_1": "Quick registration",
+    "landlords_step_1_hl_2": "Identity verification",
+    "landlords_step_1_hl_3": "Agent onboarding",
+    "landlords_step_2_title": "List Your Property",
+    "landlords_step_2_desc": "Add your property with detailed descriptions, high-quality photos, and set your rental terms.",
+    "landlords_step_2_hl_1": "Detailed listings",
+    "landlords_step_2_hl_2": "Photo & video upload",
+    "landlords_step_2_hl_3": "Flexible pricing",
+    "landlords_step_3_title": "Choose a Plan",
+    "landlords_step_3_desc": "Select a listing plan that suits your needs — from free basic listings to premium featured placements.",
+    "landlords_step_3_hl_1": "Free plan available",
+    "landlords_step_3_hl_2": "From ₦5,000/year",
+    "landlords_step_3_hl_3": "Featured badges",
+    "landlords_step_4_title": "Manage & Connect",
+    "landlords_step_4_desc": "Review applications, chat with prospective tenants, and manage all your properties from one dashboard.",
+    "landlords_step_4_hl_1": "Application management",
+    "landlords_step_4_hl_2": "Tenant messaging",
+    "landlords_step_4_hl_3": "Analytics dashboard",
+    "landlords_cta": "Start Listing Your Property",
+    "features_badge": "Platform Features",
+    "features_heading": "What Makes the Platform Work",
+    "features_desc": "These features ensure every interaction on RentalHub NG is safe and trustworthy.",
+    "features_verification_title": "Identity Verification",
+    "features_verification_desc": "Every user — tenant, landlord, and agent — goes through NIN-linked identity verification for a trusted ecosystem.",
+    "features_secure_title": "Secure Transactions",
+    "features_secure_desc": "Applications and communications are handled securely within the platform. Clear terms protect all parties.",
+    "features_legal_title": "Legal Support",
+    "features_legal_desc": "Access qualified lawyers, evidence verification, and structured dispute resolution when you need it.",
+    "features_ratings_title": "Ratings & Reviews",
+    "features_ratings_desc": "Transparent ratings and verified reviews help tenants and landlords make informed decisions.",
+    "faq_badge": "FAQ",
+    "faq_heading": "Frequently Asked Questions",
+    "faq_desc": "Everything you need to know about using RentalHub NG.",
+    "cta_heading": "Ready to Get Started?",
+    "cta_desc": "Join thousands of Nigerians using RentalHub NG to find homes and list properties. Your journey starts here.",
+    "cta_create": "Create Free Account",
+    "cta_browse": "Browse Properties",
+    "contact_heading": "Still Have Questions?",
+    "contact_desc": "Our support team is always ready to help you navigate the platform.",
+    "contact_email": "Email us",
+    "contact_call": "Call us"
+  },
+  "pricing": {
+    "hero_title_before": "Simple, Transparent ",
+    "hero_title_highlight": "Pricing",
+    "hero_desc": "Choose the plan that fits your needs. Start for free, upgrade when you are ready. No hidden fees, no surprises.",
+    "hero_cta_start": "Get Started Free",
+    "hero_cta_list": "List Your Property",
+    "plans_badge": "Pricing Plans",
+    "plans_heading": "Choose the Right Plan for You",
+    "plans_desc": "All plans include access to verified tenants, secure messaging, and landlord dashboard.",
+    "toggle_yearly": "Pay Yearly",
+    "toggle_monthly": "Pay Monthly",
+    "most_popular": "Most Popular",
+    "plan_free_name": "Free",
+    "plan_free_subtitle": "Perfect for trying out",
+    "plan_free_price": "₦0",
+    "plan_free_period": "per listing",
+    "plan_free_desc": "Get started with a basic listing and see what RentalHub NG has to offer.",
+    "plan_free_feat_1": "List 1 property",
+    "plan_free_feat_2": "Basic property details",
+    "plan_free_feat_3": "Up to 3 photos",
+    "plan_free_feat_4": "Standard search visibility",
+    "plan_free_feat_5": "Email support",
+    "plan_free_cta": "Get Started Free",
+    "plan_basic_name": "Basic",
+    "plan_basic_subtitle": "Best value for most landlords",
+    "plan_basic_price": "₦5,000",
+    "plan_basic_period": "per listing / year",
+    "plan_basic_desc": "List multiple properties with enhanced visibility and dedicated support.",
+    "plan_basic_feat_1": "List up to 5 properties",
+    "plan_basic_feat_2": "Detailed property description",
+    "plan_basic_feat_3": "Up to 10 photos per listing",
+    "plan_basic_feat_4": "Priority search visibility",
+    "plan_basic_feat_5": "Basic analytics dashboard",
+    "plan_basic_feat_6": "Email & WhatsApp support",
+    "plan_basic_cta": "Choose Basic",
+    "plan_premium_name": "Premium",
+    "plan_premium_subtitle": "For serious landlords & agents",
+    "plan_premium_price": "₦15,000",
+    "plan_premium_period": "per listing / year",
+    "plan_premium_desc": "Unlimited listings with premium placement, video tours, and dedicated agent support.",
+    "plan_premium_feat_1": "Unlimited properties",
+    "plan_premium_feat_2": "Premium property listing",
+    "plan_premium_feat_3": "Up to 30 photos + video tour",
+    "plan_premium_feat_4": "Featured badge & top placement",
+    "plan_premium_feat_5": "Advanced analytics dashboard",
+    "plan_premium_feat_6": "Dedicated agent support",
+    "plan_premium_feat_7": "Legal support access",
+    "plan_premium_feat_8": "Priority listing reviews",
+    "plan_premium_cta": "Choose Premium",
+    "save_annual": "Save 15% with annual billing",
+    "trust_secure": "Secure payments",
+    "trust_guarantee": "14-day money-back guarantee",
+    "trust_landlords": "5,000+ happy landlords",
+    "compare_badge": "Compare Plans",
+    "compare_heading": "Side-by-Side Comparison",
+    "compare_desc": "See exactly what each plan includes to make an informed decision.",
+    "compare_header_feature": "Features",
+    "compare_header_free": "Free",
+    "compare_header_basic": "Basic",
+    "compare_header_premium": "Premium",
+    "compare_row_properties": "Number of properties",
+    "compare_row_photos": "Photos per listing",
+    "compare_row_visibility": "Search visibility",
+    "compare_row_badge": "Featured badge",
+    "compare_row_analytics": "Analytics",
+    "compare_row_support": "Support",
+    "compare_row_legal": "Legal support",
+    "compare_row_reviews": "Listing reviews",
+    "addons_badge": "Add-On Services",
+    "addons_heading": "Enhance Your Listing",
+    "addons_desc": "Optional services to make your property stand out and attract more tenants.",
+    "addons_photo_name": "Professional Photography",
+    "addons_photo_price": "₦25,000",
+    "addons_photo_desc": "Professional photo shoot for your property with 20+ edited high-resolution images.",
+    "addons_video_name": "Video Tour Production",
+    "addons_video_price": "₦50,000",
+    "addons_video_desc": "Professional video walkthrough of your property, edited and optimized for the platform.",
+    "addons_featured_name": "Featured Promotion",
+    "addons_featured_price": "₦10,000",
+    "addons_featured_desc": "Boost your listing to the top of search results for 30 days with a featured badge.",
+    "addons_legal_name": "Legal Document Review",
+    "addons_legal_price": "₦15,000",
+    "addons_legal_desc": "Professional legal review of your tenancy agreement and lease documents.",
+    "addons_inquire": "Inquire Now",
+    "testimonials_badge": "Testimonials",
+    "testimonials_heading": "What Our Landlords Say",
+    "testimonials_desc": "Join thousands of satisfied landlords who found the perfect plan for their needs.",
+    "faq_badge": "FAQ",
+    "faq_heading": "Frequently Asked Questions",
+    "faq_desc": "Everything you need to know about our pricing and billing.",
+    "cta_heading": "Start Listing for Free Today",
+    "cta_desc": "No credit card required. No risk. Join thousands of landlords who trust RentalHub NG to connect them with verified, quality tenants.",
+    "cta_create": "Create Free Account",
+    "cta_list": "List Your Property",
+    "contact_heading": "Questions About Pricing?",
+    "contact_desc": "Our sales team is happy to help you find the perfect plan or create a custom enterprise solution for your portfolio.",
+    "contact_email": "Email sales",
+    "contact_call": "Call us"
+  },
+  "landlord_guide": {
+    "hero_title_before": "Landlord ",
+    "hero_title_highlight": "Guide",
+    "hero_desc": "Everything you need to know about listing, managing, and renting your properties successfully on RentalHub NG — from preparation to tenant move-in.",
+    "hero_cta_list": "List Your Property",
+    "hero_cta_pricing": "View Pricing Plans",
+    "stats_properties_listed": "Properties Listed",
+    "stats_verified_landlords": "Verified Landlords",
+    "stats_successful_tenancies": "Successful Tenancies",
+    "stats_states_covered": "States Covered",
+    "started_badge": "Getting Started",
+    "started_heading": "How to Prepare Your Listing",
+    "started_desc": "Follow these steps to create a listing that attracts quality tenants quickly.",
+    "prep_step_1_title": "Gather Property Documents",
+    "prep_step_1_desc": "Collect all necessary documents including proof of ownership, utility bills, property tax receipts, and any renovation permits.",
+    "prep_step_1_item_1": "Proof of ownership / title deed",
+    "prep_step_1_item_2": "Recent utility bills",
+    "prep_step_1_item_3": "Property tax receipts",
+    "prep_step_1_item_4": "Renovation/improvement records",
+    "prep_step_2_title": "Prepare Your Property",
+    "prep_step_2_desc": "Ensure your property is in good condition before listing. Make necessary repairs, deep clean, and consider professional photography.",
+    "prep_step_2_item_1": "Complete minor repairs and touch-ups",
+    "prep_step_2_item_2": "Deep clean all rooms and common areas",
+    "prep_step_2_item_3": "Consider professional photography",
+    "prep_step_2_item_4": "Stage rooms to look spacious and inviting",
+    "prep_step_3_title": "Verify Your Identity",
+    "prep_step_3_desc": "Complete your landlord verification through RentalHub NG. This builds trust with potential tenants and increases your listing visibility.",
+    "prep_step_3_item_1": "Submit valid government ID",
+    "prep_step_3_item_2": "Complete NIN verification",
+    "prep_step_3_item_3": "Provide proof of property ownership",
+    "prep_step_3_item_4": "Add profile photo and bio",
+    "prep_step_4_title": "Publish & Promote",
+    "prep_step_4_desc": "Create a compelling listing with detailed descriptions, high-quality photos, and competitive pricing. Share your listing across platforms.",
+    "prep_step_4_item_1": "Write detailed property description",
+    "prep_step_4_item_2": "Upload 10+ high-quality photos",
+    "prep_step_4_item_3": "Set competitive rental price",
+    "prep_step_4_item_4": "Share listing on social media",
+    "practices_badge": "Best Practices",
+    "practices_heading": "Tips for Successful Listings",
+    "practices_desc": "Proven strategies to help your property stand out and attract the right tenants.",
+    "practice_1_title": "Use Clear Titles & Accurate Descriptions",
+    "practice_1_desc": "Write descriptive, honest titles that highlight key features.",
+    "practice_1_tip_1": "Mention exact room count and floor level",
+    "practice_1_tip_2": "Include nearby transport and amenities",
+    "practice_1_tip_3": "Be specific about included utilities",
+    "practice_2_title": "Upload High-Quality Photos",
+    "practice_2_desc": "Bright, well-lit photos from multiple angles dramatically increase inquiry rates.",
+    "practice_2_tip_1": "Shoot during daylight with good lighting",
+    "practice_2_tip_2": "Capture all rooms including kitchen and bathrooms",
+    "practice_2_tip_3": "Show storage spaces and closets",
+    "practice_3_title": "Set Realistic Rent Prices",
+    "practice_3_desc": "Research comparable properties in your area before setting a price.",
+    "practice_3_tip_1": "Research 5+ similar listings in your area",
+    "practice_3_tip_2": "Factor in property condition and amenities",
+    "practice_3_tip_3": "Consider seasonal demand variations",
+    "practice_4_title": "Respond Quickly to Inquiries",
+    "practice_4_desc": "Tenants appreciate fast responses. Aim to reply within 24 hours.",
+    "practice_4_tip_1": "Enable push notifications for new messages",
+    "practice_4_tip_2": "Set up auto-reply for common questions",
+    "practice_4_tip_3": "Schedule viewing slots in advance",
+    "practice_5_title": "Keep Your Listing Updated",
+    "practice_5_desc": "Remove listings once rented, update availability status promptly.",
+    "practice_5_tip_1": "Update status immediately after tenancy",
+    "practice_5_tip_2": "Refresh photos seasonally",
+    "practice_5_tip_3": "Remove outdated promotions or offers",
+    "practice_6_title": "Highlight Verification & Safety Features",
+    "practice_6_desc": "Showcase your verified status, security features, and any safety certifications.",
+    "practice_6_tip_1": "Complete your identity verification",
+    "practice_6_tip_2": "Mention security features clearly",
+    "practice_6_tip_3": "Share safety certificates if available",
+    "protips_badge": "Pro Tips",
+    "protips_heading": "Expert Advice for Landlords",
+    "protips_desc": "Level up your landlord game with these expert insights.",
+    "protip_1_title": "First Impressions Matter",
+    "protip_1_desc": "The first photo in your listing is the most important. Choose a bright, well-composed hero shot.",
+    "protip_2_title": "Screen Tenants Thoroughly",
+    "protip_2_desc": "Use RentalHub NG verification tools to confirm tenant identities before accepting applications.",
+    "protip_3_title": "Use Secure Contracts",
+    "protip_3_desc": "Always use legally reviewed tenancy agreements. RentalHub NG provides access to legal templates.",
+    "protip_4_title": "Monitor Your Performance",
+    "protip_4_desc": "Use your landlord dashboard to track views, inquiries, and application rates.",
+    "protip_5_title": "Build Tenant Relationships",
+    "protip_5_desc": "Professional, responsive communication leads to positive reviews and referrals.",
+    "protip_6_title": "Know Your Rights & Responsibilities",
+    "protip_6_desc": "Familiarize yourself with Nigerian tenancy laws in your state.",
+    "mistakes_badge": "Avoid These",
+    "mistakes_heading": "Common Mistakes to Avoid",
+    "mistakes_desc": "Avoid these pitfalls to ensure a smooth and successful property listing experience.",
+    "mistake_1_title": "Poor Quality Photos",
+    "mistake_1_desc": "Dark, blurry, or limited photos deter potential tenants.",
+    "mistake_1_fix": "Hire a professional photographer or use natural daylight and a quality smartphone camera.",
+    "mistake_2_title": "Incomplete Information",
+    "mistake_2_desc": "Missing details about utilities, parking, or house rules leads to fewer applications.",
+    "mistake_2_fix": "Fill out all property fields completely.",
+    "mistake_3_title": "Overpricing",
+    "mistake_3_desc": "Setting rent above market rate results in longer vacancies.",
+    "mistake_3_fix": "Research comparable listings in your area and price competitively.",
+    "mistake_4_title": "Slow Response Times",
+    "mistake_4_desc": "Delayed responses frustrate tenants and make you appear unprofessional.",
+    "mistake_4_fix": "Set up notifications and aim to respond to all inquiries within 24 hours.",
+    "faq_badge": "FAQ",
+    "faq_heading": "Frequently Asked Questions",
+    "faq_desc": "Everything you need to know about listing on RentalHub NG.",
+    "cta_heading": "Ready to List Your Property?",
+    "cta_desc": "Join over 5,000 successful landlords on RentalHub NG. List your property today and start connecting with verified, qualified tenants across Nigeria.",
+    "cta_list": "List Your Property Now",
+    "cta_create": "Create Free Account",
+    "contact_heading": "Need Help With Your Listing?",
+    "contact_desc": "Our support team is here to help you every step of the way — from setting up your account to publishing your first listing.",
+    "contact_email": "Email us",
+    "contact_call": "Call us"
   }
 }

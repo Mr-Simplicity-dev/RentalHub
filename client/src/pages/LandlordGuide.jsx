@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   FaUserCheck,
   FaHome,
@@ -31,11 +32,9 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
-/* ──────────────────────────────────────────────────────────────
-   ShareButton — reusable share sheet
-   ────────────────────────────────────────────────────────────── */
 const ShareButton = ({ section, title, description }) => {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
   const pageUrl = typeof window !== 'undefined' ? window.location.href : 'https://rentalhub.com.ng/landlord-guide';
   const shareText = `${title}\n\n${description}\n\n${pageUrl}`;
   const encodedText = encodeURIComponent(shareText);
@@ -44,9 +43,9 @@ const ShareButton = ({ section, title, description }) => {
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(pageUrl);
-      toast.success('Link copied to clipboard');
+      toast.success(t('landlord_guide.share_copied'));
     } catch {
-      toast.error('Could not copy link');
+      toast.error(t('landlord_guide.share_copy_error'));
     }
     setOpen(false);
   };
@@ -57,10 +56,10 @@ const ShareButton = ({ section, title, description }) => {
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-primary-600 hover:border-primary-300 transition-all duration-200 shadow-sm"
-        title={`Share ${section}`}
+        title={`${t('landlord_guide.share')} ${section}`}
       >
         <FaShareAlt className="text-[10px]" />
-        Share
+        {t('landlord_guide.share')}
       </button>
 
       {open && (
@@ -68,7 +67,7 @@ const ShareButton = ({ section, title, description }) => {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-52 origin-top-right animate-scaleIn rounded-xl border border-gray-100 bg-white py-2 shadow-elevated-lg">
             <div className="px-4 pb-2 mb-1 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-700">Share {section}</p>
+              <p className="text-xs font-semibold text-gray-700">{t('landlord_guide.share')} {section}</p>
             </div>
 
             <a
@@ -79,7 +78,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaWhatsapp className="text-lg text-green-600" />
-              WhatsApp
+              {t('landlord_guide.share_whatsapp')}
             </a>
 
             <a
@@ -90,7 +89,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaFacebook className="text-lg text-blue-600" />
-              Facebook
+              {t('landlord_guide.share_facebook')}
             </a>
 
             <a
@@ -101,7 +100,7 @@ const ShareButton = ({ section, title, description }) => {
               onClick={() => setOpen(false)}
             >
               <FaTwitter className="text-lg text-sky-500" />
-              Twitter / X
+              {t('landlord_guide.share_twitter')}
             </a>
 
             <button
@@ -110,7 +109,7 @@ const ShareButton = ({ section, title, description }) => {
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <FaLink className="text-lg text-gray-500" />
-              Copy Link
+              {t('landlord_guide.share_copy')}
             </button>
           </div>
         </>
@@ -119,197 +118,158 @@ const ShareButton = ({ section, title, description }) => {
   );
 };
 
-/* ──────────────────────────────────────────────────────────────
-   Quick stats
-   ────────────────────────────────────────────────────────────── */
-const stats = [
-  { label: 'Properties Listed', value: '10,000+' },
-  { label: 'Verified Landlords', value: '5,000+' },
-  { label: 'Successful Tenancies', value: '8,500+' },
-  { label: 'States Covered', value: '36 + FCT' },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Best practices checklist
-   ────────────────────────────────────────────────────────────── */
-const bestPractices = [
-  {
-    icon: <FaTag className="text-xl text-primary-600" />,
-    title: 'Use Clear Titles & Accurate Descriptions',
-    desc: 'Write descriptive, honest titles that highlight key features. Include details about room sizes, amenities, nearby landmarks, and utilities. Avoid exaggerations that could lead to tenant disappointment.',
-    tips: ['Mention exact room count and floor level', 'Include nearby transport and amenities', 'Be specific about included utilities'],
-  },
-  {
-    icon: <FaCamera className="text-xl text-primary-600" />,
-    title: 'Upload High-Quality Photos',
-    desc: 'Bright, well-lit photos from multiple angles dramatically increase inquiry rates. Include shots of every room, the building exterior, and surrounding neighborhood.',
-    tips: ['Shoot during daylight with good lighting', 'Capture all rooms including kitchen and bathrooms', 'Show storage spaces and closets'],
-  },
-  {
-    icon: <FaMoneyBillWave className="text-xl text-primary-600" />,
-    title: 'Set Realistic Rent Prices',
-    desc: 'Research comparable properties in your area before setting a price. Competitive pricing attracts more qualified tenants and reduces vacancy periods.',
-    tips: ['Research 5+ similar listings in your area', 'Factor in property condition and amenities', 'Consider seasonal demand variations'],
-  },
-  {
-    icon: <FaComments className="text-xl text-primary-600" />,
-    title: 'Respond Quickly to Inquiries',
-    desc: 'Tenants appreciate fast responses. Aim to reply to messages and applications within 24 hours. Quick communication signals a professional, attentive landlord.',
-    tips: ['Enable push notifications for new messages', 'Set up auto-reply for common questions', 'Schedule viewing slots in advance'],
-  },
-  {
-    icon: <FaSyncAlt className="text-xl text-primary-600" />,
-    title: 'Keep Your Listing Updated',
-    desc: 'Remove listings once rented, update availability status promptly, and refresh your property details periodically to keep them accurate and appealing.',
-    tips: ['Update status immediately after tenancy', 'Refresh photos seasonally', 'Remove outdated promotions or offers'],
-  },
-  {
-    icon: <FaShieldAlt className="text-xl text-primary-600" />,
-    title: 'Highlight Verification & Safety Features',
-    desc: 'Showcase your verified status, security features (CCTV, security guards), and any safety certifications. Verified listings receive significantly more tenant applications.',
-    tips: ['Complete your identity verification', 'Mention security features clearly', 'Share safety certificates if available'],
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Preparation steps
-   ────────────────────────────────────────────────────────────── */
-const prepSteps = [
-  {
-    step: 1,
-    title: 'Gather Property Documents',
-    desc: 'Collect all necessary documents including proof of ownership, utility bills, property tax receipts, and any renovation permits.',
-    icon: <FaFileContract className="text-2xl text-white" />,
-    items: ['Proof of ownership / title deed', 'Recent utility bills', 'Property tax receipts', 'Renovation/improvement records'],
-  },
-  {
-    step: 2,
-    title: 'Prepare Your Property',
-    desc: 'Ensure your property is in good condition before listing. Make necessary repairs, deep clean, and consider professional photography.',
-    icon: <FaTools className="text-2xl text-white" />,
-    items: ['Complete minor repairs and touch-ups', 'Deep clean all rooms and common areas', 'Consider professional photography', 'Stage rooms to look spacious and inviting'],
-  },
-  {
-    step: 3,
-    title: 'Verify Your Identity',
-    desc: 'Complete your landlord verification through RentalHub NG. This builds trust with potential tenants and increases your listing visibility.',
-    icon: <FaUserCheck className="text-2xl text-white" />,
-    items: ['Submit valid government ID', 'Complete NIN verification', 'Provide proof of property ownership', 'Add profile photo and bio'],
-  },
-  {
-    step: 4,
-    title: 'Publish & Promote',
-    desc: 'Create a compelling listing with detailed descriptions, high-quality photos, and competitive pricing. Share your listing across platforms.',
-    icon: <FaBullhorn className="text-2xl text-white" />,
-    items: ['Write detailed property description', 'Upload 10+ high-quality photos', 'Set competitive rental price', 'Share listing on social media'],
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Tips cards
-   ────────────────────────────────────────────────────────────── */
-const proTips = [
-  {
-    icon: <FaLightbulb className="text-2xl text-primary-500" />,
-    title: 'First Impressions Matter',
-    desc: 'The first photo in your listing is the most important. Choose a bright, well-composed hero shot that showcases your property at its best.',
-  },
-  {
-    icon: <FaUsers className="text-2xl text-primary-500" />,
-    title: 'Screen Tenants Thoroughly',
-    desc: 'Use RentalHub NG verification tools to confirm tenant identities and check references before accepting applications.',
-  },
-  {
-    icon: <FaLock className="text-2xl text-primary-500" />,
-    title: 'Use Secure Contracts',
-    desc: 'Always use legally reviewed tenancy agreements. RentalHub NG provides access to legal templates and lawyer support.',
-  },
-  {
-    icon: <FaChartLine className="text-2xl text-primary-500" />,
-    title: 'Monitor Your Performance',
-    desc: 'Use your landlord dashboard to track views, inquiries, and application rates. Optimize your listing based on performance data.',
-  },
-  {
-    icon: <FaHandshake className="text-2xl text-primary-500" />,
-    title: 'Build Tenant Relationships',
-    desc: 'Professional, responsive communication leads to positive reviews and referrals. Happy tenants stay longer and take better care of your property.',
-  },
-  {
-    icon: <FaBalanceScale className="text-2xl text-primary-500" />,
-    title: 'Know Your Rights & Responsibilities',
-    desc: 'Familiarize yourself with Nigerian tenancy laws in your state. Understanding legal requirements protects you and your tenants.',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Common mistakes
-   ────────────────────────────────────────────────────────────── */
-const mistakes = [
-  {
-    title: 'Poor Quality Photos',
-    desc: 'Dark, blurry, or limited photos deter potential tenants. Always use well-lit, high-resolution images from multiple angles.',
-    fix: 'Hire a professional photographer or use natural daylight and a quality smartphone camera.',
-  },
-  {
-    title: 'Incomplete Information',
-    desc: 'Missing details about utilities, parking, or house rules leads to repetitive questions and fewer applications.',
-    fix: 'Fill out all property fields completely. Include details about water, electricity, parking, and pet policies.',
-  },
-  {
-    title: 'Overpricing',
-    desc: 'Setting rent above market rate results in longer vacancies and fewer qualified applicants.',
-    fix: 'Research comparable listings in your area and price competitively to attract quality tenants faster.',
-  },
-  {
-    title: 'Slow Response Times',
-    desc: 'Delayed responses frustrate tenants and make you appear unprofessional.',
-    fix: 'Set up notifications and aim to respond to all inquiries within 24 hours.',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   FAQ
-   ────────────────────────────────────────────────────────────── */
-const faqs = [
-  {
-    q: 'How do I become a verified landlord on RentalHub NG?',
-    a: 'Register as a landlord, complete your profile with valid identification (NIN, passport, or driver\'s license), provide proof of property ownership, and submit for verification. Our team typically verifies within 24-48 hours.',
-  },
-  {
-    q: 'How many properties can I list?',
-    a: 'The Free plan allows 1 property listing. Basic (₦5,000/year) allows up to 5 properties. Premium (₦15,000/year) allows unlimited properties with premium placement.',
-  },
-  {
-    q: 'What happens after my listing is approved?',
-    a: 'Your property appears in search results and becomes visible to all tenants. You will receive applications and inquiries through your dashboard, where you can review tenant profiles, chat, and schedule viewings.',
-  },
-  {
-    q: 'How are tenants verified?',
-    a: 'All tenants undergo NIN-linked identity verification before they can apply or message you. This ensures you only interact with verified, genuine individuals.',
-  },
-  {
-    q: 'What if my listing is rejected?',
-    a: 'Our team provides specific feedback on why a listing was rejected. Common reasons include incomplete information or poor photo quality. Simply revise and resubmit — we are happy to help you improve your listing.',
-  },
-  {
-    q: 'Can I edit my listing after it\'s published?',
-    a: 'Yes! You can edit your listing anytime from your landlord dashboard. Update photos, change pricing, modify descriptions, or mark properties as rented.',
-  },
-];
-
-/* ──────────────────────────────────────────────────────────────
-   Page Component
-   ────────────────────────────────────────────────────────────── */
 const LandlordGuide = () => {
   const [openFaq, setOpenFaq] = useState(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
+  const stats = [
+    { label: t('landlord_guide.stats_properties_listed'), value: '10,000+' },
+    { label: t('landlord_guide.stats_verified_landlords'), value: '5,000+' },
+    { label: t('landlord_guide.stats_successful_tenancies'), value: '8,500+' },
+    { label: t('landlord_guide.stats_states_covered'), value: '36 + FCT' },
+  ];
+
+  const bestPractices = [
+    {
+      icon: <FaTag className="text-xl text-primary-600" />,
+      title: t('landlord_guide.practice_1_title'),
+      desc: t('landlord_guide.practice_1_desc'),
+      tips: [t('landlord_guide.practice_1_tip_1'), t('landlord_guide.practice_1_tip_2'), t('landlord_guide.practice_1_tip_3')],
+    },
+    {
+      icon: <FaCamera className="text-xl text-primary-600" />,
+      title: t('landlord_guide.practice_2_title'),
+      desc: t('landlord_guide.practice_2_desc'),
+      tips: [t('landlord_guide.practice_2_tip_1'), t('landlord_guide.practice_2_tip_2'), t('landlord_guide.practice_2_tip_3')],
+    },
+    {
+      icon: <FaMoneyBillWave className="text-xl text-primary-600" />,
+      title: t('landlord_guide.practice_3_title'),
+      desc: t('landlord_guide.practice_3_desc'),
+      tips: [t('landlord_guide.practice_3_tip_1'), t('landlord_guide.practice_3_tip_2'), t('landlord_guide.practice_3_tip_3')],
+    },
+    {
+      icon: <FaComments className="text-xl text-primary-600" />,
+      title: t('landlord_guide.practice_4_title'),
+      desc: t('landlord_guide.practice_4_desc'),
+      tips: [t('landlord_guide.practice_4_tip_1'), t('landlord_guide.practice_4_tip_2'), t('landlord_guide.practice_4_tip_3')],
+    },
+    {
+      icon: <FaSyncAlt className="text-xl text-primary-600" />,
+      title: t('landlord_guide.practice_5_title'),
+      desc: t('landlord_guide.practice_5_desc'),
+      tips: [t('landlord_guide.practice_5_tip_1'), t('landlord_guide.practice_5_tip_2'), t('landlord_guide.practice_5_tip_3')],
+    },
+    {
+      icon: <FaShieldAlt className="text-xl text-primary-600" />,
+      title: t('landlord_guide.practice_6_title'),
+      desc: t('landlord_guide.practice_6_desc'),
+      tips: [t('landlord_guide.practice_6_tip_1'), t('landlord_guide.practice_6_tip_2'), t('landlord_guide.practice_6_tip_3')],
+    },
+  ];
+
+  const prepSteps = [
+    {
+      step: 1,
+      title: t('landlord_guide.prep_step_1_title'),
+      desc: t('landlord_guide.prep_step_1_desc'),
+      icon: <FaFileContract className="text-2xl text-white" />,
+      items: [t('landlord_guide.prep_step_1_item_1'), t('landlord_guide.prep_step_1_item_2'), t('landlord_guide.prep_step_1_item_3'), t('landlord_guide.prep_step_1_item_4')],
+    },
+    {
+      step: 2,
+      title: t('landlord_guide.prep_step_2_title'),
+      desc: t('landlord_guide.prep_step_2_desc'),
+      icon: <FaTools className="text-2xl text-white" />,
+      items: [t('landlord_guide.prep_step_2_item_1'), t('landlord_guide.prep_step_2_item_2'), t('landlord_guide.prep_step_2_item_3'), t('landlord_guide.prep_step_2_item_4')],
+    },
+    {
+      step: 3,
+      title: t('landlord_guide.prep_step_3_title'),
+      desc: t('landlord_guide.prep_step_3_desc'),
+      icon: <FaUserCheck className="text-2xl text-white" />,
+      items: [t('landlord_guide.prep_step_3_item_1'), t('landlord_guide.prep_step_3_item_2'), t('landlord_guide.prep_step_3_item_3'), t('landlord_guide.prep_step_3_item_4')],
+    },
+    {
+      step: 4,
+      title: t('landlord_guide.prep_step_4_title'),
+      desc: t('landlord_guide.prep_step_4_desc'),
+      icon: <FaBullhorn className="text-2xl text-white" />,
+      items: [t('landlord_guide.prep_step_4_item_1'), t('landlord_guide.prep_step_4_item_2'), t('landlord_guide.prep_step_4_item_3'), t('landlord_guide.prep_step_4_item_4')],
+    },
+  ];
+
+  const proTips = [
+    {
+      icon: <FaLightbulb className="text-2xl text-primary-500" />,
+      title: t('landlord_guide.protip_1_title'),
+      desc: t('landlord_guide.protip_1_desc'),
+    },
+    {
+      icon: <FaUsers className="text-2xl text-primary-500" />,
+      title: t('landlord_guide.protip_2_title'),
+      desc: t('landlord_guide.protip_2_desc'),
+    },
+    {
+      icon: <FaLock className="text-2xl text-primary-500" />,
+      title: t('landlord_guide.protip_3_title'),
+      desc: t('landlord_guide.protip_3_desc'),
+    },
+    {
+      icon: <FaChartLine className="text-2xl text-primary-500" />,
+      title: t('landlord_guide.protip_4_title'),
+      desc: t('landlord_guide.protip_4_desc'),
+    },
+    {
+      icon: <FaHandshake className="text-2xl text-primary-500" />,
+      title: t('landlord_guide.protip_5_title'),
+      desc: t('landlord_guide.protip_5_desc'),
+    },
+    {
+      icon: <FaBalanceScale className="text-2xl text-primary-500" />,
+      title: t('landlord_guide.protip_6_title'),
+      desc: t('landlord_guide.protip_6_desc'),
+    },
+  ];
+
+  const mistakes = [
+    {
+      title: t('landlord_guide.mistake_1_title'),
+      desc: t('landlord_guide.mistake_1_desc'),
+      fix: t('landlord_guide.mistake_1_fix'),
+    },
+    {
+      title: t('landlord_guide.mistake_2_title'),
+      desc: t('landlord_guide.mistake_2_desc'),
+      fix: t('landlord_guide.mistake_2_fix'),
+    },
+    {
+      title: t('landlord_guide.mistake_3_title'),
+      desc: t('landlord_guide.mistake_3_desc'),
+      fix: t('landlord_guide.mistake_3_fix'),
+    },
+    {
+      title: t('landlord_guide.mistake_4_title'),
+      desc: t('landlord_guide.mistake_4_desc'),
+      fix: t('landlord_guide.mistake_4_fix'),
+    },
+  ];
+
+  const faqs = [
+    { q: t('landlord_guide.faq_1_q'), a: t('landlord_guide.faq_1_a') },
+    { q: t('landlord_guide.faq_2_q'), a: t('landlord_guide.faq_2_a') },
+    { q: t('landlord_guide.faq_3_q'), a: t('landlord_guide.faq_3_a') },
+    { q: t('landlord_guide.faq_4_q'), a: t('landlord_guide.faq_4_a') },
+    { q: t('landlord_guide.faq_5_q'), a: t('landlord_guide.faq_5_a') },
+    { q: t('landlord_guide.faq_6_q'), a: t('landlord_guide.faq_6_a') },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ===================== HERO ===================== */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 text-white">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-10 left-10 w-72 h-72 bg-white rounded-full blur-3xl"></div>
@@ -319,14 +279,13 @@ const LandlordGuide = () => {
         <div className="container mx-auto px-4 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight">
-              Landlord{' '}
+              {t('landlord_guide.hero_title_before')}{' '}
               <span className="bg-gradient-to-r from-primary-200 to-primary-400 bg-clip-text text-transparent">
-                Guide
+                {t('landlord_guide.hero_title_highlight')}
               </span>
             </h1>
             <p className="text-lg md:text-xl text-primary-100 max-w-3xl mx-auto leading-relaxed">
-              Everything you need to know about listing, managing, and renting your properties
-              successfully on RentalHub NG — from preparation to tenant move-in.
+              {t('landlord_guide.hero_desc')}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link
@@ -334,14 +293,14 @@ const LandlordGuide = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaHome />
-                List Your Property
+                {t('landlord_guide.hero_cta_list')}
               </Link>
               <Link
                 to="/pricing"
                 className="inline-flex items-center gap-2 px-8 py-3.5 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 hover:border-white/50 transition-all duration-300"
               >
                 <FaMoneyBillWave />
-                View Pricing Plans
+                {t('landlord_guide.hero_cta_pricing')}
               </Link>
               <ShareButton
                 section="Landlord Guide"
@@ -359,7 +318,6 @@ const LandlordGuide = () => {
         </div>
       </section>
 
-      {/* ===================== STATS ===================== */}
       <section className="py-16 bg-primary-600">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto">
@@ -370,7 +328,7 @@ const LandlordGuide = () => {
                 <ShareButton
                   section={stat.label}
                   title={`RentalHub NG — ${stat.value} ${stat.label}`}
-                  description={`RentalHub NG has ${stat.value} ${stat.label.toLowerCase()}. Join thousands of successful landlords.`}
+                  description={`RentalHub NG has ${stat.value} ${stat.label}. Join thousands of successful landlords.`}
                 />
               </div>
             ))}
@@ -378,14 +336,13 @@ const LandlordGuide = () => {
         </div>
       </section>
 
-      {/* ===================== QUICK START STEPS ===================== */}
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Getting Started</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('landlord_guide.started_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                How to Prepare Your Listing
+                {t('landlord_guide.started_heading')}
               </h2>
               <ShareButton
                 section="Getting Started"
@@ -394,7 +351,7 @@ const LandlordGuide = () => {
               />
             </div>
             <p className="text-gray-600">
-              Follow these steps to create a listing that attracts quality tenants quickly.
+              {t('landlord_guide.started_desc')}
             </p>
           </div>
 
@@ -441,14 +398,13 @@ const LandlordGuide = () => {
         </div>
       </section>
 
-      {/* ===================== BEST PRACTICES ===================== */}
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Best Practices</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('landlord_guide.practices_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Tips for Successful Listings
+                {t('landlord_guide.practices_heading')}
               </h2>
               <ShareButton
                 section="Best Practices"
@@ -457,7 +413,7 @@ const LandlordGuide = () => {
               />
             </div>
             <p className="text-gray-600">
-              Proven strategies to help your property stand out and attract the right tenants.
+              {t('landlord_guide.practices_desc')}
             </p>
           </div>
 
@@ -493,14 +449,13 @@ const LandlordGuide = () => {
         </div>
       </section>
 
-      {/* ===================== PRO TIPS ===================== */}
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Pro Tips</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('landlord_guide.protips_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Expert Advice for Landlords
+                {t('landlord_guide.protips_heading')}
               </h2>
               <ShareButton
                 section="Pro Tips"
@@ -509,7 +464,7 @@ const LandlordGuide = () => {
               />
             </div>
             <p className="text-gray-600">
-              Level up your landlord game with these expert insights.
+              {t('landlord_guide.protips_desc')}
             </p>
           </div>
 
@@ -537,14 +492,13 @@ const LandlordGuide = () => {
         </div>
       </section>
 
-      {/* ===================== COMMON MISTAKES ===================== */}
       <section className="py-16 md:py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">Avoid These</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('landlord_guide.mistakes_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Common Mistakes to Avoid
+                {t('landlord_guide.mistakes_heading')}
               </h2>
               <ShareButton
                 section="Common Mistakes"
@@ -553,7 +507,7 @@ const LandlordGuide = () => {
               />
             </div>
             <p className="text-gray-600">
-              Avoid these pitfalls to ensure a smooth and successful property listing experience.
+              {t('landlord_guide.mistakes_desc')}
             </p>
           </div>
 
@@ -574,7 +528,7 @@ const LandlordGuide = () => {
                 </div>
                 <div className="ml-14 p-4 bg-green-50 rounded-xl border border-green-100">
                   <p className="text-sm text-green-800">
-                    <span className="font-semibold">Fix:</span> {item.fix}
+                    <span className="font-semibold">{t('landlord_guide.fix_label')}:</span> {item.fix}
                   </p>
                 </div>
               </div>
@@ -583,14 +537,13 @@ const LandlordGuide = () => {
         </div>
       </section>
 
-      {/* ===================== FAQ ===================== */}
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
-            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">FAQ</span>
+            <span className="text-primary-600 font-semibold text-sm uppercase tracking-widest">{t('landlord_guide.faq_badge')}</span>
             <div className="flex items-center justify-center gap-4 mt-3 mb-4">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Frequently Asked Questions
+                {t('landlord_guide.faq_heading')}
               </h2>
               <ShareButton
                 section="FAQ"
@@ -599,7 +552,7 @@ const LandlordGuide = () => {
               />
             </div>
             <p className="text-gray-600">
-              Everything you need to know about listing on RentalHub NG.
+              {t('landlord_guide.faq_desc')}
             </p>
           </div>
 
@@ -634,16 +587,14 @@ const LandlordGuide = () => {
         </div>
       </section>
 
-      {/* ===================== CTA ===================== */}
       <section className="py-16 md:py-20 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 text-white">
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to List Your Property?
+              {t('landlord_guide.cta_heading')}
             </h2>
             <p className="text-primary-100 text-lg mb-10 leading-relaxed">
-              Join over 5,000 successful landlords on RentalHub NG. List your property today
-              and start connecting with verified, qualified tenants across Nigeria.
+              {t('landlord_guide.cta_desc')}
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
@@ -651,14 +602,14 @@ const LandlordGuide = () => {
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-800 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
                 <FaHome />
-                List Your Property Now
+                {t('landlord_guide.cta_list')}
               </Link>
               <Link
                 to="/register"
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-primary-500 text-white font-semibold rounded-xl shadow-lg hover:bg-primary-400 hover:scale-105 transition-all duration-300"
               >
                 <FaUsers />
-                Create Free Account
+                {t('landlord_guide.cta_create')}
               </Link>
               <ShareButton
                 section="Call to Action"
@@ -670,16 +621,14 @@ const LandlordGuide = () => {
         </div>
       </section>
 
-      {/* ===================== CONTACT ===================== */}
       <section className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-              Need Help With Your Listing?
+              {t('landlord_guide.contact_heading')}
             </h2>
             <p className="text-gray-600 mb-12 max-w-2xl mx-auto">
-              Our support team is here to help you every step of the way — from setting up your
-              account to publishing your first listing.
+              {t('landlord_guide.contact_desc')}
             </p>
             <div className="flex justify-center mb-10">
               <ShareButton
@@ -697,7 +646,7 @@ const LandlordGuide = () => {
                   <FaEnvelope className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Email us</p>
+                  <p className="text-sm text-gray-500">{t('landlord_guide.contact_email')}</p>
                   <p className="text-gray-900 font-semibold">support@rentalhub.com.ng</p>
                 </div>
               </a>
@@ -709,7 +658,7 @@ const LandlordGuide = () => {
                   <FaPhoneAlt className="text-xl text-primary-600" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm text-gray-500">Call us</p>
+                  <p className="text-sm text-gray-500">{t('landlord_guide.contact_call')}</p>
                   <p className="text-gray-900 font-semibold">+234 803 060 1238</p>
                 </div>
               </a>

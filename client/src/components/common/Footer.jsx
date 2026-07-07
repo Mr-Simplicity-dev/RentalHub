@@ -105,7 +105,7 @@ const Footer = () => {
                   enabled={mobileContactLinksEnabled}
                 >
                   <FaEnvelope className="text-primary-400 mt-1 shrink-0" />
-                  <span>support@rentalhub.com.ng</span>
+                  <span dir="ltr" className="inline-block">support@rentalhub.com.ng</span>
                 </FooterContact>
               </li>
               <li>
@@ -114,7 +114,7 @@ const Footer = () => {
                   enabled={mobileContactLinksEnabled}
                 >
                   <FaPhoneAlt className="text-primary-400 mt-1 shrink-0" />
-                  <span>+234 8030601238</span>
+                  <span dir="ltr" className="inline-block">+234 8030601238</span>
                 </FooterContact>
               </li>
               <li>
@@ -123,7 +123,7 @@ const Footer = () => {
                   enabled={mobileContactLinksEnabled}
                 >
                   <FaPhoneAlt className="text-primary-400 mt-1 shrink-0" />
-                  <span>+234 9052187099</span>
+                  <span dir="ltr" className="inline-block">+234 9052187099</span>
                 </FooterContact>
               </li>
             </ul>

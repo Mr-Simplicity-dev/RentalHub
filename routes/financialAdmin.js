@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
+const db = require('../config/middleware/database');
 const financialAdminController = require('../controllers/financialAdminController');
 const stateAdminController = require('../controllers/stateAdminController');
 const { authenticate } = require('../config/middleware/auth');
@@ -797,9 +798,9 @@ router.put('/commission-config',
 
         if (oldVal !== undefined && parseFloat(value) !== oldVal) {
           await db.query(
-            `INSERT INTO transaction_audits (admin_id, action_type, amount, description, performed_by)
+          `INSERT INTO transaction_audits (admin_id, action_type, amount, description, performed_by)
              VALUES ($1, 'commission_rate_changed', $2, $3, $4)`,
-            [req.user.id, 0, `Commission config "${key}" changed from ${oldVal} to ${value}`]
+            [req.user.id, 0, `Commission config "${key}" changed from ${oldVal} to ${value}`, req.user.id]
           );
         }
       }

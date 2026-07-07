@@ -1,12 +1,14 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaMobileAlt, FaDownload, FaShieldAlt, FaBell, FaComments, FaHome } from 'react-icons/fa';
 
 const MobileAppPage = () => {
+  const { t } = useTranslation();
   const features = [
-    { icon: <FaBell />, title: 'Instant Alerts', desc: 'Get notified when new properties match your search criteria.' },
-    { icon: <FaComments />, title: 'In-App Chat', desc: 'Message landlords and tenants directly from your phone.' },
-    { icon: <FaHome />, title: 'Browse Properties', desc: 'Search, filter, and save your favourite listings on the go.' },
-    { icon: <FaShieldAlt />, title: 'Legal Support', desc: 'Submit legal assistance requests and track case progress.' },
+    { icon: <FaBell />, title: t('mobile_app.feature_instant_alerts'), desc: t('mobile_app.feature_instant_alerts_desc') },
+    { icon: <FaComments />, title: t('mobile_app.feature_in_app_chat'), desc: t('mobile_app.feature_in_app_chat_desc') },
+    { icon: <FaHome />, title: t('mobile_app.feature_browse_properties'), desc: t('mobile_app.feature_browse_properties_desc') },
+    { icon: <FaShieldAlt />, title: t('mobile_app.feature_legal_support'), desc: t('mobile_app.feature_legal_support_desc') },
   ];
 
   return (
@@ -14,9 +16,9 @@ const MobileAppPage = () => {
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 text-white">
         <div className="container mx-auto px-4 py-20 text-center">
           <FaMobileAlt className="mx-auto text-6xl mb-6 text-primary-300" />
-          <h1 className="text-4xl font-extrabold md:text-5xl mb-4">RentalHub Mobile App</h1>
+          <h1 className="text-4xl font-extrabold md:text-5xl mb-4">{t('mobile_app.title')}</h1>
           <p className="text-lg text-slate-200 max-w-2xl mx-auto mb-8">
-            Manage your rentals, chat with landlords and tenants, and access legal support — all from your phone.
+            {t('mobile_app.subtitle')}
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <a
@@ -24,7 +26,7 @@ const MobileAppPage = () => {
               className="inline-flex items-center justify-center gap-2 bg-white text-primary-700 px-8 py-3 rounded-xl font-semibold hover:bg-gray-100 transition"
             >
               <FaDownload />
-              Download for Android
+              {t('mobile_app.download_android')}
             </a>
             <a
               href={process.env.REACT_APP_IOS_APP_URL || '#'}
@@ -32,14 +34,14 @@ const MobileAppPage = () => {
               onClick={(e) => { if (!process.env.REACT_APP_IOS_APP_URL) e.preventDefault(); }}
             >
               <FaDownload />
-              iOS (Coming Soon)
+              {t('mobile_app.download_ios')}
             </a>
           </div>
         </div>
       </section>
 
       <section className="container mx-auto px-4 py-16">
-        <h2 className="text-2xl font-bold text-slate-900 text-center mb-10">Everything in the app</h2>
+        <h2 className="text-2xl font-bold text-slate-900 text-center mb-10">{t('mobile_app.features_heading')}</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((f, i) => (
             <div key={i} className="bg-white rounded-2xl border border-slate-200 p-6 text-center">
@@ -53,14 +55,14 @@ const MobileAppPage = () => {
 
       <section className="bg-white border-t border-slate-200 py-12">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-xl font-bold text-slate-900 mb-2">APK direct download</h2>
-          <p className="text-sm text-slate-600 mb-4">Download the APK and install it manually on your Android device.</p>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">{t('mobile_app.apk_heading')}</h2>
+          <p className="text-sm text-slate-600 mb-4">{t('mobile_app.apk_desc')}</p>
           <a
             href="/api/downloads/app"
             className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-700 transition"
           >
             <FaDownload />
-            Download RentalHub.apk
+            {t('mobile_app.apk_download_button')}
           </a>
         </div>
       </section>
