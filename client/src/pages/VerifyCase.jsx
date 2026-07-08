@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useSearchParams } from "react-router-dom";
 import BackToDashboard from "../components/common/BackToDashboard";
+import { useTranslation } from 'react-i18next';
 
 const VERIFICATION_FEE_LABEL = "N20,000";
 
 export default function VerifyCase() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const disputeFromUrl = searchParams.get("dispute");
   const verificationReference =
@@ -45,7 +47,7 @@ export default function VerifyCase() {
         console.error(err);
         setError(
           err.response?.data?.message ||
-            "Verification failed. Confirm payment and try again."
+            t("verify_case.verification_failed_confirm")
         );
       } finally {
         setLoading(false);
@@ -58,12 +60,12 @@ export default function VerifyCase() {
     const targetId = disputeId.trim();
 
     if (!targetId) {
-      setError("Enter a dispute ID to continue.");
+      setError(t("verify_case.enter_dispute_id"));
       return;
     }
 
     if (!payerEmail.trim()) {
-      setError("Enter your email to pay for verification.");
+      setError(t("verify_case.enter_email_pay"));
       return;
     }
 
@@ -85,13 +87,13 @@ export default function VerifyCase() {
         return;
       }
 
-      setError("Unable to start payment. Try again.");
+      setError(t("verify_case.unable_to_start_payment"));
       setLoading(false);
     } catch (err) {
       console.error(err);
       setError(
         err.response?.data?.message ||
-          "Failed to initialize verification payment."
+          t("verify_case.init_payment_failed")
       );
       setLoading(false);
     }
@@ -115,12 +117,11 @@ export default function VerifyCase() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="text-center sm:text-left">
             <h1 className="text-2xl font-semibold">
-              Digital Evidence Verification
+              {t("verify_case.title")}
             </h1>
 
             <p className="text-gray-500 text-sm mt-1">
-              Pay {VERIFICATION_FEE_LABEL} to verify the integrity of dispute
-              evidence
+              {t("verify_case.desc", { fee: VERIFICATION_FEE_LABEL })}
             </p>
           </div>
 
@@ -128,10 +129,9 @@ export default function VerifyCase() {
         </div>
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
-          <p className="font-medium">Verification fee: {VERIFICATION_FEE_LABEL}</p>
+          <p className="font-medium">{t("verify_case.fee_label", { fee: VERIFICATION_FEE_LABEL })}</p>
           <p className="mt-1">
-            Payment is required before any evidence verification result is
-            shown.
+            {t("verify_case.payment_notice")}
           </p>
         </div>
 
@@ -140,7 +140,7 @@ export default function VerifyCase() {
             type="text"
             value={disputeId}
             onChange={(e) => setDisputeId(e.target.value)}
-            placeholder="Enter Dispute ID"
+            placeholder={t("verify_case.dispute_id_placeholder")}
             className="border border-soft rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
 
@@ -148,7 +148,7 @@ export default function VerifyCase() {
             type="email"
             value={payerEmail}
             onChange={(e) => setPayerEmail(e.target.value)}
-            placeholder="Enter your email"
+            placeholder={t("verify_case.email_placeholder")}
             className="border border-soft rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -157,7 +157,7 @@ export default function VerifyCase() {
           type="text"
           value={payerName}
           onChange={(e) => setPayerName(e.target.value)}
-          placeholder="Enter your name (optional)"
+          placeholder={t("verify_case.name_placeholder")}
           className="w-full border border-soft rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
 
@@ -167,15 +167,15 @@ export default function VerifyCase() {
             disabled={loading}
             className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 transition disabled:opacity-70"
           >
-            {loading ? "Processing..." : `Pay ${VERIFICATION_FEE_LABEL} to Verify`}
+            {loading ? t("verify_case.processing") : t("verify_case.pay_btn", { fee: VERIFICATION_FEE_LABEL })}
           </button>
         </div>
 
         {loading && (
           <div className="text-center text-sm text-gray-500">
             {verificationReference
-              ? "Confirming payment and verifying evidence..."
-              : "Redirecting to secure payment..."}
+              ? t("verify_case.confirming")
+              : t("verify_case.redirecting")}
           </div>
         )}
 
@@ -188,13 +188,13 @@ export default function VerifyCase() {
         {result && (
           <div className="space-y-6 border-t border-soft pt-6">
             <h2 className="text-lg font-semibold">
-              Verification Result
+              {t("verify_case.result_title")}
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="border border-soft rounded-lg p-4">
                 <p className="text-xs text-gray-500 mb-1">
-                  Merkle Root
+                  {t("verify_case.merkle_root")}
                 </p>
 
                 <p className="text-sm break-all">
@@ -204,7 +204,7 @@ export default function VerifyCase() {
 
               <div className="border border-soft rounded-lg p-4">
                 <p className="text-xs text-gray-500 mb-1">
-                  Root Integrity
+                  {t("verify_case.root_integrity")}
                 </p>
 
                 <span
@@ -214,14 +214,14 @@ export default function VerifyCase() {
                       : "bg-red-100 text-red-700"
                   }`}
                 >
-                  {result.merkleValid ? "VALID" : "INVALID"}
+                  {result.merkleValid ? t("verify_case.valid") : t("verify_case.invalid")}
                 </span>
               </div>
             </div>
 
             <div>
               <h3 className="text-md font-semibold mb-3">
-                Evidence Files
+                {t("verify_case.evidence_files")}
               </h3>
 
               <div className="space-y-3">
@@ -236,7 +236,7 @@ export default function VerifyCase() {
                       </p>
 
                       <p className="text-xs text-gray-500">
-                        File integrity verification
+                        {t("verify_case.file_integrity")}
                       </p>
                     </div>
 
@@ -247,7 +247,7 @@ export default function VerifyCase() {
                           : "bg-red-100 text-red-700"
                       }`}
                     >
-                      {file.valid ? "VERIFIED" : "TAMPERED"}
+                      {file.valid ? t("verify_case.verified") : t("verify_case.tampered")}
                     </span>
                   </div>
                 ))}

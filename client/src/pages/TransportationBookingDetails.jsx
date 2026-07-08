@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 import {
   FaTruck,
   FaCalendarAlt,
@@ -21,6 +22,7 @@ import BackToDashboard from '../components/common/BackToDashboard';
 import BookingCancelModal from '../components/common/BookingCancelModal';
 
 const TransportationBookingDetails = () => {
+  const { t } = useTranslation();
   const { bookingId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -34,7 +36,7 @@ const TransportationBookingDetails = () => {
   useEffect(() => {
     const loadBookingDetails = async () => {
       if (!user || user.user_type !== 'tenant') {
-        toast.error('Only tenants can view booking details');
+        toast.error(t('transportation_booking_details.only_tenants'));
         navigate('/dashboard');
         return;
       }
@@ -48,19 +50,19 @@ const TransportationBookingDetails = () => {
           
           // Check if booking belongs to user
           if (bookingData.tenant_id !== user.id) {
-            toast.error('Access denied');
+            toast.error(t('transportation_booking_details.access_denied'));
             navigate('/dashboard');
             return;
           }
           
           setBooking(bookingData);
         } else {
-          toast.error('Booking not found');
+          toast.error(t('transportation_booking_details.not_found'));
           navigate('/transportation/bookings');
         }
       } catch (error) {
         console.error('Error loading booking details:', error);
-        toast.error('Failed to load booking details');
+        toast.error(t('transportation_booking_details.failed_load'));
         navigate('/transportation/bookings');
       } finally {
         setLoading(false);
@@ -154,20 +156,20 @@ const TransportationBookingDetails = () => {
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-3xl mx-auto px-4">
           <div className="bg-white rounded-lg shadow p-8 text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Booking Not Found</h1>
-            <p className="text-gray-600 mb-6">The transportation booking could not be found.</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{t('transportation_booking_details.not_found_title')}</h1>
+            <p className="text-gray-600 mb-6">{t('transportation_booking_details.not_found_msg')}</p>
             <button
               onClick={() => navigate('/transportation/bookings')}
               className="btn btn-primary"
             >
-              View All Bookings
+              {t('transportation_booking_details.view_all_bookings')}
             </button>
 
             <button
               onClick={() => navigate('/dashboard')}
               className="btn btn-outline ml-2"
             >
-              Return to Dashboard
+              {t('transportation_booking_details.return_dashboard')}
             </button>
 
           </div>

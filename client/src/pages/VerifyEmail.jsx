@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { setAuthSession } from '../services/authStorage';
+import { useTranslation } from 'react-i18next';
 
 const VerifyEmail = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const navigate = useNavigate();
@@ -15,7 +17,7 @@ const VerifyEmail = () => {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setMessage('Invalid verification link.');
+      setMessage(t('verify_email.invalid_link'));
       return;
     }
 
@@ -31,16 +33,16 @@ const VerifyEmail = () => {
           api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
 
           setStatus('success');
-          setMessage(res.data.message || 'Your email has been verified successfully.');
+          setMessage(res.data.message || t('verify_email.success_msg'));
         } else {
           setStatus('error');
-          setMessage(res.data?.message || 'Verification failed.');
+          setMessage(res.data?.message || t('verify_email.verification_failed'));
         }
       } catch (err) {
         setStatus('error');
         setMessage(
           err.response?.data?.message ||
-          'Invalid or expired verification link.'
+          t('verify_email.expired_link')
         );
       }
     };
@@ -70,20 +72,20 @@ const VerifyEmail = () => {
         {status === 'verifying' && (
           <>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              Verifying your email…
+              {t('verify_email.verifying')}
             </h2>
-            <p className="text-gray-600">Please wait a moment.</p>
+            <p className="text-gray-600">{t('verify_email.wait')}</p>
           </>
         )}
 
         {status === 'success' && (
           <>
             <h2 className="text-xl font-semibold text-green-700 mb-2">
-              Email Verified
+              {t('verify_email.success_title')}
             </h2>
             <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500">
-              Redirecting to phone verification in {countdown}s…
+              {t('verify_email.redirecting')}{countdown}{t('verify_email.seconds')}
             </p>
           </>
         )}
@@ -91,7 +93,7 @@ const VerifyEmail = () => {
         {status === 'error' && (
           <>
             <h2 className="text-xl font-semibold text-red-700 mb-2">
-              Verification Failed
+              {t('verify_email.failed_title')}
             </h2>
             <p className="text-gray-600 mb-6">{message}</p>
 
@@ -100,20 +102,20 @@ const VerifyEmail = () => {
                 onClick={() => navigate('/login')}
                 className="btn-primary w-full"
               >
-                Go to Login
+                {t('verify_email.go_to_login')}
               </button>
 
               <button
                 onClick={() => navigate('/register')}
                 className="btn-outline w-full"
               >
-                Create New Account
+                {t('verify_email.create_account')}
               </button>
               <button
                 onClick={() => navigate('/dashboard')}
                 className="btn btn-outline mt-4"
               >
-                Back
+                {t('verify_email.back')}
               </button>
             </div>
           </>

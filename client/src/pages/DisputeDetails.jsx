@@ -4,11 +4,7 @@ import api from '../services/api';
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 import DisputeQRCode from '../components/DisputeQRCode';
-
-const formatDateTime = (value) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
-};
+import { useTranslation } from 'react-i18next';
 
 const getEvidenceStatusBadge = (status) => {
   if (status === 'verified') return 'bg-emerald-100 text-emerald-700';
@@ -18,6 +14,11 @@ const getEvidenceStatusBadge = (status) => {
 };
 
 export default function DisputeDetails() {
+  const { t } = useTranslation();
+  const formatDateTime = (value) => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? t('dispute_details.na') : date.toLocaleString();
+  };
   const { disputeId } = useParams();
   const { user } = useAuth();
   const [payload, setPayload] = useState(null);
@@ -43,7 +44,7 @@ export default function DisputeDetails() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err.response?.data?.message || 'Failed to load dispute');
+          setError(err.response?.data?.message || t('dispute_details.load_failed'));
         }
       } finally {
         if (!cancelled) {
@@ -70,13 +71,13 @@ export default function DisputeDetails() {
       const formData = new FormData();
       formData.append('file', selectedFile);
       await api.post(`/disputes/${disputeId}/evidence`, formData);
-      toast.success('Evidence uploaded');
+      toast.success(t('dispute_details.evidence_uploaded'));
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       const res = await api.get(`/disputes/${disputeId}`);
       setPayload(res.data?.data || null);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Upload failed');
+      toast.error(err.response?.data?.message || t('dispute_details.upload_failed'));
     } finally {
       setUploading(false);
     }
@@ -92,7 +93,7 @@ export default function DisputeDetails() {
       const res = await api.get(`/disputes/${disputeId}`);
       setPayload(res.data?.data || null);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send message');
+      toast.error(err.response?.data?.message || t('dispute_details.send_failed'));
     } finally {
       setSendingMsg(false);
     }
@@ -118,15 +119,15 @@ export default function DisputeDetails() {
       const res = await api.get(`/disputes/${disputeId}`);
       setPayload(res.data?.data || null);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to edit message');
+      toast.error(err.response?.data?.message || t('dispute_details.edit_failed'));
     } finally {
       setSavingEdit(false);
     }
   };
 
-  if (loading) return <div className="p-6">Loading dispute...</div>;
+  if (loading) return <div className="p-6">{t('dispute_details.loading')}</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
-  if (!payload?.dispute) return <div className="p-6">Dispute not found.</div>;
+  if (!payload?.dispute) return <div className="p-6">{t('dispute_details.not_found')}</div>;
 
   const {
     dispute,
@@ -145,58 +146,58 @@ export default function DisputeDetails() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-700">
-                Dispute Traceability
+                {t('dispute_details.traceability')}
               </p>
               <h1 className="mt-3 text-3xl font-bold text-gray-900">
-                {dispute.title || `Dispute #${dispute.id}`}
+                {dispute.title || `${t('dispute_details.dispute_prefix')}${dispute.id}`}
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-600">{dispute.description}</p>
             </div>
 
             <div className="rounded-2xl border border-gray-200 p-4 text-sm text-gray-600">
               <div>
-                <span className="font-semibold text-gray-900">Status:</span> {dispute.status}
+                <span className="font-semibold text-gray-900">{t('dispute_details.status_label')}</span> {dispute.status}
               </div>
               <div className="mt-2">
-                <span className="font-semibold text-gray-900">Opened:</span> {formatDateTime(dispute.created_at)}
+                <span className="font-semibold text-gray-900">{t('dispute_details.opened_label')}</span> {formatDateTime(dispute.created_at)}
               </div>
               <div className="mt-2">
-                <span className="font-semibold text-gray-900">Sealed:</span> {dispute.is_legally_sealed ? 'Yes' : 'No'}
+                <span className="font-semibold text-gray-900">{t('dispute_details.sealed_label')}</span> {dispute.is_legally_sealed ? t('dispute_details.yes') : t('dispute_details.no')}
               </div>
             </div>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl bg-stone-100 p-4">
-              <p className="text-xs uppercase tracking-wide text-gray-500">Opened By</p>
-              <p className="mt-2 font-semibold text-gray-900">{dispute.opened_by_name || '-'}</p>
-              <p className="text-sm text-gray-600">{dispute.opened_by_email || '-'}</p>
+              <p className="text-xs uppercase tracking-wide text-gray-500">{t('dispute_details.opened_by')}</p>
+              <p className="mt-2 font-semibold text-gray-900">{dispute.opened_by_name || t('dispute_details.na')}</p>
+              <p className="text-sm text-gray-600">{dispute.opened_by_email || t('dispute_details.na')}</p>
             </div>
             <div className="rounded-2xl bg-stone-100 p-4">
-              <p className="text-xs uppercase tracking-wide text-gray-500">Against</p>
-              <p className="mt-2 font-semibold text-gray-900">{dispute.against_name || '-'}</p>
-              <p className="text-sm text-gray-600">{dispute.against_email || '-'}</p>
+              <p className="text-xs uppercase tracking-wide text-gray-500">{t('dispute_details.against')}</p>
+              <p className="mt-2 font-semibold text-gray-900">{dispute.against_name || t('dispute_details.na')}</p>
+              <p className="text-sm text-gray-600">{dispute.against_email || t('dispute_details.na')}</p>
             </div>
             <div className="rounded-2xl bg-stone-100 p-4">
-              <p className="text-xs uppercase tracking-wide text-gray-500">Property</p>
-              <p className="mt-2 font-semibold text-gray-900">{dispute.property_title || '-'}</p>
+              <p className="text-xs uppercase tracking-wide text-gray-500">{t('dispute_details.property')}</p>
+              <p className="mt-2 font-semibold text-gray-900">{dispute.property_title || t('dispute_details.na')}</p>
               <p className="text-sm text-gray-600">
-                {[dispute.area, dispute.city, dispute.state].filter(Boolean).join(', ') || '-'}
+                {[dispute.area, dispute.city, dispute.state].filter(Boolean).join(', ') || t('dispute_details.na')}
               </p>
             </div>
             <div className="rounded-2xl bg-stone-100 p-4">
-              <p className="text-xs uppercase tracking-wide text-gray-500">Audit Entries</p>
+              <p className="text-xs uppercase tracking-wide text-gray-500">{t('dispute_details.audit_entries')}</p>
               <p className="mt-2 font-semibold text-gray-900">{audit_logs.length}</p>
-              <p className="text-sm text-gray-600">Evidence items: {evidence.length}</p>
+              <p className="text-sm text-gray-600">{t('dispute_details.evidence_items')} {evidence.length}</p>
             </div>
           </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <section className="space-y-6 rounded-3xl bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-semibold text-gray-900">Dispute timeline</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">{t('dispute_details.timeline')}</h2>
             {timeline.length === 0 ? (
-              <p className="text-gray-500">No trace data yet.</p>
+              <p className="text-gray-500">{t('dispute_details.no_trace')}</p>
             ) : (
               <div className="space-y-4">
                 {timeline.map((item, index) => (
@@ -205,7 +206,7 @@ export default function DisputeDetails() {
                       <div>
                         <p className="font-semibold text-gray-900">{item.summary}</p>
                         <p className="text-sm text-gray-500">
-                          {item.actor_name || 'System'}{item.actor_role ? ` • ${item.actor_role}` : ''}
+                          {item.actor_name || t('dispute_details.system')}{item.actor_role ? ` • ${item.actor_role}` : ''}
                         </p>
                       </div>
                       <p className="text-sm text-gray-500">{formatDateTime(item.happened_at)}</p>
@@ -223,9 +224,9 @@ export default function DisputeDetails() {
 
           <section className="space-y-6">
             <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="text-2xl font-semibold text-gray-900">Assigned lawyers</h2>
+              <h2 className="text-2xl font-semibold text-gray-900">{t('dispute_details.assigned_lawyers')}</h2>
               {authorized_lawyers.length === 0 ? (
-                <p className="mt-4 text-gray-500">No lawyer assignment found for this dispute.</p>
+                <p className="mt-4 text-gray-500">{t('dispute_details.no_lawyer')}</p>
               ) : (
                 <div className="mt-4 space-y-3">
                   {authorized_lawyers.map((lawyer) => (
@@ -233,7 +234,7 @@ export default function DisputeDetails() {
                       <p className="font-semibold text-gray-900">{lawyer.full_name || lawyer.email}</p>
                       <p className="text-sm text-gray-600">{lawyer.email}</p>
                       <p className="mt-2 text-sm text-gray-500">
-                        Assigned by {lawyer.assigned_by_name || lawyer.client_name || 'Unknown'}
+                        {t('dispute_details.assigned_by')}{lawyer.assigned_by_name || lawyer.client_name || t('dispute_details.unknown')}
                       </p>
                     </div>
                   ))}
@@ -242,31 +243,31 @@ export default function DisputeDetails() {
             </div>
 
             <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="text-2xl font-semibold text-gray-900">Lawyer Work Progress</h2>
+              <h2 className="text-2xl font-semibold text-gray-900">{t('dispute_details.lawyer_progress')}</h2>
               {dispute.lawyer_summary ? (
                 <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                  <p className="text-sm font-semibold text-blue-900">Lawyer Summary</p>
+                  <p className="text-sm font-semibold text-blue-900">{t('dispute_details.lawyer_summary')}</p>
                   <p className="mt-2 whitespace-pre-line text-sm leading-7 text-blue-900">{dispute.lawyer_summary}</p>
                   <p className="mt-2 text-xs text-blue-700">
-                    Updated by {dispute.lawyer_summary_by_name || 'lawyer'} on {formatDateTime(dispute.lawyer_summary_at)}
+                    {t('dispute_details.updated_by')}{dispute.lawyer_summary_by_name || t('dispute_details.lawyer_fallback')} on {formatDateTime(dispute.lawyer_summary_at)}
                   </p>
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-gray-500">No lawyer summary yet.</p>
+                <p className="mt-4 text-sm text-gray-500">{t('dispute_details.no_summary')}</p>
               )}
 
               <div className="mt-5">
-                <h3 className="text-base font-semibold text-gray-900">Client-visible lawyer notes</h3>
+                <h3 className="text-base font-semibold text-gray-900">{t('dispute_details.lawyer_notes')}</h3>
                 {case_notes.length === 0 ? (
-                  <p className="mt-2 text-sm text-gray-500">No client-visible notes yet.</p>
+                  <p className="mt-2 text-sm text-gray-500">{t('dispute_details.no_notes')}</p>
                 ) : (
                   <div className="mt-3 space-y-3">
                     {case_notes.map((note) => (
                       <div key={note.id} className="rounded-xl border border-gray-200 p-3">
-                        <p className="font-semibold text-gray-900">{note.title || 'Lawyer note'}</p>
+                        <p className="font-semibold text-gray-900">{note.title || t('dispute_details.note_fallback_title')}</p>
                         <p className="mt-2 whitespace-pre-line text-sm text-gray-700">{note.content}</p>
                         <p className="mt-2 text-xs text-gray-500">
-                          {note.lawyer_name || 'Lawyer'} • {formatDateTime(note.updated_at || note.created_at)}
+                          {note.lawyer_name || t('dispute_details.note_fallback_lawyer')} • {formatDateTime(note.updated_at || note.created_at)}
                         </p>
                       </div>
                     ))}
@@ -276,9 +277,9 @@ export default function DisputeDetails() {
             </div>
 
             <div className="rounded-3xl bg-white p-8 shadow-sm">
-              <h2 className="text-2xl font-semibold text-gray-900">Evidence verification</h2>
+              <h2 className="text-2xl font-semibold text-gray-900">{t('dispute_details.evidence_verification')}</h2>
               <p className="mt-3 text-sm leading-7 text-gray-600">
-                Use the QR code or direct verification screen to validate dispute integrity.
+                {t('dispute_details.verify_instruction')}
               </p>
               <div className="mt-5">
                 <DisputeQRCode disputeId={dispute.id} />
@@ -287,7 +288,7 @@ export default function DisputeDetails() {
                 to={`/verify-case?dispute=${dispute.id}`}
                 className="mt-5 inline-flex rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white"
               >
-                Verify dispute evidence
+                {t('dispute_details.verify_evidence')}
               </Link>
             </div>
           </section>
@@ -295,14 +296,14 @@ export default function DisputeDetails() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           <section className="rounded-3xl bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-semibold text-gray-900">Messages</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">{t('dispute_details.messages')}</h2>
             {!dispute.is_legally_sealed && (
               <form onSubmit={handleSendMessage} className="mt-4 flex gap-3">
                 <input
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
+                  placeholder={t('dispute_details.message_placeholder')}
                   className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-primary-600"
                 />
                 <button
@@ -310,21 +311,21 @@ export default function DisputeDetails() {
                   disabled={sendingMsg || !newMessage.trim()}
                   className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
                 >
-                  {sendingMsg ? 'Sending...' : 'Send'}
+                  {sendingMsg ? t('dispute_details.sending') : t('dispute_details.send')}
                 </button>
               </form>
             )}
             {messages.length === 0 ? (
-              <p className="mt-4 text-gray-500">No messages recorded yet.</p>
+              <p className="mt-4 text-gray-500">{t('dispute_details.no_messages')}</p>
             ) : (
               <div className="mt-4 space-y-3">
                 {messages.map((message) => (
                   <div key={message.id} className="rounded-2xl border border-gray-200 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="font-semibold text-gray-900">{message.sender_name || 'Unknown user'}</p>
+                      <p className="font-semibold text-gray-900">{message.sender_name || t('dispute_details.unknown_user')}</p>
                       <div className="flex items-center gap-3">
                         {(message.edit_count > 0) && (
-                          <span className="text-xs text-gray-400 italic">edited ({message.edit_count}/2)</span>
+                          <span className="text-xs text-gray-400 italic">{t('dispute_details.edited_label', { count: message.edit_count })}</span>
                         )}
                         <p className="text-sm text-gray-500">{formatDateTime(message.created_at)}</p>
                       </div>
@@ -343,13 +344,13 @@ export default function DisputeDetails() {
                             disabled={savingEdit || !editMessageText.trim()}
                             className="rounded-full bg-primary-600 px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                           >
-                            {savingEdit ? 'Saving...' : 'Save'}
+                            {savingEdit ? t('dispute_details.saving') : t('dispute_details.save')}
                           </button>
                           <button
                             onClick={cancelEditing}
                             className="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-medium text-gray-600"
                           >
-                            Cancel
+                            {t('dispute_details.cancel')}
                           </button>
                         </div>
                       </div>
@@ -361,7 +362,7 @@ export default function DisputeDetails() {
                         onClick={() => startEditing(message)}
                         className="mt-2 text-xs text-primary-600 hover:underline"
                       >
-                        Edit
+{t('dispute_details.edit_btn')}
                       </button>
                     )}
                   </div>
@@ -371,9 +372,9 @@ export default function DisputeDetails() {
           </section>
 
           <section className="rounded-3xl bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-semibold text-gray-900">Legal audit logs</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">{t('dispute_details.legal_audit_logs')}</h2>
             {audit_logs.length === 0 ? (
-              <p className="mt-4 text-gray-500">No audit log entries recorded for this dispute yet.</p>
+              <p className="mt-4 text-gray-500">{t('dispute_details.no_audit')}</p>
             ) : (
               <div className="mt-4 space-y-3">
                 {audit_logs.map((entry) => (
@@ -389,7 +390,7 @@ export default function DisputeDetails() {
                       {entry.actor_role ? ` • ${entry.actor_role}` : ''}
                     </p>
                     {entry.route ? (
-                      <p className="mt-2 text-xs text-gray-500">{entry.method || 'ACTION'} {entry.route}</p>
+                      <p className="mt-2 text-xs text-gray-500">{entry.method || t('dispute_details.action_fallback')} {entry.route}</p>
                     ) : null}
                   </div>
                 ))}
@@ -400,7 +401,7 @@ export default function DisputeDetails() {
 
         <section className="rounded-3xl bg-white p-8 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-2xl font-semibold text-gray-900">Evidence files</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">{t('dispute_details.evidence_files')}</h2>
             {!dispute.is_legally_sealed && (
               <div className="flex items-center gap-3">
                 <input
@@ -416,14 +417,14 @@ export default function DisputeDetails() {
                     disabled={uploading}
                     className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                   >
-                    {uploading ? 'Uploading...' : 'Upload'}
+                    {uploading ? t('dispute_details.uploading') : t('dispute_details.upload')}
                   </button>
                 )}
               </div>
             )}
           </div>
           {evidence.length === 0 ? (
-            <p className="mt-4 text-gray-500">No evidence uploaded yet.</p>
+            <p className="mt-4 text-gray-500">{t('dispute_details.no_evidence')}</p>
           ) : (
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {evidence.map((item) => (
@@ -431,14 +432,14 @@ export default function DisputeDetails() {
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-semibold text-gray-900">{item.file_name}</p>
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${getEvidenceStatusBadge(item.verification_status)}`}>
-                      {item.verification_status || 'pending'}
+                      {item.verification_status || t('dispute_details.pending_fallback')}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">Uploaded by {item.uploaded_by_name || 'Unknown'}</p>
+                  <p className="mt-1 text-sm text-gray-600">{t('dispute_details.uploaded_by')}{item.uploaded_by_name || t('dispute_details.unknown')}</p>
                   <p className="mt-1 text-xs text-gray-500">{formatDateTime(item.created_at || item.uploaded_at)}</p>
                   {item.verified_at ? (
                     <p className="mt-2 text-xs text-gray-600">
-                      Verified by {item.verified_by_name || 'Lawyer'} on {formatDateTime(item.verified_at)}
+                      {t('dispute_details.verified_by')}{item.verified_by_name || t('dispute_details.lawyer_fallback')} on {formatDateTime(item.verified_at)}
                     </p>
                   ) : null}
                   {item.lawyer_notes ? (
@@ -453,7 +454,7 @@ export default function DisputeDetails() {
                       rel="noreferrer"
                       className="text-primary-700 hover:underline"
                     >
-                      Open file
+                      {t('dispute_details.open_file')}
                     </a>
                     <a
                       href={`/api/disputes/evidence/${item.id}/verify`}
@@ -461,7 +462,7 @@ export default function DisputeDetails() {
                       rel="noreferrer"
                       className="text-primary-700 hover:underline"
                     >
-                      Verify hash
+                      {t('dispute_details.verify_hash')}
                     </a>
                   </div>
                 </div>

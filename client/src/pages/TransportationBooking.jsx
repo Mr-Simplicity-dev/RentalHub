@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 import {
   FaTruck,
   FaShuttleVan,
@@ -19,6 +20,7 @@ import {
 import Loader from '../components/common/Loader';
 
 const TransportationBooking = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,7 +52,7 @@ const TransportationBooking = () => {
   useEffect(() => {
     const loadData = async () => {
       if (!user || user.user_type !== 'tenant') {
-        toast.error('Only tenants can book transportation');
+        toast.error(t('transportation_booking.only_tenants'));
         navigate('/dashboard');
         return;
       }
@@ -63,7 +65,7 @@ const TransportationBooking = () => {
           setEligibility(eligibilityRes.data?.data);
           
           if (!eligibilityRes.data?.data?.can_book) {
-            toast.error(eligibilityRes.data?.data?.reason || 'Cannot book transportation for this property');
+            toast.error(eligibilityRes.data?.data?.reason || t('transportation_booking.cannot_book'));
             navigate('/dashboard');
             return;
           }
@@ -91,7 +93,7 @@ const TransportationBooking = () => {
         }
       } catch (error) {
         console.error('Error loading transportation data:', error);
-        toast.error('Failed to load transportation services');
+        toast.error(t('transportation_booking.failed_load_services'));
         navigate('/dashboard');
       } finally {
         setLoading(false);
@@ -118,7 +120,7 @@ const TransportationBooking = () => {
         }
       } catch (error) {
         console.error('Error calculating price:', error);
-        toast.error('Failed to calculate price');
+        toast.error(t('transportation_booking.failed_calc_price'));
       } finally {
         setCalculatingPrice(false);
       }
@@ -160,12 +162,12 @@ const TransportationBooking = () => {
     e.preventDefault();
     
     if (!selectedService) {
-      toast.error('Please select a transportation service');
+      toast.error(t('transportation_booking.select_service'));
       return;
     }
     
     if (!priceCalculation) {
-      toast.error('Please enter distance to calculate price');
+      toast.error(t('transportation_booking.enter_distance'));
       return;
     }
     
@@ -173,7 +175,7 @@ const TransportationBooking = () => {
     const requiredFields = ['pickup_address', 'destination_address', 'booking_date', 'booking_time'];
     for (const field of requiredFields) {
       if (!formData[field]) {
-        toast.error(`Please fill in ${field.replace('_', ' ')}`);
+        toast.error(t('transportation_booking.fill_in', { field: field.replace('_', ' ') }));
         return;
       }
     }
@@ -190,15 +192,15 @@ const TransportationBooking = () => {
       const response = await api.post('/transportation/bookings', bookingData);
       
       if (response.data?.success) {
-        toast.success('Transportation booking created successfully!');
+        toast.success(t('transportation_booking.created_success'));
         // Navigate to payment page
         navigate(`/transportation/payment/${response.data.data.id}`);
       } else {
-        toast.error(response.data?.message || 'Failed to create booking');
+        toast.error(response.data?.message || t('transportation_booking.failed_create'));
       }
     } catch (error) {
       console.error('Error creating booking:', error);
-      toast.error(error.response?.data?.message || 'Failed to create transportation booking');
+      toast.error(error.response?.data?.message || t('transportation_booking.failed_create_booking'));
     } finally {
       setCreatingBooking(false);
     }
@@ -214,13 +216,13 @@ const TransportationBooking = () => {
         <div className="max-w-3xl mx-auto px-4">
           <div className="bg-white rounded-lg shadow p-8 text-center">
             <FaTimesCircle className="text-red-500 text-5xl mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Cannot Book Transportation</h1>
-            <p className="text-gray-600 mb-6">{eligibility?.reason || 'You are not eligible to book transportation for this property'}</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{t('transportation_booking.cannot_book_title')}</h1>
+            <p className="text-gray-600 mb-6">{eligibility?.reason || t('transportation_booking.not_eligible')}</p>
             <button
               onClick={() => navigate('/dashboard')}
               className="btn btn-primary"
             >
-              Return to Dashboard
+              {t('transportation_booking.return_dashboard')}
             </button>
           </div>
         </div>
@@ -232,9 +234,9 @@ const TransportationBooking = () => {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Book Transportation</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('transportation_booking.page_title')}</h1>
           <p className="text-gray-600">
-            Arrange transportation to move your items to {property?.title || 'your new property'}
+            {t('transportation_booking.page_subtitle', { property: property?.title || t('transportation_booking.your_new_property') })}
           </p>
         </div>
         
@@ -244,7 +246,7 @@ const TransportationBooking = () => {
             <div className="bg-white rounded-lg shadow p-6 mb-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 <FaTruck className="mr-2" />
-                Select Transportation Service
+                {t('transportation_booking.select_service_title')}
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -279,11 +281,11 @@ const TransportationBooking = () => {
                     
                     <div className="flex justify-between items-center">
                       <div>
-                        <div className="text-sm text-gray-600">Capacity</div>
+                        <div className="text-sm text-gray-600">{t('transportation_booking.capacity')}</div>
                         <div className="font-semibold">{service.capacity_kg} kg</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm text-gray-600">Base Price</div>
+                        <div className="text-sm text-gray-600">{t('transportation_booking.base_price')}</div>
                         <div className="font-bold text-lg text-blue-600">
                           ₦{service.base_price.toLocaleString()}
                         </div>
@@ -291,7 +293,7 @@ const TransportationBooking = () => {
                     </div>
                     
                     <div className="mt-3 text-sm text-gray-500">
-                      + ₦{service.price_per_km.toLocaleString()} per km
+                      {t('transportation_booking.per_km', { price: service.price_per_km.toLocaleString() })}
                     </div>
                   </div>
                 ))}
@@ -299,10 +301,10 @@ const TransportationBooking = () => {
               
               {selectedService && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                  <h3 className="font-bold text-blue-800 mb-2">Selected Service: {selectedService.service_name}</h3>
+                  <h3 className="font-bold text-blue-800 mb-2">{t('transportation_booking.selected_service', { name: selectedService.service_name })}</h3>
                   <p className="text-blue-700">{selectedService.description}</p>
                   <div className="mt-2 text-sm text-blue-600">
-                    Provider: {selectedService.provider_name} • {selectedService.provider_phone}
+                    {t('transportation_booking.provider_info', { name: selectedService.provider_name, phone: selectedService.provider_phone })}
                   </div>
                 </div>
               )}
@@ -312,7 +314,7 @@ const TransportationBooking = () => {
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 <FaCalendarAlt className="mr-2" />
-                Booking Details
+                {t('transportation_booking.booking_details')}
               </h2>
               
               <form onSubmit={handleSubmit}>
@@ -320,7 +322,7 @@ const TransportationBooking = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <FaMapMarkerAlt className="inline mr-1" />
-                      Pickup Address *
+                      {t('transportation_booking.pickup_address')} *
                     </label>
                     <input
                       type="text"
@@ -328,12 +330,12 @@ const TransportationBooking = () => {
                       value={formData.pickup_address}
                       onChange={handleInputChange}
                       className="input w-full"
-                      placeholder="Where will items be picked up?"
+                      placeholder={t('transportation_booking.pickup_placeholder')}
                       required
                     />
                     {property && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Property address: {property.full_address}
+                        {t('transportation_booking.property_address', { address: property.full_address })}
                       </p>
                     )}
                   </div>
@@ -341,7 +343,7 @@ const TransportationBooking = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <FaMapMarkerAlt className="inline mr-1" />
-                      Destination Address *
+                      {t('transportation_booking.destination_address')} *
                     </label>
                     <input
                       type="text"
@@ -349,7 +351,7 @@ const TransportationBooking = () => {
                       value={formData.destination_address}
                       onChange={handleInputChange}
                       className="input w-full"
-                      placeholder="Where are you moving to?"
+                      placeholder={t('transportation_booking.destination_placeholder')}
                       required
                     />
                   </div>
@@ -359,7 +361,7 @@ const TransportationBooking = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <FaRoute className="inline mr-1" />
-                      Estimated Distance (km) *
+                      {t('transportation_booking.estimated_distance')} *
                     </label>
                     <input
                       type="number"
@@ -367,20 +369,20 @@ const TransportationBooking = () => {
                       value={formData.estimated_distance_km}
                       onChange={handleInputChange}
                       className="input w-full"
-                      placeholder="e.g., 15.5"
+                      placeholder={t('transportation_booking.distance_placeholder')}
                       min="0"
                       step="0.1"
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Approximate distance between pickup and destination
+                      {t('transportation_booking.distance_hint')}
                     </p>
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <FaCalendarAlt className="inline mr-1" />
-                      Booking Date *
+                      {t('transportation_booking.booking_date')} *
                     </label>
                     <input
                       type="date"
@@ -398,7 +400,7 @@ const TransportationBooking = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <FaClock className="inline mr-1" />
-                      Preferred Time *
+                      {t('transportation_booking.preferred_time')} *
                     </label>
                     <select
                       name="booking_time"
@@ -407,21 +409,21 @@ const TransportationBooking = () => {
                       className="input w-full"
                       required
                     >
-                      <option value="08:00">08:00 AM</option>
-                      <option value="09:00">09:00 AM</option>
-                      <option value="10:00">10:00 AM</option>
-                      <option value="11:00">11:00 AM</option>
-                      <option value="12:00">12:00 PM</option>
-                      <option value="13:00">01:00 PM</option>
-                      <option value="14:00">02:00 PM</option>
-                      <option value="15:00">03:00 PM</option>
-                      <option value="16:00">04:00 PM</option>
+                      <option value="08:00">{t('transportation_booking.time_0800')}</option>
+                      <option value="09:00">{t('transportation_booking.time_0900')}</option>
+                      <option value="10:00">{t('transportation_booking.time_1000')}</option>
+                      <option value="11:00">{t('transportation_booking.time_1100')}</option>
+                      <option value="12:00">{t('transportation_booking.time_1200')}</option>
+                      <option value="13:00">{t('transportation_booking.time_1300')}</option>
+                      <option value="14:00">{t('transportation_booking.time_1400')}</option>
+                      <option value="15:00">{t('transportation_booking.time_1500')}</option>
+                      <option value="16:00">{t('transportation_booking.time_1600')}</option>
                     </select>
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Items to Move
+                      {t('transportation_booking.items_to_move')}
                     </label>
                     <input
                       type="text"
@@ -429,21 +431,21 @@ const TransportationBooking = () => {
                       value={formData.items_description}
                       onChange={handleInputChange}
                       className="input w-full"
-                      placeholder="e.g., Furniture, boxes, appliances"
+                      placeholder={t('transportation_booking.items_placeholder')}
                     />
                   </div>
                 </div>
                 
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Special Requirements
+                    {t('transportation_booking.special_requirements')}
                   </label>
                   <textarea
                     name="special_requirements"
                     value={formData.special_requirements}
                     onChange={handleInputChange}
                     className="input w-full h-24"
-                    placeholder="Any special instructions, fragile items, parking restrictions, etc."
+                    placeholder={t('transportation_booking.special_placeholder')}
                   />
                 </div>
                 
@@ -452,19 +454,19 @@ const TransportationBooking = () => {
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                     <h3 className="font-bold text-green-800 mb-3 flex items-center">
                       <FaMoneyBillWave className="mr-2" />
-                      Price Summary
+                      {t('transportation_booking.price_summary')}
                     </h3>
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Base Price:</span>
+                        <span className="text-gray-600">{t('transportation_booking.base_price_label')}:</span>
                         <span className="font-semibold">₦{priceCalculation.base_price.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Distance Charge ({formData.estimated_distance_km} km):</span>
+                        <span className="text-gray-600">{t('transportation_booking.distance_charge', { km: formData.estimated_distance_km })}:</span>
                         <span className="font-semibold">₦{priceCalculation.distance_price.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between border-t border-green-200 pt-2 mt-2">
-                        <span className="text-lg font-bold text-green-800">Total Price:</span>
+                        <span className="text-lg font-bold text-green-800">{t('transportation_booking.total_price_label')}:</span>
                         <span className="text-2xl font-bold text-green-800">
                           ₦{priceCalculation.total_price.toLocaleString()}
                         </span>
@@ -480,7 +482,7 @@ const TransportationBooking = () => {
                     className="btn btn-gray w-full sm:flex-1"
                     disabled={creatingBooking}
                   >
-                    Cancel
+                    {t('transportation_booking.cancel')}
                   </button>
                   <button
                     type="submit"
@@ -490,10 +492,10 @@ const TransportationBooking = () => {
                     {creatingBooking ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Creating Booking...
+                        {t('transportation_booking.creating')}
                       </>
                     ) : (
-                      'Proceed to Payment'
+                      t('transportation_booking.proceed_payment')
                     )}
                   </button>
                 </div>
@@ -501,7 +503,7 @@ const TransportationBooking = () => {
                 {calculatingPrice && (
                   <div className="text-center mt-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-sm text-gray-600 mt-2">Calculating price...</p>
+                    <p className="text-sm text-gray-600 mt-2">{t('transportation_booking.calculating')}</p>
                   </div>
                 )}
               </form>
@@ -511,26 +513,26 @@ const TransportationBooking = () => {
           {/* Right column - Summary and Info */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h3 className="font-bold text-gray-900 mb-4">Booking Information</h3>
+              <h3 className="font-bold text-gray-900 mb-4">{t('transportation_booking.booking_info')}</h3>
               
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-semibold text-gray-700 mb-2">Property Details</h4>
+                  <h4 className="font-semibold text-gray-700 mb-2">{t('transportation_booking.property_details')}</h4>
                   {property ? (
                     <div className="bg-gray-50 p-3 rounded">
                       <p className="font-medium">{property.title}</p>
                       <p className="text-sm text-gray-600">{property.full_address}</p>
                       <p className="text-sm text-gray-600">
-                        {property.bedrooms} bed • {property.bathrooms} bath
+                        {t('transportation_booking.bed_bath', { bed: property.bedrooms, bath: property.bathrooms })}
                       </p>
                     </div>
                   ) : (
-                    <p className="text-gray-500 text-sm">No property selected</p>
+                    <p className="text-gray-500 text-sm">{t('transportation_booking.no_property')}</p>
                   )}
                 </div>
                 
                 <div>
-                  <h4 className="font-semibold text-gray-700 mb-2">Eligibility Status</h4>
+                  <h4 className="font-semibold text-gray-700 mb-2">{t('transportation_booking.eligibility_status')}</h4>
                   <div className={`p-3 rounded ${
                     eligibility?.can_book 
                       ? 'bg-green-50 border border-green-200' 
@@ -540,12 +542,12 @@ const TransportationBooking = () => {
                       {eligibility?.can_book ? (
                         <>
                           <FaCheckCircle className="text-green-500 mr-2" />
-                          <span className="text-green-700 font-medium">Eligible to Book</span>
+                          <span className="text-green-700 font-medium">{t('transportation_booking.eligible')}</span>
                         </>
                       ) : (
                         <>
                           <FaTimesCircle className="text-red-500 mr-2" />
-                          <span className="text-red-700 font-medium">Not Eligible</span>
+                          <span className="text-red-700 font-medium">{t('transportation_booking.not_eligible_label')}</span>
                         </>
                       )}
                     </div>
@@ -559,31 +561,31 @@ const TransportationBooking = () => {
                 </div>
                 
                 <div>
-                  <h4 className="font-semibold text-gray-700 mb-2">Important Notes</h4>
+                  <h4 className="font-semibold text-gray-700 mb-2">{t('transportation_booking.important_notes')}</h4>
                   <ul className="text-sm text-gray-600 space-y-2">
                     <li className="flex items-start">
                       <span className="text-blue-500 mr-2">•</span>
-                      Transportation must be booked at least 24 hours in advance
+                      {t('transportation_booking.note_24h')}
                     </li>
                     <li className="flex items-start">
                       <span className="text-blue-500 mr-2">•</span>
-                      Cancellations within 12 hours may incur charges
+                      {t('transportation_booking.note_cancel')}
                     </li>
                     <li className="flex items-start">
                       <span className="text-blue-500 mr-2">•</span>
-                      Ensure parking is available at both locations
+                      {t('transportation_booking.note_parking')}
                     </li>
                     <li className="flex items-start">
                       <span className="text-blue-500 mr-2">•</span>
-                      Driver will contact you 1 hour before arrival
+                      {t('transportation_booking.note_driver')}
                     </li>
                   </ul>
                 </div>
                 
                 <div className="pt-4 border-t border-gray-200">
-                  <h4 className="font-semibold text-gray-700 mb-2">Need Help?</h4>
+                  <h4 className="font-semibold text-gray-700 mb-2">{t('transportation_booking.need_help')}</h4>
                   <p className="text-sm text-gray-600 mb-3">
-                    Contact our transportation support team for assistance:
+                    {t('transportation_booking.contact_support')}
                   </p>
                   <div className="text-sm">
                     <p className="text-gray-700">📞 +234 800 123 4567</p>

@@ -24,11 +24,13 @@ import {
   FaSortDown,
   FaUndo
 } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 import Loader from '../components/common/Loader';
 import BackToDashboard from '../components/common/BackToDashboard';
 import BookingCancelModal from '../components/common/BookingCancelModal';
 
 const FumigationCleaningBookings = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -46,7 +48,7 @@ const FumigationCleaningBookings = () => {
   useEffect(() => {
     const loadData = async () => {
       if (!user || user.user_type !== 'tenant') {
-        toast.error('Only tenants can view fumigation/cleaning bookings');
+        toast.error(t('fumigation_cleaning_bookings.only_tenants'));
         navigate('/dashboard');
         return;
       }

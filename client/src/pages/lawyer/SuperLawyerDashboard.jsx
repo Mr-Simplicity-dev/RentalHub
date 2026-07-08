@@ -1,15 +1,19 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { LawyerDashboardView } from './LawyerDashboard';
 
-const SuperLawyerDashboard = () => (
-  <LawyerDashboardView
-    dashboardTitle="Super Lawyer Dashboard"
-    profileLabel="Super Lawyer Profile"
-    nameFallback="Super Lawyer"
-    dashboardSubtitle="Lead cross-state legal review, evidence verification, and escalated dispute oversight from the super lawyer command layer."
-    rolePillLabel="Super Lawyer"
-    showSuperLawyerPanel
-  />
-);
+const SuperLawyerDashboard = () => {
+  const { t } = useTranslation();
+  return (
+    <LawyerDashboardView
+      dashboardTitle={t('super_lawyer_dashboard.dashboard_title')}
+      profileLabel={t('super_lawyer_dashboard.profile_label')}
+      nameFallback={t('super_lawyer_dashboard.name_fallback')}
+      dashboardSubtitle={t('super_lawyer_dashboard.dashboard_subtitle')}
+      rolePillLabel={t('super_lawyer_dashboard.role_pill_label')}
+      showSuperLawyerPanel
+    />
+  );
+};
 
 export default SuperLawyerDashboard;

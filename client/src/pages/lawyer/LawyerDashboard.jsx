@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 import ApprovalTimeline from '../../components/common/ApprovalTimeline';
 import api from '../../services/api';
 import LawyerVerification from './LawyerVerification';
@@ -48,18 +49,18 @@ const STATES = [
   'Zamfara',
 ];
 
-const MIGRATION_STEPS = [
-  { key: 'requested', label: 'Requested' },
-  { key: 'outgoing', label: 'Outgoing' },
-  { key: 'incoming', label: 'Incoming' },
-  { key: 'final', label: 'Final' },
+const getMigrationSteps = (t) => [
+  { key: 'requested', label: t('lawyer_dashboard.migration_requested') },
+  { key: 'outgoing', label: t('lawyer_dashboard.migration_outgoing') },
+  { key: 'incoming', label: t('lawyer_dashboard.migration_incoming') },
+  { key: 'final', label: t('lawyer_dashboard.migration_final') },
 ];
 
-const PROGRAM_STEPS = [
-  { key: 'broadcast', label: 'Open' },
-  { key: 'applied', label: 'Applied' },
-  { key: 'reviewed', label: 'Reviewed' },
-  { key: 'listed', label: 'Listed' },
+const getProgramSteps = (t) => [
+  { key: 'broadcast', label: t('lawyer_dashboard.program_open') },
+  { key: 'applied', label: t('lawyer_dashboard.program_applied') },
+  { key: 'reviewed', label: t('lawyer_dashboard.program_reviewed') },
+  { key: 'listed', label: t('lawyer_dashboard.program_listed') },
 ];
 
 const fadeUp = {
@@ -133,14 +134,14 @@ const resolveProgramFinalStatus = (application) => {
   return application.status || 'pending';
 };
 
-const getRoleTheme = ({ showSuperLawyerPanel, showStateLawyerPanel }) => {
+const getRoleTheme = ({ showSuperLawyerPanel, showStateLawyerPanel, t }) => {
   if (showSuperLawyerPanel) {
     return {
       pill: 'from-slate-900 via-slate-800 to-indigo-900',
       accent: 'text-indigo-700',
       softPanel: 'border-indigo-200 bg-indigo-50',
       statPanel: 'from-slate-900 via-slate-800 to-indigo-900',
-      label: 'Super Lawyer',
+      label: t('lawyer_dashboard.super_label'),
     };
   }
 
@@ -150,7 +151,7 @@ const getRoleTheme = ({ showSuperLawyerPanel, showStateLawyerPanel }) => {
       accent: 'text-emerald-700',
       softPanel: 'border-emerald-200 bg-emerald-50',
       statPanel: 'from-emerald-700 via-emerald-600 to-teal-600',
-      label: 'State Lawyer',
+      label: t('lawyer_dashboard.state_label'),
     };
   }
 
@@ -159,7 +160,7 @@ const getRoleTheme = ({ showSuperLawyerPanel, showStateLawyerPanel }) => {
     accent: 'text-sky-700',
     softPanel: 'border-sky-200 bg-sky-50',
     statPanel: 'from-sky-700 via-sky-600 to-cyan-600',
-    label: 'Lawyer',
+    label: t('lawyer_dashboard.lawyer_label'),
   };
 };
 
@@ -174,14 +175,20 @@ const StatCard = ({ label, value, helper, toneClass }) => (
 );
 
 const LawyerDashboardContent = ({
-  dashboardTitle = 'Lawyer Dashboard',
-  profileLabel = 'Lawyer Profile',
-  nameFallback = 'Lawyer',
-  dashboardSubtitle = 'Manage disputes, verify evidence, and maintain legal case notes.',
-  rolePillLabel = 'Lawyer',
+  dashboardTitle: dashboardTitleProp,
+  profileLabel: profileLabelProp,
+  nameFallback: nameFallbackProp,
+  dashboardSubtitle: dashboardSubtitleProp,
+  rolePillLabel: rolePillLabelProp,
   showSuperLawyerPanel = false,
   showStateLawyerPanel = false,
 }) => {
+  const { t } = useTranslation();
+  const dashboardTitle = dashboardTitleProp ?? t('lawyer_dashboard.dashboard_title');
+  const profileLabel = profileLabelProp ?? t('lawyer_dashboard.profile_label');
+  const nameFallback = nameFallbackProp ?? t('lawyer_dashboard.name_fallback');
+  const dashboardSubtitle = dashboardSubtitleProp ?? t('lawyer_dashboard.dashboard_subtitle');
+  const rolePillLabel = rolePillLabelProp ?? t('lawyer_dashboard.role_pill_label');
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [disputes, setDisputes] = useState([]);
@@ -211,7 +218,7 @@ const LawyerDashboardContent = ({
   const [migrationForm, setMigrationForm] = useState({ to_state: '', reason: '' });
   const [migrationLoading, setMigrationLoading] = useState(false);
 
-  const roleTheme = getRoleTheme({ showSuperLawyerPanel, showStateLawyerPanel });
+  const roleTheme = getRoleTheme({ showSuperLawyerPanel, showStateLawyerPanel, t });
 
   const loadLawyerProfile = async () => {
     try {
@@ -230,7 +237,7 @@ const LawyerDashboardContent = ({
 
   const submitMigrationRequest = async () => {
     if (!migrationForm.to_state || !migrationForm.reason.trim()) {
-      toast.error('Please select target state and provide reason');
+      toast.error(t('lawyer_dashboard.migration_validation_error'));
       return;
     }
 
@@ -240,12 +247,12 @@ const LawyerDashboardContent = ({
         to_state: migrationForm.to_state,
         reason: migrationForm.reason,
       });
-      toast.success(res.data?.message || 'Migration request submitted');
+      toast.success(res.data?.message || t('lawyer_dashboard.migration_submitted'));
       setMigrationForm({ to_state: '', reason: '' });
       const myRes = await api.get('/state-migrations/my');
       setMigrationRequests(myRes.data?.data || []);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to submit migration request');
+      toast.error(error.response?.data?.message || t('lawyer_dashboard.migration_submit_failed'));
     } finally {
       setMigrationLoading(false);
     }
@@ -260,7 +267,7 @@ const LawyerDashboardContent = ({
         setSelectedProperty(rows[0]);
       }
     } catch {
-      toast.error('Failed to load authorized properties');
+      toast.error(t('lawyer_dashboard.load_properties_failed'));
     } finally {
       setLoading(false);
     }
@@ -288,7 +295,7 @@ const LawyerDashboardContent = ({
       setSelectedDispute(nextDispute);
       await loadDisputeWorkspace(nextDispute.id);
     } catch {
-      toast.error('Failed to load disputes for this property');
+      toast.error(t('lawyer_dashboard.load_disputes_failed'));
     }
   };
 
@@ -320,7 +327,7 @@ const LawyerDashboardContent = ({
         return next;
       });
     } catch {
-      toast.error('Failed to load dispute workspace');
+      toast.error(t('lawyer_dashboard.load_workspace_failed'));
     } finally {
       setWorkspaceLoading(false);
     }
@@ -358,10 +365,10 @@ const LawyerDashboardContent = ({
     setApplyLoading(true);
     try {
       const res = await api.post('/legal/platform-lawyer-program/apply');
-      toast.success(res.data?.message || 'Application submitted');
+      toast.success(res.data?.message || t('lawyer_dashboard.application_submitted'));
       await loadPlatformLawyerProgram();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit application');
+      toast.error(err.response?.data?.message || t('lawyer_dashboard.application_failed'));
     } finally {
       setApplyLoading(false);
     }
@@ -380,10 +387,10 @@ const LawyerDashboardContent = ({
           notes,
         }
       );
-      toast.success(res.data?.message || 'Evidence updated');
+      toast.success(res.data?.message || t('lawyer_dashboard.evidence_updated'));
       await loadDisputeWorkspace(selectedDispute.id);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to verify evidence');
+      toast.error(error.response?.data?.message || t('lawyer_dashboard.evidence_verify_failed'));
     } finally {
       setVerificationBusyId(null);
     }
@@ -391,7 +398,7 @@ const LawyerDashboardContent = ({
 
   const handleSaveSummary = async () => {
     if (!selectedDispute?.id || !summaryDraft.trim()) {
-      toast.error('Enter a dispute summary first');
+      toast.error(t('lawyer_dashboard.summary_validation_error'));
       return;
     }
 
@@ -400,10 +407,10 @@ const LawyerDashboardContent = ({
       const res = await api.patch(`/legal/disputes/${selectedDispute.id}/summary`, {
         lawyer_summary: summaryDraft,
       });
-      toast.success(res.data?.message || 'Summary saved');
+      toast.success(res.data?.message || t('lawyer_dashboard.summary_saved'));
       await loadDisputeWorkspace(selectedDispute.id);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to save summary');
+      toast.error(error.response?.data?.message || t('lawyer_dashboard.summary_save_failed'));
     } finally {
       setSummarySaving(false);
     }
@@ -411,7 +418,7 @@ const LawyerDashboardContent = ({
 
   const handleCreateCaseNote = async () => {
     if (!selectedDispute?.id || !newNoteContent.trim()) {
-      toast.error('Case note content is required');
+      toast.error(t('lawyer_dashboard.note_content_required'));
       return;
     }
 
@@ -422,13 +429,13 @@ const LawyerDashboardContent = ({
         content: newNoteContent.trim(),
         is_visible_to_client: newNoteVisible,
       });
-      toast.success(res.data?.message || 'Case note added');
+      toast.success(res.data?.message || t('lawyer_dashboard.note_added'));
       setNewNoteTitle('');
       setNewNoteContent('');
       setNewNoteVisible(false);
       await loadDisputeWorkspace(selectedDispute.id);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to add case note');
+      toast.error(error.response?.data?.message || t('lawyer_dashboard.note_add_failed'));
     } finally {
       setNoteSaving(false);
     }
@@ -439,10 +446,10 @@ const LawyerDashboardContent = ({
 
     try {
       const res = await api.delete(`/legal/disputes/${selectedDispute.id}/notes/${noteId}`);
-      toast.success(res.data?.message || 'Case note deleted');
+      toast.success(res.data?.message || t('lawyer_dashboard.note_deleted'));
       await loadDisputeWorkspace(selectedDispute.id);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete case note');
+      toast.error(error.response?.data?.message || t('lawyer_dashboard.note_delete_failed'));
     }
   };
 
@@ -463,48 +470,48 @@ const LawyerDashboardContent = ({
 
     return [
       {
-        label: 'Assigned Properties',
+        label: t('lawyer_dashboard.assigned_properties'),
         value: properties.length,
-        helper: 'Properties you can legally act on',
+        helper: t('lawyer_dashboard.assigned_properties_helper'),
         toneClass: 'border-sky-100 bg-white',
       },
       {
-        label: 'Active Disputes',
+        label: t('lawyer_dashboard.active_disputes'),
         value: disputes.length,
-        helper: selectedProperty?.title || 'Select a property to focus workspace',
+        helper: selectedProperty?.title || t('lawyer_dashboard.active_disputes_helper'),
         toneClass: 'border-indigo-100 bg-white',
       },
       {
-        label: 'Pending Evidence',
+        label: t('lawyer_dashboard.pending_evidence'),
         value: pendingEvidence,
-        helper: selectedDispute ? `Dispute #${selectedDispute.id}` : 'Pending review items',
+        helper: selectedDispute ? `Dispute #${selectedDispute.id}` : t('lawyer_dashboard.pending_evidence_helper'),
         toneClass: 'border-amber-100 bg-white',
       },
       {
-        label: 'Case Notes',
+        label: t('lawyer_dashboard.case_notes'),
         value: caseNotes.length,
-        helper: 'Internal and client-visible notes',
+        helper: t('lawyer_dashboard.case_notes_helper'),
         toneClass: 'border-emerald-100 bg-white',
       },
     ];
-  }, [properties.length, disputes.length, evidenceVerification, caseNotes.length, selectedProperty, selectedDispute]);
+  }, [properties.length, disputes.length, evidenceVerification, caseNotes.length, selectedProperty, selectedDispute, t]);
 
   const quickActions = useMemo(() => {
     const base = [
       {
         to: '/verify-case',
-        label: 'Evidence Queue',
-        description: 'Review integrity checks and dispute uploads.',
+        label: t('lawyer_dashboard.evidence_queue'),
+        description: t('lawyer_dashboard.evidence_queue_desc'),
       },
       {
         to: '/messages',
-        label: 'Messages',
-        description: 'Continue escalations and legal coordination.',
+        label: t('lawyer_dashboard.messages'),
+        description: t('lawyer_dashboard.messages_desc'),
       },
       {
         to: '/legal-support',
-        label: 'Legal Support',
-        description: 'View legal support requests and assistance.',
+        label: t('lawyer_dashboard.legal_support'),
+        description: t('lawyer_dashboard.legal_support_desc'),
       },
     ];
 
@@ -512,8 +519,8 @@ const LawyerDashboardContent = ({
       return [
         {
           to: '/verify-case',
-          label: 'Cross-State Review',
-          description: 'Open the shared evidence queue for escalated matters.',
+          label: t('lawyer_dashboard.cross_state_review'),
+          description: t('lawyer_dashboard.cross_state_review_desc'),
         },
         ...base.slice(1),
       ];
@@ -523,15 +530,15 @@ const LawyerDashboardContent = ({
       return [
         {
           to: '/verify-case',
-          label: 'State Evidence',
-          description: 'Stay on top of evidence reviews inside your jurisdiction.',
+          label: t('lawyer_dashboard.state_evidence'),
+          description: t('lawyer_dashboard.state_evidence_desc'),
         },
         ...base.slice(1),
       ];
     }
 
     return base;
-  }, [showSuperLawyerPanel, showStateLawyerPanel]);
+  }, [showSuperLawyerPanel, showStateLawyerPanel, t]);
 
   if (loading || profileLoading) {
     return (
@@ -542,7 +549,7 @@ const LawyerDashboardContent = ({
           className="rounded-3xl border border-slate-200 bg-white px-8 py-10 text-center shadow-xl"
         >
           <div className="mx-auto h-14 w-14 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
-          <p className="mt-4 text-sm font-medium text-slate-600">Loading legal workspace...</p>
+          <p className="mt-4 text-sm font-medium text-slate-600">{t('lawyer_dashboard.loading')}</p>
         </motion.div>
       </div>
     );
@@ -566,14 +573,13 @@ const LawyerDashboardContent = ({
             <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-3xl">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-200">
-                  Super Lawyer Desk
+                  {t('lawyer_dashboard.super_desk')}
                 </p>
                 <h1 className="mt-2 text-3xl font-bold md:text-4xl">
-                  Cross-state legal review without changing your workflow
+                  {t('lawyer_dashboard.super_title')}
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-slate-200">
-                  Your evidence, dispute, case-note, migration, and program actions stay on the same endpoints.
-                  This layer only sharpens visibility for super lawyer coordination.
+                  {t('lawyer_dashboard.super_description')}
                 </p>
               </div>
 
@@ -582,13 +588,13 @@ const LawyerDashboardContent = ({
                   to="/verify-case"
                   className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
                 >
-                  Review Evidence Queue
+                  {t('lawyer_dashboard.review_evidence_queue')}
                 </Link>
                 <Link
                   to="/messages"
                   className="rounded-xl border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
                 >
-                  Open Escalations
+                  {t('lawyer_dashboard.open_escalations')}
                 </Link>
               </div>
             </div>
@@ -605,7 +611,7 @@ const LawyerDashboardContent = ({
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">
-                  {roleTheme.label} Workspace
+                  {roleTheme.label} {t('lawyer_dashboard.workspace')}
                 </p>
                 <h2 className="mt-2 text-3xl font-bold">{dashboardTitle}</h2>
                 <p className="mt-3 text-sm leading-6 text-white/80">{dashboardSubtitle}</p>
@@ -616,7 +622,7 @@ const LawyerDashboardContent = ({
                   {rolePillLabel}
                 </span>
                 <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
-                  Assigned Jurisdiction: {lawyerProfile?.assigned_state || 'Not configured'}{lawyerProfile?.assigned_city ? `, ${lawyerProfile.assigned_city}` : ''}
+                  {t('lawyer_dashboard.assigned_jurisdiction')}: {lawyerProfile?.assigned_state || t('lawyer_dashboard.not_configured')}{lawyerProfile?.assigned_city ? `, ${lawyerProfile.assigned_city}` : ''}
                 </span>
               </div>
             </div>
@@ -659,13 +665,13 @@ const LawyerDashboardContent = ({
           >
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
-                <h3 className="text-base font-semibold text-emerald-900">State Lawyer Coordination</h3>
+                <h3 className="text-base font-semibold text-emerald-900">{t('lawyer_dashboard.state_coordination_title')}</h3>
                 <p className="mt-1 text-sm text-emerald-800">
-                  This dashboard keeps your assigned-state work visible without changing any case, evidence, or migration logic.
+                  {t('lawyer_dashboard.state_coordination_desc')}
                 </p>
               </div>
               <div className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-700">
-                Scope: {lawyerProfile?.assigned_state || 'Not configured'}{lawyerProfile?.assigned_city ? `, ${lawyerProfile.assigned_city}` : ''}
+                {t('lawyer_dashboard.scope')}: {lawyerProfile?.assigned_state || t('lawyer_dashboard.not_configured')}{lawyerProfile?.assigned_city ? `, ${lawyerProfile.assigned_city}` : ''}
               </div>
             </div>
           </motion.section>
@@ -686,22 +692,22 @@ const LawyerDashboardContent = ({
                 {lawyerProfile?.full_name || nameFallback}
               </h3>
               <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-                <p>Email: {lawyerProfile?.email || '-'}</p>
-                <p>Phone: {lawyerProfile?.phone || '-'}</p>
-                <p>Chamber: {lawyerProfile?.chamber_name || 'No chamber provided'}</p>
-                <p>Jurisdiction: {lawyerProfile?.assigned_state || 'Not configured'}{lawyerProfile?.assigned_city ? `, ${lawyerProfile.assigned_city}` : ''}</p>
+                <p>{t('lawyer_dashboard.email')}: {lawyerProfile?.email || '-'}</p>
+                <p>{t('lawyer_dashboard.phone')}: {lawyerProfile?.phone || '-'}</p>
+                <p>{t('lawyer_dashboard.chamber')}: {lawyerProfile?.chamber_name || t('lawyer_dashboard.no_chamber')}</p>
+                <p>{t('lawyer_dashboard.jurisdiction')}: {lawyerProfile?.assigned_state || t('lawyer_dashboard.not_configured')}{lawyerProfile?.assigned_city ? `, ${lawyerProfile.assigned_city}` : ''}</p>
               </div>
             </div>
 
             <div className={`rounded-2xl border p-4 shadow-sm ${roleTheme.softPanel}`}>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Profile Access
+                {t('lawyer_dashboard.profile_access')}
               </p>
               <p className={`mt-2 text-base font-semibold ${roleTheme.accent}`}>
-                {roleTheme.label} visibility enabled
+                {t('lawyer_dashboard.visibility_enabled', { label: roleTheme.label })}
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                Identity-gated access remains unchanged. This panel only improves coordination and status visibility.
+                {t('lawyer_dashboard.identity_gated')}
               </p>
             </div>
           </div>
@@ -716,13 +722,13 @@ const LawyerDashboardContent = ({
           >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">State Migration Request</h3>
+                <h3 className="text-lg font-semibold text-slate-900">{t('lawyer_dashboard.state_migration')}</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Submit a migration request and track each approval stage without altering the current flow.
+                  {t('lawyer_dashboard.state_migration_desc')}
                 </p>
               </div>
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getWorkflowBadge(migrationRequests[0]?.status || 'pending')}`}>
-                {migrationRequests[0]?.status ? `Latest: ${migrationRequests[0].status}` : 'No active request'}
+                {migrationRequests[0]?.status ? `${t('lawyer_dashboard.latest')}: ${migrationRequests[0].status}` : t('lawyer_dashboard.no_active_request')}
               </span>
             </div>
 
@@ -732,7 +738,7 @@ const LawyerDashboardContent = ({
                 onChange={(e) => setMigrationForm((prev) => ({ ...prev, to_state: e.target.value }))}
                 className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 outline-none transition focus:border-slate-400"
               >
-                <option value="">Select target state</option>
+                <option value="">{t('lawyer_dashboard.select_target_state')}</option>
                 {STATES.map((state) => (
                   <option key={state} value={state}>
                     {state}
@@ -744,7 +750,7 @@ const LawyerDashboardContent = ({
                 value={migrationForm.reason}
                 onChange={(e) => setMigrationForm((prev) => ({ ...prev, reason: e.target.value }))}
                 className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 outline-none transition focus:border-slate-400 md:col-span-2"
-                placeholder="Reason for migration request"
+                placeholder={t('lawyer_dashboard.migration_reason_placeholder')}
               />
             </div>
 
@@ -754,13 +760,13 @@ const LawyerDashboardContent = ({
               disabled={migrationLoading}
               className={`mt-4 rounded-2xl bg-gradient-to-r ${roleTheme.pill} px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60`}
             >
-              {migrationLoading ? 'Submitting...' : 'Apply for State Migration'}
+              {migrationLoading ? t('lawyer_dashboard.submitting') : t('lawyer_dashboard.apply_for_migration')}
             </button>
 
             <div className="mt-6 space-y-3">
               {migrationRequests.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
-                  No migration requests yet.
+                  {t('lawyer_dashboard.no_requests')}
                 </div>
               ) : (
                 migrationRequests.slice(0, 3).map((request) => {
@@ -777,36 +783,36 @@ const LawyerDashboardContent = ({
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">
-                            {request.from_state || 'Current state'} to {request.to_state}
+                            {request.from_state || t('lawyer_dashboard.current_state')} {t('lawyer_dashboard.to')} {request.to_state}
                           </p>
                           <p className="mt-1 text-sm text-slate-600">{request.reason}</p>
                           <p className="mt-2 text-xs text-slate-500">
-                            Submitted {formatDateTime(request.requested_at || request.created_at)}
+                            {t('lawyer_dashboard.submitted')} {formatDateTime(request.requested_at || request.created_at)}
                           </p>
                         </div>
 
                         <div className="flex flex-wrap gap-2 text-xs">
                           <span className={`rounded-full border px-2.5 py-1 font-semibold ${getWorkflowBadge(request.status)}`}>
-                            Final: {request.status}
+                            {t('lawyer_dashboard.final')}: {request.status}
                           </span>
                           <span className={`rounded-full border px-2.5 py-1 font-semibold ${getWorkflowBadge(request.outgoing_status || 'pending')}`}>
-                            Outgoing: {request.outgoing_status || 'pending'}
+                            {t('lawyer_dashboard.outgoing')}: {request.outgoing_status || 'pending'}
                           </span>
                           <span className={`rounded-full border px-2.5 py-1 font-semibold ${getWorkflowBadge(request.incoming_status || 'pending')}`}>
-                            Incoming: {request.incoming_status || 'pending'}
+                            {t('lawyer_dashboard.incoming')}: {request.incoming_status || 'pending'}
                           </span>
                         </div>
                       </div>
 
                       <ApprovalTimeline
-                        steps={MIGRATION_STEPS}
+                        steps={getMigrationSteps(t)}
                         currentStepKey={resolveMigrationStep(request)}
                         finalStatus={request.status || 'pending'}
                       />
 
                       {latestNote ? (
                         <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                          Review note: {latestNote}
+                          {t('lawyer_dashboard.review_note')}: {latestNote}
                         </div>
                       ) : null}
                     </motion.div>
@@ -824,9 +830,9 @@ const LawyerDashboardContent = ({
           >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">RentalHub NG Lawyer Program</h3>
+                <h3 className="text-lg font-semibold text-slate-900">{t('lawyer_dashboard.program_title')}</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Apply from your dashboard and track review progress using the same backend flow already in place.
+                  {t('lawyer_dashboard.program_desc')}
                 </p>
               </div>
               {programData.application?.status ? (
@@ -846,25 +852,25 @@ const LawyerDashboardContent = ({
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="max-w-2xl">
                       <p className="text-sm font-semibold text-slate-900">
-                        {programData.broadcast?.title || 'No active recruitment broadcast'}
+                        {programData.broadcast?.title || t('lawyer_dashboard.no_broadcast')}
                       </p>
                       <p className="mt-2 whitespace-pre-line text-sm text-slate-600">
                         {programData.broadcast?.message ||
-                          'Recruitment is currently closed. Your existing application status is still preserved.'}
+                          t('lawyer_dashboard.recruitment_closed')}
                       </p>
                       {programData.broadcast?.created_at ? (
                         <p className="mt-3 text-xs text-slate-500">
-                          Broadcast sent {formatDateTime(programData.broadcast.created_at)}
+                          {t('lawyer_dashboard.broadcast_sent')} {formatDateTime(programData.broadcast.created_at)}
                         </p>
                       ) : null}
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
-                      {programData.application?.directory_active ? 'Directory listing active' : 'Directory listing pending'}
+                      {programData.application?.directory_active ? t('lawyer_dashboard.directory_active') : t('lawyer_dashboard.directory_pending')}
                     </div>
                   </div>
 
                   <ApprovalTimeline
-                    steps={PROGRAM_STEPS}
+                    steps={getProgramSteps(t)}
                     currentStepKey={resolveProgramStep(programData.application, Boolean(programData.broadcast))}
                     finalStatus={resolveProgramFinalStatus(programData.application)}
                   />
@@ -872,13 +878,13 @@ const LawyerDashboardContent = ({
 
                 {programData.application?.review_note ? (
                   <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-                    Review note: {programData.application.review_note}
+                    {t('lawyer_dashboard.review_note')}: {programData.application.review_note}
                   </div>
                 ) : null}
 
                 {programData.application?.reviewed_at ? (
                   <p className="text-xs text-slate-500">
-                    Reviewed by {programData.application.reviewed_by_name || 'Platform team'} on{' '}
+                    {t('lawyer_dashboard.reviewed_by')} {programData.application.reviewed_by_name || t('lawyer_dashboard.platform_team')} {t('lawyer_dashboard.on')}{' '}
                     {formatDateTime(programData.application.reviewed_at)}
                   </p>
                 ) : null}
@@ -895,12 +901,12 @@ const LawyerDashboardContent = ({
                   className={`rounded-2xl bg-gradient-to-r ${roleTheme.pill} px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60`}
                 >
                   {programData.application?.status === 'approved'
-                    ? 'Already Approved'
+                    ? t('lawyer_dashboard.already_approved')
                     : programData.application?.status === 'pending'
-                      ? 'Application Pending'
+                      ? t('lawyer_dashboard.application_pending')
                       : applyLoading
-                        ? 'Submitting...'
-                        : 'Apply To Serve On RentalHub NG'}
+                        ? t('lawyer_dashboard.submitting')
+                        : t('lawyer_dashboard.apply_to_serve')}
                 </button>
               </div>
             )}
@@ -916,9 +922,9 @@ const LawyerDashboardContent = ({
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Authorized Properties</h3>
+                <h3 className="text-lg font-semibold text-slate-900">{t('lawyer_dashboard.authorized_properties')}</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Select a property to keep your dispute workspace focused.
+                  {t('lawyer_dashboard.authorized_properties_desc')}
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -928,7 +934,7 @@ const LawyerDashboardContent = ({
 
             {properties.length === 0 ? (
               <div className="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
-                No authorized properties available.
+                {t('lawyer_dashboard.no_properties')}
               </div>
             ) : (
               <motion.div
@@ -952,10 +958,10 @@ const LawyerDashboardContent = ({
                   >
                     <p className="font-semibold">{property.title}</p>
                     <p className={`mt-1 text-xs ${selectedProperty?.id === property.id ? 'text-slate-200' : 'text-slate-500'}`}>
-                      Client: {property.client_name || 'Unknown'}
+                      {t('lawyer_dashboard.client')}: {property.client_name || t('lawyer_dashboard.unknown')}
                     </p>
                     <p className={`text-xs ${selectedProperty?.id === property.id ? 'text-slate-200' : 'text-slate-500'}`}>
-                      Assigned by {property.assigned_by_name || 'Unknown'}
+                      {t('lawyer_dashboard.assigned_by')} {property.assigned_by_name || t('lawyer_dashboard.unknown')}
                     </p>
                   </motion.button>
                 ))}
@@ -973,26 +979,26 @@ const LawyerDashboardContent = ({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900">
-                    Disputes {selectedProperty ? `for ${selectedProperty.title}` : ''}
+                    {t('lawyer_dashboard.disputes')}{selectedProperty ? ` ${t('lawyer_dashboard.for')} ${selectedProperty.title}` : ''}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Choose a dispute to open evidence, notes, summary, and timeline tools.
+                    {t('lawyer_dashboard.disputes_desc')}
                   </p>
                 </div>
                 {selectedProperty ? (
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                    {disputes.length} dispute{disputes.length === 1 ? '' : 's'}
+                    {disputes.length} {t('lawyer_dashboard.dispute_count')}
                   </span>
                 ) : null}
               </div>
 
               {!selectedProperty ? (
                 <div className="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
-                  Select a property from the left to view disputes.
+                  {t('lawyer_dashboard.select_property_first')}
                 </div>
               ) : disputes.length === 0 ? (
                 <div className="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
-                  No disputes found for this property.
+                  {t('lawyer_dashboard.no_disputes')}
                 </div>
               ) : (
                 <motion.div
@@ -1018,7 +1024,7 @@ const LawyerDashboardContent = ({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-semibold">Dispute #{dispute.id}</p>
+                        <p className="font-semibold">{t('lawyer_dashboard.dispute_hash')}{dispute.id}</p>
                         <span
                           className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
                             selectedDispute?.id === dispute.id
@@ -1030,10 +1036,10 @@ const LawyerDashboardContent = ({
                         </span>
                       </div>
                       <p className={`mt-2 line-clamp-2 text-sm ${selectedDispute?.id === dispute.id ? 'text-slate-100' : 'text-slate-700'}`}>
-                        {dispute.description || 'No description provided.'}
+                        {dispute.description || t('lawyer_dashboard.no_description')}
                       </p>
                       <p className={`mt-2 text-xs ${selectedDispute?.id === dispute.id ? 'text-slate-200' : 'text-slate-500'}`}>
-                        Opened by {dispute.opened_by_name || 'Unknown'} vs {dispute.against_name || 'Unknown'}
+                        {t('lawyer_dashboard.opened_by')} {dispute.opened_by_name || t('lawyer_dashboard.unknown')} {t('lawyer_dashboard.vs')} {dispute.against_name || t('lawyer_dashboard.unknown')}
                       </p>
                     </motion.button>
                   ))}

@@ -5,6 +5,7 @@ import api from '../services/api';
 import { toast } from 'react-toastify';
 import { FaExclamationTriangle, FaSearch, FaTimes, FaCheckCircle, FaClock, FaLock, FaSpinner, FaBalanceScale } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
+import { useTranslation } from 'react-i18next';
 
 const STATUS_COLORS = {
   open: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -21,6 +22,7 @@ const PRIORITY_COLORS = {
 };
 
 const MyDisputes = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [disputes, setDisputes] = useState([]);
@@ -39,7 +41,7 @@ const MyDisputes = () => {
       setDisputes(res.data.data);
       setPagination(res.data.pagination);
     } catch (err) {
-      toast.error('Failed to load disputes');
+      toast.error(t('my_disputes.load_failed'));
     } finally {
       setLoading(false);
     }
@@ -59,9 +61,9 @@ const MyDisputes = () => {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Disputes</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{t('my_disputes.title')}</h1>
             <p className="mt-2 text-sm text-gray-600">
-              View and manage disputes you are involved in
+              {t('my_disputes.desc')}
             </p>
           </div>
         </div>
@@ -73,7 +75,7 @@ const MyDisputes = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by dispute or property title..."
+              placeholder={t('my_disputes.search_placeholder')}
               className="w-full rounded-xl border border-gray-300 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-primary-600"
             />
           </form>
@@ -83,11 +85,11 @@ const MyDisputes = () => {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-primary-600"
           >
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="under_review">Under Review</option>
-            <option value="resolved">Resolved</option>
-            <option value="dismissed">Dismissed</option>
+            <option value="">{t('my_disputes.all_statuses')}</option>
+            <option value="open">{t('my_disputes.open')}</option>
+            <option value="under_review">{t('my_disputes.under_review')}</option>
+            <option value="resolved">{t('my_disputes.resolved')}</option>
+            <option value="dismissed">{t('my_disputes.dismissed')}</option>
           </select>
         </div>
 
@@ -96,11 +98,11 @@ const MyDisputes = () => {
         ) : disputes.length === 0 ? (
           <div className="rounded-3xl bg-white p-12 text-center shadow-sm">
             <FaBalanceScale className="mx-auto text-5xl text-gray-300" />
-            <h3 className="mt-4 text-xl font-semibold text-gray-900">No disputes found</h3>
+            <h3 className="mt-4 text-xl font-semibold text-gray-900">{t('my_disputes.no_disputes_title')}</h3>
             <p className="mt-2 text-sm text-gray-600">
               {search || statusFilter
-                ? 'Try adjusting your search or filter'
-                : 'You have not been involved in any disputes yet'}
+                ? t('my_disputes.no_disputes_filter')
+                : t('my_disputes.no_disputes_default')}
             </p>
           </div>
         ) : (
@@ -123,23 +125,23 @@ const MyDisputes = () => {
                       {dispute.is_legally_sealed && (
                         <span className="rounded-full border border-purple-200 bg-purple-100 px-3 py-0.5 text-xs font-semibold text-purple-700">
                           <FaLock className="mr-1 inline-block" />
-                          Sealed
+                          {t('my_disputes.sealed')}
                         </span>
                       )}
                     </div>
                     <p className="mt-2 text-sm text-gray-600 line-clamp-2">{dispute.description}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-gray-500">
                       <span>
-                        <span className="font-medium text-gray-700">Property:</span> {dispute.property_title || '-'}
+                        <span className="font-medium text-gray-700">{t('my_disputes.property')}:</span> {dispute.property_title || '-'}
                       </span>
                       <span>
-                        <span className="font-medium text-gray-700">Opened by:</span> {dispute.opened_by_name}
+                        <span className="font-medium text-gray-700">{t('my_disputes.opened_by')}:</span> {dispute.opened_by_name}
                       </span>
                       <span>
-                        <span className="font-medium text-gray-700">Against:</span> {dispute.against_name}
+                        <span className="font-medium text-gray-700">{t('my_disputes.against')}:</span> {dispute.against_name}
                       </span>
                       <span>
-                        <span className="font-medium text-gray-700">Priority:</span>{' '}
+                        <span className="font-medium text-gray-700">{t('my_disputes.priority')}:</span>{' '}
                         <span className={PRIORITY_COLORS[dispute.priority] || ''}>
                           {dispute.priority}
                         </span>
@@ -161,17 +163,17 @@ const MyDisputes = () => {
               onClick={() => fetchDisputes(pagination.page - 1)}
               className="rounded-xl border border-gray-300 px-4 py-2 text-sm disabled:opacity-50"
             >
-              Previous
+              {t('my_disputes.previous')}
             </button>
             <span className="text-sm text-gray-600">
-              Page {pagination.page} of {pagination.totalPages}
+              {t('my_disputes.page_of', { page: pagination.page, total: pagination.totalPages })}
             </span>
             <button
               disabled={pagination.page >= pagination.totalPages}
               onClick={() => fetchDisputes(pagination.page + 1)}
               className="rounded-xl border border-gray-300 px-4 py-2 text-sm disabled:opacity-50"
             >
-              Next
+              {t('my_disputes.next')}
             </button>
           </div>
         )}

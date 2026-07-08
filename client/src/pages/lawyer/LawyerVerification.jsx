@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import api from '../../services/api';
 import { toast } from 'react-toastify';
 import { isImpersonatingSession } from '../../services/authStorage';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULT_LIVENESS = {
   faceDetected: false,
@@ -54,6 +55,7 @@ const loadExternalScript = (src) => {
 };
 
 const LawyerVerification = ({ children }) => {
+  const { t } = useTranslation();
 
   const bypassVerification = isImpersonatingSession();
 
@@ -107,14 +109,14 @@ const LawyerVerification = ({ children }) => {
 
   const missingChecks = useMemo(() => {
     const checks = [];
-    if (!livenessChecks.faceDetected) checks.push('Face not detected');
-    if (!livenessChecks.centered) checks.push('Center your face in the frame');
-    if (!livenessChecks.blink) checks.push('Blink your eyes once');
-    if (!livenessChecks.mouthOpen) checks.push('Open your mouth once');
-    if (!livenessChecks.headLeft) checks.push('Turn your head left');
-    if (!livenessChecks.headRight) checks.push('Turn your head right');
-    if (!livenessChecks.movedCloser) checks.push('Move closer to camera');
-    if (!livenessChecks.movedFarther) checks.push('Move farther from camera');
+    if (!livenessChecks.faceDetected) checks.push(t('lawyer_verification.face_not_detected'));
+    if (!livenessChecks.centered) checks.push(t('lawyer_verification.center_face'));
+    if (!livenessChecks.blink) checks.push(t('lawyer_verification.blink'));
+    if (!livenessChecks.mouthOpen) checks.push(t('lawyer_verification.open_mouth'));
+    if (!livenessChecks.headLeft) checks.push(t('lawyer_verification.head_left'));
+    if (!livenessChecks.headRight) checks.push(t('lawyer_verification.head_right'));
+    if (!livenessChecks.movedCloser) checks.push(t('lawyer_verification.move_closer'));
+    if (!livenessChecks.movedFarther) checks.push(t('lawyer_verification.move_farther'));
     return checks;
   }, [livenessChecks]);
 
@@ -296,14 +298,14 @@ const LawyerVerification = ({ children }) => {
       runDetectionLoop();
     } catch (error) {
       console.error('FaceMesh init failed:', error);
-      setLivenessError('Live checks unavailable. Use a supported browser and stable internet.');
+      setLivenessError(t('lawyer_verification.live_checks_unavailable'));
       setFaceMeshReady(false);
     }
   }, [handleFaceResults, runDetectionLoop]);
 
   const startCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('Camera is not supported on this device/browser.');
+      setCameraError(t('lawyer_verification.camera_not_supported'));
       return;
     }
 
@@ -335,13 +337,13 @@ const LawyerVerification = ({ children }) => {
     } catch (error) {
       console.error('Camera access failed:', error);
       if (error?.name === 'NotAllowedError') {
-        setCameraError('Camera permission denied. Allow camera access for this site and retry.');
+        setCameraError(t('lawyer_verification.camera_permission_denied'));
       } else if (error?.name === 'NotFoundError') {
-        setCameraError('No camera device found. Connect a camera and retry.');
+        setCameraError(t('lawyer_verification.camera_not_found'));
       } else if (error?.name === 'NotReadableError') {
-        setCameraError('Camera is busy in another app. Close other apps using camera and retry.');
+        setCameraError(t('lawyer_verification.camera_busy'));
       } else {
-        setCameraError('Unable to Capture. Allow camera permission and try again.');
+        setCameraError(t('lawyer_verification.capture_failed'));
       }
     } finally {
       setCameraLoading(false);
@@ -388,7 +390,7 @@ const LawyerVerification = ({ children }) => {
 
     canvas.toBlob((blob) => {
       if (!blob) {
-        toast.error('Could not capture image. Please try again.');
+        toast.error(t('lawyer_verification.capture_image_failed'));
         return;
       }
 
@@ -469,7 +471,7 @@ const LawyerVerification = ({ children }) => {
 
   const handleUpload = async () => {
     if (!passport) {
-      toast.error('Capture a live passport photo first.');
+      toast.error(t('lawyer_verification.capture_first'));
       return;
     }
 
@@ -511,15 +513,15 @@ const LawyerVerification = ({ children }) => {
         // Fraud detected
         setFraudAlert({
           isFraudulent: true,
-          message: res.data?.message || 'Passport verification failed: Duplicate identity detected',
+          message: res.data?.message || t('lawyer_verification.duplicate_detected'),
           matchedUser: res.data?.data?.matched_user,
         });
-        toast.error('Fraud detected: Your passport matches an existing user. Super admin has been notified.');
+        toast.error(t('lawyer_verification.fraud_detected'));
         setPassport(null);
       } else {
         // Verification passed
         localStorage.setItem(LAWYER_VERIFICATION_KEY, 'true');
-        toast.success('Passport verification passed! Dashboard access granted.');
+        toast.success(t('lawyer_verification.verification_passed'));
         setVerificationComplete(true);
         setPassport(null);
         setLiveCaptureToken('');
@@ -531,9 +533,9 @@ const LawyerVerification = ({ children }) => {
     } catch (err) {
       setFraudAlert({
         isFraudulent: true,
-        message: err?.response?.data?.message || 'Passport verification failed',
+        message: err?.response?.data?.message || t('lawyer_verification.verification_failed'),
       });
-      toast.error(err?.response?.data?.message || 'Passport verification failed');
+      toast.error(err?.response?.data?.message || t('lawyer_verification.verification_failed'));
     } finally {
       setUploading(false);
     }
@@ -555,28 +557,28 @@ const LawyerVerification = ({ children }) => {
       <div className="container mx-auto px-3 py-6 max-w-full sm:max-w-2xl">
         <div className="mb-6 flex justify-center">
           <div className="rounded-xl border-2 border-red-400 bg-red-50 px-6 py-3">
-            <h1 className="text-2xl font-bold text-red-700">🚨 Verification Failed</h1>
+            <h1 className="text-2xl font-bold text-red-700">{t('lawyer_verification.verification_failed_title')}</h1>
           </div>
         </div>
 
         <div className="card bg-red-50 border-2 border-red-300 mb-6">
-          <h2 className="font-bold text-lg text-red-700 mb-4">Fraud Alert: Duplicate Identity Detected</h2>
+          <h2 className="font-bold text-lg text-red-700 mb-4">{t('lawyer_verification.fraud_alert_title')}</h2>
           <p className="text-red-900 mb-4">{fraudAlert.message}</p>
           
           {fraudAlert.matchedUser && (
             <div className="bg-white p-4 rounded border border-red-200 mb-4">
-              <p className="text-sm text-gray-600 mb-2"><strong>This passport matches an existing user:</strong></p>
+              <p className="text-sm text-gray-600 mb-2"><strong>{t('lawyer_verification.matches_existing')}:</strong></p>
               <ul className="text-sm text-gray-700">
-                <li><strong>Name:</strong> {fraudAlert.matchedUser.full_name}</li>
-                <li><strong>Email:</strong> {fraudAlert.matchedUser.email}</li>
-                <li><strong>Type:</strong> {fraudAlert.matchedUser.user_type}</li>
+                <li><strong>{t('lawyer_verification.name')}:</strong> {fraudAlert.matchedUser.full_name}</li>
+                <li><strong>{t('lawyer_verification.email')}:</strong> {fraudAlert.matchedUser.email}</li>
+                <li><strong>{t('lawyer_verification.type')}:</strong> {fraudAlert.matchedUser.user_type}</li>
               </ul>
             </div>
           )}
 
           <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-4">
             <p className="text-sm text-yellow-900">
-              <strong>⚠️ Important:</strong> Your account has been flagged and our super admin team has been notified. If you believe this is an error, please contact support immediately.
+              <strong>{t('lawyer_verification.important')}:</strong> {t('lawyer_verification.flagged_notice')}
             </p>
           </div>
 
@@ -587,7 +589,7 @@ const LawyerVerification = ({ children }) => {
             }}
             className="btn btn-secondary w-full"
           >
-            Try Different Passport
+            {t('lawyer_verification.try_different')}
           </button>
         </div>
       </div>
@@ -599,25 +601,25 @@ const LawyerVerification = ({ children }) => {
     <div className="container mx-auto px-3 py-6 max-w-full sm:max-w-3xl">
       <div className="mb-6 flex justify-center">
         <div className="rounded-xl border border-teal-200 bg-teal-50 px-6 py-2">
-          <h1 className="text-2xl font-bold text-teal-700">Lawyer Dashboard Access</h1>
+          <h1 className="text-2xl font-bold text-teal-700">{t('lawyer_verification.dashboard_access_title')}</h1>
         </div>
       </div>
 
       <div className="card mb-6 border-2 border-teal-200">
-        <h2 className="font-bold text-lg mb-3 text-teal-700 text-center">Passport Verification Required</h2>
+        <h2 className="font-bold text-lg mb-3 text-teal-700 text-center">{t('lawyer_verification.passport_required_title')}</h2>
         <p className="text-gray-600 mb-4 text-center">
-          Before you can access the lawyer dashboard, we need to verify your identity by capturing a live passport photo with face detection. This is a security measure to prevent fraud.
+          {t('lawyer_verification.passport_required_desc')}
         </p>
 
         <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-6">
           <p className="text-sm text-blue-900">
-            <strong>ℹ️ Security Note:</strong> Your passport will be compared against existing user records to ensure no duplicate identities. If fraud is detected, super admin will be notified immediately.
+            <strong>{t('lawyer_verification.security_note_label')}:</strong> {t('lawyer_verification.security_note_desc')}
           </p>
         </div>
 
         {passportPreview && (
           <div className="mb-6">
-            <p className="text-sm font-semibold mb-2">Captured Passport:</p>
+            <p className="text-sm font-semibold mb-2">{t('lawyer_verification.captured_passport')}:</p>
             <img
               src={passportPreview}
               alt="Captured Passport"
@@ -629,7 +631,7 @@ const LawyerVerification = ({ children }) => {
                 disabled={uploading}
                 className="btn btn-primary flex-1"
               >
-                {uploading ? 'Verifying & Checking for Fraud...' : 'Verify Passport'}
+                {uploading ? t('lawyer_verification.verifying') : t('lawyer_verification.verify_passport')}
               </button>
               <button
                 onClick={() => {
@@ -639,7 +641,7 @@ const LawyerVerification = ({ children }) => {
                 disabled={uploading}
                 className="btn btn-secondary flex-1"
               >
-                Retake
+                {t('lawyer_verification.retake')}
               </button>
             </div>
           </div>
@@ -648,7 +650,7 @@ const LawyerVerification = ({ children }) => {
         {showCameraModal && cameraActive && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
             <div className="bg-white rounded-lg max-w-sm sm:max-w-md w-full p-3">
-              <h3 className="font-bold text-sm mb-2">Live Passport Capture</h3>
+              <h3 className="font-bold text-sm mb-2">{t('lawyer_verification.live_capture_title')}</h3>
 
               {livenessError && (
                 <div className="bg-red-50 border border-red-200 rounded p-2 mb-2 text-red-700 text-xs">
@@ -683,7 +685,7 @@ const LawyerVerification = ({ children }) => {
               </div>
 
               <div className="mb-2">
-                <p className="text-xs font-semibold mb-1">Liveness Checks:</p>
+                <p className="text-xs font-semibold mb-1">{t('lawyer_verification.liveness_checks')}:</p>
                 <div className="grid grid-cols-2 gap-1">
                   {Object.entries(livenessChecks).map(([key, value]) => (
                     <div key={key} className={`text-xs p-1 rounded ${value ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
@@ -695,7 +697,7 @@ const LawyerVerification = ({ children }) => {
 
               {missingChecks.length > 0 && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mb-2 text-xs text-yellow-900">
-                  <p className="font-semibold mb-1">Still needed:</p>
+                  <p className="font-semibold mb-1">{t('lawyer_verification.still_needed')}:</p>
                   <ul className="list-disc list-inside space-y-0.5">
                     {missingChecks.map((check, idx) => <li key={idx}>{check}</li>)}
                   </ul>
@@ -709,7 +711,7 @@ const LawyerVerification = ({ children }) => {
                 }}
                 className="btn btn-secondary w-full"
               >
-                Close
+                {t('lawyer_verification.close')}
               </button>
             </div>
           </div>
@@ -721,7 +723,7 @@ const LawyerVerification = ({ children }) => {
             disabled={cameraLoading}
             className="btn btn-primary w-full"
           >
-            {cameraLoading ? 'Starting Camera...' : '📷 Capture'}
+            {cameraLoading ? t('lawyer_verification.starting_camera') : t('lawyer_verification.capture')}
           </button>
         )}
       </div>

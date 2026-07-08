@@ -16,8 +16,10 @@ import {
   FaShieldAlt
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
+import { useTranslation } from 'react-i18next';
 
 const FumigationCleaningPayment = () => {
+  const { t } = useTranslation();
   const { bookingId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -32,7 +34,7 @@ const FumigationCleaningPayment = () => {
   useEffect(() => {
     const loadBookingDetails = async () => {
       if (!user || user.user_type !== 'tenant') {
-        toast.error('Only tenants can make fumigation/cleaning payments');
+        toast.error(t('fumigation_cleaning_payment.only_tenants'));
         navigate('/dashboard');
         return;
       }
@@ -46,26 +48,26 @@ const FumigationCleaningPayment = () => {
           
           // Check if booking belongs to user
           if (bookingData.tenant_id !== user.id) {
-            toast.error('Access denied');
+            toast.error(t('fumigation_cleaning_payment.access_denied'));
             navigate('/dashboard');
             return;
           }
           
           // Check if already paid
           if (bookingData.payment_status === 'completed') {
-            toast.info('This booking is already paid');
+            toast.info(t('fumigation_cleaning_payment.already_paid'));
             navigate(`/fumigation-cleaning/bookings/${bookingId}`);
             return;
           }
           
           setBooking(bookingData);
         } else {
-          toast.error('Booking not found');
+          toast.error(t('fumigation_cleaning_payment.booking_not_found'));
           navigate('/dashboard');
         }
       } catch (error) {
         console.error('Error loading booking details:', error);
-        toast.error('Failed to load booking details');
+        toast.error(t('fumigation_cleaning_payment.load_failed'));
         navigate('/dashboard');
       } finally {
         setLoading(false);
@@ -91,18 +93,18 @@ const FumigationCleaningPayment = () => {
         // Redirect to payment gateway
         window.location.href = response.data.data.payment_url;
       } else {
-        toast.error(response.data?.message || 'Failed to initialize payment');
+        toast.error(response.data?.message || t('fumigation_cleaning_payment.init_failed'));
       }
     } catch (error) {
       console.error('Error initializing payment:', error);
-      toast.error(error.response?.data?.message || 'Failed to initialize payment');
+      toast.error(error.response?.data?.message || t('fumigation_cleaning_payment.init_failed'));
     } finally {
       setProcessingPayment(false);
     }
   };
   
   const handleManualPayment = () => {
-    toast.info('Manual payment option coming soon');
+    toast.info(t('fumigation_cleaning_payment.manual_coming_soon'));
     // In a real implementation, this would show bank transfer details
   };
   
@@ -126,12 +128,12 @@ const FumigationCleaningPayment = () => {
     }
   };
   
-  const getCategoryName = (categoryType) => {
+  const getCategoryName = (categoryType, t) => {
     switch (categoryType) {
-      case 'fumigation': return 'Fumigation Service';
-      case 'cleaning': return 'Cleaning Service';
-      case 'deep_cleaning': return 'Deep Cleaning Service';
-      default: return 'Service';
+      case 'fumigation': return t('fumigation_cleaning_payment.service_fumigation');
+      case 'cleaning': return t('fumigation_cleaning_payment.service_cleaning');
+      case 'deep_cleaning': return t('fumigation_cleaning_payment.service_deep_cleaning');
+      default: return t('fumigation_cleaning_payment.service_default');
     }
   };
   
@@ -144,13 +146,13 @@ const FumigationCleaningPayment = () => {
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-3xl mx-auto px-4">
           <div className="bg-white rounded-lg shadow p-8 text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Booking Not Found</h1>
-            <p className="text-gray-600 mb-6">The fumigation/cleaning booking could not be found.</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{t('fumigation_cleaning_payment.booking_not_found_title')}</h1>
+            <p className="text-gray-600 mb-6">{t('fumigation_cleaning_payment.booking_not_found_msg')}</p>
             <button
               onClick={() => navigate('/dashboard')}
               className="btn btn-primary"
             >
-              Return to Dashboard
+              {t('fumigation_cleaning_payment.return_dashboard')}
             </button>
           </div>
         </div>
@@ -162,9 +164,9 @@ const FumigationCleaningPayment = () => {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Complete Payment</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('fumigation_cleaning_payment.complete_payment_title')}</h1>
           <p className="text-gray-600">
-            Secure payment for your fumigation/cleaning booking
+            {t('fumigation_cleaning_payment.complete_payment_desc')}
           </p>
         </div>
         
@@ -174,7 +176,7 @@ const FumigationCleaningPayment = () => {
             <div className="bg-white rounded-lg shadow p-6 mb-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 {getServiceIcon(booking.category_type)}
-                <span className="ml-2">Booking Summary</span>
+                <span className="ml-2">{t('fumigation_cleaning_payment.booking_summary')}</span>
               </h2>
               
               <div className="space-y-4">
@@ -184,21 +186,21 @@ const FumigationCleaningPayment = () => {
                       {getServiceIcon(booking.category_type)}
                       <h3 className="font-bold text-gray-900 ml-2">{booking.service_name}</h3>
                     </div>
-                    <p className="text-sm text-gray-600">{getCategoryName(booking.category_type)}</p>
-                    <p className="text-sm text-gray-600 mt-1">Duration: {booking.duration_hours} hours</p>
-                    <p className="text-sm text-gray-600">Team Size: {booking.team_size} people</p>
+                    <p className="text-sm text-gray-600">{getCategoryName(booking.category_type, t)}</p>
+                    <p className="text-sm text-gray-600 mt-1">{t('fumigation_cleaning_payment.duration')}: {booking.duration_hours} {t('fumigation_cleaning_payment.hours')}</p>
+                    <p className="text-sm text-gray-600">{t('fumigation_cleaning_payment.team_size')}: {booking.team_size} {t('fumigation_cleaning_payment.people')}</p>
                   </div>
                   
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h3 className="font-bold text-gray-900 mb-2 flex items-center">
                       <FaCalendarAlt className="mr-2" />
-                      Schedule
+                      {t('fumigation_cleaning_payment.schedule')}
                     </h3>
                     <p className="text-gray-700">
                       {formatDate(booking.booking_date)}
                     </p>
                     <p className="text-gray-700">
-                      Time: {booking.preferred_time_slot === 'specific' ? booking.specific_time : booking.preferred_time_slot}
+                      {t('fumigation_cleaning_payment.time')}: {booking.preferred_time_slot === 'specific' ? booking.specific_time : booking.preferred_time_slot}
                     </p>
                   </div>
                 </div>
@@ -207,16 +209,16 @@ const FumigationCleaningPayment = () => {
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h3 className="font-bold text-blue-800 mb-2 flex items-center">
                       <FaHome className="mr-2" />
-                      Property Details
+                      {t('fumigation_cleaning_payment.property_details')}
                     </h3>
                     <p className="text-blue-700">{booking.property_address}</p>
                     <div className="grid grid-cols-2 gap-2 mt-2">
                       <div>
-                        <p className="text-sm text-blue-600">Size:</p>
-                        <p className="font-semibold">{booking.property_size_sqm} sqm</p>
+                        <p className="text-sm text-blue-600">{t('fumigation_cleaning_payment.size')}:</p>
+                        <p className="font-semibold">{booking.property_size_sqm} {t('fumigation_cleaning_payment.sqm')}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-blue-600">Rooms:</p>
+                        <p className="text-sm text-blue-600">{t('fumigation_cleaning_payment.rooms')}:</p>
                         <p className="font-semibold">{booking.number_of_rooms}</p>
                       </div>
                     </div>
@@ -225,16 +227,16 @@ const FumigationCleaningPayment = () => {
                   <div className="bg-green-50 p-4 rounded-lg">
                     <h3 className="font-bold text-green-800 mb-2 flex items-center">
                       <FaClipboardList className="mr-2" />
-                      Service Details
+                      {t('fumigation_cleaning_payment.service_details')}
                     </h3>
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-sm text-green-700">Condition:</span>
+                        <span className="text-sm text-green-700">{t('fumigation_cleaning_payment.condition')}:</span>
                         <span className="font-semibold capitalize">{booking.property_condition?.replace('_', ' ')}</span>
                       </div>
                       {booking.special_instructions && (
                         <div>
-                          <p className="text-sm text-green-700">Instructions:</p>
+                          <p className="text-sm text-green-700">{t('fumigation_cleaning_payment.instructions')}:</p>
                           <p className="text-green-700 text-sm">{booking.special_instructions}</p>
                         </div>
                       )}
@@ -247,7 +249,7 @@ const FumigationCleaningPayment = () => {
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                     <h3 className="font-bold text-purple-800 mb-2 flex items-center">
                       <FaClipboardList className="mr-2" />
-                      Additional Services
+                      {t('fumigation_cleaning_payment.additional_services')}
                     </h3>
                     <div className="space-y-2">
                       {booking.addon_details.map((addon, index) => (
@@ -271,15 +273,14 @@ const FumigationCleaningPayment = () => {
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 <FaCreditCard className="mr-2" />
-                Payment Options
+                {t('fumigation_cleaning_payment.payment_options')}
               </h2>
               
               <div className="mb-6">
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                  <h3 className="font-bold text-yellow-800 mb-2">Payment Required</h3>
+                  <h3 className="font-bold text-yellow-800 mb-2">{t('fumigation_cleaning_payment.payment_required_title')}</h3>
                   <p className="text-yellow-700">
-                    Your fumigation/cleaning booking will be confirmed only after successful payment.
-                    The service team will be assigned after payment confirmation.
+                    {t('fumigation_cleaning_payment.payment_required_desc')}
                   </p>
                 </div>
                 
@@ -292,8 +293,8 @@ const FumigationCleaningPayment = () => {
                           <FaCreditCard className="text-blue-600 text-xl" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-gray-900">Pay with Paystack</h3>
-                          <p className="text-sm text-gray-600">Card, Bank Transfer, USSD</p>
+                          <h3 className="font-bold text-gray-900">{t('fumigation_cleaning_payment.pay_with_paystack')}</h3>
+                          <p className="text-sm text-gray-600">{t('fumigation_cleaning_payment.paystack_methods')}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -308,25 +309,25 @@ const FumigationCleaningPayment = () => {
                       disabled={processingPayment || paymentInitialized}
                       className="btn btn-primary w-full py-3"
                     >
-                      {processingPayment ? (
-                        <>
-                          <FaSpinner className="animate-spin mr-2" />
-                          Initializing Payment...
-                        </>
-                      ) : paymentInitialized ? (
-                        <>
-                          <FaSpinner className="animate-spin mr-2" />
-                          Redirecting to Payment...
-                        </>
-                      ) : (
-                        'Pay with Paystack'
-                      )}
+                        {processingPayment ? (
+                          <>
+                            <FaSpinner className="animate-spin mr-2" />
+                            {t('fumigation_cleaning_payment.initializing')}
+                          </>
+                        ) : paymentInitialized ? (
+                          <>
+                            <FaSpinner className="animate-spin mr-2" />
+                            {t('fumigation_cleaning_payment.redirecting')}
+                          </>
+                        ) : (
+                          t('fumigation_cleaning_payment.pay_with_paystack')
+                        )}
                     </button>
                     
                     <div className="mt-3 text-xs text-gray-500">
-                      <p>• Secure payment powered by Paystack</p>
-                      <p>• Supports all Nigerian banks and cards</p>
-                      <p>• Instant confirmation</p>
+                      <p>{t('fumigation_cleaning_payment.paystack_feature_1')}</p>
+                      <p>{t('fumigation_cleaning_payment.paystack_feature_2')}</p>
+                      <p>{t('fumigation_cleaning_payment.paystack_feature_3')}</p>
                     </div>
                   </div>
                   
@@ -337,8 +338,8 @@ const FumigationCleaningPayment = () => {
                         <FaMoneyBillWave className="text-gray-600 text-xl" />
                       </div>
                       <div>
-                        <h3 className="font-bold text-gray-900">Bank Transfer</h3>
-                        <p className="text-sm text-gray-600">Manual bank transfer</p>
+                        <h3 className="font-bold text-gray-900">{t('fumigation_cleaning_payment.bank_transfer')}</h3>
+                        <p className="text-sm text-gray-600">{t('fumigation_cleaning_payment.manual_transfer')}</p>
                       </div>
                     </div>
                     
@@ -346,36 +347,36 @@ const FumigationCleaningPayment = () => {
                       onClick={handleManualPayment}
                       className="btn btn-outline w-full py-3"
                     >
-                      Request Bank Details
+                      {t('fumigation_cleaning_payment.request_bank_details')}
                     </button>
                     
                     <div className="mt-3 text-xs text-gray-500">
-                      <p>• Transfer to our company account</p>
-                      <p>• Send proof of payment to cleaning@rentalhub.com</p>
-                      <p>• Booking confirmed within 24 hours</p>
+                      <p>{t('fumigation_cleaning_payment.bank_feature_1')}</p>
+                      <p>{t('fumigation_cleaning_payment.bank_feature_2')}</p>
+                      <p>{t('fumigation_cleaning_payment.bank_feature_3')}</p>
                     </div>
                   </div>
                 </div>
               </div>
               
               <div className="border-t border-gray-200 pt-4">
-                <h3 className="font-bold text-gray-900 mb-3">Payment Terms</h3>
+                <h3 className="font-bold text-gray-900 mb-3">{t('fumigation_cleaning_payment.payment_terms')}</h3>
                 <ul className="text-sm text-gray-600 space-y-2">
                   <li className="flex items-start">
                     <FaCheckCircle className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                    Full payment is required to confirm your booking
+                    {t('fumigation_cleaning_payment.term_full_payment')}
                   </li>
                   <li className="flex items-start">
                     <FaCheckCircle className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                    Refunds available for cancellations made 24+ hours in advance
+                    {t('fumigation_cleaning_payment.term_refunds')}
                   </li>
                   <li className="flex items-start">
                     <FaCheckCircle className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                    Payment is securely processed through certified payment gateways
+                    {t('fumigation_cleaning_payment.term_secure')}
                   </li>
                   <li className="flex items-start">
                     <FaCheckCircle className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                    Receipt will be emailed to {user?.email}
+                    {t('fumigation_cleaning_payment.term_receipt', { email: user?.email })}
                   </li>
                 </ul>
               </div>
@@ -387,25 +388,25 @@ const FumigationCleaningPayment = () => {
             <div className="bg-white rounded-lg shadow p-6 mb-6 sticky top-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center">
                 <FaMoneyBillWave className="mr-2" />
-                Price Breakdown
+                {t('fumigation_cleaning_payment.price_breakdown')}
               </h3>
               
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Base Service</span>
+                  <span className="text-gray-600">{t('fumigation_cleaning_payment.base_service')}</span>
                   <span className="font-semibold">₦{booking.base_service_price?.toLocaleString()}</span>
                 </div>
                 
                 {booking.addons_total_price > 0 && (
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Additional Services</span>
+                    <span className="text-gray-600">{t('fumigation_cleaning_payment.additional_services')}</span>
                     <span className="font-semibold">₦{booking.addons_total_price?.toLocaleString()}</span>
                   </div>
                 )}
                 
                 <div className="border-t border-gray-200 pt-3 mt-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold text-gray-900">Total Amount</span>
+                    <span className="text-lg font-bold text-gray-900">{t('fumigation_cleaning_payment.total_amount')}</span>
                     <span className="text-2xl font-bold text-blue-600">
                       ₦{booking.total_price?.toLocaleString()}
                     </span>
@@ -414,31 +415,31 @@ const FumigationCleaningPayment = () => {
               </div>
               
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                <h4 className="font-bold text-green-800 mb-2">What's Included</h4>
+                <h4 className="font-bold text-green-800 mb-2">{t('fumigation_cleaning_payment.whats_included')}</h4>
                 <ul className="text-sm text-green-700 space-y-1">
-                  <li>• Professional service team</li>
-                  <li>• Approved chemicals and equipment</li>
-                  <li>• Safety gear and protocols</li>
-                  <li>• Post-service inspection</li>
-                  <li>• 7-day service guarantee</li>
+                  <li>{t('fumigation_cleaning_payment.included_1')}</li>
+                  <li>{t('fumigation_cleaning_payment.included_2')}</li>
+                  <li>{t('fumigation_cleaning_payment.included_3')}</li>
+                  <li>{t('fumigation_cleaning_payment.included_4')}</li>
+                  <li>{t('fumigation_cleaning_payment.included_5')}</li>
                 </ul>
               </div>
               
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-bold text-blue-800 mb-2">Booking Status</h4>
+                <h4 className="font-bold text-blue-800 mb-2">{t('fumigation_cleaning_payment.booking_status')}</h4>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Booking ID:</span>
+                    <span className="text-gray-600">{t('fumigation_cleaning_payment.booking_id')}:</span>
                     <span className="font-mono text-sm">FC-{booking.id.toString().padStart(6, '0')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Created:</span>
+                    <span className="text-gray-600">{t('fumigation_cleaning_payment.created')}:</span>
                     <span className="font-medium">
                       {new Date(booking.created_at).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Payment Status:</span>
+                    <span className="text-gray-600">{t('fumigation_cleaning_payment.payment_status')}:</span>
                     <span className={`font-semibold ${
                       booking.payment_status === 'completed' ? 'text-green-600' :
                       booking.payment_status === 'pending' ? 'text-yellow-600' :
@@ -448,7 +449,7 @@ const FumigationCleaningPayment = () => {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Booking Status:</span>
+                    <span className="text-gray-600">{t('fumigation_cleaning_payment.booking_status_label')}:</span>
                     <span className={`font-semibold ${
                       booking.booking_status === 'confirmed' ? 'text-green-600' :
                       booking.booking_status === 'pending' ? 'text-yellow-600' :
@@ -465,55 +466,53 @@ const FumigationCleaningPayment = () => {
                   onClick={() => navigate(`/fumigation-cleaning/bookings/${bookingId}`)}
                   className="btn btn-outline w-full"
                 >
-                  View Booking Details
+                  {t('fumigation_cleaning_payment.view_booking_details')}
                 </button>
                 
                 <button
                   onClick={() => navigate('/fumigation-cleaning/bookings')}
                   className="btn btn-gray w-full"
                 >
-                  My Bookings
+                  {t('fumigation_cleaning_payment.my_bookings')}
                 </button>
                 
                 <button
                   onClick={() => navigate('/dashboard')}
                   className="btn btn-gray w-full"
                 >
-                  Return to Dashboard
+                  {t('fumigation_cleaning_payment.return_dashboard')}
                 </button>
               </div>
             </div>
             
             {/* Support Information */}
             <div className="bg-white rounded-lg shadow p-6">
-              <h4 className="font-bold text-gray-900 mb-3">Need Help?</h4>
+              <h4 className="font-bold text-gray-900 mb-3">{t('fumigation_cleaning_payment.need_help')}</h4>
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Payment Issues</p>
+                  <p className="text-sm text-gray-600 mb-1">{t('fumigation_cleaning_payment.payment_issues')}</p>
                   <p className="text-blue-600 font-medium">support@rentalhub.com</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Fumigation/Cleaning Support</p>
+                  <p className="text-sm text-gray-600 mb-1">{t('fumigation_cleaning_payment.service_support')}</p>
                   <p className="text-blue-600 font-medium">+234 800 123 4567</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Operating Hours</p>
-                  <p className="text-gray-700">Mon - Sat: 7:00 AM - 6:00 PM</p>
+                  <p className="text-sm text-gray-600 mb-1">{t('fumigation_cleaning_payment.operating_hours')}</p>
+                  <p className="text-gray-700">{t('fumigation_cleaning_payment.hours_value')}</p>
                 </div>
               </div>
               
               <div className="mt-4 pt-4 border-t border-gray-200">
-                <h5 className="font-semibold text-gray-700 mb-2">Safety Notice</h5>
+                <h5 className="font-semibold text-gray-700 mb-2">{t('fumigation_cleaning_payment.safety_notice')}</h5>
                 <p className="text-xs text-gray-500">
-                  Our teams use approved chemicals and follow strict safety protocols. 
-                  Please ensure proper ventilation during and after service. 
-                  Keep children and pets away from treated areas for recommended periods.
+                  {t('fumigation_cleaning_payment.safety_notice_desc')}
                 </p>
                 <div className="flex items-center mt-3">
                   <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center mr-2">
                     <FaShieldAlt className="text-green-600" />
                   </div>
-                  <span className="text-xs text-gray-600">Certified & Safe Service</span>
+                  <span className="text-xs text-gray-600">{t('fumigation_cleaning_payment.certified_safe')}</span>
                 </div>
               </div>
             </div>
@@ -528,26 +527,26 @@ const FumigationCleaningPayment = () => {
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <FaSpinner className="text-blue-600 text-2xl animate-spin" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Redirecting to Payment</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{t('fumigation_cleaning_payment.redirecting_title')}</h3>
                 <p className="text-gray-600 mb-4">
-                  You are being redirected to Paystack to complete your payment securely.
+                  {t('fumigation_cleaning_payment.redirecting_desc')}
                 </p>
                 <div className="space-y-3">
                   <a
                     href={paymentUrl}
                     className="btn btn-primary w-full"
                   >
-                    Click here if not redirected
+                    {t('fumigation_cleaning_payment.click_if_not_redirected')}
                   </a>
                   <button
                     onClick={() => setPaymentInitialized(false)}
                     className="btn btn-gray w-full"
                   >
-                    Cancel Payment
+                    {t('fumigation_cleaning_payment.cancel_payment')}
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-4">
-                  Do not close this window until payment is complete.
+                  {t('fumigation_cleaning_payment.do_not_close')}
                 </p>
               </div>
             </div>

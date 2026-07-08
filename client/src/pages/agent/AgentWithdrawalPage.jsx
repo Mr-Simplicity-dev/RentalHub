@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { FaUniversity, FaCheck, FaClock, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import { useTranslation } from 'react-i18next';
 import Loader from '../../components/common/Loader';
 
 const AgentWithdrawalPage = () => {
+  const { t } = useTranslation();
   const [agentId] = useState(parseInt(localStorage.getItem('userId') || 0));
   const [landlordId, setLandlordId] = useState('');
   const [withdrawalRequests, setWithdrawalRequests] = useState([]);
@@ -43,7 +45,7 @@ const AgentWithdrawalPage = () => {
       }
     } catch (error) {
       console.error('Failed to load withdrawal data:', error);
-      toast.error('Failed to load withdrawal information');
+      toast.error(t('agent_withdrawal.failed_load'));
     } finally {
       setLoading(false);
     }
@@ -53,12 +55,12 @@ const AgentWithdrawalPage = () => {
     e.preventDefault();
 
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      toast.error('Please enter a valid amount');
+      toast.error(t('agent_withdrawal.valid_amount'));
       return;
     }
 
     if (!landlordId) {
-      toast.error('Please select a landlord');
+      toast.error(t('agent_withdrawal.select_landlord'));
       return;
     }
 
@@ -73,7 +75,7 @@ const AgentWithdrawalPage = () => {
       });
 
       if (response.data?.success) {
-        toast.success('Withdrawal request submitted successfully');
+        toast.success(t('agent_withdrawal.submitted'));
         setShowForm(false);
         setFormData({
           amount: '',
@@ -84,7 +86,7 @@ const AgentWithdrawalPage = () => {
         loadData();
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to submit withdrawal request');
+      toast.error(error.response?.data?.message || t('agent_withdrawal.submit_failed'));
     } finally {
       setSubmitting(false);
     }
@@ -92,11 +94,11 @@ const AgentWithdrawalPage = () => {
 
   const getStatusBadge = (status) => {
     const configs = {
-      pending: { icon: FaClock, bg: 'bg-amber-100', text: 'text-amber-700', label: 'Pending' },
-      approved: { icon: FaCheck, bg: 'bg-blue-100', text: 'text-blue-700', label: 'Approved' },
-      processing: { icon: FaClock, bg: 'bg-purple-100', text: 'text-purple-700', label: 'Processing' },
-      completed: { icon: FaCheck, bg: 'bg-green-100', text: 'text-green-700', label: 'Completed' },
-      rejected: { icon: FaTimes, bg: 'bg-red-100', text: 'text-red-700', label: 'Rejected' },
+      pending: { icon: FaClock, bg: 'bg-amber-100', text: 'text-amber-700', label: t('agent_withdrawal.status_pending') },
+      approved: { icon: FaCheck, bg: 'bg-blue-100', text: 'text-blue-700', label: t('agent_withdrawal.status_approved') },
+      processing: { icon: FaClock, bg: 'bg-purple-100', text: 'text-purple-700', label: t('agent_withdrawal.status_processing') },
+      completed: { icon: FaCheck, bg: 'bg-green-100', text: 'text-green-700', label: t('agent_withdrawal.status_completed') },
+      rejected: { icon: FaTimes, bg: 'bg-red-100', text: 'text-red-700', label: t('agent_withdrawal.status_rejected') },
     };
     const config = configs[status] || configs.pending;
     const IconComponent = config.icon;
@@ -115,9 +117,9 @@ const AgentWithdrawalPage = () => {
       <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white shadow-lg">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Withdrawal Requests</h1>
+            <h1 className="text-3xl font-bold">{t('agent_withdrawal.title')}</h1>
             <p className="mt-2 text-sm text-white/85">
-              Request payouts for your earned commissions
+              {t('agent_withdrawal.subtitle')}
             </p>
           </div>
           <div className="rounded-xl bg-white/10 p-4">
@@ -128,10 +130,10 @@ const AgentWithdrawalPage = () => {
 
       {/* Landlord Selector */}
       <div className="rounded-2xl border bg-white p-6 shadow-sm">
-        <label className="block text-sm font-semibold text-gray-900">Select Landlord</label>
+        <label className="block text-sm font-semibold text-gray-900">{t('agent_withdrawal.select_landlord_label')}</label>
         <input
           type="number"
-          placeholder="Enter landlord ID"
+          placeholder={t('agent_withdrawal.landlord_id_placeholder')}
           value={landlordId}
           onChange={(e) => setLandlordId(e.target.value)}
           className="mt-2 w-full max-w-xs rounded-lg border border-gray-300 px-4 py-2"
@@ -144,25 +146,25 @@ const AgentWithdrawalPage = () => {
           {summary && (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
               <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <p className="text-sm text-gray-600">Pending Requests</p>
+                <p className="text-sm text-gray-600">{t('agent_withdrawal.pending_requests')}</p>
                 <p className="mt-2 text-2xl font-bold text-gray-900">
                   ₦{summary.pending_amount || 0}
                 </p>
               </div>
               <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <p className="text-sm text-gray-600">Approved</p>
+                <p className="text-sm text-gray-600">{t('agent_withdrawal.approved')}</p>
                 <p className="mt-2 text-2xl font-bold text-blue-600">
                   ₦{summary.approved_amount || 0}
                 </p>
               </div>
               <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <p className="text-sm text-gray-600">Processed</p>
+                <p className="text-sm text-gray-600">{t('agent_withdrawal.processed')}</p>
                 <p className="mt-2 text-2xl font-bold text-green-600">
                   ₦{summary.processed_amount || 0}
                 </p>
               </div>
               <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <p className="text-sm text-gray-600">Total Requests</p>
+                <p className="text-sm text-gray-600">{t('agent_withdrawal.total_requests')}</p>
                 <p className="mt-2 text-2xl font-bold text-gray-900">
                   {summary.total_requests || 0}
                 </p>
@@ -175,48 +177,48 @@ const AgentWithdrawalPage = () => {
             onClick={() => setShowForm(!showForm)}
             className="btn btn-primary"
           >
-            {showForm ? 'Cancel' : '+ New Withdrawal Request'}
+            {showForm ? t('agent_withdrawal.cancel') : t('agent_withdrawal.new_request')}
           </button>
 
           {/* Form */}
           {showForm && (
             <div className="rounded-2xl border bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900">Request Withdrawal</h2>
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">{t('agent_withdrawal.request_withdrawal')}</h2>
               <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900">Amount (₦)</label>
+                  <label className="block text-sm font-medium text-gray-900">{t('agent_withdrawal.amount_label')}</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     value={formData.amount}
                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    placeholder="0.00"
+                    placeholder={t('agent_withdrawal.amount_placeholder')}
                     className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900">Withdrawal Method</label>
+                  <label className="block text-sm font-medium text-gray-900">{t('agent_withdrawal.method_label')}</label>
                   <select
                     value={formData.withdrawalMethod}
                     onChange={(e) => setFormData({ ...formData, withdrawalMethod: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2"
                   >
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="wallet">Wallet</option>
-                    <option value="cheque">Cheque</option>
-                    <option value="other">Other</option>
+                    <option value="bank_transfer">{t('agent_withdrawal.method_bank')}</option>
+                    <option value="wallet">{t('agent_withdrawal.method_wallet')}</option>
+                    <option value="cheque">{t('agent_withdrawal.method_cheque')}</option>
+                    <option value="other">{t('agent_withdrawal.method_other')}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900">Reason (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-900">{t('agent_withdrawal.reason_label')}</label>
                   <textarea
                     value={formData.requestReason}
                     onChange={(e) => setFormData({ ...formData, requestReason: e.target.value })}
-                    placeholder="Why are you requesting this withdrawal?"
+                    placeholder={t('agent_withdrawal.reason_placeholder')}
                     className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2"
                     rows="3"
                   />
@@ -227,7 +229,7 @@ const AgentWithdrawalPage = () => {
                   disabled={submitting}
                   className="btn btn-primary w-full"
                 >
-                  {submitting ? 'Processing...' : 'Submit Request'}
+                  {submitting ? t('agent_withdrawal.processing') : t('agent_withdrawal.submit_request')}
                 </button>
               </form>
             </div>
@@ -235,10 +237,10 @@ const AgentWithdrawalPage = () => {
 
           {/* Requests List */}
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Your Withdrawal Requests</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('agent_withdrawal.your_requests')}</h2>
             {withdrawalRequests.length === 0 ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-800">
-                <p>No withdrawal requests yet</p>
+                <p>{t('agent_withdrawal.no_requests')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -254,11 +256,11 @@ const AgentWithdrawalPage = () => {
                         </div>
                         <p className="mt-1 text-sm text-gray-600 capitalize">{request.withdrawal_method}</p>
                         <p className="text-xs text-gray-500 mt-2">
-                          Requested: {new Date(request.requested_date || request.created_at).toLocaleDateString()}
+                          {t('agent_withdrawal.requested')}: {new Date(request.requested_date || request.created_at).toLocaleDateString()}
                         </p>
                         {request.reason_for_rejection && (
                           <p className="mt-2 text-sm text-red-600">
-                            <strong>Rejection Reason:</strong> {request.reason_for_rejection}
+                            <strong>{t('agent_withdrawal.rejection_reason')}:</strong> {request.reason_for_rejection}
                           </p>
                         )}
                       </div>
