@@ -3,8 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import { setAuthSession } from '../services/authStorage';
+import { useTranslation } from 'react-i18next';
 
 const AcceptAgentInvite = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
 
@@ -31,32 +33,32 @@ const AcceptAgentInvite = () => {
     e.preventDefault();
 
     if (!token) {
-      toast.error('Agent invite token is missing');
+      toast.error(t('accept_agent_invite.token_missing'));
       return;
     }
 
     if (!String(formData.full_name || '').trim()) {
-      toast.error('Full name is required');
+      toast.error(t('accept_agent_invite.name_required'));
       return;
     }
 
     if (!String(formData.phone || '').trim()) {
-      toast.error('Phone number is required');
+      toast.error(t('accept_agent_invite.phone_required'));
       return;
     }
 
     if (!formData.consent) {
-      toast.error('You must agree to the terms and privacy policy');
+      toast.error(t('accept_agent_invite.consent_required'));
       return;
     }
 
     if (String(formData.password || '').length < 8) {
-      toast.error('Password must be at least 8 characters');
+      toast.error(t('accept_agent_invite.password_min_length'));
       return;
     }
 
     if (formData.password !== formData.confirm_password) {
-      toast.error('Passwords do not match');
+      toast.error(t('accept_agent_invite.password_mismatch'));
       return;
     }
 
@@ -74,15 +76,15 @@ const AcceptAgentInvite = () => {
         const { token: authToken, user } = res.data.data;
         setAuthSession(authToken, user);
         api.defaults.headers.common.Authorization = `Bearer ${authToken}`;
-        toast.success('Agent access activated successfully');
+        toast.success(t('accept_agent_invite.activated'));
         window.location.href = '/agent/dashboard';
         return;
       }
 
-      toast.error(res.data?.message || 'Failed to activate agent access');
+      toast.error(res.data?.message || t('accept_agent_invite.activation_failed'));
     } catch (error) {
       toast.error(
-        error.response?.data?.message || 'Failed to activate agent access'
+        error.response?.data?.message || t('accept_agent_invite.activation_failed')
       );
     } finally {
       setLoading(false);
@@ -95,12 +97,12 @@ const AcceptAgentInvite = () => {
         <div className="max-w-md px-10 text-center space-y-6">
           <div className="flex justify-center">
             <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center">
-              <img src="/rentalhub-mark.svg" className="h-12 w-12 rounded-xl object-contain shadow-sm" alt="RentalHub NG" />
+              <img src="/rentalhub-mark.svg" className="h-12 w-12 rounded-xl object-contain shadow-sm" alt={t('accept_agent_invite.alt_logo')} />
             </div>
           </div>
-          <h1 className="text-4xl font-bold">Activate Agent Access</h1>
+          <h1 className="text-4xl font-bold">{t('accept_agent_invite.title')}</h1>
           <p className="text-white/80">
-            Complete your details to start helping a landlord manage listings and other approved property tasks on RentalHub NG.
+            {t('accept_agent_invite.subtitle')}
           </p>
         </div>
       </div>
@@ -108,9 +110,9 @@ const AcceptAgentInvite = () => {
       <div className="flex w-full md:w-1/2 items-center justify-center px-6">
         <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl space-y-6">
           <div className="text-center">
-            <h2 className="text-2xl font-semibold dark:text-white">Accept Agent Invite</h2>
+            <h2 className="text-2xl font-semibold dark:text-white">{t('accept_agent_invite.heading')}</h2>
             <p className="text-sm text-gray-500">
-              Create your password and activate your agent dashboard.
+              {t('accept_agent_invite.desc')}
             </p>
           </div>
 
@@ -120,7 +122,7 @@ const AcceptAgentInvite = () => {
               value={formData.full_name}
               onChange={handleChange}
               className="input w-full"
-              placeholder="Full name"
+              placeholder={t('accept_agent_invite.full_name_placeholder')}
             />
 
             <input
@@ -128,7 +130,7 @@ const AcceptAgentInvite = () => {
               value={formData.phone}
               onChange={handleChange}
               className="input w-full"
-              placeholder="Phone number (+234...)"
+              placeholder={t('accept_agent_invite.phone_placeholder')}
             />
 
             <div className="relative">
@@ -138,14 +140,14 @@ const AcceptAgentInvite = () => {
                 value={formData.password}
                 onChange={handleChange}
                 className="input w-full"
-                placeholder="Password"
+                placeholder={t('accept_agent_invite.password_placeholder')}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 className="absolute right-3 top-3 text-sm text-gray-500"
               >
-                {showPassword ? 'Hide' : 'Show'}
+                {showPassword ? t('accept_agent_invite.hide') : t('accept_agent_invite.show')}
               </button>
             </div>
 
@@ -156,14 +158,14 @@ const AcceptAgentInvite = () => {
                 value={formData.confirm_password}
                 onChange={handleChange}
                 className="input w-full"
-                placeholder="Confirm password"
+                placeholder={t('accept_agent_invite.confirm_password_placeholder')}
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword((prev) => !prev)}
                 className="absolute right-3 top-3 text-sm text-gray-500"
               >
-                {showConfirmPassword ? 'Hide' : 'Show'}
+                {showConfirmPassword ? t('accept_agent_invite.hide') : t('accept_agent_invite.show')}
               </button>
             </div>
 
@@ -176,7 +178,7 @@ const AcceptAgentInvite = () => {
                 className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span>
-                I agree to the <Link to="/terms" className="text-indigo-600 hover:underline">Terms of Service</Link> and <Link to="/privacy" className="text-indigo-600 hover:underline">Privacy Policy</Link>.
+                {t('accept_agent_invite.agree_prefix')}<Link to="/terms" className="text-indigo-600 hover:underline">{t('accept_agent_invite.terms')}</Link>{t('accept_agent_invite.agree_separator')}<Link to="/privacy" className="text-indigo-600 hover:underline">{t('accept_agent_invite.privacy')}</Link>{t('accept_agent_invite.agree_suffix')}
               </span>
             </label>
 
@@ -185,13 +187,13 @@ const AcceptAgentInvite = () => {
               disabled={loading}
               className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Activating...' : 'Activate Agent Access'}
+              {loading ? t('accept_agent_invite.activating') : t('accept_agent_invite.submit')}
             </button>
           </form>
 
           <p className="text-center text-sm text-gray-500">
             <Link to="/login" className="text-indigo-600 hover:underline">
-              Back to login
+              {t('accept_agent_invite.back_to_login')}
             </Link>
           </p>
         </div>

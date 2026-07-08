@@ -4,8 +4,10 @@ import api from '../services/api';
 import { toast } from 'react-toastify';
 import { FaHome, FaCheckCircle, FaTimesCircle, FaClock, FaExternalLinkAlt, FaKey } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
+import { useTranslation } from 'react-i18next';
 
 const SubscribedProperties = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
   const [subscription, setSubscription] = useState(null);
@@ -21,7 +23,7 @@ const SubscribedProperties = () => {
         setSubscription(statusRes.data?.data?.multiple_property || null);
         setProperties(propsRes.data?.data || []);
       } catch (err) {
-        toast.error('Failed to load subscription data');
+        toast.error(t('subscribed_properties.load_failed'));
       } finally {
         setLoading(false);
       }
@@ -38,9 +40,9 @@ const SubscribedProperties = () => {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Subscribed Properties</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{t('subscribed_properties.title')}</h1>
             <p className="mt-2 text-sm text-gray-600">
-              Properties you have unlocked access to
+              {t('subscribed_properties.desc')}
             </p>
           </div>
         </div>
@@ -52,17 +54,17 @@ const SubscribedProperties = () => {
             </div>
             <div className="flex-1">
               <p className={`text-lg font-semibold ${isActive ? 'text-green-900' : 'text-gray-700'}`}>
-                {isActive ? 'Subscription Active' : 'No Active Subscription'}
+                {isActive ? t('subscribed_properties.active') : t('subscribed_properties.inactive')}
               </p>
               {isActive && subscription.expires_at && (
                 <p className="mt-1 text-sm text-green-700">
                   <FaClock className="mr-1 inline-block" />
-                  Expires {new Date(subscription.expires_at).toLocaleDateString()}
+                  {t('subscribed_properties.expires')} {new Date(subscription.expires_at).toLocaleDateString()}
                 </p>
               )}
               {!isActive && (
                 <p className="mt-1 text-sm text-gray-600">
-                  Subscribe to unlock access to multiple properties
+                  {t('subscribed_properties.subscribe_prompt')}
                 </p>
               )}
             </div>
@@ -70,7 +72,7 @@ const SubscribedProperties = () => {
               onClick={() => navigate('/subscribe')}
               className="rounded-full bg-primary-600 px-5 py-2.5 text-sm font-medium text-white"
             >
-              {isActive ? 'Renew' : 'Subscribe'}
+              {isActive ? t('subscribed_properties.renew') : t('subscribed_properties.subscribe')}
             </button>
           </div>
         </div>
@@ -78,15 +80,15 @@ const SubscribedProperties = () => {
         {properties.length === 0 ? (
           <div className="rounded-3xl bg-white p-12 text-center shadow-sm">
             <FaKey className="mx-auto text-5xl text-gray-300" />
-            <h3 className="mt-4 text-xl font-semibold text-gray-900">No unlocked properties</h3>
+            <h3 className="mt-4 text-xl font-semibold text-gray-900">{t('subscribed_properties.no_properties_title')}</h3>
             <p className="mt-2 text-sm text-gray-600">
-              Unlock a property to view its full details and photos
+              {t('subscribed_properties.no_properties_desc')}
             </p>
             <button
               onClick={() => navigate('/properties')}
               className="mt-4 rounded-full bg-primary-600 px-5 py-2.5 text-sm font-medium text-white"
             >
-              Browse Properties
+              {t('subscribed_properties.browse')}
             </button>
           </div>
         ) : (
@@ -118,11 +120,11 @@ const SubscribedProperties = () => {
                   )}
                 </div>
                 <p className="mt-3 text-xs text-gray-400">
-                  Unlocked {new Date(prop.unlocked_at).toLocaleDateString()}
+                  {t('subscribed_properties.unlocked')} {new Date(prop.unlocked_at).toLocaleDateString()}
                 </p>
                 <div className="mt-3 flex items-center gap-1 text-xs text-primary-600">
                   <FaExternalLinkAlt />
-                  View details
+                  {t('subscribed_properties.view_details')}
                 </div>
               </div>
             ))}

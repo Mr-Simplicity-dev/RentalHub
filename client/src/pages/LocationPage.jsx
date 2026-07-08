@@ -1,43 +1,45 @@
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useParams } from 'react-router-dom';
-
-const currency = (amount) =>
-  Number.isFinite(Number(amount))
-    ? `₦${Math.round(Number(amount)).toLocaleString('en-NG')}`
-    : 'N/A';
-
-const PropertyCard = ({ property }) => (
-  <Link
-    to={property.url}
-    className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-  >
-    {property.primary_photo ? (
-      <img
-        src={property.primary_photo}
-        alt={property.title}
-        className="h-44 w-full object-cover"
-      />
-    ) : (
-      <div className="flex h-44 items-center justify-center bg-gray-100 text-sm text-gray-500">
-        No photo
-      </div>
-    )}
-
-    <div className="space-y-2 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">
-        {property.property_type || 'Rental'}
-      </p>
-      <h3 className="text-base font-semibold text-gray-900">{property.title}</h3>
-      <p className="text-sm text-gray-600">
-        {[property.area, property.city, property.state_name].filter(Boolean).join(', ')}
-      </p>
-      <p className="text-lg font-bold text-gray-900">{currency(property.rent_amount)}</p>
-    </div>
-  </Link>
-);
+import { useTranslation } from 'react-i18next';
 
 export default function LocationPage() {
+  const { t } = useTranslation();
+  const currency = (amount) =>
+    Number.isFinite(Number(amount))
+      ? `₦${Math.round(Number(amount)).toLocaleString('en-NG')}`
+      : t('location_page.na');
+
+  const PropertyCard = ({ property }) => (
+    <Link
+      to={property.url}
+      className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+    >
+      {property.primary_photo ? (
+        <img
+          src={property.primary_photo}
+          alt={property.title}
+          className="h-44 w-full object-cover"
+        />
+      ) : (
+        <div className="flex h-44 items-center justify-center bg-gray-100 text-sm text-gray-500">
+          {t('location_page.no_photo')}
+        </div>
+      )}
+
+      <div className="space-y-2 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">
+          {property.property_type || t('location_page.property_fallback_type')}
+        </p>
+        <h3 className="text-base font-semibold text-gray-900">{property.title}</h3>
+        <p className="text-sm text-gray-600">
+          {[property.area, property.city, property.state_name].filter(Boolean).join(', ')}
+        </p>
+        <p className="text-lg font-bold text-gray-900">{currency(property.rent_amount)}</p>
+      </div>
+    </Link>
+  );
+
   const { stateSlug, lgaSlug } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +59,7 @@ export default function LocationPage() {
 
         const payload = await response.json();
         if (!response.ok) {
-          throw new Error(payload?.message || 'Failed to load location page');
+          throw new Error(payload?.message || t('location_page.load_failed'));
         }
 
         if (!cancelled) {
@@ -65,7 +67,7 @@ export default function LocationPage() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err.message || 'Failed to load location page');
+          setError(err.message || t('location_page.load_failed'));
           setData(null);
         }
       } finally {
@@ -83,11 +85,11 @@ export default function LocationPage() {
   }, [stateSlug, lgaSlug]);
 
   if (loading) {
-    return <div className="px-4 py-16 text-center text-gray-600">Loading rental page...</div>;
+    return <div className="px-4 py-16 text-center text-gray-600">{t('location_page.loading')}</div>;
   }
 
   if (error || !data?.success) {
-    return <div className="px-4 py-16 text-center text-red-600">{error || 'Location page not found'}</div>;
+    return <div className="px-4 py-16 text-center text-red-600">{error || t('location_page.not_found')}</div>;
   }
 
   const faqSchema = {
@@ -110,13 +112,13 @@ export default function LocationPage() {
       {
         '@type': 'ListItem',
         position: 1,
-        name: 'Home',
+        name: t('location_page.home'),
         item: `${window.location.origin}/`,
       },
       {
         '@type': 'ListItem',
         position: 2,
-        name: 'Nigeria',
+        name: t('location_page.nigeria'),
         item: `${window.location.origin}/nigeria`,
       },
       {
@@ -161,11 +163,11 @@ export default function LocationPage() {
         <div className="mx-auto max-w-7xl px-4 py-10">
           <div className="mb-6 text-sm text-gray-500">
             <Link to="/" className="hover:text-primary-700">
-              Home
+              {t('location_page.home')}
             </Link>{' '}
             /{' '}
             <Link to="/nigeria" className="hover:text-primary-700">
-              Nigeria
+              {t('location_page.nigeria')}
             </Link>{' '}
             /{' '}
             <Link to={`/nigeria/${data.location.stateSlug}`} className="hover:text-primary-700">
@@ -177,7 +179,7 @@ export default function LocationPage() {
           <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
             <section className="rounded-3xl bg-white p-8 shadow-sm">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-primary-700">
-                Nigeria Rental SEO Page
+                {t('location_page.title')}
               </p>
               <h1 className="max-w-3xl text-3xl font-bold text-gray-900 md:text-4xl">
                 {data.seo.title}
@@ -188,28 +190,28 @@ export default function LocationPage() {
 
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 <div className="rounded-2xl bg-stone-100 p-4">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Verified Listings</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">{t('location_page.verified_listings')}</p>
                   <p className="mt-2 text-2xl font-bold text-gray-900">
                     {Number(data.stats?.total_properties || 0).toLocaleString('en-NG')}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-stone-100 p-4">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Average Rent</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">{t('location_page.average_rent')}</p>
                   <p className="mt-2 text-2xl font-bold text-gray-900">
                     {currency(data.stats?.avg_rent)}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-stone-100 p-4">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Target Query</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">{t('location_page.target_query')}</p>
                   <p className="mt-2 text-sm font-semibold text-gray-900">
-                    {data.keyword_targets?.[2] || `cheap rent in ${locationLabel}`}
+                    {data.keyword_targets?.[2] || t('location_page.cheap_rent_in', { location: locationLabel })}
                   </p>
                 </div>
               </div>
             </section>
 
             <aside className="rounded-3xl bg-primary-900 p-8 text-white shadow-sm">
-              <h2 className="text-xl font-semibold">Ranking Strategy</h2>
+              <h2 className="text-xl font-semibold">{t('location_page.ranking_strategy')}</h2>
               <p className="mt-3 text-sm leading-7 text-primary-100">{data.content?.strategy}</p>
 
               <div className="mt-6 space-y-2">
@@ -228,11 +230,11 @@ export default function LocationPage() {
           <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
             <section className="space-y-6 rounded-3xl bg-white p-8 shadow-sm">
               <div>
-                <h2 className="text-2xl font-semibold text-gray-900">Rental Market Overview</h2>
+                <h2 className="text-2xl font-semibold text-gray-900">{t('location_page.market_overview')}</h2>
                 <p className="mt-3 leading-7 text-gray-700">{data.content?.overview}</p>
               </div>
               <div>
-                <h3 className="text-xl font-semibold text-gray-900">What Renters Should Know</h3>
+                <h3 className="text-xl font-semibold text-gray-900">{t('location_page.renter_know')}</h3>
                 <p className="mt-3 leading-7 text-gray-700">{data.content?.marketSummary}</p>
               </div>
             </section>
@@ -240,7 +242,7 @@ export default function LocationPage() {
             <section className="space-y-6 rounded-3xl bg-white p-8 shadow-sm">
               <div>
                 <h2 className="text-2xl font-semibold text-gray-900">
-                  Nearby Rental Intent Pages
+                  {t('location_page.nearby_intent_pages')}
                 </h2>
                 <div className="mt-4 grid gap-3">
                   {(data.links?.areas || []).map((item) => (
@@ -250,7 +252,7 @@ export default function LocationPage() {
                       className="flex items-center justify-between rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 transition hover:border-primary-300 hover:text-primary-700"
                     >
                       <span>{item.name}</span>
-                      <span>{Number(item.property_count || 0)} listings</span>
+                      <span>{t('location_page.count_listings', { count: Number(item.property_count || 0) })}</span>
                     </Link>
                   ))}
                 </div>
@@ -258,12 +260,12 @@ export default function LocationPage() {
 
               {data.links?.statePage && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">State Page</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">{t('location_page.state_page')}</h3>
                   <Link
                     to={data.links.statePage.url}
                     className="mt-3 inline-flex rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white"
                   >
-                    Explore {data.links.statePage.name}
+                    {t('location_page.explore', { name: data.links.statePage.name })}
                   </Link>
                 </div>
               )}
@@ -273,7 +275,7 @@ export default function LocationPage() {
           {data.links?.lgas?.length > 0 && (
             <section className="mt-8 rounded-3xl bg-white p-8 shadow-sm">
               <h2 className="text-2xl font-semibold text-gray-900">
-                All LGAs in {data.location.state}
+                {t('location_page.all_lgas', { state: data.location.state })}
               </h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {data.links.lgas.map((item) => (
@@ -282,7 +284,7 @@ export default function LocationPage() {
                     to={item.url}
                     className="rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 transition hover:border-primary-300 hover:text-primary-700"
                   >
-                    Houses for rent in {item.name}
+                    {t('location_page.houses_for_rent', { name: item.name })}
                   </Link>
                 ))}
               </div>
@@ -293,17 +295,17 @@ export default function LocationPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-gray-900">
-                  Verified Properties in {locationLabel}
+                  {t('location_page.verified_properties', { location: locationLabel })}
                 </h2>
                 <p className="mt-2 text-sm text-gray-600">
-                  Property-based SEO pages work best when they connect a location guide to live verified inventory.
+                  {t('location_page.seo_note')}
                 </p>
               </div>
               <Link
                 to="/properties"
                 className="rounded-full border border-primary-200 px-4 py-2 text-sm font-medium text-primary-700"
               >
-                Browse all properties
+                {t('location_page.browse_properties')}
               </Link>
             </div>
 
@@ -315,13 +317,13 @@ export default function LocationPage() {
               </div>
             ) : (
               <p className="mt-6 text-gray-500">
-                No verified properties are live on this location page yet.
+                {t('location_page.no_properties')}
               </p>
             )}
           </section>
 
           <section className="mt-8 rounded-3xl bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-semibold text-gray-900">FAQ</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">{t('location_page.faq')}</h2>
             <div className="mt-5 space-y-4">
               {(data.faq || []).map((item) => (
                 <div key={item.question} className="rounded-2xl border border-gray-200 p-4">

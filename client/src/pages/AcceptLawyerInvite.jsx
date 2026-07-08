@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import api from '../services/api';
 import { setAuthSession } from '../services/authStorage';
+import { useTranslation } from 'react-i18next';
 
 const getPasswordStrength = (password) => {
   let score = 0;
@@ -15,6 +16,7 @@ const getPasswordStrength = (password) => {
 };
 
 const AcceptLawyerInvite = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
   const mode = useMemo(() => searchParams.get('mode') || 'client', [searchParams]);
@@ -48,16 +50,16 @@ const AcceptLawyerInvite = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!token) return toast.error('Invite token missing');
-    if (!formData.full_name.trim()) return toast.error('Full name is required');
-    if (!formData.chamber_name.trim()) return toast.error('Chamber/Law firm name is required');
-    if (!formData.chamber_phone.trim()) return toast.error('Chamber phone number is required');
-    if (!formData.phone.trim()) return toast.error('Phone number is required');
-    if (!formData.consent) return toast.error('You must agree to the terms and policy to continue');
+    if (!token) return toast.error(t('accept_lawyer_invite.token_missing'));
+    if (!formData.full_name.trim()) return toast.error(t('accept_lawyer_invite.name_required'));
+    if (!formData.chamber_name.trim()) return toast.error(t('accept_lawyer_invite.chamber_name_required'));
+    if (!formData.chamber_phone.trim()) return toast.error(t('accept_lawyer_invite.chamber_phone_required'));
+    if (!formData.phone.trim()) return toast.error(t('accept_lawyer_invite.phone_required'));
+    if (!formData.consent) return toast.error(t('accept_lawyer_invite.consent_required'));
     if (formData.password.length < 8)
-      return toast.error('Password must be at least 8 characters');
+      return toast.error(t('accept_lawyer_invite.password_min_length'));
     if (formData.password !== formData.confirm_password)
-      return toast.error('Passwords do not match');
+      return toast.error(t('accept_lawyer_invite.password_mismatch'));
 
     setLoading(true);
     try {
@@ -76,7 +78,7 @@ const AcceptLawyerInvite = () => {
       });
 
       if (res.data.success) {
-        toast.success('OTP sent to your phone for verification');
+        toast.success(t('accept_lawyer_invite.otp_sent'));
         setStep('otp');
       } else {
         toast.error('Failed to send OTP');
@@ -178,27 +180,27 @@ const AcceptLawyerInvite = () => {
   >
     {/* LOGO */}
     <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl shadow-xl border border-white/20">
-      <img src="/rentalhub-mark.svg" alt="RentalHub NG" className="h-12 w-12 rounded-xl object-contain shadow-sm" />
+      <img src="/rentalhub-mark.svg" alt={t('accept_lawyer_invite.alt_logo')} className="h-12 w-12 rounded-xl object-contain shadow-sm" />
     </div>
 
     {/* BRAND */}
     <div className="text-lg font-semibold tracking-wide text-white/90">
-      Rental Hub NG
+      {t('accept_lawyer_invite.brand')}
     </div>
 
     {/* TITLE */}
     <h1 className="text-4xl font-bold leading-tight text-white">
-      Secure Legal Access
+      {t('accept_lawyer_invite.title')}
     </h1>
 
     {/* DESCRIPTION */}
     <p className="text-lg text-white/80 leading-relaxed">
-      You’ve been invited to join as a lawyer. Activate your account to start managing legal cases and disputes seamlessly.
+      {t('accept_lawyer_invite.subtitle')}
     </p>
 
     {/* TRUST */}
     <p className="text-sm text-white/60">
-      Trusted by landlords, tenants, and legal professionals.
+      {t('accept_lawyer_invite.trust_text')}
     </p>
   </motion.div>
 </motion.div>
@@ -215,24 +217,22 @@ const AcceptLawyerInvite = () => {
             <>
               <div className="text-center">
                 <h2 className="text-xl font-semibold dark:text-white">
-                  {isPlatformInvite ? 'Activate Platform Lawyer Access' : 'Activate Lawyer Access'}
+                  {isPlatformInvite ? t('accept_lawyer_invite.activate_platform') : t('accept_lawyer_invite.activate_lawyer')}
                 </h2>
                 <p className="text-xs text-gray-500">
-                  {isPlatformInvite
-                    ? 'Create your password and complete your RentalHub NG lawyer profile'
-                    : 'Complete your lawyer profile details'}
+                  {isPlatformInvite ? t('accept_lawyer_invite.platform_subtitle') : t('accept_lawyer_invite.client_subtitle')}
                 </p>
               </div>
 
               <div className="text-center mb-4">
                 <h3 className="text-lg font-medium dark:text-white">
-                  Lawyer Details
+                  {t('accept_lawyer_invite.lawyer_details')}
                 </h3>
               </div>
 
               <input
                 name="full_name"
-                placeholder="Full name"
+                placeholder={t('accept_lawyer_invite.full_name_placeholder')}
                 value={formData.full_name}
                 onChange={handleChange}
                 className="input w-full text-sm"
@@ -280,7 +280,7 @@ const AcceptLawyerInvite = () => {
 
               <input
                 name="chamber_name"
-                placeholder="Law firm / Chamber name"
+                placeholder={t('accept_lawyer_invite.chamber_name_placeholder')}
                 value={formData.chamber_name}
                 onChange={handleChange}
                 className="input w-full text-sm"
@@ -288,7 +288,7 @@ const AcceptLawyerInvite = () => {
 
               <input
                 name="chamber_phone"
-                placeholder="Chamber phone (e.g., +234...)"
+                placeholder={t('accept_lawyer_invite.chamber_phone_placeholder')}
                 value={formData.chamber_phone}
                 onChange={handleChange}
                 className="input w-full text-sm"
@@ -296,7 +296,7 @@ const AcceptLawyerInvite = () => {
 
               <input
                 name="phone"
-                placeholder="Your personal phone (+234...)"
+                placeholder={t('accept_lawyer_invite.phone_placeholder')}
                 value={formData.phone}
                 onChange={handleChange}
                 className="input w-full text-sm"
@@ -308,7 +308,7 @@ const AcceptLawyerInvite = () => {
                   <input
                     name="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Password"
+                    placeholder={t('accept_lawyer_invite.password_placeholder')}
                     value={formData.password}
                     onChange={handleChange}
                     className="input w-full text-sm"
@@ -317,7 +317,7 @@ const AcceptLawyerInvite = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-2 top-2 text-xs cursor-pointer hover:underline"
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    {showPassword ? t('accept_lawyer_invite.hide') : t('accept_lawyer_invite.show')}
                   </span>
                 </div>
 
@@ -343,7 +343,7 @@ const AcceptLawyerInvite = () => {
                 <input
                   name="confirm_password"
                   type={showConfirm ? 'text' : 'password'}
-                  placeholder="Confirm password"
+                  placeholder={t('accept_lawyer_invite.confirm_password_placeholder')}
                   value={formData.confirm_password}
                   onChange={handleChange}
                   className="input w-full text-sm"
@@ -352,7 +352,7 @@ const AcceptLawyerInvite = () => {
                   onClick={() => setShowConfirm(!showConfirm)}
                   className="absolute right-2 top-2 text-xs cursor-pointer hover:underline"
                 >
-                  {showConfirm ? 'Hide' : 'Show'}
+                  {showConfirm ? t('accept_lawyer_invite.hide') : t('accept_lawyer_invite.show')}
                 </span>
               </div>
 
@@ -367,7 +367,7 @@ const AcceptLawyerInvite = () => {
                   className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span>
-                  I agree to the <Link to="/terms" className="text-indigo-600 underline">Terms of Service</Link> and <Link to="/privacy" className="text-indigo-600 underline">Privacy Policy</Link>.
+                  {t('accept_lawyer_invite.agree_prefix')}<Link to="/terms" className="text-indigo-600 underline">{t('accept_lawyer_invite.terms')}</Link>{t('accept_lawyer_invite.agree_separator')}<Link to="/privacy" className="text-indigo-600 underline">{t('accept_lawyer_invite.privacy')}</Link>{t('accept_lawyer_invite.agree_suffix')}
                 </span>
               </label>
 
@@ -376,7 +376,7 @@ const AcceptLawyerInvite = () => {
                 disabled={loading}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white py-2 rounded-lg font-medium transition text-sm"
               >
-                {loading ? 'Sending OTP...' : 'Continue'}
+                {loading ? t('accept_lawyer_invite.sending_otp') : t('accept_lawyer_invite.continue')}
               </button>
             </>
           )}
@@ -386,29 +386,29 @@ const AcceptLawyerInvite = () => {
             <>
               <div className="text-center">
                 <h2 className="text-xl font-semibold dark:text-white">
-                  Verify Your Phone
+                  {t('accept_lawyer_invite.verify_phone_title')}
                 </h2>
                 <p className="text-xs text-gray-500">
-                  Enter the OTP sent to {formData.phone}
+                  {t('accept_lawyer_invite.otp_sent_to')} {formData.phone}
                 </p>
               </div>
 
               <input
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                placeholder="Enter 6-digit OTP"
+                placeholder={t('accept_lawyer_invite.otp_placeholder')}
                 maxLength="6"
                 className="input w-full text-center text-base tracking-widest font-bold"
               />
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-xs text-blue-800">
-                  <strong>Verification details:</strong>
+                  <strong>{t('accept_lawyer_invite.verification_details')}:</strong>
                 </p>
                 <p className="text-xs text-blue-700 mt-1">
-                  ✓ Lawyer: <strong>{formData.full_name}</strong><br/>
-                  ✓ Chamber: <strong>{formData.chamber_name}</strong><br/>
-                  ✓ Chamber Phone: <strong>{formData.chamber_phone}</strong>
+                  ✓ {t('accept_lawyer_invite.lawyer_label')} <strong>{formData.full_name}</strong><br/>
+                  ✓ {t('accept_lawyer_invite.chamber_label')} <strong>{formData.chamber_name}</strong><br/>
+                  ✓ {t('accept_lawyer_invite.chamber_phone_label')} <strong>{formData.chamber_phone}</strong>
                 </p>
               </div>
 
@@ -417,7 +417,7 @@ const AcceptLawyerInvite = () => {
                 disabled={loading || !otp}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-2 rounded-lg font-medium transition text-sm"
               >
-                {loading ? 'Verifying...' : 'Verify & Activate Account'}
+                {loading ? t('accept_lawyer_invite.verifying') : t('accept_lawyer_invite.verify_activate')}
               </button>
 
               <button
@@ -427,14 +427,14 @@ const AcceptLawyerInvite = () => {
                 }}
                 className="w-full text-indigo-600 hover:text-indigo-700 py-1 text-xs"
               >
-                Back to Edit
+                {t('accept_lawyer_invite.back_to_edit')}
               </button>
             </>
           )}
 
           <p className="text-center text-xs text-gray-500">
             <Link to="/login" className="text-indigo-600 hover:underline">
-              Back to login
+              {t('accept_lawyer_invite.back_to_login')}
             </Link>
           </p>
         </motion.div>

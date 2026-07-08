@@ -169,7 +169,7 @@ const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   return isAuthenticated ? children : <Navigate to="/login" />;
@@ -179,7 +179,7 @@ const FinancialAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -192,7 +192,7 @@ const SuperFinancialAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -205,7 +205,7 @@ const StateAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -218,7 +218,7 @@ const LgaSupportAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -231,7 +231,7 @@ const StateSupportAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -244,7 +244,7 @@ const SuperSupportAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -261,7 +261,7 @@ const RecruitmentAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -274,7 +274,7 @@ const SuperAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -287,7 +287,7 @@ const TenantRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -300,7 +300,7 @@ const LandlordRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -336,7 +336,7 @@ const AgentRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -349,7 +349,7 @@ const BaseLawyerRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -362,7 +362,7 @@ const StateLawyerRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -375,7 +375,7 @@ const SuperLawyerRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -388,7 +388,7 @@ const AdminShellRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -401,7 +401,7 @@ const TransportationCoreAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -414,7 +414,7 @@ const TransportationStateAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -429,7 +429,7 @@ const TransportationSuperAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -444,7 +444,7 @@ const LgaFumigationAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -457,7 +457,7 @@ const StateFumigationAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -470,7 +470,7 @@ const SuperFumigationAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -483,7 +483,7 @@ const PropertyManagerRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" />;

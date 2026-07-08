@@ -18,8 +18,10 @@ import {
 import Loader from '../components/common/Loader';
 import BackToDashboard from '../components/common/BackToDashboard';
 import BookingCancelModal from '../components/common/BookingCancelModal';
+import { useTranslation } from 'react-i18next';
 
 const TransportationBookings = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -34,7 +36,7 @@ const TransportationBookings = () => {
   useEffect(() => {
     const loadData = async () => {
       if (!user || user.user_type !== 'tenant') {
-        toast.error('Only tenants can view transportation bookings');
+        toast.error(t('transportation_bookings.only_tenants'));
         navigate('/dashboard');
         return;
       }
@@ -54,7 +56,7 @@ const TransportationBookings = () => {
         }
       } catch (error) {
         console.error('Error loading transportation data:', error);
-        toast.error('Failed to load transportation bookings');
+        toast.error(t('transportation_bookings.load_failed'));
       } finally {
         setLoading(false);
       }
@@ -144,15 +146,15 @@ const TransportationBookings = () => {
       });
       
       if (response.data?.success) {
-        toast.success('Booking cancelled successfully');
+        toast.success(t('transportation_bookings.cancelled'));
         setCancelTarget(null);
         await refreshBookings();
       } else {
-        toast.error(response.data?.message || 'Failed to cancel booking');
+        toast.error(response.data?.message || t('transportation_bookings.cancel_failed'));
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
-      toast.error(error.response?.data?.message || 'Failed to cancel booking');
+      toast.error(error.response?.data?.message || t('transportation_bookings.cancel_failed'));
     } finally {
       setCancelling(false);
     }
@@ -177,9 +179,9 @@ const TransportationBookings = () => {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">My Transportation Bookings</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('transportation_bookings.title')}</h1>
               <p className="text-gray-600">
-                Manage your transportation bookings and moving arrangements
+                {t('transportation_bookings.desc')}
               </p>
             </div>
             
@@ -189,7 +191,7 @@ const TransportationBookings = () => {
                 className="btn btn-primary flex w-full items-center justify-center sm:w-auto"
               >
                 <FaPlus className="mr-2" />
-                New Booking
+                {t('transportation_bookings.new_booking')}
               </Link>
               
               <BackToDashboard />
@@ -206,7 +208,7 @@ const TransportationBookings = () => {
                   <FaTruck className="text-blue-600 text-xl" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Total Bookings</p>
+                  <p className="text-sm text-gray-600">{t('transportation_bookings.total_bookings')}</p>
                   <p className="text-2xl font-bold text-gray-900">{stats.total_bookings || 0}</p>
                 </div>
               </div>
@@ -218,7 +220,7 @@ const TransportationBookings = () => {
                   <FaCheckCircle className="text-green-600 text-xl" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Completed</p>
+                  <p className="text-sm text-gray-600">{t('transportation_bookings.completed')}</p>
                   <p className="text-2xl font-bold text-gray-900">{stats.completed_bookings || 0}</p>
                 </div>
               </div>
@@ -230,7 +232,7 @@ const TransportationBookings = () => {
                   <FaClock className="text-yellow-600 text-xl" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Pending</p>
+                  <p className="text-sm text-gray-600">{t('transportation_bookings.pending')}</p>
                   <p className="text-2xl font-bold text-gray-900">{stats.pending_bookings || 0}</p>
                 </div>
               </div>
@@ -242,7 +244,7 @@ const TransportationBookings = () => {
                   <FaMoneyBillWave className="text-purple-600 text-xl" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Total Spent</p>
+                  <p className="text-sm text-gray-600">{t('transportation_bookings.total_spent')}</p>
                   <p className="text-2xl font-bold text-gray-900">
                     ₦{(stats.total_spent || 0).toLocaleString()}
                   </p>
@@ -257,7 +259,7 @@ const TransportationBookings = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center">
               <FaFilter className="text-gray-400 mr-2" />
-              <span className="text-gray-700 mr-3">Filter by status:</span>
+              <span className="text-gray-700 mr-3">{t('transportation_bookings.filter_by_status')}:</span>
               <div className="flex flex-wrap gap-2">
                 {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map((status) => (
                   <button
@@ -269,14 +271,14 @@ const TransportationBookings = () => {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    {status === 'all' ? 'All Bookings' : status.replace('_', ' ').toUpperCase()}
+                    {status === 'all' ? t('transportation_bookings.all_bookings') : status.replace('_', ' ').toUpperCase()}
                   </button>
                 ))}
               </div>
             </div>
             
             <div className="text-sm text-gray-600">
-              Showing {filteredBookings.length} of {bookings.length} bookings
+              {t('transportation_bookings.showing', { count: filteredBookings.length, total: bookings.length })}
             </div>
           </div>
         </div>
@@ -288,11 +290,11 @@ const TransportationBookings = () => {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FaTruck className="text-gray-400 text-2xl" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">No Bookings Found</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">{t('transportation_bookings.no_bookings_title')}</h3>
               <p className="text-gray-600 mb-6">
                 {filter === 'all' 
-                  ? "You haven't made any transportation bookings yet."
-                  : `No ${filter} bookings found.`
+                  ? t('transportation_bookings.no_bookings_all')
+                  : t('transportation_bookings.no_bookings_filter', { filter })
                 }
               </p>
               {filter === 'all' && (
@@ -301,7 +303,7 @@ const TransportationBookings = () => {
                   className="btn btn-primary"
                 >
                   <FaPlus className="mr-2" />
-                  Book Transportation Now
+                  {t('transportation_bookings.book_now')}
                 </Link>
               )}
             </div>
@@ -311,19 +313,19 @@ const TransportationBookings = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Service & Property
+                      {t('transportation_bookings.service_property')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Schedule
+                      {t('transportation_bookings.schedule')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Price & Payment
+                      {t('transportation_bookings.price_payment')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      {t('transportation_bookings.status')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                      {t('transportation_bookings.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -386,7 +388,7 @@ const TransportationBookings = () => {
                             onClick={() => handleViewDetails(booking.id)}
                             className="btn btn-sm btn-outline"
                           >
-                            Details
+                            {t('transportation_bookings.details')}
                           </button>
                           
                           {booking.payment_status === 'pending' && booking.booking_status !== 'cancelled' && (
@@ -394,7 +396,7 @@ const TransportationBookings = () => {
                               onClick={() => handlePayNow(booking.id)}
                               className="btn btn-sm btn-primary"
                             >
-                              Pay Now
+                              {t('transportation_bookings.pay_now')}
                             </button>
                           )}
                           
@@ -403,7 +405,7 @@ const TransportationBookings = () => {
                               onClick={() => setCancelTarget(booking)}
                               className="btn btn-sm btn-gray"
                             >
-                              Cancel
+                              {t('transportation_bookings.cancel')}
                             </button>
                           )}
                         </div>
@@ -419,38 +421,38 @@ const TransportationBookings = () => {
         {/* Help Section */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
-            <h3 className="font-bold text-blue-800 mb-2">Need to Reschedule?</h3>
+            <h3 className="font-bold text-blue-800 mb-2">{t('transportation_bookings.need_reschedule')}</h3>
             <p className="text-blue-700 text-sm mb-3">
-              Contact our transportation team at least 24 hours before your booking to reschedule.
+              {t('transportation_bookings.reschedule_desc')}
             </p>
             <p className="text-blue-600 font-medium">+234 800 123 4567</p>
           </div>
           
           <div className="bg-green-50 border border-green-200 rounded-lg p-5">
-            <h3 className="font-bold text-green-800 mb-2">Payment Issues?</h3>
+            <h3 className="font-bold text-green-800 mb-2">{t('transportation_bookings.payment_issues')}</h3>
             <p className="text-green-700 text-sm mb-3">
-              If you're having trouble with payment, contact our support team for assistance.
+              {t('transportation_bookings.payment_issues_desc')}
             </p>
             <p className="text-green-600 font-medium">support@rentalhub.com</p>
           </div>
           
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-5">
-            <h3 className="font-bold text-purple-800 mb-2">Booking Policies</h3>
+            <h3 className="font-bold text-purple-800 mb-2">{t('transportation_bookings.booking_policies')}</h3>
             <p className="text-purple-700 text-sm">
-              • Free cancellation up to 24 hours before booking
+              {t('transportation_bookings.policy_1')}
               <br />
-              • 50% refund for cancellations within 12-24 hours
+              {t('transportation_bookings.policy_2')}
               <br />
-              • No refund for cancellations within 12 hours
+              {t('transportation_bookings.policy_3')}
             </p>
           </div>
         </div>
       </div>
       <BookingCancelModal
         isOpen={!!cancelTarget}
-        title="Cancel Transportation Booking"
-        message="Please share why you are cancelling this transportation booking."
-        warning="Cancellation may affect refunds depending on how close the booking date is."
+        title={t('transportation_bookings.cancel_title')}
+        message={t('transportation_bookings.cancel_message')}
+        warning={t('transportation_bookings.cancel_warning')}
         loading={cancelling}
         onClose={() => !cancelling && setCancelTarget(null)}
         onConfirm={handleCancelBooking}

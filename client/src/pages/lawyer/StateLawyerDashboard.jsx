@@ -1,15 +1,19 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { LawyerDashboardView } from './LawyerDashboard';
 
-const StateLawyerDashboard = () => (
-  <LawyerDashboardView
-    dashboardTitle="State Lawyer Dashboard"
-    profileLabel="State Lawyer Profile"
-    nameFallback="State Lawyer"
-    dashboardSubtitle="Manage state-level disputes, verify evidence within your jurisdiction, and keep case notes aligned with your assigned state workflow."
-    rolePillLabel="State Lawyer"
-    showStateLawyerPanel
-  />
-);
+const StateLawyerDashboard = () => {
+  const { t } = useTranslation();
+  return (
+    <LawyerDashboardView
+      dashboardTitle={t('state_lawyer_dashboard.dashboard_title')}
+      profileLabel={t('state_lawyer_dashboard.profile_label')}
+      nameFallback={t('state_lawyer_dashboard.name_fallback')}
+      dashboardSubtitle={t('state_lawyer_dashboard.dashboard_subtitle')}
+      rolePillLabel={t('state_lawyer_dashboard.role_pill_label')}
+      showStateLawyerPanel
+    />
+  );
+};
 
 export default StateLawyerDashboard;

@@ -13,29 +13,21 @@ import {
   FaUserCircle,
 } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
+import { useTranslation } from 'react-i18next';
 
 const ROLE_CONFIG = {
   lawyer: {
-    title: 'LGA Lawyer Workspace',
-    subtitle: 'Local-government legal review, disputes, evidence, and case-note coordination',
     homePath: '/lawyer',
-    dashboardLabel: 'LGA Lawyer Dashboard',
     gradient: 'from-sky-700 via-sky-600 to-cyan-600',
     softPanel: 'bg-sky-50 border-sky-200 text-sky-800',
   },
   state_lawyer: {
-    title: 'State Lawyer Workspace',
-    subtitle: 'Assigned-state legal review and dispute operations',
     homePath: '/lawyer/state',
-    dashboardLabel: 'State Lawyer Dashboard',
     gradient: 'from-emerald-700 via-emerald-600 to-teal-600',
     softPanel: 'bg-emerald-50 border-emerald-200 text-emerald-800',
   },
   super_lawyer: {
-    title: 'Super Lawyer Workspace',
-    subtitle: 'Cross-state review and escalated legal coordination',
     homePath: '/lawyer/super',
-    dashboardLabel: 'Super Lawyer Dashboard',
     gradient: 'from-slate-900 via-slate-800 to-indigo-900',
     softPanel: 'bg-indigo-50 border-indigo-200 text-indigo-800',
   },
@@ -63,6 +55,7 @@ const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = '
 
 const LawyerLayout = () => {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -71,42 +64,46 @@ const LawyerLayout = () => {
 
   const role = String(user?.user_type || 'lawyer').trim().toLowerCase();
   const config = ROLE_CONFIG[role] || ROLE_CONFIG.lawyer;
+  const roleTitle = t(`lawyer_layout.${role}.title`);
+  const roleSubtitle = t(`lawyer_layout.${role}.subtitle`);
+  const dashboardLabel = t(`lawyer_layout.${role}.dashboard_label`);
+  const roleDisplayLabel = t(`lawyer_layout.${role}.role_label`);
 
   const menuItems = useMemo(
     () => [
       {
         to: config.homePath,
-        label: config.dashboardLabel,
+        label: dashboardLabel,
         icon: FaTachometerAlt,
         end: true,
       },
       {
         to: '/verify-case',
-        label: 'Verify Evidence',
+        label: t('lawyer_layout.verify_evidence'),
         icon: FaCheckCircle,
       },
       {
         to: '/messages',
-        label: 'Messages',
+        label: t('lawyer_layout.messages'),
         icon: FaEnvelope,
       },
       {
         to: '/legal-support',
-        label: 'Legal Support',
+        label: t('lawyer_layout.legal_support'),
         icon: FaGavel,
       },
       {
         to: '/verification-status',
-        label: 'Verification Status',
+        label: t('lawyer_layout.verification_status'),
         icon: FaIdCard,
       },
       {
         to: '/profile',
-        label: 'Profile',
+        label: t('lawyer_layout.profile'),
         icon: FaUserCircle,
       },
     ],
-    [config.dashboardLabel, config.homePath]
+    [dashboardLabel, config.homePath, t]
   );
 
   const handleLogout = () => {
@@ -132,18 +129,18 @@ const LawyerLayout = () => {
   const sidebarContent = (
     <div className="flex h-full flex-col">
       <div className={`rounded-b-[28px] bg-gradient-to-r ${config.gradient} px-5 py-6 text-white`}>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">Legal Console</p>
-        <h2 className="mt-2 text-2xl font-bold">{config.title}</h2>
-        <p className="mt-2 text-sm text-white/80">{config.subtitle}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">{t('lawyer_layout.legal_console')}</p>
+        <h2 className="mt-2 text-2xl font-bold">{roleTitle}</h2>
+        <p className="mt-2 text-sm text-white/80">{roleSubtitle}</p>
 
         <div className="mt-5 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-          <p className="text-sm font-semibold">{user?.full_name || 'Lawyer'}</p>
+          <p className="text-sm font-semibold">{user?.full_name || t('lawyer_layout.lawyer_fallback_name')}</p>
           <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/70">
-            {role === 'lawyer' ? 'LGA Lawyer' : String(role || 'lawyer').replace(/_/g, ' ')}
+            {roleDisplayLabel}
           </p>
           {user?.assigned_state ? (
             <div className="mt-3 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white">
-              Scope: {user.assigned_state}{user.assigned_city ? `, ${user.assigned_city}` : ''}
+              {t('lawyer_layout.scope')}: {user.assigned_state}{user.assigned_city ? `, ${user.assigned_city}` : ''}
             </div>
           ) : null}
         </div>
@@ -151,7 +148,7 @@ const LawyerLayout = () => {
 
       <div className="flex-1 overflow-y-auto px-4 py-5">
         <div className={`rounded-2xl border px-4 py-3 text-sm ${config.softPanel}`}>
-          This menu is separate from `AdminLayout` so lawyer routing and logic stay unchanged.
+          {t('lawyer_layout.sidebar_notice')}
         </div>
 
         <nav className="mt-5 space-y-2">
@@ -183,7 +180,7 @@ const LawyerLayout = () => {
           className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100"
         >
           <FaSignOutAlt />
-          Logout
+          {t('lawyer_layout.logout')}
         </button>
       </div>
     </div>
@@ -195,8 +192,8 @@ const LawyerLayout = () => {
         <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Lawyer Menu</p>
-              <p className="text-sm font-semibold text-slate-900">{config.title}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('lawyer_layout.lawyer_menu')}</p>
+              <p className="text-sm font-semibold text-slate-900">{roleTitle}</p>
             </div>
             <button
               type="button"
