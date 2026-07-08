@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaCopy,
   FaFacebookF,
   FaShareAlt,
   FaTelegramPlane,
+  FaVolumeMute,
+  FaVolumeUp,
   FaWhatsapp,
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
@@ -18,6 +20,42 @@ const normalizeTargetUrl = (url) => {
   if (!target) return '';
   if (isExternalUrl(target) || isInternalUrl(target)) return target;
   return `/${target.replace(/^\/+/, '')}`;
+};
+
+const VideoAd = ({ src, poster, title, onError }) => {
+  const [muted, setMuted] = useState(true);
+  const videoRef = useRef(null);
+
+  const toggleSound = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMuted((prev) => !prev);
+  }, []);
+
+  return (
+    <div className="relative h-full w-full">
+      <video
+        ref={videoRef}
+        src={src}
+        poster={poster}
+        autoPlay
+        muted={muted}
+        loop
+        playsInline
+        className="h-full w-full object-cover"
+        aria-label={title}
+        onError={onError}
+      />
+      <button
+        type="button"
+        onClick={toggleSound}
+        className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+        aria-label={muted ? 'Unmute ad' : 'Mute ad'}
+      >
+        {muted ? <FaVolumeMute size={14} /> : <FaVolumeUp size={14} />}
+      </button>
+    </div>
+  );
 };
 
 const normalizeLimit = (value) => {
@@ -355,15 +393,10 @@ const AdSpace = ({
                     : 'h-40 md:h-auto md:w-56 lg:w-72'
               }`}
             >
-              <video
+              <VideoAd
                 src={ad.video_url}
                 poster={ad.video_thumbnail || undefined}
-                autoPlay
-                muted
-                loop
-                playsInline
-                className="h-full w-full object-cover"
-                aria-label={ad.title}
+                title={ad.title}
                 onError={() => handleMediaError(ad.id)}
               />
             </div>
