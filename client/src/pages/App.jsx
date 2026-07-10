@@ -7,6 +7,7 @@ import { FaChevronDown } from 'react-icons/fa';
 
 import i18n from '../i18n';
 
+import ErrorBoundary from '../components/common/ErrorBoundary';
 import { AuthProvider } from '../context/AuthContext';
 import { SocketProvider } from '../context/SocketContext';
 import { TourProvider } from '../context/TourContext';
@@ -675,6 +676,7 @@ function Layout({ children }) {
 
 function App() {
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TourProvider>
@@ -895,6 +897,7 @@ function App() {
       </TourProvider>
     </AuthProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
   );
 }
 

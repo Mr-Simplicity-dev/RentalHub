@@ -254,7 +254,7 @@ router.post(
 );
 
 router.get('/me', authenticate, authController.getCurrentUser);
-router.post('/refresh-token', authController.refreshToken);
+router.post('/refresh-token', authSensitiveLimiter, authController.refreshToken);
 router.post('/logout', authenticate, authController.logout);
 
 router.post(

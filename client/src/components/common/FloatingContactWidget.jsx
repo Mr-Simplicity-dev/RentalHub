@@ -983,7 +983,7 @@ const FloatingContactWidget = () => {
                                     setContactReplyFile(f);
                                   }} />
                                 </label>
-                                <textarea value={contactReplyText} onChange={(e) => { setContactReplyText(e.target.value); if (!guestTypingThrottleRef.current) { guestTypingThrottleRef.current = setTimeout(() => { guestTypingThrottleRef.current = null; }, 2000); guestSocketRef.current?.emit('ticket:typing'); } }}
+                                <textarea value={contactReplyText} onChange={(e) => { setContactReplyText(e.target.value); if (!guestTypingThrottleRef.current) { guestTypingThrottleRef.current = setTimeout(() => { guestTypingThrottleRef.current = null; }, 2000); guestSocketRef.current?.emit('ticket:typing', { ticketId: viewingContactTicket?.id, email: lookupEmail }); } }}
                                   placeholder={t('widget.type_reply', 'Type a reply...')} rows={1}
                                   className="flex-1 resize-none rounded border border-slate-300 px-2 py-2 text-xs outline-none focus:border-indigo-400"
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />

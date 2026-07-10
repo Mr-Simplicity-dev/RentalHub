@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
+const validateRequest = require('../config/middleware/validateRequest');
 const paymentController = require('../controllers/paymentController');
 const refundController  = require('../controllers/refundController');
 const landlordPropertyFeeController = require('../controllers/landlordPropertyFeeController');
@@ -358,6 +359,10 @@ router.put('/tenancy-adjustments/admin/:requestId/review',
 // Both tenant and landlord: initialize wallet top-up via Paystack
 router.post('/wallet/fund',
   authenticate,
+  [
+    body('amount').isFloat({ min: 100 }).withMessage('Amount must be at least ₦100'),
+  ],
+  validateRequest,
   paymentController.initializeWalletFunding
 );
 
@@ -387,6 +392,14 @@ router.get('/wallet/landlord-balance',
 router.post('/wallet/withdraw',
   authenticate,
   criticalFinanceOpsLimiter,
+  [
+    body('amount').isFloat({ min: 1 }).withMessage('Amount must be greater than zero'),
+    body('bank_name').isString().trim().notEmpty().withMessage('Bank name is required'),
+    body('account_number').isString().trim().isLength({ min: 10, max: 10 }).withMessage('Account number must be 10 digits'),
+    body('account_name').isString().trim().notEmpty().withMessage('Account name is required'),
+    body('bank_code').optional().isString().trim(),
+  ],
+  validateRequest,
   refundController.requestWithdrawal
 );
 
