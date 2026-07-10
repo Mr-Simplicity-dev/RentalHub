@@ -385,6 +385,16 @@ const FumigationCleaningAdmin = ({
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
 
+  const htmlEscape = (value) => {
+    const text = value === null || value === undefined ? '' : String(value);
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
   const handleExportData = (format) => {
     const headers = ['Booking ID', 'Tenant', 'Service', 'Property', 'Booking Date', 'Time Slot', 'Status', 'Payment', 'Amount', 'Provider'];
     const rows = filteredBookings.map((booking) => [
@@ -420,11 +430,11 @@ const FumigationCleaningAdmin = ({
       <html>
         <head><title>Fumigation Bookings Report</title></head>
         <body style="font-family: Arial, sans-serif;">
-          <h1>Fumigation & Cleaning Bookings</h1>
-          <p>Generated ${new Date().toLocaleString()}</p>
+          <h1>Fumigation &amp; Cleaning Bookings</h1>
+          <p>Generated ${htmlEscape(new Date().toLocaleString())}</p>
           <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse; width: 100%; font-size: 12px;">
-            <thead><tr>${headers.map((heading) => `<th>${heading}</th>`).join('')}</tr></thead>
-            <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${csvEscape(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+            <thead><tr>${headers.map((heading) => `<th>${htmlEscape(heading)}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${htmlEscape(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
           </table>
         </body>
       </html>

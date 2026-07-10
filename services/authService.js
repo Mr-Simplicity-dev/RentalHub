@@ -500,7 +500,7 @@ const generateToken = (userId, userType, options = {}) => {
   return jwt.sign(
     { userId, userType, tv: options.tokenVersion || 1 },
     process.env.JWT_SECRET,
-    { expiresIn: options.expiresIn || '7d' }
+    { expiresIn: options.expiresIn || '24h' }
   );
 };
 
@@ -509,7 +509,7 @@ const generateAccessToken = (userId, userType) => generateToken(userId, userType
 const attachAuthSession = (res, data) => {
   if (!data?.token) return data;
 
-  // data.token is the 7d session token → stored in HTTP-only cookie
+  // data.token is the 24h session token → stored in HTTP-only cookie
   // Decode it to mint a 1h access token for the Bearer header
   let accessToken = data.token;
   try {
@@ -643,10 +643,6 @@ const validateAndPrepareRegistration = async (payload) => {
   let identityType = null;
   let cleanNIN = null;
   let cleanPassportNumber = null;
-  const testNIN = String(process.env.NIMC_TEST_NIN || '00000000000').trim();
-  const allowTestNINBypass =
-    process.env.ALLOW_TEST_NIN_BYPASS === 'true' ||
-    (process.env.NODE_ENV !== 'production' && process.env.ALLOW_TEST_NIN_BYPASS !== 'false');
   const submittedNationality = nationality ? String(nationality).trim() : '';
   const cleanNationality = submittedNationality || (isForeigner ? 'Foreign' : 'Nigeria');
   const isNigerianNationality = /^nigeria(n)?$/i.test(cleanNationality);
@@ -688,69 +684,60 @@ const validateAndPrepareRegistration = async (payload) => {
       const firstName = names[0] || '';
       const lastName = names.slice(1).join(' ') || names[0] || '';
 
-      const isTestNIN = cleanNIN === testNIN;
-      if (isTestNIN && allowTestNINBypass) {
-        ninVerified = true;
-        verificationMeta = {
-          status: 'test_bypass',
-          message: 'Test NIN bypass enabled'
-        };
-      } else {
-        const nimcResult = await executeRegistrationVerificationWithRecovery({
-          identityType: 'nin',
-          identityValue: cleanNIN,
-          email: cleanEmail,
-          phone: cleanPhone,
-          verify: (callbackUrl) => verifyNINWithPrembly(
-            cleanNIN,
-            firstName,
-            lastName,
-            date_of_birth,
-            { callbackUrl }
-          ),
-        });
+      const nimcResult = await executeRegistrationVerificationWithRecovery({
+        identityType: 'nin',
+        identityValue: cleanNIN,
+        email: cleanEmail,
+        phone: cleanPhone,
+        verify: (callbackUrl) => verifyNINWithPrembly(
+          cleanNIN,
+          firstName,
+          lastName,
+          date_of_birth,
+          { callbackUrl }
+        ),
+      });
 
-        verificationMeta = {
-          status: nimcResult.status,
-          message: nimcResult.message,
-          reference: nimcResult.reference_id || null,
-          response_code: nimcResult.response_code || null,
-          billing_status: nimcResult.billing_status,
-        };
+      verificationMeta = {
+        status: nimcResult.status,
+        message: nimcResult.message,
+        reference: nimcResult.reference_id || null,
+        response_code: nimcResult.response_code || null,
+        billing_status: nimcResult.billing_status,
+      };
 
-        if (nimcResult.status === 'not_configured') {
-          const error = new Error('Prembly verification is required but not configured on the server');
-          error.statusCode = 503;
-          throw error;
-        }
-
-        if (nimcResult.status === 'service_error') {
-          const error = new Error(nimcResult.message);
-          error.statusCode = 503;
-          throw error;
-        }
-
-        if (nimcResult.status === 'provider_pending') {
-          const error = new Error(
-            'Prembly is temporarily unavailable or still processing this NIN. RentalHub saved the transaction and will check it automatically without submitting another paid verification.'
-          );
-          error.statusCode = 202;
-          error.code = 'PREMBLY_VERIFICATION_PENDING';
-          error.data = {
-            attempt_id: nimcResult.attempt_id,
-            identity_type: 'nin',
-          };
-          throw error;
-        }
-
-        if (nimcResult.status === 'not_verified') {
-          const error = new Error(nimcResult.message || 'NIN verification failed');
-          error.statusCode = 400;
-          throw error;
-        }
-
-        ninVerified = nimcResult.verified === true;
+      if (nimcResult.status === 'not_configured') {
+        const error = new Error('Prembly verification is required but not configured on the server');
+        error.statusCode = 503;
+        throw error;
       }
+
+      if (nimcResult.status === 'service_error') {
+        const error = new Error(nimcResult.message);
+        error.statusCode = 503;
+        throw error;
+      }
+
+      if (nimcResult.status === 'provider_pending') {
+        const error = new Error(
+          'Prembly is temporarily unavailable or still processing this NIN. RentalHub saved the transaction and will check it automatically without submitting another paid verification.'
+        );
+        error.statusCode = 202;
+        error.code = 'PREMBLY_VERIFICATION_PENDING';
+        error.data = {
+          attempt_id: nimcResult.attempt_id,
+          identity_type: 'nin',
+        };
+        throw error;
+      }
+
+      if (nimcResult.status === 'not_verified') {
+        const error = new Error(nimcResult.message || 'NIN verification failed');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      ninVerified = nimcResult.verified === true;
     }
   } else {
     if (identity_document_type === 'nin') {
@@ -3349,7 +3336,7 @@ exports.verifyEmail = async (req, res) => {
     const authToken = jwt.sign(
       { id: user.id, user_type: user.user_type, tv: user.token_version || 1 },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '24h' }
     );
 
     const csrfToken = setAuthCookies(res, authToken);

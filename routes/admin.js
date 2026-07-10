@@ -188,7 +188,11 @@ router.post(
     body('phone').isString().trim().isLength({ min: 5, max: 20 }),
     body('full_name').isString().trim().isLength({ min: 1, max: 200 }),
     body('password').isString().isLength({ min: 8, max: 128 }),
-    body('user_type').isString().trim().isIn(['admin', 'lga_admin', 'state_admin', 'state_financial_admin']),
+    body('user_type').isString().trim().isIn([
+      'admin', 'lga_admin', 'state_admin', 'state_financial_admin',
+      'lga_support_admin', 'state_support_admin', 'super_support_admin',
+      'recruitment_admin',
+    ]),
     body('assigned_state').optional().isString().trim().isLength({ max: 200 }),
     body('assigned_city').optional().isString().trim().isLength({ max: 200 }),
   ],

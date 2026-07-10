@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { FaUniversity, FaCheck, FaClock, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import { getAuthUser } from '../../services/authStorage';
 import { useTranslation } from 'react-i18next';
 import Loader from '../../components/common/Loader';
 
 const AgentWithdrawalPage = () => {
   const { t } = useTranslation();
-  const [agentId] = useState(parseInt(localStorage.getItem('userId') || 0));
+  const currentUser = getAuthUser();
+  const [agentId] = useState(currentUser?.id || 0);
   const [landlordId, setLandlordId] = useState('');
   const [withdrawalRequests, setWithdrawalRequests] = useState([]);
   const [summary, setSummary] = useState(null);

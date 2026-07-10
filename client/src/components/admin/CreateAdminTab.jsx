@@ -24,6 +24,12 @@ const STATE_BOUND_ROLES = new Set([
   'state_fumigation_admin',
 ]);
 
+const SUPPORT_ROLES = new Set([
+  'lga_support_admin',
+  'state_support_admin',
+  'super_support_admin',
+]);
+
 const LAWYER_ROLES = new Set([
   'lawyer',
   'state_lawyer',
@@ -41,6 +47,7 @@ const CreateAdminTab = () => {
     assigned_state: "",
     assigned_city: "",
     lawyer_client_scope: "",
+    is_lead: false,
   });
 
   const [loading, setLoading] = useState(false);
@@ -119,6 +126,7 @@ const CreateAdminTab = () => {
           lawyer_client_scope: LAWYER_ROLES.has(formData.user_type)
             ? formData.lawyer_client_scope
             : null,
+          is_lead: SUPPORT_ROLES.has(formData.user_type) ? formData.is_lead : false,
         }
       );
 
@@ -273,6 +281,19 @@ const CreateAdminTab = () => {
                   <option key={lga} value={lga}>{lga}</option>
                 ))}
               </select>
+            )}
+
+            {SUPPORT_ROLES.has(formData.user_type) && (
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="is_lead"
+                  checked={formData.is_lead}
+                  onChange={(e) => setFormData(prev => ({ ...prev, is_lead: e.target.checked }))}
+                  className="w-4 h-4"
+                />
+                Mark as Lead Admin (first point of contact for this location)
+              </label>
             )}
           </>
         )}

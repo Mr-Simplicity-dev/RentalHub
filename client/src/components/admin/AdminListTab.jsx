@@ -452,6 +452,7 @@ const AdminListTab = () => {
               <th className="p-3 text-left">Role</th>
               <th className="p-3 text-left">Assigned State</th>
               <th className="p-3 text-left">Assigned LGA</th>
+              <th className="p-3 text-left">Lead</th>
               <th className="p-3 text-left">Status</th>
               <th className="p-3 text-left">Verified Cases</th>
               <th className="p-3 text-left">Actions (7d)</th>
@@ -500,6 +501,13 @@ const AdminListTab = () => {
                   </td>
                   <td className="p-3">{admin.assigned_state || '-'}</td>
                   <td className="p-3">{admin.assigned_city || '-'}</td>
+                  <td className="p-3">
+                    {admin.is_lead && ['lga_support_admin', 'state_support_admin', 'super_support_admin'].includes(admin.user_type) ? (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Lead</span>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </td>
                   <td className="p-3">
                     <span
                       className={`rounded-full px-2 py-1 text-xs ${

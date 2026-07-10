@@ -101,7 +101,8 @@ const Login = () => {
         const role = user.user_type;
         const isRecruitmentAdmin = role === 'recruitment_admin' || user.is_recruitment_admin === true;
         const redirectParam = searchParams.get('redirect');
-        const safeRedirect = redirectParam && redirectParam.startsWith('/') ? redirectParam : '';
+        const allowedPaths = ['/dashboard', '/tenant/dashboard', '/super-admin', '/profile', '/applications', '/messages', '/saved-properties', '/payment-history', '/my-properties', '/verification-status', '/subscribe', '/my-disputes', '/my-damage-reports', '/subscribed-properties'];
+        const safeRedirect = redirectParam && redirectParam.startsWith('/') && !redirectParam.includes('//') && allowedPaths.some(p => redirectParam === p || redirectParam.startsWith(p + '/')) ? redirectParam : '';
 
         if (safeRedirect) {
           navigate(safeRedirect);

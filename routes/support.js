@@ -9,6 +9,8 @@ const { body } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 
 const router = express.Router();
+const logger = require('../config/utils/logger');
+const activityLogger = require('../services/activityLogger');
 
 const { contactFormLimiter, typingLimiter } = require('../config/middleware/securityRateLimiters');
 
@@ -530,7 +532,7 @@ const addTicketTimeline = async (ticketId, actor, eventType, message, metadata =
       ]
     );
   } catch (err) {
-    req.logger.error('Support ticket timeline error (non-fatal):', err);
+    logger.error('Support ticket timeline error (non-fatal):', err);
   }
 };
 
@@ -1137,18 +1139,23 @@ router.post('/contact', contactFormLimiter, [
       { category, related_type: relatedType, related_id: relatedId, escalation_department: escalationDepartment }
     );
 
-    // Auto-assign: LGA support → State support → Super support
+    // Auto-assign: LGA support → State support → Super support (least-loaded)
     try {
       let assignedTo = null;
 
       if (lga) {
         const lgaResult = await db.query(
-          `SELECT id FROM users
-           WHERE user_type = 'lga_support_admin'
-             AND assigned_state = $1
-             AND assigned_city = $2
-             AND deleted_at IS NULL AND account_suspended_at IS NULL
-           ORDER BY id ASC LIMIT 1`,
+          `SELECT u.id, COUNT(st.id) AS open_tickets
+           FROM users u
+           LEFT JOIN support_tickets st ON st.assigned_to = u.id
+             AND st.status NOT IN ('resolved', 'closed')
+           WHERE u.user_type = 'lga_support_admin'
+             AND u.assigned_state = $1
+             AND u.assigned_city = $2
+             AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+           GROUP BY u.id
+           ORDER BY open_tickets ASC, u.id ASC
+           LIMIT 1`,
           [state, lga]
         );
         if (lgaResult.rows.length > 0) assignedTo = lgaResult.rows[0].id;
@@ -1156,11 +1163,16 @@ router.post('/contact', contactFormLimiter, [
 
       if (!assignedTo) {
         const stateResult = await db.query(
-          `SELECT id FROM users
-           WHERE user_type = 'state_support_admin'
-             AND assigned_state = $1
-             AND deleted_at IS NULL AND account_suspended_at IS NULL
-           ORDER BY id ASC LIMIT 1`,
+          `SELECT u.id, COUNT(st.id) AS open_tickets
+           FROM users u
+           LEFT JOIN support_tickets st ON st.assigned_to = u.id
+             AND st.status NOT IN ('resolved', 'closed')
+           WHERE u.user_type = 'state_support_admin'
+             AND u.assigned_state = $1
+             AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+           GROUP BY u.id
+           ORDER BY open_tickets ASC, u.id ASC
+           LIMIT 1`,
           [state]
         );
         if (stateResult.rows.length > 0) assignedTo = stateResult.rows[0].id;
@@ -1168,19 +1180,34 @@ router.post('/contact', contactFormLimiter, [
 
       if (!assignedTo) {
         const superResult = await db.query(
-          `SELECT id FROM users
-           WHERE user_type = 'super_support_admin'
-             AND deleted_at IS NULL AND account_suspended_at IS NULL
-           ORDER BY id ASC LIMIT 1`
+          `SELECT u.id, COUNT(st.id) AS open_tickets
+           FROM users u
+           LEFT JOIN support_tickets st ON st.assigned_to = u.id
+             AND st.status NOT IN ('resolved', 'closed')
+           WHERE u.user_type = 'super_support_admin'
+             AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+           GROUP BY u.id
+           ORDER BY open_tickets ASC, u.id ASC
+           LIMIT 1`
         );
         if (superResult.rows.length > 0) assignedTo = superResult.rows[0].id;
       }
 
       if (assignedTo) {
         await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticketId]);
+
+        await activityLogger.log({
+          userId: assignedTo,
+          action: 'ticket_auto_assigned',
+          entityType: 'ticket',
+          entityId: ticketId,
+          metadata: { source: 'contact_form', state, lga },
+          state,
+          lga,
+        });
       }
     } catch (assignErr) {
-      req.logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
+      logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
     }
 
     emitTicketToAdmins('ticket:created', {
@@ -1266,19 +1293,24 @@ router.post('/tickets', authenticate, [
       escalation_department: escalationDepartment,
     });
 
-    // Auto-assign: LGA support → State support → Super support
+    // Auto-assign: LGA support → State support → Super support (least-loaded)
     if (state) {
       try {
         let assignedTo = null;
 
         if (lga) {
           const lgaResult = await db.query(
-            `SELECT id FROM users
-             WHERE user_type = 'lga_support_admin'
-               AND assigned_state = $1
-               AND assigned_city = $2
-               AND deleted_at IS NULL AND account_suspended_at IS NULL
-             ORDER BY id ASC LIMIT 1`,
+            `SELECT u.id, COUNT(st.id) AS open_tickets
+             FROM users u
+             LEFT JOIN support_tickets st ON st.assigned_to = u.id
+               AND st.status NOT IN ('resolved', 'closed')
+             WHERE u.user_type = 'lga_support_admin'
+               AND u.assigned_state = $1
+               AND u.assigned_city = $2
+               AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+             GROUP BY u.id
+             ORDER BY open_tickets ASC, u.id ASC
+             LIMIT 1`,
             [state, lga]
           );
           if (lgaResult.rows.length > 0) assignedTo = lgaResult.rows[0].id;
@@ -1286,11 +1318,16 @@ router.post('/tickets', authenticate, [
 
         if (!assignedTo) {
           const stateResult = await db.query(
-            `SELECT id FROM users
-             WHERE user_type = 'state_support_admin'
-               AND assigned_state = $1
-               AND deleted_at IS NULL AND account_suspended_at IS NULL
-             ORDER BY id ASC LIMIT 1`,
+            `SELECT u.id, COUNT(st.id) AS open_tickets
+             FROM users u
+             LEFT JOIN support_tickets st ON st.assigned_to = u.id
+               AND st.status NOT IN ('resolved', 'closed')
+             WHERE u.user_type = 'state_support_admin'
+               AND u.assigned_state = $1
+               AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+             GROUP BY u.id
+             ORDER BY open_tickets ASC, u.id ASC
+             LIMIT 1`,
             [state]
           );
           if (stateResult.rows.length > 0) assignedTo = stateResult.rows[0].id;
@@ -1298,10 +1335,15 @@ router.post('/tickets', authenticate, [
 
         if (!assignedTo) {
           const superResult = await db.query(
-            `SELECT id FROM users
-             WHERE user_type = 'super_support_admin'
-               AND deleted_at IS NULL AND account_suspended_at IS NULL
-             ORDER BY id ASC LIMIT 1`
+            `SELECT u.id, COUNT(st.id) AS open_tickets
+             FROM users u
+             LEFT JOIN support_tickets st ON st.assigned_to = u.id
+               AND st.status NOT IN ('resolved', 'closed')
+             WHERE u.user_type = 'super_support_admin'
+               AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+             GROUP BY u.id
+             ORDER BY open_tickets ASC, u.id ASC
+             LIMIT 1`
           );
           if (superResult.rows.length > 0) assignedTo = superResult.rows[0].id;
         }
@@ -1309,9 +1351,20 @@ router.post('/tickets', authenticate, [
         if (assignedTo) {
           await db.query('UPDATE support_tickets SET assigned_to = $1 WHERE id = $2', [assignedTo, ticket.id]);
           ticket.assigned_to = assignedTo;
+
+          await activityLogger.log({
+            userId: assignedTo,
+            action: 'ticket_auto_assigned',
+            entityType: 'ticket',
+            entityId: ticket.id,
+            metadata: { source: 'authenticated', state, lga, userId: req.user.id },
+            state,
+            lga,
+            ip: req.ip,
+          });
         }
       } catch (assignErr) {
-        req.logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
+        logger.error('Ticket auto-assignment error (non-fatal):', assignErr);
       }
     }
 
@@ -1552,6 +1605,19 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
 
     emitTicketUpdated(result.rows[0]);
 
+    await activityLogger.log({
+      userId: req.user.id,
+      userName: req.user.full_name,
+      userType: req.user.user_type,
+      action: 'ticket_assigned',
+      entityType: 'ticket',
+      entityId: ticketId,
+      metadata: { assigned_to: assignedTo, previous: ticket?.assigned_to },
+      state: result.rows[0].state,
+      lga: result.rows[0].lga,
+      ip: req.ip,
+    });
+
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     req.logger.error('Assign support ticket error:', error);
@@ -1643,6 +1709,19 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
 
     emitTicketUpdated(result.rows[0]);
     await addTicketTimeline(ticketId, req.user, 'ticket_resolved', resolutionSummary || 'Ticket marked as resolved');
+
+    await activityLogger.log({
+      userId: req.user.id,
+      userName: req.user.full_name,
+      userType: req.user.user_type,
+      action: 'ticket_resolved',
+      entityType: 'ticket',
+      entityId: ticketId,
+      metadata: { resolution_summary: resolutionSummary },
+      state: result.rows[0].state,
+      lga: result.rows[0].lga,
+      ip: req.ip,
+    });
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -3150,6 +3229,226 @@ router.get('/governance/export', authenticate, async (req, res) => {
   } catch (error) {
     req.logger.error('Governance export error:', error);
     res.status(500).json({ success: false, message: 'Failed to export governance data' });
+  }
+});
+
+// ─── Activity log routes ───────────────────────────────────────────────────
+
+router.get('/activity', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.abs(Number(req.query.limit) || 50), 200);
+    const offset = Math.abs(Number(req.query.offset) || 0);
+    const logs = await activityLogger.getLogsByRole({ user: req.user, limit, offset });
+    res.json({ success: true, data: logs });
+  } catch (error) {
+    req.logger.error('Activity log fetch error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch activity logs' });
+  }
+});
+
+router.get('/activity/all', authenticate, async (req, res) => {
+  try {
+    const role = String(req.user?.user_type || '').toLowerCase();
+    if (!['super_admin', 'super_support_admin'].includes(role)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const limit = Math.min(Math.abs(Number(req.query.limit) || 50), 200);
+    const offset = Math.abs(Number(req.query.offset) || 0);
+    const { action, state, lga, userType } = req.query;
+    const logs = await activityLogger.getLogs({ action, state, lga, userType, limit, offset });
+    res.json({ success: true, data: logs });
+  } catch (error) {
+    req.logger.error('Activity log all fetch error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch activity logs' });
+  }
+});
+
+// ─── Support admin pool routes ────────────────────────────────────────────
+
+router.get('/admin-pool', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    const role = String(req.user?.user_type || '').toLowerCase();
+    let admins;
+
+    if (role === 'super_admin' || role === 'super_support_admin') {
+      const result = await db.query(
+        `SELECT id, full_name, email, user_type, assigned_state, assigned_city, is_lead,
+                (SELECT COUNT(*) FROM support_tickets st WHERE st.assigned_to = u.id AND st.status NOT IN ('resolved', 'closed'))::int AS open_tickets,
+                created_at
+         FROM users u
+         WHERE u.user_type IN ('lga_support_admin', 'state_support_admin', 'super_support_admin')
+           AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+         ORDER BY u.user_type, u.assigned_state, u.assigned_city, u.full_name`
+      );
+      admins = result.rows;
+    } else if (role === 'state_support_admin' && req.user.assigned_state) {
+      const result = await db.query(
+        `SELECT id, full_name, email, user_type, assigned_state, assigned_city, is_lead,
+                (SELECT COUNT(*) FROM support_tickets st WHERE st.assigned_to = u.id AND st.status NOT IN ('resolved', 'closed'))::int AS open_tickets,
+                created_at
+         FROM users u
+         WHERE u.user_type IN ('lga_support_admin', 'state_support_admin')
+           AND u.assigned_state = $1
+           AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+         ORDER BY u.user_type, u.assigned_city, u.full_name`,
+        [req.user.assigned_state]
+      );
+      admins = result.rows;
+    } else if (role === 'lga_support_admin' && req.user.assigned_state && req.user.assigned_city) {
+      const result = await db.query(
+        `SELECT id, full_name, email, user_type, assigned_state, assigned_city, is_lead,
+                (SELECT COUNT(*) FROM support_tickets st WHERE st.assigned_to = u.id AND st.status NOT IN ('resolved', 'closed'))::int AS open_tickets,
+                created_at
+         FROM users u
+         WHERE u.user_type = 'lga_support_admin'
+           AND u.assigned_state = $1
+           AND u.assigned_city = $2
+           AND u.deleted_at IS NULL AND u.account_suspended_at IS NULL
+         ORDER BY u.is_lead DESC, u.full_name`,
+        [req.user.assigned_state, req.user.assigned_city]
+      );
+      admins = result.rows;
+    } else {
+      return res.json({ success: true, data: [] });
+    }
+
+    res.json({ success: true, data: admins });
+  } catch (error) {
+    req.logger.error('Admin pool fetch error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch admin pool' });
+  }
+});
+
+router.patch('/admin-pool/:userId/lead', authenticate, async (req, res) => {
+  try {
+    const role = String(req.user?.user_type || '').toLowerCase();
+    if (role !== 'super_admin' && role !== 'super_support_admin') {
+      return res.status(403).json({ success: false, message: 'Only super admins can promote leads' });
+    }
+
+    const targetUserId = Number(req.params.userId);
+    if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid user ID is required' });
+    }
+
+    const { is_lead } = req.body;
+    if (typeof is_lead !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'is_lead must be a boolean' });
+    }
+
+    const result = await db.query(
+      `UPDATE users SET is_lead = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+         AND user_type IN ('lga_support_admin', 'state_support_admin', 'super_support_admin')
+         AND deleted_at IS NULL
+       RETURNING id, full_name, email, user_type, assigned_state, assigned_city, is_lead`,
+      [is_lead, targetUserId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Support admin not found' });
+    }
+
+    await activityLogger.log({
+      userId: req.user.id,
+      userName: req.user.full_name,
+      userType: req.user.user_type,
+      action: is_lead ? 'admin_promoted_to_lead' : 'admin_demoted_from_lead',
+      entityType: 'user',
+      entityId: targetUserId,
+      metadata: { target_name: result.rows[0].full_name, target_role: result.rows[0].user_type },
+      state: result.rows[0].assigned_state,
+      lga: result.rows[0].assigned_city,
+      ip: req.ip,
+    });
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    req.logger.error('Admin lead update error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update admin lead status' });
+  }
+});
+
+// ─── Admin dashboard summary ──────────────────────────────────────────────
+
+router.get('/admin/dashboard', authenticate, requireSupportAdmin, async (req, res) => {
+  try {
+    const level = String(req.query.level || 'lga').toLowerCase();
+    let stateFilter = '';
+    let lgaFilter = '';
+    const params = [];
+    let paramIdx = 0;
+
+    if (level === 'lga' && req.user.assigned_state && req.user.assigned_city) {
+      paramIdx++; params.push(req.user.assigned_state); stateFilter = ` AND st.state = $${paramIdx}`;
+      paramIdx++; params.push(req.user.assigned_city); lgaFilter = ` AND st.lga = $${paramIdx}`;
+    } else if (level === 'state' && req.user.assigned_state) {
+      paramIdx++; params.push(req.user.assigned_state); stateFilter = ` AND st.state = $${paramIdx}`;
+    }
+
+    const scopeClause = stateFilter + lgaFilter;
+    const role = String(req.user.user_type || '').toLowerCase();
+    if (role === 'super_support_admin' || role === 'super_admin') {
+      const result = await db.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE st.status = 'open') AS open_tickets,
+          COUNT(*) FILTER (WHERE st.status = 'in_progress') AS in_progress_tickets,
+          COUNT(*) FILTER (WHERE st.status = 'resolved') AS closed_tickets,
+          COUNT(*) FILTER (WHERE st.escalation_status <> 'none') AS escalated_tickets,
+          ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(st.resolved_at, CURRENT_TIMESTAMP) - st.created_at))/3600)::numeric, 1) AS avg_response_hours
+        FROM support_tickets st
+      `);
+      const poolResult = await db.query(`
+        SELECT COUNT(*)::int AS total_admins FROM users
+        WHERE user_type IN ('lga_support_admin','state_support_admin','super_support_admin')
+          AND deleted_at IS NULL AND account_suspended_at IS NULL
+      `);
+      return res.json({
+        success: true,
+        dashboard: {
+          open_tickets: Number(result.rows[0]?.open_tickets || 0),
+          in_progress_tickets: Number(result.rows[0]?.in_progress_tickets || 0),
+          closed_tickets: Number(result.rows[0]?.closed_tickets || 0),
+          escalated_tickets: Number(result.rows[0]?.escalated_tickets || 0),
+          avg_response_hours: result.rows[0]?.avg_response_hours || '-',
+          total_admins: Number(poolResult.rows[0]?.total_admins || 0),
+        },
+      });
+    }
+
+    const result = await db.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE st.status = 'open') AS open_tickets,
+        COUNT(*) FILTER (WHERE st.status = 'in_progress') AS in_progress_tickets,
+        COUNT(*) FILTER (WHERE st.status = 'resolved') AS closed_tickets,
+        COUNT(*) FILTER (WHERE st.escalation_status <> 'none') AS escalated_tickets,
+        ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(st.resolved_at, CURRENT_TIMESTAMP) - st.created_at))/3600)::numeric, 1) AS avg_response_hours
+      FROM support_tickets st
+      WHERE (st.assigned_to = $${paramIdx + 1} OR 1=1)${scopeClause}
+    `, [...params, req.user.id]);
+
+    const poolResult = await db.query(`
+      SELECT COUNT(*)::int AS pool_admins FROM users
+      WHERE user_type IN ('lga_support_admin','state_support_admin')
+        ${req.user.assigned_state ? `AND assigned_state = $1` : ''}
+        ${req.user.assigned_city ? `AND assigned_city = $2` : ''}
+        AND deleted_at IS NULL AND account_suspended_at IS NULL
+    `, [req.user.assigned_state, req.user.assigned_city].filter(Boolean));
+
+    res.json({
+      success: true,
+      dashboard: {
+        open_tickets: Number(result.rows[0]?.open_tickets || 0),
+        in_progress_tickets: Number(result.rows[0]?.in_progress_tickets || 0),
+        closed_tickets: Number(result.rows[0]?.closed_tickets || 0),
+        escalated_tickets: Number(result.rows[0]?.escalated_tickets || 0),
+        avg_response_hours: result.rows[0]?.avg_response_hours || '-',
+        pool_admins: Number(poolResult.rows[0]?.pool_admins || 0),
+      },
+    });
+  } catch (error) {
+    req.logger.error('Admin dashboard error:', error);
+    res.status(500).json({ success: false, message: 'Failed to load dashboard' });
   }
 });
 

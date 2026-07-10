@@ -372,6 +372,7 @@ app.use(helmet({
       styleSrc: ["'self'", "fonts.googleapis.com"],
       mediaSrc: ["'self'", "res.cloudinary.com", "blob:"],
       frameSrc: ["'self'", "app.hubspot.com"],
+      frameAncestors: ["'none'"],
     },
   },
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },

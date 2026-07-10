@@ -90,8 +90,39 @@ const SuperSupportAdminDashboard = () => {
   const [modalType, setModalType] = useState('');
 
   const isModalOpen = showModal;
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [adminPool, setAdminPool] = useState([]);
 
+  const loadActivityLogs = useCallback(async () => {
+    try {
+      const res = await api.get('/support/activity');
+      if (res.data?.success) setActivityLogs(res.data.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
+  const loadAdminPool = useCallback(async () => {
+    try {
+      const res = await api.get('/support/admin-pool');
+      if (res.data?.success) setAdminPool(res.data.data || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  const promoteToLead = async (userId) => {
+    try {
+      const res = await api.patch(`/support/admin-pool/${userId}/lead`);
+      if (res.data?.success) {
+        toast.success('Promoted to Lead');
+        loadAdminPool();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to promote');
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'activity') loadActivityLogs();
+    if (activeTab === 'pool') loadAdminPool();
+  }, [activeTab, loadActivityLogs, loadAdminPool]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -184,7 +215,7 @@ const SuperSupportAdminDashboard = () => {
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'escalations', 'alerts', 'reports'];
+    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'escalations', 'alerts', 'reports', 'activity', 'pool'];
     if (tab && allowedTabs.includes(tab)) {
       setActiveTab(tab);
       return;
@@ -411,6 +442,8 @@ const SuperSupportAdminDashboard = () => {
           { key: 'alerts', label: 'Alerts' },
           { key: 'audit', label: 'Audit Logs' },
           { key: 'reports', label: 'Reports' },
+          { key: 'activity', label: 'Activity Feed' },
+          { key: 'pool', label: 'Admin Pool' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -1269,6 +1302,114 @@ const SuperSupportAdminDashboard = () => {
             </div>
           </div>
           
+        )}
+
+        {/* Activity Feed Tab */}
+        {activeTab === 'activity' && (
+          <div className="super-support-activity-section rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Activity Feed</h3>
+              <button
+                onClick={loadActivityLogs}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <FaSyncAlt size={14} /> Refresh
+              </button>
+            </div>
+            {activityLogs.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center">
+                <FaHistory className="mx-auto text-slate-400" size={32} />
+                <p className="mt-2 text-sm text-slate-500">No activity logs found</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                {activityLogs.map((log) => (
+                  <div key={log.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900 capitalize">
+                          {log.action.replace(/_/g, ' ')}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          by {log.user_name || 'System'} ({log.user_type})
+                          {log.state && ` • ${log.state}${log.lga ? ` / ${log.lga}` : ''}`}
+                        </p>
+                      </div>
+                      <span className="text-xs text-slate-400">{formatDate(log.created_at)}</span>
+                    </div>
+                    {log.metadata && (
+                      <p className="mt-1 text-xs text-slate-600">{JSON.stringify(log.metadata)}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Admin Pool Tab */}
+        {activeTab === 'pool' && (
+          <div className="super-support-pool-section rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Admin Pool</h3>
+              <button
+                onClick={loadAdminPool}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <FaSyncAlt size={14} /> Refresh
+              </button>
+            </div>
+            {adminPool.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center">
+                <FaUserShield className="mx-auto text-slate-400" size={32} />
+                <p className="mt-2 text-sm text-slate-500">No support admins found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Role</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Location</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Open Tickets</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Lead</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {adminPool.map((admin) => (
+                      <tr key={admin.id} className="hover:bg-slate-50">
+                        <td className="whitespace-nowrap px-4 py-3"><span className="text-sm font-medium text-slate-900">{admin.full_name}</span></td>
+                        <td className="whitespace-nowrap px-4 py-3"><span className="text-sm text-slate-700">{admin.user_type}</span></td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span className="text-sm text-slate-700">{admin.state}{admin.lga ? ` / ${admin.lga}` : ''}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3"><span className="text-sm font-medium text-slate-900">{admin.open_tickets}</span></td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          {admin.is_lead ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Lead</span>
+                          ) : (
+                            <span className="text-sm text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          {!admin.is_lead && (
+                            <button
+                              onClick={() => promoteToLead(admin.id)}
+                              className="rounded bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                            >
+                              Make Lead
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
 
         {modalType === 'view-ticket' && selectedItem && (
