@@ -642,10 +642,17 @@ router.get('/tour/analytics', authenticate, [
 });
 
 
-// Get user profile by ID (public info only)
-router.get('/:userId', async (req, res) => {
+// Get user profile by ID (public info only — requires auth, returns own profile or limited public info)
+router.get('/:userId', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
+
+    if (String(req.user.id) !== String(userId)) {
+      return res.status(200).json({
+        success: true,
+        data: { id: Number(userId), public: true }
+      });
+    }
 
     const result = await db.query(
       `SELECT id, user_type, full_name, created_at,

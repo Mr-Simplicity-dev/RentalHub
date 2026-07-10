@@ -317,11 +317,6 @@ exports.submitRequest = async (req, res) => {
         await client.query('ROLLBACK');
         return res.status(400).json({ success: false, message: 'A valid past date of birth is required for NIN verification' });
       }
-      const testNin = String(process.env.NIMC_TEST_NIN || '00000000000').trim();
-      const allowTestBypass =
-        process.env.ALLOW_TEST_NIN_BYPASS === 'true' ||
-        (process.env.NODE_ENV !== 'production' && process.env.ALLOW_TEST_NIN_BYPASS !== 'false');
-
       encryptedIdentity = encryptNIN(validation.value);
       if (!encryptedIdentity) {
         await client.query('ROLLBACK');
@@ -331,32 +326,24 @@ exports.submitRequest = async (req, res) => {
       identityType = 'nin';
       submittedSummary.nin = maskValue(validation.value);
 
-      if (validation.value === testNin && allowTestBypass) {
-        verificationMetadata = {
-          provider: 'test_bypass',
-          status: 'verified',
-          verified: true,
-        };
-      } else {
-        if (!isPremblyConfigured()) {
-          await client.query('ROLLBACK');
-          return res.status(503).json({
-            success: false,
-            message: 'Prembly verification is required but is not configured on the server',
-          });
-        }
-        const names = String(request.full_name || '').trim().split(/\s+/);
-        providerPlan = {
-          identityType: 'nin',
-          verify: (callbackUrl) => verifyNINWithPrembly(
-            validation.value,
-            names[0] || '',
-            names.slice(1).join(' ') || names[0] || '',
-            dateOfBirth,
-            { callbackUrl }
-          ),
-        };
+      if (!isPremblyConfigured()) {
+        await client.query('ROLLBACK');
+        return res.status(503).json({
+          success: false,
+          message: 'Prembly verification is required but is not configured on the server',
+        });
       }
+      const names = String(request.full_name || '').trim().split(/\s+/);
+      providerPlan = {
+        identityType: 'nin',
+        verify: (callbackUrl) => verifyNINWithPrembly(
+          validation.value,
+          names[0] || '',
+          names.slice(1).join(' ') || names[0] || '',
+          dateOfBirth,
+          { callbackUrl }
+        ),
+      };
     }
 
     if (fields.includes('international_passport')) {

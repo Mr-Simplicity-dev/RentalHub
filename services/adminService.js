@@ -2458,15 +2458,18 @@ exports.createAdmin = async (req, res) => {
 
     const pendingApproval = requiresApprovalRoles.has(user_type);
 
+    const normalizedIsLead = req.body.is_lead === true
+      && ['lga_support_admin', 'state_support_admin', 'super_support_admin'].includes(user_type);
+
     const result = await db.query(
       `INSERT INTO users (
         user_type, email, phone, password_hash,
         full_name, nin, assigned_state, assigned_city, lawyer_client_scope,
         email_verified, phone_verified, identity_verified, approval_status,
-        is_recruitment_admin, is_active
+        is_recruitment_admin, is_lead, is_active
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,TRUE,TRUE,$10,$11,TRUE)
-      RETURNING id, email, user_type, assigned_state, assigned_city, lawyer_client_scope, approval_status, is_recruitment_admin`,
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,TRUE,TRUE,$10,$11,$12,TRUE)
+      RETURNING id, email, user_type, assigned_state, assigned_city, lawyer_client_scope, is_lead, approval_status, is_recruitment_admin`,
       [
         user_type,
         normalizedEmail,
@@ -2479,6 +2482,7 @@ exports.createAdmin = async (req, res) => {
         normalizedLawyerScope,
         pendingApproval ? 'pending' : 'approved',
         user_type === 'recruitment_admin',
+        normalizedIsLead,
       ]
     );
 
@@ -2490,6 +2494,20 @@ exports.createAdmin = async (req, res) => {
     const statusNote = pendingApproval
       ? ' — awaiting Super Admin approval'
       : '';
+
+    const activityLogger = require('./activityLogger');
+    await activityLogger.log({
+      userId: req.user.id,
+      userName: req.user.full_name,
+      userType: req.user.user_type,
+      action: 'admin_created',
+      entityType: 'user',
+      entityId: result.rows[0].id,
+      metadata: { created_role: user_type, created_email: normalizedEmail, created_name: normalizedFullName, pending: pendingApproval },
+      state: canonicalAssignedState || null,
+      lga: normalizedCity || null,
+      ip: req.ip,
+    });
 
     res.json({
       message: `${createdRoleLabel} created successfully${statusNote}`,
