@@ -130,6 +130,20 @@ const uploadPassport = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single('passport');
 
+const uploadPassportWithValidation = (req, res, next) => {
+  uploadPassport(req, res, (err) => {
+    if (err) return next(err);
+    if (req.file && !validateFileMagicBytes(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+      return res.status(400).json({
+        success: false,
+        message: 'File content does not match allowed file types. The file may be corrupted or renamed.',
+      });
+    }
+    next();
+  });
+};
+
 // Handles: images[] (up to 20) + video (1)
 const uploadPropertyMedia = multer({
   storage: propertyMediaStorage,
@@ -202,7 +216,7 @@ const validateFileMagicBytesMiddleware = (req, res, next) => {
 };
 
 module.exports = {
-  uploadPassport: withCloudinaryConfig(uploadPassport),
+  uploadPassport: withCloudinaryConfig(uploadPassportWithValidation),
   uploadPassportLocal,
   uploadPropertyMedia: withCloudinaryConfig(uploadPropertyMedia),
   uploadPropertyPhotos: withCloudinaryConfig(uploadPropertyPhotos),
