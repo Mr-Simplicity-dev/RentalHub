@@ -8,6 +8,7 @@ import { FaChevronDown } from 'react-icons/fa';
 import i18n from '../i18n';
 
 import ErrorBoundary from '../components/common/ErrorBoundary';
+import Loader from '../components/common/Loader';
 import { AuthProvider } from '../context/AuthContext';
 import { SocketProvider } from '../context/SocketContext';
 import { TourProvider } from '../context/TourContext';
@@ -683,7 +684,7 @@ function App() {
           <Router>
             <SocketProvider>
             <Layout>
-              <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center text-sm text-gray-500">Loading...</div>}>
+              <Suspense fallback={<Loader />}>
               <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Home />} />

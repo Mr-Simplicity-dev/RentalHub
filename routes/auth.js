@@ -129,10 +129,6 @@ router.post(
 router.post(
   '/login',
   checkLoginRateLimit,
-  [
-    body('email').isEmail().normalizeEmail(),
-    body('password').notEmpty(),
-  ],
   authController.login
 );
 

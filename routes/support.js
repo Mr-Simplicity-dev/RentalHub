@@ -5,7 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 
 const router = express.Router();
@@ -2687,7 +2687,7 @@ router.get('/tickets/internal-notes/unread-count', authenticate, requireSupportA
 });
 
 // POST /tickets/contact-lookup — look up contact-form tickets by email (public)
-router.post('/tickets/contact-lookup', async (req, res) => {
+router.post('/tickets/contact-lookup', contactFormLimiter, async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -2711,7 +2711,7 @@ router.post('/tickets/contact-lookup', async (req, res) => {
 });
 
 // POST /tickets/contact-conversation — get replies for a contact-form ticket (public, email-gated)
-router.post('/tickets/contact-conversation', async (req, res) => {
+router.post('/tickets/contact-conversation', contactFormLimiter, async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -2979,7 +2979,7 @@ router.delete('/tickets/:ticketId/internal-notes/:noteId', authenticate, require
 });
 
 // POST /tickets/contact-reply — public reply for contact-form tickets (email-gated)
-router.post('/tickets/contact-reply', uploadAttachment.single('attachment'), verifyUploadedFile, async (req, res) => {
+router.post('/tickets/contact-reply', contactFormLimiter, uploadAttachment.single('attachment'), verifyUploadedFile, async (req, res) => {
   try {
     await ensureSupportSchema();
 
@@ -3146,7 +3146,7 @@ router.get('/activity', authenticate, requireSupportAdmin, async (req, res) => {
   }
 });
 
-router.get('/activity/all', authenticate, async (req, res) => {
+router.get('/activity/all', authenticate, requireSupportAdmin, async (req, res) => {
   try {
     const role = String(req.user?.user_type || '').toLowerCase();
     if (!['super_admin', 'super_support_admin'].includes(role)) {
@@ -3219,22 +3219,18 @@ router.get('/admin-pool', authenticate, requireSupportAdmin, async (req, res) =>
   }
 });
 
-router.patch('/admin-pool/:userId/lead', authenticate, async (req, res) => {
+router.patch('/admin-pool/:userId/lead', authenticate, requireSupportAdmin, [
+  param('userId').isInt({ min: 1 }),
+  body('is_lead').isBoolean(),
+], validateRequest, async (req, res) => {
   try {
     const role = String(req.user?.user_type || '').toLowerCase();
     if (role !== 'super_admin' && role !== 'super_support_admin') {
       return res.status(403).json({ success: false, message: 'Only super admins can promote leads' });
     }
 
-    const targetUserId = Number(req.params.userId);
-    if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
-      return res.status(400).json({ success: false, message: 'Valid user ID is required' });
-    }
-
+    const targetUserId = parseInt(req.params.userId, 10);
     const { is_lead } = req.body;
-    if (typeof is_lead !== 'boolean') {
-      return res.status(400).json({ success: false, message: 'is_lead must be a boolean' });
-    }
 
     const result = await db.query(
       `UPDATE users SET is_lead = $1, updated_at = CURRENT_TIMESTAMP

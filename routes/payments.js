@@ -359,6 +359,7 @@ router.put('/tenancy-adjustments/admin/:requestId/review',
 // Both tenant and landlord: initialize wallet top-up via Paystack
 router.post('/wallet/fund',
   authenticate,
+  criticalFinanceOpsLimiter,
   [
     body('amount').isFloat({ min: 100 }).withMessage('Amount must be at least ₦100'),
   ],
