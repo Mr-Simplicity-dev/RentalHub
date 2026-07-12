@@ -1897,15 +1897,14 @@ exports.login = async (req, res) => {
     await ensureIdentitySchema();
     await ensureUserSuspensionSchema();
 
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(401).json({
         success: false,
-        errors: errors.array()
+        message: 'Invalid email or password'
       });
     }
-
-    const { email, password } = req.body;
 
     // Find user
     const result = await db.query(

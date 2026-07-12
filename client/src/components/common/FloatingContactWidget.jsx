@@ -20,12 +20,12 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'ap
 
 const formatTime = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-const ChatBubble = ({ msg, isOwn }) => {
+const ChatBubble = ({ msg, isOwn, onRetry }) => {
   const isAudio = msg.attachment_type && msg.attachment_type.startsWith('audio/');
   const readAt = msg.read_at ? new Date(msg.read_at) : null;
   return (
     <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isOwn ? 'bg-indigo-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md'}`}>
+      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isOwn ? 'bg-indigo-600 text-white rounded-br-md' : 'bg-slate-100 dark:bg-gray-700 text-slate-800 rounded-bl-md'}`}>
         {!isOwn && msg.author_name && (
           <p className="mb-0.5 text-[10px] font-semibold text-indigo-600">{msg.author_name}</p>
         )}
@@ -37,12 +37,12 @@ const ChatBubble = ({ msg, isOwn }) => {
             </audio>
           </div>
         ) : msg.attachment_url ? (
-          <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className={`mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${isOwn ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'} hover:underline`}>
+          <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className={`mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${isOwn ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700 dark:text-gray-200'} hover:underline`}>
             <FaFile size={10} /> {msg.attachment_name || 'Attachment'}
           </a>
         ) : null}
         <div className={`mt-0.5 flex items-center gap-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-          <p className={`text-[10px] ${isOwn ? 'text-indigo-200' : 'text-slate-400'}`}>
+          <p className={`text-[10px] ${isOwn ? 'text-indigo-200' : 'text-slate-400 dark:text-gray-400'}`}>
             {formatTime(new Date(msg.created_at))}
           </p>
           {isOwn && readAt && (
@@ -50,8 +50,13 @@ const ChatBubble = ({ msg, isOwn }) => {
               <FaCheck className="w-2.5 h-2.5" />
             </span>
           )}
-          {isOwn && msg._temp && (
+          {isOwn && msg._temp && !msg._failed && (
             <span className="text-[10px] text-indigo-200 italic">Sending...</span>
+          )}
+          {isOwn && msg._failed && (
+            <button onClick={() => onRetry?.(msg)} className="ml-1 text-[10px] text-red-300 hover:text-red-200 underline">
+              Retry
+            </button>
           )}
         </div>
       </div>
@@ -62,7 +67,7 @@ const ChatBubble = ({ msg, isOwn }) => {
 const FloatingContactWidget = () => {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
-  const { socket } = useSocket();
+  const { socket, connected } = useSocket();
   const authRecorder = useVoiceRecorder();
   const contactRecorder = useVoiceRecorder();
 
@@ -412,7 +417,25 @@ const FloatingContactWidget = () => {
       setSentConfirm('sent');
       setTimeout(() => setSentConfirm(null), 2000);
     } catch (err) {
-      setConversation((prev) => prev.filter((r) => r.id !== tempId));
+      setConversation((prev) => prev.map((r) => r.id === tempId ? { ...r, _failed: true, _error: err.response?.data?.message || t('widget.send_failed', 'Failed to send') } : r));
+      setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
+    } finally { setSendingReply(false); }
+  };
+
+  const retrySend = async (failedMsg) => {
+    setConversation((prev) => prev.map((r) => r.id === failedMsg.id ? { ...r, _failed: false, _temp: true, _error: null } : r));
+    setSendingReply(true);
+    try {
+      const fd = new FormData();
+      if (failedMsg.message) fd.append('message', failedMsg.message);
+      const res = await api.post(`/support/tickets/${activeTicket.id}/reply`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setConversation((prev) => prev.map((r) => r.id === failedMsg.id ? { ...res.data.data, _temp: false } : r));
+      setSentConfirm('sent');
+      setTimeout(() => setSentConfirm(null), 2000);
+    } catch (err) {
+      setConversation((prev) => prev.map((r) => r.id === failedMsg.id ? { ...r, _failed: true } : r));
       setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
     } finally { setSendingReply(false); }
   };
@@ -514,6 +537,13 @@ const FloatingContactWidget = () => {
     const voiceFile = contactRecorder.recordedFile;
     const fileToSend = contactReplyFile || voiceFile;
     if (!msg && !fileToSend) return;
+    const tempId = `contact_temp_${Date.now()}`;
+    const optimist = { id: tempId, message: msg, is_admin: false, author_name: lookupEmail.trim(), created_at: new Date().toISOString(), _temp: true };
+    if (fileToSend) optimist.attachment_name = fileToSend.name;
+    setContactConv((prev) => [...prev, optimist]);
+    setContactReplyText('');
+    setContactReplyFile(null);
+    contactRecorder.reset();
     setSendingContactReply(true);
     try {
       const fd = new FormData();
@@ -524,11 +554,27 @@ const FloatingContactWidget = () => {
       const res = await api.post('/support/tickets/contact-reply', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setContactConv((prev) => [...prev, res.data.data]);
-      setContactReplyText('');
-      setContactReplyFile(null);
-      contactRecorder.reset();
+      setContactConv((prev) => prev.map((r) => r.id === tempId ? { ...res.data.data, _temp: false } : r));
     } catch (err) {
+      setContactConv((prev) => prev.map((r) => r.id === tempId ? { ...r, _failed: true, _error: err.response?.data?.message || t('widget.send_failed', 'Failed to send') } : r));
+      setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
+    } finally { setSendingContactReply(false); }
+  };
+
+  const retryContactReply = async (failedMsg) => {
+    setContactConv((prev) => prev.map((r) => r.id === failedMsg.id ? { ...r, _failed: false, _temp: true, _error: null } : r));
+    setSendingContactReply(true);
+    try {
+      const fd = new FormData();
+      fd.append('ticketId', viewingContactTicket.id);
+      fd.append('email', lookupEmail.trim());
+      if (failedMsg.message) fd.append('message', failedMsg.message);
+      const res = await api.post('/support/tickets/contact-reply', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setContactConv((prev) => prev.map((r) => r.id === failedMsg.id ? { ...res.data.data, _temp: false } : r));
+    } catch (err) {
+      setContactConv((prev) => prev.map((r) => r.id === failedMsg.id ? { ...r, _failed: true } : r));
       setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
     } finally { setSendingContactReply(false); }
   };
@@ -555,12 +601,12 @@ const FloatingContactWidget = () => {
   const fileInput = (onFile, currentFile, isRecording) => (
     <>
       {currentFile && !isRecording && (
-        <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
+        <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 dark:bg-gray-700 px-2 py-1 text-xs text-slate-600 dark:text-gray-300">
           <FaPaperclip size={8} /> {currentFile.name}
           <button onClick={() => onFile(null)} className="ml-auto text-red-500"><FaTimes size={8} /></button>
         </div>
       )}
-      <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 shrink-0">
+      <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 dark:border-gray-600 text-slate-500 dark:text-gray-400 hover:bg-slate-50 shrink-0">
         <FaPaperclip size={12} />
         <input type="file" className="hidden" onChange={(e) => {
           const f = e.target.files[0];
@@ -589,7 +635,7 @@ const FloatingContactWidget = () => {
           setError(err.message);
         }
       }}
-        className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 shrink-0"
+        className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 dark:border-gray-600 text-slate-500 dark:text-gray-400 hover:bg-slate-50 shrink-0"
         title={t('widget.record_voice', 'Record voice message')}>
         <FaMicrophone size={12} />
       </button>
@@ -608,7 +654,7 @@ const FloatingContactWidget = () => {
         </div>
       )}
       {file && !recorder.isRecording && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 dark:bg-gray-700 px-3 py-1.5 text-xs text-slate-600 dark:text-gray-300">
           <FaPaperclip size={10} /> {file.name}
           <button onClick={() => setFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={10} /></button>
         </div>
@@ -618,7 +664,7 @@ const FloatingContactWidget = () => {
         {!recorder.isRecording && !file && (
           <textarea value={value} onChange={(e) => { onChange(e.target.value); if (emitTyping) emitTyping(); }}
             placeholder={t('widget.type_message', 'Type your message...')} rows={1}
-            className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+            className="flex-1 resize-none rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } }} />
         )}
         {recorder.isRecording && <div className="flex-1" />}
@@ -671,58 +717,65 @@ const FloatingContactWidget = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
-            className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col"
+            className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden flex flex-col"
             style={{ maxHeight: '480px' }}
           >
           {renderHeader()}
+
+          {isAuthenticated && !connected && (
+            <div className="flex items-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-700">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
+              {t('widget.reconnecting', 'Reconnecting...')}
+            </div>
+          )}
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={listRef}>
             {/* ─── FORM VIEW (anonymous/fallback) ─── */}
             {view === 'form' && !isAuthenticated && (
               <form onSubmit={handleSubmit} className="space-y-3">
-                <p className="text-xs text-slate-500">{t('widget.fill_form', "Fill this form and we'll get back to you via email.")}</p>
+                <p className="text-xs text-slate-500 dark:text-gray-400">{t('widget.fill_form', "Fill this form and we'll get back to you via email.")}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.name', 'Name')} *</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.name', 'Name')} *</label>
                     <input type="text" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
+                      className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
                       placeholder={t('widget.your_name', 'Your name')} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.email', 'Email')} *</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.email', 'Email')} *</label>
                     <input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
+                      className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
                       placeholder="you@example.com" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.state', 'State')} *</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.state', 'State')} *</label>
                   <select value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value, lga: '' }))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                    className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
                     <option value="">{t('widget.select_state', 'Select state')}</option>
                     {states.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 {lgas.length > 0 && (
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">LGA</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">LGA</label>
                     <select value={form.lga} onChange={(e) => setForm((p) => ({ ...p, lga: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                      className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
                       <option value="">{t('widget.select_lga', 'Select LGA')}</option>
                       {lgas.map((l) => <option key={l} value={l}>{l}</option>)}
                     </select>
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.subject', 'Subject')}</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.subject', 'Subject')}</label>
                   <input type="text" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                     placeholder={t('widget.how_can_we_help', 'How can we help?')} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.priority', 'Priority')}</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.priority', 'Priority')}</label>
                   <select value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                    className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
                     <option value="medium">{t('widget.medium', 'Medium')}</option>
                     <option value="low">{t('widget.low', 'Low')}</option>
                     <option value="high">{t('widget.high', 'High')}</option>
@@ -730,9 +783,9 @@ const FloatingContactWidget = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.message', 'Message')} *</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.message', 'Message')} *</label>
                   <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none"
+                    className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none"
                     placeholder={t('widget.tell_us_more', 'Tell us more...')} />
                 </div>
                 {error && <p className="text-xs text-red-600">{error}</p>}
@@ -750,31 +803,31 @@ const FloatingContactWidget = () => {
             {/* ─── FORM VIEW (authenticated, no tickets) ─── */}
             {view === 'form' && isAuthenticated && (
               <div className="py-2 text-left">
-                <p className="text-sm text-slate-600 mb-3 font-medium">{t('widget.start_conversation', 'Start a new conversation')}</p>
+                <p className="text-sm text-slate-600 dark:text-gray-300 mb-3 font-medium">{t('widget.start_conversation', 'Start a new conversation')}</p>
                 <div className="space-y-3">
                   <div className="flex gap-2">
                     <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
-                      <span className="text-slate-400">{t('widget.name', 'Name')}</span>
+                      <span className="text-slate-400 dark:text-gray-400">{t('widget.name', 'Name')}</span>
                       <p className="text-slate-800 font-medium truncate">{user?.full_name || form.name}</p>
                     </div>
                     <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
-                      <span className="text-slate-400">{t('widget.email', 'Email')}</span>
+                      <span className="text-slate-400 dark:text-gray-400">{t('widget.email', 'Email')}</span>
                       <p className="text-slate-800 truncate">{user?.email || form.email}</p>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.state', 'State')} *</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.state', 'State')} *</label>
                     <select value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value, lga: '' }))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                      className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
                       <option value="">{t('widget.select_state', 'Select state')}</option>
                       {states.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                   {lgas.length > 0 && (
                     <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">LGA</label>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">LGA</label>
                       <select value={form.lga} onChange={(e) => setForm((p) => ({ ...p, lga: e.target.value }))}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                        className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
                         <option value="">{t('widget.select_lga', 'Select LGA')}</option>
                         {lgas.map((l) => <option key={l} value={l}>{l}</option>)}
                       </select>
@@ -782,14 +835,14 @@ const FloatingContactWidget = () => {
                   )}
                   <input type="text" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
                     placeholder={t('widget.subject_optional', 'Subject (optional)')}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
+                    className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                   <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
                     placeholder={t('widget.how_can_we_help', 'How can we help you?')}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none" />
+                    className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none" />
                   <div className="pt-1">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">{t('widget.priority', 'Priority')}</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.priority', 'Priority')}</label>
                     <select value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                      className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
                       <option value="medium">{t('widget.medium', 'Medium')}</option>
                       <option value="low">{t('widget.low', 'Low')}</option>
                       <option value="high">{t('widget.high', 'High')}</option>
@@ -826,10 +879,10 @@ const FloatingContactWidget = () => {
             {view === 'success' && (
               <div className="flex flex-col items-center py-4 text-center">
                 <FaCheckCircle className="text-green-500 text-4xl mb-3" />
-                <p className="font-semibold text-slate-900">{t('widget.message_sent', 'Message sent!')}</p>
-                <p className="text-sm text-slate-600 mt-1">{t('widget.will_reply', "We'll get back to you shortly.")}</p>
+                <p className="font-semibold text-slate-900 dark:text-gray-100">{t('widget.message_sent', 'Message sent!')}</p>
+                <p className="text-sm text-slate-600 dark:text-gray-300 mt-1">{t('widget.will_reply', "We'll get back to you shortly.")}</p>
                 {localStorage.getItem(LS_TICKET_ID) && (
-                  <p className="mt-2 text-xs text-slate-400">{t('widget.ticket', 'Ticket')} #<span className="font-mono">{localStorage.getItem(LS_TICKET_ID)}</span></p>
+                  <p className="mt-2 text-xs text-slate-400 dark:text-gray-400">{t('widget.ticket', 'Ticket')} #<span className="font-mono">{localStorage.getItem(LS_TICKET_ID)}</span></p>
                 )}
                 <button onClick={handleClose} className="mt-4 text-sm text-indigo-600 hover:underline">{t('widget.close_btn', 'Close')}</button>
                 {sentConfirm && (
@@ -841,14 +894,14 @@ const FloatingContactWidget = () => {
             {/* ─── TICKET LIST (authenticated) ─── */}
             {view === 'tickets' && isAuthenticated && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('widget.your_tickets', 'Your Tickets')}</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider">{t('widget.your_tickets', 'Your Tickets')}</p>
                 {loadingTickets ? (
                   <div className="space-y-2 py-2">
-                    {[1,2,3].map((i) => <div key={i} className="h-16 rounded-xl bg-slate-100 animate-pulse" />)}
+                    {[1,2,3].map((i) => <div key={i} className="h-16 rounded-xl bg-slate-100 dark:bg-gray-700 animate-pulse" />)}
                   </div>
                 ) : tickets.length === 0 ? (
                   <div className="text-center py-4">
-                    <p className="text-sm text-slate-500 mb-3">{t('widget.no_tickets', 'No tickets yet.')}</p>
+                    <p className="text-sm text-slate-500 dark:text-gray-400 mb-3">{t('widget.no_tickets', 'No tickets yet.')}</p>
                     <button onClick={() => setView('form')} className="text-sm text-indigo-600 hover:underline">{t('widget.start_new', 'Start a new conversation')}</button>
                   </div>
                 ) : (
@@ -856,13 +909,13 @@ const FloatingContactWidget = () => {
                     <button key={ticket.id} onClick={() => openTicketChat(ticket)}
                       className="w-full text-left rounded-xl border border-slate-200 p-3 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-slate-900 truncate flex-1">{ticket.subject}</p>
+                        <p className="text-sm font-medium text-slate-900 dark:text-gray-100 truncate flex-1">{ticket.subject}</p>
                         <span className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                           ticket.status === 'open' ? 'bg-amber-100 text-amber-700' :
                           ticket.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
                         }`}>{ticket.status?.replace(/_/g, ' ')}</span>
                       </div>
-                      <p className="mt-1 text-[11px] text-slate-400">#{ticket.id} &middot; {new Date(ticket.created_at).toLocaleDateString()}</p>
+                      <p className="mt-1 text-[11px] text-slate-400 dark:text-gray-400">#{ticket.id} &middot; {new Date(ticket.created_at).toLocaleDateString()}</p>
                       {ticket.unread_admin_replies > 0 && (
                         <span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{ticket.unread_admin_replies} {t('widget.new', 'new')}</span>
                       )}
@@ -875,20 +928,20 @@ const FloatingContactWidget = () => {
             {/* ─── CONVERSATION VIEW (authenticated) ─── */}
             {view === 'conversation' && activeTicket && (
               <div className="space-y-3">
-                <p className="text-xs font-semibold text-slate-500 truncate">{activeTicket.subject}</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 truncate">{activeTicket.subject}</p>
                 {loadingConv ? (
                   <div className="space-y-3 py-2">
-                    {[1,2].map((i) => <div key={i} className={`h-12 rounded-xl bg-slate-100 animate-pulse ${i % 2 === 0 ? 'ml-12' : 'mr-12'}`} />)}
+                    {[1,2].map((i) => <div key={i} className={`h-12 rounded-xl bg-slate-100 dark:bg-gray-700 animate-pulse ${i % 2 === 0 ? 'ml-12' : 'mr-12'}`} />)}
                   </div>
                 ) : (
                   <>
-                    {conversation.length === 0 && <p className="text-sm text-slate-400 text-center py-4">{t('widget.no_messages', 'No messages yet.')}</p>}
+                    {conversation.length === 0 && <p className="text-sm text-slate-400 dark:text-gray-400 text-center py-4">{t('widget.no_messages', 'No messages yet.')}</p>}
                     {conversation.map((reply) => (
-                      <ChatBubble key={reply.id} msg={reply} isOwn={!reply.is_admin} />
+                      <ChatBubble key={reply.id} msg={reply} isOwn={!reply.is_admin} onRetry={retrySend} />
                     ))}
                     {typingUser && (
                       <div className="flex justify-start">
-                        <div className="rounded-2xl bg-slate-100 px-4 py-2.5 text-sm text-slate-400 italic">
+                        <div className="rounded-2xl bg-slate-100 dark:bg-gray-700 px-4 py-2.5 text-sm text-slate-400 dark:text-gray-400 italic">
                           {typingUser.userName} {t('widget.is_typing', 'is typing...')}
                         </div>
                       </div>
@@ -901,46 +954,58 @@ const FloatingContactWidget = () => {
             {/* ─── CHECK STATUS (anonymous) ─── */}
             {view === 'check-status' && (
               <div className="space-y-3">
-                <p className="text-xs text-slate-500">{t('widget.enter_email', 'Enter the email you used to contact us.')}</p>
+                <p className="text-xs text-slate-500 dark:text-gray-400">{t('widget.enter_email', 'Enter the email you used to contact us.')}</p>
                 <input type="email" value={lookupEmail} onChange={(e) => setLookupEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
+                  className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                 <button onClick={handleLookup} disabled={lookupLoading}
                   className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
                   {lookupLoading ? t('widget.searching', 'Searching...') : t('widget.lookup', 'Check Tickets Status')}
                 </button>
                 {lookupTickets.length > 0 && (
                   <div className="space-y-2 mt-3">
-                    <p className="text-xs font-semibold text-slate-500 uppercase">{t('widget.your_tickets', 'Your tickets')}</p>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase">{t('widget.your_tickets', 'Your tickets')}</p>
                     {lookupTickets.map((ticket) => (
                       <div key={ticket.id}>
                         <button onClick={() => viewContactConversation(ticket)}
                           className="w-full text-left rounded-xl border border-slate-200 p-3 hover:border-indigo-300 transition">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-slate-900 truncate">{ticket.subject}</p>
+                            <p className="text-sm font-medium text-slate-900 dark:text-gray-100 truncate">{ticket.subject}</p>
                             <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                               ticket.status === 'resolved' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                             }`}>{ticket.status}</span>
                           </div>
-                          <p className="mt-0.5 text-[11px] text-slate-400">{new Date(ticket.created_at).toLocaleDateString()}</p>
+                          <p className="mt-0.5 text-[11px] text-slate-400 dark:text-gray-400">{new Date(ticket.created_at).toLocaleDateString()}</p>
                         </button>
                         {viewingContactTicket?.id === ticket.id && (
                           <div className="mt-2 space-y-2 pl-2 border-l-2 border-indigo-300">
-                            {contactConv.length === 0 ? <p className="text-xs text-slate-400">{t('widget.no_replies', 'No replies yet.')}</p> : (
+                            {contactConv.length === 0 ? <p className="text-xs text-slate-400 dark:text-gray-400">{t('widget.no_replies', 'No replies yet.')}</p> : (
                               contactConv.map((r) => (
-                                <div key={r.id} className={`rounded-xl px-3 py-2 text-sm ${r.is_admin ? 'bg-indigo-50 border border-indigo-200' : 'bg-slate-50'}`}>
-                                  {r.is_admin && <p className="text-[10px] font-semibold text-indigo-600 mb-0.5">{r.author_name || 'Support'}</p>}
-                                  <p className="text-slate-700">{r.message}</p>
-                                  {r.attachment_url && r.attachment_type && r.attachment_type.startsWith('audio/') ? (
-                                    <div className="mt-1 rounded-lg bg-slate-200 p-1">
-                                      <audio controls className="w-full h-8" src={r.attachment_url} preload="none" />
+                                <div key={r.id} className={`rounded-xl px-3 py-2 text-sm ${r._failed ? 'bg-red-50 border border-red-200' : r.is_admin ? 'bg-indigo-50 border border-indigo-200' : 'bg-slate-50'}`}>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex-1">
+                                      {r.is_admin && <p className="text-[10px] font-semibold text-indigo-600 mb-0.5">{r.author_name || 'Support'}</p>}
+                                      <p className="text-slate-700 dark:text-gray-200">{r.message}</p>
+                                      {r.attachment_url && r.attachment_type && r.attachment_type.startsWith('audio/') ? (
+                                        <div className="mt-1 rounded-lg bg-slate-200 p-1">
+                                          <audio controls className="w-full h-8" src={r.attachment_url} preload="none" />
+                                        </div>
+                                      ) : r.attachment_url ? (
+                                        <a href={r.attachment_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 rounded-lg bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700 dark:text-gray-200 hover:bg-slate-300">
+                                          <FaFile size={10} /> {r.attachment_name || 'Attachment'}
+                                        </a>
+                                      ) : null}
+                                      <p className="text-[10px] text-slate-400 dark:text-gray-400 mt-0.5">
+                                        {new Date(r.created_at).toLocaleString()}
+                                        {r._temp && !r._failed ? ' \u2022 Sending...' : ''}
+                                      </p>
                                     </div>
-                                  ) : r.attachment_url ? (
-                                    <a href={r.attachment_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 rounded-lg bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-300">
-                                      <FaFile size={10} /> {r.attachment_name || 'Attachment'}
-                                    </a>
-                                  ) : null}
-                                  <p className="text-[10px] text-slate-400 mt-0.5">{new Date(r.created_at).toLocaleString()}</p>
+                                    {r._failed && (
+                                      <button onClick={() => retryContactReply(r)} className="shrink-0 text-xs text-red-500 hover:text-red-700 underline">
+                                        Retry
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               ))
                             )}
@@ -968,13 +1033,13 @@ const FloatingContactWidget = () => {
                                 </div>
                               )}
                               {contactReplyFile && !contactRecorder.isRecording && (
-                                <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                                <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 dark:bg-gray-700 px-2 py-1 text-xs text-slate-600 dark:text-gray-300">
                                   <FaPaperclip size={8} /> {contactReplyFile.name}
                                   <button onClick={() => setContactReplyFile(null)} className="ml-auto text-red-500"><FaTimes size={8} /></button>
                                 </div>
                               )}
                               <div className="flex items-end gap-1.5">
-                                <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded border border-slate-300 text-slate-400 hover:bg-slate-50 shrink-0">
+                                <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded border border-slate-300 dark:border-gray-600 text-slate-400 dark:text-gray-400 hover:bg-slate-50 shrink-0">
                                   <FaPaperclip size={10} />
                                   <input type="file" className="hidden" onChange={(e) => {
                                     const f = e.target.files[0];
@@ -985,7 +1050,7 @@ const FloatingContactWidget = () => {
                                 </label>
                                 <textarea value={contactReplyText} onChange={(e) => { setContactReplyText(e.target.value); if (!guestTypingThrottleRef.current) { guestTypingThrottleRef.current = setTimeout(() => { guestTypingThrottleRef.current = null; }, 2000); guestSocketRef.current?.emit('ticket:typing', { ticketId: viewingContactTicket?.id, email: lookupEmail }); } }}
                                   placeholder={t('widget.type_reply', 'Type a reply...')} rows={1}
-                                  className="flex-1 resize-none rounded border border-slate-300 px-2 py-2 text-xs outline-none focus:border-indigo-400"
+                                  className="flex-1 resize-none rounded border border-slate-300 dark:border-gray-600 px-2 py-2 text-xs outline-none focus:border-indigo-400"
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />
                                 {contactRecorder.isRecording ? (
                                   <button onClick={contactRecorder.stop}
@@ -997,7 +1062,7 @@ const FloatingContactWidget = () => {
                                     try { await contactRecorder.start(); }
                                     catch (err) { setError(err.message); }
                                   }}
-                                    className="flex h-[36px] w-[36px] items-center justify-center rounded border border-slate-300 text-slate-400 hover:bg-slate-50 shrink-0"
+                                    className="flex h-[36px] w-[36px] items-center justify-center rounded border border-slate-300 dark:border-gray-600 text-slate-400 dark:text-gray-400 hover:bg-slate-50 shrink-0"
                                     title={t('widget.record_voice', 'Record voice message')}>
                                     <FaMicrophone size={10} />
                                   </button>
@@ -1015,7 +1080,7 @@ const FloatingContactWidget = () => {
                   </div>
                 )}
                 {lookupTickets.length === 0 && !lookupLoading && lookupEmail.trim() && (
-                  <p className="text-xs text-slate-400 text-center">{t('widget.no_tickets_email', 'No tickets found for this email.')}</p>
+                  <p className="text-xs text-slate-400 dark:text-gray-400 text-center">{t('widget.no_tickets_email', 'No tickets found for this email.')}</p>
                 )}
                 <button onClick={() => setView('form')} className="w-full text-center text-xs text-indigo-600 hover:underline">{t('widget.start_new', 'Start a new conversation')}</button>
               </div>
@@ -1035,13 +1100,13 @@ const FloatingContactWidget = () => {
                 </div>
               )}
               {attachmentFile && !authRecorder.isRecording && (
-                <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 dark:bg-gray-700 px-3 py-1.5 text-xs text-slate-600 dark:text-gray-300">
                   <FaPaperclip size={10} /> {attachmentFile.name}
                   <button onClick={() => setAttachmentFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={10} /></button>
                 </div>
               )}
               <div className="flex items-end gap-2">
-                <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 shrink-0">
+                <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 dark:border-gray-600 text-slate-500 dark:text-gray-400 hover:bg-slate-50 shrink-0">
                   <FaPaperclip size={12} />
                   <input type="file" className="hidden" onChange={(e) => {
                     const f = e.target.files[0];
@@ -1055,7 +1120,7 @@ const FloatingContactWidget = () => {
                 ) : (
                   <textarea value={replyText} onChange={(e) => { setReplyText(e.target.value); emitTyping(); }}
                     placeholder={t('widget.type_message', 'Type your message...')} rows={1}
-                    className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                    className="flex-1 resize-none rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }} />
                 )}
                 {authRecorder.isRecording ? (
@@ -1068,7 +1133,7 @@ const FloatingContactWidget = () => {
                     try { await authRecorder.start(); }
                     catch (err) { setError(err.message); }
                   }}
-                    className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 shrink-0"
+                    className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 dark:border-gray-600 text-slate-500 dark:text-gray-400 hover:bg-slate-50 shrink-0"
                     title={t('widget.record_voice', 'Record voice message')}>
                     <FaMicrophone size={12} />
                   </button>
