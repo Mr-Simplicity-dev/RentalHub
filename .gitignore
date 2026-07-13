@@ -78,6 +78,7 @@ media/
 
 # User uploads (passports, property images, evidence)
 uploads/
+!uploads/.gitkeep
 
 # Temporary files
 tmp/
