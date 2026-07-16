@@ -40,7 +40,7 @@ const Home = () => {
   const propertiesRef = useRef(null);
   const locationsRef = useRef(null);
 
-  const androidAppUrl = process.env.REACT_APP_ANDROID_APP_URL || '';
+  const mobileAppPageUrl = '/mobile-app';
   const iosAppUrl = process.env.REACT_APP_IOS_APP_URL || '';
 
   const loadData = useCallback(async () => {
@@ -118,11 +118,18 @@ const Home = () => {
     setShowAppPrompt(false);
   };
 
+  const resolveShareUrl = (url) => {
+    if (!url) return window.location.href;
+    if (/^https?:\/\//i.test(url)) return url;
+    return `${window.location.origin}${url.startsWith('/') ? url : `/${url}`}`;
+  };
+
   const shareApp = async (url) => {
+    const resolvedUrl = resolveShareUrl(url);
     const shareData = {
       title: 'RentalHub NG',
       text: t('home.share_app_text'),
-      url: url,
+      url: resolvedUrl,
     };
 
     if (navigator.share) {
@@ -138,7 +145,7 @@ const Home = () => {
       }
     }
 
-    const text = `${t('home.share_app_text')} ${url}`;
+    const text = `${t('home.share_app_text')} ${resolvedUrl}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
@@ -191,16 +198,12 @@ const Home = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {androidAppUrl && (
-                <a
-                  href={androidAppUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              <Link
+                  to={mobileAppPageUrl}
                   className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
                   {t('home.download_android')}
-                </a>
-              )}
+              </Link>
 
               {iosAppUrl && (
                 <a
@@ -213,16 +216,14 @@ const Home = () => {
                 </a>
               )}
 
-              {(androidAppUrl || iosAppUrl) && (
-                <button
-                  type="button"
-                  onClick={() => shareApp(androidAppUrl || iosAppUrl)}
-                  className="flex items-center gap-1.5 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-green-600 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
-                >
-                  <FaWhatsapp />
-                  {t('home.share_app')}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => shareApp(mobileAppPageUrl)}
+                className="flex items-center gap-1.5 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-green-600 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
+              >
+                <FaWhatsapp />
+                {t('home.share_app')}
+              </button>
 
               <button
                 type="button"
@@ -464,7 +465,7 @@ const Home = () => {
             <p className="text-lg mb-4 text-primary-100">{t('home.download_app_cta')}</p>
             <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
               <Link
-                to="/mobile-app"
+                to={mobileAppPageUrl}
                 className="w-full rounded-lg bg-white px-8 py-3 font-semibold text-primary-600 transition-all duration-300 hover:-translate-y-0.5 hover:bg-gray-100 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
               >
                 <FaMobileAlt />
@@ -483,7 +484,7 @@ const Home = () => {
               )}
               <button
                 type="button"
-                onClick={() => shareApp(androidAppUrl || iosAppUrl || '/mobile-app')}
+                onClick={() => shareApp(mobileAppPageUrl)}
                 className="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-600 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
               >
                 <FaWhatsapp />
