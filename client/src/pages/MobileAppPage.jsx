@@ -1,11 +1,10 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { FaMobileAlt, FaDownload, FaShieldAlt, FaBell, FaComments, FaHome, FaArrowLeft } from 'react-icons/fa';
 
 const MobileAppPage = () => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const features = [
     { icon: <FaBell />, title: t('mobile_app.feature_instant_alerts'), desc: t('mobile_app.feature_instant_alerts_desc') },
     { icon: <FaComments />, title: t('mobile_app.feature_in_app_chat'), desc: t('mobile_app.feature_in_app_chat_desc') },
@@ -15,14 +14,14 @@ const MobileAppPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <button
-        onClick={() => navigate(-1)}
-        className="fixed top-4 left-4 z-50 flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2.5 rounded-xl shadow-md hover:bg-white transition sm:hidden"
-        aria-label="Go back"
+      <Link
+        to="/"
+        className="fixed top-4 left-4 z-50 flex items-center gap-2 rounded-xl border border-white/70 bg-white/95 px-4 py-2.5 text-slate-800 shadow-md backdrop-blur-sm transition hover:bg-white hover:shadow-lg"
+        aria-label="Back to RentalHub home"
       >
         <FaArrowLeft />
-        <span className="text-sm font-medium">Back</span>
-      </button>
+        <span className="text-sm font-medium">Back to Home</span>
+      </Link>
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 text-white">
         <div className="container mx-auto px-4 py-20 text-center">
           <FaMobileAlt className="mx-auto text-6xl mb-6 text-primary-300" />
