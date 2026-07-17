@@ -183,59 +183,36 @@ const Home = () => {
   return (
     <div className="w-full max-w-full overflow-x-hidden">
       {showAppPrompt && (
-        <section className="bg-white border border-soft shadow-card rounded-xl2 p-4 m-4 animate-slideInRight transform transition-all duration-300 hover:shadow-cardHover">
-          <div className="container mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center transition-transform duration-300 hover:scale-110">
+        <section className="relative m-4 overflow-hidden rounded-2xl border border-primary-100 bg-white shadow-card animate-slideInRight transition-all duration-300 hover:-translate-y-0.5 hover:shadow-cardHover">
+          <button
+            type="button"
+            onClick={dismissAppPrompt}
+            className="absolute right-3 top-3 z-10 rounded-full bg-white/95 p-2 text-gray-500 shadow-sm transition-all duration-300 hover:scale-110 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-300"
+            aria-label={t('home.close_app_prompt')}
+            title={t('common.close')}
+          >
+            <FaTimes />
+          </button>
+
+          <Link
+            to={mobileAppPageUrl}
+            className="group block px-5 py-5 pr-12 text-center transition-colors duration-300 hover:bg-primary-50/60 sm:px-6"
+            aria-label={t('home.app_prompt_title')}
+          >
+            <div className="mx-auto flex max-w-xl flex-col items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-primary-700 shadow-inner transition-transform duration-300 group-hover:scale-110">
                 <FaMobileAlt />
               </div>
-              <div className="cursor-pointer" onClick={() => { window.location.href = '/mobile-app'; }}>
-                <p className="font-semibold text-gray-900">{t('home.app_prompt_title')}</p>
-                <p className="text-sm text-gray-600">
+              <div className="space-y-1">
+                <p className="mx-auto max-w-[18rem] text-center text-base font-extrabold leading-snug text-gray-900 sm:max-w-none sm:text-lg">
+                  {t('home.app_prompt_title')}
+                </p>
+                <p className="mx-auto max-w-sm text-center text-sm leading-5 text-gray-600">
                   {t('home.app_prompt_text')}
                 </p>
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                  to={mobileAppPageUrl}
-                  className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
-                >
-                  {t('home.download_android')}
-              </Link>
-
-              {iosAppUrl && (
-                <a
-                  href={iosAppUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="border border-soft px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
-                >
-                  {t('home.download_iphone')}
-                </a>
-              )}
-
-              <button
-                type="button"
-                onClick={() => shareApp(mobileAppPageUrl)}
-                className="flex items-center gap-1.5 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-green-600 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
-              >
-                <FaWhatsapp />
-                {t('home.share_app')}
-              </button>
-
-              <button
-                type="button"
-                onClick={dismissAppPrompt}
-                className="p-2 text-gray-500 hover:text-gray-700 transition-all duration-300 transform hover:scale-110"
-                aria-label={t('home.close_app_prompt')}
-                title={t('common.close')}
-              >
-                <FaTimes />
-              </button>
-            </div>
-          </div>
+          </Link>
         </section>
       )}
 
