@@ -1,9 +1,9 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { FaChevronDown } from 'react-icons/fa';
+import { FaArrowLeft, FaChevronDown } from 'react-icons/fa';
 
 import i18n from '../i18n';
 
@@ -588,6 +588,7 @@ function Layout({ children }) {
     location.pathname.startsWith('/admin') ||
     location.pathname.startsWith('/super-admin') ||
     location.pathname.startsWith('/lawyer');
+  const isMobileAppPage = location.pathname === '/mobile-app';
   const showPublicHeaderFooter = !isVerificationPage && !isDashboardShell;
 
   useEffect(() => {
@@ -641,7 +642,17 @@ function Layout({ children }) {
 
       {/* Global Language Switcher */}
       {!isDashboardShell && (
-        <div className="flex justify-end border-b bg-white px-3 py-1 sm:px-4 sm:py-2">
+        <div className={`flex items-center border-b bg-white px-3 py-1 sm:px-4 sm:py-2 ${isMobileAppPage ? 'justify-between gap-3' : 'justify-end'}`}>
+          {isMobileAppPage && (
+            <Link
+              to="/"
+              className="inline-flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-primary-700 sm:text-sm"
+              aria-label="Back to RentalHub home"
+            >
+              <FaArrowLeft className="shrink-0 text-[11px] sm:text-xs" />
+              <span className="truncate">Back to Home</span>
+            </Link>
+          )}
           <label className="relative block w-[8.25rem] sm:w-full sm:max-w-[12rem]" dir="ltr">
             <span className="sr-only">{i18n.t('language.select')}</span>
             <select
