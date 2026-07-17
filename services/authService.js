@@ -504,28 +504,45 @@ const generateToken = (userId, userType, options = {}) => {
   );
 };
 
-const generateAccessToken = (userId, userType) => generateToken(userId, userType, { expiresIn: '1h' });
+const generateAccessToken = (userId, userType, options = {}) =>
+  generateToken(userId, userType, {
+    expiresIn: '1h',
+    tokenVersion: options.tokenVersion || 1,
+  });
 
-const attachAuthSession = (res, data) => {
+const isNativeAuthClient = (req) =>
+  String(
+    req?.headers?.['x-rentalhub-client'] ||
+      req?.headers?.['x-client-platform'] ||
+      ''
+  ).toLowerCase() === 'native';
+
+const attachAuthSession = (res, data, options = {}) => {
   if (!data?.token) return data;
 
   // data.token is the 24h session token → stored in HTTP-only cookie
   // Decode it to mint a 1h access token for the Bearer header
   let accessToken = data.token;
+  let tokenVersion = data?.user?.token_version || 1;
   try {
     const decoded = jwt.verify(data.token, process.env.JWT_SECRET, { algorithms: ['HS256'], ignoreExpiration: true });
     if (decoded?.userId) {
-      accessToken = generateAccessToken(decoded.userId, decoded.userType);
+      tokenVersion = decoded.tv || tokenVersion;
+      accessToken = generateAccessToken(decoded.userId, decoded.userType, { tokenVersion });
     }
   } catch (_) {}
 
   const csrfToken = setAuthCookies(res, data.token);
   if (shouldReturnTokenInBody()) {
-    return {
+    const responseData = {
       ...data,
       token: accessToken,
       csrf_token: csrfToken,
     };
+    if (options.exposeSessionToken) {
+      responseData.session_token = data.token;
+    }
+    return responseData;
   }
 
   const { token, ...safeData } = data;
@@ -1555,7 +1572,7 @@ exports.register = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Registration successful! Please verify your email and phone.',
-      data: attachAuthSession(res, data)
+      data: attachAuthSession(res, data, { exposeSessionToken: isNativeAuthClient(req) })
     });
 
   } catch (error) {
@@ -1879,7 +1896,7 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Registration completed successfully',
-      data: attachAuthSession(res, data)
+      data: attachAuthSession(res, data, { exposeSessionToken: isNativeAuthClient(req) })
     });
   } catch (error) {
     req.logger.error('Registration completion error:', error);
@@ -1984,7 +2001,7 @@ exports.login = async (req, res) => {
       data: attachAuthSession(res, {
         user,
         token
-      })
+      }, { exposeSessionToken: isNativeAuthClient(req) })
     });
 
   } catch (error) {
@@ -3645,8 +3662,14 @@ exports.getCurrentUser = async (req, res) => {
 // ================= REFRESH TOKEN =================
 exports.refreshToken = async (req, res) => {
   try {
-    // Read the 7d session token from the cookie (not the Bearer header)
-    const sessionToken = parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME];
+    // Browsers refresh from the HTTP-only cookie. Native clients do not reliably
+    // retain that cookie, so they can send their secure device-stored session
+    // token when explicitly identified as a native RentalHub client.
+    const sessionToken =
+      parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME] ||
+      (isNativeAuthClient(req)
+        ? req.body?.session_token || req.headers?.['x-rentalhub-session-token']
+        : null);
     if (!sessionToken) {
       return res.status(401).json({
         success: false,
@@ -3684,7 +3707,7 @@ exports.refreshToken = async (req, res) => {
 
     res.json({
       success: true,
-      data: attachAuthSession(res, { token: newSessionToken }),
+      data: attachAuthSession(res, { token: newSessionToken }, { exposeSessionToken: isNativeAuthClient(req) }),
     });
   } catch (error) {
     req.logger.error('Refresh token error:', error);

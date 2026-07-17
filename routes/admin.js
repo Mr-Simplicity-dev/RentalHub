@@ -80,18 +80,20 @@ router.get(
   adminController.getAllProperties
 );
 
-// ✅ Single property
-router.get(
-  '/properties/:id',
-  requireAdminOrSuperAdmin,
-  adminController.getPropertyById
-);
+
 
 // ✅ Pending properties (approval queue)
 router.get(
   '/properties/pending',
   requireAdminOrSuperAdmin,
   adminController.getPendingProperties
+);
+
+// ✅ Single property
+router.get(
+  '/properties/:id',
+  requireAdminOrSuperAdmin,
+  adminController.getPropertyById
 );
 
 // ✅ Approve property
