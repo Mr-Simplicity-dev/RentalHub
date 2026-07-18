@@ -20,34 +20,26 @@
     <filter id="glow">
       <feDropShadow dx="0" dy="8" stdDeviation="32" flood-color="#0f172a" flood-opacity="0.3"/>
     </filter>
-    <filter id="softGlow">
+    <filter id="textGlow">
       <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#0ea5e9" flood-opacity="0.4"/>
     </filter>
-    <clipPath id="rounded">
-      <rect x="0" y="0" width="1200" height="630" rx="0"/>
-    </clipPath>
   </defs>
 
   <rect width="1200" height="630" fill="url(#bg)"/>
 
   <circle cx="1050" cy="80" r="320" fill="#ffffff" opacity="0.04"/>
   <circle cx="1100" cy="50" r="180" fill="#38bdf8" opacity="0.06"/>
-
   <circle cx="150" cy="550" r="260" fill="#ffffff" opacity="0.03"/>
   <circle cx="200" cy="520" r="140" fill="#0ea5e9" opacity="0.05"/>
-
   <line x1="0" y1="628" x2="1200" y2="628" stroke="#facc15" stroke-width="4" opacity="0.3"/>
 
-  <g transform="translate(130, 185) scale(1.35)" filter="url(#glow)">
+  <g transform="translate(110, 165) scale(1.25)" filter="url(#glow)">
     <rect x="0" y="0" width="200" height="200" rx="44" fill="url(#bg)" opacity="0.95"/>
     <rect x="4" y="4" width="192" height="192" rx="42" fill="#0f172a" opacity="0.15"/>
-
     <g transform="translate(100, 100)">
       <circle cx="0" cy="0" r="65" fill="#ffffff" opacity="0.08"/>
       <circle cx="0" cy="0" r="51" fill="#0f172a" opacity="0.2"/>
-
       <path d="M0-54.7c-35.7 0-64.6 28.4-64.6 63.4 0 45.1 50 87.6 59.1 95.2a9.6 9.6 0 0 0 12.2 0c9.1-7.6 59.1-50.1 59.1-95.2 0-35-28.9-63.4-64.6-63.4Zm0 98c-19.7 0-35.6-15.7-35.6-35s15.9-35 35.6-35 35.6 15.7 35.6 35-15.9 35-35.6 35Z" fill="url(#pinGrad)"/>
-
       <path d="M-48.9 14.6 0-24.4l48.9 39.1-12.7 15.3L0-1.7l-36.2 29.9L-48.9 14.6Z" fill="url(#roofGrad)"/>
       <path d="M-31.3 27.2 0 0l31.3 25.9v35a7 7 0 0 1-7 7H-24.3a7 7 0 0 1-7-7v-35Z" fill="#f8fafc"/>
       <rect x="-18.8" y="38.4" width="17.6" height="30.5" rx="3.9" fill="#16a34a"/>
@@ -59,19 +51,17 @@
     </g>
   </g>
 
-  <text x="370" y="248" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="76" font-weight="800" fill="#ffffff" letter-spacing="-1.5" filter="url(#softGlow)">RentalHub</text>
-  <text x="370" y="248" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="76" font-weight="300" fill="#facc15" letter-spacing="-1.5" filter="url(#softGlow)">
-    <tspan dx="333">NG</tspan>
+  <text x="420" y="235" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="72" font-weight="800" fill="#ffffff" letter-spacing="-1.5" filter="url(#textGlow)">Rental</text>
+  <text x="420" y="235" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="72" font-weight="300" fill="#facc15" letter-spacing="-1.5" filter="url(#textGlow)">
+    <tspan dx="375">NG</tspan>
   </text>
 
-  <rect x="370" y="272" width="60" height="4" rx="2" fill="#22c55e"/>
+  <rect x="420" y="260" width="64" height="4" rx="2" fill="#22c55e"/>
 
-  <text x="370" y="320" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="28" font-weight="400" fill="#94a3b8" letter-spacing="0.5">Find &amp; Manage Properties in Nigeria</text>
+  <text x="420" y="330" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="26" font-weight="400" fill="#94a3b8" letter-spacing="0.5">Find &amp; Manage Properties in Nigeria</text>
 
-  <g transform="translate(370, 360)">
+  <g transform="translate(420, 380)">
     <rect x="0" y="0" width="180" height="44" rx="22" fill="#0ea5e9" opacity="0.15" stroke="#0ea5e9" stroke-width="1" stroke-opacity="0.4"/>
     <text x="90" y="28" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#7dd3fc" text-anchor="middle">Available on iOS &amp; Android</text>
   </g>
-
-  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="#0f172a" stroke-width="0" opacity="0.5"/>
 </svg>
