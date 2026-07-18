@@ -66,6 +66,18 @@ const platformStoreUrl = (platform) => {
   return process.env.MOBILE_ANDROID_STORE_URL || process.env.MOBILE_STORE_URL || '';
 };
 
+const platformApkUrl = (platform) => {
+  if (platform !== 'android') return '';
+  return (
+    process.env.MOBILE_ANDROID_APK_URL ||
+    process.env.MOBILE_APK_URL ||
+    ''
+  );
+};
+
+const platformUpdateUrl = (platform) =>
+  platformApkUrl(platform) || platformStoreUrl(platform);
+
 router.post(
   '/diagnostics/crash',
   [
@@ -202,6 +214,8 @@ router.get('/app-version', (req, res) => {
       update_required: updateRequired,
       platform: platform || null,
       store_url: platformStoreUrl(platform),
+      download_url: platformUpdateUrl(platform),
+      apk_url: platformApkUrl(platform),
       message: updateRequired
         ? 'A required app update is available.'
         : updateAvailable

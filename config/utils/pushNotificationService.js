@@ -100,6 +100,7 @@ const sendPushToUser = async (userId, notification = {}) => {
     data: notification.data || {},
     channelId: notification.channelId || 'messages',
     priority: 'high',
+    ...(notification.badge !== undefined ? { badge: Number(notification.badge || 0) } : {}),
   }));
 
   try {
@@ -137,10 +138,102 @@ const sendPushToUser = async (userId, notification = {}) => {
   }
 };
 
+const sendExpoMessages = async (messages) => {
+  if (!messages.length) return { sent: 0, invalid: 0 };
+
+  try {
+    const response = await axios.post(EXPO_PUSH_URL, messages, {
+      headers: {
+        Accept: 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      timeout: 12000,
+    });
+    const tickets = Array.isArray(response.data?.data)
+      ? response.data.data
+      : [response.data?.data].filter(Boolean);
+    const invalidTokens = tickets
+      .map((ticket, index) =>
+        ticket?.details?.error === 'DeviceNotRegistered'
+          ? messages[index]?.to
+          : null
+      )
+      .filter(Boolean);
+
+    if (invalidTokens.length) {
+      await db.query(
+        `UPDATE push_device_tokens
+         SET enabled = FALSE, updated_at = NOW()
+         WHERE expo_push_token = ANY($1::text[])`,
+        [invalidTokens]
+      );
+    }
+    return { sent: messages.length, invalid: invalidTokens.length };
+  } catch (error) {
+    logger.error('Expo push delivery failed:', error.message);
+    return { sent: 0, invalid: 0, error: error.message };
+  }
+};
+
+const sendPushToAll = async (notification = {}, filters = {}) => {
+  await ensurePushSchema();
+  const params = [];
+  const where = ['pdt.enabled = TRUE'];
+
+  if (filters.platform) {
+    params.push(String(filters.platform).toLowerCase());
+    where.push(`pdt.platform = $${params.length}`);
+  }
+
+  if (filters.respectUpdateAlerts !== false) {
+    where.push(`COALESCE((unp.preferences->>'updateAlerts')::boolean, TRUE) = TRUE`);
+  }
+
+  const tokenResult = await db.query(
+    `SELECT DISTINCT pdt.expo_push_token
+     FROM push_device_tokens pdt
+     LEFT JOIN user_notification_preferences unp ON unp.user_id = pdt.user_id
+     WHERE ${where.join(' AND ')}`,
+    params
+  );
+
+  const tokens = tokenResult.rows.map((row) => row.expo_push_token).filter(Boolean);
+  const messages = tokens.map((to) => ({
+    to,
+    sound: 'default',
+    title: String(notification.title || 'RentalHub NG').slice(0, 255),
+    body: String(notification.body || '').slice(0, 1000),
+    data: notification.data || {},
+    channelId: notification.channelId || 'general',
+    priority: 'high',
+    badge: Number(notification.badge || 1),
+  }));
+
+  let totalSent = 0;
+  let totalInvalid = 0;
+  const errors = [];
+  for (let index = 0; index < messages.length; index += 100) {
+    const chunk = messages.slice(index, index + 100);
+    const result = await sendExpoMessages(chunk);
+    totalSent += result.sent || 0;
+    totalInvalid += result.invalid || 0;
+    if (result.error) errors.push(result.error);
+  }
+
+  return {
+    sent: totalSent,
+    invalid: totalInvalid,
+    errors,
+    targeted: messages.length,
+  };
+};
+
 module.exports = {
   ensurePushSchema,
   isExpoPushToken,
   registerDevice,
+  sendPushToAll,
   sendPushToUser,
   unregisterDevice,
 };
