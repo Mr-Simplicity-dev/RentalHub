@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, param } = require('express-validator');
 const router = express.Router();
-const { authenticate } = require('../config/middleware/auth');
+const { authenticate, requireSuperAdmin } = require('../config/middleware/auth');
 const validateRequest = require('../config/middleware/validateRequest');
 const db = require('../config/middleware/database');
 const {
@@ -13,6 +13,7 @@ const {
 } = require('../config/utils/notificationService');
 const {
   registerDevice,
+  sendPushToAll,
   unregisterDevice,
 } = require('../config/utils/pushNotificationService');
 
@@ -22,6 +23,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES = {
   pushApplications: true,
   pushBookings: true,
   adminAlerts: true,
+  updateAlerts: true,
 };
 
 const ALLOWED_PREFERENCE_KEYS = Object.keys(DEFAULT_NOTIFICATION_PREFERENCES);
@@ -143,6 +145,58 @@ router.patch(
       return res.status(500).json({
         success: false,
         message: 'Failed to update notification preferences',
+      });
+    }
+  }
+);
+
+router.post(
+  '/mobile-update',
+  [
+    body('latest_version').optional().isString().trim().isLength({ max: 80 }),
+    body('title').optional().isString().trim().isLength({ max: 120 }),
+    body('body').optional().isString().trim().isLength({ max: 500 }),
+    body('platform').optional().isIn(['android', 'ios']),
+    body('download_url').optional().isString().trim().isLength({ max: 1000 }),
+    body('apk_url').optional().isString().trim().isLength({ max: 1000 }),
+  ],
+  validateRequest,
+  authenticate,
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const latestVersion = String(req.body?.latest_version || process.env.MOBILE_LATEST_VERSION || '').trim();
+      const platform = req.body?.platform ? String(req.body.platform).toLowerCase() : undefined;
+      const result = await sendPushToAll(
+        {
+          title: req.body?.title || 'RentalHub update available',
+          body: req.body?.body || 'A newer RentalHub app is ready. Open RentalHub to install the latest version.',
+          channelId: 'general',
+          data: {
+            type: 'app_update',
+            screen: 'Settings',
+            latest_version: latestVersion || null,
+            download_url: req.body?.download_url || null,
+            apk_url: req.body?.apk_url || null,
+          },
+          badge: 1,
+        },
+        {
+          platform,
+          respectUpdateAlerts: true,
+        }
+      );
+
+      return res.json({
+        success: true,
+        data: result,
+        message: 'Mobile update notification queued',
+      });
+    } catch (error) {
+      req.logger?.error?.('Mobile update push error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send mobile update notification',
       });
     }
   }
