@@ -546,11 +546,19 @@ const attachAuthSession = (res, data, options = {}) => {
   }
 
   const { token, ...safeData } = data;
-  return {
+  const responseData = {
     ...safeData,
     token: accessToken,
     csrf_token: csrfToken,
   };
+
+  // Strict cookie mode must still expose the device session token to an
+  // explicitly identified native client. Browser sessions remain cookie-only.
+  if (options.exposeSessionToken) {
+    responseData.session_token = data.token;
+  }
+
+  return responseData;
 };
 
 const assertUniqueUserFields = async (executor, {
@@ -1931,6 +1939,7 @@ exports.login = async (req, res) => {
               u.subscription_active, u.subscription_expires_at,
               u.identity_document_type, u.international_passport_number,
               u.nationality, u.nin_verified,
+              u.assigned_state, u.assigned_city,
               u.preferred_state_id, s.state_name AS preferred_state_name,
               u.preferred_lga_name,
               u.deleted_at,
@@ -3619,6 +3628,7 @@ exports.getCurrentUser = async (req, res) => {
               u.subscription_active, u.subscription_expires_at,
               u.identity_document_type, u.international_passport_number,
               u.nationality, u.nin_verified, u.nin,
+              u.assigned_state, u.assigned_city,
               u.preferred_state_id, s.state_name AS preferred_state_name,
               u.preferred_lga_name,
               u.deleted_at,

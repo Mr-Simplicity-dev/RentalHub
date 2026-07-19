@@ -1916,7 +1916,7 @@ router.get('/state-admin/dashboard', async (req, res) => {
       `SELECT user_type, assigned_state, assigned_city 
        FROM users 
        WHERE id = $1 
-         AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin')
+         AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin')
          AND deleted_at IS NULL`,
       [adminId]
     );
@@ -2059,7 +2059,7 @@ router.get('/state-admin/bookings', async (req, res) => {
       `SELECT assigned_state, assigned_city 
        FROM users 
        WHERE id = $1 
-         AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin')
+         AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin')
          AND deleted_at IS NULL`,
       [adminId]
     );
@@ -2268,7 +2268,7 @@ router.get('/state-admin/bookings', async (req, res) => {
         SELECT assigned_state, assigned_city 
         FROM users 
         WHERE id = $1 
-          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin')
+          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin')
           AND deleted_at IS NULL
       `, [adminId]);
       
@@ -2401,7 +2401,7 @@ router.get('/state-admin/bookings', async (req, res) => {
         SELECT assigned_state, assigned_city 
         FROM users 
         WHERE id = $1 
-          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin')
+          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin')
           AND deleted_at IS NULL
       `, [adminId]);
       
@@ -2522,7 +2522,7 @@ router.get('/state-admin/bookings', async (req, res) => {
         SELECT assigned_state, assigned_city 
         FROM users 
         WHERE id = $1 
-          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin')
+          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin')
           AND deleted_at IS NULL
       `, [adminId]);
       
@@ -2649,7 +2649,7 @@ router.get('/state-admin/bookings', async (req, res) => {
         SELECT assigned_state 
         FROM users 
         WHERE id = $1 
-          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin')
+          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin')
           AND deleted_at IS NULL
       `, [adminId]);
       
@@ -2732,7 +2732,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
       `SELECT user_type 
        FROM users 
        WHERE id = $1 
-         AND user_type IN ('super_admin', 'super_financial_admin', 'super_support_admin')
+         AND user_type IN ('super_admin', 'super_financial_admin', 'super_support_admin', 'super_transportation_admin')
          AND deleted_at IS NULL`,
       [adminId]
     );
@@ -2988,7 +2988,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
         SELECT id, user_type 
         FROM users 
         WHERE id = $1 
-          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin')
+          AND user_type IN ('state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin')
           AND deleted_at IS NULL
           AND approval_status = 'approved'
       `, [state_admin_id]);
