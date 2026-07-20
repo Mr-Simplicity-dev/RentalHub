@@ -135,7 +135,7 @@ if (process.env.MONGODB_URI) {
 const Blog = require('./models/Blog');
 const locations = require('./data/nigeriaLocations');
 const slugify = require('./utils/slugify');
-const { pingGoogle } = require('./utils/pingGoogle');
+const { submitUrl } = require('./config/utils/googleIndexing');
 const { generateAIContent } = require('./utils/aiContentGenerator');
 const configureRealtimeSocket = require('./config/utils/realtimeSocket');
 const { setRealtimeIo } = require('./config/utils/realtimeEmitter');
@@ -312,14 +312,20 @@ Start your search today and find the best home in ${location}.
     }
   });
 
-  // Daily sitemap submission
+  // Daily sitemap submission via Google Indexing API
   cron.schedule('0 2 * * *', async () => {
     try {
-      logger.info('Submitting sitemap to Google...');
-      await pingGoogle();
-      logger.info('Sitemap submitted');
+      logger.info('Submitting homepage to Google Indexing API...');
+      const result = await submitUrl('https://rentalhub.com.ng', 'URL_UPDATED');
+      if (result.success) {
+        logger.info('Homepage submitted to Google Indexing API');
+      } else if (result.skipped && result.reason === 'missing_service_account') {
+        logger.warn('Google Indexing API skipped — no service-account.json found');
+      } else {
+        logger.error('Google Indexing API submission failed:', result.reason || result.error);
+      }
     } catch (err) {
-      logger.error('Sitemap submission failed:', err.message);
+      logger.error('Google Indexing API submission error:', err.message);
     }
   });
 };

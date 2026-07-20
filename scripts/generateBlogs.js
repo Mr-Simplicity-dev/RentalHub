@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const Blog = require("../models/Blog");
 const locations = require("../data/nigeriaLocations");
 const slugify = require("../utils/slugify");
-const { pingGoogle } = require("../utils/pingGoogle");
+const { submitUrl } = require("../config/utils/googleIndexing");
 
 const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
 
@@ -114,11 +114,18 @@ Start your search today and find the best properties in ${location}.
 
     console.log(`✅ ${count} blog posts created`);
 
-    // 🔥 Ping Google (safe)
+    // 🔥 Submit to Google Indexing API
     try {
-      await pingGoogle();
+      const result = await submitUrl('https://rentalhub.com.ng', 'URL_UPDATED');
+      if (result.success) {
+        console.log("✅ Homepage submitted to Google Indexing API");
+      } else if (result.skipped) {
+        console.log("⚠️ Google Indexing skipped:", result.reason);
+      } else {
+        console.error("⚠️ Google Indexing failed:", result.error);
+      }
     } catch (err) {
-      console.error("⚠️ Google ping failed:", err.message);
+      console.error("⚠️ Google Indexing error:", err.message);
     }
 
   } catch (err) {
