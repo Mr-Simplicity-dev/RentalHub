@@ -4,7 +4,7 @@ const db = require('../config/middleware/database');
 const nigeriaLocations = require('../data/nigeriaLocations');
 const { getSitemapUrls } = require('../config/utils/seoPageService');
 const { generateSitemap } = require('../config/utils/sitemapGenerator');
-const { pingGoogle } = require('../config/utils/pingGoogle');
+const { submitUrl } = require('../config/utils/googleIndexing');
 const Ranking = require('../models/Ranking');
 const { runConfiguredRankingChecks } = require('../config/utils/rankChecker');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
@@ -170,7 +170,7 @@ router.get('/sitemap-xml', authenticate, requireAdminOrSuperAdmin, async (req, r
 
 router.post('/ping-google', authenticate, requireAdminOrSuperAdmin, validateRequest, async (req, res) => {
   try {
-    const result = await pingGoogle();
+    const result = await submitUrl('https://rentalhub.com.ng', 'URL_UPDATED');
     res.json({ success: true, data: result });
   } catch (error) {
     req.logger.error('Ping Google error:', error);
