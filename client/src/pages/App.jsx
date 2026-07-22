@@ -76,6 +76,7 @@ const AdminPropertyDetail = React.lazy(() => import('./admin/AdminPropertyDetail
 const AdminApplicationDetail = React.lazy(() => import('./admin/AdminApplicationDetail'));
 const AdminCompliance = React.lazy(() => import('./admin/AdminCompliance'));
 const SeoDashboard = React.lazy(() => import('./SeoDashboard'));
+const AppLanding = React.lazy(() => import('./AppLanding'));
 const SupportGovernancePanel = React.lazy(() => import('../components/admin/SupportGovernancePanel'));
 const LawyerDashboard = React.lazy(() => import('./lawyer/LawyerDashboard'));
 const LawyerLayout = React.lazy(() => import('./lawyer/LawyerLayout'));
@@ -589,6 +590,7 @@ function Layout({ children }) {
     location.pathname.startsWith('/super-admin') ||
     location.pathname.startsWith('/lawyer');
   const isMobileAppPage = location.pathname === '/mobile-app';
+  const isLandingPage = location.pathname === '/download';
   const showPublicHeaderFooter = !isVerificationPage && !isDashboardShell;
 
   useEffect(() => {
@@ -642,8 +644,8 @@ function Layout({ children }) {
 
       {/* Global Language Switcher */}
       {!isDashboardShell && (
-        <div className={`flex items-center border-b bg-white px-3 py-1 sm:px-4 sm:py-2 ${isMobileAppPage ? 'justify-between gap-3' : 'justify-end'}`}>
-          {isMobileAppPage && (
+        <div className={`flex items-center border-b bg-white px-3 py-1 sm:px-4 sm:py-2 ${isMobileAppPage || isLandingPage ? 'justify-between gap-3' : 'justify-end'}`}>
+          {(isMobileAppPage || isLandingPage) && (
             <Link
               to="/"
               className="inline-flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-primary-700 sm:text-sm"
@@ -706,6 +708,7 @@ function App() {
               <Route path="/lawyers" element={<LegalSupport />} />
               <Route path="/legal-support" element={<LegalSupport />} />
               <Route path="/mobile-app" element={<MobileAppPage />} />
+              <Route path="/download" element={<React.Suspense fallback={<div />}><AppLanding /></React.Suspense>} />
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
               <Route path="/transportation/book" element={<TransportationBooking />} />
