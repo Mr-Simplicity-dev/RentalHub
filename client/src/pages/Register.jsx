@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
 import { setAuthSession } from '../services/authStorage';
+import { getStoredUtm } from '../hooks/useUtmParams';
 import { useTranslation } from 'react-i18next';
 
 const LAWYER_ACCESS_FEE = 2000; // Fee for using RentalHub NG lawyers during registration
@@ -143,6 +144,15 @@ const Register = () => {
       registrationData.referral_code = cleanReferralCode;
     } else {
       delete registrationData.referral_code;
+    }
+
+    const utm = getStoredUtm();
+    if (utm) {
+      registrationData.utm_source = utm.utm_source || '';
+      registrationData.utm_medium = utm.utm_medium || '';
+      registrationData.utm_campaign = utm.utm_campaign || '';
+      registrationData.utm_term = utm.utm_term || '';
+      registrationData.utm_content = utm.utm_content || '';
     }
 
     return registrationData;
