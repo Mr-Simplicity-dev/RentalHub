@@ -14,6 +14,7 @@ import {
   FaUsers,
   FaBuilding,
   FaHeadset,
+  FaWhatsapp,
 } from 'react-icons/fa';
 
 const features = [
@@ -77,6 +78,8 @@ const stats = [
   { value: '2,000+', label: 'Trusted Landlords' },
 ];
 
+const WHATSAPP_LINK = 'https://wa.me/2348030601238?text=Hi!%20I%20want%20to%20download%20RentalHub';
+
 const AppLanding = () => {
   return (
     <div className="min-h-screen bg-white">
@@ -125,6 +128,18 @@ const AppLanding = () => {
                   <div className="text-left">
                     <div className="text-[10px] uppercase tracking-wider opacity-80">Download on the</div>
                     <div className="text-base font-semibold -mt-0.5">App Store</div>
+                  </div>
+                </a>
+                <a
+                  href={WHATSAPP_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 bg-[#25D366] text-white px-6 py-3.5 rounded-xl hover:bg-[#1da851] transition-all duration-300 hover:scale-105 shadow-lg"
+                >
+                  <FaWhatsapp className="text-2xl" />
+                  <div className="text-left">
+                    <div className="text-[10px] uppercase tracking-wider opacity-80">Chat on</div>
+                    <div className="text-base font-semibold -mt-0.5">WhatsApp</div>
                   </div>
                 </a>
               </div>
@@ -306,6 +321,15 @@ const AppLanding = () => {
             >
               <FaApple className="text-xl" />
               App Store
+            </a>
+            <a
+              href={WHATSAPP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 bg-[#25D366] text-white px-8 py-4 rounded-xl hover:bg-[#1da851] transition-all duration-300 hover:scale-105 shadow-lg font-semibold"
+            >
+              <FaWhatsapp className="text-xl" />
+              Chat on WhatsApp
             </a>
             <Link
               to="/register"
