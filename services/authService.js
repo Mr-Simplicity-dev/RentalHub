@@ -1115,7 +1115,8 @@ const createUserFromPreparedRegistration = async ({
   passwordHash,
   verificationMeta,
   kycResult,
-  tenantRegistrationPayment
+  tenantRegistrationPayment,
+  utm
 }) => {
   await ensureTenantRegistrationPaymentSchema();
   const crypto = require('crypto');
@@ -1166,9 +1167,15 @@ const createUserFromPreparedRegistration = async ({
          nationality,
          preferred_state_id,
          preferred_lga_name,
-         kyc_metadata
+         kyc_metadata,
+         utm_source,
+         utm_medium,
+         utm_campaign,
+         utm_term,
+         utm_content,
+         utm_captured_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
        RETURNING id, email, full_name, user_type, created_at,
                  identity_document_type, nin_verified, nationality,
                  preferred_state_id, preferred_lga_name`,
@@ -1186,7 +1193,13 @@ const createUserFromPreparedRegistration = async ({
         preparedRegistration.cleanNationality,
         preparedRegistration.preferredStateId,
         preparedRegistration.preferredLgaName,
-        kycMetadata
+        kycMetadata,
+        utm?.utm_source || null,
+        utm?.utm_medium || null,
+        utm?.utm_campaign || null,
+        utm?.utm_term || null,
+        utm?.utm_content || null,
+        utm?.utm_source ? new Date().toISOString() : null,
       ]
     );
 
@@ -1574,7 +1587,14 @@ exports.register = async (req, res) => {
       preparedRegistration: preparedRegistrationWithLocation,
       passwordHash,
       verificationMeta,
-      kycResult
+      kycResult,
+      utm: {
+        utm_source: req.body.utm_source || null,
+        utm_medium: req.body.utm_medium || null,
+        utm_campaign: req.body.utm_campaign || null,
+        utm_term: req.body.utm_term || null,
+        utm_content: req.body.utm_content || null,
+      }
     });
 
     res.status(201).json({
@@ -1713,9 +1733,12 @@ exports.initializeRegistrationPayment = async (req, res) => {
           lga_name: registrationPricing.location?.lga_name || null,
           password_hash: passwordHash,
           kycResult: kycResult || null,
-          // Store base fee so createUserFromPreparedRegistration records only
-          // the base as general_platform_fee (add-ons get their own records).
           base_registration_amount: baseAmount,
+          utm_source: req.body.utm_source || null,
+          utm_medium: req.body.utm_medium || null,
+          utm_campaign: req.body.utm_campaign || null,
+          utm_term: req.body.utm_term || null,
+          utm_content: req.body.utm_content || null,
         }),
         verificationMeta ? JSON.stringify(verificationMeta) : null
       ]
@@ -1898,7 +1921,14 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       passwordHash: storedPayload.password_hash,
       verificationMeta,
       kycResult,
-      tenantRegistrationPayment
+      tenantRegistrationPayment,
+      utm: {
+        utm_source: storedPayload.utm_source || null,
+        utm_medium: storedPayload.utm_medium || null,
+        utm_campaign: storedPayload.utm_campaign || null,
+        utm_term: storedPayload.utm_term || null,
+        utm_content: storedPayload.utm_content || null,
+      }
     });
 
     res.status(201).json({

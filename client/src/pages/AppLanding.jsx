@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import useUtmParams from '../hooks/useUtmParams';
 import {
   FaSearch,
   FaShieldAlt,
@@ -81,6 +82,17 @@ const stats = [
 const WHATSAPP_LINK = 'https://wa.me/2348030601238?text=Hi!%20I%20want%20to%20download%20RentalHub';
 
 const AppLanding = () => {
+  const getUtm = useUtmParams();
+
+  useEffect(() => {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', 'page_view', {
+        page_title: 'App Landing',
+        page_location: window.location.href,
+      });
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero */}
