@@ -8,6 +8,21 @@
 ## Landing Page
 - **URL:** `https://rentalhub.com.ng/download`
 
+## QR Code Page
+- **URL:** `https://rentalhub.com.ng/qr-code`
+- **Use for:** Flyers, posters, business cards, event banners, expo booths
+- **How to print:** Open the page → Ctrl+P → print. Or right-click QR code → Save image as
+
+## Deep Links (Direct to Store)
+
+### Google Play Store
+- **URL:** `https://play.google.com/store/apps/details?id=com.rentalhub`
+- **Status:** Placeholder — will work once app is published on Play Store
+
+### Apple App Store
+- **URL:** `https://apps.apple.com/app/rentalhub-ng`
+- **Status:** Placeholder — will work once app is published on App Store
+
 ## UTM-Tagged Links
 
 ### Facebook Ad
