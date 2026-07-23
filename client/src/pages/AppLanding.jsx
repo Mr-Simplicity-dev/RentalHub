@@ -13,7 +13,6 @@ import {
   FaArrowRight,
   FaUsers,
   FaBuilding,
-  FaShieldCheck,
   FaHeadset,
 } from 'react-icons/fa';
 
@@ -44,7 +43,7 @@ const features = [
     desc: 'Built-in support system with real agents ready to help you at any time.',
   },
   {
-    icon: FaShieldCheck,
+    icon: FaShieldAlt,
     title: 'Dispute Resolution',
     desc: 'Legal support and dispute resolution built right into the platform.',
   },
