@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RentalHub — Phone Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0284c7 100%);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 40px 20px;
+  }
+  .mockup-container {
+    display: flex;
+    gap: 60px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Phone Device */
+  .phone {
+    width: 300px;
+    height: 620px;
+    background: #1a1a1a;
+    border-radius: 40px;
+    padding: 12px;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5), inset 0 0 0 2px #333;
+    position: relative;
+  }
+  .phone-notch {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 28px;
+    background: #1a1a1a;
+    border-radius: 0 0 18px 18px;
+    z-index: 10;
+  }
+  .phone-notch::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 8px;
+    background: #333;
+    border-radius: 50%;
+  }
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    background: #f8fafc;
+    border-radius: 30px;
+    overflow: hidden;
+    position: relative;
+  }
+  .phone-screen img,
+  .phone-screen .placeholder {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #0284c7 0%, #0f172a 100%);
+    color: white;
+    text-align: center;
+    padding: 30px 20px;
+  }
+  .placeholder .logo {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+  .placeholder h2 {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .placeholder p {
+    font-size: 12px;
+    opacity: 0.7;
+    line-height: 1.5;
+  }
+  .phone-button {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background: #555;
+    border-radius: 2px;
+  }
+
+  /* Labels */
+  .label {
+    text-align: center;
+    color: white;
+    margin-top: 24px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.6;
+  }
+
+  /* Instructions */
+  .instructions {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 13px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+  }
+  .instructions code {
+    background: rgba(255,255,255,0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+  <div class="mockup-container">
+    <div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <!-- REPLACE THIS div WITH: <img src="your-screenshot.png" alt="RentalHub" /> -->
+          <div class="placeholder">
+            <div class="logo">🏠</div>
+            <h2>RentalHub NG</h2>
+            <p>Replace this with your app screenshot.<br>Just paste an &lt;img&gt; tag inside .phone-screen.</p>
+          </div>
+        </div>
+        <div class="phone-button"></div>
+      </div>
+      <div class="label">Phone Mockup</div>
+    </div>
+  </div>
+
+  <div class="instructions">
+    To use: Take a screenshot of your RentalHub app → save as <code>screenshot.png</code> in this folder → replace the placeholder div with <code>&lt;img src="screenshot.png" alt="RentalHub" /&gt;</code> → open this file in browser → screenshot it
+  </div>
+</body>
+</html>
