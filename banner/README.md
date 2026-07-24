@@ -134,3 +134,40 @@
 - Keep text **big and bold** — people scroll fast on phones
 - Make sure the **most important text** is in the center (safe area)
 - For story/reel formats (1080×1920), keep key content in the **middle 60%** (top and bottom get cut off by UI)
+
+---
+
+## How to Add Phone Mockups (Makes Banners Look Professional)
+
+A phone mockup = your app shown inside a phone frame. It looks like someone is actually using RentalHub.
+
+### Method 1: Use Canva's Built-in Mockups (Easiest)
+1. When designing your banner, click **Elements** in the left sidebar
+2. Search **"phone mockup"** or **"iPhone mockup"**
+3. Drag a phone frame onto your canvas
+4. Search for a **real estate app screenshot** in Elements → Photos
+   - OR upload your own RentalHub screenshot later
+5. Drag the image into the phone frame — it snaps in automatically
+6. Resize and position the phone where you want it
+
+### Method 2: Search for Pre-made Templates (Fastest)
+1. In Canva's home screen, search **"app promotion"** or **"phone banner"**
+2. Pick a template that already shows a phone with an app on screen
+3. Just change the text to RentalHub text
+4. Change colors to match branding
+5. Done in 1 minute
+
+### Method 3: Use Your Own App Screenshot
+1. Take a screenshot of your RentalHub app (or website on mobile)
+2. Upload it to Canva
+3. Search **"phone mockup"** in Elements
+4. Drag the mockup frame onto canvas
+5. Drag your screenshot into the frame
+6. It looks like your real app inside a phone
+
+### Which Banners Should Have Phone Mockups?
+- **Facebook Feed Ad** (#1) — yes, shows the app in action
+- **Instagram Feed** (#3) — yes
+- **TikTok End Card** (#7) — yes, shows app download
+- **General Promo** (#10) — yes
+- **Story/Reel formats** — optional, text-heavy works better for stories
