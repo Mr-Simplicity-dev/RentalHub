@@ -1,0 +1,28 @@
+{
+  "name": "rentalhub-video-ads",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "remotion studio",
+    "build": "remotion render",
+    "render:text-1": "remotion render TextAd1 out/text-ad-1-stop-scam.mp4",
+    "render:text-2": "remotion render TextAd2 out/text-ad-2-three-steps.mp4",
+    "render:text-3": "remotion render TextAd3 out/text-ad-3-36-states.mp4",
+    "render:text-4": "remotion render TextAd4 out/text-ad-4-testimonials.mp4",
+    "render:text-5": "remotion render TextAd5 out/text-ad-5-scams.mp4",
+    "render:cartoon-1": "remotion render CartoonAd1 out/cartoon-ad-1-bad-agent.mp4",
+    "render:cartoon-2": "remotion render CartoonAd2 out/cartoon-ad-2-how-it-works.mp4",
+    "render:cartoon-3": "remotion render CartoonAd3 out/cartoon-ad-3-map.mp4",
+    "render:all": "remotion render TextAd1 out/text-ad-1.mp4 && remotion render TextAd2 out/text-ad-2.mp4 && remotion render TextAd3 out/text-ad-3.mp4 && remotion render TextAd4 out/text-ad-4.mp4 && remotion render TextAd5 out/text-ad-5.mp4 && remotion render CartoonAd1 out/cartoon-ad-1.mp4 && remotion render CartoonAd2 out/cartoon-ad-2.mp4 && remotion render CartoonAd3 out/cartoon-ad-3.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/react": "^18.2.0"
+  }
+}
