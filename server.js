@@ -124,13 +124,25 @@ const mongoose = require('mongoose');
 // Enable strict query mode to suppress Mongoose deprecation warning
 mongoose.set('strictQuery', true);
 
-if (process.env.MONGODB_URI) {
-  mongoose.connect(process.env.MONGODB_URI).catch((err) => {
-    console.error('MongoDB connection failed — MongoDB-dependent features (blogs, cron) disabled:', err.message);
-  });
-} else {
-  console.warn('WARNING: MONGODB_URI not set — MongoDB-dependent features (blogs, cron) will not work');
-}
+const connectMongoWithRetry = (retries = 6, delayMs = 5000) => {
+  if (!process.env.MONGODB_URI) {
+    console.warn('WARNING: MONGODB_URI not set — MongoDB-dependent features (blogs, cron) will not work');
+    return;
+  }
+
+  mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('MongoDB connected successfully'))
+    .catch((err) => {
+      if (retries <= 0) {
+        console.error('MongoDB connection failed permanently — MongoDB-dependent features (blogs, cron) disabled:', err.message);
+        return;
+      }
+      console.warn(`MongoDB connection failed (${retries} retries left, retrying in ${delayMs}ms): ${err.message}`);
+      setTimeout(() => connectMongoWithRetry(retries - 1, Math.min(delayMs * 2, 60000)), delayMs);
+    });
+};
+
+connectMongoWithRetry();
 
 const Blog = require('./models/Blog');
 const locations = require('./data/nigeriaLocations');

@@ -2,23 +2,36 @@ const logger = require('./logger');
 const db = require("../middleware/database");
 const { sendPushToUser } = require('./pushNotificationService');
 
-// Create notification table
-const createNotificationTable = async () => {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS notifications (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      type VARCHAR(50) NOT NULL,
-      title VARCHAR(255) NOT NULL,
-      message TEXT NOT NULL,
-      link VARCHAR(500),
-      is_read BOOLEAN DEFAULT FALSE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    
-    CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
-    CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
-  `);
+// Create notification table with retry
+const createNotificationTable = async (retries = 5, delayMs = 3000) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          type VARCHAR(50) NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          message TEXT NOT NULL,
+          link VARCHAR(500),
+          is_read BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
+      `);
+      return;
+    } catch (err) {
+      if (attempt === retries) {
+        logger.error(`notificationService: table creation failed after ${retries} attempts:`, err.message);
+        return;
+      }
+      logger.warn(`notificationService: attempt ${attempt}/${retries} failed, retrying in ${delayMs}ms...`);
+      await new Promise((r) => setTimeout(r, delayMs));
+      delayMs = Math.min(delayMs * 2, 30000);
+    }
+  }
 };
 
 // Create notification
@@ -127,6 +140,6 @@ exports.getUnreadCount = async (userId) => {
 };
 
 // Initialize notification table
-createNotificationTable().catch(console.error);
+createNotificationTable();
 
 module.exports = exports;
