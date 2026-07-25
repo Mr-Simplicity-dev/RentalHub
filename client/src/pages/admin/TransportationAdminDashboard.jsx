@@ -57,58 +57,44 @@ const TransportationAdminDashboard = () => {
   const [openOperations, setOpenOperations] = useState({});
 
   const loadDashboard = useCallback(async () => {
-    const response = await api.get('/transportation-admin/dashboard');
-    setDashboard(response.data?.data || null);
+    try { const response = await api.get('/transportation-admin/dashboard'); setDashboard(response.data?.data || null); }
+    catch (e) { console.error('Failed to load dashboard:', e); }
   }, []);
 
   const loadBookings = useCallback(async () => {
-    const response = await api.get('/transportation-admin/bookings', {
-      params: { limit: 12 },
-    });
-    setBookings(response.data?.data?.bookings || []);
+    try { const response = await api.get('/transportation-admin/bookings', { params: { limit: 12 } }); setBookings(response.data?.data?.bookings || []); }
+    catch (e) { console.error('Failed to load bookings:', e); }
   }, []);
 
   const loadServices = useCallback(async () => {
-    const response = await api.get('/transportation-admin/services');
-    setServices(Array.isArray(response.data?.data) ? response.data.data : []);
+    try { const response = await api.get('/transportation-admin/services'); setServices(Array.isArray(response.data?.data) ? response.data.data : []); }
+    catch (e) { console.error('Failed to load services:', e); }
   }, []);
 
   const loadAlerts = useCallback(async () => {
-    const response = await api.get('/transportation-admin/alerts', {
-      params: { limit: 12, is_resolved: false },
-    });
-    setAlerts(response.data?.data?.alerts || []);
+    try { const response = await api.get('/transportation-admin/alerts', { params: { limit: 12, is_resolved: false } }); setAlerts(response.data?.data?.alerts || []); }
+    catch (e) { console.error('Failed to load alerts:', e); }
   }, []);
 
   const loadAnalytics = useCallback(async () => {
-    const response = await api.get('/transportation-admin/analytics', {
-      params: { period: '30days' },
-    });
-    setAnalytics(response.data?.data || null);
+    try { const response = await api.get('/transportation-admin/analytics', { params: { period: '30days' } }); setAnalytics(response.data?.data || null); }
+    catch (e) { console.error('Failed to load analytics:', e); }
   }, []);
 
   const loadPage = useCallback(async (showRefresh = false) => {
-    try {
-      if (showRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      setError('');
+    if (showRefresh) setRefreshing(true); else setLoading(true);
+    setError('');
 
-      await Promise.all([
-        loadDashboard(),
-        loadBookings(),
-        loadServices(),
-        loadAlerts(),
-        loadAnalytics(),
-      ]);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load transportation admin console');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    await Promise.all([
+      loadDashboard(),
+      loadBookings(),
+      loadServices(),
+      loadAlerts(),
+      loadAnalytics(),
+    ]);
+
+    setLoading(false);
+    setRefreshing(false);
   }, [loadAlerts, loadAnalytics, loadBookings, loadDashboard, loadServices]);
 
   useEffect(() => {

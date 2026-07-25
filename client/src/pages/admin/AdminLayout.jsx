@@ -861,10 +861,12 @@ const AdminLayout = () => {
                 Inspections
               </NavLink>
 
+              {role === 'admin' && (
               <NavLink to="/admin/agents" className={navItem}>
                 <FaUserShield className="mr-3" />
                 Agent Management
               </NavLink>
+              )}
 
           </div>
           </div>
@@ -959,6 +961,7 @@ const AdminLayout = () => {
                 Evidence Verification
               </NavLink>
 
+              {role === 'admin' && (
               <NavLink to="/admin/compliance" className={navItem}>
                 <FaShieldAlt className="mr-3" />
                 Compliance & Risk
@@ -969,6 +972,7 @@ const AdminLayout = () => {
                   </span>
                 )}
               </NavLink>
+              )}
 
             </div>
 

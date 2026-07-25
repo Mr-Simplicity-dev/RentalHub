@@ -9,6 +9,7 @@ const agentCommissionController = require('../controllers/agentCommissionControl
 const damageReportController = require('../controllers/damageReportController');
 const db = require('../config/middleware/database');
 const supportRoutes = require('../routes/support');
+const appealRoutes = require('../routes/appeals');
 
 const makeRes = () => {
   const res = {};
@@ -161,6 +162,38 @@ test('support admin ticket scope follows LGA, state, assignment, and super hiera
   );
 });
 
+test('support dashboard scope is derived from the authenticated role', () => {
+  const { resolveSupportDashboardScope } = supportRoutes._supportScopeForTest;
+
+  assert.deepEqual(
+    resolveSupportDashboardScope({
+      user_type: 'lga_support_admin',
+      assigned_state: 'Lagos',
+      assigned_city: 'Ikeja',
+    }),
+    { level: 'lga', assignedState: 'Lagos', assignedCity: 'Ikeja' }
+  );
+
+  assert.deepEqual(
+    resolveSupportDashboardScope({
+      user_type: 'state_support_admin',
+      assigned_state: 'Lagos',
+      assigned_city: 'Ikeja',
+    }),
+    { level: 'state', assignedState: 'Lagos', assignedCity: null }
+  );
+
+  assert.deepEqual(
+    resolveSupportDashboardScope({ user_type: 'super_support_admin' }),
+    { level: 'super', assignedState: null, assignedCity: null }
+  );
+
+  assert.throws(
+    () => resolveSupportDashboardScope({ user_type: 'state_support_admin' }),
+    /missing assigned_state/
+  );
+});
+
 test('support service metadata normalizes category, department, and escalation status', () => {
   const {
     normalizeSupportCategory,
@@ -308,4 +341,32 @@ test('support admin deep links point to scoped operational dashboards', () => {
     getDepartmentEscalationPath('finance', 'super_financial_admin'),
     '/admin/super-financial-dashboard?panel=support-escalations'
   );
+});
+
+test('appeal review authority is limited to state and super administrators', () => {
+  const { canReviewAppeal } = appealRoutes._appealScopeForTest;
+
+  assert.equal(canReviewAppeal({ user_type: 'state_admin' }), true);
+  assert.equal(canReviewAppeal({ user_type: 'super_admin' }), true);
+
+  [
+    'admin',
+    'state_financial_admin',
+    'state_support_admin',
+    'state_lawyer',
+    'super_financial_admin',
+    'super_support_admin',
+    'super_lawyer',
+  ].forEach((userType) => {
+    assert.equal(canReviewAppeal({ user_type: userType }), false);
+  });
+});
+
+test('appeal pagination rejects non-positive values and caps oversized limits', () => {
+  const { parsePositiveInteger } = appealRoutes._appealScopeForTest;
+
+  assert.equal(parsePositiveInteger('-5', 20, 100), 20);
+  assert.equal(parsePositiveInteger('not-a-number', 20, 100), 20);
+  assert.equal(parsePositiveInteger('500', 20, 100), 100);
+  assert.equal(parsePositiveInteger('25', 20, 100), 25);
 });

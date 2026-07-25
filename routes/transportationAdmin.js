@@ -20,6 +20,27 @@ const TRANSPORTATION_ADMIN_ROLES = new Set([
   'super_transportation_admin',
 ]);
 
+const LGA_TRANSPORTATION_ADMIN_ROLES = new Set([
+  'admin',
+  'lga_admin',
+  'transportation_admin',
+  'lga_transportation_admin',
+]);
+
+const STATE_TRANSPORTATION_ADMIN_ROLES = new Set([
+  'state_admin',
+  'state_financial_admin',
+  'state_support_admin',
+  'state_transportation_admin',
+]);
+
+const GLOBAL_TRANSPORTATION_ADMIN_ROLES = new Set([
+  'super_admin',
+  'super_financial_admin',
+  'super_support_admin',
+  'super_transportation_admin',
+]);
+
 const requireTransportationAdminAccess = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
@@ -36,6 +57,100 @@ const requireTransportationAdminAccess = (req, res, next) => {
   }
 
   return next();
+};
+
+const normalizeLocation = (value) => String(value || '').trim().toLowerCase();
+
+const getTransportationAdminScope = (user) => {
+  const role = normalizeLocation(user?.user_type);
+  const state = String(user?.assigned_state || '').trim();
+  const city = String(user?.assigned_city || '').trim();
+
+  if (GLOBAL_TRANSPORTATION_ADMIN_ROLES.has(role)) {
+    return { valid: true, level: 'national', state: null, city: null };
+  }
+
+  if (LGA_TRANSPORTATION_ADMIN_ROLES.has(role)) {
+    if (!state || !city) {
+      return {
+        valid: false,
+        message:
+          'This LGA transportation admin account has no complete state and LGA assignment. Ask a super admin to update its jurisdiction.',
+      };
+    }
+    return { valid: true, level: 'lga', state, city };
+  }
+
+  if (STATE_TRANSPORTATION_ADMIN_ROLES.has(role)) {
+    if (!state) {
+      return {
+        valid: false,
+        message:
+          'This state transportation admin account has no assigned state. Ask a super admin to update its jurisdiction.',
+      };
+    }
+    return { valid: true, level: 'state', state, city: null };
+  }
+
+  return { valid: false, message: 'Transportation admin access only' };
+};
+
+const sendInvalidTransportationScope = (res, scope) =>
+  res.status(403).json({
+    success: false,
+    message: scope?.message || 'No transportation jurisdiction is assigned to this account.',
+  });
+
+const buildTransportationScopeSql = (
+  scope,
+  startIndex = 1,
+  propertyAlias = 'p',
+  stateAlias = 's'
+) => {
+  if (scope.level === 'national') {
+    return { sql: '', params: [] };
+  }
+
+  const params = [scope.state];
+  let sql = ` AND (
+    LOWER(TRIM(${stateAlias}.state_name)) = LOWER(TRIM($${startIndex}))
+    OR LOWER(TRIM(${stateAlias}.state_code)) = LOWER(TRIM($${startIndex}))
+    OR (
+      LOWER(TRIM($${startIndex})) = 'fct'
+      AND LOWER(TRIM(${stateAlias}.state_name)) = 'federal capital territory'
+    )
+  )`;
+
+  if (scope.level === 'lga') {
+    sql += ` AND LOWER(TRIM(${propertyAlias}.city)) = LOWER(TRIM($${startIndex + 1}))`;
+    params.push(scope.city);
+  }
+
+  return { sql, params };
+};
+
+const getScopedTransportationBooking = async (bookingId, user) => {
+  const scope = getTransportationAdminScope(user);
+  if (!scope.valid) return { scope, booking: null };
+
+  const scopeFilter = buildTransportationScopeSql(scope, 2);
+  const result = await db.query(
+    `SELECT
+       tb.*,
+       p.title AS property_title,
+       p.full_address AS property_address,
+       p.city AS property_city,
+       s.state_name AS property_state,
+       s.state_code AS property_state_code
+     FROM transportation_bookings tb
+     JOIN properties p ON p.id = tb.property_id
+     LEFT JOIN states s ON s.id = p.state_id
+     WHERE tb.id = $1
+     ${scopeFilter.sql}`,
+    [bookingId, ...scopeFilter.params]
+  );
+
+  return { scope, booking: result.rows[0] || null };
 };
 
 let transportationOperationsSchemaReady = false;
@@ -116,6 +231,12 @@ router.use(requireTransportationAdminAccess);
  */
 router.get('/dashboard', async (req, res) => {
   try {
+    const scope = getTransportationAdminScope(req.user);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
+    const scopeFilter = buildTransportationScopeSql(scope);
+
     const [
       overallStats,
       serviceStats,
@@ -128,21 +249,24 @@ router.get('/dashboard', async (req, res) => {
       db.query(`
         SELECT 
           COUNT(*) as total_bookings,
-          COUNT(CASE WHEN booking_status = 'pending' THEN 1 END) as pending_bookings,
-          COUNT(CASE WHEN booking_status = 'confirmed' THEN 1 END) as confirmed_bookings,
-          COUNT(CASE WHEN booking_status = 'in_progress' THEN 1 END) as in_progress_bookings,
-          COUNT(CASE WHEN booking_status = 'completed' THEN 1 END) as completed_bookings,
-          COUNT(CASE WHEN booking_status = 'cancelled' THEN 1 END) as cancelled_bookings,
-          COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) as pending_payments,
-          COUNT(CASE WHEN payment_status = 'completed' THEN 1 END) as completed_payments,
-          COUNT(CASE WHEN payment_status = 'failed' THEN 1 END) as failed_payments,
-          COALESCE(SUM(total_price), 0) as total_revenue,
-          COALESCE(AVG(total_price), 0) as avg_booking_value,
-          COUNT(DISTINCT tenant_id) as unique_tenants,
-          COUNT(DISTINCT property_id) as unique_properties
-        FROM transportation_bookings
-        WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-      `),
+          COUNT(CASE WHEN tb.booking_status = 'pending' THEN 1 END) as pending_bookings,
+          COUNT(CASE WHEN tb.booking_status = 'confirmed' THEN 1 END) as confirmed_bookings,
+          COUNT(CASE WHEN tb.booking_status = 'in_progress' THEN 1 END) as in_progress_bookings,
+          COUNT(CASE WHEN tb.booking_status = 'completed' THEN 1 END) as completed_bookings,
+          COUNT(CASE WHEN tb.booking_status = 'cancelled' THEN 1 END) as cancelled_bookings,
+          COUNT(CASE WHEN tb.payment_status = 'pending' THEN 1 END) as pending_payments,
+          COUNT(CASE WHEN tb.payment_status = 'completed' THEN 1 END) as completed_payments,
+          COUNT(CASE WHEN tb.payment_status = 'failed' THEN 1 END) as failed_payments,
+          COALESCE(SUM(tb.total_price), 0) as total_revenue,
+          COALESCE(AVG(tb.total_price), 0) as avg_booking_value,
+          COUNT(DISTINCT tb.tenant_id) as unique_tenants,
+          COUNT(DISTINCT tb.property_id) as unique_properties
+        FROM transportation_bookings tb
+        JOIN properties p ON p.id = tb.property_id
+        LEFT JOIN states s ON s.id = p.state_id
+        WHERE tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
+        ${scopeFilter.sql}
+      `, scopeFilter.params),
       
       // Service type statistics
       db.query(`
@@ -154,23 +278,29 @@ router.get('/dashboard', async (req, res) => {
           AVG(tb.total_price) as avg_price
         FROM transportation_bookings tb
         JOIN transportation_services ts ON tb.service_id = ts.id
+        JOIN properties p ON p.id = tb.property_id
+        LEFT JOIN states s ON s.id = p.state_id
         WHERE tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
+        ${scopeFilter.sql}
         GROUP BY ts.service_type, ts.service_name
         ORDER BY booking_count DESC
-      `),
+      `, scopeFilter.params),
       
       // Revenue statistics by date
       db.query(`
         SELECT 
-          DATE(created_at) as date,
+          DATE(tb.created_at) as date,
           COUNT(*) as booking_count,
-          COALESCE(SUM(total_price), 0) as daily_revenue
-        FROM transportation_bookings
-        WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
-          AND payment_status = 'completed'
-        GROUP BY DATE(created_at)
+          COALESCE(SUM(tb.total_price), 0) as daily_revenue
+        FROM transportation_bookings tb
+        JOIN properties p ON p.id = tb.property_id
+        LEFT JOIN states s ON s.id = p.state_id
+        WHERE tb.created_at >= CURRENT_DATE - INTERVAL '7 days'
+          AND tb.payment_status = 'completed'
+          ${scopeFilter.sql}
+        GROUP BY DATE(tb.created_at)
         ORDER BY date DESC
-      `),
+      `, scopeFilter.params),
       
       // Recent bookings
       db.query(`
@@ -184,10 +314,13 @@ router.get('/dashboard', async (req, res) => {
         FROM transportation_bookings tb
         JOIN transportation_services ts ON tb.service_id = ts.id
         JOIN properties p ON tb.property_id = p.id
+        LEFT JOIN states s ON s.id = p.state_id
         JOIN users u ON tb.tenant_id = u.id
+        WHERE 1=1
+          ${scopeFilter.sql}
         ORDER BY tb.created_at DESC
         LIMIT 10
-      `),
+      `, scopeFilter.params),
       
       // Top properties by transportation bookings
       db.query(`
@@ -202,10 +335,11 @@ router.get('/dashboard', async (req, res) => {
         JOIN properties p ON tb.property_id = p.id
         LEFT JOIN states s ON s.id = p.state_id
         WHERE tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
+          ${scopeFilter.sql}
         GROUP BY p.id, p.title, s.state_name, p.city
         ORDER BY booking_count DESC
         LIMIT 10
-      `),
+      `, scopeFilter.params),
       
       // Top tenants by transportation usage
       db.query(`
@@ -218,11 +352,14 @@ router.get('/dashboard', async (req, res) => {
           COALESCE(SUM(tb.total_price), 0) as total_spent
         FROM transportation_bookings tb
         JOIN users u ON tb.tenant_id = u.id
+        JOIN properties p ON p.id = tb.property_id
+        LEFT JOIN states s ON s.id = p.state_id
         WHERE tb.created_at >= CURRENT_DATE - INTERVAL '30 days'
+          ${scopeFilter.sql}
         GROUP BY u.id, u.full_name, u.email, u.phone
         ORDER BY booking_count DESC
         LIMIT 10
-      `)
+      `, scopeFilter.params)
     ]);
     
     res.json({
@@ -233,7 +370,12 @@ router.get('/dashboard', async (req, res) => {
         revenue_trends: revenueStats.rows,
         recent_bookings: recentBookings.rows,
         top_properties: topProperties.rows,
-        top_tenants: topTenants.rows
+        top_tenants: topTenants.rows,
+        scope: {
+          level: scope.level,
+          state: scope.state,
+          city: scope.city,
+        }
       }
     });
     
@@ -252,6 +394,11 @@ router.get('/dashboard', async (req, res) => {
 router.get('/bookings', async (req, res) => {
   try {
     await ensureTransportationOperationsSchema();
+    const scope = getTransportationAdminScope(req.user);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
+
     const {
       page = 1,
       limit = 20,
@@ -265,7 +412,10 @@ router.get('/bookings', async (req, res) => {
       tenant_id
     } = req.query;
     
-    const offset = (page - 1) * limit;
+    const parsedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+    const parsedLimit = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
+    const offset = (parsedPage - 1) * parsedLimit;
+    const scopeFilter = buildTransportationScopeSql(scope);
     
     let query = `
       SELECT 
@@ -282,8 +432,10 @@ router.get('/bookings', async (req, res) => {
       FROM transportation_bookings tb
       JOIN transportation_services ts ON tb.service_id = ts.id
       JOIN properties p ON tb.property_id = p.id
+      LEFT JOIN states s ON s.id = p.state_id
       JOIN users u ON tb.tenant_id = u.id
       WHERE 1=1
+      ${scopeFilter.sql}
     `;
     
     let countQuery = `
@@ -291,13 +443,15 @@ router.get('/bookings', async (req, res) => {
       FROM transportation_bookings tb
       JOIN transportation_services ts ON tb.service_id = ts.id
       JOIN properties p ON tb.property_id = p.id
+      LEFT JOIN states s ON s.id = p.state_id
       JOIN users u ON tb.tenant_id = u.id
       WHERE 1=1
+      ${scopeFilter.sql}
     `;
     
-    const params = [];
-    const countParams = [];
-    let paramCount = 1;
+    const params = [...scopeFilter.params];
+    const countParams = [...scopeFilter.params];
+    let paramCount = scopeFilter.params.length + 1;
     
     // Apply filters
     if (booking_status) {
@@ -380,7 +534,7 @@ router.get('/bookings', async (req, res) => {
     
     // Order and paginate
     query += ` ORDER BY tb.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
-    params.push(limit, offset);
+    params.push(parsedLimit, offset);
     
     const [result, countResult] = await Promise.all([
       db.query(query, params),
@@ -392,11 +546,16 @@ router.get('/bookings', async (req, res) => {
       data: {
         bookings: result.rows,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page: parsedPage,
+          limit: parsedLimit,
           total: parseInt(countResult.rows[0].total),
-          total_pages: Math.ceil(countResult.rows[0].total / limit)
-        }
+          total_pages: Math.ceil(countResult.rows[0].total / parsedLimit)
+        },
+        scope: {
+          level: scope.level,
+          state: scope.state,
+          city: scope.city,
+        },
       }
     });
     
@@ -416,6 +575,11 @@ router.get('/bookings/:bookingId', async (req, res) => {
   try {
     await ensureTransportationOperationsSchema();
     const { bookingId } = req.params;
+    const scope = getTransportationAdminScope(req.user);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
+    const scopeFilter = buildTransportationScopeSql(scope, 2);
     
     const result = await db.query(`
       SELECT 
@@ -441,10 +605,12 @@ router.get('/bookings/:bookingId', async (req, res) => {
       FROM transportation_bookings tb
       JOIN transportation_services ts ON tb.service_id = ts.id
       JOIN properties p ON tb.property_id = p.id
+      LEFT JOIN states s ON s.id = p.state_id
       JOIN users u ON tb.tenant_id = u.id
       JOIN users l ON p.landlord_id = l.id
       WHERE tb.id = $1
-    `, [bookingId]);
+      ${scopeFilter.sql}
+    `, [bookingId, ...scopeFilter.params]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -475,12 +641,12 @@ router.get('/bookings/:bookingId/operations', async (req, res) => {
     await ensureTransportationOperationsSchema();
     const { bookingId } = req.params;
 
-    const bookingResult = await db.query(
-      'SELECT id FROM transportation_bookings WHERE id = $1',
-      [bookingId]
-    );
+    const { scope, booking } = await getScopedTransportationBooking(bookingId, req.user);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
 
-    if (bookingResult.rows.length === 0) {
+    if (!booking) {
       return res.status(404).json({
         success: false,
         message: 'Transportation booking not found'
@@ -548,19 +714,18 @@ router.patch('/bookings/:bookingId/dispatch', [param('bookingId').isInt(), body(
       });
     }
 
-    const bookingResult = await db.query(
-      'SELECT * FROM transportation_bookings WHERE id = $1',
-      [bookingId]
-    );
+    const { scope, booking } = await getScopedTransportationBooking(bookingId, req.user);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
 
-    if (bookingResult.rows.length === 0) {
+    if (!booking) {
       return res.status(404).json({
         success: false,
         message: 'Transportation booking not found'
       });
     }
 
-    const booking = bookingResult.rows[0];
     const updates = ['updated_at = CURRENT_TIMESTAMP'];
     const params = [];
     let paramCount = 1;
@@ -708,19 +873,17 @@ router.patch('/bookings/:bookingId/status', [param('bookingId').isInt(), body('b
     }
     
     // Get current booking
-    const bookingResult = await db.query(
-      'SELECT * FROM transportation_bookings WHERE id = $1',
-      [bookingId]
-    );
+    const { scope, booking } = await getScopedTransportationBooking(bookingId, req.user);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
     
-    if (bookingResult.rows.length === 0) {
+    if (!booking) {
       return res.status(404).json({
         success: false,
         message: 'Transportation booking not found'
       });
     }
-    
-    const booking = bookingResult.rows[0];
     
     // Update booking status
     const updates = ['booking_status = $1', 'updated_at = CURRENT_TIMESTAMP'];
@@ -828,19 +991,17 @@ router.patch('/bookings/:bookingId/payment-status', [param('bookingId').isInt(),
     }
     
     // Get current booking
-    const bookingResult = await db.query(
-      'SELECT * FROM transportation_bookings WHERE id = $1',
-      [bookingId]
-    );
+    const { scope, booking } = await getScopedTransportationBooking(bookingId, req.user);
+    if (!scope.valid) {
+      return sendInvalidTransportationScope(res, scope);
+    }
     
-    if (bookingResult.rows.length === 0) {
+    if (!booking) {
       return res.status(404).json({
         success: false,
         message: 'Transportation booking not found'
       });
     }
-    
-    const booking = bookingResult.rows[0];
     
     // Update payment status
     const updates = ['payment_status = $1', 'updated_at = CURRENT_TIMESTAMP'];
@@ -1937,14 +2098,14 @@ router.get('/state-admin/dashboard', async (req, res) => {
       [adminId, admin.assigned_state]
     );
     
-    if (jurisdictionResult.rows.length === 0) {
-      return res.status(403).json({
-        success: false,
-        message: 'No transportation monitoring jurisdiction assigned'
-      });
-    }
-    
-    const jurisdiction = jurisdictionResult.rows[0];
+    const jurisdiction = jurisdictionResult.rows[0] || {
+      state_admin_id: adminId,
+      state: admin.assigned_state,
+      city: admin.assigned_city || null,
+      can_monitor_bookings: true,
+      can_view_analytics: true,
+      source: 'account_assignment',
+    };
     
     // Get state-specific transportation statistics
     const [stateStats, recentBookings, serviceStats, alerts] = await Promise.all([

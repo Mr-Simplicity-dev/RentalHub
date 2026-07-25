@@ -15,8 +15,122 @@ const FUMIGATION_ADMIN_ROLES = new Set([
   'super_fumigation_admin',
 ]);
 
+const LGA_FUMIGATION_ADMIN_ROLES = new Set([
+  'admin',
+  'lga_admin',
+  'fumigation_admin',
+  'lga_fumigation_admin',
+]);
+
+const STATE_FUMIGATION_ADMIN_ROLES = new Set([
+  'state_admin',
+  'state_financial_admin',
+  'state_fumigation_admin',
+]);
+
+const GLOBAL_FUMIGATION_ADMIN_ROLES = new Set([
+  'super_admin',
+  'super_fumigation_admin',
+]);
+
 const isFumigationAdminUser = (user) =>
   Boolean(user?.is_admin) || FUMIGATION_ADMIN_ROLES.has(String(user?.user_type || '').toLowerCase());
+
+const normalizeLocation = (value) => String(value || '').trim().toLowerCase();
+
+const normalizeState = (value) => {
+  const normalized = normalizeLocation(value);
+  return ['fct', 'federal capital territory'].includes(normalized)
+    ? 'fct'
+    : normalized;
+};
+
+const getFumigationAdminScope = (user) => {
+  const role = normalizeLocation(user?.user_type);
+  const state = String(user?.assigned_state || '').trim();
+  const city = String(user?.assigned_city || '').trim();
+
+  if (GLOBAL_FUMIGATION_ADMIN_ROLES.has(role)) {
+    return { valid: true, level: 'national', state: null, city: null };
+  }
+
+  if (LGA_FUMIGATION_ADMIN_ROLES.has(role)) {
+    if (!state || !city) {
+      return {
+        valid: false,
+        message:
+          'This LGA fumigation admin account has no complete state and LGA assignment. Ask a super admin to update its jurisdiction.',
+      };
+    }
+    return { valid: true, level: 'lga', state, city };
+  }
+
+  if (STATE_FUMIGATION_ADMIN_ROLES.has(role)) {
+    if (!state) {
+      return {
+        valid: false,
+        message:
+          'This state fumigation admin account has no assigned state. Ask a super admin to update its jurisdiction.',
+      };
+    }
+    return { valid: true, level: 'state', state, city: null };
+  }
+
+  return { valid: false, message: 'Fumigation admin access only' };
+};
+
+const sendInvalidScope = (res, scope) =>
+  res.status(403).json({
+    success: false,
+    message: scope?.message || 'No fumigation jurisdiction is assigned to this account.',
+  });
+
+const getScopedFilters = (query, scope) => {
+  const filters = { ...(query || {}) };
+
+  if (scope.state) {
+    filters.state = scope.state;
+  }
+  if (scope.level === 'lga') {
+    filters.city = scope.city;
+  }
+
+  return filters;
+};
+
+const bookingMatchesScope = (booking, scope) => {
+  if (scope.level === 'national') return true;
+
+  const bookingState = normalizeState(booking?.property_state);
+  const bookingStateCode = normalizeState(booking?.property_state_code);
+  const assignedState = normalizeState(scope.state);
+  const stateMatches =
+    assignedState &&
+    (assignedState === bookingState || assignedState === bookingStateCode);
+
+  if (!stateMatches) return false;
+  if (scope.level !== 'lga') return true;
+
+  return normalizeLocation(booking?.property_city) === normalizeLocation(scope.city);
+};
+
+const ensureBookingInAdminScope = (req, res, booking) => {
+  const scope = getFumigationAdminScope(req.user);
+  if (!scope.valid) {
+    sendInvalidScope(res, scope);
+    return false;
+  }
+
+  if (!bookingMatchesScope(booking, scope)) {
+    res.status(403).json({
+      success: false,
+      message: 'This booking is outside your assigned fumigation jurisdiction.',
+    });
+    return false;
+  }
+
+  return true;
+};
 
 const getActorName = (user) =>
   user?.full_name || user?.name || user?.email || user?.username || `User ${user?.id || ''}`.trim();
@@ -155,7 +269,7 @@ class FumigationCleaningController {
        WHERE p.id = $1`,
       [propertyId]
     );
-    return result.rows[0]?.state_code || 'LA'; // Default to Lagos if not found
+    return result.rows[0]?.state_code || null;
   }
 
   // Get review by booking ID (helper method)
@@ -938,12 +1052,22 @@ class FumigationCleaningController {
         });
       }
 
-      const filters = req.query;
+      const scope = getFumigationAdminScope(req.user);
+      if (!scope.valid) {
+        return sendInvalidScope(res, scope);
+      }
+
+      const filters = getScopedFilters(req.query, scope);
       const bookings = await FumigationCleaningService.getAllBookings(filters);
       
       res.json({
         success: true,
         data: bookings,
+        scope: {
+          level: scope.level,
+          state: scope.state,
+          city: scope.city,
+        },
         message: 'All bookings retrieved successfully'
       });
     } catch (error) {
@@ -966,12 +1090,24 @@ class FumigationCleaningController {
         });
       }
 
-      const filters = req.query;
+      const scope = getFumigationAdminScope(req.user);
+      if (!scope.valid) {
+        return sendInvalidScope(res, scope);
+      }
+
+      const filters = getScopedFilters(req.query, scope);
       const stats = await FumigationCleaningService.getAdminStats(filters);
       
       res.json({
         success: true,
-        data: stats,
+        data: {
+          ...stats,
+          scope: {
+            level: scope.level,
+            state: scope.state,
+            city: scope.city,
+          },
+        },
         message: 'Admin statistics retrieved successfully'
       });
     } catch (error) {
@@ -1013,6 +1149,10 @@ class FumigationCleaningController {
           success: false,
           message: 'Booking not found'
         });
+      }
+
+      if (!ensureBookingInAdminScope(req, res, booking)) {
+        return;
       }
 
       const updatedBooking = await FumigationCleaningService.updateBookingStatus(
@@ -1094,6 +1234,10 @@ class FumigationCleaningController {
           success: false,
           message: 'Booking not found'
         });
+      }
+
+      if (!ensureBookingInAdminScope(req, res, booking)) {
+        return;
       }
 
       // Check if provider is available for this service
@@ -1188,6 +1332,10 @@ class FumigationCleaningController {
         });
       }
 
+      if (!ensureBookingInAdminScope(req, res, booking)) {
+        return;
+      }
+
       const [assignment, operations] = await Promise.all([
         FumigationCleaningService.getLatestProviderAssignment(bookingId),
         FumigationCleaningService.getBookingOperations(bookingId)
@@ -1245,6 +1393,10 @@ class FumigationCleaningController {
           success: false,
           message: 'Booking not found'
         });
+      }
+
+      if (!ensureBookingInAdminScope(req, res, booking)) {
+        return;
       }
 
       const currentAssignment = await FumigationCleaningService.getLatestProviderAssignment(bookingId);
@@ -1336,6 +1488,10 @@ class FumigationCleaningController {
         });
       }
 
+      if (!ensureBookingInAdminScope(req, res, booking)) {
+        return;
+      }
+
       const propertyState = await this.getPropertyState(booking.property_id);
       const providers = await FumigationCleaningService.getAvailableProviders(
         booking.service_id,
@@ -1367,6 +1523,11 @@ class FumigationCleaningController {
         });
       }
 
+      const scope = getFumigationAdminScope(req.user);
+      if (!scope.valid) {
+        return sendInvalidScope(res, scope);
+      }
+
       const result = await db.query(
         `SELECT
            sp.*,
@@ -1375,13 +1536,36 @@ class FumigationCleaningController {
          FROM service_providers sp
          LEFT JOIN service_reviews sr ON sp.id = sr.provider_id
          WHERE sp.is_active = TRUE
+           AND (
+             $1::TEXT IS NULL
+             OR sp.service_areas ? COALESCE(
+               (
+                 SELECT state_code
+                 FROM states
+                 WHERE LOWER(TRIM(state_name)) = LOWER(TRIM($1))
+                   OR LOWER(TRIM(state_code)) = LOWER(TRIM($1))
+                   OR (
+                     LOWER(TRIM($1)) = 'fct'
+                     AND LOWER(TRIM(state_name)) = 'federal capital territory'
+                   )
+                 LIMIT 1
+               ),
+               $1
+             )
+           )
          GROUP BY sp.id
-         ORDER BY avg_rating DESC, sp.total_jobs_completed DESC, sp.company_name ASC`
+         ORDER BY avg_rating DESC, sp.total_jobs_completed DESC, sp.company_name ASC`,
+        [scope.state || null]
       );
 
       res.json({
         success: true,
         data: result.rows,
+        scope: {
+          level: scope.level,
+          state: scope.state,
+          city: scope.city,
+        },
         message: 'Providers retrieved successfully'
       });
     } catch (error) {
@@ -1454,7 +1638,7 @@ class FumigationCleaningController {
       }
 
       const { bookingId } = req.params;
-      const complianceData = req.body;
+      const complianceData = { ...req.body };
       
       complianceData.booking_id = bookingId;
       
@@ -1468,14 +1652,23 @@ class FumigationCleaningController {
         });
       }
 
-      if (!complianceData.provider_id) {
-        complianceData.provider_id = booking.provider_id;
+      if (!ensureBookingInAdminScope(req, res, booking)) {
+        return;
       }
 
-      if (!complianceData.provider_id) {
+      const assignment = await FumigationCleaningService.getLatestProviderAssignment(bookingId);
+
+      if (!assignment) {
         return res.status(400).json({
           success: false,
-          message: 'Provider ID is required'
+          message: 'Assign a provider before submitting safety compliance'
+        });
+      }
+
+      if (Number(complianceData.provider_id) !== Number(assignment.provider_id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'The selected provider is not assigned to this booking'
         });
       }
 
@@ -1527,6 +1720,10 @@ class FumigationCleaningController {
           success: false,
           message: 'Access denied'
         });
+      }
+
+      if (isAdmin && !ensureBookingInAdminScope(req, res, booking)) {
+        return;
       }
 
       const complianceRecord = await FumigationCleaningService.getComplianceRecord(bookingId);

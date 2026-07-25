@@ -254,6 +254,9 @@ class FumigationCleaningService {
         fcc.category_type,
         p.title as property_title,
         p.full_address as property_address,
+        p.city as property_city,
+        s.state_name as property_state,
+        s.state_code as property_state_code,
         p.property_type as property_type,
         p.bedrooms,
         p.bathrooms,
@@ -273,12 +276,13 @@ class FumigationCleaningService {
       JOIN fumigation_cleaning_services fcs ON fcb.service_id = fcs.id
       JOIN fumigation_cleaning_categories fcc ON fcs.category_id = fcc.id
       JOIN properties p ON fcb.property_id = p.id
+      LEFT JOIN states s ON s.id = p.state_id
       JOIN users u ON fcb.tenant_id = u.id
       LEFT JOIN service_addons sa ON sa.id = ANY(
         SELECT jsonb_array_elements_text(fcb.selected_addons)::integer
       )
       WHERE fcb.id = $1
-      GROUP BY fcb.id, fcs.id, fcc.id, p.id, u.id`,
+      GROUP BY fcb.id, fcs.id, fcc.id, p.id, s.id, u.id`,
       [bookingId]
     );
     return result.rows[0];
@@ -642,6 +646,10 @@ class FumigationCleaningService {
 
   // Get available service providers for a service
   static async getAvailableProviders(serviceId, stateCode) {
+    if (!stateCode) {
+      return [];
+    }
+
     const result = await db.query(
       `SELECT 
         sp.*,
@@ -650,8 +658,8 @@ class FumigationCleaningService {
        FROM service_providers sp
        LEFT JOIN service_reviews sr ON sp.id = sr.provider_id
        WHERE sp.is_active = TRUE
-         AND $1::integer = ANY(sp.services_offered)
-         AND $2::text = ANY(sp.service_areas)
+         AND sp.services_offered @> jsonb_build_array($1::integer)
+         AND sp.service_areas ? $2::text
        GROUP BY sp.id
        ORDER BY avg_rating DESC, sp.total_jobs_completed DESC`,
       [serviceId, stateCode]
@@ -907,7 +915,9 @@ class FumigationCleaningService {
       `SELECT scr.*, sp.company_name
        FROM safety_compliance_records scr
        JOIN service_providers sp ON scr.provider_id = sp.id
-       WHERE scr.booking_id = $1`,
+       WHERE scr.booking_id = $1
+       ORDER BY scr.created_at DESC, scr.id DESC
+       LIMIT 1`,
       [bookingId]
     );
     
@@ -927,6 +937,9 @@ class FumigationCleaningService {
         fcc.category_type,
         p.title as property_title,
         p.full_address as property_address,
+        p.city as property_city,
+        s.state_name as property_state,
+        s.state_code as property_state_code,
         u.full_name as tenant_name,
         u.email as tenant_email,
         u.phone as tenant_phone,
@@ -954,6 +967,7 @@ class FumigationCleaningService {
       JOIN fumigation_cleaning_services fcs ON fcb.service_id = fcs.id
       JOIN fumigation_cleaning_categories fcc ON fcs.category_id = fcc.id
       JOIN properties p ON fcb.property_id = p.id
+      LEFT JOIN states s ON s.id = p.state_id
       JOIN users u ON fcb.tenant_id = u.id
       LEFT JOIN LATERAL (
         SELECT *
@@ -991,6 +1005,23 @@ class FumigationCleaningService {
       query += ` AND fcc.category_type = $${params.length + 1}`;
       params.push(filters.service_type);
     }
+
+    if (filters.state) {
+      query += ` AND (
+        LOWER(TRIM(s.state_name)) = LOWER(TRIM($${params.length + 1}))
+        OR LOWER(TRIM(s.state_code)) = LOWER(TRIM($${params.length + 1}))
+        OR (
+          LOWER(TRIM($${params.length + 1})) = 'fct'
+          AND LOWER(TRIM(s.state_name)) = 'federal capital territory'
+        )
+      )`;
+      params.push(filters.state);
+    }
+
+    if (filters.city) {
+      query += ` AND LOWER(TRIM(p.city)) = LOWER(TRIM($${params.length + 1}))`;
+      params.push(filters.city);
+    }
     
     if (filters.search) {
       query += ` AND (
@@ -1022,27 +1053,102 @@ class FumigationCleaningService {
   static async getAdminStats(filters = {}) {
     let query = `
       SELECT 
-        COUNT(*) as total_bookings,
-        COUNT(CASE WHEN booking_status = 'completed' THEN 1 END) as completed_bookings,
-        COUNT(CASE WHEN booking_status = 'pending' THEN 1 END) as pending_bookings,
-        COUNT(CASE WHEN booking_status = 'cancelled' THEN 1 END) as cancelled_bookings,
-        COUNT(CASE WHEN payment_status = 'completed' THEN 1 END) as paid_bookings,
-        COALESCE(SUM(total_price), 0) as total_revenue,
-        COUNT(DISTINCT tenant_id) as unique_customers,
-        COUNT(DISTINCT service_id) as unique_services_booked
-      FROM fumigation_cleaning_bookings
+        COUNT(*)::INT AS total_bookings,
+        COUNT(*) FILTER (WHERE fcb.booking_status = 'completed')::INT AS completed_bookings,
+        COUNT(*) FILTER (WHERE fcb.booking_status = 'pending')::INT AS pending_bookings,
+        COUNT(*) FILTER (WHERE fcb.booking_status = 'cancelled')::INT AS cancelled_bookings,
+        COUNT(*) FILTER (WHERE fcb.payment_status = 'completed')::INT AS paid_bookings,
+        COALESCE(SUM(fcb.total_price), 0)::FLOAT8 AS total_revenue,
+        COUNT(DISTINCT fcb.tenant_id)::INT AS unique_customers,
+        COUNT(DISTINCT fcb.service_id)::INT AS unique_services_booked,
+        COUNT(DISTINCT NULLIF(TRIM(p.city), ''))::INT AS distinct_cities,
+        COALESCE(
+          ROUND(
+            100.0 * COUNT(*) FILTER (WHERE fcb.booking_status = 'completed')
+            / NULLIF(COUNT(*), 0),
+            1
+          ),
+          0
+        )::FLOAT8 AS completion_rate,
+        COALESCE(
+          ROUND(
+            100.0 * COUNT(*) FILTER (
+              WHERE fcb.booking_status = 'completed'
+                AND EXISTS (
+                  SELECT 1
+                  FROM safety_compliance_records scr
+                  WHERE scr.booking_id = fcb.id
+                    AND scr.safety_briefing_completed = TRUE
+                    AND scr.ppe_used = TRUE
+                    AND scr.area_secured = TRUE
+                    AND scr.warning_signs_posted = TRUE
+                    AND scr.ventilation_adequate = TRUE
+                    AND scr.msds_available = TRUE
+                    AND scr.proper_storage = TRUE
+                    AND scr.spill_kit_available = TRUE
+                    AND scr.waste_disposal_proper = TRUE
+                    AND scr.recycling_compliant = TRUE
+                )
+            )
+            / NULLIF(COUNT(*) FILTER (WHERE fcb.booking_status = 'completed'), 0),
+            1
+          ),
+          0
+        )::FLOAT8 AS compliance_rate,
+        (
+          SELECT COUNT(*)::INT
+          FROM service_providers sp
+          WHERE sp.is_active = TRUE
+            AND (
+              $1::TEXT IS NULL
+              OR sp.service_areas ? COALESCE(
+                (
+                  SELECT state_code
+                  FROM states
+                  WHERE LOWER(TRIM(state_name)) = LOWER(TRIM($1))
+                    OR LOWER(TRIM(state_code)) = LOWER(TRIM($1))
+                    OR (
+                      LOWER(TRIM($1)) = 'fct'
+                      AND LOWER(TRIM(state_name)) = 'federal capital territory'
+                    )
+                  LIMIT 1
+                ),
+                $1
+              )
+            )
+        ) AS active_providers
+      FROM fumigation_cleaning_bookings fcb
+      JOIN properties p ON p.id = fcb.property_id
+      LEFT JOIN states s ON s.id = p.state_id
       WHERE 1=1
     `;
-    const params = [];
+    const params = [filters.state || null];
     
     if (filters.start_date) {
-      query += ` AND booking_date >= $${params.length + 1}`;
+      query += ` AND fcb.booking_date >= $${params.length + 1}`;
       params.push(filters.start_date);
     }
     
     if (filters.end_date) {
-      query += ` AND booking_date <= $${params.length + 1}`;
+      query += ` AND fcb.booking_date <= $${params.length + 1}`;
       params.push(filters.end_date);
+    }
+
+    if (filters.state) {
+      query += ` AND (
+        LOWER(TRIM(s.state_name)) = LOWER(TRIM($${params.length + 1}))
+        OR LOWER(TRIM(s.state_code)) = LOWER(TRIM($${params.length + 1}))
+        OR (
+          LOWER(TRIM($${params.length + 1})) = 'fct'
+          AND LOWER(TRIM(s.state_name)) = 'federal capital territory'
+        )
+      )`;
+      params.push(filters.state);
+    }
+
+    if (filters.city) {
+      query += ` AND LOWER(TRIM(p.city)) = LOWER(TRIM($${params.length + 1}))`;
+      params.push(filters.city);
     }
     
     const result = await db.query(query, params);

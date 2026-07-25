@@ -46,64 +46,50 @@ export default function TransportationAdminStateDashboard() {
   const [analytics, setAnalytics] = useState(null);
 
   const loadDashboard = useCallback(async () => {
-    const response = await api.get('/transportation-admin/state-admin/dashboard');
-    setDashboard(response.data?.data || null);
+    try { const response = await api.get('/transportation-admin/state-admin/dashboard'); setDashboard(response.data?.data || null); }
+    catch (e) { console.error('Failed to load dashboard:', e); }
   }, []);
 
   const loadBookings = useCallback(async () => {
-    const response = await api.get('/transportation-admin/state-admin/bookings', {
-      params: { limit: 12 },
-    });
-    setBookings(response.data?.data?.bookings || []);
+    try { const response = await api.get('/transportation-admin/state-admin/bookings', { params: { limit: 12 } }); setBookings(response.data?.data?.bookings || []); }
+    catch (e) { console.error('Failed to load bookings:', e); }
   }, []);
 
   const loadServices = useCallback(async () => {
-    const response = await api.get('/transportation-admin/state-admin/services', {
-      params: { limit: 12 },
-    });
-    setServices(response.data?.data?.services || []);
+    try { const response = await api.get('/transportation-admin/state-admin/services', { params: { limit: 12 } }); setServices(response.data?.data?.services || []); }
+    catch (e) { console.error('Failed to load services:', e); }
   }, []);
 
   const loadAlerts = useCallback(async () => {
-    const response = await api.get('/transportation-admin/state-admin/alerts', {
-      params: { limit: 12, is_resolved: false },
-    });
-    setAlerts(response.data?.data?.alerts || []);
+    try { const response = await api.get('/transportation-admin/state-admin/alerts', { params: { limit: 12, is_resolved: false } }); setAlerts(response.data?.data?.alerts || []); }
+    catch (e) { console.error('Failed to load alerts:', e); }
   }, []);
 
   const loadJurisdiction = useCallback(async () => {
-    const response = await api.get('/transportation-admin/state-admin/jurisdiction');
-    setJurisdiction(response.data?.data?.jurisdiction || []);
+    try { const response = await api.get('/transportation-admin/state-admin/jurisdiction'); setJurisdiction(response.data?.data?.jurisdiction || []); }
+    catch (e) { console.error('Failed to load jurisdiction:', e); }
   }, []);
 
   const loadAnalytics = useCallback(async () => {
-    const response = await api.get('/transportation-admin/state-admin/analytics');
-    setAnalytics(response.data?.data || null);
+    try { const response = await api.get('/transportation-admin/state-admin/analytics'); setAnalytics(response.data?.data || null); }
+    catch (e) { console.error('Failed to load analytics:', e); }
   }, []);
 
   const loadPage = useCallback(async (showRefresh = false) => {
-    try {
-      if (showRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      setError('');
+    if (showRefresh) setRefreshing(true); else setLoading(true);
+    setError('');
 
-      await Promise.all([
-        loadDashboard(),
-        loadBookings(),
-        loadServices(),
-        loadAlerts(),
-        loadJurisdiction(),
-        loadAnalytics(),
-      ]);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load state transportation dashboard');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    await Promise.all([
+      loadDashboard(),
+      loadBookings(),
+      loadServices(),
+      loadAlerts(),
+      loadJurisdiction(),
+      loadAnalytics(),
+    ]);
+
+    setLoading(false);
+    setRefreshing(false);
   }, [loadAlerts, loadAnalytics, loadBookings, loadDashboard, loadJurisdiction, loadServices]);
 
   useEffect(() => {

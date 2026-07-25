@@ -26,8 +26,14 @@ const getAuditLogs = async (req, res) => {
 // specifically filtering to show actions performed by admin users.
 const getAdminMonitor = async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 100, 200);
-    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const requestedOffset = Number.parseInt(req.query.offset, 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(requestedLimit, 200))
+      : 100;
+    const offset = Number.isFinite(requestedOffset)
+      ? Math.max(requestedOffset, 0)
+      : 0;
 
     // Admin user types we want to monitor
     const adminTypes = [
@@ -35,7 +41,9 @@ const getAdminMonitor = async (req, res) => {
       'financial_admin', 'lga_financial_admin', 'super_financial_admin',
       'state_admin', 'state_financial_admin',
       'lga_support_admin', 'state_support_admin', 'super_support_admin',
-      'recruitment_admin',
+      'recruitment_admin',
+
+      'state_lawyer', 'super_lawyer', 'state_lawyer_admin', 'super_lawyer_admin',
       'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin',
       'transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin',
     ];

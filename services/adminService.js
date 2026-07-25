@@ -750,6 +750,7 @@ exports.getPendingVerifications = async (req, res) => {
 
     const {
       search = '',
+      status = '',
       page = 1,
       limit = 20,
     } = req.query;
@@ -793,6 +794,18 @@ exports.getPendingVerifications = async (req, res) => {
       )`);
       params.push(`%${search}%`);
       i++;
+    }
+
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    if (normalizedStatus === 'approved') {
+      where.push('p.is_verified = TRUE');
+    } else if (normalizedStatus === 'pending') {
+      where.push(`p.is_verified = FALSE AND COALESCE(LOWER(p.status), '') <> 'rejected'`);
+    } else if (normalizedStatus === 'rejected') {
+      where.push(`COALESCE(LOWER(p.status), '') = 'rejected'`);
+    } else if (normalizedStatus) {
+      where.push(`LOWER(p.status) = LOWER($${i++})`);
+      params.push(normalizedStatus);
     }
 
     if (assignedState) {
@@ -1145,11 +1158,17 @@ exports.getAllProperties = async (req, res) => {
         p.title,
         p.rent_amount,
         p.status,
+        CASE
+          WHEN p.is_verified = TRUE THEN 'approved'
+          WHEN COALESCE(LOWER(p.status), '') = 'rejected' THEN 'rejected'
+          ELSE 'pending'
+        END AS approval_status,
         p.is_available,
         p.featured,
         p.created_at,
         p.city,
         s.state_name AS state,
+        s.state_name AS state_name,
         u.full_name AS landlord_name
       FROM properties p
       LEFT JOIN users u ON p.user_id = u.id
@@ -1218,11 +1237,19 @@ exports.getPendingProperties = async (req, res) => {
     const result = await db.query(
       `SELECT 
          p.*, 
+         CASE
+           WHEN p.is_verified = TRUE THEN 'approved'
+           WHEN COALESCE(LOWER(p.status), '') = 'rejected' THEN 'rejected'
+           ELSE 'pending'
+         END AS approval_status,
          u.full_name AS landlord_name,
-         u.email AS landlord_email
+         u.email AS landlord_email,
+         s.state_name AS state_name
        FROM properties p
        LEFT JOIN users u ON p.landlord_id = u.id
+       LEFT JOIN states s ON s.id = p.state_id
        WHERE p.is_verified = FALSE
+         AND COALESCE(LOWER(p.status), '') <> 'rejected'
          AND p.deleted_at IS NULL
          ${stateClause}
        ORDER BY p.created_at DESC`,
@@ -2060,9 +2087,10 @@ exports.approveApplication = async (req, res) => {
       queryParams.push(assignedState);
       stateCheck += `AND EXISTS (
            SELECT 1
-           FROM properties p
-           WHERE p.id = applications.property_id
-             AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${stateIdx}))
+         FROM properties p
+         LEFT JOIN states s ON s.id = p.state_id
+         WHERE p.id = applications.property_id
+           AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${stateIdx}))
          )`;
     }
 
@@ -2149,9 +2177,10 @@ exports.rejectApplication = async (req, res) => {
       queryParams.push(assignedState);
       stateCheck += `AND EXISTS (
            SELECT 1
-           FROM properties p
-           WHERE p.id = applications.property_id
-             AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${stateIdx}))
+         FROM properties p
+         LEFT JOIN states s ON s.id = p.state_id
+         WHERE p.id = applications.property_id
+           AND LOWER(TRIM(s.state_name)) = LOWER(TRIM($${stateIdx}))
          )`;
     }
 
@@ -2309,6 +2338,8 @@ exports.createAdmin = async (req, res) => {
       'lga_financial_admin',
       'lga_transportation_admin',
       'lga_fumigation_admin',
+      'fumigation_admin',
+      'transportation_admin',
       'state_admin',
       'state_financial_admin',
       'state_support_admin',
@@ -2402,7 +2433,7 @@ exports.createAdmin = async (req, res) => {
       }
     }
 
-    if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(user_type) && !normalizedCity) {
+    if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(user_type) && !normalizedCity) {
       return res.status(400).json({
         success: false,
         message: 'Assigned local government is required for this LGA role',
@@ -2478,7 +2509,7 @@ exports.createAdmin = async (req, res) => {
         normalizedFullName,
         normalizedNin || null,
         canonicalAssignedState || null,
-        ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(user_type) ? normalizedCity : null,
+        ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(user_type) ? normalizedCity : null,
         normalizedLawyerScope,
         pendingApproval ? 'pending' : 'approved',
         user_type === 'recruitment_admin',

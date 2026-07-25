@@ -73,7 +73,7 @@ const SuperFinancialAdminDashboard = () => {
 
     const boot = async () => {
       try {
-        const [statsRes, transactionsRes, frozenRes, performanceRes, withdrawalsRes] = await Promise.all([
+        const results = await Promise.allSettled([
           api.get('/financial-admin/stats/realtime'),
           api.get('/financial-admin/transactions?limit=20&page=1'),
           api.get('/financial-admin/funds/frozen'),
@@ -83,11 +83,20 @@ const SuperFinancialAdminDashboard = () => {
 
         if (!active) return;
 
-        setStats(statsRes?.data?.data || null);
-        setRecentTransactions(transactionsRes?.data?.data || []);
-        setFrozenFunds(frozenRes?.data?.data || []);
-        setStatePerformance(performanceRes?.data?.data?.admin_performance || performanceRes?.data?.data || []);
-        setWithdrawals(withdrawalsRes?.data?.data || []);
+        if (results[0].status === 'fulfilled') setStats(results[0].value?.data?.data || null);
+        else console.error('Failed to load stats:', results[0].reason);
+
+        if (results[1].status === 'fulfilled') setRecentTransactions(results[1].value?.data?.data || []);
+        else console.error('Failed to load transactions:', results[1].reason);
+
+        if (results[2].status === 'fulfilled') setFrozenFunds(results[2].value?.data?.data || []);
+        else console.error('Failed to load frozen funds:', results[2].reason);
+
+        if (results[3].status === 'fulfilled') setStatePerformance(results[3].value?.data?.data || []);
+        else console.error('Failed to load state performance:', results[3].reason);
+
+        if (results[4].status === 'fulfilled') setWithdrawals(results[4].value?.data?.data || []);
+        else console.error('Failed to load withdrawals:', results[4].reason);
       } catch (error) {
         console.error('Super financial dashboard init error:', error);
         const status = error?.response?.status;

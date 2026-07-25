@@ -795,12 +795,21 @@ const handleServerStartupError = (err) => {
 const server = http.createServer(app);
 
 server.once('error', handleServerStartupError);
-server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-  ensureStartupSchema().then(() => startBackgroundServices()).catch((err) => {
-    logger.error('Startup schema migration failed:', err.message);
-    startBackgroundServices();
+
+const startServer = () => {
+  server.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+    if (process.send) process.send('ready');
   });
+};
+
+ensureStartupSchema().then(() => {
+  startServer();
+  startBackgroundServices();
+}).catch((err) => {
+  logger.error('Startup schema migration failed:', err.message);
+  startServer();
+  startBackgroundServices();
 });
 
 // Graceful shutdown — drain connections, stop jobs, close DB

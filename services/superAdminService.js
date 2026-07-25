@@ -434,7 +434,16 @@ const impersonateAdmin = async (req, res) => {
       redirect_path: getDashboardPathForRole(target.user_type),
     };
 
-    if (shouldReturnTokenInBody()) {
+    const isNativeClient =
+      String(
+        req.headers?.['x-rentalhub-client'] ||
+          req.headers?.['x-client-platform'] ||
+          ''
+      ).toLowerCase() === 'native';
+    const usesBearerAuthentication =
+      /^Bearer\s+\S+/i.test(String(req.headers?.authorization || ''));
+
+    if (shouldReturnTokenInBody() || (isNativeClient && usesBearerAuthentication)) {
       responseData.token = impersonationToken;
     }
 
@@ -1322,6 +1331,8 @@ const updateAdminJurisdiction = async (req, res) => {
       'lga_financial_admin',
       'lga_transportation_admin',
       'lga_fumigation_admin',
+      'fumigation_admin',
+      'transportation_admin',
       'state_admin',
       'state_financial_admin',
       'state_support_admin',
@@ -1338,7 +1349,7 @@ const updateAdminJurisdiction = async (req, res) => {
       });
     }
 
-    if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) && !normalizedCity) {
+    if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(targetRole) && !normalizedCity) {
       return res.status(400).json({
         success: false,
         message: 'Assigned local government is required for this LGA role',
@@ -1356,7 +1367,7 @@ const updateAdminJurisdiction = async (req, res) => {
       [
         adminId,
         normalizedState || null,
-        ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) ? normalizedCity : null,
+        ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(targetRole) ? normalizedCity : null,
       ]
     );
 
@@ -1631,8 +1642,14 @@ const getAuditLogs = async (req, res) => {
 // specifically filtering to show actions performed by admin users.
 const getAdminMonitor = async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 100, 200);
-    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const requestedOffset = Number.parseInt(req.query.offset, 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(requestedLimit, 200))
+      : 100;
+    const offset = Number.isFinite(requestedOffset)
+      ? Math.max(requestedOffset, 0)
+      : 0;
 
     // Admin user types we want to monitor
     const adminTypes = [
@@ -1641,6 +1658,7 @@ const getAdminMonitor = async (req, res) => {
       'state_admin', 'state_financial_admin',
       'lga_support_admin', 'state_support_admin', 'super_support_admin',
       'recruitment_admin',
+      'state_lawyer', 'super_lawyer', 'state_lawyer_admin', 'super_lawyer_admin',
       'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin',
       'transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin',
     ];

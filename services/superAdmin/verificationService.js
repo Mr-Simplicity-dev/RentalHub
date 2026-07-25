@@ -590,10 +590,12 @@ const updateAdminJurisdiction = async (req, res) => {
       'admin',
       'lga_admin',
       'lga_support_admin',
-      'lga_financial_admin',
-      'lga_transportation_admin',
-      'lga_fumigation_admin',
-      'state_admin',
+      'lga_financial_admin',
+      'lga_transportation_admin',
+      'lga_fumigation_admin',
+      'fumigation_admin',
+      'transportation_admin',
+      'state_admin',
       'state_financial_admin',
       'state_support_admin',
       'state_lawyer',
@@ -609,7 +611,7 @@ const updateAdminJurisdiction = async (req, res) => {
       });
     }
 
-    if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) && !normalizedCity) {
+    if (['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(targetRole) && !normalizedCity) {
       return res.status(400).json({
         success: false,
         message: 'Assigned local government is required for this LGA role',
@@ -627,7 +629,7 @@ const updateAdminJurisdiction = async (req, res) => {
       [
         adminId,
         normalizedState || null,
-        ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(targetRole) ? normalizedCity : null,
+        ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(targetRole) ? normalizedCity : null,
       ]
     );
 
