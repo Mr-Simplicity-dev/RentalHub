@@ -106,17 +106,24 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
     try {
       setLoading(true);
       
-      const [dashboardRes, transactionsRes, usersRes, withdrawalsRes] = await Promise.all([
+      const results = await Promise.allSettled([
         api.get('/state-admin/dashboard'),
         api.get('/state-admin/transactions?limit=10'),
         api.get('/state-admin/managed-users?limit=10'),
         api.get('/state-admin/withdrawals')
       ]);
 
-      setDashboardData(dashboardRes.data.data);
-      setTransactions(transactionsRes.data.data?.recent_transactions || []);
-      setManagedUsers(usersRes.data.data?.users || []);
-      setWithdrawals(withdrawalsRes.data.data?.withdrawals || []);
+      if (results[0].status === 'fulfilled') setDashboardData(results[0].value.data.data);
+      else console.error('Failed to load dashboard data:', results[0].reason);
+
+      if (results[1].status === 'fulfilled') setTransactions(results[1].value.data.data?.recent_transactions || []);
+      else console.error('Failed to load transactions:', results[1].reason);
+
+      if (results[2].status === 'fulfilled') setManagedUsers(results[2].value.data.data?.users || []);
+      else console.error('Failed to load managed users:', results[2].reason);
+
+      if (results[3].status === 'fulfilled') setWithdrawals(results[3].value.data.data?.withdrawals || []);
+      else console.error('Failed to load withdrawals:', results[3].reason);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to fetch dashboard data');

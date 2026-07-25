@@ -41,14 +41,20 @@ const TENANCY_ADMIN_ROLES = new Set([
   'lga_admin',
   'lga_support_admin',
   'state_admin',
+  'state_financial_admin',
   'state_support_admin',
   'super_support_admin',
   'super_admin',
 ]);
 const TENANCY_LGA_ADMIN_ROLES = new Set(['admin', 'lga_admin', 'lga_support_admin']);
-const TENANCY_STATE_ADMIN_ROLES = new Set(['state_admin', 'state_support_admin']);
+const TENANCY_STATE_ADMIN_ROLES = new Set([
+  'state_admin',
+  'state_financial_admin',
+  'state_support_admin',
+]);
 const TENANCY_SUPER_ADMIN_ROLES = new Set(['super_admin', 'super_support_admin']);
-const TENANCY_HIERARCHY_LABEL = 'LGA admin/support, state admin/support, or super admin';
+const TENANCY_HIERARCHY_LABEL =
+  'LGA admin/support, state admin/financial/support, or super admin';
 const EARLY_EXIT_REASONS = new Set([
   'relocation_transfer_migration',
   'transfer_relocation',

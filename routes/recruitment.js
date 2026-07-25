@@ -13,6 +13,18 @@ const {
   recruitmentInterviewLimiter,
 } = require('../config/middleware/securityRateLimiters');
 
+const requireRecruitmentAdmin = (req, res, next) => {
+  const role = String(req.user?.user_type || '').trim().toLowerCase();
+  if (role === 'recruitment_admin' || req.user?.is_recruitment_admin === true) {
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    message: 'Recruitment administrator access required',
+  });
+};
+
 // Multer config for document uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -137,6 +149,8 @@ router.post('/interview/recording',
   validateRequest, recordingUpload.single('recording'), recruitmentController.uploadInterviewRecording);
 
 // ==================== ADMIN ROUTES ====================
+
+router.use('/admin', authenticate, requireRecruitmentAdmin);
 
 // Master toggle
 router.put('/admin/settings/toggle', authenticate, [body('is_active').isBoolean()], validateRequest, recruitmentController.toggleRecruitment);

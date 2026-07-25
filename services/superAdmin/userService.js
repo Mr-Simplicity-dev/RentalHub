@@ -186,7 +186,16 @@ const impersonateAdmin = async (req, res) => {
       redirect_path: getDashboardPathForRole(target.user_type),
     };
 
-    if (shouldReturnTokenInBody()) {
+    const isNativeClient =
+      String(
+        req.headers?.['x-rentalhub-client'] ||
+          req.headers?.['x-client-platform'] ||
+          ''
+      ).toLowerCase() === 'native';
+    const usesBearerAuthentication =
+      /^Bearer\s+\S+/i.test(String(req.headers?.authorization || ''));
+
+    if (shouldReturnTokenInBody() || (isNativeClient && usesBearerAuthentication)) {
       responseData.token = impersonationToken;
     }
 

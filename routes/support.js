@@ -415,6 +415,38 @@ const requireSupportAdmin = (req, res, next) => {
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
 
+const resolveSupportDashboardScope = (user = {}) => {
+  const role = normalizeText(user.user_type || user.userType);
+  const assignedState = String(user.assigned_state || '').trim();
+  const assignedCity = String(user.assigned_city || '').trim();
+
+  if (role === 'super_admin' || role === 'super_support_admin') {
+    return { level: 'super', assignedState: null, assignedCity: null };
+  }
+
+  if (role === 'state_support_admin') {
+    if (!assignedState) {
+      const error = new Error('State support account is missing assigned_state');
+      error.statusCode = 403;
+      throw error;
+    }
+    return { level: 'state', assignedState, assignedCity: null };
+  }
+
+  if (role === 'lga_support_admin') {
+    if (!assignedState || !assignedCity) {
+      const error = new Error('LGA support account is missing assigned state or local government');
+      error.statusCode = 403;
+      throw error;
+    }
+    return { level: 'lga', assignedState, assignedCity };
+  }
+
+  const error = new Error('Support admin access required');
+  error.statusCode = 403;
+  throw error;
+};
+
 const normalizeSupportCategory = (value, relatedType) => {
   const normalized = normalizeText(value).replace(/-/g, '_');
   if (SUPPORT_TICKET_CATEGORIES.has(normalized)) return normalized;
@@ -3269,22 +3301,24 @@ router.patch('/admin-pool/:userId/lead', authenticate, requireSupportAdmin, [
 
 router.get('/admin/dashboard', authenticate, requireSupportAdmin, async (req, res) => {
   try {
-    const level = String(req.query.level || 'lga').toLowerCase();
-    let stateFilter = '';
-    let lgaFilter = '';
+    const scope = resolveSupportDashboardScope(req.user);
     const params = [];
-    let paramIdx = 0;
+    const scopeClauses = [];
 
-    if (level === 'lga' && req.user.assigned_state && req.user.assigned_city) {
-      paramIdx++; params.push(req.user.assigned_state); stateFilter = ` AND st.state = $${paramIdx}`;
-      paramIdx++; params.push(req.user.assigned_city); lgaFilter = ` AND st.lga = $${paramIdx}`;
-    } else if (level === 'state' && req.user.assigned_state) {
-      paramIdx++; params.push(req.user.assigned_state); stateFilter = ` AND st.state = $${paramIdx}`;
+    if (scope.assignedState) {
+      params.push(scope.assignedState);
+      scopeClauses.push(
+        `LOWER(TRIM(st.state)) = LOWER(TRIM($${params.length}))`
+      );
+    }
+    if (scope.assignedCity) {
+      params.push(scope.assignedCity);
+      scopeClauses.push(
+        `LOWER(TRIM(st.lga)) = LOWER(TRIM($${params.length}))`
+      );
     }
 
-    const scopeClause = stateFilter + lgaFilter;
-    const role = String(req.user.user_type || '').toLowerCase();
-    if (role === 'super_support_admin' || role === 'super_admin') {
+    if (scope.level === 'super') {
       const result = await db.query(`
         SELECT
           COUNT(*) FILTER (WHERE st.status = 'open') AS open_tickets,
@@ -3301,6 +3335,7 @@ router.get('/admin/dashboard', authenticate, requireSupportAdmin, async (req, re
       `);
       return res.json({
         success: true,
+        level: scope.level,
         dashboard: {
           open_tickets: Number(result.rows[0]?.open_tickets || 0),
           in_progress_tickets: Number(result.rows[0]?.in_progress_tickets || 0),
@@ -3319,20 +3354,31 @@ router.get('/admin/dashboard', authenticate, requireSupportAdmin, async (req, re
         COUNT(*) FILTER (WHERE st.status = 'resolved') AS closed_tickets,
         COUNT(*) FILTER (WHERE st.escalation_status <> 'none') AS escalated_tickets,
         ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(st.resolved_at, CURRENT_TIMESTAMP) - st.created_at))/3600)::numeric, 1) AS avg_response_hours
-      FROM support_tickets st
-      WHERE (st.assigned_to = $${paramIdx + 1} OR 1=1)${scopeClause}
-    `, [...params, req.user.id]);
+       FROM support_tickets st
+       WHERE ${scopeClauses.join(' AND ')}
+    `, params);
 
-    const poolResult = await db.query(`
-      SELECT COUNT(*)::int AS pool_admins FROM users
-      WHERE user_type IN ('lga_support_admin','state_support_admin')
-        ${req.user.assigned_state ? `AND assigned_state = $1` : ''}
-        ${req.user.assigned_city ? `AND assigned_city = $2` : ''}
-        AND deleted_at IS NULL AND account_suspended_at IS NULL
-    `, [req.user.assigned_state, req.user.assigned_city].filter(Boolean));
+    const poolParams = [scope.assignedState];
+    const poolClauses = [
+      `LOWER(TRIM(assigned_state)) = LOWER(TRIM($1))`,
+    ];
+    if (scope.assignedCity) {
+      poolParams.push(scope.assignedCity);
+      poolClauses.push(`LOWER(TRIM(assigned_city)) = LOWER(TRIM($2))`);
+    }
+    const poolResult = await db.query(
+      `SELECT COUNT(*)::int AS pool_admins
+       FROM users
+       WHERE user_type IN ('lga_support_admin','state_support_admin')
+         AND ${poolClauses.join(' AND ')}
+         AND deleted_at IS NULL
+         AND account_suspended_at IS NULL`,
+      poolParams
+    );
 
     res.json({
       success: true,
+      level: scope.level,
       dashboard: {
         open_tickets: Number(result.rows[0]?.open_tickets || 0),
         in_progress_tickets: Number(result.rows[0]?.in_progress_tickets || 0),
@@ -3344,7 +3390,10 @@ router.get('/admin/dashboard', authenticate, requireSupportAdmin, async (req, re
     });
   } catch (error) {
     req.logger.error('Admin dashboard error:', error);
-    res.status(500).json({ success: false, message: 'Failed to load dashboard' });
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to load dashboard',
+    });
   }
 });
 
@@ -3357,6 +3406,7 @@ router._supportScopeForTest = {
   resolveSlaDueAt,
   departmentsForUser,
   canAccessDepartmentEscalation,
+  resolveSupportDashboardScope,
   getRelatedAdminPath,
   getDepartmentEscalationPath,
   getSupportPolicySettings,

@@ -56,70 +56,50 @@ export default function TransportationSuperAdminDashboard() {
   const [assignmentForm, setAssignmentForm] = useState(defaultAssignmentForm);
 
   const loadDashboard = useCallback(async () => {
-    const response = await api.get('/transportation-admin/super-admin/dashboard');
-    setDashboard(response.data?.data || null);
+    try { const response = await api.get('/transportation-admin/super-admin/dashboard'); setDashboard(response.data?.data || null); }
+    catch (e) { console.error('Failed to load dashboard:', e); }
   }, []);
 
   const loadStateAdmins = useCallback(async () => {
-    const response = await api.get('/transportation-admin/super-admin/state-admins', {
-      params: { limit: 50 },
-    });
-    setStateAdmins(response.data?.data?.state_admins || []);
+    try { const response = await api.get('/transportation-admin/super-admin/state-admins', { params: { limit: 50 } }); setStateAdmins(response.data?.data?.state_admins || []); }
+    catch (e) { console.error('Failed to load state admins:', e); }
   }, []);
 
   const loadAlerts = useCallback(async () => {
-    const response = await api.get('/transportation-admin/super-admin/alerts', {
-      params: { limit: 12, is_resolved: false },
-    });
-    setAlerts(response.data?.data?.alerts || []);
+    try { const response = await api.get('/transportation-admin/super-admin/alerts', { params: { limit: 12, is_resolved: false } }); setAlerts(response.data?.data?.alerts || []); }
+    catch (e) { console.error('Failed to load alerts:', e); }
   }, []);
 
   const loadSystemHealth = useCallback(async () => {
-    const response = await api.get('/transportation-admin/super-admin/system-health', {
-      params: { days: 30 },
-    });
-    setSystemHealth(response.data?.data || null);
+    try { const response = await api.get('/transportation-admin/super-admin/system-health', { params: { days: 30 } }); setSystemHealth(response.data?.data || null); }
+    catch (e) { console.error('Failed to load system health:', e); }
   }, []);
 
   const loadMetrics = useCallback(async () => {
-    const response = await api.get('/transportation-admin/super-admin/performance-metrics', {
-      params: { limit: 20 },
-    });
-    setMetrics(response.data?.data?.metrics || []);
+    try { const response = await api.get('/transportation-admin/super-admin/performance-metrics', { params: { limit: 20 } }); setMetrics(response.data?.data?.metrics || []); }
+    catch (e) { console.error('Failed to load metrics:', e); }
   }, []);
 
   const loadCandidates = useCallback(async () => {
-    const response = await api.get('/admin/users');
-    const users = response.data?.data?.users || response.data?.data || [];
-    const candidates = Array.isArray(users)
-      ? users.filter((user) => STATE_ADMIN_USER_TYPES.includes(user.user_type))
-      : [];
-    setCandidateAdmins(candidates);
+    try { const response = await api.get('/admin/users'); const users = response.data?.data?.users || response.data?.data || []; const candidates = Array.isArray(users) ? users.filter((user) => STATE_ADMIN_USER_TYPES.includes(user.user_type)) : []; setCandidateAdmins(candidates); }
+    catch (e) { console.error('Failed to load candidates:', e); }
   }, []);
 
   const loadPage = useCallback(async (showRefresh = false) => {
-    try {
-      if (showRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      setError('');
+    if (showRefresh) setRefreshing(true); else setLoading(true);
+    setError('');
 
-      await Promise.all([
-        loadDashboard(),
-        loadStateAdmins(),
-        loadAlerts(),
-        loadSystemHealth(),
-        loadMetrics(),
-        loadCandidates(),
-      ]);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load transportation super admin dashboard');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    await Promise.all([
+      loadDashboard(),
+      loadStateAdmins(),
+      loadAlerts(),
+      loadSystemHealth(),
+      loadMetrics(),
+      loadCandidates(),
+    ]);
+
+    setLoading(false);
+    setRefreshing(false);
   }, [loadAlerts, loadCandidates, loadDashboard, loadMetrics, loadStateAdmins, loadSystemHealth]);
 
   useEffect(() => {

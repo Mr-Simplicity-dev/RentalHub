@@ -226,7 +226,13 @@ exports.getDisputeDetails = async (req, res) => {
 
     const dispute = disputeResult.rows[0];
 
-    const canViewAllCaseNotes = ['lawyer', 'admin', 'super_admin'].includes(req.user?.user_type);
+    const canViewAllCaseNotes = [
+      'lawyer',
+      'state_lawyer',
+      'super_lawyer',
+      'admin',
+      'super_admin',
+    ].includes(req.user?.user_type);
 
     const [messagesResult, evidenceResult, auditResult, lawyerResult, caseNotesResult] = await Promise.all([
       db.query(
@@ -296,9 +302,6 @@ exports.getDisputeDetails = async (req, res) => {
            )`,
         [dispute.property_id, dispute.opened_by, dispute.against_user]
       ),
-    ]);
-
-    const timeline = [
       db.query(
         `SELECT
            lcn.id,
@@ -317,6 +320,9 @@ exports.getDisputeDetails = async (req, res) => {
          ORDER BY lcn.updated_at DESC, lcn.id DESC`,
         [disputeId, canViewAllCaseNotes]
       ),
+    ]);
+
+    const timeline = [
       dispute.created_at
         ? {
             type: 'dispute_created',

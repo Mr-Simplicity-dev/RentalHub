@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const db = require('./database');
+const { statesMatch } = require('../utils/stateScope');
 
 exports.canAccessDispute = async (req, res, next) => {
   try {
@@ -9,7 +10,10 @@ exports.canAccessDispute = async (req, res, next) => {
 
     if (lawyerRoles.includes(req.user.user_type)) {
       const lawyerAccess = await db.query(
-        `SELECT d.id
+        `SELECT
+           d.id,
+           u.assigned_state AS lawyer_assigned_state,
+           s.state_name AS property_state
          FROM disputes d
          JOIN legal_authorizations la
            ON la.status = 'active'
@@ -19,14 +23,22 @@ exports.canAccessDispute = async (req, res, next) => {
             OR (
               la.property_id IS NULL
               AND la.client_user_id IN (d.opened_by, d.against_user)
-            )
-          )
+             )
+           )
+         JOIN users u ON u.id = la.lawyer_user_id
+         JOIN properties p ON p.id = d.property_id
+         LEFT JOIN states s ON s.id = p.state_id
          WHERE d.id = $1
          LIMIT 1`,
         [disputeId, userId]
       );
 
-      if (lawyerAccess.rows.length > 0) {
+      const access = lawyerAccess.rows[0];
+      if (
+        access
+        && access.lawyer_assigned_state
+        && statesMatch(access.lawyer_assigned_state, access.property_state)
+      ) {
         return next();
       }
     }

@@ -114,11 +114,7 @@ const FinancialAdminDashboard = () => {
           return;
         }
 
-        if (me.user_type === 'lga_financial_admin') {
-          await fetchLgaFinanceData();
-        } else {
-          await fetchDashboardData();
-        }
+        await fetchLgaFinanceData();
       } catch (error) {
         navigate('/login');
       }
