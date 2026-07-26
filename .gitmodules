@@ -1,0 +1,3 @@
+[submodule "RentalHubMobile"]
+	path = RentalHubMobile
+	url = https://github.com/Mr-Simplicity-dev/RentalHubApp.git
