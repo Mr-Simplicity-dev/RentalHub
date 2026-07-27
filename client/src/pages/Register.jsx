@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
@@ -7,6 +7,7 @@ import api from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
+import TurnstileWidget from '../components/common/TurnstileWidget';
 import { setAuthSession } from '../services/authStorage';
 import { getStoredUtm } from '../hooks/useUtmParams';
 import { useTranslation } from 'react-i18next';
@@ -98,6 +99,7 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showRegistrationFeeModal, setShowRegistrationFeeModal] = useState(!registrationReference);
   const [premblyPending, setPremblyPending] = useState(null);
+  const [turnstileToken, setTurnstileToken] = useState(null);
   const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -502,6 +504,11 @@ const Register = () => {
     return;
   }
 
+  if (!turnstileToken && process.env.REACT_APP_TURNSTILE_SITE_KEY) {
+    toast.error('Please complete the security check.');
+    return;
+  }
+
   if (formData.password !== formData.confirm_password) {
     toast.error(t('register.password_mismatch'));
     return;
@@ -582,6 +589,8 @@ const Register = () => {
     // Build cleaned payload
     const registrationData = buildRegistrationData();
 
+    registrationData.turnstile_token = turnstileToken;
+
     if (requiresPayment && !registrationData.state_id) {
       toast.error(t('register.state_required'));
       return;
@@ -657,6 +666,7 @@ const Register = () => {
     }
 
   } catch (error) {
+    setTurnstileToken(null);
     const serverError = error.response?.data;
     const firstError = serverError?.errors?.[0];
 
@@ -897,7 +907,8 @@ const submitDisabled =
   !registrationFlags.loaded ||
   !registrationFlags.registration_allowed ||
   (requiresPayment && !registrationPricing.location_complete) ||
-  !isStepFourComplete;
+  !isStepFourComplete ||
+  (!turnstileToken && !!process.env.REACT_APP_TURNSTILE_SITE_KEY);
 
 const canContinueAccountTypeStep =
   registrationFlags.registration_master_enabled &&
@@ -1798,6 +1809,13 @@ return (
                   </label>
                 </div>
                 {errors.terms && <p className="text-red-500 text-sm mt-1">{errors.terms}</p>}
+
+                <TurnstileWidget
+                  key={turnstileToken ? 'used' : 'fresh'}
+                  onToken={setTurnstileToken}
+                  onExpire={() => setTurnstileToken(null)}
+                  onError={() => setTurnstileToken(null)}
+                />
 
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setStep(3)} className="btn w-full">{t('register.back')}</button>

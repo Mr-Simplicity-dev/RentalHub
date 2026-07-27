@@ -25,8 +25,8 @@ export const authService = {
   },
 
   // Login
-  login: async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
+  login: async (email, password, turnstileToken) => {
+    const response = await api.post('/auth/login', { email, password, turnstile_token: turnstileToken });
     if (response.data.success) {
       const { token, user } = response.data.data;
       setAuthSession(token, user);
