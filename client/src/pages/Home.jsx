@@ -119,37 +119,10 @@ const Home = () => {
     setShowAppPrompt(false);
   };
 
-  const resolveShareUrl = (url) => {
-    if (!url) return window.location.href;
-    if (/^https?:\/\//i.test(url)) return url;
-    return `${window.location.origin}${url.startsWith('/') ? url : `/${url}`}`;
-  };
-
-  const shareApp = async (url) => {
-    const resolvedUrl = resolveShareUrl(url);
-    const shareData = {
-      title: 'RentalHub NG',
-      text: t('home.share_app_text'),
-      url: resolvedUrl,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.warn('Web Share API failed, falling back to WhatsApp', err);
-        } else {
-          return;
-        }
-      }
-    }
-
-    const text = `${t('home.share_app_text')} ${resolvedUrl}`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-  };
+  const shareAppUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/mobile-app`
+    : 'https://rentalhub.com.ng/mobile-app';
+  const shareAppText = t('home.share_app_text');
 
   useEffect(() => {
     // Sync HubSpot language with i18next
@@ -460,14 +433,15 @@ const Home = () => {
                   {t('home.download_iphone')}
                 </a>
               )}
-              <button
-                type="button"
-                onClick={() => shareApp(mobileAppPageUrl)}
-                className="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-600 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
-              >
-                <FaWhatsapp />
-                {t('home.share_app')}
-              </button>
+              <ShareMenu
+                url={shareAppUrl}
+                text={shareAppText}
+                title="RentalHub NG"
+                buttonLabel={t('home.share_app')}
+                buttonClassName="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-600 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
+                headerLabel={`Share ${t('home.share_app')}`}
+                copySuccessMessage="App link copied to clipboard"
+              />
             </div>
           </div>
         </div>
