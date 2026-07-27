@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
+import ShareMenu from '../components/common/ShareMenu';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import {
@@ -24,10 +25,8 @@ import {
   FaTruck,
   FaSprayCan,
   FaUserCheck,
-  FaShareAlt,
   FaCopy,
   FaGift,
-  FaWhatsapp,
   FaMapMarkedAlt,
   FaExternalLinkAlt,
   FaLock,
@@ -841,38 +840,6 @@ const Dashboard = () => {
     } catch (error) {
       toast.error('Unable to copy invite link right now');
     }
-  };
-
-  const shareReferralInvite = async () => {
-    if (!referralInfo?.invite_url) return;
-
-    const shareText = `Join RentalHub NG with my invite link and I earn ₦${Number(referralInfo.reward_amount || 1000).toLocaleString()} subscription credit when your registration is complete.`;
-
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'RentalHub NG invite',
-          text: shareText,
-          url: referralInfo.invite_url,
-        });
-        return;
-      } catch (error) {
-        if (error?.name === 'AbortError') return;
-      }
-    }
-
-    await copyReferralInvite();
-  };
-
-  const openWhatsappReferralShare = () => {
-    if (!referralInfo?.invite_url) return;
-
-    const shareText = `Join RentalHub NG with my invite link: ${referralInfo.invite_url}`;
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(shareText)}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
   };
 
   const openPropertyInGoogleMaps = (property) => {
@@ -1766,23 +1733,19 @@ const Dashboard = () => {
                     Copy link
                   </button>
                 </div>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={shareReferralInvite}
-                    className="btn btn-primary gap-2"
-                  >
-                    <FaShareAlt />
-                    Share
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openWhatsappReferralShare}
-                    className="btn btn-secondary gap-2"
-                  >
-                    <FaWhatsapp />
-                    WhatsApp
-                  </button>
+                <div className="mt-3">
+                  <ShareMenu
+                    url={referralInfo?.invite_url}
+                    title="RentalHub NG invite"
+                    text={`Join RentalHub NG with my invite link and earn \u20A6${Number(referralInfo?.reward_amount || 1000).toLocaleString()} subscription credit`}
+                    buttonLabel="Share invite"
+                    buttonClassName="btn btn-primary gap-2"
+                    headerLabel="Share referral invite"
+                    copySuccessMessage="Invite link copied"
+                    copyErrorMessage="Unable to copy invite link right now"
+                    shareErrorMessage="Unable to open share sheet"
+                    position="left"
+                  />
                 </div>
               </div>
             </div>
