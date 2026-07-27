@@ -444,9 +444,9 @@ const AdSpace = ({
                 {ad.title}
               </h2>
               {ad.description && (
-                <p className="mt-1 max-w-3xl text-sm leading-relaxed opacity-80 md:text-base">
+                <div className="mt-1 max-w-3xl text-sm leading-relaxed opacity-80 md:text-base whitespace-pre-line">
                   {ad.description}
-                </p>
+                </div>
               )}
             </div>
 

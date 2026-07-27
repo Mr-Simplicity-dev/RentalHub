@@ -14,24 +14,38 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <meta name="google-site-verification" content="google65762146367ad1da" />
     <meta name="facebook-domain-verification" content="dwgvomveicqm4zh5sn1onvk5uyauop" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net unpkg.com js-eu1.hs-scripts.com js.hs-scripts.com www.googletagmanager.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; img-src 'self' res.cloudinary.com data: blob: js-eu1.hs-scripts.com www.googletagmanager.com; font-src 'self' fonts.googleapis.com fonts.gstatic.com; connect-src 'self' api.paystack.co api.hubspot.com forms.hubspot.com www.google-analytics.com www.googletagmanager.com; frame-src 'self' app.hubspot.com; media-src 'self' res.cloudinary.com blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net unpkg.com js-eu1.hs-scripts.com js.hs-scripts.com www.googletagmanager.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com https://challenges.cloudflare.com; img-src 'self' res.cloudinary.com data: blob: js-eu1.hs-scripts.com www.googletagmanager.com https://challenges.cloudflare.com; font-src 'self' fonts.googleapis.com fonts.gstatic.com; connect-src 'self' api.paystack.co api.hubspot.com forms.hubspot.com www.google-analytics.com www.googletagmanager.com https://challenges.cloudflare.com; frame-src 'self' app.hubspot.com https://challenges.cloudflare.com; media-src 'self' res.cloudinary.com blob:;">
     <meta property="og:title" content="RentalHub NG — Find &amp; Manage Properties in Nigeria" />
     <meta property="og:description" content="RentalHub is Nigeria's trusted platform for finding and managing rental properties. Available on iOS, Android, and web." />
     <meta property="og:url" content="https://rentalhub.com.ng" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://rentalhub.com.ng/og-preview.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="RentalHub NG — Find and Manage Properties in Nigeria" />
+    <meta property="og:site_name" content="RentalHub NG" />
+    <meta property="og:locale" content="en_NG" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="RentalHub NG — Find &amp; Manage Properties in Nigeria" />
     <meta name="twitter:description" content="RentalHub is Nigeria's trusted platform for finding and managing rental properties. Available on iOS, Android, and web." />
     <meta name="twitter:image" content="https://rentalhub.com.ng/og-preview.png" />
     <title>RentalHub NG</title>
-    <!-- Google Analytics 4 (GA4) — replace G-XXXXXXXXXX with your Measurement ID -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <!-- Google Analytics 4 (GA4) — set REACT_APP_GA_ID in client/.env with your Measurement ID -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-XXXXXXXXXX');
+      (function() {
+        var gaId = '%REACT_APP_GA_ID%';
+        if (gaId && gaId !== 'G-XXXXXXXXXX') {
+          var s = document.createElement('script');
+          s.src = 'https://www.googletagmanager.com/gtag/js?id=' + gaId;
+          s.async = true;
+          document.head.appendChild(s);
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', gaId);
+          window.gtag = gtag;
+        }
+      })();
     </script>
   </head>
   <body>
