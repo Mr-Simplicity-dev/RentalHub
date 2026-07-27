@@ -11,102 +11,22 @@ import {
   FaCheckCircle,
   FaPhoneAlt,
   FaEnvelope,
-  FaShareAlt,
-  FaWhatsapp,
-  FaFacebook,
-  FaTwitter,
-  FaLink,
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import ShareMenu from '../components/common/ShareMenu';
 
-/* ──────────────────────────────────────────────────────────────
-   ShareButton — opens a floating share sheet with social options
-   ────────────────────────────────────────────────────────────── */
 const ShareButton = ({ section, title, description }) => {
-  const [open, setOpen] = useState(false);
-  const pageUrl = typeof window !== 'undefined' ? window.location.href : 'https://rentalhub.com.ng/about';
-  const shareText = `${title}\n\n${description}\n\n${pageUrl}`;
-  const encodedText = encodeURIComponent(shareText);
-  const encodedUrl = encodeURIComponent(pageUrl);
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(pageUrl);
-      toast.success('Link copied to clipboard');
-    } catch {
-      toast.error('Could not copy link');
-    }
-    setOpen(false);
-  };
+  const shareText = `${title}\n\n${description}`;
 
   return (
-    <div className="relative inline-block">
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-primary-600 hover:border-primary-300 transition-all duration-200 shadow-sm"
-        title={`Share ${section}`}
-      >
-        <FaShareAlt className="text-[10px]" />
-        Share
-      </button>
-
-      {open && (
-        <>
-          {/* backdrop */}
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-
-          {/* sheet */}
-          <div className="absolute right-0 z-50 mt-2 w-52 origin-top-right animate-scaleIn rounded-xl border border-gray-100 bg-white py-2 shadow-elevated-lg">
-            <div className="px-4 pb-2 mb-1 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-700">Share {section}</p>
-            </div>
-
-            <a
-              href={`https://wa.me/?text=${encodedText}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors"
-              onClick={() => setOpen(false)}
-            >
-              <FaWhatsapp className="text-lg text-green-600" />
-              WhatsApp
-            </a>
-
-            <a
-              href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-              onClick={() => setOpen(false)}
-            >
-              <FaFacebook className="text-lg text-blue-600" />
-              Facebook
-            </a>
-
-            <a
-              href={`https://twitter.com/intent/tweet?text=${encodedText}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700 transition-colors"
-              onClick={() => setOpen(false)}
-            >
-              <FaTwitter className="text-lg text-sky-500" />
-              Twitter / X
-            </a>
-
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <FaLink className="text-lg text-gray-500" />
-              Copy Link
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+    <ShareMenu
+      title={title}
+      text={shareText}
+      headerLabel={`Share ${section}`}
+      buttonLabel="Share"
+      copySuccessMessage="Link copied to clipboard"
+      copyErrorMessage="Could not copy link"
+    />
   );
 };
 
