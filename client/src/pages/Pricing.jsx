@@ -11,14 +11,10 @@ import {
   FaShieldAlt,
   FaPhoneAlt,
   FaEnvelope,
-  FaShareAlt,
-  FaWhatsapp,
-  FaFacebook,
-  FaTwitter,
-  FaLink,
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
+import ShareMenu from '../components/common/ShareMenu';
 
 const ShareButton = ({ section, title, description }) => {
   const { t } = useTranslation();
