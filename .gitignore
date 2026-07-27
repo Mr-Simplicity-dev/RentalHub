@@ -83,3 +83,5 @@ uploads/
 # Temporary files
 tmp/
 temp/
+build_output.txt
+build_output2.txt
