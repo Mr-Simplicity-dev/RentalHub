@@ -5,6 +5,7 @@ const { uploadPassportLocal, validateFileMagicBytesMiddleware } = require('../co
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const { checkLoginRateLimit } = require('../config/middleware/loginRateLimiter');
 const { authSensitiveLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter } = require('../config/middleware/securityRateLimiters');
+const { requireTurnstile } = require('../config/middleware/turnstileVerify');
 
 const router = express.Router();
 
@@ -95,6 +96,7 @@ router.get('/registration-flags', authController.getRegistrationFlags);
 
 router.post(
   '/register/payment',
+  requireTurnstile,
   registrationLimiter,
   registerValidators,
   authController.initializeRegistrationPayment
@@ -107,6 +109,7 @@ router.post(
 
 router.post(
   '/register/tenant-payment',
+  requireTurnstile,
   registrationLimiter,
   registerValidators,
   authController.initializeRegistrationPayment
@@ -120,6 +123,7 @@ router.post(
 // Register new user (Landlord or Tenant)
 router.post(
   '/register',
+  requireTurnstile,
   registrationLimiter,
   registerValidators,
   authController.register
@@ -128,6 +132,7 @@ router.post(
 
 router.post(
   '/login',
+  requireTurnstile,
   checkLoginRateLimit,
   authController.login
 );

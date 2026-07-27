@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
+import TurnstileWidget from '../components/common/TurnstileWidget';
 import { toast } from 'react-toastify';
 import { FaEnvelope, FaEye, FaEyeSlash, FaLock } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
@@ -58,6 +59,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loginEmailSuggestions, setLoginEmailSuggestions] = useState([]);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+  const turnstileRef = useRef(null);
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -83,8 +86,15 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
+    if (!turnstileToken && process.env.REACT_APP_TURNSTILE_SITE_KEY) {
+      toast.error('Please complete the security check.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await login(email, password);
+      const response = await login(email, password, turnstileToken);
+      setTurnstileToken(null);
       if (response.success) {
         toast.success(t('login.success'));
 
@@ -157,6 +167,7 @@ const Login = () => {
       }
     } catch (error) {
       toast.error(error.response?.data?.message || t('login.failed'));
+      setTurnstileToken(null);
     } finally {
       setLoading(false);
     }
@@ -279,11 +290,19 @@ const Login = () => {
             </Link>
           </div>
 
+          {/* TURNSTILE */}
+          <TurnstileWidget
+            key={turnstileToken ? 'used' : 'fresh'}
+            onToken={setTurnstileToken}
+            onExpire={() => setTurnstileToken(null)}
+            onError={() => setTurnstileToken(null)}
+          />
+
           {/* BUTTON */}
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition"
+            disabled={loading || (!turnstileToken && !!process.env.REACT_APP_TURNSTILE_SITE_KEY)}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50"
           >
             {loading ? t('login.signing') : t('login.submit')}
           </button>

@@ -1976,7 +1976,9 @@ exports.login = async (req, res) => {
               u.is_active, u.account_suspended_reason,
               COALESCE(u.approval_status, 'approved') AS approval_status,
               COALESCE(u.is_recruitment_admin, FALSE) AS is_recruitment_admin,
-              u.token_version
+              u.token_version,
+              u.failed_login_attempts,
+              u.locked_until
        FROM users u
        LEFT JOIN states s ON s.id = u.preferred_state_id
        WHERE u.email = $1`,
@@ -1984,6 +1986,8 @@ exports.login = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      // Delay on unknown email too — prevents email enumeration timing attack
+      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1500));
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -1992,17 +1996,58 @@ exports.login = async (req, res) => {
 
     const user = result.rows[0];
 
+    // Check persistent account lockout
+    if (user.locked_until) {
+      const lockTime = new Date(user.locked_until).getTime();
+      if (Date.now() < lockTime) {
+        const retryAfter = Math.ceil((lockTime - Date.now()) / 1000);
+        res.set('Retry-After', String(retryAfter));
+        return res.status(423).json({
+          success: false,
+          message: 'Account temporarily locked due to too many failed attempts. Try again later.',
+        });
+      }
+      // Lock expired — reset counter
+      await db.query(
+        'UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1',
+        [user.id]
+      );
+    }
+
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
-      recordFailedLogin(email);
+      await db.query(
+        'UPDATE users SET failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1 WHERE id = $1',
+        [user.id]
+      );
+
+      // Lock after 10 failed attempts
+      const updatedUser = await db.query(
+        'SELECT failed_login_attempts FROM users WHERE id = $1',
+        [user.id]
+      );
+      const attempts = updatedUser.rows[0]?.failed_login_attempts || 1;
+      if (attempts >= 10) {
+        const lockDurationMs = 15 * 60 * 1000;
+        await db.query(
+          'UPDATE users SET locked_until = NOW() + INTERVAL \'15 minutes\' WHERE id = $1',
+          [user.id]
+        );
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1500));
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    clearLoginAttempts(email);
+    // Persistent lockout: reset on successful login
+    await db.query(
+      'UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1',
+      [user.id]
+    );
 
     if (user.deleted_at) {
       return res.status(403).json({
@@ -2025,6 +2070,14 @@ exports.login = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Your account is pending Super Admin approval. You will be notified once your account is activated.',
+      });
+    }
+
+    // Enforce email verification
+    if (user.email_verified === false || user.email_verified === null) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email before logging in. Check your inbox for the verification link.',
       });
     }
 
