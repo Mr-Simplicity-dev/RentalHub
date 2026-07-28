@@ -1254,7 +1254,18 @@ api.get('/fumigation-cleaning/admin/providers');
                             required
                           />
                           <label htmlFor="privacy_policy_accepted" className="text-gray-700">
-                            <span className="font-medium">Accept Privacy Policy</span>
+                            <span className="font-medium">
+                              Accept{' '}
+                              <a
+                                href="/privacy"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(event) => event.stopPropagation()}
+                                className="font-semibold text-primary-700 underline decoration-primary-300 underline-offset-2 hover:text-primary-900"
+                              >
+                                Privacy Policy
+                              </a>
+                            </span>
                             <p className="text-sm text-gray-500 mt-1">
                               I agree to the processing of my personal data as described in the Privacy Policy
                             </p>
