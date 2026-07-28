@@ -66,6 +66,10 @@ const {
   setAuthCookies,
   shouldReturnTokenInBody,
 } = require('../config/utils/authCookies');
+const {
+  getSessionTokenIdentity,
+  hasTokenPurpose,
+} = require('../config/utils/sessionToken');
 const redis = require('../config/utils/redis');
 
 // OTP storage with Redis fallback to in-memory Map
@@ -498,7 +502,12 @@ const normalizeOptionalAgentInvite = async ({
 
 const generateToken = (userId, userType, options = {}) => {
   return jwt.sign(
-    { userId, userType, tv: options.tokenVersion || 1 },
+    {
+      userId,
+      userType,
+      tv: options.tokenVersion || 1,
+      purpose: 'session',
+    },
     process.env.JWT_SECRET,
     { expiresIn: options.expiresIn || '24h' }
   );
@@ -1477,7 +1486,11 @@ const createUserFromPreparedRegistration = async ({
     }
 
     const verificationToken = jwt.sign(
-      { userId: newUser.id, email: newUser.email },
+      {
+        userId: newUser.id,
+        email: newUser.email,
+        purpose: 'email-verification',
+      },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -3421,6 +3434,9 @@ exports.verifyEmail = async (req, res) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    if (!hasTokenPurpose(decoded, 'email-verification')) {
+      throw new Error('Invalid email verification token purpose');
+    }
 
     // Update user email verification status and return user
     const result = await db.query(
@@ -3442,7 +3458,12 @@ exports.verifyEmail = async (req, res) => {
 
     // 🔐 Auto-login token with current token_version
     const authToken = jwt.sign(
-      { id: user.id, user_type: user.user_type, tv: user.token_version || 1 },
+      {
+        id: user.id,
+        user_type: user.user_type,
+        tv: user.token_version || 1,
+        purpose: 'session',
+      },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -3497,7 +3518,11 @@ exports.resendVerification = async (req, res) => {
 
     // Generate new token
     const verificationToken = jwt.sign(
-      { userId: user.id, email: user.email },
+      {
+        userId: user.id,
+        email: user.email,
+        purpose: 'email-verification',
+      },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -3772,11 +3797,12 @@ exports.refreshToken = async (req, res) => {
 
     // Verify the session token (should still be valid since it's 7d)
     const decoded = jwt.verify(sessionToken, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const sessionIdentity = getSessionTokenIdentity(decoded);
 
     // Fetch current token_version from DB
     const userResult = await db.query(
       `SELECT token_version FROM users WHERE id = $1 AND deleted_at IS NULL`,
-      [decoded.userId]
+      [sessionIdentity.userId]
     );
     if (userResult.rows.length === 0) {
       return res.status(401).json({
@@ -3785,10 +3811,9 @@ exports.refreshToken = async (req, res) => {
       });
     }
 
-    const tokenVersion = userResult.rows[0].token_version || 1;
+    const tokenVersion = Number(userResult.rows[0].token_version || 1);
     // Verify the token version in the old token is still valid
-    const oldTv = decoded.tv || 1;
-    if (oldTv < tokenVersion) {
+    if (sessionIdentity.tokenVersion !== tokenVersion) {
       return res.status(401).json({
         success: false,
         message: 'Session expired. Please log in again.',
@@ -3796,7 +3821,11 @@ exports.refreshToken = async (req, res) => {
     }
 
     // Mint a new session token with current token_version
-    const newSessionToken = generateToken(decoded.userId, decoded.userType, { tokenVersion });
+    const newSessionToken = generateToken(
+      sessionIdentity.userId,
+      sessionIdentity.userType,
+      { tokenVersion }
+    );
 
     res.json({
       success: true,
@@ -3850,7 +3879,9 @@ exports.forgotPassword = async (req, res) => {
 
     // Find user by email
     const result = await db.query(
-      `SELECT id, email, full_name FROM users WHERE email = $1 AND deleted_at IS NULL`,
+      `SELECT id, email, full_name, COALESCE(token_version, 1) AS token_version
+       FROM users
+       WHERE email = $1 AND deleted_at IS NULL`,
       [email]
     );
 
@@ -3866,7 +3897,11 @@ exports.forgotPassword = async (req, res) => {
 
     // Generate a JWT-based reset token (self-contained, no DB column needed)
     const resetToken = jwt.sign(
-      { userId: user.id, purpose: 'password-reset' },
+      {
+        userId: user.id,
+        purpose: 'password-reset',
+        tv: user.token_version,
+      },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -3913,34 +3948,40 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    if (decoded.purpose !== 'password-reset' || !decoded.userId) {
+    if (
+      !hasTokenPurpose(decoded, 'password-reset') ||
+      !decoded.userId ||
+      !Number.isSafeInteger(Number(decoded.tv)) ||
+      Number(decoded.tv) < 1
+    ) {
       return res.status(400).json({
         success: false,
         message: 'Invalid password reset token',
       });
     }
 
-    // Verify user still exists
-    const userResult = await db.query(
-      `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL`,
-      [decoded.userId]
+    // Hash the new password
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    // Atomically consume the reset token. The token version changes on success,
+    // so the same link (and every older session/reset link) cannot be reused.
+    const updateResult = await db.query(
+      `UPDATE users
+       SET password_hash = $1,
+           token_version = COALESCE(token_version, 1) + 1
+       WHERE id = $2
+         AND deleted_at IS NULL
+         AND COALESCE(token_version, 1) = $3
+       RETURNING id`,
+      [passwordHash, decoded.userId, Number(decoded.tv)]
     );
 
-    if (userResult.rows.length === 0) {
+    if (updateResult.rowCount === 0) {
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired password reset token',
       });
     }
-
-    // Hash the new password
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    // Update password and invalidate all existing tokens
-    await db.query(
-      `UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2`,
-      [passwordHash, decoded.userId]
-    );
 
     res.json({
       success: true,

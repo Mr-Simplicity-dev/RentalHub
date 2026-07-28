@@ -7,6 +7,12 @@ import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
 import useVoiceRecorder from '../../hooks/useVoiceRecorder';
+import {
+  getGuestSupportCredential,
+  getGuestSupportCredentialsForEmail,
+  removeGuestSupportCredential,
+  saveGuestSupportCredential,
+} from '../../utils/guestSupportCredentials';
 import WidgetErrorBoundary from './WidgetErrorBoundary';
 
 const LS_EMAIL = 'contact_widget_email';
@@ -17,6 +23,17 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'ap
   'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/mpeg'];
+
+const guestApiConfig = (guestAccessToken) => ({
+  skipAuth: true,
+  skipAuthRefresh: true,
+  ...(guestAccessToken
+    ? { headers: { 'X-Guest-Access-Token': guestAccessToken } }
+    : {}),
+});
+
+const isRejectedGuestCredential = (error) =>
+  error?.response?.status === 401 || error?.response?.status === 404;
 
 const formatTime = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -382,10 +399,17 @@ const FloatingContactWidget = () => {
     setSending(true);
     setError('');
     try {
-      const res = await api.post('/support/contact', form);
+      const res = await api.post('/support/contact', form, guestApiConfig());
+      const ticketId = Number(res.data?.data?.ticketId);
+      const guestAccessToken = res.data?.data?.guestAccessToken;
       localStorage.setItem(LS_EMAIL, form.email.trim());
       localStorage.setItem(LS_NAME, form.name.trim());
-      localStorage.setItem(LS_TICKET_ID, String(res.data?.data?.ticketId || ''));
+      localStorage.setItem(LS_TICKET_ID, String(ticketId || ''));
+      saveGuestSupportCredential({
+        ticketId,
+        guestAccessToken,
+        email: form.email,
+      });
       setView('success');
     } catch (err) {
       setError(err.response?.data?.message || t('widget.send_failed', 'Could not send message.'));
@@ -454,18 +478,90 @@ const FloatingContactWidget = () => {
   const handleLookup = async () => {
     if (!lookupEmail.trim()) return;
     setLookupLoading(true);
+    setError('');
+    setViewingContactTicket(null);
+    setContactConv([]);
     try {
-      const res = await api.post('/support/tickets/contact-lookup', { email: lookupEmail.trim() });
-      setLookupTickets(res.data?.data || []);
-    } catch { setError(t('widget.lookup_failed', 'Could not find tickets. Please check your email.')); } finally { setLookupLoading(false); }
+      const email = lookupEmail.trim();
+      const credentials = getGuestSupportCredentialsForEmail(email).slice(0, 10);
+      let unexpectedError = null;
+
+      const tokenResults = await Promise.all(credentials.map(async (credential) => {
+        try {
+          const res = await api.post(
+            '/support/tickets/contact-lookup',
+            { guestAccessToken: credential.guestAccessToken },
+            guestApiConfig()
+          );
+          return res.data?.data || [];
+        } catch (lookupError) {
+          if (isRejectedGuestCredential(lookupError)) {
+            removeGuestSupportCredential(credential.ticketId);
+            return [];
+          }
+          unexpectedError = lookupError;
+          return [];
+        }
+      }));
+
+      let legacyTickets = [];
+      let legacyAccessDenied = false;
+      try {
+        const legacyResponse = await api.post(
+          '/support/tickets/contact-lookup',
+          { email },
+          guestApiConfig()
+        );
+        legacyTickets = legacyResponse.data?.data || [];
+      } catch (legacyError) {
+        legacyAccessDenied = isRejectedGuestCredential(legacyError);
+        if (!legacyAccessDenied) unexpectedError = unexpectedError || legacyError;
+      }
+
+      const ticketMap = new Map();
+      [...tokenResults.flat(), ...legacyTickets].forEach((ticket) => {
+        if (ticket?.id) ticketMap.set(ticket.id, ticket);
+      });
+      const nextTickets = Array.from(ticketMap.values())
+        .sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
+
+      setLookupTickets(nextTickets);
+      if (!nextTickets.length && unexpectedError) throw unexpectedError;
+      if (!nextTickets.length && legacyAccessDenied && credentials.length === 0) {
+        setError(t(
+          'widget.secure_ticket_device_only',
+          'For your security, guest tickets can only be reopened on the device where they were created.'
+        ));
+      }
+    } catch {
+      setError(t('widget.lookup_failed', 'Could not load saved tickets. Please try again.'));
+    } finally {
+      setLookupLoading(false);
+    }
   };
 
   const viewContactConversation = async (ticket) => {
-    setViewingContactTicket(ticket);
+    const credential = getGuestSupportCredential(ticket.id);
+    const proof = credential
+      ? { guestAccessToken: credential.guestAccessToken }
+      : { email: lookupEmail.trim() };
     try {
-      const res = await api.post('/support/tickets/contact-conversation', { ticketId: ticket.id, email: lookupEmail.trim() });
+      const res = await api.post(
+        '/support/tickets/contact-conversation',
+        { ticketId: ticket.id, ...proof },
+        guestApiConfig()
+      );
+      setViewingContactTicket(ticket);
       setContactConv(res.data?.data || []);
-    } catch { setError(t('widget.conversation_failed', 'Could not load conversation.')); }
+    } catch (conversationError) {
+      if (credential && isRejectedGuestCredential(conversationError)) {
+        removeGuestSupportCredential(ticket.id);
+      }
+      setError(t(
+        'widget.conversation_failed',
+        'Could not securely open this conversation. Start a new request if access has expired.'
+      ));
+    }
   };
 
   const [contactReplyText, setContactReplyText] = useState('');
@@ -477,7 +573,10 @@ const FloatingContactWidget = () => {
 
   // Poll admin typing/viewing status for anonymous contact conversation
   useEffect(() => {
-    if (!viewingContactTicket || !lookupEmail.trim()) {
+    const credential = viewingContactTicket
+      ? getGuestSupportCredential(viewingContactTicket.id)
+      : null;
+    if (!viewingContactTicket || (!credential && !lookupEmail.trim())) {
       setAdminTypingName(null);
       setAdminViewingName(null);
       return;
@@ -485,11 +584,18 @@ const FloatingContactWidget = () => {
     const poll = async () => {
       try {
         const res = await api.get(`/support/tickets/${viewingContactTicket.id}/typing-status`, {
-          params: { email: lookupEmail.trim() },
+          ...guestApiConfig(credential?.guestAccessToken),
+          ...(credential ? {} : { params: { email: lookupEmail.trim() } }),
         });
         setAdminTypingName(res.data?.typing?.userName || null);
         setAdminViewingName(res.data?.viewing?.userName || null);
-      } catch {}
+      } catch (presenceError) {
+        if (credential && isRejectedGuestCredential(presenceError)) {
+          removeGuestSupportCredential(viewingContactTicket.id);
+          setViewingContactTicket(null);
+          setContactConv([]);
+        }
+      }
     };
     poll();
     typingPollRef.current = setInterval(poll, 3000);
@@ -498,7 +604,10 @@ const FloatingContactWidget = () => {
 
   // Guest socket — stable deps using ref
   useEffect(() => {
-    if (!viewingContactTicket || !lookupEmail.trim()) {
+    const credential = viewingContactTicket
+      ? getGuestSupportCredential(viewingContactTicket.id)
+      : null;
+    if (!viewingContactTicket || (!credential && !lookupEmail.trim())) {
       if (guestSocketRef.current) {
         guestSocketRef.current.disconnect();
         guestSocketRef.current = null;
@@ -507,7 +616,15 @@ const FloatingContactWidget = () => {
     }
     const baseUrl = (process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || '').replace(/\/api\/?$/, '') || undefined;
     const gs = socketIO(baseUrl ? `${baseUrl}/guest` : '/guest', {
-      auth: { ticketId: viewingContactTicket.id, email: lookupEmail.trim() },
+      auth: credential
+        ? {
+            ticketId: viewingContactTicket.id,
+            guestAccessToken: credential.guestAccessToken,
+          }
+        : {
+            ticketId: viewingContactTicket.id,
+            email: lookupEmail.trim(),
+          },
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
@@ -525,6 +642,17 @@ const FloatingContactWidget = () => {
       setAdminTypingName(data.userName || t('widget.support_team', 'Support'));
       clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(() => setAdminTypingName(null), 3000);
+    });
+    gs.on('connect_error', (socketError) => {
+      if (credential && socketError?.message === 'Guest authentication failed') {
+        removeGuestSupportCredential(viewingContactTicket.id);
+        setError(t(
+          'widget.guest_access_expired',
+          'Secure access to this ticket has expired. Start a new request if you still need help.'
+        ));
+        setViewingContactTicket(null);
+        setContactConv([]);
+      }
     });
     return () => {
       gs.disconnect();
@@ -545,17 +673,26 @@ const FloatingContactWidget = () => {
     setContactReplyFile(null);
     contactRecorder.reset();
     setSendingContactReply(true);
+    const credential = getGuestSupportCredential(viewingContactTicket.id);
     try {
       const fd = new FormData();
       fd.append('ticketId', viewingContactTicket.id);
-      fd.append('email', lookupEmail.trim());
+      if (credential) {
+        fd.append('guestAccessToken', credential.guestAccessToken);
+      } else {
+        fd.append('email', lookupEmail.trim());
+      }
       if (msg) fd.append('message', msg);
       if (fileToSend) fd.append('attachment', fileToSend);
       const res = await api.post('/support/tickets/contact-reply', fd, {
+        ...guestApiConfig(),
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setContactConv((prev) => prev.map((r) => r.id === tempId ? { ...res.data.data, _temp: false } : r));
     } catch (err) {
+      if (credential && isRejectedGuestCredential(err)) {
+        removeGuestSupportCredential(viewingContactTicket.id);
+      }
       setContactConv((prev) => prev.map((r) => r.id === tempId ? { ...r, _failed: true, _error: err.response?.data?.message || t('widget.send_failed', 'Failed to send') } : r));
       setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
     } finally { setSendingContactReply(false); }
@@ -564,16 +701,25 @@ const FloatingContactWidget = () => {
   const retryContactReply = async (failedMsg) => {
     setContactConv((prev) => prev.map((r) => r.id === failedMsg.id ? { ...r, _failed: false, _temp: true, _error: null } : r));
     setSendingContactReply(true);
+    const credential = getGuestSupportCredential(viewingContactTicket.id);
     try {
       const fd = new FormData();
       fd.append('ticketId', viewingContactTicket.id);
-      fd.append('email', lookupEmail.trim());
+      if (credential) {
+        fd.append('guestAccessToken', credential.guestAccessToken);
+      } else {
+        fd.append('email', lookupEmail.trim());
+      }
       if (failedMsg.message) fd.append('message', failedMsg.message);
       const res = await api.post('/support/tickets/contact-reply', fd, {
+        ...guestApiConfig(),
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setContactConv((prev) => prev.map((r) => r.id === failedMsg.id ? { ...res.data.data, _temp: false } : r));
     } catch (err) {
+      if (credential && isRejectedGuestCredential(err)) {
+        removeGuestSupportCredential(viewingContactTicket.id);
+      }
       setContactConv((prev) => prev.map((r) => r.id === failedMsg.id ? { ...r, _failed: true } : r));
       setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
     } finally { setSendingContactReply(false); }
@@ -962,6 +1108,7 @@ const FloatingContactWidget = () => {
                   className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
                   {lookupLoading ? t('widget.searching', 'Searching...') : t('widget.lookup', 'Check Tickets Status')}
                 </button>
+                {error && <p className="text-xs text-red-600">{error}</p>}
                 {lookupTickets.length > 0 && (
                   <div className="space-y-2 mt-3">
                     <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase">{t('widget.your_tickets', 'Your tickets')}</p>
@@ -1048,7 +1195,7 @@ const FloatingContactWidget = () => {
                                     setContactReplyFile(f);
                                   }} />
                                 </label>
-                                <textarea value={contactReplyText} onChange={(e) => { setContactReplyText(e.target.value); if (!guestTypingThrottleRef.current) { guestTypingThrottleRef.current = setTimeout(() => { guestTypingThrottleRef.current = null; }, 2000); guestSocketRef.current?.emit('ticket:typing', { ticketId: viewingContactTicket?.id, email: lookupEmail }); } }}
+                                <textarea value={contactReplyText} onChange={(e) => { setContactReplyText(e.target.value); if (!guestTypingThrottleRef.current) { guestTypingThrottleRef.current = setTimeout(() => { guestTypingThrottleRef.current = null; }, 2000); guestSocketRef.current?.emit('ticket:typing'); } }}
                                   placeholder={t('widget.type_reply', 'Type a reply...')} rows={1}
                                   className="flex-1 resize-none rounded border border-slate-300 dark:border-gray-600 px-2 py-2 text-xs outline-none focus:border-indigo-400"
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />
@@ -1079,7 +1226,7 @@ const FloatingContactWidget = () => {
                     ))}
                   </div>
                 )}
-                {lookupTickets.length === 0 && !lookupLoading && lookupEmail.trim() && (
+                {lookupTickets.length === 0 && !lookupLoading && lookupEmail.trim() && !error && (
                   <p className="text-xs text-slate-400 dark:text-gray-400 text-center">{t('widget.no_tickets_email', 'No tickets found for this email.')}</p>
                 )}
                 <button onClick={() => setView('form')} className="w-full text-center text-xs text-indigo-600 hover:underline">{t('widget.start_new', 'Start a new conversation')}</button>

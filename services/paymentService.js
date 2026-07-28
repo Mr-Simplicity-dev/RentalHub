@@ -1,6 +1,5 @@
 // ====================== IMPORTS ======================
 const axios = require("axios");
-const crypto = require("crypto");
 const db = require('../config/middleware/database');
 const { validationResult } = require("express-validator");
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
@@ -30,6 +29,11 @@ const {
   creditWallet,
   creditLandlordRentPayment,
 } = require('../services/walletLedgerService');
+const {
+  amountMatchesStoredPayment,
+  verifyPaystackSignature,
+} = require('../config/utils/paystackWebhookSecurity');
+const logger = require('../config/utils/logger');
 
 // ====================== PAYSTACK CONFIG ======================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -3582,14 +3586,14 @@ exports.retryPayment = async (req, res) => {
 // =====================================================
 
 exports.paystackWebhook = async (req, res) => {
-  try {
-    const rawBody = req.rawBody || JSON.stringify(req.body);
-    const hash = crypto
-      .createHmac("sha512", PAYSTACK_SECRET_KEY)
-      .update(rawBody)
-      .digest("hex");
+  const webhookLogger = req.logger || logger;
 
-    if (hash !== req.headers["x-paystack-signature"]) {
+  try {
+    if (!verifyPaystackSignature({
+      rawBody: req.rawBody,
+      signature: req.headers["x-paystack-signature"],
+      secret: PAYSTACK_SECRET_KEY,
+    })) {
       return res.status(401).send("Invalid signature");
     }
 
@@ -3597,53 +3601,105 @@ exports.paystackWebhook = async (req, res) => {
 
     switch (event.event) {
       case "charge.success":
-        await handleSuccessfulPayment(event.data);
+        await handleSuccessfulPayment(event.data, webhookLogger);
         break;
 
       case "charge.failed":
-        await handleFailedPayment(event.data);
+        await handleFailedPayment(event.data, webhookLogger);
         break;
 
       case "charge.refund":
-        await handleRefundPayment(event.data);
+        await handleRefundPayment(event.data, webhookLogger);
         break;
 
       case "transfer.success":
       case "transfer.failed":
       case "transfer.reversed":
-        await handleTransferWebhook(event.event, event.data);
+        await handleTransferWebhook(event.event, event.data, webhookLogger);
         break;
 
       default:
-        req.logger.info("Unhandled event:", event.event);
+        webhookLogger.info("Unhandled event:", event.event);
     }
 
     res.status(200).send("Webhook received");
   } catch (error) {
-    req.logger.error("Webhook error:", error);
+    webhookLogger.error("Webhook error:", error);
     res.status(500).send("Webhook processing failed");
   }
 };
 
 
 // Handle successful payment
-async function handleSuccessfulPayment(data) {
+async function handleSuccessfulPayment(data, webhookLogger) {
   try {
     const reference = data.reference;
     const metadata = data.metadata || {};
+
+    if (!reference) {
+      throw new Error('Paystack success event is missing a transaction reference');
+    }
+
+    const paymentResult = await db.query(
+      `SELECT id, payment_type, user_id, property_id, amount, payment_status
+       FROM payments
+       WHERE transaction_reference = $1
+       LIMIT 1`,
+      [reference]
+    );
+    const storedPayment = paymentResult.rows[0] || null;
+
+    if (!storedPayment) {
+      webhookLogger.warn('Ignoring successful Paystack event for an unknown payment', {
+        reference,
+      });
+      return;
+    }
+
+    if (!amountMatchesStoredPayment(storedPayment.amount, data.amount)) {
+      webhookLogger.error('Blocked Paystack fulfillment because the amount did not match', {
+        reference,
+        paymentId: storedPayment.id,
+      });
+      return;
+    }
+
+    if (
+      metadata.payment_type &&
+      storedPayment.payment_type &&
+      metadata.payment_type !== storedPayment.payment_type
+    ) {
+      webhookLogger.error('Blocked Paystack fulfillment because the payment type did not match', {
+        reference,
+        paymentId: storedPayment.id,
+      });
+      return;
+    }
+
+    if (
+      metadata.user_id &&
+      storedPayment.user_id &&
+      Number(metadata.user_id) !== Number(storedPayment.user_id)
+    ) {
+      webhookLogger.error('Blocked Paystack fulfillment because the user did not match', {
+        reference,
+        paymentId: storedPayment.id,
+      });
+      return;
+    }
 
     const updateResult = await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
            gateway_response = $1
-       WHERE transaction_reference = $2
+       WHERE id = $2
        RETURNING id, payment_type, user_id, amount`,
-      [JSON.stringify(data), reference]
+      [JSON.stringify(data), storedPayment.id]
     );
 
-    const storedPayment = updateResult.rows[0] || null;
-    const paymentId = storedPayment?.id || null;
+    const completedPayment = updateResult.rows[0] || null;
+    const paymentId = completedPayment?.id || null;
 
     if (metadata.payment_type === "tenant_subscription") {
       const expiry = new Date();
@@ -3728,7 +3784,7 @@ async function handleSuccessfulPayment(data) {
     
     if (metadata.payment_type === "wallet_funding") {
       await creditWallet({
-        userId: metadata.user_id || storedPayment?.user_id,
+        userId: completedPayment?.user_id,
         paymentId,
         amount: data.amount / 100,
         source: 'wallet_funding',
@@ -3762,13 +3818,14 @@ async function handleSuccessfulPayment(data) {
       await commissionService.processPaymentCommission(paymentId);
     }
 
-    req.logger.info("Webhook payment processed:", reference);
+    webhookLogger.info("Webhook payment processed:", reference);
   } catch (error) {
-    req.logger.error("Webhook success handler error:", error);
+    webhookLogger.error("Webhook success handler error:", error);
+    throw error;
   }
 }
 
-async function handleTransferWebhook(eventName, data) {
+async function handleTransferWebhook(eventName, data, webhookLogger) {
   try {
     const reference = data?.reference;
     if (!reference) return;
@@ -3881,13 +3938,14 @@ async function handleTransferWebhook(eventName, data) {
       }
     }
   } catch (error) {
-    req.logger.error('Transfer webhook handler error:', error);
+    webhookLogger.error('Transfer webhook handler error:', error);
+    throw error;
   }
 }
 
 
 // Handle refunded payment
-async function handleRefundPayment(data) {
+async function handleRefundPayment(data, webhookLogger) {
   try {
     const reference = data.reference;
     const paymentResult = await db.query(
@@ -3904,14 +3962,15 @@ async function handleRefundPayment(data) {
       await commissionService.clawbackCommissionsForPayment(paymentId, 'payment_refunded');
     }
 
-    req.logger.info("Payment refunded:", reference);
+    webhookLogger.info("Payment refunded:", reference);
   } catch (error) {
-    req.logger.error("Webhook refund handler error:", error);
+    webhookLogger.error("Webhook refund handler error:", error);
+    throw error;
   }
 }
 
 // Handle failed payment
-async function handleFailedPayment(data) {
+async function handleFailedPayment(data, webhookLogger) {
   try {
     const reference = data.reference;
 
@@ -3929,9 +3988,10 @@ async function handleFailedPayment(data) {
       await commissionService.clawbackCommissionsForPayment(paymentId, 'payment_failed');
     }
 
-    req.logger.info("Payment failed:", reference);
+    webhookLogger.info("Payment failed:", reference);
   } catch (error) {
-    req.logger.error("Webhook failure handler error:", error);
+    webhookLogger.error("Webhook failure handler error:", error);
+    throw error;
   }
 }
 

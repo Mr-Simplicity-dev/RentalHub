@@ -45,6 +45,10 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const db = require('./config/middleware/database');
+const {
+  getSessionTokenIdentity,
+  hasTokenPurpose,
+} = require('./config/utils/sessionToken');
 
 const authRoutes = require('./routes/auth');
 const propertyRoutes = require('./routes/properties');
@@ -611,6 +615,9 @@ app.get('/api/auth/verify-email', async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    if (!hasTokenPurpose(decoded, 'email-verification')) {
+      throw new Error('Invalid email verification token purpose');
+    }
 
     const result = await db.query(
       `UPDATE users
@@ -880,11 +887,7 @@ io.use(async (socket, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
-    const userId = decoded.userId || decoded.id || decoded.user_id;
-
-    if (!userId) {
-      return next(new Error('Invalid token payload'));
-    }
+    const { userId, userType, tokenVersion } = getSessionTokenIdentity(decoded);
 
     const userResult = await db.query(
       `SELECT id, user_type, is_active, deleted_at, token_version
@@ -897,14 +900,13 @@ io.use(async (socket, next) => {
     }
 
     const userData = userResult.rows[0];
-    const tokenVersion = decoded.tv || 1;
-    const dbVersion = userData.token_version || 1;
-    if (tokenVersion < dbVersion) {
+    const dbVersion = Number(userData.token_version || 1);
+    if (tokenVersion !== dbVersion) {
       return next(new Error('Session expired. Please log in again.'));
     }
 
     socket.userId = userId;
-    socket.userType = userData.user_type;
+    socket.userType = userData.user_type || userType;
     next();
   } catch (err) {
     return next(new Error('Invalid or expired token'));

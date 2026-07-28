@@ -31,7 +31,12 @@ let pendingRequests = [];
 api.interceptors.request.use(
   (config) => {
     const token = getAuthToken();
-    if (token) {
+    if (config.skipAuth && typeof config.headers?.delete === 'function') {
+      config.headers.delete('Authorization');
+    } else if (config.skipAuth && config.headers) {
+      delete config.headers.Authorization;
+      delete config.headers.authorization;
+    } else if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
@@ -60,6 +65,10 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    if (originalRequest?.skipAuthRefresh) {
+      return Promise.reject(error);
+    }
 
     // Only attempt refresh on 401 and if we haven't already retried
     if (error.response?.status !== 401 || originalRequest?._retry) {

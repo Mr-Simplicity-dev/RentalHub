@@ -1,5 +1,6 @@
 const express = require('express');
-const { body, param } = require('express-validator');
+const { body, param, query } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
@@ -12,6 +13,59 @@ const {
   recruitmentPaymentLimiter,
   recruitmentInterviewLimiter,
 } = require('../config/middleware/securityRateLimiters');
+
+const recruitmentLookupLimiter = rateLimit({
+  windowMs: Number(process.env.RECRUITMENT_LOOKUP_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RECRUITMENT_LOOKUP_MAX) || 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many applicant lookup attempts. Please wait and try again.',
+  },
+});
+
+const recruitmentApplicantActionLimiter = rateLimit({
+  windowMs: Number(process.env.RECRUITMENT_APPLICANT_ACTION_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RECRUITMENT_APPLICANT_ACTION_MAX) || 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many applicant requests. Please wait and try again.',
+  },
+});
+
+const referenceBodyValidation = body('reference_number')
+  .isString()
+  .trim()
+  .isLength({ min: 12, max: 50 })
+  .matches(/^RH-APP-[A-Z0-9]+$/i)
+  .withMessage('A valid application reference is required');
+
+const emailBodyValidation = body('applicant_email')
+  .isEmail()
+  .normalizeEmail()
+  .withMessage('A valid applicant email is required');
+
+const referenceQueryValidation = query('reference_number')
+  .isString()
+  .trim()
+  .isLength({ min: 12, max: 50 })
+  .matches(/^RH-APP-[A-Z0-9]+$/i)
+  .withMessage('A valid application reference is required');
+
+const emailQueryValidation = query('email')
+  .isEmail()
+  .normalizeEmail()
+  .withMessage('A valid applicant email is required');
+
+const challengeBodyValidation = body('challenge_token')
+  .isString()
+  .trim()
+  .isLength({ min: 64, max: 128 })
+  .matches(/^[a-f0-9]+$/i)
+  .withMessage('A valid interview challenge is required');
 
 const requireRecruitmentAdmin = (req, res, next) => {
   const role = String(req.user?.user_type || '').trim().toLowerCase();
@@ -94,59 +148,177 @@ router.post('/apply',
    body('role_id').optional().isInt()],
   validateRequest,
   recruitmentApplyLimiter, recruitmentController.createApplication);
-router.put('/applications/:id', [param('id').isInt()], validateRequest, recruitmentController.updateApplication);
-router.get('/my-application', recruitmentController.getMyApplication);
-router.get('/my-applications', recruitmentController.getMyApplications);
+router.put(
+  '/applications/:id',
+  recruitmentApplicantActionLimiter,
+  [param('id').isInt(), emailBodyValidation, referenceBodyValidation],
+  validateRequest,
+  recruitmentController.updateApplication
+);
+router.get(
+  '/my-application',
+  recruitmentLookupLimiter,
+  [emailQueryValidation, referenceQueryValidation],
+  validateRequest,
+  recruitmentController.getMyApplication
+);
+router.get(
+  '/my-applications',
+  recruitmentLookupLimiter,
+  [emailQueryValidation, referenceQueryValidation],
+  validateRequest,
+  recruitmentController.getMyApplications
+);
 
 // Payment initiation
 router.post('/payments/initiate',
-  [body('amount').isFloat({ min: 0 }), body('application_id').optional().isInt()],
+  recruitmentPaymentLimiter,
+  [
+    body('amount').isFloat({ min: 0 }),
+    body('application_id').isInt(),
+    emailBodyValidation,
+    referenceBodyValidation,
+  ],
   validateRequest,
-  recruitmentPaymentLimiter, recruitmentController.initiatePayment);
-router.post('/payments/verify/:reference', [param('reference').isString().trim().isLength({ min: 1 })], validateRequest, recruitmentController.verifyPayment);
+  recruitmentController.initiatePayment);
+router.post(
+  '/payments/verify/:reference',
+  recruitmentPaymentLimiter,
+  [
+    param('reference').isString().trim().isLength({ min: 1, max: 255 }),
+    emailBodyValidation,
+    referenceBodyValidation,
+  ],
+  validateRequest,
+  recruitmentController.verifyPayment
+);
 router.post('/payments/webhook', recruitmentPaymentLimiter, recruitmentController.paystackWebhook);
 
 // Access code verification
-router.post('/verify-access-code', [body('code').isString().trim().isLength({ min: 1 })], validateRequest, recruitmentController.verifyAccessCode);
+router.post(
+  '/verify-access-code',
+  recruitmentApplicantActionLimiter,
+  [
+    body('application_id').isInt(),
+    body('access_code').isString().trim().isLength({ min: 8, max: 50 }),
+    emailBodyValidation,
+    referenceBodyValidation,
+  ],
+  validateRequest,
+  recruitmentController.verifyAccessCode
+);
 
 // Document upload (after access code)
-router.post('/documents/upload/:applicationId', [param('applicationId').isInt()], validateRequest, upload.fields([
+router.post(
+  '/documents/upload/:applicationId',
+  recruitmentApplicantActionLimiter,
+  [
+    param('applicationId').isInt(),
+    emailQueryValidation,
+    referenceQueryValidation,
+  ],
+  validateRequest,
+  recruitmentController.authorizeDocumentUpload,
+  upload.fields([
   { name: 'cv', maxCount: 1 },
   { name: 'cover_letter', maxCount: 1 },
   { name: 'guarantor_letter', maxCount: 1 },
   { name: 'government_id', maxCount: 1 },
   { name: 'proof_of_address', maxCount: 1 },
   { name: 'certificates', maxCount: 5 }
-]), recruitmentController.uploadDocuments);
+  ]),
+  recruitmentController.uploadDocuments
+);
 
 // Submit application
-router.post('/applications/:id/submit', [param('id').isInt()], validateRequest, recruitmentController.submitApplication);
+router.post(
+  '/applications/:id/submit',
+  recruitmentApplicantActionLimiter,
+  [param('id').isInt(), emailBodyValidation, referenceBodyValidation],
+  validateRequest,
+  recruitmentController.submitApplication
+);
 
 // Download own documents
-router.get('/documents/download/:docId', recruitmentController.downloadDocument);
-router.get('/documents/download-all/:applicationId', recruitmentController.downloadMyDocumentsZip);
-router.post('/documents/generate-cv/:applicationId', [param('applicationId').isInt()], validateRequest, recruitmentController.generatePlatformCv);
+router.get(
+  '/documents/download/:docId',
+  recruitmentApplicantActionLimiter,
+  [param('docId').isInt(), emailQueryValidation, referenceQueryValidation],
+  validateRequest,
+  recruitmentController.downloadDocument
+);
+router.get(
+  '/documents/download-all/:applicationId',
+  recruitmentApplicantActionLimiter,
+  [param('applicationId').isInt(), emailQueryValidation, referenceQueryValidation],
+  validateRequest,
+  recruitmentController.downloadMyDocumentsZip
+);
+router.post(
+  '/documents/generate-cv/:applicationId',
+  recruitmentApplicantActionLimiter,
+  [param('applicationId').isInt(), emailBodyValidation, referenceBodyValidation],
+  validateRequest,
+  recruitmentController.generatePlatformCv
+);
 
 // Interview routes
 router.post('/interview/start',
-  [body('application_id').isInt(), body('access_code').optional().isString().trim().isLength({ max: 50 })],
+  [
+    body('application_id').isInt(),
+    body('phone_number').isString().trim().isLength({ min: 7, max: 30 }),
+    emailBodyValidation,
+    referenceBodyValidation,
+  ],
   validateRequest, recruitmentInterviewLimiter, recruitmentController.startInterview);
-router.get('/interview/start', recruitmentInterviewLimiter, recruitmentController.startInterview);
+router.get(
+  '/interview/start',
+  recruitmentInterviewLimiter,
+  [
+    query('application_id').optional().isInt(),
+    query('phone_number').isString().trim().isLength({ min: 7, max: 30 }),
+    emailQueryValidation,
+    referenceQueryValidation,
+  ],
+  validateRequest,
+  recruitmentController.startInterview
+);
 router.post('/interview/ping',
-  [body('application_id').isInt(), body('session_id').optional().isString().trim().isLength({ max: 255 })],
+  [body('application_id').isInt(), challengeBodyValidation],
   validateRequest, recruitmentInterviewLimiter, recruitmentController.interviewPing);
 router.post('/interview/answer',
-  [body('application_id').isInt(), body('question_id').isInt(), body('answer').isString().trim().isLength({ min: 1 })],
+  [
+    body('application_id').isInt(),
+    body('question_id').isInt(),
+    body('answer').isString().trim().isIn(['A', 'B', 'C', 'D', 'X']),
+    challengeBodyValidation,
+  ],
   validateRequest, recruitmentInterviewLimiter, recruitmentController.submitAnswer);
 router.post('/interview/violation',
-  [body('application_id').isInt(), body('type').optional().isString().trim().isLength({ max: 100 }), body('details').optional().isString().trim().isLength({ max: 2000 })],
+  [
+    body('application_id').isInt(),
+    body('violation_type').optional().isString().trim().isLength({ max: 100 }),
+    body('details').optional().isString().trim().isLength({ max: 2000 }),
+    challengeBodyValidation,
+  ],
   validateRequest, recruitmentInterviewLimiter, recruitmentController.reportViolation);
 router.post('/interview/complete',
-  [body('application_id').isInt()],
+  [body('application_id').isInt(), challengeBodyValidation],
   validateRequest, recruitmentInterviewLimiter, recruitmentController.completeInterview);
 router.post('/interview/recording',
-  [body('application_id').isInt()],
-  validateRequest, recordingUpload.single('recording'), recruitmentController.uploadInterviewRecording);
+  recruitmentInterviewLimiter,
+  [
+    query('application_id').isInt(),
+    query('challenge_token')
+      .isString()
+      .trim()
+      .isLength({ min: 64, max: 128 })
+      .matches(/^[a-f0-9]+$/i),
+  ],
+  validateRequest,
+  recruitmentController.authorizeInterviewRecording,
+  recordingUpload.single('recording'),
+  recruitmentController.uploadInterviewRecording);
 
 // ==================== ADMIN ROUTES ====================
 

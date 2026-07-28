@@ -4,9 +4,15 @@ const {
   sendApplicationNotification,
   sendApplicationStatusUpdate,
 } = require('../config/utils/emailService');
-const { decryptNIN } = require('../config/utils/ninEncryption');
 
 let applicationNegotiationSchemaReady = false;
+
+const APPLICATION_IDENTITY_FIELDS = [
+  'tenant_nin',
+  'tenant_passport_number',
+  'nin',
+  'international_passport_number',
+];
 
 // Phone number masking for security - prevent sharing during negotiation
 const maskPhoneNumbers = (data) => {
@@ -25,6 +31,12 @@ const sanitizeForNegotiation = (application) => {
   delete sanitized.landlord_phone;
   delete sanitized.tenant_phone;
   delete sanitized.phone;
+  // Identity numbers are never required to review or negotiate an application.
+  // Keep this denylist as defence in depth in case a future query accidentally
+  // selects one of the underlying user identity columns.
+  APPLICATION_IDENTITY_FIELDS.forEach((field) => {
+    delete sanitized[field];
+  });
   // Keep only name and email for contact, not phone
   return sanitized;
 };
@@ -142,11 +154,13 @@ const getApplicationForLandlord = async (applicationId, userId) => {
        u.full_name AS tenant_name,
        u.phone AS tenant_phone,
        u.email AS tenant_email,
-       u.nin AS tenant_nin,
        u.identity_document_type AS tenant_identity_document_type,
-       u.international_passport_number AS tenant_passport_number,
        u.nationality AS tenant_nationality,
-       u.identity_verified AS tenant_verified
+       u.identity_verified AS tenant_verified,
+       CASE
+         WHEN u.identity_verified = TRUE THEN 'verified'
+         ELSE 'pending'
+       END AS tenant_identity_verification_status
      FROM applications a
      JOIN properties p ON a.property_id = p.id
      JOIN users u ON a.tenant_id = u.id
@@ -155,13 +169,7 @@ const getApplicationForLandlord = async (applicationId, userId) => {
   );
 
   const row = result.rows[0] || null;
-
-  // Decrypt tenant NIN before returning to landlord
-  if (row && row.tenant_nin) {
-    row.tenant_nin = decryptNIN(row.tenant_nin);
-  }
-
-  return row;
+  return sanitizeForNegotiation(row);
 };
 
 const getNegotiationHistory = async (applicationId) => {
@@ -531,7 +539,7 @@ exports.getPropertyApplications = async (req, res) => {
 
     return res.json({
       success: true,
-      data: result.rows,
+      data: result.rows.map(sanitizeForNegotiation),
       pagination: {
         page: parseInt(page, 10),
         limit: parseInt(limit, 10),

@@ -270,7 +270,7 @@ export default function Careers() {
   const withApplicantAccess = useCallback((url, targetApplication = application) => {
     const payload = getApplicantAccessPayload(targetApplication);
     const params = new URLSearchParams();
-    if (payload.applicant_email) params.set('applicant_email', payload.applicant_email);
+    if (payload.applicant_email) params.set('email', payload.applicant_email);
     if (payload.reference_number) params.set('reference_number', payload.reference_number);
     const query = params.toString();
     return query ? `${url}${url.includes('?') ? '&' : '?'}${query}` : url;
@@ -310,9 +310,8 @@ export default function Careers() {
         : '';
       const email = normalize(emailOverride || form.email_address || storedEmail);
       const reference = normalize(referenceOverride || storedReference);
-      if (!email) return;
-      const params = new URLSearchParams({ email });
-      if (reference) params.set('reference_number', reference);
+      if (!email || !reference) return;
+      const params = new URLSearchParams({ email, reference_number: reference });
       const res = await api.get(`/recruitment/my-application?${params.toString()}`);
       const app = res.data?.data || null;
       setApplication(app);
@@ -400,7 +399,10 @@ export default function Careers() {
     const verify = async () => {
       setPaymentBusy(true);
       try {
-        const res = await api.post(`/recruitment/payments/verify/${encodeURIComponent(reference)}`);
+        const res = await api.post(
+          `/recruitment/payments/verify/${encodeURIComponent(reference)}`,
+          getApplicantAccessPayload()
+        );
         const code = res.data?.data?.access_code;
         const paidApplication = res.data?.data?.application;
         if (paidApplication) {
@@ -429,7 +431,7 @@ export default function Careers() {
     };
 
     verify();
-  }, [loadMyApplication, rememberApplication, searchParams, setSearchParams]);
+  }, [getApplicantAccessPayload, loadMyApplication, rememberApplication, searchParams, setSearchParams]);
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
@@ -514,7 +516,10 @@ export default function Careers() {
 
     setUploading(true);
     try {
-      await api.post(`/recruitment/documents/upload/${application.id}`, formData);
+      await api.post(
+        withApplicantAccess(`/recruitment/documents/upload/${application.id}`),
+        formData
+      );
       toast.success(t('careers.documents_uploaded'));
       await loadMyApplication();
     } catch (error) {
@@ -803,7 +808,11 @@ export default function Careers() {
     formData.append('fingerprint', interviewFingerprintRef.current);
     formData.append('violation_log', interviewLocked ? 'Interview locked by proctoring' : '');
     try {
-      await api.post('/recruitment/interview/recording', formData);
+      const recordingParams = new URLSearchParams({
+        application_id: String(application?.id || ''),
+        challenge_token: interviewChallengeToken,
+      });
+      await api.post(`/recruitment/interview/recording?${recordingParams.toString()}`, formData);
     } catch (error) {
       console.error('Interview recording upload failed:', error);
     }

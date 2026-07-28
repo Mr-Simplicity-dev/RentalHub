@@ -12,7 +12,22 @@ const router = express.Router();
 const logger = require('../config/utils/logger');
 const activityLogger = require('../services/activityLogger');
 
-const { contactFormLimiter, typingLimiter } = require('../config/middleware/securityRateLimiters');
+const {
+  contactFormLimiter,
+  guestSupportLookupLimiter,
+  guestSupportReadLimiter,
+  guestSupportWriteLimiter,
+  guestSupportPresenceLimiter,
+  typingLimiter,
+} = require('../config/middleware/securityRateLimiters');
+const {
+  generateGuestAccessToken,
+  hashGuestAccessToken,
+  verifyGuestAccessToken,
+  normalizeGuestEmail,
+  isLegacyGuestEmailAccessEnabled,
+  canUseLegacyGuestEmailAccess,
+} = require('../config/utils/guestSupportAccess');
 
 const SUPPORT_ADMIN_ROLES = new Set([
   'super_admin',
@@ -222,11 +237,24 @@ const emitTicketToAdmins = (event, payload) => {
   }
 };
 
+const toClientSupportTicket = (ticket = {}) => {
+  const {
+    guest_access_token_hash: _guestAccessTokenHash,
+    guest_access_token_created_at: _guestAccessTokenCreatedAt,
+    guest_access_token_last_used_at: _guestAccessTokenLastUsedAt,
+    guest_access_token_revoked_at: _guestAccessTokenRevokedAt,
+    guest_legacy_access_expires_at: _guestLegacyAccessExpiresAt,
+    ...safeTicket
+  } = ticket;
+
+  return safeTicket;
+};
+
 const emitTicketUpdated = (ticket, extra = {}) => {
   if (!ticket?.id) return;
   const payload = {
     ticketId: ticket.id,
-    ticket: { ...ticket, ...extra },
+    ticket: { ...toClientSupportTicket(ticket), ...extra },
   };
   emitTicketToAdmins('ticket:updated', payload);
   if (ticket.user_id) emitToUser(ticket.user_id, 'ticket:updated', payload);
@@ -254,6 +282,11 @@ const ensureSupportSchema = async () => {
       sla_due_at TIMESTAMP,
       last_escalated_at TIMESTAMP,
       resolution_summary TEXT,
+      guest_access_token_hash VARCHAR(64),
+      guest_access_token_created_at TIMESTAMP,
+      guest_access_token_last_used_at TIMESTAMP,
+      guest_access_token_revoked_at TIMESTAMP,
+      guest_legacy_access_expires_at TIMESTAMP,
       user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
       escalated_at TIMESTAMP,
@@ -312,6 +345,21 @@ const ensureSupportSchema = async () => {
       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='department_resolution_notified_at') THEN
         ALTER TABLE support_tickets ADD COLUMN department_resolution_notified_at TIMESTAMP;
       END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='guest_access_token_hash') THEN
+        ALTER TABLE support_tickets ADD COLUMN guest_access_token_hash VARCHAR(64);
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='guest_access_token_created_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN guest_access_token_created_at TIMESTAMP;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='guest_access_token_last_used_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN guest_access_token_last_used_at TIMESTAMP;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='guest_access_token_revoked_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN guest_access_token_revoked_at TIMESTAMP;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='support_tickets' AND column_name='guest_legacy_access_expires_at') THEN
+        ALTER TABLE support_tickets ADD COLUMN guest_legacy_access_expires_at TIMESTAMP;
+      END IF;
     END $$;
 
     CREATE INDEX IF NOT EXISTS idx_support_tickets_status_priority
@@ -322,6 +370,15 @@ const ensureSupportSchema = async () => {
       ON support_tickets(escalation_department, escalation_status);
     CREATE INDEX IF NOT EXISTS idx_support_tickets_sla
       ON support_tickets(sla_due_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_support_tickets_guest_access_token_hash
+      ON support_tickets(guest_access_token_hash)
+      WHERE guest_access_token_hash IS NOT NULL;
+
+    UPDATE support_tickets
+    SET guest_legacy_access_expires_at = CURRENT_TIMESTAMP + INTERVAL '30 days'
+    WHERE user_id IS NULL
+      AND guest_access_token_hash IS NULL
+      AND guest_legacy_access_expires_at IS NULL;
 
     CREATE TABLE IF NOT EXISTS support_ticket_replies (
       id SERIAL PRIMARY KEY,
@@ -414,6 +471,80 @@ const requireSupportAdmin = (req, res, next) => {
 };
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
+const GUEST_ACCESS_DENIED_MESSAGE = 'Ticket not found or guest access credentials are invalid';
+
+const getGuestAccessTokenFromRequest = (req = {}) => {
+  const headerToken = typeof req.get === 'function'
+    ? req.get('x-guest-access-token')
+    : req.headers?.['x-guest-access-token'];
+
+  return String(
+    headerToken
+      || req.body?.guestAccessToken
+      || req.body?.accessToken
+      || ''
+  ).trim();
+};
+
+const getGuestEmailFromRequest = (req = {}) =>
+  normalizeGuestEmail(req.body?.email || req.query?.email);
+
+const removeUploadedFile = (file) => {
+  if (!file?.path) return;
+  try {
+    fs.unlinkSync(file.path);
+  } catch {
+    // The upload may already have been removed by validation middleware.
+  }
+};
+
+const setGuestResponseNoStore = (res) => {
+  if (typeof res.set === 'function') {
+    res.set('Cache-Control', 'no-store, private');
+    res.set('Pragma', 'no-cache');
+  }
+};
+
+const touchGuestAccessToken = async (ticketId) => {
+  await db.query(
+    `UPDATE support_tickets
+     SET guest_access_token_last_used_at = CURRENT_TIMESTAMP
+     WHERE id = $1
+       AND (
+         guest_access_token_last_used_at IS NULL
+         OR guest_access_token_last_used_at < CURRENT_TIMESTAMP - INTERVAL '15 minutes'
+       )`,
+    [ticketId]
+  );
+};
+
+const getGuestTicketForRequest = async (ticketId, req) => {
+  const result = await db.query(
+    `SELECT *
+     FROM support_tickets
+     WHERE id = $1 AND user_id IS NULL
+     LIMIT 1`,
+    [ticketId]
+  );
+  if (!result.rows.length) return null;
+
+  const ticket = result.rows[0];
+  const accessToken = getGuestAccessTokenFromRequest(req);
+  const tokenAuthorized = Boolean(
+    !ticket.guest_access_token_revoked_at
+      && ticket.guest_access_token_hash
+      && verifyGuestAccessToken(accessToken, ticket.guest_access_token_hash)
+  );
+  const legacyAuthorized = canUseLegacyGuestEmailAccess(
+    ticket,
+    getGuestEmailFromRequest(req)
+  );
+
+  if (!tokenAuthorized && !legacyAuthorized) return null;
+  if (tokenAuthorized) await touchGuestAccessToken(ticket.id);
+
+  return { ticket, legacyAuthorized };
+};
 
 const resolveSupportDashboardScope = (user = {}) => {
   const role = normalizeText(user.user_type || user.userType);
@@ -1124,11 +1255,14 @@ router.post('/contact', contactFormLimiter, [
     const normalizedPriority = priority || 'medium';
     const escalationDepartment = normalizeDepartment(req.body.escalation_department, category, relatedType);
     const slaDueAt = resolveSlaDueAt(category, normalizedPriority);
+    const guestAccessToken = generateGuestAccessToken();
+    const guestAccessTokenHash = hashGuestAccessToken(guestAccessToken);
     const result = await db.query(
       `INSERT INTO support_tickets
          (subject, description, state, lga, contact_email, priority, status, user_id,
-          category, related_type, related_id, escalation_department, sla_due_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'open', NULL, $7, $8, $9, $10, $11)
+          category, related_type, related_id, escalation_department, sla_due_at,
+          guest_access_token_hash, guest_access_token_created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'open', NULL, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
        RETURNING id`,
       [
         subject?.trim() ? `[Contact] ${subject.trim()}` : `[Contact] ${name.trim()}`,
@@ -1144,6 +1278,7 @@ router.post('/contact', contactFormLimiter, [
         relatedId,
         escalationDepartment,
         slaDueAt,
+        guestAccessTokenHash,
       ]
     );
 
@@ -1265,7 +1400,12 @@ router.post('/contact', contactFormLimiter, [
       },
     });
 
-    res.status(201).json({ success: true, message: 'Message sent successfully', data: { ticketId } });
+    setGuestResponseNoStore(res);
+    res.status(201).json({
+      success: true,
+      message: 'Message sent successfully',
+      data: { ticketId, guestAccessToken },
+    });
   } catch (error) {
     req.logger.error('Contact form error:', error);
     res.status(500).json({ success: false, message: 'Failed to send message' });
@@ -1650,7 +1790,7 @@ router.patch('/tickets/:id/assign', authenticate, requireSupportAdmin, async (re
       ip: req.ip,
     });
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: toClientSupportTicket(result.rows[0]) });
   } catch (error) {
     req.logger.error('Assign support ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to assign support ticket' });
@@ -1696,7 +1836,7 @@ router.post('/tickets/:id/takeover', authenticate, async (req, res) => {
     });
 
     emitTicketUpdated(result.rows[0]);
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: toClientSupportTicket(result.rows[0]) });
   } catch (error) {
     req.logger.error('Takeover ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to take over ticket' });
@@ -1755,7 +1895,7 @@ router.patch('/tickets/:id/resolve', authenticate, requireSupportAdmin, async (r
       ip: req.ip,
     });
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: toClientSupportTicket(result.rows[0]) });
   } catch (error) {
     req.logger.error('Resolve support ticket error:', error);
     res.status(500).json({ success: false, message: 'Failed to resolve support ticket' });
@@ -1810,7 +1950,10 @@ router.get('/tickets/:id/context', authenticate, async (req, res) => {
     res.json({
       success: true,
       data: {
-        ticket: { ...ticket, related_admin_path: getRelatedAdminPath(ticket, req.user.user_type) },
+        ticket: {
+          ...toClientSupportTicket(ticket),
+          related_admin_path: getRelatedAdminPath(ticket, req.user.user_type),
+        },
         related_context: relatedContext,
         timeline: timelineResult.rows,
       },
@@ -1860,9 +2003,13 @@ router.post('/tickets/:id/escalate-department', authenticate, requireSupportAdmi
     await addTicketTimeline(ticketId, req.user, 'department_escalated', note || `Escalated to ${department.replace(/_/g, ' ')}`, { department });
     await notifyDepartmentEscalation(result.rows[0], department, note);
     emitTicketUpdated(result.rows[0]);
-    emitTicketToAdmins('ticket:department_escalated', { ticketId, ticket: result.rows[0], department });
+    emitTicketToAdmins('ticket:department_escalated', {
+      ticketId,
+      ticket: toClientSupportTicket(result.rows[0]),
+      department,
+    });
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: toClientSupportTicket(result.rows[0]) });
   } catch (error) {
     req.logger.error('Support department escalation error:', error);
     res.status(500).json({ success: false, message: 'Failed to escalate ticket to department' });
@@ -1897,7 +2044,7 @@ router.patch('/tickets/:id/escalation-status', authenticate, requireSupportAdmin
 
     await addTicketTimeline(ticketId, req.user, 'escalation_status_updated', note || `Escalation status changed to ${escalationStatus.replace(/_/g, ' ')}`, { escalation_status: escalationStatus });
     emitTicketUpdated(result.rows[0]);
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: toClientSupportTicket(result.rows[0]) });
   } catch (error) {
     req.logger.error('Support escalation status error:', error);
     res.status(500).json({ success: false, message: 'Failed to update escalation status' });
@@ -2031,7 +2178,11 @@ router.patch('/department-escalations/:id/status', authenticate, async (req, res
             `Ticket #${ticketId} "${ticket.subject}" was resolved by ${departmentName}. Please follow up with the user.`,
             `/super-admin`
           );
-          emitToUser(ticket.assigned_to, 'ticket:department_resolved', { ticketId, ticket: result.rows[0], department: ticket.escalation_department });
+          emitToUser(ticket.assigned_to, 'ticket:department_resolved', {
+            ticketId,
+            ticket: toClientSupportTicket(result.rows[0]),
+            department: ticket.escalation_department,
+          });
         } catch (notifyErr) {
           req.logger.error('Failed to notify support admin of department resolution:', notifyErr);
         }
@@ -2039,7 +2190,7 @@ router.patch('/department-escalations/:id/status', authenticate, async (req, res
     }
 
     emitTicketUpdated(result.rows[0]);
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: toClientSupportTicket(result.rows[0]) });
   } catch (error) {
     req.logger.error('Department escalation status error:', error);
     res.status(500).json({ success: false, message: 'Failed to update department escalation' });
@@ -2718,50 +2869,84 @@ router.get('/tickets/internal-notes/unread-count', authenticate, requireSupportA
   }
 });
 
-// POST /tickets/contact-lookup — look up contact-form tickets by email (public)
-router.post('/tickets/contact-lookup', contactFormLimiter, async (req, res) => {
+// POST /tickets/contact-lookup — recover a guest ticket using its per-ticket secret.
+// Email-only lookup is an explicit, time-limited migration aid for pre-token tickets.
+router.post('/tickets/contact-lookup', guestSupportLookupLimiter, async (req, res) => {
   try {
     await ensureSupportSchema();
 
-    const { email } = req.body;
-    if (!email || !email.trim()) {
-      return res.status(400).json({ success: false, message: 'Email is required' });
+    setGuestResponseNoStore(res);
+    const accessToken = getGuestAccessTokenFromRequest(req);
+    const accessTokenHash = hashGuestAccessToken(accessToken);
+
+    if (accessTokenHash) {
+      const result = await db.query(
+        `SELECT id, subject, status, created_at
+         FROM support_tickets
+         WHERE guest_access_token_hash = $1
+           AND guest_access_token_revoked_at IS NULL
+           AND user_id IS NULL
+         LIMIT 1`,
+        [accessTokenHash]
+      );
+
+      if (!result.rows.length) {
+        return res.status(404).json({ success: false, message: GUEST_ACCESS_DENIED_MESSAGE });
+      }
+
+      await touchGuestAccessToken(result.rows[0].id);
+      return res.json({ success: true, data: result.rows });
     }
 
-    const result = await db.query(
-      `SELECT id, subject, status, created_at FROM support_tickets
-       WHERE contact_email = $1 AND user_id IS NULL
-       ORDER BY created_at DESC LIMIT 10`,
-      [email.trim().toLowerCase()]
+    if (accessToken) {
+      return res.status(404).json({ success: false, message: GUEST_ACCESS_DENIED_MESSAGE });
+    }
+
+    if (!isLegacyGuestEmailAccessEnabled()) {
+      return res.status(401).json({
+        success: false,
+        message: 'A guest access token is required',
+      });
+    }
+
+    const email = getGuestEmailFromRequest(req);
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'A guest access token is required' });
+    }
+
+    const legacyResult = await db.query(
+      `SELECT id, subject, status, created_at
+       FROM support_tickets
+       WHERE contact_email = $1
+         AND user_id IS NULL
+         AND guest_access_token_hash IS NULL
+         AND guest_legacy_access_expires_at > CURRENT_TIMESTAMP
+       ORDER BY created_at DESC
+       LIMIT 10`,
+      [email]
     );
 
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: legacyResult.rows, legacyAccess: true });
   } catch (error) {
     req.logger.error('Contact lookup error:', error);
     res.status(500).json({ success: false, message: 'Lookup failed' });
   }
 });
 
-// POST /tickets/contact-conversation — get replies for a contact-form ticket (public, email-gated)
-router.post('/tickets/contact-conversation', contactFormLimiter, async (req, res) => {
+// POST /tickets/contact-conversation — get replies for a token-authorized guest ticket.
+router.post('/tickets/contact-conversation', guestSupportReadLimiter, async (req, res) => {
   try {
     await ensureSupportSchema();
 
-    const { ticketId, email } = req.body;
-    if (!ticketId || !email) {
-      return res.status(400).json({ success: false, message: 'Ticket ID and email are required' });
+    setGuestResponseNoStore(res);
+    const ticketId = Number(req.body?.ticketId);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
     }
 
-    const ticketResult = await db.query(
-      'SELECT id, contact_email FROM support_tickets WHERE id = $1 AND user_id IS NULL',
-      [ticketId]
-    );
-    if (!ticketResult.rows.length) {
-      return res.status(404).json({ success: false, message: 'Ticket not found' });
-    }
-
-    if (ticketResult.rows[0].contact_email !== email.trim().toLowerCase()) {
-      return res.status(403).json({ success: false, message: 'Email does not match this ticket' });
+    const guestAccess = await getGuestTicketForRequest(ticketId, req);
+    if (!guestAccess) {
+      return res.status(404).json({ success: false, message: GUEST_ACCESS_DENIED_MESSAGE });
     }
 
     const result = await db.query(
@@ -2772,7 +2957,12 @@ router.post('/tickets/contact-conversation', contactFormLimiter, async (req, res
       [ticketId]
     );
 
-    res.json({ success: true, data: result.rows, ticket: { id: ticketResult.rows[0].id, contact_email: ticketResult.rows[0].contact_email } });
+    res.json({
+      success: true,
+      data: result.rows,
+      ticket: { id: guestAccess.ticket.id },
+      legacyAccess: guestAccess.legacyAuthorized,
+    });
   } catch (error) {
     req.logger.error('Contact conversation error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch conversation' });
@@ -3010,33 +3200,35 @@ router.delete('/tickets/:ticketId/internal-notes/:noteId', authenticate, require
   }
 });
 
-// POST /tickets/contact-reply — public reply for contact-form tickets (email-gated)
-router.post('/tickets/contact-reply', contactFormLimiter, uploadAttachment.single('attachment'), verifyUploadedFile, async (req, res) => {
+// POST /tickets/contact-reply — token-authorized public reply for a guest ticket.
+router.post('/tickets/contact-reply', guestSupportWriteLimiter, uploadAttachment.single('attachment'), verifyUploadedFile, async (req, res) => {
+  let attachmentPersisted = false;
   try {
     await ensureSupportSchema();
 
-    const { ticketId, email, message } = req.body;
+    setGuestResponseNoStore(res);
+    const ticketId = Number(req.body?.ticketId);
+    const { message } = req.body;
     const msg = (message || '').trim();
 
-    if (!ticketId || !email) {
-      return res.status(400).json({ success: false, message: 'Ticket ID and email are required' });
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      removeUploadedFile(req.file);
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
     }
     if (!msg && !req.file) {
       return res.status(400).json({ success: false, message: 'Message or attachment is required' });
     }
-
-    const ticketResult = await db.query(
-      'SELECT id, subject, contact_email, status, assigned_to, state, lga FROM support_tickets WHERE id = $1 AND user_id IS NULL',
-      [ticketId]
-    );
-    if (!ticketResult.rows.length) {
-      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    if (msg.length > 10000) {
+      removeUploadedFile(req.file);
+      return res.status(400).json({ success: false, message: 'Message must not exceed 10000 characters' });
     }
-    const ticket = ticketResult.rows[0];
 
-    if (ticket.contact_email !== email.trim().toLowerCase()) {
-      return res.status(403).json({ success: false, message: 'Email does not match this ticket' });
+    const guestAccess = await getGuestTicketForRequest(ticketId, req);
+    if (!guestAccess) {
+      removeUploadedFile(req.file);
+      return res.status(404).json({ success: false, message: GUEST_ACCESS_DENIED_MESSAGE });
     }
+    const ticket = guestAccess.ticket;
 
     const result = await db.query(
       `INSERT INTO support_ticket_replies (ticket_id, user_id, author_name, message, is_admin, attachment_url, attachment_name, attachment_type)
@@ -3044,13 +3236,14 @@ router.post('/tickets/contact-reply', contactFormLimiter, uploadAttachment.singl
        RETURNING *`,
       [
         ticketId,
-        email.trim(),
+        ticket.contact_email || 'Guest',
         msg,
         req.file ? `/uploads/tickets/${req.file.filename}` : null,
         req.file ? req.file.originalname : null,
         req.file ? req.file.mimetype : null,
       ]
     );
+    attachmentPersisted = Boolean(req.file);
 
     const reply = result.rows[0];
 
@@ -3109,31 +3302,26 @@ router.post('/tickets/contact-reply', contactFormLimiter, uploadAttachment.singl
 
     res.status(201).json({ success: true, data: reply });
   } catch (error) {
+    if (!attachmentPersisted) removeUploadedFile(req.file);
     req.logger.error('Contact reply error:', error);
     res.status(500).json({ success: false, message: 'Failed to send reply' });
   }
 });
 
 // GET /tickets/:id/typing-status — polling endpoint for anonymous contact users
-router.get('/tickets/:id/typing-status', async (req, res) => {
+router.get('/tickets/:id/typing-status', guestSupportPresenceLimiter, async (req, res) => {
   try {
+    await ensureSupportSchema();
+
+    setGuestResponseNoStore(res);
     const ticketId = Number(req.params.id);
-    const { email } = req.query;
-
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email query param is required' });
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid ticket ID is required' });
     }
 
-    // Verify this is a contact ticket and email matches
-    const ticketResult = await db.query(
-      'SELECT id, contact_email FROM support_tickets WHERE id = $1 AND user_id IS NULL',
-      [ticketId]
-    );
-    if (!ticketResult.rows.length) {
-      return res.status(404).json({ success: false, message: 'Ticket not found' });
-    }
-    if (ticketResult.rows[0].contact_email !== email.trim().toLowerCase()) {
-      return res.status(403).json({ success: false, message: 'Email does not match' });
+    const guestAccess = await getGuestTicketForRequest(ticketId, req);
+    if (!guestAccess) {
+      return res.status(404).json({ success: false, message: GUEST_ACCESS_DENIED_MESSAGE });
     }
 
     const now = Date.now();
@@ -3411,6 +3599,8 @@ router._supportScopeForTest = {
   getDepartmentEscalationPath,
   getSupportPolicySettings,
   runSupportSlaMonitor,
+  toClientSupportTicket,
+  getGuestAccessTokenFromRequest,
 };
 
 module.exports = router;
