@@ -37,27 +37,29 @@ const QrCodePage = () => {
           {/* QR Code Card */}
           <div className="bg-white rounded-3xl shadow-xl p-8 sm:p-10 text-center print:shadow-none print:border print:border-gray-200">
             {/* QR Code with Logo */}
-            <div className="relative inline-block mb-8">
-              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm print:border-0 print:p-2">
-                <QRCodeSVG
-                  value={DOWNLOAD_URL}
-                  size={280}
-                  level="H"
-                  bgColor="#ffffff"
-                  fgColor="#0f172a"
-                  includeMargin={false}
-                  imageSettings={{
-                    src: '/rentalhub-mark.svg',
-                    x: undefined,
-                    y: undefined,
-                    height: 56,
-                    width: 56,
-                    excavate: true,
-                  }}
-                />
-              </div>
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-md">
-                RENTALHUB NG
+            <div className="flex justify-center mb-8">
+              <div className="relative inline-block">
+                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-gray-100 shadow-sm print:border-0 print:p-2">
+                  <QRCodeSVG
+                    value={DOWNLOAD_URL}
+                    size={Math.min(260, typeof window !== 'undefined' ? window.innerWidth - 96 : 260)}
+                    level="H"
+                    bgColor="#ffffff"
+                    fgColor="#0f172a"
+                    includeMargin={false}
+                    imageSettings={{
+                      src: '/rentalhub-mark.svg',
+                      x: undefined,
+                      y: undefined,
+                      height: 48,
+                      width: 48,
+                      excavate: true,
+                    }}
+                  />
+                </div>
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-md">
+                  RENTALHUB NG
+                </div>
               </div>
             </div>
 
