@@ -50,7 +50,7 @@ const dataGroups = [
       'Name, email address, phone number, password hash, account type and role, profile photograph, preferred state/LGA, referral information, account settings, verification status and information about an agent or lawyer you nominate.',
     source: 'You, an authorised inviter or referrer, and account administrators.',
     use:
-      'Create and secure your account, authenticate you, personalise the service, connect the correct role and jurisdiction, communicate with you and provide customer support.',
+      'Create and secure your account, authenticate you, personalise the service, connect the correct role and jurisdiction, communicate with you, provide customer support and—where permitted—send campaigns or offers. Some account and lead flows synchronise email/phone details to campaign lists.',
     basis: 'Contract and steps requested before a contract; legitimate interests in account security and service administration; consent where required.',
     share: 'Authorised RentalHub personnel and service providers that support authentication, communications and hosting.',
     retention:
@@ -68,7 +68,7 @@ const dataGroups = [
     basis:
       'Consent where required for sensitive or biometric-related processing; contract; legal obligations; legitimate interests in fraud prevention and platform safety.',
     share:
-      'Prembly and other approved identity-verification processors, restricted authorised staff, and regulators or law-enforcement bodies where legally required.',
+      'Prembly and other approved identity-verification processors, restricted authorised staff, and regulators or law-enforcement bodies where legally required. For a property application, the relevant landlord currently receives the applicant’s full NIN or passport number together with name and contact/identity details.',
     retention:
       'Only while needed for identity assurance, fraud prevention, compliance, disputes and applicable legal requirements. Verification results and audit evidence may outlast an active account where justified.',
   },
@@ -76,13 +76,13 @@ const dataGroups = [
     title: 'Properties, rentals and applications',
     icon: FaFileAlt,
     collect:
-      'Property address and location, ownership/listing details, rent and deposits, amenities, photographs and media, applications, saved properties, views, inspections, tenancy and landlord-agent relationship records, reviews and ratings.',
+      'Property address and location, ownership/listing details, rent and deposits, amenities, photographs and media, applications, saved properties, views, inspections, tenancy and landlord-agent relationship records, reviews, ratings, public-display choices and an optional testimonial image.',
     source: 'Tenants, landlords, agents, inspectors, administrators and your use of property features.',
     use:
       'Publish and match listings, process applications, manage tenancies and inspections, provide property access, prevent misleading listings and resolve rental issues.',
     basis: 'Contract and pre-contract steps; legitimate interests in operating a trusted marketplace; legal obligations; consent for optional public content.',
     share:
-      'The landlord, tenant, agent or professional involved in the transaction; authorised administrators; Cloudinary or other media-storage providers; and professional advisers where a case requires them.',
+      'The landlord, tenant, agent or professional involved in the transaction; authorised administrators; Cloudinary or other media-storage providers; and professional advisers where a case requires them. An approved public rating can show the selected name format, comment, role/location and—only where the relevant platform setting and user choice permit it—a profile/passport photograph as the testimonial image.',
     retention:
       'For the listing, application or tenancy lifecycle and afterwards for support, fraud, legal, audit and limitation-period needs. Public content is removed or de-identified when it is no longer needed or following an applicable request.',
   },
@@ -175,6 +175,11 @@ const recipientGroups = [
     name: 'Communications and web services',
     detail:
       'Configured email/SMTP or Resend services, Termii or Twilio for SMS, Meta WhatsApp services, Google Maps, Google Analytics and HubSpot chat may process the information required to provide their feature.',
+  },
+  {
+    name: 'AI-assisted damage analysis',
+    detail:
+      'When the damage-analysis feature is used, the submitted damage photograph is sent to Anthropic’s Claude service for a non-binding analysis. RentalHub stores the resulting assessment with the damage workflow.',
   },
   {
     name: 'Professional and public authorities',
@@ -493,8 +498,10 @@ const Privacy = () => {
                   <h3 className="font-extrabold text-slate-950">Service and safety communications</h3>
                   <p className="mt-2 text-sm leading-6 text-primary-900">
                     We may send account, security, payment, application, booking, dispute and support notices needed to
-                    operate the service. Promotional messages are treated separately: use an unsubscribe control,
-                    notification setting where available, or contact us to opt out.
+                    operate the service. Some account and lead flows also synchronise email and phone details to email/SMS
+                    campaign lists. Email campaigns provide an unsubscribe route. Mobile notification preferences control
+                    native push categories only; to stop SMS or WhatsApp marketing, contact us. Promotional messages must
+                    only be sent where consent or another applicable legal basis permits them.
                   </p>
                 </div>
               </PolicySection>
@@ -515,9 +522,8 @@ const Privacy = () => {
                 <p className="mt-5">
                   Provider names can change as the platform evolves. A provider is permitted to process only the
                   information needed for its service and must be assessed and governed as required by applicable law.
-                  RentalHub does not sell personal data for money or data-broker activity. Sponsored content may record
-                  aggregate impression or click counts; opening a sponsor’s link takes you to a service with its own
-                  privacy policy.
+                  Sponsored content may record aggregate impression or click counts; opening a sponsor’s link takes you
+                  to a service with its own privacy policy.
                 </p>
               </PolicySection>
 
@@ -526,12 +532,20 @@ const Privacy = () => {
                   <div>
                     <h3 className="text-lg font-extrabold text-slate-950">Identity verification and face/liveness checks</h3>
                     <p className="mt-2">
-                      RentalHub may send NIN, passport, nationality, date-of-birth, document and live-face information to
-                      Prembly to validate identity and liveness. Within RentalHub, NIN values are protected using
-                      authenticated encryption and a separate one-way lookup hash used to detect duplicates. Access is
-                      restricted to authorised verification and compliance workflows. A verification result can be used
-                      to approve, reject, revalidate or investigate an account, subject to the rights below.
+                      Current Prembly validation sends NIN, name and date of birth for a Nigerian identity check, or
+                      passport number, name, nationality and date of birth for a passport check. RentalHub may separately
+                      collect an identity/passport photograph. If a face/liveness feature is enabled and presented to
+                      you, the notice at that step will explain any face image sent for liveness processing. Within
+                      RentalHub, NIN values are protected using authenticated encryption and a separate one-way lookup
+                      hash used to detect duplicates. A verification result can be used to approve, reject, revalidate or
+                      investigate an account, subject to the rights below.
                     </p>
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+                      <strong>Property-application disclosure:</strong> when an application is submitted, the relevant
+                      landlord currently receives the applicant’s full decrypted NIN (for a Nigerian identity) or
+                      plaintext passport number (for a foreign identity), together with name, phone, email and applicable
+                      nationality information. Do not submit an application unless you understand this disclosure.
+                    </div>
                   </div>
                   <div>
                     <h3 className="text-lg font-extrabold text-slate-950">Phone biometrics</h3>
@@ -622,7 +636,6 @@ const Privacy = () => {
                       'Accounting, tax, audit, court, regulatory, transaction and limitation-period obligations.',
                       'An unresolved payment, chargeback, complaint, dispute, damage report, legal claim or investigation.',
                       'Whether the record can be safely aggregated, anonymised or redacted instead of retained in identifiable form.',
-                      'Backup and processor deletion cycles, during which a deleted record may remain isolated until the cycle completes.',
                     ]}
                   />
                 </div>
@@ -685,8 +698,8 @@ const Privacy = () => {
                     Use an available profile/account control or email support@rentalhub.com.ng with the subject
                     “Privacy request”. Describe the account and request, but do not email a password, full NIN, full
                     payment-card details or unnecessary identity documents. We may securely verify identity and authority
-                    before disclosing or changing data. Authenticated personal-data export and account-purge workflows are
-                    supported; contact us if the relevant control is not visible.
+                    before disclosing or changing data. Account controls differ by platform, so contact us if an export,
+                    correction or deletion control is not visible and we will assess the full request.
                   </p>
                   <p className="mt-3 text-sm leading-6 text-primary-100">
                     A right may have lawful limits—for example, another person’s privacy, an active transaction or
@@ -698,10 +711,10 @@ const Privacy = () => {
 
               <PolicySection id="children" eyebrow="14 · Age" title="Children’s privacy" icon={FaUsers}>
                 <p>
-                  RentalHub’s property, payment and professional services are intended for adults who can enter binding
-                  transactions. We do not knowingly invite a child under 18 to create an independent account. A parent or
-                  guardian who believes a child supplied personal data without appropriate authority should contact us so
-                  we can investigate, restrict the account and delete data where the law permits.
+                  RentalHub’s property, payment and professional services are designed for adults who can enter binding
+                  transactions. The current registration code does not provide a comprehensive age-verification gate. A
+                  parent or guardian who believes a child under 18 supplied personal data without appropriate authority
+                  should contact us so we can investigate, restrict the account and delete data where the law permits.
                 </p>
               </PolicySection>
 
