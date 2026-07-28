@@ -33,9 +33,23 @@ const ShareMenu = ({
   shareErrorMessage = 'Unable to open share sheet',
 }) => {
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState({});
+  const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const shareUrl = typeof window !== 'undefined' ? (url || window.location.href) : (url || '');
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  const handleToggle = () => {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        top: `${rect.bottom + 8}px`,
+        [position]: `${Math.min(16, window.innerWidth - rect.right)}px`,
+        maxHeight: `${window.innerHeight - rect.bottom - 24}px`,
+      });
+    }
+    setOpen((p) => !p);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -44,8 +58,13 @@ const ShareMenu = ({
         setOpen(false);
       }
     };
+    const handleScroll = () => setOpen(false);
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('scroll', handleScroll, true);
+    };
   }, [open]);
 
   const handleNativeShare = async () => {
@@ -104,10 +123,11 @@ const ShareMenu = ({
   ];
 
   return (
-    <div ref={menuRef} className={`relative inline-block ${className}`} onClick={(e) => e.stopPropagation()}>
+    <div ref={menuRef} className={`inline-block ${className}`} onClick={(e) => e.stopPropagation()}>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((p) => !p)}
+        onClick={handleToggle}
         className={buttonClassName || 'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-primary-600 hover:border-primary-300 transition-all duration-200 shadow-sm'}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -118,9 +138,10 @@ const ShareMenu = ({
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[100]" onClick={() => setOpen(false)} />
           <div
-            className={`absolute ${position === 'right' ? 'right-0' : 'left-0'} z-50 mt-2 w-52 origin-top-right animate-scaleIn rounded-xl border border-gray-100 bg-white py-2 shadow-elevated-lg`}
+            style={dropdownStyle}
+            className={`fixed z-[110] w-52 origin-top-right animate-scaleIn rounded-xl border border-gray-100 bg-white py-2 shadow-elevated-lg overflow-y-auto`}
           >
             <div className="px-4 pb-2 mb-1 border-b border-gray-100">
               <p className="text-xs font-semibold text-gray-700">{headerLabel}</p>
