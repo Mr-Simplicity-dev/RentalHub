@@ -301,8 +301,8 @@ const Login = () => {
           {/* BUTTON */}
           <button
             type="submit"
-            disabled={loading || (!turnstileToken && !!process.env.REACT_APP_TURNSTILE_SITE_KEY)}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50"
+            disabled={loading}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? t('login.signing') : t('login.submit')}
           </button>

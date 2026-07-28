@@ -103,6 +103,27 @@ const Register = () => {
   const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [errors, setErrors] = useState({});
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const referralCodePattern = /^[A-Za-z0-9_-]+$/;
+  const passportPattern = /^[A-Za-z0-9]{6,20}$/;
+
+  const getPasswordStrength = (pwd) => {
+    if (!pwd) return null;
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (pwd.length >= 12) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    if (score <= 1) return { label: t('register.weak'),   bar: 'w-1/4',  color: 'bg-red-500',    text: 'text-red-500'    };
+    if (score <= 2) return { label: t('register.fair'),   bar: 'w-2/4',  color: 'bg-orange-400', text: 'text-orange-400' };
+    if (score <= 3) return { label: t('register.good'),   bar: 'w-3/4',  color: 'bg-yellow-400', text: 'text-yellow-500' };
+                    return { label: t('register.strong'), bar: 'w-full', color: 'bg-green-500',  text: 'text-green-600'  };
+  };
 
   const buildRegistrationData = () => {
     const { confirm_password, add_agent, ...registrationData } = formData;
@@ -696,10 +717,6 @@ const Register = () => {
 };
 
 
-const [step, setStep] = useState(1);
-const [errors, setErrors] = useState({});
-const [termsAccepted, setTermsAccepted] = useState(false);
-
 useEffect(() => {
   if (!restartToken || registrationReference) {
     return;
@@ -718,24 +735,6 @@ useEffect(() => {
   setErrors({});
   setTermsAccepted(false);
 }, [restartToken, registrationReference, referralCode]);
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const referralCodePattern = /^[A-Za-z0-9_-]+$/;
-const passportPattern = /^[A-Za-z0-9]{6,20}$/;
-
-const getPasswordStrength = (pwd) => {
-  if (!pwd) return null;
-  let score = 0;
-  if (pwd.length >= 8) score++;
-  if (pwd.length >= 12) score++;
-  if (/[A-Z]/.test(pwd)) score++;
-  if (/[0-9]/.test(pwd)) score++;
-  if (/[^A-Za-z0-9]/.test(pwd)) score++;
-  if (score <= 1) return { label: t('register.weak'),   bar: 'w-1/4',  color: 'bg-red-500',    text: 'text-red-500'    };
-  if (score <= 2) return { label: t('register.fair'),   bar: 'w-2/4',  color: 'bg-orange-400', text: 'text-orange-400' };
-  if (score <= 3) return { label: t('register.good'),   bar: 'w-3/4',  color: 'bg-yellow-400', text: 'text-yellow-500' };
-                  return { label: t('register.strong'), bar: 'w-full', color: 'bg-green-500',  text: 'text-green-600'  };
-};
 
 const validateStep = () => {
   let newErrors = {};
@@ -907,8 +906,7 @@ const submitDisabled =
   !registrationFlags.loaded ||
   !registrationFlags.registration_allowed ||
   (requiresPayment && !registrationPricing.location_complete) ||
-  !isStepFourComplete ||
-  (!turnstileToken && !!process.env.REACT_APP_TURNSTILE_SITE_KEY);
+  !isStepFourComplete;
 
 const canContinueAccountTypeStep =
   registrationFlags.registration_master_enabled &&
