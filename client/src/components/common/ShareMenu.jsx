@@ -42,9 +42,11 @@ const ShareMenu = ({
   const handleToggle = () => {
     if (!open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
+      const dropdownWidth = 208;
+      const left = Math.min(rect.left, window.innerWidth - dropdownWidth - 16);
       setDropdownStyle({
         top: `${rect.bottom + 8}px`,
-        [position]: `${Math.min(16, window.innerWidth - rect.right)}px`,
+        left: `${Math.max(16, left)}px`,
         maxHeight: `${window.innerHeight - rect.bottom - 24}px`,
       });
     }
