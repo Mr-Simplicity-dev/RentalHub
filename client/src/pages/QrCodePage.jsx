@@ -6,13 +6,15 @@ import { FaApple, FaGooglePlay, FaArrowLeft, FaPrint } from 'react-icons/fa';
 const DOWNLOAD_URL = 'https://rentalhub.com.ng/download';
 
 const QrCodePage = () => {
+  const qrSize = Math.min(260, typeof window !== 'undefined' ? window.innerWidth - 96 : 260);
+
   const handlePrint = () => {
     window.print();
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="hidden sm:block absolute top-0 left-0 z-20">
+      <div className="hidden sm:block absolute top-0 left-0 z-20 print:hidden">
         <Link
           to="/"
           className="inline-flex items-center gap-2 rounded-br-xl bg-white/90 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-md transition hover:bg-white hover:text-primary-700"
@@ -35,14 +37,14 @@ const QrCodePage = () => {
           </div>
 
           {/* QR Code Card */}
-          <div className="bg-white rounded-3xl shadow-xl p-8 sm:p-10 text-center print:shadow-none print:border print:border-gray-200">
+          <div className="bg-white rounded-3xl shadow-xl p-8 sm:p-10 text-center print:shadow-none print:border-2 print:border-gray-300 print:rounded-none print:p-6">
             {/* QR Code with Logo */}
-            <div className="flex justify-center mb-8">
+            <div className="flex justify-center mb-8 print:mb-6">
               <div className="relative inline-block">
-                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-gray-100 shadow-sm print:border-0 print:p-2">
+                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-gray-100 shadow-sm print:border print:border-gray-300 print:shadow-none print:p-2">
                   <QRCodeSVG
                     value={DOWNLOAD_URL}
-                    size={Math.min(260, typeof window !== 'undefined' ? window.innerWidth - 96 : 260)}
+                    size={qrSize}
                     level="H"
                     bgColor="#ffffff"
                     fgColor="#0f172a"
@@ -57,30 +59,36 @@ const QrCodePage = () => {
                     }}
                   />
                 </div>
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-md">
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-md print:bg-white print:text-gray-800 print:border print:border-gray-400 print:shadow-none">
                   RENTALHUB NG
                 </div>
               </div>
             </div>
 
             {/* Instructions */}
-            <div className="space-y-3 mb-8 text-left max-w-xs mx-auto">
+            <div className="space-y-3 mb-8 text-left max-w-xs mx-auto print:mb-6">
               <div className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">1</span>
-                <p className="text-gray-600 text-sm pt-0.5">Open your phone camera or QR scanner app</p>
+                <span className="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold print:bg-white print:border-2 print:border-primary-700 print:text-gray-900">1</span>
+                <p className="text-gray-600 text-sm pt-0.5 print:text-gray-800">Open your phone camera or QR scanner app</p>
               </div>
               <div className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">2</span>
-                <p className="text-gray-600 text-sm pt-0.5">Point it at the QR code above</p>
+                <span className="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold print:bg-white print:border-2 print:border-primary-700 print:text-gray-900">2</span>
+                <p className="text-gray-600 text-sm pt-0.5 print:text-gray-800">Point it at the QR code above</p>
               </div>
               <div className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">3</span>
-                <p className="text-gray-600 text-sm pt-0.5">Tap the link that appears to download the app</p>
+                <span className="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold print:bg-white print:border-2 print:border-primary-700 print:text-gray-900">3</span>
+                <p className="text-gray-600 text-sm pt-0.5 print:text-gray-800">Tap the link that appears to download the app</p>
               </div>
             </div>
 
+            {/* Download URL (print only) */}
+            <div className="hidden print:block mb-4 text-center">
+              <p className="text-xs text-gray-600 mb-1">Or visit:</p>
+              <p className="text-sm font-mono font-bold text-gray-900 tracking-wide">{DOWNLOAD_URL}</p>
+            </div>
+
             {/* Store Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6 print:hidden">
               <a
                 href="https://play.google.com/store/apps/details?id=com.rentalhub"
                 target="_blank"
@@ -121,14 +129,28 @@ const QrCodePage = () => {
       {/* Print styles */}
       <style>{`
         @media print {
-          body { background: white !important; }
+          @page { margin: 1.5cm; }
+          body {
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
           .print\\:hidden { display: none !important; }
           .print\\:mb-6 { margin-bottom: 1.5rem !important; }
           .print\\:shadow-none { box-shadow: none !important; }
           .print\\:border { border: 1px solid #e5e7eb !important; }
-          .print\\:border-0 { border: 0 !important; }
           .print\\:p-2 { padding: 0.5rem !important; }
           .print\\:mt-4 { margin-top: 1rem !important; }
+          img, svg { break-inside: avoid; }
+          .min-h-screen { min-height: auto !important; }
+          .bg-gray-50 { background: white !important; }
+          .container { padding-top: 0 !important; padding-bottom: 0 !important; }
+        }
+        @media print and (orientation: portrait) {
+          .max-w-lg { max-width: 400px !important; }
+        }
+        @media print and (orientation: landscape) {
+          .max-w-lg { max-width: 350px !important; }
         }
       `}</style>
     </div>
