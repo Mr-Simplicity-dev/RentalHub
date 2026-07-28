@@ -592,6 +592,7 @@ function Layout({ children }) {
     location.pathname.startsWith('/lawyer');
   const isMobileAppPage = location.pathname === '/mobile-app';
   const isLandingPage = location.pathname === '/download';
+  const isPrivacyPage = location.pathname === '/privacy';
   const showPublicHeaderFooter = !isVerificationPage && !isDashboardShell;
 
   useEffect(() => {
@@ -680,8 +681,8 @@ function Layout({ children }) {
 
       <main className="flex-grow animate-fadeIn">{children}</main>
 
-      <LiveRatingFlyIn disabled={isDashboardShell} />
-      <PlatformRatingPrompt disabled={isDashboardShell} />
+      <LiveRatingFlyIn disabled={isDashboardShell || isPrivacyPage} />
+      <PlatformRatingPrompt disabled={isDashboardShell || isPrivacyPage} />
 
 
       {showPublicHeaderFooter && <Footer />}
