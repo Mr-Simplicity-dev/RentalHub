@@ -2,6 +2,7 @@ const logger = require('../utils/logger');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
 const { getAuthTokenFromRequest } = require('../utils/authCookies');
+const { getSessionTokenIdentity } = require('../utils/sessionToken');
 
 let userSuspensionSchemaReady = false;
 
@@ -28,15 +29,7 @@ const authenticate = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
-
-    const userId = decoded.userId || decoded.id || decoded.user_id;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token payload.',
-      });
-    }
+    const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
 
     const result = await db.query(
       `SELECT id, email, user_type, identity_verified, subscription_active,
@@ -59,9 +52,8 @@ const authenticate = async (req, res, next) => {
 
     const currentUser = result.rows[0];
 
-    const tokenVersion = decoded.tv || 1;
-    const dbVersion = currentUser.token_version || 1;
-    if (tokenVersion < dbVersion) {
+    const dbVersion = Number(currentUser.token_version || 1);
+    if (tokenVersion !== dbVersion) {
       return res.status(401).json({
         success: false,
         message: 'Session expired. Please log in again.',
@@ -108,18 +100,15 @@ const optionalAuthenticate = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
-    const userId = decoded.userId || decoded.id || decoded.user_id;
-
-    if (!userId) {
-      return next();
-    }
+    const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
 
     const result = await db.query(
       `SELECT id, email, user_type, identity_verified, subscription_active,
               assigned_state, assigned_city, is_recruitment_admin,
               preferred_state_id, preferred_lga_name,
               deleted_at, is_active,
-              account_suspended_reason
+              account_suspended_reason,
+              token_version
        FROM users
        WHERE id = $1`,
       [userId]
@@ -130,7 +119,8 @@ const optionalAuthenticate = async (req, res, next) => {
     if (
       currentUser &&
       !currentUser.deleted_at &&
-      currentUser.is_active !== false
+      currentUser.is_active !== false &&
+      tokenVersion === Number(currentUser.token_version || 1)
     ) {
       req.auth = decoded;
       req.user = currentUser;

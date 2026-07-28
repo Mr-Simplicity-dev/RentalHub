@@ -72,6 +72,30 @@ const contactFormLimiter = buildLimiter({
   message: 'Too many contact form submissions. Please wait 15 minutes and try again.',
 });
 
+const guestSupportLookupLimiter = buildLimiter({
+  windowMs: Number(process.env.GUEST_SUPPORT_LOOKUP_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.GUEST_SUPPORT_LOOKUP_MAX) || 20,
+  message: 'Too many guest support access attempts. Please wait and try again.',
+});
+
+const guestSupportReadLimiter = buildLimiter({
+  windowMs: Number(process.env.GUEST_SUPPORT_READ_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.GUEST_SUPPORT_READ_MAX) || 120,
+  message: 'Too many guest support requests. Please slow down.',
+});
+
+const guestSupportWriteLimiter = buildLimiter({
+  windowMs: Number(process.env.GUEST_SUPPORT_WRITE_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.GUEST_SUPPORT_WRITE_MAX) || 30,
+  message: 'Too many guest support replies. Please wait and try again.',
+});
+
+const guestSupportPresenceLimiter = buildLimiter({
+  windowMs: Number(process.env.GUEST_SUPPORT_PRESENCE_WINDOW_MS) || 10 * 60 * 1000,
+  max: Number(process.env.GUEST_SUPPORT_PRESENCE_MAX) || 240,
+  message: 'Too many guest support presence requests. Please slow down.',
+});
+
 const typingLimiter = buildLimiter({
   windowMs: Number(process.env.TYPING_WINDOW_MS) || 1000,
   max: Number(process.env.TYPING_MAX) || 5,
@@ -114,6 +138,10 @@ module.exports = {
   recruitmentPaymentLimiter,
   recruitmentInterviewLimiter,
   contactFormLimiter,
+  guestSupportLookupLimiter,
+  guestSupportReadLimiter,
+  guestSupportWriteLimiter,
+  guestSupportPresenceLimiter,
   typingLimiter,
   otpLimiter,
   otpSendLimiter,

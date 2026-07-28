@@ -6,6 +6,7 @@ const {
   isGlobalRegistrationEnabled,
 } = require('../utils/registrationAccess');
 const { getAuthTokenFromRequest } = require('../utils/authCookies');
+const { getSessionTokenIdentity } = require('../utils/sessionToken');
 
 const DEFAULT_FEATURE_FLAGS = [
   {
@@ -164,10 +165,11 @@ const attachUserFromToken = (req) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const identity = getSessionTokenIdentity(decoded);
     req.user = {
       ...(req.user || {}),
-      id: decoded.userId,
-      user_type: decoded.userType,
+      id: identity.userId,
+      user_type: identity.userType,
     };
   } catch {
     // Ignore invalid tokens here; auth middleware will handle protected routes.

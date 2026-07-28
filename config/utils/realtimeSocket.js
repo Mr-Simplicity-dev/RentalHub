@@ -3,6 +3,10 @@ const crypto = require('crypto');
 const db = require('../middleware/database');
 const { logAction } = require('./auditLogger');
 const { getSocketAuthToken } = require('./authCookies');
+const {
+  verifyGuestAccessToken,
+  canUseLegacyGuestEmailAccess,
+} = require('./guestSupportAccess');
 
 const CALL_ALLOWED_ROLES = new Set(['tenant', 'landlord', 'agent']);
 const CALL_TYPES = new Set(['audio', 'video', 'virtual_tour']);
@@ -17,7 +21,47 @@ const SUPPORT_ADMIN_ROLES = new Set([
 const onlineUsers = new Map();
 const socketUsers = new Map();
 const activeCalls = new Map();
+const guestSocketAuthFailures = new Map();
 let callHistorySchemaReady = false;
+
+const GUEST_SOCKET_AUTH_WINDOW_MS = Number(process.env.GUEST_SOCKET_AUTH_WINDOW_MS || 15 * 60 * 1000);
+const GUEST_SOCKET_AUTH_MAX = Number(process.env.GUEST_SOCKET_AUTH_MAX || 30);
+
+const getGuestSocketAddress = (socket) =>
+  String(socket.handshake?.address || socket.conn?.remoteAddress || 'unknown');
+
+const isGuestSocketAuthRateLimited = (socket) => {
+  const key = getGuestSocketAddress(socket);
+  const attempt = guestSocketAuthFailures.get(key);
+  if (!attempt) return false;
+  if (attempt.resetAt <= Date.now()) {
+    guestSocketAuthFailures.delete(key);
+    return false;
+  }
+  return attempt.count >= GUEST_SOCKET_AUTH_MAX;
+};
+
+const recordGuestSocketAuthFailure = (socket) => {
+  const key = getGuestSocketAddress(socket);
+  const now = Date.now();
+  const attempt = guestSocketAuthFailures.get(key);
+
+  if (!attempt || attempt.resetAt <= now) {
+    guestSocketAuthFailures.set(key, { count: 1, resetAt: now + GUEST_SOCKET_AUTH_WINDOW_MS });
+    return;
+  }
+
+  attempt.count += 1;
+  guestSocketAuthFailures.set(key, attempt);
+};
+
+const guestSocketAuthCleanup = setInterval(() => {
+  const now = Date.now();
+  for (const [key, attempt] of guestSocketAuthFailures) {
+    if (attempt.resetAt <= now) guestSocketAuthFailures.delete(key);
+  }
+}, Math.min(GUEST_SOCKET_AUTH_WINDOW_MS, 60 * 1000));
+if (typeof guestSocketAuthCleanup.unref === 'function') guestSocketAuthCleanup.unref();
 
 const toUserRoom = (userId) => `user:${userId}`;
 
@@ -649,17 +693,65 @@ const configureRealtimeSocket = (io) => {
   const guestNsp = io.of('/guest');
   guestNsp.use(async (socket, next) => {
     try {
-      const { ticketId, email } = socket.handshake.auth || {};
-      if (!ticketId || !email) return next(new Error('ticketId and email required'));
+      if (isGuestSocketAuthRateLimited(socket)) {
+        return next(new Error('Guest authentication failed'));
+      }
+
+      const {
+        ticketId,
+        guestAccessToken,
+        accessToken,
+        email,
+      } = socket.handshake.auth || {};
+      const normalizedTicketId = Number(ticketId);
+      if (!Number.isInteger(normalizedTicketId) || normalizedTicketId <= 0) {
+        recordGuestSocketAuthFailure(socket);
+        return next(new Error('Guest authentication failed'));
+      }
+
       const result = await db.query(
-        'SELECT id FROM support_tickets WHERE id = $1 AND contact_email = $2 AND user_id IS NULL LIMIT 1',
-        [ticketId, email.toLowerCase().trim()]
+        `SELECT id, contact_email, guest_access_token_hash,
+                guest_access_token_revoked_at, guest_legacy_access_expires_at
+         FROM support_tickets
+         WHERE id = $1 AND user_id IS NULL
+         LIMIT 1`,
+        [normalizedTicketId]
       );
-      if (!result.rows.length) return next(new Error('Invalid ticket or email'));
-      socket.ticketId = Number(ticketId);
-      socket.contactEmail = email;
+      const ticket = result.rows[0];
+      const tokenAuthorized = Boolean(
+        ticket
+          && !ticket.guest_access_token_revoked_at
+          && ticket.guest_access_token_hash
+          && verifyGuestAccessToken(
+            String(guestAccessToken || accessToken || '').trim(),
+            ticket.guest_access_token_hash
+          )
+      );
+      const legacyAuthorized = canUseLegacyGuestEmailAccess(ticket, email);
+
+      if (!tokenAuthorized && !legacyAuthorized) {
+        recordGuestSocketAuthFailure(socket);
+        return next(new Error('Guest authentication failed'));
+      }
+
+      if (tokenAuthorized) {
+        await db.query(
+          `UPDATE support_tickets
+           SET guest_access_token_last_used_at = CURRENT_TIMESTAMP
+           WHERE id = $1
+             AND (
+               guest_access_token_last_used_at IS NULL
+               OR guest_access_token_last_used_at < CURRENT_TIMESTAMP - INTERVAL '15 minutes'
+             )`,
+          [normalizedTicketId]
+        );
+      }
+
+      socket.ticketId = normalizedTicketId;
+      socket.contactEmail = ticket.contact_email;
       next();
     } catch (err) {
+      recordGuestSocketAuthFailure(socket);
       return next(new Error('Guest authentication failed'));
     }
   });

@@ -44,12 +44,9 @@ const generateAccessCode = () => {
 };
 
 const generateReferenceNumber = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let ref = '';
-  for (let i = 0; i < 8; i++) {
-    ref += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `RH-APP-${ref}`;
+  // 128 bits of cryptographic randomness makes the applicant reference safe
+  // to use as the possession factor alongside the applicant's email address.
+  return `RH-APP-${crypto.randomBytes(16).toString('hex').toUpperCase()}`;
 };
 
 const isRecruitmentAdmin = async (userId) => {
@@ -262,7 +259,7 @@ exports.updateApplication = async (req, res) => {
     const query = `UPDATE recruitment_applications SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramCount} RETURNING *`;
     
     const result = await db.query(query, values);
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: stripPublicApplicationSecrets(result.rows[0]) });
   } catch (err) {
     req.logger.error('updateApplication error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -272,13 +269,12 @@ exports.updateApplication = async (req, res) => {
 exports.getMyApplication = async (req, res) => {
   try {
     const { email, referenceNumber } = getApplicantAccessInput(req);
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email query parameter is required' });
+    if (!email || !referenceNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Applicant email and application reference are required',
+      });
     }
-    const params = [email];
-    const referenceFilter = referenceNumber
-      ? `AND UPPER(a.reference_number) = $${params.push(referenceNumber)}`
-      : '';
     const result = await db.query(
       `SELECT a.*, r.title as role_title, r.type as role_type,
               c.title as cycle_title, c.close_date as cycle_close_date
@@ -286,10 +282,10 @@ exports.getMyApplication = async (req, res) => {
        JOIN recruitment_roles r ON a.role_id = r.id
        JOIN recruitment_cycles c ON a.cycle_id = c.id
        WHERE LOWER(a.email_address) = LOWER($1)
-       ${referenceFilter}
+         AND UPPER(a.reference_number) = $2
        ORDER BY a.created_at DESC
        LIMIT 1`,
-      params
+      [email, referenceNumber]
     );
     
     if (!result.rows.length) {
@@ -302,14 +298,12 @@ exports.getMyApplication = async (req, res) => {
       [result.rows[0].id]
     );
     
-    const application = stripPublicApplicationSecrets(result.rows[0]);
-    if (!referenceNumber) {
-      delete application.access_code;
-    }
-
     res.json({ 
       success: true, 
-      data: { ...application, documents: referenceNumber ? docs.rows : [] }
+      data: {
+        ...stripPublicApplicationSecrets(result.rows[0]),
+        documents: docs.rows.map(stripPublicDocumentSecrets),
+      },
     });
   } catch (err) {
     req.logger.error('getMyApplication error:', err);
@@ -319,9 +313,12 @@ exports.getMyApplication = async (req, res) => {
 
 exports.getMyApplications = async (req, res) => {
   try {
-    const { email } = getApplicantAccessInput(req);
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email query parameter is required' });
+    const { email, referenceNumber } = getApplicantAccessInput(req);
+    if (!email || !referenceNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Applicant email and application reference are required',
+      });
     }
     const result = await db.query(
       `SELECT a.*, r.title as role_title, r.type as role_type,
@@ -330,16 +327,11 @@ exports.getMyApplications = async (req, res) => {
        JOIN recruitment_roles r ON a.role_id = r.id
        JOIN recruitment_cycles c ON a.cycle_id = c.id
        WHERE LOWER(a.email_address) = LOWER($1)
+         AND UPPER(a.reference_number) = $2
        ORDER BY a.created_at DESC`,
-      [email]
+      [email, referenceNumber]
     );
-    const rows = result.rows.map((row) => {
-      const safeRow = stripPublicApplicationSecrets(row);
-      delete safeRow.access_code;
-      delete safeRow.payment_reference;
-      return safeRow;
-    });
-    res.json({ success: true, data: rows });
+    res.json({ success: true, data: result.rows.map(stripPublicApplicationSecrets) });
   } catch (err) {
     req.logger.error('getMyApplications error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -366,13 +358,13 @@ exports.verifyAccessCode = async (req, res) => {
     }
     
     const application = app.rows[0];
-    if (!requirePublicApplicationAccess(req, res, application, { allowAccessCode: true })) return;
+    if (!requirePublicApplicationAccess(req, res, application)) return;
 
     if (application.access_code_used) {
       return res.status(400).json({ success: false, message: 'Access code has already been used' });
     }
     
-    if (application.access_code !== access_code.trim().toUpperCase()) {
+    if (!timingSafeEqualText(application.access_code, access_code.trim().toUpperCase())) {
       return res.status(400).json({ success: false, message: 'Invalid access code' });
     }
     
@@ -409,17 +401,10 @@ exports.verifyAccessCode = async (req, res) => {
 exports.uploadDocuments = async (req, res) => {
   try {
     const { applicationId } = req.params;
-    
-    const app = await db.query(
-      'SELECT * FROM recruitment_applications WHERE id = $1',
-      [applicationId]
-    );
-    if (!app.rows.length) {
-      return res.status(404).json({ success: false, message: 'Application not found' });
+    const application = req.recruitmentApplication;
+    if (!application) {
+      return res.status(403).json({ success: false, message: 'Applicant verification is required' });
     }
-    
-    const application = app.rows[0];
-    if (!requirePublicApplicationAccess(req, res, application)) return;
 
     if (!application.access_code_used || application.payment_status !== 'paid') {
       return res.status(403).json({ 
@@ -446,7 +431,11 @@ exports.uploadDocuments = async (req, res) => {
       }
     }
     
-    res.json({ success: true, data: docs, message: 'Documents uploaded successfully' });
+    res.json({
+      success: true,
+      data: docs.map(stripPublicDocumentSecrets),
+      message: 'Documents uploaded successfully',
+    });
   } catch (err) {
     req.logger.error('uploadDocuments error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -684,7 +673,7 @@ exports.generatePlatformCv = async (req, res) => {
 
     res.json({
       success: true,
-      data: inserted.rows[0],
+      data: stripPublicDocumentSecrets(inserted.rows[0]),
       message: 'Platform CV generated and attached successfully',
     });
   } catch (err) {
@@ -881,9 +870,7 @@ exports.submitAnswer = async (req, res) => {
     const application = appResult.rows[0];
     const applicationId = application.id;
 
-    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
-      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
-    }
+    if (!requireInterviewChallenge(res, challenge_token, application.interview_challenge_token)) return;
 
     if (
       application.interview_fingerprint &&
@@ -997,9 +984,7 @@ exports.reportViolation = async (req, res) => {
     
     const application = appResult.rows[0];
 
-    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
-      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
-    }
+    if (!requireInterviewChallenge(res, challenge_token, application.interview_challenge_token)) return;
 
     if (
       application.interview_fingerprint &&
@@ -1055,9 +1040,7 @@ exports.interviewPing = async (req, res) => {
     }
 
     const application = appResult.rows[0];
-    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
-      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
-    }
+    if (!requireInterviewChallenge(res, challenge_token, application.interview_challenge_token)) return;
 
     if (
       application.interview_fingerprint &&
@@ -1113,9 +1096,7 @@ exports.completeInterview = async (req, res) => {
     const application = appResult.rows[0];
     const applicationId = application.id;
 
-    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
-      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
-    }
+    if (!requireInterviewChallenge(res, challenge_token, application.interview_challenge_token)) return;
 
     if (
       application.interview_fingerprint &&
@@ -2078,10 +2059,17 @@ const safeFileSegment = (value) =>
     .replace(/^_+|_+$/g, '')
     .slice(0, 80) || 'file';
 
+const timingSafeEqualText = (left, right) => {
+  const leftBuffer = Buffer.from(normalizeText(left), 'utf8');
+  const rightBuffer = Buffer.from(normalizeText(right), 'utf8');
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+};
+
 const getApplicantAccessInput = (req = {}) => ({
   email: normalizeLower(
     req.body?.applicant_email ||
     req.body?.email_address ||
+    req.body?.email ||
     req.query?.applicant_email ||
     req.query?.email_address ||
     req.query?.email
@@ -2089,41 +2077,171 @@ const getApplicantAccessInput = (req = {}) => ({
   referenceNumber: normalizeText(
     req.body?.reference_number ||
     req.body?.application_reference ||
+    req.body?.referenceNumber ||
     req.query?.reference_number ||
-    req.query?.application_reference
+    req.query?.application_reference ||
+    req.query?.referenceNumber
   ).toUpperCase(),
-  accessCode: normalizeText(req.body?.access_code || req.query?.access_code).toUpperCase(),
 });
 
-const hasPublicApplicationAccess = (req, application, { allowAccessCode = false } = {}) => {
+const hasPublicApplicationAccess = (req, application) => {
   if (!application) return false;
-  const { email, referenceNumber, accessCode } = getApplicantAccessInput(req);
+  const { email, referenceNumber } = getApplicantAccessInput(req);
   const emailMatches = email && normalizeLower(application.email_address) === email;
   const referenceMatches = referenceNumber &&
-    normalizeText(application.reference_number).toUpperCase() === referenceNumber;
-  const accessCodeMatches = allowAccessCode &&
-    accessCode &&
-    normalizeText(application.access_code).toUpperCase() === accessCode;
+    timingSafeEqualText(normalizeText(application.reference_number).toUpperCase(), referenceNumber);
 
-  return (emailMatches && referenceMatches) || accessCodeMatches;
+  return Boolean(emailMatches && referenceMatches);
 };
 
-const requirePublicApplicationAccess = (req, res, application, options) => {
-  if (hasPublicApplicationAccess(req, application, options)) return true;
+const requirePublicApplicationAccess = (req, res, application) => {
+  if (hasPublicApplicationAccess(req, application)) return true;
   res.status(403).json({
     success: false,
-    message: 'Applicant verification failed. Please reopen your applicant dashboard from the same application reference.',
+    message: 'Applicant verification failed. Enter the email and reference for this application.',
   });
   return false;
 };
 
+const PUBLIC_APPLICATION_FIELDS = new Set([
+  'id',
+  'cycle_id',
+  'role_id',
+  'full_name',
+  'phone_number',
+  'email_address',
+  'state_name',
+  'lga_name',
+  'area_locality',
+  'residential_address',
+  'date_of_birth',
+  'highest_education',
+  'years_of_experience',
+  'current_employment_status',
+  'skills_qualifications',
+  'suitability_reason',
+  'application_fee',
+  'payment_status',
+  'payment_date',
+  'access_code_used',
+  'application_track',
+  'status',
+  'shortlist_reason',
+  'current_stage',
+  'reviewed_at',
+  'interview_date',
+  'interview_activated',
+  'interview_score',
+  'interview_passed',
+  'interview_completed',
+  'interview_started_at',
+  'interview_completed_at',
+  'disqualified_reason',
+  'disqualified_at',
+  'violation_detected',
+  'reference_number',
+  'created_at',
+  'updated_at',
+  'role_title',
+  'role_type',
+  'cycle_title',
+  'cycle_close_date',
+]);
+
+const PUBLIC_DOCUMENT_FIELDS = new Set([
+  'id',
+  'application_id',
+  'document_type',
+  'file_name',
+  'file_size',
+  'mime_type',
+  'uploaded_at',
+]);
+
+const stripPublicDocumentSecrets = (document = {}) =>
+  Object.fromEntries(
+    Object.entries(document).filter(([key]) => PUBLIC_DOCUMENT_FIELDS.has(key))
+  );
+
 const stripPublicApplicationSecrets = (application = {}) => {
-  const copy = { ...application };
-  delete copy.payment_gateway_payload;
-  delete copy.interview_challenge_token;
-  delete copy.interview_fingerprint;
-  delete copy.interview_user_agent;
-  return copy;
+  const safe = Object.fromEntries(
+    Object.entries(application).filter(([key]) => PUBLIC_APPLICATION_FIELDS.has(key))
+  );
+  if (Array.isArray(application.documents)) {
+    safe.documents = application.documents.map(stripPublicDocumentSecrets);
+  }
+  return safe;
+};
+
+const requireInterviewChallenge = (res, submittedToken, expectedToken) => {
+  if (
+    !submittedToken ||
+    !expectedToken ||
+    !timingSafeEqualText(submittedToken, expectedToken)
+  ) {
+    res.status(403).json({
+      success: false,
+      message: 'Interview session challenge failed',
+    });
+    return false;
+  }
+  return true;
+};
+
+exports.authorizeDocumentUpload = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT id, email_address, reference_number, payment_status, access_code_used
+       FROM recruitment_applications
+       WHERE id = $1
+       LIMIT 1`,
+      [req.params.applicationId]
+    );
+    const application = result.rows[0];
+    if (!application) {
+      return res.status(403).json({ success: false, message: 'Applicant verification failed' });
+    }
+    if (!requirePublicApplicationAccess(req, res, application)) return;
+    if (application.payment_status !== 'paid' || !application.access_code_used) {
+      return res.status(403).json({
+        success: false,
+        message: 'Payment and access-code verification are required before uploading documents',
+      });
+    }
+    req.recruitmentApplication = application;
+    next();
+  } catch (error) {
+    req.logger?.error?.('authorizeDocumentUpload error:', error);
+    res.status(500).json({ success: false, message: 'Failed to verify applicant access' });
+  }
+};
+
+exports.authorizeInterviewRecording = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT id, interview_challenge_token, interview_fingerprint
+       FROM recruitment_applications
+       WHERE id = $1
+         AND interview_started_at IS NOT NULL
+         AND interview_completed = FALSE
+       LIMIT 1`,
+      [req.query.application_id]
+    );
+    const application = result.rows[0];
+    if (!application) {
+      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
+    }
+    if (!requireInterviewChallenge(
+      res,
+      req.query.challenge_token,
+      application.interview_challenge_token
+    )) return;
+    req.recruitmentInterviewApplication = application;
+    next();
+  } catch (error) {
+    req.logger?.error?.('authorizeInterviewRecording error:', error);
+    res.status(500).json({ success: false, message: 'Failed to verify interview access' });
+  }
 };
 
 const addSqlParam = (params, value) => {
@@ -2722,7 +2840,11 @@ exports.createApplication = async (req, res) => {
     );
     res.status(201).json({
       success: true,
-      data: { ...result.rows[0], role_title: role.title, role_type: role.type },
+      data: stripPublicApplicationSecrets({
+        ...result.rows[0],
+        role_title: role.title,
+        role_type: role.type,
+      }),
       message: 'Application started. Proceed to payment to receive your access code.',
     });
   } catch (error) {
@@ -2824,6 +2946,8 @@ exports.verifyPayment = async (req, res) => {
     }
 
     const application = appResult.rows[0];
+    if (!requirePublicApplicationAccess(req, res, application)) return;
+
     if (application.payment_status === 'paid' && application.access_code) {
       return res.json({
         success: true,
@@ -3668,31 +3792,14 @@ exports.getQuestions = exports.getAllQuestions;
 
 exports.uploadInterviewRecording = async (req, res) => {
   try {
-    const { application_id, challenge_token, fingerprint } = req.body;
+    const { fingerprint } = req.body;
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Recording file is required' });
     }
 
-    if (!application_id) {
-      return res.status(400).json({ success: false, message: 'Application ID is required' });
-    }
-
-    const appResult = await db.query(
-      `SELECT id, interview_challenge_token, interview_fingerprint
-       FROM recruitment_applications
-       WHERE id = $1
-         AND interview_started_at IS NOT NULL
-       LIMIT 1`,
-      [application_id]
-    );
-
-    if (!appResult.rows.length) {
-      return res.status(403).json({ success: false, message: 'No interview session found' });
-    }
-
-    const application = appResult.rows[0];
-    if (application.interview_challenge_token && challenge_token !== application.interview_challenge_token) {
-      return res.status(403).json({ success: false, message: 'Interview session challenge failed' });
+    const application = req.recruitmentInterviewApplication;
+    if (!application) {
+      return res.status(403).json({ success: false, message: 'Interview verification is required' });
     }
 
     if (
@@ -3700,6 +3807,7 @@ exports.uploadInterviewRecording = async (req, res) => {
       fingerprint &&
       normalizeText(fingerprint) !== normalizeText(application.interview_fingerprint)
     ) {
+      fs.unlink(req.file.path, () => {});
       return res.status(403).json({ success: false, message: 'Interview browser fingerprint changed' });
     }
 
@@ -3716,9 +3824,25 @@ exports.uploadInterviewRecording = async (req, res) => {
       ]
     );
 
-    res.json({ success: true, data: result.rows[0], message: 'Interview recording saved' });
+    res.json({
+      success: true,
+      data: {
+        id: result.rows[0].id,
+        application_id: result.rows[0].application_id,
+        created_at: result.rows[0].created_at,
+      },
+      message: 'Interview recording saved',
+    });
   } catch (error) {
     req.logger.error('uploadInterviewRecording error:', error);
     res.status(500).json({ success: false, message: 'Failed to save interview recording' });
   }
 };
+
+if (process.env.NODE_ENV === 'test') {
+  exports.__test = {
+    generateReferenceNumber,
+    stripPublicApplicationSecrets,
+    stripPublicDocumentSecrets,
+  };
+}

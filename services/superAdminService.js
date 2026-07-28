@@ -345,7 +345,8 @@ const impersonateAdmin = async (req, res) => {
       `SELECT id, email, full_name, user_type, assigned_state, assigned_city,
               email_verified, phone_verified, identity_verified,
               identity_verification_status, subscription_active, subscription_expires_at,
-              is_active, deleted_at, COALESCE(approval_status, 'approved') AS approval_status
+              is_active, deleted_at, COALESCE(token_version, 1) AS token_version,
+              COALESCE(approval_status, 'approved') AS approval_status
        FROM users
        WHERE id = $1
        LIMIT 1`,
@@ -403,6 +404,8 @@ const impersonateAdmin = async (req, res) => {
       {
         userId: target.id,
         userType: target.user_type,
+        tv: target.token_version,
+        purpose: 'session',
         impersonation: true,
         impersonatedBy: req.user.id,
       },

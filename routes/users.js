@@ -21,8 +21,12 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const LIVE_CAPTURE_SESSION_TTL_MS = 10 * 60 * 1000;
-const REQUIRE_LIVE_CAPTURE_SESSION = process.env.REQUIRE_LIVE_CAPTURE_SESSION === 'true';
+const REQUIRE_LIVE_CAPTURE_SESSION =
+  process.env.NODE_ENV === 'production' ||
+  process.env.REQUIRE_LIVE_CAPTURE_SESSION === 'true';
 const liveCaptureSessions = new Map();
+const IDENTITY_PHOTO_SCOPED_ROLES = new Set(['admin', 'lga_admin', 'state_admin']);
+const IDENTITY_PHOTO_LGA_ROLES = new Set(['admin', 'lga_admin']);
 
 router.get('/credential-revalidations', authenticate, credentialRevalidationCtrl.getMyRequests);
 router.post('/credential-revalidations/:requestId/submit', authenticate, sensitiveActionLimiter, credentialRevalidationCtrl.submitRequest);
@@ -60,6 +64,94 @@ const consumeLiveCaptureSession = (userId, token) => {
 
   liveCaptureSessions.delete(key);
   return session.expiresAt > Date.now();
+};
+
+const canViewPassportPhoto = async ({ requester, ownerId, filename }) => {
+  const storedPhoto = await db.query(
+    `SELECT passport_photo_url
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [ownerId]
+  );
+
+  const expectedUrl = `/uploads/passports/${filename}`;
+  if (
+    !storedPhoto.rows.length ||
+    String(storedPhoto.rows[0].passport_photo_url || '') !== expectedUrl
+  ) {
+    return false;
+  }
+
+  if (Number(requester?.id) === Number(ownerId)) return true;
+
+  const role = String(requester?.user_type || '').trim().toLowerCase();
+  if (role === 'super_admin') return true;
+  if (!IDENTITY_PHOTO_SCOPED_ROLES.has(role)) return false;
+
+  const assignedState = String(requester?.assigned_state || '').trim();
+  const assignedCity = IDENTITY_PHOTO_LGA_ROLES.has(role)
+    ? String(requester?.assigned_city || '').trim()
+    : null;
+
+  if (!assignedState || (IDENTITY_PHOTO_LGA_ROLES.has(role) && !assignedCity)) {
+    return false;
+  }
+
+  const scopeResult = await db.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM users target
+       WHERE target.id = $1
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM states preferred_state
+             WHERE preferred_state.id = target.preferred_state_id
+               AND LOWER(TRIM(preferred_state.state_name)) = LOWER(TRIM($2))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM properties scoped_property
+             JOIN states property_state ON property_state.id = scoped_property.state_id
+             WHERE (scoped_property.user_id = target.id OR scoped_property.landlord_id = target.id)
+               AND LOWER(TRIM(property_state.state_name)) = LOWER(TRIM($2))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications scoped_application
+             JOIN properties application_property ON application_property.id = scoped_application.property_id
+             JOIN states application_state ON application_state.id = application_property.state_id
+             WHERE scoped_application.tenant_id = target.id
+               AND LOWER(TRIM(application_state.state_name)) = LOWER(TRIM($2))
+           )
+         )
+         AND (
+           $3::text IS NULL
+           OR LOWER(TRIM(COALESCE(target.preferred_lga_name, ''))) = LOWER(TRIM($3))
+           OR EXISTS (
+             SELECT 1
+             FROM properties scoped_property
+             JOIN states property_state ON property_state.id = scoped_property.state_id
+             WHERE (scoped_property.user_id = target.id OR scoped_property.landlord_id = target.id)
+               AND LOWER(TRIM(property_state.state_name)) = LOWER(TRIM($2))
+               AND LOWER(TRIM(COALESCE(scoped_property.lga_name, ''))) = LOWER(TRIM($3))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications scoped_application
+             JOIN properties application_property ON application_property.id = scoped_application.property_id
+             JOIN states application_state ON application_state.id = application_property.state_id
+             WHERE scoped_application.tenant_id = target.id
+               AND LOWER(TRIM(application_state.state_name)) = LOWER(TRIM($2))
+               AND LOWER(TRIM(COALESCE(application_property.lga_name, ''))) = LOWER(TRIM($3))
+           )
+         )
+     ) AS allowed`,
+    [ownerId, assignedState, assignedCity]
+  );
+
+  return scopeResult.rows[0]?.allowed === true;
 };
 
 const cleanupUploadedFile = (file) => {
@@ -1179,8 +1271,13 @@ router.get('/passport-photo/:filename', authenticate, async (req, res) => {
 
     const fileOwnerId = parseInt(match[1], 10);
 
-    // Only the owner or admins can view
-    if (fileOwnerId !== req.user.id && !['admin', 'super_admin', 'state_admin', 'financial_admin'].includes(req.user.user_type)) {
+    const hasAccess = await canViewPassportPhoto({
+      requester: req.user,
+      ownerId: fileOwnerId,
+      filename,
+    });
+
+    if (!hasAccess) {
       return res.status(403).json({ success: false, message: 'You do not have permission to view this file' });
     }
 
@@ -1202,5 +1299,10 @@ router.get('/passport-photo/:filename', authenticate, async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to serve file' });
   }
 });
+
+router._userSecurityForTest = {
+  canViewPassportPhoto,
+  requireLiveCaptureSession: REQUIRE_LIVE_CAPTURE_SESSION,
+};
 
 module.exports = router;
