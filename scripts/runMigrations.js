@@ -25,12 +25,27 @@ const { Pool } = require('pg');
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const {
+  computeCanonicalMigrationHash,
+  extractMigrationNumber,
+  findDuplicateMigrationNumbers,
+  findMissingAppliedMigrationFiles,
+  isStoredMigrationHashCompatible,
+  stripOuterMigrationTransaction,
+} = require('./migrationIntegrity');
 
 // ── Configuration ──────────────────────────────────────────────────────────────
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 const TRACKING_TABLE = 'schema_migrations';
-const BATCH_SIZE = 1; // Run one migration per batch for granular tracking
+const MIGRATION_LOCK_KEY = 'rentalhub:schema-migrations';
+const MIGRATION_LOCK_TIMEOUT_MS = Math.max(
+  Number(process.env.MIGRATION_LOCK_TIMEOUT_MS) || 15000,
+  1000
+);
+const MIGRATION_STATEMENT_TIMEOUT_MS = Math.max(
+  Number(process.env.MIGRATION_STATEMENT_TIMEOUT_MS) || 300000,
+  10000
+);
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -51,6 +66,7 @@ const DOWN_MODE = args.includes('--down');
 const RESET_MODE = args.includes('--reset');
 const SKIP_HASH_CHECK = args.includes('--skip-hash-check');
 const CONTINUE_ON_ERROR = args.includes('--continue-on-error');
+const RESET_CONFIRMED = args.includes('--confirm-reset=RESET_SCHEMA_MIGRATION_TRACKING');
 const fileArg = args.find(a => a.startsWith('--file='));
 const START_FROM = fileArg ? fileArg.split('=')[1] : null;
 
@@ -64,13 +80,13 @@ const loadMigrationFiles = () => {
   return files.map(filename => {
     const filepath = path.join(MIGRATIONS_DIR, filename);
     const content = fs.readFileSync(filepath, 'utf8');
-    // Extract migration number from filename (e.g. "001_" -> "001")
-    const match = filename.match(/^(\d+)/);
+    // Optional alphabetic suffixes support forward-only ordering repairs such
+    // as "031a_" without modifying an already-applied migration.
     return {
       filename,
       filepath,
       content,
-      number: match ? match[1] : filename,
+      number: extractMigrationNumber(filename),
     };
   });
 };
@@ -89,16 +105,19 @@ const ensureTrackingTable = async (client) => {
   `);
 };
 
+const trackingTableExists = async (client) => {
+  const result = await client.query(
+    `SELECT to_regclass($1) IS NOT NULL AS exists`,
+    [`public.${TRACKING_TABLE}`]
+  );
+  return result.rows[0]?.exists === true;
+};
+
 const getAppliedMigrations = async (client) => {
   const result = await client.query(
     `SELECT filename, hash FROM ${TRACKING_TABLE} ORDER BY filename ASC`
   );
   return result.rows;
-};
-
-const computeFileHash = (content) => {
-  const crypto = require('crypto');
-  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
 };
 
 const getNextBatch = async (client) => {
@@ -108,29 +127,71 @@ const getNextBatch = async (client) => {
   return Number(result.rows[0].last_batch) + 1;
 };
 
-const isTransactionalMigration = (filename) => {
-  // Some migrations may contain explicit transaction control (BEGIN/COMMIT)
-  // We'll still wrap them but catch errors gracefully
-  return true;
+const acquireMigrationLock = async (client) => {
+  const result = await client.query(
+    'SELECT pg_try_advisory_lock(hashtext($1)) AS acquired',
+    [MIGRATION_LOCK_KEY]
+  );
+  if (!result.rows[0]?.acquired) {
+    throw new Error('Another migration process is already running');
+  }
+};
+
+const releaseMigrationLock = async (client) => {
+  await client.query(
+    'SELECT pg_advisory_unlock(hashtext($1))',
+    [MIGRATION_LOCK_KEY]
+  ).catch(() => {});
 };
 
 // ── Main migration logic ──────────────────────────────────────────────────────
 
 const runPendingMigrations = async () => {
   const client = await pool.connect();
+  let lockAcquired = false;
 
   try {
+    if (
+      CONTINUE_ON_ERROR &&
+      process.env.NODE_ENV === 'production' &&
+      process.env.ALLOW_UNSAFE_MIGRATION_CONTINUE !== 'true'
+    ) {
+      throw new Error(
+        '--continue-on-error is disabled in production unless ALLOW_UNSAFE_MIGRATION_CONTINUE=true'
+      );
+    }
+
     console.log('📋 Migration Runner');
     console.log('═'.repeat(50));
 
-    await client.query('BEGIN');
-    await ensureTrackingTable(client);
-    await client.query('COMMIT');
+    await acquireMigrationLock(client);
+    lockAcquired = true;
 
     const migrations = loadMigrationFiles();
-    const applied = await getAppliedMigrations(client);
+    const duplicateNumbers = findDuplicateMigrationNumbers(migrations);
+    if (duplicateNumbers.length) {
+      const details = duplicateNumbers
+        .map(({ number, filenames }) => `${number}: ${filenames.join(', ')}`)
+        .join('; ');
+      throw new Error(`Duplicate migration numbers detected: ${details}`);
+    }
+
+    const hasTrackingTable = await trackingTableExists(client);
+    if (!hasTrackingTable && !DRY_RUN) {
+      await client.query('BEGIN');
+      await ensureTrackingTable(client);
+      await client.query('COMMIT');
+    }
+
+    const applied = hasTrackingTable ? await getAppliedMigrations(client) : [];
     const appliedFilenames = new Set(applied.map(r => r.filename));
     const appliedHashes = new Map(applied.map(r => [r.filename, r.hash]));
+    const missingAppliedFiles = findMissingAppliedMigrationFiles(applied, migrations);
+    if (missingAppliedFiles.length) {
+      throw new Error(
+        `Applied migration files are missing from this release: ${missingAppliedFiles.join(', ')}`
+      );
+    }
 
     console.log(`Found ${migrations.length} migration files, ${appliedFilenames.size} already applied.`);
 
@@ -156,22 +217,34 @@ const runPendingMigrations = async () => {
     // Check for hash changes in already-applied migrations
     // Skip this check if --skip-hash-check flag is provided
     let hashChanged = false;
+    let compatibleLegacyHashes = 0;
     if (!SKIP_HASH_CHECK) {
       for (const m of migrations) {
         if (appliedFilenames.has(m.filename)) {
           const storedHash = appliedHashes.get(m.filename);
-          const currentHash = computeFileHash(m.content);
-          if (storedHash !== currentHash) {
+          const currentHash = computeCanonicalMigrationHash(m.content);
+          if (!isStoredMigrationHashCompatible(storedHash, m.content)) {
             hashChanged = true;
             console.warn(`\n⚠️  WARNING: Migration "${m.filename}" has changed since it was applied!`);
             console.warn(`   Stored hash: ${storedHash}`);
             console.warn(`   Current hash: ${currentHash}`);
             console.warn('   This could indicate tampering or an unintentional edit.');
-            if (!DRY_RUN) {
-              console.warn('   Continuing anyway. Update the tracking record manually if needed.');
-            }
+          } else if (storedHash !== currentHash) {
+            compatibleLegacyHashes += 1;
           }
         }
+      }
+
+      if (compatibleLegacyHashes > 0) {
+        console.log(
+          `Recognized ${compatibleLegacyHashes} legacy checksum(s) that differ only by line endings or a UTF-8 BOM.`
+        );
+      }
+
+      if (hashChanged) {
+        throw new Error(
+          'Applied migration content has changed. Restore the original files or use --skip-hash-check only after a documented review.'
+        );
       }
     } else {
       console.log('🔓 Hash check skipped (--skip-hash-check flag set).');
@@ -197,26 +270,24 @@ const runPendingMigrations = async () => {
     let failed = 0;
 
     for (const migration of pending) {
-      const hash = computeFileHash(migration.content);
+      const hash = computeCanonicalMigrationHash(migration.content);
       process.stdout.write(`\n▶ Running ${migration.filename}... `);
 
       const startTime = Date.now();
 
       try {
-        // Check if migration contains its own explicit transaction control
-        const hasExplicitTx = /^\s*BEGIN\b/im.test(migration.content) && /^\s*COMMIT\b/im.test(migration.content);
+        const executable = stripOuterMigrationTransaction(migration.content);
 
-        if (hasExplicitTx) {
-          // Migration manages its own transaction - run directly
-          await client.query(migration.content);
-        } else {
-          // For safety, each migration runs in its own transaction
-          await client.query('BEGIN');
-          await client.query(migration.content);
-          await client.query('COMMIT');
-        }
+        await client.query('BEGIN');
+        await client.query(
+          `SELECT
+             set_config('lock_timeout', $1, true),
+             set_config('statement_timeout', $2, true)`,
+          [`${MIGRATION_LOCK_TIMEOUT_MS}ms`, `${MIGRATION_STATEMENT_TIMEOUT_MS}ms`]
+        );
+        await client.query(executable.content);
 
-        // Mark as applied (outside transaction to avoid nested tx issues)
+        const duration = Date.now() - startTime;
         await client.query(
           `INSERT INTO ${TRACKING_TABLE} (filename, migration_number, hash, batch, duration_ms)
            VALUES ($1, $2, $3, $4, $5)
@@ -225,15 +296,9 @@ const runPendingMigrations = async () => {
              batch = EXCLUDED.batch,
              duration_ms = EXCLUDED.duration_ms,
              applied_at = CURRENT_TIMESTAMP`,
-          [migration.filename, migration.number, hash, batch, 0]
+          [migration.filename, migration.number, hash, batch, duration]
         );
-
-        const duration = Date.now() - startTime;
-        // Update duration after commit
-        await client.query(
-          `UPDATE ${TRACKING_TABLE} SET duration_ms = $1 WHERE filename = $2`,
-          [duration, migration.filename]
-        );
+        await client.query('COMMIT');
 
         console.log(`✅ (${duration}ms)`);
         succeeded++;
@@ -253,15 +318,6 @@ const runPendingMigrations = async () => {
 
         if (CONTINUE_ON_ERROR) {
           console.warn(`   ⏩ Continuing with next migration (--continue-on-error).`);
-          // Mark as failed in tracking so we know it was attempted
-          try {
-            await client.query(
-              `INSERT INTO ${TRACKING_TABLE} (filename, migration_number, hash, batch, duration_ms)
-               VALUES ($1, $2, $3, $4, $5)
-               ON CONFLICT (filename) DO NOTHING`,
-              [migration.filename, migration.number, 'FAILED_' + hash, batch, Date.now() - startTime]
-            );
-          } catch (trackErr) { console.error(`   ⚠️  Failed to record failed migration in tracking table: ${trackErr.message}`); }
           continue;
         } else {
           console.error('\n   ⚠️  To continue despite errors, use: --continue-on-error');
@@ -273,11 +329,17 @@ const runPendingMigrations = async () => {
     console.log('\n' + '═'.repeat(50));
     console.log(`📊 Results: ${succeeded} succeeded, ${failed} failed`);
     console.log('═'.repeat(50));
+    if (failed > 0) {
+      process.exitCode = 1;
+    }
 
   } catch (error) {
     console.error('\n❌ Migration runner error:', error.message);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
+    if (lockAcquired) {
+      await releaseMigrationLock(client);
+    }
     client.release();
     await pool.end();
   }
@@ -342,8 +404,27 @@ const resetTracking = async () => {
   console.log('Use only if you know what you are doing!\n');
 
   const client = await pool.connect();
+  let lockAcquired = false;
 
   try {
+    if (!DRY_RUN && !RESET_CONFIRMED) {
+      throw new Error(
+        'Reset refused. Re-run with --confirm-reset=RESET_SCHEMA_MIGRATION_TRACKING only after an approved recovery review.'
+      );
+    }
+    if (
+      !DRY_RUN &&
+      process.env.NODE_ENV === 'production' &&
+      process.env.ALLOW_MIGRATION_TRACKING_RESET !== 'true'
+    ) {
+      throw new Error(
+        'Migration tracking reset is disabled in production unless ALLOW_MIGRATION_TRACKING_RESET=true'
+      );
+    }
+
+    await acquireMigrationLock(client);
+    lockAcquired = true;
+
     const result = await client.query(
       `SELECT COUNT(*) AS count FROM ${TRACKING_TABLE}`
     );
@@ -354,25 +435,22 @@ const resetTracking = async () => {
       return;
     }
 
+    await client.query('BEGIN');
     await client.query(`DROP TABLE IF EXISTS ${TRACKING_TABLE} CASCADE`);
     console.log(`✅ Dropped table "${TRACKING_TABLE}".`);
     console.log('The next migration run will start fresh.\n');
 
-    // Re-create the table so next run works
-    await client.query(`
-      CREATE TABLE ${TRACKING_TABLE} (
-        id SERIAL PRIMARY KEY,
-        filename VARCHAR(255) NOT NULL UNIQUE,
-        migration_number VARCHAR(20) NOT NULL,
-        hash VARCHAR(64) NOT NULL,
-        applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        batch INTEGER NOT NULL,
-        duration_ms INTEGER NOT NULL DEFAULT 0
-      )
-    `);
+    await ensureTrackingTable(client);
+    await client.query('COMMIT');
     console.log('✅ Re-created empty tracking table.');
 
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
   } finally {
+    if (lockAcquired) {
+      await releaseMigrationLock(client);
+    }
     client.release();
     await pool.end();
   }
@@ -389,9 +467,8 @@ const resetTracking = async () => {
     } else {
       await runPendingMigrations();
     }
-    process.exit(0);
   } catch (error) {
     console.error('Fatal error:', error.message);
-    process.exit(1);
+    process.exitCode = 1;
   }
 })();
