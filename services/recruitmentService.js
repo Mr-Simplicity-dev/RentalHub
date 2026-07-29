@@ -7,6 +7,7 @@ const axios = require('axios');
 const { sendEmail } = require('../config/utils/mailer');
 const { sendSMS } = require('../config/utils/smsService');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+const logger = require('../config/utils/logger');
 
 const optionalRequire = (moduleName, featureName) => {
   try {
@@ -16,7 +17,7 @@ const optionalRequire = (moduleName, featureName) => {
       throw error;
     }
 
-    req.logger.error(`${featureName} dependency "${moduleName}" is not installed. Run npm install before using this feature.`);
+    logger.error(`${featureName} dependency "${moduleName}" is not installed. Run npm install before using this feature.`);
     return null;
   }
 };
@@ -2385,6 +2386,74 @@ const timingSafeEqualHex = (left, right) => {
   return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
 };
 
+const parseGatewayMetadata = (value) => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value !== 'string') return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const getApplicationFeeKobo = (application) => {
+  const fee = Number(application?.application_fee);
+  if (!Number.isFinite(fee) || fee <= 0) return null;
+
+  const amount = Math.round(fee * 100);
+  return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
+};
+
+const validateRecruitmentGatewayTransaction = (application, transaction) => {
+  if (!application || !transaction || typeof transaction !== 'object') {
+    return { valid: false, reason: 'Payment details are missing' };
+  }
+
+  if (normalizeLower(transaction.status) !== 'success') {
+    return { valid: false, reason: 'Payment is not successful' };
+  }
+
+  const expectedReference = normalizeText(application.payment_reference);
+  const receivedReference = normalizeText(transaction.reference);
+  if (
+    !expectedReference ||
+    !receivedReference ||
+    !timingSafeEqualText(expectedReference, receivedReference)
+  ) {
+    return { valid: false, reason: 'Payment reference does not match the application' };
+  }
+
+  const expectedAmount = getApplicationFeeKobo(application);
+  const receivedAmount = Number(transaction.amount);
+  if (
+    expectedAmount === null ||
+    !Number.isSafeInteger(receivedAmount) ||
+    receivedAmount !== expectedAmount
+  ) {
+    return { valid: false, reason: 'Payment amount does not match the application fee' };
+  }
+
+  if (normalizeText(transaction.currency).toUpperCase() !== 'NGN') {
+    return { valid: false, reason: 'Payment currency is not NGN' };
+  }
+
+  const metadata = parseGatewayMetadata(transaction.metadata);
+  if (!metadata || metadata.type !== 'recruitment_application_access_fee') {
+    return { valid: false, reason: 'Payment purpose does not match recruitment' };
+  }
+
+  if (
+    !normalizeText(metadata.application_id) ||
+    normalizeText(metadata.application_id) !== normalizeText(application.id)
+  ) {
+    return { valid: false, reason: 'Payment application ID does not match' };
+  }
+
+  return { valid: true };
+};
+
 const sendAccessCodeNotice = async (application) => {
   const code = application.access_code;
   const email = application.email_address;
@@ -2414,7 +2483,7 @@ const sendAccessCodeNotice = async (application) => {
          WHERE id = $1`,
         [application.id]
       )).catch(async (error) => {
-        req.logger.error('Recruitment access email failed:', error.message);
+        logger.error('Recruitment access email failed:', error.message);
         await db.query(
           'UPDATE recruitment_applications SET access_code_email_last_error = $2 WHERE id = $1',
           [application.id, error.message]
@@ -2451,7 +2520,7 @@ const sendAccessCodeNotice = async (application) => {
           );
         })
         .catch(async (error) => {
-          req.logger.error('Recruitment access SMS failed:', error.message);
+          logger.error('Recruitment access SMS failed:', error.message);
           await db.query(
             `UPDATE recruitment_applications
              SET access_code_sent_sms = FALSE,
@@ -2484,6 +2553,13 @@ const markApplicationPaid = async ({ application, reference, gatewayPayload }) =
     }
 
     const current = locked.rows[0];
+    const integrity = validateRecruitmentGatewayTransaction(current, gatewayPayload);
+    if (!integrity.valid) {
+      const integrityError = new Error(`Recruitment payment integrity check failed: ${integrity.reason}`);
+      integrityError.code = 'RECRUITMENT_PAYMENT_INTEGRITY';
+      throw integrityError;
+    }
+
     const accessCode = current.access_code || await ensureUniqueAccessCode();
 
     if (current.payment_status === 'paid' && current.access_code) {
@@ -2881,6 +2957,12 @@ exports.initiatePayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Application Access Fee has already been paid' });
     }
 
+    const amountKobo = getApplicationFeeKobo(application);
+    if (amountKobo === null) {
+      req.logger?.error?.(`Invalid recruitment fee configured for application ${application.id}`);
+      return res.status(500).json({ success: false, message: 'The recruitment fee is not configured correctly' });
+    }
+
     const reference = `RH_CR_${application.id}_${Date.now()}`;
     await db.query(
       'UPDATE recruitment_applications SET payment_reference = $1, updated_at = NOW() WHERE id = $2',
@@ -2890,8 +2972,8 @@ exports.initiatePayment = async (req, res) => {
     const response = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-                email: application.email_address,
-        amount: Math.round(Number(application.application_fee || 5000) * 100),
+        email: application.email_address,
+        amount: amountKobo,
         reference,
         callback_url: `${getFrontendUrl()}/careers?payment_reference=${encodeURIComponent(reference)}`,
         metadata: {
@@ -2972,6 +3054,17 @@ exports.verifyPayment = async (req, res) => {
       return res.status(402).json({ success: false, message: 'Payment has not been completed' });
     }
 
+    const integrity = validateRecruitmentGatewayTransaction(application, transaction);
+    if (!integrity.valid) {
+      req.logger?.warn?.(
+        `Rejected recruitment payment verification for application ${application.id}: ${integrity.reason}`
+      );
+      return res.status(409).json({
+        success: false,
+        message: 'Payment details do not match this recruitment application',
+      });
+    }
+
     const paid = await markApplicationPaid({
       application,
       reference,
@@ -2984,6 +3077,13 @@ exports.verifyPayment = async (req, res) => {
       data: { application: stripPublicApplicationSecrets(paid), access_code: paid.access_code },
     });
   } catch (error) {
+    if (error.code === 'RECRUITMENT_PAYMENT_INTEGRITY') {
+      req.logger?.warn?.(error.message);
+      return res.status(409).json({
+        success: false,
+        message: 'Payment details changed before verification could be completed',
+      });
+    }
     req.logger.error('verifyPayment error:', error.response?.data || error.message);
     res.status(500).json({ success: false, message: 'Failed to verify recruitment payment' });
   }
@@ -3021,34 +3121,37 @@ exports.paystackWebhook = async (req, res) => {
     const event = req.body || {};
     const transaction = event.data || {};
     const reference = transaction.reference;
-    const metadata = transaction.metadata || {};
+    const metadata = parseGatewayMetadata(transaction.metadata) || {};
 
     if (event.event !== 'charge.success' || metadata.type !== 'recruitment_application_access_fee') {
       return res.json({ success: true, ignored: true });
     }
 
-    const params = [];
-    const filters = [];
-    if (metadata.application_id) {
-      params.push(metadata.application_id);
-      filters.push(`id = $${params.length}`);
-    }
-    if (reference) {
-      params.push(reference);
-      filters.push(`payment_reference = $${params.length}`);
-    }
-
-    if (!filters.length) {
+    if (!reference || !metadata.application_id) {
       return res.status(400).json({ success: false, message: 'Webhook missing application reference' });
     }
 
     const appResult = await db.query(
-      `SELECT * FROM recruitment_applications WHERE ${filters.join(' OR ')} LIMIT 1`,
-      params
+      `SELECT * FROM recruitment_applications
+       WHERE payment_reference = $1
+         AND id = $2
+       LIMIT 1`,
+      [reference, metadata.application_id]
     );
 
     if (!appResult.rows.length) {
       return res.status(404).json({ success: false, message: 'Recruitment payment reference not found' });
+    }
+
+    const integrity = validateRecruitmentGatewayTransaction(appResult.rows[0], transaction);
+    if (!integrity.valid) {
+      req.logger?.warn?.(
+        `Rejected recruitment payment webhook for reference ${reference}: ${integrity.reason}`
+      );
+      return res.status(409).json({
+        success: false,
+        message: 'Webhook payment details do not match the recruitment application',
+      });
     }
 
     await markApplicationPaid({
@@ -3059,6 +3162,13 @@ exports.paystackWebhook = async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
+    if (error.code === 'RECRUITMENT_PAYMENT_INTEGRITY') {
+      req.logger?.warn?.(error.message);
+      return res.status(409).json({
+        success: false,
+        message: 'Webhook payment details changed before processing completed',
+      });
+    }
     req.logger.error('paystackWebhook recruitment error:', error);
     res.status(500).json({ success: false, message: 'Failed to process recruitment webhook' });
   }
@@ -3844,5 +3954,7 @@ if (process.env.NODE_ENV === 'test') {
     generateReferenceNumber,
     stripPublicApplicationSecrets,
     stripPublicDocumentSecrets,
+    getApplicationFeeKobo,
+    validateRecruitmentGatewayTransaction,
   };
 }

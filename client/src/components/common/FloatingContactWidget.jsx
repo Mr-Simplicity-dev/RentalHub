@@ -332,7 +332,7 @@ const FloatingContactWidget = () => {
       socket.off('ticket:updated', ticketListHandler);
       socket.off('ticket:typing', typingHandler);
     };
-  }, [socket, isAuthenticated, fetchMyTickets]);
+  }, [socket, isAuthenticated, fetchMyTickets, playNotification]);
 
   const loadConversation = useCallback(async (ticketId) => {
     setLoadingConv(true);
@@ -658,7 +658,7 @@ const FloatingContactWidget = () => {
       gs.disconnect();
       if (guestSocketRef.current === gs) guestSocketRef.current = null;
     };
-  }, [viewingContactTicket?.id, lookupEmail]);
+  }, [viewingContactTicket, lookupEmail, t]);
 
   const handleContactReply = async () => {
     const msg = contactReplyText.trim();

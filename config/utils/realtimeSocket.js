@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const db = require('../middleware/database');
 const { logAction } = require('./auditLogger');
 const { getSocketAuthToken } = require('./authCookies');
+const { getSessionTokenIdentity } = require('./sessionToken');
 const {
   verifyGuestAccessToken,
   canUseLegacyGuestEmailAccess,
@@ -115,11 +116,7 @@ const getOnlineUsersPayload = () =>
 
 const fetchSocketUser = async (token) => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
-  const userId = decoded.userId || decoded.id || decoded.user_id;
-
-  if (!userId) {
-    throw new Error('Invalid token payload');
-  }
+  const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
 
   const result = await db.query(
     `SELECT id, full_name, email, user_type, deleted_at, is_active, token_version
@@ -135,9 +132,8 @@ const fetchSocketUser = async (token) => {
     throw new Error('User is not active');
   }
 
-  const tokenVersion = decoded.tv || 1;
-  const dbVersion = user.token_version || 1;
-  if (tokenVersion < dbVersion) {
+  const dbVersion = Number(user.token_version || 1);
+  if (tokenVersion !== dbVersion) {
     throw new Error('Session expired. Please log in again.');
   }
 

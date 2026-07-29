@@ -298,7 +298,7 @@ export default function Careers() {
     } finally {
       setStatusLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadMyApplication = useCallback(async (emailOverride = '', referenceOverride = '') => {
     try {
@@ -431,7 +431,7 @@ export default function Careers() {
     };
 
     verify();
-  }, [getApplicantAccessPayload, loadMyApplication, rememberApplication, searchParams, setSearchParams]);
+  }, [getApplicantAccessPayload, loadMyApplication, rememberApplication, searchParams, setSearchParams, t]);
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
@@ -836,7 +836,7 @@ export default function Careers() {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to complete interview');
     }
-  }, [application?.id, interviewChallengeToken, loadMyApplication, stopInterviewMedia, uploadRecording]);
+  }, [application?.id, interviewChallengeToken, loadMyApplication, stopInterviewMedia, uploadRecording, t]);
 
   const submitEmptyAnswer = useCallback(async () => {
     const question = interviewQuestions[questionIndex];
