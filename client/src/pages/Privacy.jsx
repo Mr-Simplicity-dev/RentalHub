@@ -21,7 +21,7 @@ import {
   FaUsers,
 } from 'react-icons/fa';
 
-const LAST_UPDATED = '28 July 2026';
+const LAST_UPDATED = '29 July 2026';
 
 const tableOfContents = [
   ['scope', 'Who we are and scope'],
@@ -68,7 +68,7 @@ const dataGroups = [
     basis:
       'Consent where required for sensitive or biometric-related processing; contract; legal obligations; legitimate interests in fraud prevention and platform safety.',
     share:
-      'Prembly and other approved identity-verification processors, restricted authorised staff, and regulators or law-enforcement bodies where legally required. For a property application, the relevant landlord currently receives the applicant’s full NIN or passport number together with name and contact/identity details.',
+      'Prembly and other approved identity-verification processors, restricted authorised staff, and regulators or law-enforcement bodies where legally required. For a property application, the relevant landlord receives the applicant’s name, permitted contact and application details, nationality where relevant, identity-document type and verification status—not the stored NIN or passport number.',
     retention:
       'Only while needed for identity assurance, fraud prevention, compliance, disputes and applicable legal requirements. Verification results and audit evidence may outlast an active account where justified.',
   },
@@ -540,11 +540,11 @@ const Privacy = () => {
                       hash used to detect duplicates. A verification result can be used to approve, reject, revalidate or
                       investigate an account, subject to the rights below.
                     </p>
-                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-                      <strong>Property-application disclosure:</strong> when an application is submitted, the relevant
-                      landlord currently receives the applicant’s full decrypted NIN (for a Nigerian identity) or
-                      plaintext passport number (for a foreign identity), together with name, phone, email and applicable
-                      nationality information. Do not submit an application unless you understand this disclosure.
+                    <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+                      <strong>Property-application access:</strong> the relevant landlord can review the applicant’s name,
+                      permitted contact and application details, nationality where relevant, identity-document type and
+                      verification status. RentalHub does not include the stored NIN or passport number in the landlord’s
+                      application response.
                     </div>
                   </div>
                   <div>
