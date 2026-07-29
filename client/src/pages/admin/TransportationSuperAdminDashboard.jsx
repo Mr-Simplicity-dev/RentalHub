@@ -224,7 +224,7 @@ export default function TransportationSuperAdminDashboard() {
       <SectionTabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'overview' ? (
-        <div className="space-y-6">
+        <div className="super-trans-overview-section space-y-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="National bookings" value={stats.total_bookings || 0} tone="cyan" />
             <MetricCard label="National revenue" value={formatCurrency(stats.total_revenue)} tone="emerald" />
@@ -286,7 +286,7 @@ export default function TransportationSuperAdminDashboard() {
       ) : null}
 
       {activeTab === 'state-admins' ? (
-        <div className="grid gap-6 xl:grid-cols-[0.9fr,1.1fr]">
+        <div className="super-trans-jurisdictions-section grid gap-6 xl:grid-cols-[0.9fr,1.1fr]">
           <SectionCard
             title="Assign transportation jurisdiction"
             description="Give a state admin visibility or management rights over transportation operations in a state or city."
@@ -411,6 +411,7 @@ export default function TransportationSuperAdminDashboard() {
         <SectionCard
           title="National alert queue"
           description="Warning and critical transportation events from all monitored states."
+          className="super-trans-alerts-section"
         >
           {alerts.length ? (
             <div className="grid gap-4 lg:grid-cols-2">
@@ -448,7 +449,7 @@ export default function TransportationSuperAdminDashboard() {
       ) : null}
 
       {activeTab === 'health' ? (
-        <div className="space-y-6">
+        <div className="super-trans-health-section space-y-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Active bookings" value={systemHealth?.current_stats?.total_active_bookings || 0} tone="cyan" />
             <MetricCard label="Today revenue" value={formatCurrency(systemHealth?.current_stats?.today_revenue)} tone="emerald" />

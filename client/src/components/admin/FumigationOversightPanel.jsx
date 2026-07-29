@@ -108,7 +108,7 @@ const FumigationOversightPanel = () => {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="super-fum-overview-section grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: 'Total bookings', value: stats.total_bookings || bookings.length, icon: FaCalendarAlt, tone: 'text-blue-600 bg-blue-50' },
           { label: 'Revenue', value: formatCurrency(stats.total_revenue), icon: FaMoneyBillWave, tone: 'text-green-600 bg-green-50' },
@@ -127,7 +127,7 @@ const FumigationOversightPanel = () => {
         ))}
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="super-fum-operations-section grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: 'Awaiting action', value: operations.pending, icon: FaExclamationTriangle, tone: 'bg-amber-50 text-amber-700' },
           { label: 'Active operations', value: operations.active, icon: FaChartLine, tone: 'bg-blue-50 text-blue-700' },
@@ -142,7 +142,7 @@ const FumigationOversightPanel = () => {
         ))}
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section className="super-fum-bookings-section rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="font-semibold text-slate-900">Recent national bookings</h2>
           <p className="text-xs text-slate-500">Visibility only—no provider assignment or status controls.</p>
@@ -181,7 +181,7 @@ const FumigationOversightPanel = () => {
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section className="super-fum-providers-section rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="font-semibold text-slate-900">Provider coverage</h2>
           <p className="text-xs text-slate-500">Active provider quality and completed-job visibility.</p>

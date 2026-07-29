@@ -633,6 +633,7 @@ const LawyerDashboardContent = ({
               <motion.div key={action.to} whileHover={{ y: -2 }} transition={{ duration: 0.18 }}>
                 <Link
                   to={action.to}
+                  data-tour-id={action.to === '/verify-case' ? 'lawyer-evidence-verification' : undefined}
                   className="block rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white hover:shadow-sm"
                 >
                   <p className="text-sm font-semibold text-slate-900">{action.label}</p>

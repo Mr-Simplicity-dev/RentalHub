@@ -1117,7 +1117,7 @@ export default function SuperAdminDashboard() {
               const sectionClass = `super-admin-${cat.key}-section`;
 
               return (
-                <div key={cat.key}>
+                <div key={cat.key} className={sectionClass}>
                   <div className={`mb-3 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${c.border} ${c.bg}`}>
                     <span className={`inline-block h-2 w-2 rounded-full ${c.dot}`} />
                     <span className={`text-[11px] font-bold uppercase tracking-widest ${c.text}`}>{cat.label}</span>
@@ -1130,7 +1130,7 @@ export default function SuperAdminDashboard() {
                           key={item.name}
                           type="button"
                           onClick={() => loadTab(item.name)}
-                          className={`${sectionClass} group relative flex flex-col justify-center rounded-xl border-2 p-3 text-left transition-all duration-150 ${
+                          className={`group relative flex flex-col justify-center rounded-xl border-2 p-3 text-left transition-all duration-150 ${
                             isActive
                               ? `${c.activeBorder} ${c.activeBg} ${c.activeText} shadow-sm ring-1 ring-inset ${c.activeBorder.replace('border-', 'ring-')}`
                               : `border-slate-200 bg-white text-slate-700 ${c.hover}`

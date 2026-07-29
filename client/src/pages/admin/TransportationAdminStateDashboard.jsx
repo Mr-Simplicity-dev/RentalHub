@@ -175,7 +175,7 @@ export default function TransportationAdminStateDashboard() {
       <SectionTabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'overview' ? (
-        <div className="space-y-6">
+        <div className="state-trans-overview-section space-y-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Bookings (30 days)" value={stats.total_bookings || 0} tone="cyan" />
             <MetricCard label="Revenue" value={formatCurrency(stats.total_revenue)} tone="emerald" />
@@ -250,6 +250,7 @@ export default function TransportationAdminStateDashboard() {
         <SectionCard
           title="State booking queue"
           description="All transportation bookings linked to properties inside your assigned jurisdiction."
+          className="state-trans-bookings-section"
         >
           {bookings.length ? (
             <div className="space-y-3">
@@ -286,6 +287,7 @@ export default function TransportationAdminStateDashboard() {
         <SectionCard
           title="Services visible in your jurisdiction"
           description="Transportation services with booking activity mapped to your state scope."
+          className="state-trans-services-section"
         >
           {services.length ? (
             <div className="grid gap-4 lg:grid-cols-2">
@@ -363,6 +365,7 @@ export default function TransportationAdminStateDashboard() {
         <SectionCard
           title="Assigned transportation jurisdiction"
           description="This is the monitoring scope configured for your account."
+          className="state-trans-jurisdiction-section"
         >
           {jurisdiction.length ? (
             <div className="space-y-3">

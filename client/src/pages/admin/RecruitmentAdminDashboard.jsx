@@ -173,7 +173,7 @@ export default function RecruitmentAdminDashboard() {
           />
 
           {/* ── Metric Cards ───────────────────────────── */}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="recruitment-admin-overview-section grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Total Applicants"
               value={analytics?.total_applicants || 0}
@@ -214,7 +214,9 @@ export default function RecruitmentAdminDashboard() {
           )}
 
           {activeTab === 'cycles' && (
+            <div className="recruitment-admin-cycles-section">
             <RecruitmentCyclesTab cycles={cycles} onRefresh={loadCore} />
+            </div>
           )}
 
           {activeTab === 'roles' && (
@@ -230,10 +232,12 @@ export default function RecruitmentAdminDashboard() {
           )}
 
           {activeTab === 'applicants' && (
+            <div className="recruitment-admin-applicants-section">
             <RecruitmentApplicantsTab
               roles={roles}
               onRefreshCore={loadCore}
             />
+            </div>
           )}
 
           {activeTab === 'interviews' && (

@@ -948,7 +948,9 @@ const SuperSupportAdminDashboard = () => {
 
         {/* Support Tickets Tab */}
         {activeTab === 'tickets' && (
+          <div className="super-support-tickets-section">
           <SupportTicketWorkspace tickets={dashboardData.supportTickets || []} loading={loading || refreshing} user={user} onOpenTicket={(ticket) => openModal('view-ticket', ticket)} onTicketAction={handleQuickAction} mode="tickets" />
+          </div>
         )}
 
         {activeTab === 'escalations' && (

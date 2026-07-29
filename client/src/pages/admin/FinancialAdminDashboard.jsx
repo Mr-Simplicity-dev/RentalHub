@@ -269,7 +269,7 @@ const FinancialAdminDashboard = () => {
               <button
                 type="button"
                 onClick={() => setShowPersonalWithdrawDialog(true)}
-                className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                className="lga-finance-withdrawal-action rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
               >
                 Request Withdrawal
               </button>
@@ -384,14 +384,14 @@ const FinancialAdminDashboard = () => {
                 <button
                   type="button"
                   onClick={() => setActiveTab('frozen-funds')}
-                  className="fin-admin-refunds-section rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   View Frozen Funds
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('withdrawals')}
-                  className="fin-admin-settlements-section rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   View Withdrawal History
                 </button>
