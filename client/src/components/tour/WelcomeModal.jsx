@@ -1,91 +1,273 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FaTimes, FaCheckCircle } from 'react-icons/fa';
+import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import {
+  FaCheck,
+  FaClock,
+  FaCompass,
+  FaTimes,
+} from 'react-icons/fa';
 
-const WelcomeModal = ({ isOpen, onStartTour, onSkip, isReturningUser = false }) => {
-  return (
+const BRAND = {
+  navy: '#071A3D',
+  navySoft: '#102B5C',
+  gold: '#FFC928',
+  goldSoft: '#FFE58A',
+};
+
+const getFocusableElements = (container) => {
+  if (!container) return [];
+  return Array.from(container.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), '
+    + 'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  ));
+};
+
+const WelcomeModal = ({
+  isOpen,
+  onStartTour,
+  onSkip,
+  isReturningUser = false,
+}) => {
+  const prefersReducedMotion = useReducedMotion();
+  const dialogRef = useRef(null);
+  const startButtonRef = useRef(null);
+  const previousFocusRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return undefined;
+
+    previousFocusRef.current = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const focusTimer = window.setTimeout(() => {
+      startButtonRef.current?.focus({ preventScroll: true });
+    }, prefersReducedMotion ? 0 : 180);
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onSkip();
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+      const focusable = getFocusableElements(dialogRef.current);
+      if (!focusable.length) {
+        event.preventDefault();
+        dialogRef.current?.focus({ preventScroll: true });
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener('keydown', handleKeyDown, true);
+      document.body.style.overflow = previousOverflow;
+
+      const previousFocus = previousFocusRef.current;
+      if (previousFocus && typeof previousFocus.focus === 'function' && previousFocus.isConnected) {
+        previousFocus.focus({ preventScroll: true });
+      }
+    };
+  }, [isOpen, onSkip, prefersReducedMotion]);
+
+  if (typeof document === 'undefined') return null;
+
+  const transition = prefersReducedMotion
+    ? { duration: 0 }
+    : { type: 'spring', stiffness: 280, damping: 27, mass: 0.85 };
+
+  const benefits = [
+    'Highlights the real controls on your dashboard',
+    'Personalized for your RentalHub account role',
+    'Available to replay whenever you need a refresher',
+  ];
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-40"
+        <motion.div
+          key="rentalhub-tour-welcome"
+          className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4 sm:p-6"
+          style={{ zIndex: 2147483000 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.22 }}
+        >
+          <button
+            type="button"
+            className="absolute inset-0 h-full w-full cursor-default border-0"
+            style={{
+              background: 'rgba(3, 12, 30, 0.76)',
+              backdropFilter: 'blur(7px)',
+            }}
+            aria-label="Close guided tour introduction"
             onClick={onSkip}
           />
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+          <motion.section
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rentalhub-tour-welcome-title"
+            aria-describedby="rentalhub-tour-welcome-description"
+            tabIndex={-1}
+            className="relative my-auto w-full max-w-lg overflow-hidden rounded-[28px] border bg-white shadow-2xl outline-none"
+            style={{
+              borderColor: 'rgba(255, 201, 40, 0.56)',
+              boxShadow: '0 34px 90px rgba(3, 12, 30, 0.42), 0 10px 32px rgba(3, 12, 30, 0.25)',
+            }}
+            initial={prefersReducedMotion
+              ? { opacity: 0 }
+              : { opacity: 0, scale: 0.94, y: 22 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            exit={prefersReducedMotion
+              ? { opacity: 0 }
+              : { opacity: 0, scale: 0.97, y: 10 }}
+            transition={transition}
           >
-            <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl max-h-[85vh] overflow-y-auto p-5 sm:p-8">
+            <div
+              className="relative overflow-hidden px-6 pb-8 pt-7 text-center sm:px-9 sm:pb-9 sm:pt-8"
+              style={{
+                background: `linear-gradient(145deg, ${BRAND.navy} 0%, #0B285A 62%, ${BRAND.navySoft} 100%)`,
+              }}
+            >
+              <div
+                aria-hidden="true"
+                className="absolute -left-20 -top-24 h-64 w-64 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle, rgba(255, 201, 40, 0.2), transparent 68%)',
+                }}
+              />
+              <div
+                aria-hidden="true"
+                className="absolute -bottom-24 -right-16 h-56 w-56 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle, rgba(56, 189, 248, 0.16), transparent 68%)',
+                }}
+              />
+
               <button
+                type="button"
                 onClick={onSkip}
-                className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
+                aria-label="Skip the guided tour"
+                className="absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={{
+                  '--tw-ring-color': BRAND.gold,
+                  '--tw-ring-offset-color': BRAND.navy,
+                }}
               >
-                <FaTimes size={22} className="sm:text-2xl" />
+                <FaTimes size={16} aria-hidden="true" />
               </button>
 
-              <div className="text-center">
-                <div className="mb-4 sm:mb-6">
-                  <div className="inline-block bg-gradient-to-r from-blue-500 to-blue-600 rounded-full p-3 sm:p-4">
-                    <FaCheckCircle className="text-white text-2xl sm:text-4xl" />
-                  </div>
-                </div>
-
-                <h2 className="text-xl sm:text-3xl font-bold text-gray-900 mb-2 sm:mb-3">
-                  {isReturningUser ? 'Welcome Back!' : 'Welcome to RentalHub NG!'}
-                </h2>
-
-                <p className="text-sm sm:text-base text-gray-600 mb-5 sm:mb-8 leading-relaxed">
-                  {isReturningUser
-                    ? "It's been a while! Let's refresh you on how to make the most of RentalHub."
-                    : 'Get the most out of your account with a guided tour of the powerful features available to you.'}
-                </p>
-
-                <div className="bg-gray-50 rounded-lg p-4 sm:p-6 mb-5 sm:mb-8 text-left space-y-2 sm:space-y-3">
-                  <div className="flex items-start">
-                    <FaCheckCircle className="text-green-500 mt-0.5 mr-3 shrink-0" />
-                    <span className="text-sm sm:text-base text-gray-700">Learn key features step-by-step</span>
-                  </div>
-                  <div className="flex items-start">
-                    <FaCheckCircle className="text-green-500 mt-0.5 mr-3 shrink-0" />
-                    <span className="text-sm sm:text-base text-gray-700">Get personalized for your role</span>
-                  </div>
-                  <div className="flex items-start">
-                    <FaCheckCircle className="text-green-500 mt-0.5 mr-3 shrink-0" />
-                    <span className="text-sm sm:text-base text-gray-700">Replay anytime from settings</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 sm:gap-3">
-                  <button
-                    onClick={onSkip}
-                    className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-300 text-gray-700 font-semibold text-sm sm:text-base rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Skip for Now
-                  </button>
-                  <button
-                    onClick={onStartTour}
-                    className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold text-sm sm:text-base rounded-lg hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all"
-                  >
-                    Start Tour
-                  </button>
-                </div>
-
-                <p className="text-xs text-gray-500 mt-4 sm:mt-6">
-                  This tour takes about 2-3 minutes
-                </p>
+              <div
+                className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[24px] border p-2.5"
+                style={{
+                  borderColor: 'rgba(255, 229, 138, 0.72)',
+                  background: 'linear-gradient(145deg, rgba(255, 229, 138, 0.96), rgba(255, 201, 40, 0.76))',
+                  boxShadow: '0 16px 36px rgba(255, 201, 40, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.72)',
+                }}
+              >
+                <img
+                  src="/rentalhub-mark.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-full w-full rounded-[16px] object-contain"
+                />
               </div>
+
+              <p
+                className="relative mb-2 text-[11px] font-extrabold uppercase tracking-[0.22em]"
+                style={{ color: BRAND.goldSoft }}
+              >
+                Your personal dashboard guide
+              </p>
+              <h1
+                id="rentalhub-tour-welcome-title"
+                className="relative text-2xl font-black leading-tight text-white sm:text-3xl"
+              >
+                {isReturningUser ? 'Welcome back to RentalHub' : 'Welcome to RentalHub NG'}
+              </h1>
+              <p
+                id="rentalhub-tour-welcome-description"
+                className="relative mx-auto mt-3 max-w-md text-sm leading-6 text-slate-200 sm:text-[15px]"
+              >
+                {isReturningUser
+                  ? 'Take a quick refresher and rediscover the controls that matter most for your account.'
+                  : 'Let us show you the most useful controls for your account with a short, focused walkthrough.'}
+              </p>
             </div>
-          </motion.div>
-        </>
+
+            <div className="max-h-[48vh] overflow-y-auto px-6 py-6 sm:px-9 sm:py-7">
+              <div className="space-y-3">
+                {benefits.map((benefit) => (
+                  <div
+                    key={benefit}
+                    className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+                  >
+                    <span
+                      className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                      style={{ background: BRAND.gold, color: BRAND.navy }}
+                    >
+                      <FaCheck size={10} aria-hidden="true" />
+                    </span>
+                    <span className="text-sm font-medium leading-6 text-slate-700">
+                      {benefit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={onSkip}
+                  className="order-2 inline-flex min-h-[48px] items-center justify-center rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 sm:order-1"
+                  style={{ '--tw-ring-color': BRAND.navySoft }}
+                >
+                  Maybe later
+                </button>
+                <button
+                  ref={startButtonRef}
+                  type="button"
+                  onClick={onStartTour}
+                  className="order-1 inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold transition-transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 sm:order-2"
+                  style={{
+                    color: BRAND.navy,
+                    background: `linear-gradient(135deg, ${BRAND.goldSoft}, ${BRAND.gold})`,
+                    boxShadow: '0 10px 24px rgba(255, 201, 40, 0.24)',
+                    '--tw-ring-color': BRAND.gold,
+                  }}
+                >
+                  <FaCompass size={14} aria-hidden="true" />
+                  Start guided tour
+                </button>
+              </div>
+
+              <p className="mt-5 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
+                <FaClock size={12} aria-hidden="true" />
+                About 2 minutes · you remain in control
+              </p>
+            </div>
+          </motion.section>
+        </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };
 

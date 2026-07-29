@@ -196,53 +196,44 @@ const ensureCommissionPasswordSchema = async () => {
   commissionPasswordSchemaReady = true;
 };
 
-let tourSchemaReady = false;
+let tourSchemaPromise = null;
 const ensureTourSchema = async () => {
-  if (tourSchemaReady) return;
+  if (!tourSchemaPromise) {
+    tourSchemaPromise = db.query(
+      `SELECT table_name, column_name
+       FROM information_schema.columns
+       WHERE table_schema = current_schema()
+         AND table_name IN ('user_tour_states', 'user_tour_events')`
+    ).then((result) => {
+      const columnsByTable = result.rows.reduce((tables, row) => {
+        if (!tables[row.table_name]) tables[row.table_name] = new Set();
+        tables[row.table_name].add(row.column_name);
+        return tables;
+      }, {});
+      const requiredColumns = {
+        user_tour_states: ['user_id', 'platform', 'tour_key', 'last_skipped_at'],
+        user_tour_events: ['user_id', 'platform', 'tour_key', 'event_id'],
+      };
+      const missing = Object.entries(requiredColumns).flatMap(([table, columns]) =>
+        columns
+          .filter((column) => !columnsByTable[table]?.has(column))
+          .map((column) => `${table}.${column}`)
+      );
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS user_tour_states (
-      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      dashboard_type VARCHAR(80),
-      tour_version VARCHAR(40) NOT NULL DEFAULT '1',
-      status VARCHAR(30) NOT NULL DEFAULT 'not_started',
-      last_welcome_shown_at TIMESTAMP,
-      last_started_at TIMESTAMP,
-      last_completed_at TIMESTAMP,
-      last_dismissed_at TIMESTAMP,
-      started_count INTEGER NOT NULL DEFAULT 0,
-      completed_count INTEGER NOT NULL DEFAULT 0,
-      skipped_count INTEGER NOT NULL DEFAULT 0,
-      dismissed_count INTEGER NOT NULL DEFAULT 0,
-      replay_count INTEGER NOT NULL DEFAULT 0,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT user_tour_states_status_check
-        CHECK (status IN ('not_started', 'welcome_shown', 'in_progress', 'completed', 'skipped', 'dismissed'))
-    );
+      if (missing.length) {
+        throw new Error(
+          `Tour schema is not ready (${missing.join(', ')}). Run the pending database migrations.`
+        );
+      }
 
-    CREATE TABLE IF NOT EXISTS user_tour_events (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      event_type VARCHAR(40) NOT NULL,
-      dashboard_type VARCHAR(80),
-      tour_version VARCHAR(40) NOT NULL DEFAULT '1',
-      step_id VARCHAR(120),
-      current_step INTEGER,
-      total_steps INTEGER,
-      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT user_tour_events_type_check
-        CHECK (event_type IN ('welcome_shown', 'started', 'replayed', 'completed', 'skipped', 'dismissed'))
-    );
+      return true;
+    }).catch((error) => {
+      tourSchemaPromise = null;
+      throw error;
+    });
+  }
 
-    CREATE INDEX IF NOT EXISTS idx_user_tour_events_user_created
-      ON user_tour_events(user_id, created_at DESC);
-
-    CREATE INDEX IF NOT EXISTS idx_user_tour_events_type_created
-      ON user_tour_events(event_type, created_at DESC);
-  `);
-
-  tourSchemaReady = true;
+  return tourSchemaPromise;
 };
 
 const TOUR_EVENTS = new Set(['welcome_shown', 'started', 'replayed', 'completed', 'skipped', 'dismissed']);
@@ -255,19 +246,103 @@ const TOUR_EVENT_STATUS = {
   dismissed: 'dismissed',
 };
 
-const normalizeTourText = (value, fallback = null) => {
-  const text = String(value || '').trim();
+const TOUR_PLATFORM_ALIASES = new Map([
+  ['legacy', 'legacy'],
+  ['web', 'web'],
+  ['browser', 'web'],
+  ['pwa', 'web'],
+  ['mobile', 'mobile'],
+  ['native', 'mobile'],
+  ['android', 'mobile'],
+  ['ios', 'mobile'],
+]);
+
+const tourInputError = (message) => {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+};
+
+const normalizeTourText = (
+  value,
+  fallback = null,
+  { field = 'Tour value', maxLength = null, lowercase = false } = {}
+) => {
+  const text = String(value ?? '').trim();
+  if (maxLength && text.length > maxLength) {
+    throw tourInputError(`${field} must be ${maxLength} characters or fewer`);
+  }
+  if (!text) return fallback;
+  return lowercase ? text.toLowerCase() : text;
+};
+
+const normalizeTourPlatform = (value, fallback = 'legacy') => {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+
+  const text = normalizeTourText(value, null, {
+    field: 'Tour platform',
+    maxLength: 20,
+    lowercase: true,
+  });
+  const platform = TOUR_PLATFORM_ALIASES.get(text);
+
+  if (!platform) {
+    throw tourInputError('Tour platform must be web, mobile, or legacy');
+  }
+
+  return platform;
+};
+
+const normalizeTourKey = (value, fallback = 'default') => {
+  const text = normalizeTourText(value, fallback, {
+    field: 'Tour key',
+    maxLength: 120,
+    lowercase: true,
+  });
   return text || fallback;
 };
 
-const getTourState = async (userId) => {
+const normalizeTourInteger = (value, field) => {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'boolean') {
+    throw tourInputError(`${field} must be a non-negative integer`);
+  }
+
+  const parsed = Number(value);
+  if (
+    !Number.isSafeInteger(parsed) ||
+    parsed < 0 ||
+    parsed > 2147483647
+  ) {
+    throw tourInputError(`${field} must be a non-negative integer`);
+  }
+  return parsed;
+};
+
+const getTourState = async (userId, { platform = null, tourKey = null } = {}) => {
   await ensureTourSchema();
+  const clauses = ['user_id = $1'];
+  const values = [userId];
+
+  if (platform) {
+    values.push(platform);
+    clauses.push(`platform = $${values.length}`);
+  }
+
+  if (tourKey) {
+    values.push(tourKey);
+    clauses.push(`tour_key = $${values.length}`);
+  }
+
   const result = await db.query(
     `SELECT *
      FROM user_tour_states
-     WHERE user_id = $1
+     WHERE ${clauses.join(' AND ')}
+     ORDER BY updated_at DESC
      LIMIT 1`,
-    [userId]
+    values
   );
 
   return result.rows[0] || null;
@@ -278,90 +353,169 @@ const recordTourEvent = async (userId, payload = {}) => {
 
   const eventType = normalizeTourText(payload.event_type);
   if (!TOUR_EVENTS.has(eventType)) {
-    const error = new Error('Invalid tour event type');
-    error.status = 400;
-    throw error;
+    throw tourInputError('Invalid tour event type');
   }
 
-  const dashboardType = normalizeTourText(payload.dashboard_type);
-  const tourVersion = normalizeTourText(payload.tour_version, '1');
-  const stepId = normalizeTourText(payload.step_id);
-  const currentStep = Number.isInteger(Number(payload.current_step)) ? Number(payload.current_step) : null;
-  const totalSteps = Number.isInteger(Number(payload.total_steps)) ? Number(payload.total_steps) : null;
-  const metadata = payload.metadata && typeof payload.metadata === 'object' && !Array.isArray(payload.metadata)
+  const dashboardType = normalizeTourText(payload.dashboard_type, null, {
+    field: 'Dashboard type',
+    maxLength: 80,
+    lowercase: true,
+  });
+  const rawMetadata = payload.metadata && typeof payload.metadata === 'object' && !Array.isArray(payload.metadata)
     ? payload.metadata
     : {};
-
-  await db.query(
-    `INSERT INTO user_tour_events (
-       user_id, event_type, dashboard_type, tour_version,
-       step_id, current_step, total_steps, metadata
-     )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
-    [
-      userId,
-      eventType,
-      dashboardType,
-      tourVersion,
-      stepId,
-      currentStep,
-      totalSteps,
-      JSON.stringify(metadata),
-    ]
-  );
+  const platform = normalizeTourPlatform(payload.platform ?? rawMetadata.platform, 'legacy');
+  const tourKey = normalizeTourKey(payload.tour_key, dashboardType || 'default');
+  const tourVersion = normalizeTourText(payload.tour_version, '3', {
+    field: 'Tour version',
+    maxLength: 40,
+  });
+  const eventId = normalizeTourText(payload.event_id, null, {
+    field: 'Tour event ID',
+    maxLength: 100,
+    lowercase: true,
+  });
+  const stepId = normalizeTourText(payload.step_id, null, {
+    field: 'Tour step ID',
+    maxLength: 120,
+  });
+  const currentStep = normalizeTourInteger(payload.current_step, 'Current step');
+  const totalSteps = normalizeTourInteger(payload.total_steps, 'Total steps');
+  if (currentStep !== null && totalSteps !== null && currentStep > totalSteps) {
+    throw tourInputError('Current step cannot be greater than total steps');
+  }
+  const metadata = {
+    ...rawMetadata,
+    platform,
+  };
+  const serializedMetadata = JSON.stringify(metadata);
+  if (Buffer.byteLength(serializedMetadata, 'utf8') > 16384) {
+    throw tourInputError('Tour metadata must be 16 KB or smaller');
+  }
 
   const startedIncrement = eventType === 'started' ? 1 : 0;
   const completedIncrement = eventType === 'completed' ? 1 : 0;
   const skippedIncrement = eventType === 'skipped' ? 1 : 0;
   const dismissedIncrement = eventType === 'dismissed' ? 1 : 0;
   const replayIncrement = eventType === 'replayed' ? 1 : 0;
+  const client = await db.connect();
 
-  const stateResult = await db.query(
-    `INSERT INTO user_tour_states (
-       user_id, dashboard_type, tour_version, status,
-       last_welcome_shown_at, last_started_at, last_completed_at, last_dismissed_at,
-       started_count, completed_count, skipped_count, dismissed_count, replay_count,
-       updated_at
-     )
-     VALUES (
-       $1, $2, $3, $4,
-       CASE WHEN $5 = 'welcome_shown' THEN CURRENT_TIMESTAMP ELSE NULL END,
-       CASE WHEN $5 IN ('started', 'replayed') THEN CURRENT_TIMESTAMP ELSE NULL END,
-       CASE WHEN $5 = 'completed' THEN CURRENT_TIMESTAMP ELSE NULL END,
-       CASE WHEN $5 IN ('completed', 'skipped', 'dismissed') THEN CURRENT_TIMESTAMP ELSE NULL END,
-       $6, $7, $8, $9, $10,
-       CURRENT_TIMESTAMP
-     )
-     ON CONFLICT (user_id) DO UPDATE SET
-       dashboard_type = COALESCE(EXCLUDED.dashboard_type, user_tour_states.dashboard_type),
-       tour_version = EXCLUDED.tour_version,
-       status = EXCLUDED.status,
-       last_welcome_shown_at = COALESCE(EXCLUDED.last_welcome_shown_at, user_tour_states.last_welcome_shown_at),
-       last_started_at = COALESCE(EXCLUDED.last_started_at, user_tour_states.last_started_at),
-       last_completed_at = COALESCE(EXCLUDED.last_completed_at, user_tour_states.last_completed_at),
-       last_dismissed_at = COALESCE(EXCLUDED.last_dismissed_at, user_tour_states.last_dismissed_at),
-       started_count = user_tour_states.started_count + $6,
-       completed_count = user_tour_states.completed_count + $7,
-       skipped_count = user_tour_states.skipped_count + $8,
-       dismissed_count = user_tour_states.dismissed_count + $9,
-       replay_count = user_tour_states.replay_count + $10,
-       updated_at = CURRENT_TIMESTAMP
-     RETURNING *`,
-    [
-      userId,
-      dashboardType,
-      tourVersion,
-      TOUR_EVENT_STATUS[eventType],
-      eventType,
-      startedIncrement,
-      completedIncrement,
-      skippedIncrement,
-      dismissedIncrement,
-      replayIncrement,
-    ]
-  );
+  try {
+    await client.query('BEGIN');
 
-  return stateResult.rows[0];
+    const eventResult = await client.query(
+      `INSERT INTO user_tour_events (
+         user_id, platform, tour_key, event_id, event_type, dashboard_type,
+         tour_version, step_id, current_step, total_steps, metadata
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
+       ON CONFLICT (user_id, platform, event_id)
+         WHERE event_id IS NOT NULL
+       DO NOTHING
+       RETURNING id`,
+      [
+        userId,
+        platform,
+        tourKey,
+        eventId,
+        eventType,
+        dashboardType,
+        tourVersion,
+        stepId,
+        currentStep,
+        totalSteps,
+        serializedMetadata,
+      ]
+    );
+
+    // A retried request with the same client event ID must not create another
+    // analytics row or increment the aggregate counters a second time.
+    if (eventId && eventResult.rowCount === 0) {
+      const existingState = await client.query(
+        `SELECT *
+         FROM user_tour_states
+         WHERE user_id = $1 AND platform = $2 AND tour_key = $3
+         LIMIT 1`,
+        [userId, platform, tourKey]
+      );
+      await client.query('COMMIT');
+      return existingState.rows[0] || null;
+    }
+
+    const stateResult = await client.query(
+      `INSERT INTO user_tour_states (
+         user_id, platform, tour_key, dashboard_type, tour_version, status,
+         last_welcome_shown_at, last_started_at, last_completed_at,
+         last_dismissed_at, last_skipped_at,
+         started_count, completed_count, skipped_count, dismissed_count, replay_count,
+         updated_at
+       )
+       VALUES (
+         $1, $2, $3, $4, $5, $6,
+         CASE WHEN $7 = 'welcome_shown' THEN CURRENT_TIMESTAMP ELSE NULL END,
+         CASE WHEN $7 IN ('started', 'replayed') THEN CURRENT_TIMESTAMP ELSE NULL END,
+         CASE WHEN $7 = 'completed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+         CASE WHEN $7 = 'dismissed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+         CASE WHEN $7 = 'skipped' THEN CURRENT_TIMESTAMP ELSE NULL END,
+         $8, $9, $10, $11, $12,
+         CURRENT_TIMESTAMP
+       )
+       ON CONFLICT (user_id, platform, tour_key) DO UPDATE SET
+         dashboard_type = COALESCE(EXCLUDED.dashboard_type, user_tour_states.dashboard_type),
+         tour_version = CASE
+           WHEN user_tour_states.tour_version ~ '^[0-9]+$'
+            AND EXCLUDED.tour_version ~ '^[0-9]+$'
+            AND user_tour_states.tour_version::numeric > EXCLUDED.tour_version::numeric
+             THEN user_tour_states.tour_version
+           ELSE EXCLUDED.tour_version
+         END,
+         status = CASE
+           WHEN user_tour_states.tour_version ~ '^[0-9]+$'
+            AND EXCLUDED.tour_version ~ '^[0-9]+$'
+            AND user_tour_states.tour_version::numeric > EXCLUDED.tour_version::numeric
+             THEN user_tour_states.status
+           WHEN user_tour_states.tour_version = EXCLUDED.tour_version
+            AND user_tour_states.status IN ('completed', 'skipped', 'dismissed')
+            AND $7 IN ('welcome_shown', 'started')
+             THEN user_tour_states.status
+           ELSE EXCLUDED.status
+         END,
+         last_welcome_shown_at = COALESCE(EXCLUDED.last_welcome_shown_at, user_tour_states.last_welcome_shown_at),
+         last_started_at = COALESCE(EXCLUDED.last_started_at, user_tour_states.last_started_at),
+         last_completed_at = COALESCE(EXCLUDED.last_completed_at, user_tour_states.last_completed_at),
+         last_dismissed_at = COALESCE(EXCLUDED.last_dismissed_at, user_tour_states.last_dismissed_at),
+         last_skipped_at = COALESCE(EXCLUDED.last_skipped_at, user_tour_states.last_skipped_at),
+         started_count = user_tour_states.started_count + $8,
+         completed_count = user_tour_states.completed_count + $9,
+         skipped_count = user_tour_states.skipped_count + $10,
+         dismissed_count = user_tour_states.dismissed_count + $11,
+         replay_count = user_tour_states.replay_count + $12,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [
+        userId,
+        platform,
+        tourKey,
+        dashboardType,
+        tourVersion,
+        TOUR_EVENT_STATUS[eventType],
+        eventType,
+        startedIncrement,
+        completedIncrement,
+        skippedIncrement,
+        dismissedIncrement,
+        replayIncrement,
+      ]
+    );
+
+    await client.query('COMMIT');
+    return stateResult.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 const normalizeCommissionPassword = (value) => String(value || '').trim();
@@ -636,14 +790,35 @@ router.post('/commission-password/reset', authenticate, sensitiveActionLimiter, 
 
 router.get('/tour', authenticate, async (req, res) => {
   try {
-    const state = await getTourState(req.user.id);
+    const platform = req.query.platform == null
+      ? 'legacy'
+      : normalizeTourPlatform(req.query.platform);
+    const dashboardType = normalizeTourText(
+      req.query.dashboard_type,
+      null,
+      {
+        field: 'Dashboard type',
+        maxLength: 80,
+        lowercase: true,
+      }
+    );
+    const tourKey = req.query.tour_key == null && !dashboardType
+      ? null
+      : normalizeTourKey(req.query.tour_key, dashboardType || 'default');
+    const state = await getTourState(req.user.id, {
+      platform,
+      tourKey,
+    });
 
     return res.json({
       success: true,
       data: state || {
         user_id: req.user.id,
+        platform,
+        tour_key: tourKey || dashboardType || 'default',
+        dashboard_type: dashboardType,
         status: 'not_started',
-        tour_version: '1',
+        tour_version: '3',
         started_count: 0,
         completed_count: 0,
         skipped_count: 0,
@@ -653,9 +828,9 @@ router.get('/tour', authenticate, async (req, res) => {
     });
   } catch (error) {
     req.logger.error('Tour state load error:', error);
-    return res.status(500).json({
+    return res.status(error.status || 500).json({
       success: false,
-      message: 'Failed to load tour state',
+      message: error.status ? error.message : 'Failed to load tour state',
     });
   }
 });

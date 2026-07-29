@@ -1,10 +1,34 @@
 import React, { useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import WelcomeModal from './WelcomeModal';
 import TourOverlay from './TourOverlay';
 import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
-import { getTourStepsByUserRole } from '../../config/tourConfig';
+import {
+  getTourDashboardRoute,
+  getTourDashboardType,
+  getTourStepsByUserRole,
+} from '../../config/tourConfig';
+
+const routeMatches = (location, expectedRoute) => {
+  if (!expectedRoute) return true;
+
+  const [expectedPath, expectedQuery = ''] = expectedRoute.split('?');
+  const normalizePath = (value) => value.replace(/\/+$/, '') || '/';
+  if (normalizePath(location.pathname) !== normalizePath(expectedPath)) return false;
+
+  const expectedParams = new URLSearchParams(expectedQuery);
+  const currentParams = new URLSearchParams(location.search);
+  return Array.from(expectedParams.entries()).every(
+    ([key, value]) => currentParams.get(key) === value,
+  );
+};
+
+const getEffectiveTourRole = (user) => (
+  user?.is_recruitment_admin === true && user?.user_type !== 'super_admin'
+    ? 'recruitment_admin'
+    : user?.user_type
+);
 
 /**
  * TourManager Component
@@ -13,12 +37,14 @@ import { getTourStepsByUserRole } from '../../config/tourConfig';
  */
 const TourManager = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const prevPathRef = useRef(location.pathname + location.search);
 
   const {
     showWelcomeModal,
     showTourOverlay,
     currentStep,
+    currentDashboard,
     tourSteps,
     startTour,
     nextStep,
@@ -34,19 +60,52 @@ const TourManager = () => {
     const routeKey = location.pathname + location.search;
     if (routeKey !== prevPathRef.current) {
       prevPathRef.current = routeKey;
-      if (showWelcomeModal) dismissWelcomeModal();
+      if (showWelcomeModal && !showTourOverlay) dismissWelcomeModal();
     }
-  }, [dismissWelcomeModal, location.pathname, location.search, showWelcomeModal]);
+  }, [
+    dismissWelcomeModal,
+    location.pathname,
+    location.search,
+    showTourOverlay,
+    showWelcomeModal,
+  ]);
+
+  // Replays can be started from Profile or Settings. Keep every tour anchored to
+  // the correct dashboard (and tab, where a step provides a route) before the
+  // overlay resolves its target.
+  useEffect(() => {
+    if (!showTourOverlay || !user) return;
+
+    const stepRoute = tourSteps[currentStep]?.route;
+    const desiredRoute = stepRoute || getTourDashboardRoute(getEffectiveTourRole(user));
+    if (desiredRoute && !routeMatches(location, desiredRoute)) {
+      navigate(desiredRoute);
+    }
+  }, [
+    currentStep,
+    location,
+    navigate,
+    showTourOverlay,
+    tourSteps,
+    user,
+  ]);
 
   const handleStartTour = () => {
     if (user) {
-      const tourSteps = getTourStepsByUserRole(user.user_type);
-      startTour(user.user_type, tourSteps);
+      const tourRole = getEffectiveTourRole(user);
+      const roleSteps = getTourStepsByUserRole(tourRole);
+      startTour(tourRole, roleSteps);
+
+      const desiredRoute = roleSteps[0]?.route || getTourDashboardRoute(tourRole);
+      if (desiredRoute && !routeMatches(location, desiredRoute)) {
+        navigate(desiredRoute);
+      }
     }
   };
 
+  const effectiveRole = getEffectiveTourRole(user);
   const isReturningUser = localStorage.getItem(
-    `tour_last_dismissal_${user?.id}`
+    `tour_last_dismissal_${user?.id}_${getTourDashboardType(effectiveRole)}`
   );
 
   return (
@@ -65,7 +124,11 @@ const TourManager = () => {
         onNext={nextStep}
         onPrevious={previousStep}
         onSkip={skipTour}
-        dashboardTitle={currentStep < tourSteps.length ? tourSteps[currentStep]?.title : 'Tour Complete'}
+        dashboardTitle={
+          currentDashboard
+            ? `${String(currentDashboard).replace(/_/g, ' ')} dashboard`
+            : 'RentalHub dashboard'
+        }
       />
     </>
   );

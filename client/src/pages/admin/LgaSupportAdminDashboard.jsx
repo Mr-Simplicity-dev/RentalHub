@@ -181,7 +181,9 @@ const LgaSupportAdminDashboard = () => {
         )}
 
         {activeTab === 'tickets' && (
+        <div className="lga-support-tickets-section">
         <SupportTicketWorkspace tickets={data.tickets} loading={loading} user={user} onOpenTicket={openTicket} onTicketAction={handleQuickAction} mode="tickets" />
+        </div>
         )}
 
         {activeTab === 'escalations' && (

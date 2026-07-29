@@ -273,7 +273,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       <div className="mx-auto max-w-7xl">
         <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="state-admin-overview-section bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">State Admin Dashboard</h1>
@@ -393,7 +393,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="state-admin-finance-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -474,7 +474,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       </div>
 
       {/* Withdrawal Section */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="state-admin-withdrawal-section bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold mb-4">Request Withdrawal</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -543,7 +543,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="state-admin-tools-section bg-white rounded-lg shadow">
         <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
             {['overview', 'commissions', 'transactions', 'users', 'withdrawals'].map((tab) => (

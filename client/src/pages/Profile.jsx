@@ -7,7 +7,11 @@ import { useTranslation } from 'react-i18next';
 import BackToDashboard from '../components/common/BackToDashboard';
 import AppealModal from '../components/common/AppealModal';
 import { useTour } from '../hooks/useTour';
-import { getTourDashboardType, getTourStepsByUserRole } from '../config/tourConfig';
+import {
+  getTourDashboardRoute,
+  getTourDashboardType,
+  getTourStepsByUserRole,
+} from '../config/tourConfig';
 
 const DEFAULT_LIVENESS = {
   faceDetected: false,
@@ -630,33 +634,20 @@ const Profile = () => {
     }
   };
 
-  const getDashboardPathForTour = () => {
-    if (user?.user_type === 'tenant') return '/tenant/dashboard';
-    if (user?.user_type === 'agent') return '/agent/dashboard';
-    if (user?.user_type === 'lawyer') return '/lawyer';
-    if (user?.user_type === 'state_lawyer') return '/lawyer/state';
-    if (user?.user_type === 'super_lawyer') return '/lawyer/super';
-    if (user?.user_type === 'super_admin') return '/super-admin';
-    if (String(user?.user_type || '').includes('admin')) return '/admin';
-    return '/dashboard';
-  };
-
   const handleReplayTour = () => {
     if (!user) return;
 
-    const tourSteps = getTourStepsByUserRole(user.user_type);
-    const dashboardType = getTourDashboardType(user.user_type);
-    const targetPath = getDashboardPathForTour();
-
-    if (window.location.pathname !== targetPath) {
-      navigate(targetPath);
-      window.setTimeout(() => {
-        replayTour(dashboardType, tourSteps);
-      }, 350);
-      return;
-    }
+    const tourRole = user.is_recruitment_admin === true && user.user_type !== 'super_admin'
+      ? 'recruitment_admin'
+      : user.user_type;
+    const tourSteps = getTourStepsByUserRole(tourRole);
+    const dashboardType = getTourDashboardType(tourRole);
+    const targetPath = tourSteps[0]?.route || getTourDashboardRoute(tourRole);
 
     replayTour(dashboardType, tourSteps);
+    if (window.location.pathname !== targetPath.split('?')[0]) {
+      navigate(targetPath);
+    }
   };
 
   return (
