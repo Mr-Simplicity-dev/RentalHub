@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
       try {
         // Server-first check supports HttpOnly cookie auth after page refresh.
         const response = await authService.getCurrentUser();
+
         if (response.success) {
           setUser(response.data);
           setIsAuthenticated(true);
@@ -33,20 +34,28 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password, turnstileToken) => {
-    const response = await authService.login(email, password, turnstileToken);
+    const response = await authService.login(
+      email,
+      password,
+      turnstileToken
+    );
+
     if (response.success) {
       setUser(response.data.user);
       setIsAuthenticated(true);
     }
+
     return response;
   };
 
   const register = async (userData) => {
     const response = await authService.register(userData);
+
     if (response.success) {
       setUser(response.data.user);
       setIsAuthenticated(true);
     }
+
     return response;
   };
 
@@ -71,5 +80,9 @@ export const AuthProvider = ({ children }) => {
     updateUser,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

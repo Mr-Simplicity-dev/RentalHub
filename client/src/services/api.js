@@ -101,24 +101,49 @@ api.interceptors.response.use(
         {},
         { withCredentials: true }
       );
+if (data.success && data.data?.token) {
+  const newToken = data.data.token;
 
-      if (data.success && data.data?.token) {
-        setAuthToken(data.data.token);
-        api.defaults.headers.common.Authorization = `Bearer ${data.data.token}`;
+  setAuthToken(newToken);
 
-        // Replay queued requests before releasing the refresh lock
-        isRefreshing = false;
-        const queuedRequests = pendingRequests;
-        pendingRequests = [];
-        queuedRequests.forEach((cb) => cb(data.data.token));
+  api.defaults.headers.common.Authorization =
+    `Bearer ${newToken}`;
 
-        // Retry the original request
-        originalRequest.headers.Authorization = `Bearer ${data.data.token}`;
-        return api(originalRequest);
-      }
-    } catch (_) {
-      // Refresh failed — clear session
-    }
+  // Release the refresh lock before replaying queued requests.
+  isRefreshing = false;
+
+  const queuedRequests = pendingRequests;
+  pendingRequests = [];
+
+  queuedRequests.forEach((callback) => {
+    callback(newToken);
+  });
+
+  // Retry the original request with the refreshed token.
+  originalRequest.headers =
+    originalRequest.headers || {};
+
+  originalRequest.headers.Authorization =
+    `Bearer ${newToken}`;
+
+  return api(originalRequest);
+}
+
+throw new Error(
+  data?.message || 'Authentication token refresh failed'
+);
+} catch (refreshError) {
+  // Refresh failed — clear the session and release pending requests.
+  isRefreshing = false;
+  pendingRequests = [];
+
+  clearAuthSession();
+
+  delete api.defaults.headers.common.Authorization;
+
+  return Promise.reject(refreshError);
+}
+    
 
     isRefreshing = false;
     pendingRequests = [];

@@ -100,6 +100,7 @@ const Register = () => {
   const [showRegistrationFeeModal, setShowRegistrationFeeModal] = useState(!registrationReference);
   const [premblyPending, setPremblyPending] = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
+  const turnstileRef = useRef(null);
   const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -684,9 +685,12 @@ const Register = () => {
         response.message ||
         t('register.registration_failed')
       );
+      turnstileRef.current?.reset();
+      setTurnstileToken(null);
     }
 
   } catch (error) {
+    turnstileRef.current?.reset();
     setTurnstileToken(null);
     const serverError = error.response?.data;
     const firstError = serverError?.errors?.[0];
@@ -1809,7 +1813,7 @@ return (
                 {errors.terms && <p className="text-red-500 text-sm mt-1">{errors.terms}</p>}
 
                 <TurnstileWidget
-                  key={turnstileToken ? 'used' : 'fresh'}
+                  ref={turnstileRef}
                   onToken={setTurnstileToken}
                   onExpire={() => setTurnstileToken(null)}
                   onError={() => setTurnstileToken(null)}
