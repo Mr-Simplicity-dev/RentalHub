@@ -94,7 +94,6 @@ const Login = () => {
 
     try {
       const response = await login(email, password, turnstileToken);
-      setTurnstileToken(null);
       if (response.success) {
         toast.success(t('login.success'));
 
@@ -164,9 +163,12 @@ const Login = () => {
         }
       } else {
         toast.error(response.message || t('login.failed'));
+        turnstileRef.current?.reset();
+        setTurnstileToken(null);
       }
     } catch (error) {
       toast.error(error.response?.data?.message || t('login.failed'));
+      turnstileRef.current?.reset();
       setTurnstileToken(null);
     } finally {
       setLoading(false);
@@ -292,7 +294,7 @@ const Login = () => {
 
           {/* TURNSTILE */}
           <TurnstileWidget
-            key={turnstileToken ? 'used' : 'fresh'}
+            ref={turnstileRef}
             onToken={setTurnstileToken}
             onExpire={() => setTurnstileToken(null)}
             onError={() => setTurnstileToken(null)}
