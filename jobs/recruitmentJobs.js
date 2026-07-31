@@ -205,7 +205,7 @@ const cleanupStaleRecruitmentPayments = async () => {
     `UPDATE recruitment_applications
      SET payment_reference = NULL,
          updated_at = NOW(),
-         admin_notes = CONCAT_WS(E'\n', admin_notes, $2)
+         admin_notes = CONCAT_WS(E'\n', admin_notes, $2::text)
      WHERE payment_status = 'pending'
        AND payment_reference IS NOT NULL
        AND updated_at < NOW() - ($1::int * INTERVAL '1 hour')

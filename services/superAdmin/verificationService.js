@@ -581,7 +581,7 @@ const getAdminPerformance = async (req, res) => {
          COALESCE(al7d.reports_resolved, 0)::INT AS reports_resolved_7d,
          COALESCE(al30d.reports_resolved, 0)::INT AS reports_resolved_30d,
          al7d.last_action_at,
-         COALESCE(ops.operations, '[]'::json) AS account_operations
+         COALESCE(ops.operations, '[]'::jsonb) AS account_operations
        FROM users a
        LEFT JOIN users v
 
@@ -629,8 +629,11 @@ const getAdminPerformance = async (req, res) => {
            AND created_at >= CURRENT_DATE - INTERVAL '30 days'
        ) al30d ON TRUE
        LEFT JOIN LATERAL (
-         SELECT json_agg(row_to_json(operation_rows) ORDER BY operation_rows.created_at DESC, operation_rows.id DESC) AS operations
-         FROM (
+SELECT jsonb_agg(
+  to_jsonb(operation_rows)
+  ORDER BY operation_rows.created_at DESC,
+           operation_rows.id DESC
+) AS operations         FROM (
            SELECT id, actor_id, actor_name, event_type, note, metadata, created_at
            FROM admin_account_operations
            WHERE admin_user_id = a.id
