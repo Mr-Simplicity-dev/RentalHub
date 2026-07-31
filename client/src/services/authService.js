@@ -11,18 +11,30 @@ import {
 export const authService = {
   // Register
   register: async (userData) => {
-    const response = await api.post('/auth/register', userData);
-    if (response.data.success) {
-      const { token, user } = response.data.data;
-      setAuthSession(token, user);
-      if (token) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      } else {
-        delete api.defaults.headers.common['Authorization'];
-      }
+  const response = await api.post(
+    '/auth/register',
+    userData,
+    {
+      skipAuth: true,
+      skipAuthRefresh: true,
     }
-    return response.data;
-  },
+  );
+
+  if (response.data.success) {
+    const { token, user } = response.data.data;
+
+    setAuthSession(token, user);
+
+    if (token) {
+      api.defaults.headers.common.Authorization =
+        `Bearer ${token}`;
+    } else {
+      delete api.defaults.headers.common.Authorization;
+    }
+  }
+
+  return response.data;
+},
 
   // Login
   login: async (email, password, turnstileToken) => {

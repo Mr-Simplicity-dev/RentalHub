@@ -101,6 +101,10 @@ const Register = () => {
   const [premblyPending, setPremblyPending] = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
+  const resetTurnstile = () => {
+  setTurnstileToken(null);
+  turnstileRef.current?.reset();
+};
   const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -631,19 +635,28 @@ const Register = () => {
     // Payment-required roles must complete payment before account creation
     if (requiresPayment) {
       const paymentResponse = await api.post(
-        "/auth/register/payment",
-        registrationData
-      );
+  '/auth/register/payment',
+  registrationData,
+  {
+    skipAuth: true,
+    skipAuthRefresh: true,
+  }
+);
 
-      if (paymentResponse.data?.code === 'PREMBLY_VERIFICATION_PENDING') {
-        setPremblyPending({
-          attempt_id: paymentResponse.data?.data?.attempt_id,
-          status: 'pending',
-          message: paymentResponse.data?.message,
-        });
-        toast.info(t('register.prembly_check'));
-        return;
-      }
+     if (
+  paymentResponse.data?.code ===
+  'PREMBLY_VERIFICATION_PENDING'
+) {
+  setPremblyPending({
+    attempt_id: paymentResponse.data?.data?.attempt_id,
+    status: 'pending',
+    message: paymentResponse.data?.message,
+  });
+
+  resetTurnstile();
+  toast.info(t('register.prembly_check'));
+  return;
+}
 
       if (
         paymentResponse.data?.success &&
@@ -653,46 +666,64 @@ const Register = () => {
         return;
       }
 
-      toast.error(
-        paymentResponse.data?.message ||
-        t('register.registration_failed')
-      );
-      return;
+      resetTurnstile();
+
+toast.error(
+  paymentResponse.data?.message ||
+    t('register.registration_failed')
+);
+
+return;
     }
 
     // Roles without registration payment create the account immediately
     const response = await register(registrationData);
 
     if (response.success) {
-      toast.success(t('register.registration_success'));
+  toast.success(t('register.registration_success'));
 
-      const role =
-        response.data?.user?.user_type || registrationData.user_type;
+  const role =
+    response.data?.user?.user_type ||
+    registrationData.user_type;
 
-      navigate(role === "tenant" ? "/tenant/dashboard" : "/dashboard");
-    } else if (response.code === 'PREMBLY_VERIFICATION_PENDING') {
-      setPremblyPending({
-        attempt_id: response.data?.attempt_id,
-        status: 'pending',
-        message: response.message,
-      });
-      toast.info(t('register.prembly_check'));
-    } else {
-      const firstError = response.errors?.[0];
+  navigate(
+    role === 'tenant'
+      ? '/tenant/dashboard'
+      : '/dashboard'
+  );
 
-      toast.error(
-        firstError?.msg ||
-        response.message ||
-        t('register.registration_failed')
-      );
-      turnstileRef.current?.reset();
-      setTurnstileToken(null);
-    }
+  return;
+}
+
+if (
+  response.code ===
+  'PREMBLY_VERIFICATION_PENDING'
+) {
+  setPremblyPending({
+    attempt_id: response.data?.attempt_id,
+    status: 'pending',
+    message: response.message,
+  });
+
+  resetTurnstile();
+  toast.info(t('register.prembly_check'));
+  return;
+}
+
+const firstError = response.errors?.[0];
+
+resetTurnstile();
+
+toast.error(
+  firstError?.msg ||
+    response.message ||
+    t('register.registration_failed')
+);
 
   } catch (error) {
-    turnstileRef.current?.reset();
-    setTurnstileToken(null);
-    const serverError = error.response?.data;
+  resetTurnstile();
+
+  const serverError = error.response?.data;
     const firstError = serverError?.errors?.[0];
 
     if (serverError?.code === 'PREMBLY_VERIFICATION_PENDING') {
