@@ -99,57 +99,53 @@ api.interceptors.response.use(
       const { data } = await axios.post(
         `${API_BASE_URL}/auth/refresh-token`,
         {},
-        { withCredentials: true }
+        {
+          withCredentials: true,
+        }
       );
-if (data.success && data.data?.token) {
-  const newToken = data.data.token;
 
-  setAuthToken(newToken);
+      if (!data?.success || !data?.data?.token) {
+        throw new Error(
+          data?.message || 'Authentication token refresh failed'
+        );
+      }
 
-  api.defaults.headers.common.Authorization =
-    `Bearer ${newToken}`;
+      const newToken = data.data.token;
 
-  // Release the refresh lock before replaying queued requests.
-  isRefreshing = false;
+      setAuthToken(newToken);
 
-  const queuedRequests = pendingRequests;
-  pendingRequests = [];
+      api.defaults.headers.common.Authorization =
+        `Bearer ${newToken}`;
 
-  queuedRequests.forEach((callback) => {
-    callback(newToken);
-  });
+      // Release the refresh lock before replaying queued requests.
+      isRefreshing = false;
 
-  // Retry the original request with the refreshed token.
-  originalRequest.headers =
-    originalRequest.headers || {};
+      const queuedRequests = [...pendingRequests];
+      pendingRequests = [];
 
-  originalRequest.headers.Authorization =
-    `Bearer ${newToken}`;
+      queuedRequests.forEach((callback) => {
+        callback(newToken);
+      });
 
-  return api(originalRequest);
-}
+      // Retry the original request with the refreshed token.
+      originalRequest.headers =
+        originalRequest.headers || {};
 
-throw new Error(
-  data?.message || 'Authentication token refresh failed'
-);
-} catch (refreshError) {
-  // Refresh failed — clear the session and release pending requests.
-  isRefreshing = false;
-  pendingRequests = [];
+      originalRequest.headers.Authorization =
+        `Bearer ${newToken}`;
 
-  clearAuthSession();
+      return api(originalRequest);
+    } catch (refreshError) {
+      // Release the refresh lock and clear the failed session.
+      isRefreshing = false;
+      pendingRequests = [];
 
-  delete api.defaults.headers.common.Authorization;
+      clearAuthSession();
 
-  return Promise.reject(refreshError);
-}
-    
+      delete api.defaults.headers.common.Authorization;
 
-    isRefreshing = false;
-    pendingRequests = [];
-    clearAuthSession();
-    delete api.defaults.headers.common.Authorization;
-    return Promise.reject(error);
+      return Promise.reject(refreshError);
+    }
   }
 );
 
