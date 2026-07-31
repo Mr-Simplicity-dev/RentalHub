@@ -26,18 +26,34 @@ export const authService = {
 
   // Login
   login: async (email, password, turnstileToken) => {
-    const response = await api.post('/auth/login', { email, password, turnstile_token: turnstileToken });
-    if (response.data.success) {
-      const { token, user } = response.data.data;
-      setAuthSession(token, user);
-      if (token) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      } else {
-        delete api.defaults.headers.common['Authorization'];
-      }
+  const response = await api.post(
+    '/auth/login',
+    {
+      email,
+      password,
+      turnstile_token: turnstileToken,
+    },
+    {
+      skipAuth: true,
+      skipAuthRefresh: true,
     }
-    return response.data;
-  },
+  );
+
+  if (response.data.success) {
+    const { token, user } = response.data.data;
+
+    setAuthSession(token, user);
+
+    if (token) {
+      api.defaults.headers.common.Authorization =
+        `Bearer ${token}`;
+    } else {
+      delete api.defaults.headers.common.Authorization;
+    }
+  }
+
+  return response.data;
+},
 
   clearLocalSession: () => {
     clearAuthSession();
