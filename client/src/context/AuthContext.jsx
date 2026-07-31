@@ -32,8 +32,8 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  const login = async (email, password) => {
-    const response = await authService.login(email, password);
+  const login = async (email, password, turnstileToken) => {
+    const response = await authService.login(email, password, turnstileToken);
     if (response.success) {
       setUser(response.data.user);
       setIsAuthenticated(true);

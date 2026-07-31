@@ -106,9 +106,11 @@ api.interceptors.response.use(
         setAuthToken(data.data.token);
         api.defaults.headers.common.Authorization = `Bearer ${data.data.token}`;
 
-        // Replay queued requests
-        pendingRequests.forEach((cb) => cb(data.data.token));
+        // Replay queued requests before releasing the refresh lock
+        isRefreshing = false;
+        const queuedRequests = pendingRequests;
         pendingRequests = [];
+        queuedRequests.forEach((cb) => cb(data.data.token));
 
         // Retry the original request
         originalRequest.headers.Authorization = `Bearer ${data.data.token}`;

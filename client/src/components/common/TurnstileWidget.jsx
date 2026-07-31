@@ -1,12 +1,20 @@
-import React, { useEffect, useRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 
 const SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY;
 
-const TurnstileWidget = ({ onToken, onExpire, onError }) => {
+const TurnstileWidget = forwardRef(({ onToken, onExpire, onError }, ref) => {
   const containerRef = useRef(null);
   const widgetIdRef = useRef(null);
   const callbacksRef = useRef({ onToken, onExpire, onError });
   callbacksRef.current = { onToken, onExpire, onError };
+
+  useImperativeHandle(ref, () => ({
+    reset() {
+      if (window.turnstile && widgetIdRef.current !== null) {
+        window.turnstile.reset(widgetIdRef.current);
+      }
+    },
+  }), []);
 
   useEffect(() => {
     if (!SITE_KEY || !containerRef.current) return;
@@ -23,7 +31,7 @@ const TurnstileWidget = ({ onToken, onExpire, onError }) => {
 
     const renderWidget = () => {
       if (!window.turnstile || !containerRef.current) return;
-      if (widgetIdRef.current) {
+      if (widgetIdRef.current !== null) {
         try { window.turnstile.remove(widgetIdRef.current); } catch {}
         widgetIdRef.current = null;
       }
@@ -32,12 +40,11 @@ const TurnstileWidget = ({ onToken, onExpire, onError }) => {
           sitekey: SITE_KEY,
           callback: (token) => callbacksRef.current.onToken?.(token),
           'expired-callback': () => {
-            widgetIdRef.current = null;
             callbacksRef.current.onExpire?.();
           },
-          'error-callback': () => {
-            widgetIdRef.current = null;
-            callbacksRef.current.onError?.();
+          'error-callback': (errorCode) => {
+            callbacksRef.current.onError?.(errorCode);
+            return true;
           },
         });
       } catch {}
@@ -57,8 +64,9 @@ const TurnstileWidget = ({ onToken, onExpire, onError }) => {
 
     return () => {
       clearInterval(checkLoaded);
-      if (widgetIdRef.current && window.turnstile) {
+      if (widgetIdRef.current !== null && window.turnstile) {
         try { window.turnstile.remove(widgetIdRef.current); } catch {}
+        widgetIdRef.current = null;
       }
     };
   }, []);
@@ -66,6 +74,8 @@ const TurnstileWidget = ({ onToken, onExpire, onError }) => {
   if (!SITE_KEY) return null;
 
   return <div ref={containerRef} />;
-};
+});
+
+TurnstileWidget.displayName = 'TurnstileWidget';
 
 export default TurnstileWidget;
