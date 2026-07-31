@@ -167,12 +167,28 @@ const Login = () => {
         setTurnstileToken(null);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || t('login.failed'));
-      turnstileRef.current?.reset();
-      setTurnstileToken(null);
-    } finally {
-      setLoading(false);
-    }
+  const status = error.response?.status;
+  const serverError = error.response?.data;
+
+  console.error('Login request failed:', {
+    status,
+    message: serverError?.message || error.message,
+    code: serverError?.code,
+    errors: serverError?.errors,
+    response: serverError,
+  });
+
+  toast.error(
+    serverError?.message ||
+      error.message ||
+      t('login.failed')
+  );
+
+  setTurnstileToken(null);
+  turnstileRef.current?.reset();
+} finally {
+  setLoading(false);
+}
   };
 
  return (
