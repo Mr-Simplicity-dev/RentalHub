@@ -6,6 +6,7 @@ import ru from "./i18n/ru.json";
 import fr from "./i18n/fr.json";
 import ar from "./i18n/ar.json";
 import zh from "./i18n/zh.json";
+import tourTranslations from './i18n/tourTranslations';
 
 const getInitialLanguage = () => {
   if (typeof window === 'undefined') return 'en';
@@ -18,11 +19,11 @@ const getInitialLanguage = () => {
 
 i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: en },
-    ru: { translation: ru },
-    fr: { translation: fr },
-    ar: { translation: ar },
-    zh: { translation: zh }
+    en: { translation: { ...en, tour: tourTranslations.en } },
+    ru: { translation: { ...ru, tour: tourTranslations.ru } },
+    fr: { translation: { ...fr, tour: tourTranslations.fr } },
+    ar: { translation: { ...ar, tour: tourTranslations.ar } },
+    zh: { translation: { ...zh, tour: tourTranslations.zh } }
   },
   lng: getInitialLanguage(),
   fallbackLng: "en",

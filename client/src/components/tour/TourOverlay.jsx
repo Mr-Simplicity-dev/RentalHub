@@ -401,7 +401,6 @@ const TourOverlay = ({
   onPrevious,
   onSkipStep,
   onSkip,
-  onSkipStep,
   onActionComplete,
   onTargetUnavailable,
   dashboardTitle = 'Dashboard',
@@ -1035,9 +1034,7 @@ const TourOverlay = ({
                   </button>
                   <button
                     type="button"
-                        onClick={() => (onSkipStep || onNext)(
-                          step.optional ? 'context_unavailable' : 'target_not_found',
-                        )}
+                    onClick={onNext}
                     className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-extrabold transition-transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2"
                     style={{
                       color: BRAND.navy,

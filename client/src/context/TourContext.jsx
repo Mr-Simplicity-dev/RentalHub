@@ -67,6 +67,18 @@ const parseStepIndex = (state, steps) => {
   return Number.isInteger(numericIndex) && numericIndex >= 0 ? numericIndex : 0;
 };
 
+const pickFreshestResumeState = (serverState, localState) => {
+  if (!serverState) return localState;
+  if (!localState) return serverState;
+  const serverTime = new Date(
+    serverState.progress_updated_at || serverState.updated_at || 0
+  ).getTime();
+  const localTime = new Date(localState.updatedAt || 0).getTime();
+  if (!Number.isFinite(serverTime)) return localState;
+  if (!Number.isFinite(localTime)) return serverState;
+  return localTime > serverTime ? localState : serverState;
+};
+
 export const TourProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -160,9 +172,9 @@ export const TourProvider = ({ children }) => {
 
     try {
       const tourKey = details.dashboardType || currentDashboard || userDashboardType;
-      const route = typeof window === 'undefined'
-        ? null
-        : `${window.location.pathname}${window.location.search}`;
+      // Analytics routes intentionally exclude query strings and hashes because
+      // they may contain reset tokens, search text, references, or other PII.
+      const route = typeof window === 'undefined' ? null : window.location.pathname;
       const locale = i18n.resolvedLanguage || i18n.language || 'en';
       const sessionId = details.sessionId
         || activeSessionRef.current
@@ -324,7 +336,9 @@ export const TourProvider = ({ children }) => {
       && (userTourData?.tour_key || tourKey) === tourKey
       ? userTourData
       : null;
-    const resumeState = options.resume === false ? null : (serverResume || localResume);
+    const resumeState = options.resume === false
+      ? null
+      : pickFreshestResumeState(serverResume, localResume);
     const requestedStep = Number.isInteger(options.initialStep)
       ? options.initialStep
       : parseStepIndex(resumeState, safeSteps);
@@ -333,7 +347,10 @@ export const TourProvider = ({ children }) => {
       Math.max(safeSteps.length - 1, 0)
     );
     const isResume = Boolean(resumeState && safeSteps.length);
-    const sessionId = getSessionId(tourKey, !isResume || options.replay);
+    // Every visible run receives a fresh session so its sequence always starts
+    // at zero and delayed events from an earlier run cannot rewind the cursor.
+    eventSequenceRef.current = 0;
+    const sessionId = getSessionId(tourKey, true);
 
     setCurrentDashboard(tourKey);
     setTourSteps(safeSteps);
@@ -361,7 +378,7 @@ export const TourProvider = ({ children }) => {
       sessionId,
       context: {
         workflow_key: options.workflowKey || null,
-        resumed_from: isResume ? (serverResume ? 'server' : 'device') : null,
+        resumed_from: isResume ? (resumeState === localResume ? 'device' : 'server') : null,
       },
       metadata: { source: options.source || 'tour_manager' },
     });

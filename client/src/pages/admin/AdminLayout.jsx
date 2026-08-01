@@ -650,6 +650,11 @@ const AdminLayout = () => {
                   Analytics
                 </NavLink>
 
+                <NavLink to="/super-admin/tour-analytics" className={navItem}>
+                  <FaChartLine className="mr-3" />
+                  {t('tour.analytics.nav_label', 'Tour Analytics')}
+                </NavLink>
+
                 <NavLink to="/super-admin?tab=reports" className={() => superAdminNavItem('reports')}>
                   <FaFileAlt className="mr-3" />
                   Reports
@@ -840,6 +845,13 @@ const AdminLayout = () => {
                 <FaFileAlt className="mr-3" />
                 Applications
               </NavLink>
+
+              {role === 'admin' && (
+                <NavLink to="/admin/tour-analytics" className={navItem}>
+                  <FaChartLine className="mr-3" />
+                  {t('tour.analytics.nav_label', 'Tour Analytics')}
+                </NavLink>
+              )}
 
               <NavLink to="/admin?tab=property_requests" className={navItem}>
                 <FaHome className="mr-3" />

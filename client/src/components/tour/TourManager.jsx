@@ -134,13 +134,7 @@ const TourManager = () => {
         onSkip={skipTour}
         onActionComplete={completeStepAction}
         onTargetUnavailable={reportStepAvailability}
-        dashboardTitle={
-          currentDashboard
-            ? t(`tour.dashboard_titles.${currentDashboard}`, {
-              defaultValue: String(currentDashboard).replace(/_/g, ' '),
-            })
-            : t('tour.dashboard_titles.default', 'RentalHub dashboard')
-        }
+        dashboardTitle={t('tour.ui.dashboard_title', 'RentalHub dashboard')}
       />
     </>
   );

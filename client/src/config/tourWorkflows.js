@@ -370,8 +370,9 @@ export const getWorkflowToursByUserRole = (userRole, t) => {
     : (roleToWorkflows[userRole] || [WORKFLOW_TOURS.ACCOUNT_SETTINGS]);
   return workflows.map((workflow) => ({
     ...workflow,
-    title: translate(t, `tour.workflows.${workflow.id}.title`, workflow.title),
-    description: translate(t, `tour.workflows.${workflow.id}.description`, workflow.description),
+    title: translate(t, `tour.titles.${workflow.id}`, workflow.title),
+    description: translate(t, 'tour.ui.generic_workflow_description', workflow.description)
+      .replace('__TITLE__', translate(t, `tour.titles.${workflow.id}`, workflow.title)),
     steps: localizeTourSteps(workflow.steps, t),
   }));
 };

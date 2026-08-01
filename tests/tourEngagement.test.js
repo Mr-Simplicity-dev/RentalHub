@@ -61,6 +61,30 @@ const informationSchemaRows = Object.entries(tourSchemaRows).flatMap(
   ([table_name, columns]) => columns.map((column_name) => ({ table_name, column_name }))
 );
 
+const getRouteHandler = (routePath, method) => {
+  const layer = usersRouter.stack.find(
+    (candidate) => candidate.route?.path === routePath && candidate.route.methods?.[method]
+  );
+  assert.ok(layer, `${method.toUpperCase()} ${routePath} must be registered`);
+  return layer.route.stack[layer.route.stack.length - 1].handle;
+};
+
+const createJsonResponse = () => {
+  const response = {
+    statusCode: 200,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
+  };
+  return response;
+};
+
 const withMockedTourDatabase = async (clientQuery, callback) => {
   const originalQuery = db.query;
   const originalConnect = db.connect;
@@ -167,6 +191,7 @@ test('tour locale, context size, analytics filters and rates are validated', () 
   assert.deepEqual(where.values, [30, 'web', 'tenant_dashboard', 'fr']);
   assert.equal(calculateTourRate(3, 4), 75);
   assert.equal(calculateTourRate(1, 0), 0);
+  assert.equal(calculateTourRate(2, 1), 100);
 });
 
 test('tour cursor transitions reject stale sequences and inactive sessions', () => {
@@ -264,6 +289,71 @@ test('terminal tours only reopen on replay or a newer tour version', () => {
   assert.equal(upgraded.applied, true);
   assert.equal(upgraded.values.tourVersion, '4');
   assert.equal(upgraded.values.currentStep, 0);
+});
+
+test('analytics endpoint is admin-only and returns a complete empty dashboard shape', async () => {
+  const handler = getRouteHandler('/tour/analytics', 'get');
+  const forbiddenResponse = createJsonResponse();
+  await handler(
+    {
+      user: { id: 7, user_type: 'tenant' },
+      query: {},
+      logger: { error: () => {} },
+    },
+    forbiddenResponse
+  );
+  assert.equal(forbiddenResponse.statusCode, 403);
+
+  const originalQuery = db.query;
+  let analyticsQueries = 0;
+  resetSchemaCheck();
+  db.query = async (sql) => {
+    if (String(sql).includes('information_schema.columns')) {
+      return { rows: informationSchemaRows };
+    }
+    analyticsQueries += 1;
+    return { rows: [] };
+  };
+
+  try {
+    const response = createJsonResponse();
+    await handler(
+      {
+        user: { id: 1, user_type: 'super_admin' },
+        query: { days: '30', platform: 'web', locale: 'fr' },
+        logger: { error: () => {} },
+      },
+      response
+    );
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.success, true);
+    assert.equal(response.body.data.days, 30);
+    assert.deepEqual(response.body.data.filters, {
+      platform: 'web',
+      tour_key: null,
+      dashboard_type: null,
+      locale: 'fr',
+    });
+    assert.equal(response.body.data.overview.completion_rate, 0);
+    for (const collection of [
+      'summary',
+      'daily',
+      'by_platform',
+      'by_tour',
+      'steps',
+      'locales',
+      'statuses',
+      'problems',
+      'issues',
+    ]) {
+      assert.deepEqual(response.body.data[collection], []);
+    }
+    assert.equal(analyticsQueries, 11);
+  } finally {
+    db.query = originalQuery;
+    resetSchemaCheck();
+  }
 });
 
 test('step_viewed persists a localized resume cursor and normalized context', async () => {

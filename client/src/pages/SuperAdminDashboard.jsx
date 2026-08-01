@@ -155,6 +155,13 @@ const shortcutCategories = [
   },
 ];
 
+const TOUR_SECTION_CLASSES = {
+  management: 'super-admin-management-section',
+  marketing: 'super-admin-marketing-section',
+  trust: 'super-admin-trust-section',
+  system: 'super-admin-system-section',
+};
+
 const PAGE_LIMITS = {
   users: 10,
   properties: 10,
@@ -1114,7 +1121,8 @@ export default function SuperAdminDashboard() {
                 amber: { dot: 'bg-amber-500', border: 'border-amber-300', bg: 'bg-amber-50', text: 'text-amber-700', activeBorder: 'border-amber-500', activeBg: 'bg-amber-50', activeText: 'text-amber-900', hover: 'hover:border-amber-300 hover:bg-amber-50' },
               };
               const c = colorMap[cat.color] || colorMap.indigo;
-              const sectionClass = `super-admin-${cat.key}-section`;
+              const sectionClass = TOUR_SECTION_CLASSES[cat.key]
+                || `super-admin-${cat.key}-section`;
 
               return (
                 <div key={cat.key} className={sectionClass}>
