@@ -214,6 +214,7 @@ const PropertyCard = ({
             {showApplyButton && (
               <Link
                 to={resolvedApplyLink}
+                data-tour-id="saved-property-apply-workflow"
                 className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5"
               >
                 Apply Now
