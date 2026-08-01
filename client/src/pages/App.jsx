@@ -605,7 +605,7 @@ function Layout({ children }) {
     location.pathname.startsWith('/lawyer');
   const isMobileAppPage = location.pathname === '/mobile-app';
   const isLandingPage = location.pathname === '/download';
-  const isPrivacyPage = location.pathname === '/privacy';
+  const isLegalPage = ['/privacy', '/terms'].includes(location.pathname);
   const showPublicHeaderFooter = !isVerificationPage && !isDashboardShell;
 
   useEffect(() => {
@@ -656,11 +656,11 @@ function Layout({ children }) {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {showPublicHeaderFooter && <Header />}
+      {showPublicHeaderFooter && <div className="app-public-header"><Header /></div>}
 
       {/* Global Language Switcher */}
       {!isDashboardShell && (
-        <div className={`flex items-center border-b bg-white px-3 py-1 sm:px-4 sm:py-2 ${isMobileAppPage || isLandingPage ? 'justify-between gap-3' : 'justify-end'}`}>
+        <div className={`app-language-switcher flex items-center border-b bg-white px-3 py-1 sm:px-4 sm:py-2 ${isMobileAppPage || isLandingPage ? 'justify-between gap-3' : 'justify-end'}`}>
           {(isMobileAppPage || isLandingPage) && (
             <Link
               to="/"
@@ -695,11 +695,11 @@ function Layout({ children }) {
 
       <main className="flex-grow animate-fadeIn">{children}</main>
 
-      <LiveRatingFlyIn disabled={isDashboardShell || isPrivacyPage} />
-      <PlatformRatingPrompt disabled={isDashboardShell || isPrivacyPage} />
+      <LiveRatingFlyIn disabled={isDashboardShell || isLegalPage} />
+      <PlatformRatingPrompt disabled={isDashboardShell || isLegalPage} />
 
 
-      {showPublicHeaderFooter && <Footer />}
+      {showPublicHeaderFooter && <div className="app-public-footer"><Footer /></div>}
     </div>
   );
 }

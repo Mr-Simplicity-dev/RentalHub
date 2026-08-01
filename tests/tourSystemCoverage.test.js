@@ -140,10 +140,14 @@ test('web tour dictionaries have complete keys and real translations', () => {
 
 test('every configured native target is registered outside the mobile tour config', () => {
   const configPath = path.join(MOBILE_SOURCE, 'config', 'tourConfig.js');
-  const config = read(configPath);
-  const stepIds = collectMatches(config, /\bid:\s*['"]([^'"]+)['"]/g);
+  const catalogPath = path.join(MOBILE_SOURCE, 'i18n', 'tourStepCatalog.cjs');
+  delete require.cache[require.resolve(catalogPath)];
+  const { TOUR_STEP_IDS: stepIds } = require(catalogPath);
   const sourceCorpus = walk(MOBILE_SOURCE, new Set(['.js', '.jsx']))
-    .filter((filename) => filename !== configPath)
+    .filter(
+      (filename) => filename !== configPath
+        && !filename.includes(`${path.sep}i18n${path.sep}`),
+    )
     .map(read)
     .join('\n');
 

@@ -127,6 +127,15 @@ const registrationLimiter = buildLimiter({
   message: 'Too many registration attempts. Please wait an hour and try again.',
 });
 
+// A complete guided tour legitimately emits several events per step. This
+// dedicated ceiling still prevents a compromised client from flooding the
+// analytics table without penalising normal API traffic.
+const tourEventLimiter = buildLimiter({
+  windowMs: Number(process.env.TOUR_EVENT_WINDOW_MS) || 5 * 60 * 1000,
+  max: Number(process.env.TOUR_EVENT_MAX) || 180,
+  message: 'Too many guided-tour events. Please wait briefly and continue.',
+});
+
 module.exports = {
   authSensitiveLimiter,
   paymentOpsLimiter,
@@ -147,4 +156,5 @@ module.exports = {
   otpSendLimiter,
   passwordResetLimiter,
   registrationLimiter,
+  tourEventLimiter,
 };

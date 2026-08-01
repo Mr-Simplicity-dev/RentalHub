@@ -217,10 +217,10 @@ const SummaryCard = ({ icon: Icon, title, children }) => (
 const PolicySection = ({ id, eyebrow, title, icon: Icon, children }) => (
   <section
     id={id}
-    className="scroll-mt-28 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_55px_-35px_rgba(15,23,42,0.45)]"
+    className="privacy-policy-section scroll-mt-28 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_55px_-35px_rgba(15,23,42,0.45)]"
     aria-labelledby={`${id}-title`}
   >
-    <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-5 sm:px-7">
+    <div className="privacy-section-heading border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-5 sm:px-7">
       <div className="flex items-start gap-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-900 text-amber-300 shadow-md">
           <Icon aria-hidden="true" />
@@ -233,14 +233,14 @@ const PolicySection = ({ id, eyebrow, title, icon: Icon, children }) => (
         </div>
       </div>
     </div>
-    <div className="px-5 py-6 text-[15px] leading-7 text-slate-700 sm:px-7 sm:text-base">
+    <div className="privacy-section-content px-5 py-6 text-[15px] leading-7 text-slate-700 sm:px-7 sm:text-base">
       {children}
     </div>
   </section>
 );
 
 const Detail = ({ label, children }) => (
-  <div>
+  <div className="privacy-detail">
     <h4 className="text-xs font-extrabold uppercase tracking-[0.14em] text-primary-700">{label}</h4>
     <p className="mt-1.5 text-sm leading-6 text-slate-600">{children}</p>
   </div>
@@ -275,7 +275,7 @@ const Privacy = () => {
         <link rel="canonical" href="https://rentalhub.com.ng/privacy" />
       </Helmet>
 
-      <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="privacy-document min-h-screen bg-slate-50 text-slate-900">
         <a
           href="#privacy-content"
           className="sr-only z-[100] rounded-lg bg-white px-4 py-2 font-semibold text-primary-900 focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
@@ -283,7 +283,7 @@ const Privacy = () => {
           Skip to privacy policy
         </a>
 
-        <header className="relative isolate overflow-hidden bg-slate-950 text-white">
+        <header className="privacy-screen-hero relative isolate overflow-hidden bg-slate-950 text-white">
           <div className="absolute inset-0 -z-10">
             <div className="absolute -left-20 top-10 h-80 w-80 rounded-full bg-primary-500/25 blur-3xl" />
             <div className="absolute -right-20 bottom-0 h-96 w-96 rounded-full bg-amber-300/15 blur-3xl" />
@@ -343,8 +343,14 @@ const Privacy = () => {
           </div>
         </header>
 
-        <main id="privacy-content" className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-          <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-950">
+        <div className="privacy-print-header hidden">
+          <p>RENTALHUB NG</p>
+          <h1>Privacy Policy</h1>
+          <span>Effective and last updated {LAST_UPDATED} · rentalhub.com.ng/privacy</span>
+        </div>
+
+        <main id="privacy-content" className="privacy-main mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+          <div className="privacy-screen-notice mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-950">
             <div className="flex items-start gap-3">
               <FaExclamationTriangle className="mt-1 shrink-0 text-amber-600" aria-hidden="true" />
               <p>
@@ -355,8 +361,8 @@ const Privacy = () => {
             </div>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
-            <aside className="hidden lg:block">
+          <div className="privacy-content-grid grid gap-8 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
+            <aside className="privacy-toc hidden lg:block">
               <nav
                 aria-label="Privacy policy contents"
                 className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -379,7 +385,7 @@ const Privacy = () => {
               </nav>
             </aside>
 
-            <div className="min-w-0 space-y-7">
+            <div className="privacy-policy-stack min-w-0 space-y-7">
               <PolicySection id="scope" eyebrow="01 · Controller" title="Who we are and what this policy covers" icon={FaShieldAlt}>
                 <p>
                   <strong className="text-slate-900">RentalHub NG</strong> (“RentalHub”, “we”, “us” or “our”) operates
@@ -424,7 +430,7 @@ const Privacy = () => {
                 </p>
                 <div className="space-y-4">
                   {dataGroups.map(({ title, icon: Icon, collect, source, use, basis, share, retention }, index) => (
-                    <article key={title} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 sm:p-6">
+                    <article key={title} className="privacy-data-card rounded-2xl border border-slate-200 bg-slate-50/70 p-5 sm:p-6">
                       <div className="mb-5 flex items-start gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-800">
                           <Icon aria-hidden="true" />
@@ -771,6 +777,37 @@ const Privacy = () => {
           </div>
         </main>
       </div>
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 15mm 14mm 17mm; }
+          html, body, #root { background: #fff !important; }
+          body { color: #111827 !important; font-family: Arial, Helvetica, sans-serif !important; }
+          .privacy-screen-hero, .privacy-screen-notice, .privacy-toc,
+          .app-public-header, .app-language-switcher, .app-public-footer,
+          .Toastify, [data-floating-widget], button { display: none !important; }
+          .privacy-print-header { display: block !important; margin: 0 0 9mm; padding-bottom: 5mm; border-bottom: 2px solid #0f172a; }
+          .privacy-print-header p { margin: 0 0 2mm; font-size: 9pt; font-weight: 800; letter-spacing: .16em; }
+          .privacy-print-header h1 { margin: 0; font-size: 23pt; line-height: 1.1; }
+          .privacy-print-header span { display: block; margin-top: 2mm; color: #475569; font-size: 9pt; }
+          .privacy-main { max-width: none !important; padding: 0 !important; }
+          .privacy-content-grid, .privacy-policy-stack { display: block !important; }
+          .privacy-policy-section { display: block !important; overflow: visible !important; margin: 0 0 7mm !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; break-inside: auto; page-break-inside: auto; }
+          .privacy-section-heading { padding: 3mm 0 2.5mm !important; border-bottom: 1px solid #cbd5e1 !important; background: #fff !important; break-after: avoid-page; page-break-after: avoid; }
+          .privacy-section-heading > div > div:first-child { display: none !important; }
+          .privacy-section-heading p { margin: 0; font-size: 8pt !important; }
+          .privacy-section-heading h2 { margin: 1mm 0 0 !important; font-size: 14pt !important; }
+          .privacy-section-content { padding: 3mm 0 0 !important; font-size: 9.5pt !important; line-height: 1.48 !important; }
+          .privacy-section-content p { orphans: 3; widows: 3; }
+          .privacy-data-card { overflow: visible !important; margin-bottom: 4mm !important; padding: 4mm !important; border: 1px solid #cbd5e1 !important; border-radius: 2mm !important; background: #fff !important; break-inside: auto; page-break-inside: auto; }
+          .privacy-data-card > div:first-child, .privacy-detail, .privacy-section-content li,
+          .privacy-section-content table tr { break-inside: avoid; page-break-inside: avoid; }
+          .privacy-detail { margin-bottom: 2.5mm; }
+          h1, h2, h3, h4 { break-after: avoid-page; page-break-after: avoid; }
+          p, li { orphans: 3; widows: 3; }
+          a { color: inherit !important; text-decoration: none !important; }
+          * { animation: none !important; transition: none !important; }
+        }
+      `}</style>
     </>
   );
 };
