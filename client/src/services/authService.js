@@ -82,13 +82,20 @@ export const authService = {
   },
 
   // Get current user
-  getCurrentUser: async () => {
-    const response = await api.get('/auth/me');
-    if (response.data.success) {
-      setAuthUser(response.data.data);
-    }
-    return response.data;
-  },
+ 
+getCurrentUser: async () => {
+  const response = await api.get('/auth/me', {
+    // Do not call refresh-token when there is no logged-in session.
+    // The /auth/me endpoint already accepts the HttpOnly session cookie.
+    skipAuthRefresh: true,
+  });
+
+  if (response.data.success) {
+    setAuthUser(response.data.data);
+  }
+
+  return response.data;
+},
 
   // Verify email
   verifyEmail: async (token) => {
