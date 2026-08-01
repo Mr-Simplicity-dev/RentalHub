@@ -1,4 +1,4 @@
-import { localizeTourSteps } from './tourConfig';
+import { getTourStepsByUserRole, localizeTourSteps } from './tourConfig';
 
 // These tours cover real multi-page workflows. Interactive steps are limited to
 // safe gestures such as changing a filter or opening a form; no tour step ever
@@ -22,11 +22,14 @@ export const WORKFLOW_TOURS = {
       },
       {
         id: 'tenant_workflow_save',
-        target: '[data-tour-id="saved-properties-workflow"]',
+        target: '[data-tour-id="saved-property-apply-workflow"]',
         route: '/saved-properties',
-        title: 'Compare saved properties',
-        description: 'Your saved homes stay together here so you can compare them before applying.',
+        title: 'Move from saved property to application',
+        description: 'Compare your saved homes, then open Apply Now on the property you want to pursue.',
         placement: 'bottom',
+        advanceOn: 'click',
+        actionHint: 'Choose Apply Now to continue automatically.',
+        optional: true,
       },
       {
         id: 'tenant_workflow_apply',
@@ -100,6 +103,16 @@ export const WORKFLOW_TOURS = {
         placement: 'bottom',
       },
       {
+        id: 'landlord_workflow_withdrawal',
+        target: '.tour-wallet',
+        route: '/dashboard',
+        title: 'Withdraw available rent securely',
+        description: 'Open the withdrawal workspace, confirm your available balance, and use only verified bank details.',
+        placement: 'bottom',
+        advanceOn: 'click',
+        actionHint: 'Open the withdrawal workspace to continue automatically.',
+      },
+      {
         id: 'landlord_workflow_messages',
         target: '[data-tour-id="messages-compose-workflow"]',
         route: '/messages',
@@ -133,6 +146,14 @@ export const WORKFLOW_TOURS = {
     title: 'Run your agent operations',
     description: 'Review earnings, withdrawals, properties, messages, and support in one guided flow.',
     steps: [
+      {
+        id: 'agent_workflow_assignment',
+        target: '.agent-bookings-section',
+        route: '/agent/dashboard',
+        title: 'Confirm your landlord assignment',
+        description: 'Review the assigned landlord, contact details, and operational status before managing property work.',
+        placement: 'bottom',
+      },
       {
         id: 'agent_workflow_earnings',
         target: '[data-tour-id="agent-earnings-workflow"]',
@@ -227,6 +248,73 @@ export const WORKFLOW_TOURS = {
       },
     ],
   },
+  SERVICE_BOOKINGS: {
+    key: 'service_bookings_workflow',
+    id: 'service_bookings',
+    title: 'Book and track trusted services',
+    description: 'Learn how to review transportation bookings, payment status, and service support.',
+    steps: [
+      {
+        id: 'services_workflow_bookings',
+        target: '[data-tour-id="transportation-bookings-workflow"]',
+        route: '/transportation/bookings',
+        title: 'Review your bookings',
+        description: 'Filter bookings by status, open the full details, and confirm the payment state before taking action.',
+        placement: 'bottom',
+      },
+      {
+        id: 'services_workflow_payments',
+        target: '[data-tour-id="payment-history-workflow"]',
+        route: '/payment-history',
+        title: 'Match bookings to payments',
+        description: 'Use the transaction reference and status to confirm that the correct service was paid for.',
+        placement: 'bottom',
+      },
+      {
+        id: 'services_workflow_support',
+        target: '[data-tour-id="support-new-ticket-workflow"]',
+        route: '/support',
+        title: 'Get service support',
+        description: 'Open a categorized ticket when a booking, provider, or payment needs attention.',
+        placement: 'left',
+        advanceOn: 'click',
+        actionHint: 'Open the support form to finish this tour.',
+      },
+    ],
+  },
+  ACCOUNT_SETTINGS: {
+    key: 'account_settings_workflow',
+    id: 'account_settings',
+    title: 'Secure and personalize your account',
+    description: 'Review your profile, verification details, preferences, and guided-tour controls.',
+    steps: [
+      {
+        id: 'settings_workflow_profile',
+        target: '[data-tour-id="profile-details-workflow"]',
+        route: '/profile',
+        title: 'Keep profile details current',
+        description: 'Review your name and phone details and use Edit only when something needs to change.',
+        placement: 'bottom',
+      },
+      {
+        id: 'settings_workflow_verification',
+        target: '[data-tour-id="profile-verification-workflow"]',
+        route: '/profile',
+        title: 'Monitor verification status',
+        description: 'Check identity and credential status here so you can respond promptly when revalidation is requested.',
+        placement: 'bottom',
+        optional: true,
+      },
+      {
+        id: 'settings_workflow_tours',
+        target: '[data-tour-id="profile-tour-settings-workflow"]',
+        route: '/profile',
+        title: 'Replay help whenever you need it',
+        description: 'Restart your dashboard guide or launch a focused workflow without resetting your account.',
+        placement: 'top',
+      },
+    ],
+  },
 };
 
 const translate = (t, key, fallback) => (
@@ -235,20 +323,55 @@ const translate = (t, key, fallback) => (
 
 export const getWorkflowToursByUserRole = (userRole, t) => {
   const roleToWorkflows = {
-    user: [WORKFLOW_TOURS.TENANT_RENTAL],
-    tenant: [WORKFLOW_TOURS.TENANT_RENTAL],
-    landlord: [WORKFLOW_TOURS.LANDLORD_LISTING],
-    agent: [WORKFLOW_TOURS.AGENT_OPERATIONS],
-    lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK],
-    state_lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK],
-    super_lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK],
+    user: [WORKFLOW_TOURS.TENANT_RENTAL, WORKFLOW_TOURS.SERVICE_BOOKINGS, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
+    tenant: [WORKFLOW_TOURS.TENANT_RENTAL, WORKFLOW_TOURS.SERVICE_BOOKINGS, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
+    landlord: [WORKFLOW_TOURS.LANDLORD_LISTING, WORKFLOW_TOURS.SERVICE_BOOKINGS, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
+    agent: [WORKFLOW_TOURS.AGENT_OPERATIONS, WORKFLOW_TOURS.SERVICE_BOOKINGS, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
+    lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
+    state_lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
+    super_lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
   };
 
-  return (roleToWorkflows[userRole] || []).map((workflow) => ({
+  const adminWorkflowMeta = {
+    admin: ['platform_admin_operations', 'Run the platform review queue', 'Move through users, properties, applications, verifications, and administration tools.'],
+    lga_admin: ['lga_admin_operations', 'Run local platform operations', 'Review users, properties, applications, and verification work inside your assigned scope.'],
+    state_admin: ['state_admin_operations', 'Run state operations', 'Follow state oversight, finance, withdrawals, and administration tools in one guided path.'],
+    state_financial_admin: ['state_financial_operations', 'Run state financial operations', 'Review state coverage, balances, commissions, withdrawals, and operational tools.'],
+    financial_admin: ['financial_admin_operations', 'Manage the financial workflow', 'Move from transactions to state performance, frozen funds, withdrawals, escalations, and audit records.'],
+    lga_financial_admin: ['lga_financial_operations', 'Manage local financial operations', 'Review available commission, create secure withdrawal requests, and track their history.'],
+    super_financial_admin: ['super_financial_operations', 'Run national financial oversight', 'Review platform transactions, state performance, withdrawals, and decision queues.'],
+    lga_support_admin: ['lga_support_operations', 'Resolve local support work', 'Move from tickets to property requests and tenancy actions for your local scope.'],
+    state_support_admin: ['state_support_operations', 'Resolve state support work', 'Review the state queue, migrations, property requests, and operational follow-up.'],
+    super_support_admin: ['super_support_operations', 'Govern support operations', 'Monitor national support health, migrations, tickets, escalations, and the audit trail.'],
+    transportation_admin: ['transportation_operations', 'Manage transportation services', 'Follow bookings, routes, drivers, revenue, and service health.'],
+    lga_transportation_admin: ['lga_transportation_operations', 'Manage local transportation services', 'Review bookings, routes, drivers, and revenue in your service area.'],
+    state_transportation_admin: ['state_transportation_operations', 'Manage state transportation services', 'Move through state logistics, bookings, service activity, and jurisdiction controls.'],
+    super_transportation_admin: ['super_transportation_operations', 'Govern national transportation', 'Review national logistics, jurisdictions, alerts, and system health.'],
+    fumigation_admin: ['fumigation_operations', 'Manage cleaning and fumigation services', 'Review bookings, service packages, providers, and revenue.'],
+    lga_fumigation_admin: ['lga_fumigation_operations', 'Manage local service delivery', 'Review service bookings, providers, packages, and payments in your local scope.'],
+    state_fumigation_admin: ['state_fumigation_operations', 'Manage state service delivery', 'Review state bookings, providers, packages, and payment activity.'],
+    super_fumigation_admin: ['super_fumigation_operations', 'Govern national service delivery', 'Monitor national service health, bookings, providers, and coverage.'],
+    recruitment_admin: ['recruitment_operations', 'Run the recruitment workflow', 'Move from the overview to cycles, candidates, exports, and hiring stages.'],
+    super_admin: ['super_admin_operations', 'Run platform-wide operations', 'Move through platform management, intelligence, growth, trust, and administration controls.'],
+  };
+
+  const adminMeta = adminWorkflowMeta[userRole];
+  const workflows = adminMeta
+    ? [{
+      key: `${userRole}_operations_workflow`,
+      id: adminMeta[0],
+      title: adminMeta[1],
+      description: adminMeta[2],
+      steps: getTourStepsByUserRole(userRole, t).map((step) => ({
+        ...step,
+        workflowKey: `${userRole}_operations_workflow`,
+      })),
+    }, WORKFLOW_TOURS.ACCOUNT_SETTINGS]
+    : (roleToWorkflows[userRole] || [WORKFLOW_TOURS.ACCOUNT_SETTINGS]);
+  return workflows.map((workflow) => ({
     ...workflow,
     title: translate(t, `tour.workflows.${workflow.id}.title`, workflow.title),
     description: translate(t, `tour.workflows.${workflow.id}.description`, workflow.description),
     steps: localizeTourSteps(workflow.steps, t),
   }));
 };
-

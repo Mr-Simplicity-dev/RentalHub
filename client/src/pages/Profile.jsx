@@ -12,6 +12,7 @@ import {
   getTourDashboardType,
   getTourStepsByUserRole,
 } from '../config/tourConfig';
+import { getWorkflowToursByUserRole } from '../config/tourWorkflows';
 
 const DEFAULT_LIVENESS = {
   faceDetected: false,
@@ -66,7 +67,12 @@ const loadExternalScript = (src) => {
 const Profile = () => {
   const POST_VERIFY_REDIRECT_KEY = 'pending_unlock_redirect';
   const { user, updateUser } = useAuth();
-  const { replayTour, userTourData, showTourOverlay } = useTour();
+  const {
+    replayTour,
+    startTour,
+    userTourData,
+    showTourOverlay,
+  } = useTour();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
@@ -640,12 +646,30 @@ const Profile = () => {
     const tourRole = user.is_recruitment_admin === true && user.user_type !== 'super_admin'
       ? 'recruitment_admin'
       : user.user_type;
-    const tourSteps = getTourStepsByUserRole(tourRole);
+    const tourSteps = getTourStepsByUserRole(tourRole, t, { user });
     const dashboardType = getTourDashboardType(tourRole);
     const targetPath = tourSteps[0]?.route || getTourDashboardRoute(tourRole);
 
     replayTour(dashboardType, tourSteps);
     if (window.location.pathname !== targetPath.split('?')[0]) {
+      navigate(targetPath);
+    }
+  };
+
+  const effectiveTourRole = user?.is_recruitment_admin === true && user?.user_type !== 'super_admin'
+    ? 'recruitment_admin'
+    : user?.user_type;
+  const workflowTours = getWorkflowToursByUserRole(effectiveTourRole, t);
+
+  const handleStartWorkflowTour = (workflow) => {
+    if (!workflow?.steps?.length) return;
+    const tourKey = `workflow_${workflow.id}`;
+    startTour(tourKey, workflow.steps, {
+      source: 'profile_workflow_library',
+      workflowKey: workflow.id,
+    });
+    const targetPath = workflow.steps[0]?.route;
+    if (targetPath && window.location.pathname !== targetPath.split('?')[0]) {
       navigate(targetPath);
     }
   };
@@ -659,7 +683,7 @@ const Profile = () => {
         <BackToDashboard />
       </div>
 
-      <div className="card mb-6">
+      <div className="card mb-6" data-tour-id="profile-details-workflow">
         <h2 className="font-semibold mb-4">{t('profile.account_title')}</h2>
         <div className="space-y-3 text-sm">
           <div>
@@ -737,16 +761,21 @@ const Profile = () => {
         </div>
       </div>
 
-      <div className="card mb-6">
+      <div className="card mb-6" data-tour-id="profile-tour-settings-workflow">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-semibold text-gray-900">Guided Tour</h2>
+            <h2 className="font-semibold text-gray-900">
+              {t('tour.profile.title', 'Guided tours')}
+            </h2>
             <p className="mt-1 text-sm text-gray-600">
-              Replay the dashboard walkthrough for your current account role.
+              {t('tour.profile.description', 'Replay your dashboard guide or start a focused workflow.')}
             </p>
             {userTourData?.last_completed_at && (
               <p className="mt-2 text-xs text-gray-500">
-                Last completed {new Date(userTourData.last_completed_at).toLocaleDateString()}
+                {t('tour.profile.last_completed', {
+                  date: new Date(userTourData.last_completed_at).toLocaleDateString(),
+                  defaultValue: 'Last completed {{date}}',
+                })}
               </p>
             )}
           </div>
@@ -756,12 +785,44 @@ const Profile = () => {
             onClick={handleReplayTour}
             disabled={showTourOverlay}
           >
-            Replay Tour
+            {t('tour.profile.replay', 'Replay dashboard tour')}
           </button>
         </div>
+
+        {workflowTours.length > 0 && (
+          <div className="mt-6 border-t border-slate-200 pt-5">
+            <h3 className="text-sm font-bold text-slate-900">
+              {t('tour.profile.workflow_library', 'Focused workflow guides')}
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {t('tour.profile.workflow_library_description', 'Practice a complete task with safe, contextual guidance. Tours never submit payments or forms for you.')}
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {workflowTours.map((workflow) => (
+                <article
+                  key={workflow.id}
+                  className="flex h-full flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <h4 className="text-sm font-bold text-slate-900">{workflow.title}</h4>
+                  <p className="mt-1 flex-1 text-xs leading-5 text-slate-600">
+                    {workflow.description}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-secondary mt-3 w-full"
+                    onClick={() => handleStartWorkflowTour(workflow)}
+                    disabled={showTourOverlay}
+                  >
+                    {t('tour.profile.start_workflow', 'Start workflow guide')}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="card">
+      <div className="card" data-tour-id="profile-verification-workflow">
         <h2 className="font-semibold mb-4">{t('profile.verify_title')}</h2>
 
         {user?.identity_verification_status === 'revalidation_required' && (

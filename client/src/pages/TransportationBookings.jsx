@@ -173,7 +173,7 @@ const TransportationBookings = () => {
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 py-8" data-tour-id="transportation-bookings-workflow">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
