@@ -7,9 +7,11 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   FaChevronLeft,
   FaChevronRight,
+  FaHandPointer,
   FaMapMarkerAlt,
   FaRedo,
   FaTimes,
@@ -397,9 +399,14 @@ const TourOverlay = ({
   currentStep = 0,
   onNext,
   onPrevious,
+  onSkipStep,
   onSkip,
+  onSkipStep,
+  onActionComplete,
+  onTargetUnavailable,
   dashboardTitle = 'Dashboard',
 }) => {
+  const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
   const [highlightBox, setHighlightBox] = useState(null);
   const [targetStatus, setTargetStatus] = useState('searching');
@@ -419,8 +426,15 @@ const TourOverlay = ({
   const tooltipRef = useRef(null);
   const previousFocusRef = useRef(null);
   const resizeObserverRef = useRef(null);
+  const actionHandledRef = useRef(false);
+  const unavailableReportedRef = useRef(false);
   const step = steps[currentStep];
   const isLastStep = currentStep === steps.length - 1;
+
+  useEffect(() => {
+    actionHandledRef.current = false;
+    unavailableReportedRef.current = false;
+  }, [currentStep, step?.id]);
 
   const titleId = useMemo(
     () => `rentalhub-tour-title-${step?.id || currentStep}`,
@@ -603,6 +617,44 @@ const TourOverlay = ({
   }, [isOpen, targetStatus, updatePosition]);
 
   useEffect(() => {
+    if (
+      !isOpen
+      || targetStatus !== 'missing'
+      || unavailableReportedRef.current
+      || !step
+    ) {
+      return;
+    }
+
+    unavailableReportedRef.current = true;
+    onTargetUnavailable?.(step.optional ? 'unavailable' : 'missing', {
+      reasonCode: step.optional ? 'context_unavailable' : 'target_not_found',
+      context: { target: String(step.target || '') },
+    });
+  }, [isOpen, onTargetUnavailable, step, targetStatus]);
+
+  useEffect(() => {
+    if (!isOpen || targetStatus !== 'found' || !step?.advanceOn) return undefined;
+
+    const target = targetRef.current;
+    if (!target) return undefined;
+
+    const eventNames = Array.isArray(step.advanceOn) ? step.advanceOn : [step.advanceOn];
+    const handleAction = (event) => {
+      if (actionHandledRef.current) return;
+      if (event.target?.closest?.('[data-testid="rentalhub-tour-overlay"]')) return;
+
+      actionHandledRef.current = true;
+      onActionComplete?.({ actionType: event.type });
+    };
+
+    eventNames.forEach((eventName) => target.addEventListener(eventName, handleAction));
+    return () => {
+      eventNames.forEach((eventName) => target.removeEventListener(eventName, handleAction));
+    };
+  }, [isOpen, onActionComplete, step, targetStatus]);
+
+  useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return undefined;
 
     previousFocusRef.current = document.activeElement;
@@ -647,7 +699,7 @@ const TourOverlay = ({
         return;
       }
 
-      if (event.key !== 'Tab') return;
+      if (event.key !== 'Tab' || step.advanceOn) return;
       const focusable = getFocusableElements(tooltipRef.current);
       if (!focusable.length) {
         event.preventDefault();
@@ -688,6 +740,28 @@ const TourOverlay = ({
     ? { duration: 0 }
     : { duration: 0.24, ease: [0.22, 1, 0.36, 1] };
   const targetIsUnavailable = targetStatus !== 'found';
+  const localizedTitle = step?.titleKey
+    ? t(step.titleKey, { defaultValue: step.title })
+    : step?.title;
+  const localizedDescription = step?.descriptionKey
+    ? t(step.descriptionKey, { defaultValue: step.description })
+    : step?.description;
+  const localizedActionHint = step?.actionHintKey
+    ? t(step.actionHintKey, { defaultValue: step.actionHint })
+    : step?.actionHint;
+
+  const focusActionTarget = () => {
+    const target = targetRef.current;
+    if (!target) return;
+    const focusTarget = target.matches?.('button, a, input, select, textarea, [tabindex]')
+      ? target
+      : target.querySelector?.('button, a, input, select, textarea, [tabindex]');
+    focusTarget?.focus?.({ preventScroll: true });
+    const eventNames = Array.isArray(step?.advanceOn) ? step.advanceOn : [step?.advanceOn];
+    if (eventNames.includes('click') && typeof focusTarget?.click === 'function') {
+      focusTarget.click();
+    }
+  };
 
   return createPortal(
     <AnimatePresence>
@@ -708,7 +782,7 @@ const TourOverlay = ({
             <motion.div
               key={`highlight-${step.id || currentStep}`}
               aria-hidden="true"
-              className="fixed pointer-events-auto"
+              className={`fixed ${step.advanceOn ? 'pointer-events-none' : 'pointer-events-auto'}`}
               style={{
                 top: highlightBox.top,
                 left: highlightBox.left,
@@ -744,10 +818,13 @@ const TourOverlay = ({
             key={`tooltip-${step.id || currentStep}-${targetStatus}`}
             ref={tooltipRef}
             role="dialog"
-            aria-modal="true"
+            aria-modal={step.advanceOn ? undefined : 'true'}
             aria-labelledby={titleId}
             aria-describedby={descriptionId}
-            aria-label={`${dashboardTitle} guided tour`}
+            aria-label={t('tour.ui.dialog_label', {
+              title: dashboardTitle,
+              defaultValue: `${dashboardTitle} guided tour`,
+            })}
             tabIndex={-1}
             className="fixed pointer-events-auto outline-none"
             style={{
@@ -792,19 +869,19 @@ const TourOverlay = ({
                       className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em]"
                       style={{ color: BRAND.goldSoft }}
                     >
-                      RentalHub guided tour
+                      {t('tour.ui.eyebrow', 'RentalHub guided tour')}
                     </p>
                     <h2
                       id={titleId}
                       className="pr-2 text-xl font-extrabold leading-tight text-white"
                     >
-                      {step.title}
+                      {localizedTitle}
                     </h2>
                   </div>
                   <button
                     type="button"
                     onClick={onSkip}
-                    aria-label="Close and skip the guided tour"
+                    aria-label={t('tour.ui.close_and_skip', 'Close and skip the guided tour')}
                     className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2"
                     style={{ '--tw-ring-color': BRAND.gold, '--tw-ring-offset-color': BRAND.navy }}
                   >
@@ -818,7 +895,7 @@ const TourOverlay = ({
                   id={descriptionId}
                   className="text-sm leading-6 text-slate-200"
                 >
-                  {step.description}
+                  {localizedDescription}
                 </p>
 
                 {targetStatus === 'searching' && (
@@ -838,7 +915,7 @@ const TourOverlay = ({
                     >
                       <FaMapMarkerAlt />
                     </span>
-                    Finding this control on the dashboard…
+                    {t('tour.ui.finding_target', 'Finding this control on the dashboard…')}
                   </div>
                 )}
 
@@ -853,11 +930,15 @@ const TourOverlay = ({
                     aria-live="polite"
                   >
                     <p className="text-sm font-semibold text-white">
-                      This dashboard section is not available yet.
+                      {step.optional
+                        ? t('tour.ui.not_available_for_account', 'This step is not available for this account.')
+                        : t('tour.ui.target_not_available', 'This dashboard section is not available yet.')}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-slate-300">
-                      It may still be loading or unavailable for this account. Retry, or continue
-                      without interrupting the tour.
+                      {t(
+                        'tour.ui.target_not_available_body',
+                        'It may still be loading or unavailable for this account. Retry, or continue without interrupting the tour.',
+                      )}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
@@ -867,24 +948,58 @@ const TourOverlay = ({
                         style={{ '--tw-ring-color': BRAND.gold }}
                       >
                         <FaRedo size={11} aria-hidden="true" />
-                        Retry target
+                        {t('tour.ui.retry_target', 'Retry target')}
                       </button>
                       <button
                         type="button"
-                        onClick={onNext}
+                        onClick={() => (onSkipStep || onNext)?.('target_not_found')}
                         className="rounded-lg px-3 py-2 text-xs font-bold transition-colors hover:bg-white/10 focus:outline-none focus:ring-2"
                         style={{ color: BRAND.goldSoft, '--tw-ring-color': BRAND.gold }}
                       >
-                        {isLastStep ? 'Finish tour' : 'Skip this step'}
+                        {isLastStep
+                          ? t('tour.ui.finish_tour', 'Finish tour')
+                          : t('tour.ui.skip_step', 'Skip this step')}
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {step.advanceOn && targetStatus === 'found' && (
+                  <div
+                    className="mt-4 rounded-xl border px-3 py-2.5 text-xs"
+                    style={{
+                      borderColor: 'rgba(255, 201, 40, 0.34)',
+                      background: 'rgba(255, 201, 40, 0.09)',
+                      color: BRAND.goldSoft,
+                    }}
+                    role="status"
+                  >
+                    <p className="flex items-start gap-3 leading-5">
+                      <FaHandPointer className="mt-0.5 shrink-0" aria-hidden="true" />
+                      <span>
+                        {localizedActionHint
+                          || t('tour.ui.interact_hint', 'Use the highlighted control to continue automatically.')}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={focusActionTarget}
+                      className="mt-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 font-bold text-white transition-colors hover:bg-white/15 focus:outline-none focus:ring-2"
+                      style={{ '--tw-ring-color': BRAND.gold }}
+                    >
+                      {t('tour.ui.use_highlighted_control', 'Use highlighted control')}
+                    </button>
                   </div>
                 )}
 
                 <div className="mt-5">
                   <div className="mb-2 flex items-center justify-between gap-3 text-[11px] font-semibold">
                     <span className="uppercase tracking-[0.16em]" style={{ color: BRAND.goldSoft }}>
-                      Step {currentStep + 1} of {steps.length}
+                      {t('tour.ui.step_progress', {
+                        current: currentStep + 1,
+                        total: steps.length,
+                        defaultValue: `Step ${currentStep + 1} of ${steps.length}`,
+                      })}
                     </span>
                     <span className="text-slate-300">{Math.round(progress)}%</span>
                   </div>
@@ -916,11 +1031,13 @@ const TourOverlay = ({
                     style={{ '--tw-ring-color': BRAND.gold }}
                   >
                     <FaChevronLeft size={12} aria-hidden="true" />
-                    Back
+                    {t('tour.ui.back', 'Back')}
                   </button>
                   <button
                     type="button"
-                    onClick={onNext}
+                        onClick={() => (onSkipStep || onNext)(
+                          step.optional ? 'context_unavailable' : 'target_not_found',
+                        )}
                     className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-extrabold transition-transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2"
                     style={{
                       color: BRAND.navy,
@@ -930,7 +1047,7 @@ const TourOverlay = ({
                       '--tw-ring-offset-color': BRAND.navy,
                     }}
                   >
-                    {isLastStep ? 'Finish' : 'Next'}
+                    {isLastStep ? t('tour.ui.finish', 'Finish') : t('tour.ui.next', 'Next')}
                     {!isLastStep && <FaChevronRight size={12} aria-hidden="true" />}
                   </button>
                 </div>
@@ -941,14 +1058,14 @@ const TourOverlay = ({
                   className="mt-3 w-full rounded-lg py-2 text-xs font-semibold text-slate-300 transition-colors hover:text-white focus:outline-none focus:ring-2"
                   style={{ '--tw-ring-color': BRAND.gold }}
                 >
-                  Skip the complete tour
+                  {t('tour.ui.skip_complete', 'Skip the complete tour')}
                 </button>
 
                 {targetIsUnavailable && (
                   <span className="sr-only" aria-live="polite">
                     {targetStatus === 'searching'
-                      ? 'Searching for the dashboard control.'
-                      : 'The dashboard control is currently unavailable.'}
+                      ? t('tour.ui.searching_sr', 'Searching for the dashboard control.')
+                      : t('tour.ui.unavailable_sr', 'The dashboard control is currently unavailable.')}
                   </span>
                 )}
               </div>

@@ -756,8 +756,46 @@ export const TOUR_STEPS = {
   ],
 };
 
+const getTranslatedValue = (t, key, fallback) => (
+  typeof t === 'function' ? t(key, { defaultValue: fallback }) : fallback
+);
+
+export const localizeTourSteps = (steps = [], t) => steps.map((step) => ({
+  ...step,
+  titleKey: `tour.steps.${step.id}.title`,
+  descriptionKey: `tour.steps.${step.id}.description`,
+  actionHintKey: step.actionHint ? `tour.steps.${step.id}.action_hint` : undefined,
+  title: getTranslatedValue(t, `tour.steps.${step.id}.title`, step.title),
+  description: getTranslatedValue(t, `tour.steps.${step.id}.description`, step.description),
+  actionHint: step.actionHint
+    ? getTranslatedValue(t, `tour.steps.${step.id}.action_hint`, step.actionHint)
+    : undefined,
+}));
+
+export const isTourStepEligible = (step, context = {}) => {
+  if (!step) return false;
+  if (typeof step.when === 'function') {
+    try {
+      return Boolean(step.when(context));
+    } catch {
+      return false;
+    }
+  }
+  if (Array.isArray(step.roles) && !step.roles.includes(context.user?.user_type)) {
+    return false;
+  }
+  if (step.requiresUserField && !context.user?.[step.requiresUserField]) {
+    return false;
+  }
+  return true;
+};
+
+export const getEligibleTourSteps = (steps = [], context = {}) => (
+  steps.filter((step) => isTourStepEligible(step, context))
+);
+
 // Map user roles to their appropriate tour steps
-export const getTourStepsByUserRole = (userRole) => {
+export const getTourStepsByUserRole = (userRole, t, context = {}) => {
   const roleToTourMap = {
     user: TOUR_STEPS.TENANT_DASHBOARD,
     landlord: TOUR_STEPS.LANDLORD_DASHBOARD,
@@ -788,7 +826,13 @@ export const getTourStepsByUserRole = (userRole) => {
     super_admin: TOUR_STEPS.SUPER_ADMIN_DASHBOARD,
   };
 
-  return roleToTourMap[userRole] || TOUR_STEPS.TENANT_DASHBOARD;
+  return localizeTourSteps(
+    getEligibleTourSteps(
+      roleToTourMap[userRole] || TOUR_STEPS.TENANT_DASHBOARD,
+      { ...context, role: userRole },
+    ),
+    t,
+  );
 };
 
 // Helper function to get tour dashboard type from role

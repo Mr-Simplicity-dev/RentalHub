@@ -387,7 +387,7 @@ const Messages = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="card lg:col-span-1">
+        <div className="card lg:col-span-1" data-tour-id="messages-conversations-workflow">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">{t('messages.conversations')}</h2>
             <button
@@ -436,7 +436,7 @@ const Messages = () => {
 
         <div className="lg:col-span-2 space-y-6">
           {canCompose ? (
-            <div className="card">
+            <div className="card" data-tour-id="messages-compose-workflow">
               <h2 className="font-semibold mb-4">{t('messages.compose')}</h2>
               <form onSubmit={handleSendMessage} className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

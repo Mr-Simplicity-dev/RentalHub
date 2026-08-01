@@ -179,7 +179,7 @@ const AddProperty = () => {
       </div>
 
       {step === 1 && (
-        <form onSubmit={proceedToVerification} className="card space-y-4">
+        <form onSubmit={proceedToVerification} className="card space-y-4" data-tour-id="add-property-form-workflow">
           <input name="title" value={form.title} onChange={handleChange} className="input" placeholder={t('add_property.form.title')} />
           <textarea name="description" value={form.description} onChange={handleChange} className="input" rows="4" placeholder={t('add_property.form.description')} />
           {(user?.preferred_state_id || user?.preferred_lga_name) && (

@@ -211,8 +211,40 @@ const ensureTourSchema = async () => {
         return tables;
       }, {});
       const requiredColumns = {
-        user_tour_states: ['user_id', 'platform', 'tour_key', 'last_skipped_at'],
-        user_tour_events: ['user_id', 'platform', 'tour_key', 'event_id'],
+        user_tour_states: [
+          'user_id',
+          'platform',
+          'tour_key',
+          'last_skipped_at',
+          'current_step',
+          'current_step_id',
+          'total_steps',
+          'progress_updated_at',
+          'locale',
+          'context',
+          'last_event_type',
+          'last_event_at',
+          'resume_count',
+          'last_resumed_at',
+          'active_session_id',
+          'last_sequence_number',
+          'state_revision',
+        ],
+        user_tour_events: [
+          'user_id',
+          'platform',
+          'tour_key',
+          'event_id',
+          'locale',
+          'route',
+          'target_id',
+          'reason_code',
+          'session_id',
+          'sequence_number',
+          'duration_ms',
+          'client_created_at',
+          'context',
+        ],
       };
       const missing = Object.entries(requiredColumns).flatMap(([table, columns]) =>
         columns
@@ -236,15 +268,56 @@ const ensureTourSchema = async () => {
   return tourSchemaPromise;
 };
 
-const TOUR_EVENTS = new Set(['welcome_shown', 'started', 'replayed', 'completed', 'skipped', 'dismissed']);
+const TOUR_EVENTS = new Set([
+  'welcome_shown',
+  'started',
+  'resumed',
+  'replayed',
+  'step_viewed',
+  'step_completed',
+  'step_skipped',
+  'action_completed',
+  'target_missing',
+  'step_unavailable',
+  'paused',
+  'completed',
+  'skipped',
+  'dismissed',
+]);
 const TOUR_EVENT_STATUS = {
   welcome_shown: 'welcome_shown',
   started: 'in_progress',
+  resumed: 'in_progress',
   replayed: 'in_progress',
+  step_viewed: 'in_progress',
+  step_completed: 'in_progress',
+  step_skipped: 'in_progress',
+  action_completed: 'in_progress',
+  target_missing: 'in_progress',
+  step_unavailable: 'in_progress',
+  paused: 'paused',
   completed: 'completed',
   skipped: 'skipped',
   dismissed: 'dismissed',
 };
+const TERMINAL_TOUR_STATUSES = new Set(['completed', 'skipped', 'dismissed']);
+const TOUR_RESTART_EVENTS = new Set(['replayed']);
+const TOUR_SESSION_START_EVENTS = new Set(['started', 'resumed', 'replayed']);
+const TOUR_PROGRESS_EVENTS = new Set([
+  'started',
+  'resumed',
+  'replayed',
+  'step_viewed',
+  'step_completed',
+  'step_skipped',
+  'action_completed',
+  'target_missing',
+  'step_unavailable',
+  'paused',
+  'completed',
+  'skipped',
+  'dismissed',
+]);
 
 const TOUR_PLATFORM_ALIASES = new Map([
   ['legacy', 'legacy'],
@@ -301,6 +374,9 @@ const normalizeTourKey = (value, fallback = 'default') => {
     maxLength: 120,
     lowercase: true,
   });
+  if (text && !/^[a-z0-9][a-z0-9._:-]*$/.test(text)) {
+    throw tourInputError('Tour key contains unsupported characters');
+  }
   return text || fallback;
 };
 
@@ -319,6 +395,242 @@ const normalizeTourInteger = (value, field) => {
     throw tourInputError(`${field} must be a non-negative integer`);
   }
   return parsed;
+};
+
+const normalizeTourObject = (value, field, maxBytes) => {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw tourInputError(`${field} must be a JSON object`);
+  }
+
+  let serialized;
+  try {
+    serialized = JSON.stringify(value);
+  } catch (_error) {
+    throw tourInputError(`${field} must be valid JSON`);
+  }
+  if (Buffer.byteLength(serialized, 'utf8') > maxBytes) {
+    throw tourInputError(`${field} must be ${Math.floor(maxBytes / 1024)} KB or smaller`);
+  }
+
+  return JSON.parse(serialized);
+};
+
+const normalizeTourLocale = (value, fallback = null) => {
+  const text = normalizeTourText(value, fallback, {
+    field: 'Tour locale',
+    maxLength: 35,
+  });
+  if (!text) return fallback;
+
+  try {
+    return Intl.getCanonicalLocales(text.replace(/_/g, '-'))[0];
+  } catch (_error) {
+    throw tourInputError('Tour locale must be a valid language tag');
+  }
+};
+
+const normalizeTourCode = (value, field, maxLength = 120) => {
+  const text = normalizeTourText(value, null, {
+    field,
+    maxLength,
+    lowercase: true,
+  });
+  if (!text) return null;
+  if (!/^[a-z0-9][a-z0-9._:-]*$/.test(text)) {
+    throw tourInputError(`${field} contains unsupported characters`);
+  }
+  return text;
+};
+
+const normalizeTourTimestamp = (value, field = 'Client event time') => {
+  if (value === undefined || value === null || value === '') return null;
+  const timestamp = new Date(value);
+  if (!Number.isFinite(timestamp.getTime())) {
+    throw tourInputError(`${field} must be a valid ISO-8601 timestamp`);
+  }
+
+  const now = Date.now();
+  if (timestamp.getTime() > now + 5 * 60 * 1000) {
+    throw tourInputError(`${field} cannot be more than 5 minutes in the future`);
+  }
+  return timestamp.toISOString();
+};
+
+const compareTourVersions = (left, right) => {
+  if (left === right) return 0;
+  if (/^\d+$/.test(String(left)) && /^\d+$/.test(String(right))) {
+    const leftNumber = BigInt(left);
+    const rightNumber = BigInt(right);
+    return leftNumber === rightNumber ? 0 : leftNumber > rightNumber ? 1 : -1;
+  }
+  return null;
+};
+
+const serializeTourState = (state) => {
+  if (!state) return null;
+  const currentStep = state.current_step == null ? null : Number(state.current_step);
+  const totalSteps = state.total_steps == null ? null : Number(state.total_steps);
+  const stateRevision = state.state_revision == null ? 0 : Number(state.state_revision);
+  const canResume = ['in_progress', 'paused'].includes(state.status) && currentStep !== null;
+
+  return {
+    ...state,
+    current_step: currentStep,
+    current_step_id: state.current_step_id || null,
+    // Compatibility alias for clients that adopted the original resume draft.
+    last_step_id: state.current_step_id || null,
+    total_steps: totalSteps,
+    state_revision: stateRevision,
+    context: state.context && typeof state.context === 'object' ? state.context : {},
+    can_resume: canResume,
+  };
+};
+
+const getTourTimestamp = (value) => {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+/**
+ * Resolve an event into the next resumable cursor without performing I/O.
+ * Events are still retained for diagnostics when this returns applied=false,
+ * but an older version, session, or sequence can never move the saved cursor.
+ */
+const deriveTourStateTransition = (state, event) => {
+  state = state || {
+    status: 'not_started',
+    tour_version: event.tourVersion,
+    context: {},
+  };
+  const currentVersion = String(state?.tour_version || event.tourVersion);
+  const versionComparison = compareTourVersions(event.tourVersion, currentVersion);
+  const sameVersion = event.tourVersion === currentVersion;
+  const newerVersion = !sameVersion && versionComparison !== -1;
+
+  if (versionComparison === -1) {
+    return { applied: false, reason: 'older_tour_version' };
+  }
+
+  if (
+    sameVersion &&
+    TERMINAL_TOUR_STATUSES.has(state.status) &&
+    !TOUR_RESTART_EVENTS.has(event.eventType)
+  ) {
+    return { applied: false, reason: 'terminal_tour_state' };
+  }
+
+  const currentSessionId = state.active_session_id || null;
+  const incomingSessionId = event.sessionId || null;
+  const sessionChanged = Boolean(
+    incomingSessionId && currentSessionId && incomingSessionId !== currentSessionId
+  );
+
+  if (sessionChanged && !newerVersion && !TOUR_SESSION_START_EVENTS.has(event.eventType)) {
+    return { applied: false, reason: 'inactive_session' };
+  }
+
+  if (sessionChanged && !newerVersion) {
+    const clientCreatedAt = getTourTimestamp(event.clientCreatedAt);
+    const lastEventAt = getTourTimestamp(state.last_event_at);
+    if (
+      clientCreatedAt !== null &&
+      lastEventAt !== null &&
+      clientCreatedAt <= lastEventAt
+    ) {
+      return { applied: false, reason: 'older_session' };
+    }
+  }
+
+  const sameSession = Boolean(
+    incomingSessionId && currentSessionId && incomingSessionId === currentSessionId
+  );
+  const lastSequenceNumber = state.last_sequence_number == null
+    ? null
+    : Number(state.last_sequence_number);
+  if (
+    sameSession &&
+    event.sequenceNumber !== null &&
+    lastSequenceNumber !== null &&
+    event.sequenceNumber <= lastSequenceNumber
+  ) {
+    return { applied: false, reason: 'stale_sequence' };
+  }
+
+  const resetProgress = newerVersion || TOUR_RESTART_EVENTS.has(event.eventType);
+  const cursorEvent = TOUR_PROGRESS_EVENTS.has(event.eventType);
+  let currentStep = resetProgress
+    ? null
+    : state.current_step == null ? null : Number(state.current_step);
+  let currentStepId = resetProgress ? null : state.current_step_id || null;
+  let totalSteps = resetProgress
+    ? null
+    : state.total_steps == null ? null : Number(state.total_steps);
+  let context = resetProgress
+    ? {}
+    : state.context && typeof state.context === 'object' ? state.context : {};
+
+  if (cursorEvent && event.currentStep !== null) {
+    if (currentStep !== event.currentStep && !event.stepId) {
+      currentStepId = null;
+    }
+    currentStep = event.currentStep;
+  }
+  if (cursorEvent && event.stepId) {
+    currentStepId = event.stepId;
+  }
+  if (cursorEvent && event.totalSteps !== null) {
+    totalSteps = event.totalSteps;
+  }
+  if (event.contextProvided) {
+    context = event.context;
+  }
+
+  // Keep the database invariant valid when a newer client reports a shorter
+  // tour definition without also reporting a replacement cursor.
+  if (currentStep !== null && totalSteps !== null && currentStep > totalSteps) {
+    if (event.currentStep === null) {
+      currentStep = null;
+      currentStepId = null;
+    } else {
+      totalSteps = null;
+    }
+  }
+
+  let status = TOUR_EVENT_STATUS[event.eventType];
+  if (
+    event.eventType === 'welcome_shown' &&
+    ['in_progress', 'paused'].includes(state.status) &&
+    !newerVersion
+  ) {
+    status = state.status;
+  }
+
+  const nextSessionId = incomingSessionId || (resetProgress ? null : currentSessionId);
+  let nextSequenceNumber = resetProgress || sessionChanged
+    ? null
+    : lastSequenceNumber;
+  if (incomingSessionId && event.sequenceNumber !== null) {
+    nextSequenceNumber = event.sequenceNumber;
+  }
+
+  return {
+    applied: true,
+    values: {
+      dashboardType: event.dashboardType || state.dashboard_type || null,
+      tourVersion: event.tourVersion,
+      status,
+      currentStep,
+      currentStepId,
+      totalSteps,
+      locale: event.locale || (resetProgress ? null : state.locale || null),
+      context,
+      activeSessionId: nextSessionId,
+      lastSequenceNumber: nextSequenceNumber,
+      progressUpdated: cursorEvent,
+    },
+  };
 };
 
 const getTourState = async (userId, { platform = null, tourKey = null } = {}) => {
@@ -345,13 +657,17 @@ const getTourState = async (userId, { platform = null, tourKey = null } = {}) =>
     values
   );
 
-  return result.rows[0] || null;
+  return serializeTourState(result.rows[0] || null);
 };
 
 const recordTourEvent = async (userId, payload = {}) => {
   await ensureTourSchema();
 
-  const eventType = normalizeTourText(payload.event_type);
+  const eventType = normalizeTourText(payload.event_type, null, {
+    field: 'Tour event type',
+    maxLength: 40,
+    lowercase: true,
+  });
   if (!TOUR_EVENTS.has(eventType)) {
     throw tourInputError('Invalid tour event type');
   }
@@ -361,20 +677,24 @@ const recordTourEvent = async (userId, payload = {}) => {
     maxLength: 80,
     lowercase: true,
   });
-  const rawMetadata = payload.metadata && typeof payload.metadata === 'object' && !Array.isArray(payload.metadata)
-    ? payload.metadata
-    : {};
+  const rawMetadata = normalizeTourObject(payload.metadata, 'Tour metadata', 16384);
+  const contextProvided = Object.prototype.hasOwnProperty.call(payload, 'context') ||
+    Object.prototype.hasOwnProperty.call(rawMetadata, 'context');
+  const context = normalizeTourObject(
+    payload.context ?? rawMetadata.context,
+    'Tour context',
+    16384
+  );
   const platform = normalizeTourPlatform(payload.platform ?? rawMetadata.platform, 'legacy');
   const tourKey = normalizeTourKey(payload.tour_key, dashboardType || 'default');
   const tourVersion = normalizeTourText(payload.tour_version, '3', {
     field: 'Tour version',
     maxLength: 40,
   });
-  const eventId = normalizeTourText(payload.event_id, null, {
-    field: 'Tour event ID',
-    maxLength: 100,
-    lowercase: true,
-  });
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(tourVersion)) {
+    throw tourInputError('Tour version contains unsupported characters');
+  }
+  const eventId = normalizeTourCode(payload.event_id, 'Tour event ID', 100);
   const stepId = normalizeTourText(payload.step_id, null, {
     field: 'Tour step ID',
     maxLength: 120,
@@ -384,35 +704,96 @@ const recordTourEvent = async (userId, payload = {}) => {
   if (currentStep !== null && totalSteps !== null && currentStep > totalSteps) {
     throw tourInputError('Current step cannot be greater than total steps');
   }
+  if (['step_viewed', 'step_completed', 'step_skipped'].includes(eventType)) {
+    if (currentStep === null || !stepId) {
+      throw tourInputError(`${eventType} requires current_step and step_id`);
+    }
+  }
+  if (eventType === 'resumed' && currentStep === null) {
+    throw tourInputError('resumed requires current_step');
+  }
+
+  const locale = normalizeTourLocale(
+    payload.locale ?? context.locale ?? rawMetadata.locale ?? rawMetadata.language,
+    null
+  );
+  const route = normalizeTourText(
+    payload.route ?? context.route ?? context.screen ?? rawMetadata.route ?? rawMetadata.screen,
+    null,
+    { field: 'Tour route', maxLength: 255 }
+  );
+  const targetId = normalizeTourText(
+    payload.target_id ?? context.target_id ?? rawMetadata.target_id,
+    null,
+    { field: 'Tour target ID', maxLength: 120 }
+  );
+  const reasonCode = normalizeTourCode(
+    payload.reason_code ?? context.reason_code ?? context.reason ?? rawMetadata.reason_code ?? rawMetadata.reason,
+    'Tour reason code',
+    80
+  );
+  const sessionId = normalizeTourCode(
+    payload.session_id ?? context.session_id ?? rawMetadata.session_id,
+    'Tour session ID',
+    100
+  );
+  const sequenceNumber = normalizeTourInteger(
+    payload.sequence_number ?? context.sequence_number ?? rawMetadata.sequence_number,
+    'Tour sequence number'
+  );
+  if (sequenceNumber !== null && !sessionId) {
+    throw tourInputError('Tour session ID is required when sequence number is provided');
+  }
+  const durationMs = normalizeTourInteger(
+    payload.duration_ms ?? rawMetadata.duration_ms,
+    'Tour duration'
+  );
+  if (durationMs !== null && durationMs > 86400000) {
+    throw tourInputError('Tour duration must be 24 hours or fewer');
+  }
+  const clientCreatedAt = normalizeTourTimestamp(
+    payload.client_created_at ?? rawMetadata.client_created_at
+  );
+
   const metadata = {
     ...rawMetadata,
     platform,
+    ...(locale ? { locale } : {}),
   };
   const serializedMetadata = JSON.stringify(metadata);
   if (Buffer.byteLength(serializedMetadata, 'utf8') > 16384) {
     throw tourInputError('Tour metadata must be 16 KB or smaller');
   }
+  const serializedContext = JSON.stringify(context);
 
   const startedIncrement = eventType === 'started' ? 1 : 0;
   const completedIncrement = eventType === 'completed' ? 1 : 0;
   const skippedIncrement = eventType === 'skipped' ? 1 : 0;
   const dismissedIncrement = eventType === 'dismissed' ? 1 : 0;
   const replayIncrement = eventType === 'replayed' ? 1 : 0;
+  const resumeIncrement = eventType === 'resumed' ? 1 : 0;
   const client = await db.connect();
 
   try {
     await client.query('BEGIN');
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
+      [String(userId), `${platform}:${tourKey}`]
+    );
 
     const eventResult = await client.query(
       `INSERT INTO user_tour_events (
          user_id, platform, tour_key, event_id, event_type, dashboard_type,
-         tour_version, step_id, current_step, total_steps, metadata
+         tour_version, step_id, current_step, total_steps, metadata,
+         locale, route, target_id, reason_code, session_id, sequence_number,
+         duration_ms, client_created_at, context
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
-       ON CONFLICT (user_id, platform, event_id)
-         WHERE event_id IS NOT NULL
-       DO NOTHING
-       RETURNING id`,
+       VALUES (
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb,
+         $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb
+       )
+       ON CONFLICT DO NOTHING
+       RETURNING id, event_id`,
       [
         userId,
         platform,
@@ -425,12 +806,55 @@ const recordTourEvent = async (userId, payload = {}) => {
         currentStep,
         totalSteps,
         serializedMetadata,
+        locale,
+        route,
+        targetId,
+        reasonCode,
+        sessionId,
+        sequenceNumber,
+        durationMs,
+        clientCreatedAt,
+        serializedContext,
       ]
     );
 
     // A retried request with the same client event ID must not create another
     // analytics row or increment the aggregate counters a second time.
-    if (eventId && eventResult.rowCount === 0) {
+    if (eventResult.rows.length === 0) {
+      const lookupByEventId = Boolean(eventId);
+      const existingEventResult = await client.query(
+        `SELECT tour_key, event_type, tour_version, step_id, current_step, total_steps
+         FROM user_tour_events
+         WHERE user_id = $1
+           AND platform = $2
+           AND (
+             ($3::text IS NOT NULL AND event_id = $3)
+             OR (
+               $4::text IS NOT NULL
+               AND $5::int IS NOT NULL
+               AND tour_key = $6
+               AND session_id = $4
+               AND sequence_number = $5
+             )
+           )
+         ORDER BY CASE WHEN $3::text IS NOT NULL AND event_id = $3 THEN 0 ELSE 1 END
+         LIMIT 1`,
+        [userId, platform, eventId, sessionId, sequenceNumber, tourKey]
+      );
+      const existingEvent = existingEventResult.rows[0];
+      const sameEvent = existingEvent
+        && existingEvent.tour_key === tourKey
+        && existingEvent.event_type === eventType
+        && existingEvent.tour_version === tourVersion
+        && (existingEvent.step_id || null) === stepId
+        && (existingEvent.current_step == null ? null : Number(existingEvent.current_step)) === currentStep
+        && (existingEvent.total_steps == null ? null : Number(existingEvent.total_steps)) === totalSteps;
+      if (!sameEvent || (!lookupByEventId && !sessionId)) {
+        const conflict = new Error('Tour event ID was already used for a different event');
+        conflict.status = 409;
+        throw conflict;
+      }
+
       const existingState = await client.query(
         `SELECT *
          FROM user_tour_states
@@ -439,77 +863,145 @@ const recordTourEvent = async (userId, payload = {}) => {
         [userId, platform, tourKey]
       );
       await client.query('COMMIT');
-      return existingState.rows[0] || null;
+      return {
+        state: serializeTourState(existingState.rows[0] || null),
+        deduplicated: true,
+      };
     }
 
-    const stateResult = await client.query(
-      `INSERT INTO user_tour_states (
-         user_id, platform, tour_key, dashboard_type, tour_version, status,
-         last_welcome_shown_at, last_started_at, last_completed_at,
-         last_dismissed_at, last_skipped_at,
-         started_count, completed_count, skipped_count, dismissed_count, replay_count,
-         updated_at
-       )
-       VALUES (
-         $1, $2, $3, $4, $5, $6,
-         CASE WHEN $7 = 'welcome_shown' THEN CURRENT_TIMESTAMP ELSE NULL END,
-         CASE WHEN $7 IN ('started', 'replayed') THEN CURRENT_TIMESTAMP ELSE NULL END,
-         CASE WHEN $7 = 'completed' THEN CURRENT_TIMESTAMP ELSE NULL END,
-         CASE WHEN $7 = 'dismissed' THEN CURRENT_TIMESTAMP ELSE NULL END,
-         CASE WHEN $7 = 'skipped' THEN CURRENT_TIMESTAMP ELSE NULL END,
-         $8, $9, $10, $11, $12,
-         CURRENT_TIMESTAMP
-       )
-       ON CONFLICT (user_id, platform, tour_key) DO UPDATE SET
-         dashboard_type = COALESCE(EXCLUDED.dashboard_type, user_tour_states.dashboard_type),
-         tour_version = CASE
-           WHEN user_tour_states.tour_version ~ '^[0-9]+$'
-            AND EXCLUDED.tour_version ~ '^[0-9]+$'
-            AND user_tour_states.tour_version::numeric > EXCLUDED.tour_version::numeric
-             THEN user_tour_states.tour_version
-           ELSE EXCLUDED.tour_version
-         END,
-         status = CASE
-           WHEN user_tour_states.tour_version ~ '^[0-9]+$'
-            AND EXCLUDED.tour_version ~ '^[0-9]+$'
-            AND user_tour_states.tour_version::numeric > EXCLUDED.tour_version::numeric
-             THEN user_tour_states.status
-           WHEN user_tour_states.tour_version = EXCLUDED.tour_version
-            AND user_tour_states.status IN ('completed', 'skipped', 'dismissed')
-            AND $7 IN ('welcome_shown', 'started')
-             THEN user_tour_states.status
-           ELSE EXCLUDED.status
-         END,
-         last_welcome_shown_at = COALESCE(EXCLUDED.last_welcome_shown_at, user_tour_states.last_welcome_shown_at),
-         last_started_at = COALESCE(EXCLUDED.last_started_at, user_tour_states.last_started_at),
-         last_completed_at = COALESCE(EXCLUDED.last_completed_at, user_tour_states.last_completed_at),
-         last_dismissed_at = COALESCE(EXCLUDED.last_dismissed_at, user_tour_states.last_dismissed_at),
-         last_skipped_at = COALESCE(EXCLUDED.last_skipped_at, user_tour_states.last_skipped_at),
-         started_count = user_tour_states.started_count + $8,
-         completed_count = user_tour_states.completed_count + $9,
-         skipped_count = user_tour_states.skipped_count + $10,
-         dismissed_count = user_tour_states.dismissed_count + $11,
-         replay_count = user_tour_states.replay_count + $12,
-         updated_at = CURRENT_TIMESTAMP
-       RETURNING *`,
-      [
-        userId,
-        platform,
-        tourKey,
-        dashboardType,
-        tourVersion,
-        TOUR_EVENT_STATUS[eventType],
-        eventType,
-        startedIncrement,
-        completedIncrement,
-        skippedIncrement,
-        dismissedIncrement,
-        replayIncrement,
-      ]
+    const existingStateResult = await client.query(
+      `SELECT *
+       FROM user_tour_states
+       WHERE user_id = $1 AND platform = $2 AND tour_key = $3
+       FOR UPDATE`,
+      [userId, platform, tourKey]
     );
+    const existingState = existingStateResult.rows[0] || null;
+    const transition = deriveTourStateTransition(existingState, {
+      eventType,
+      dashboardType,
+      tourVersion,
+      stepId,
+      currentStep,
+      totalSteps,
+      locale,
+      context: {
+        ...context,
+        ...(route ? { route } : {}),
+      },
+      contextProvided: contextProvided || Boolean(route),
+      sessionId,
+      sequenceNumber,
+      clientCreatedAt,
+    });
+
+    // Keep the analytics row for diagnostics, but never let an older version,
+    // inactive session, duplicate sequence, or terminal tour mutate the cursor.
+    if (!transition.applied) {
+      await client.query('COMMIT');
+      return {
+        state: serializeTourState(existingState),
+        deduplicated: false,
+        state_ignored: transition.reason,
+      };
+    }
+
+    const next = transition.values;
+    const status = next.status;
+    const updatesProgress = next.progressUpdated;
+    const nextCurrentStep = next.currentStep;
+    const nextStepId = next.currentStepId;
+    const nextTotalSteps = next.totalSteps;
+    const nextLocale = next.locale;
+    const nextContext = next.context;
+    const nextSessionId = next.activeSessionId;
+    const nextSequenceNumber = next.lastSequenceNumber;
+
+    let stateResult;
+    if (!existingState) {
+      stateResult = await client.query(
+        `INSERT INTO user_tour_states (
+           user_id, platform, tour_key, dashboard_type, tour_version, status,
+           current_step, current_step_id, total_steps, progress_updated_at,
+           locale, context, last_event_type, last_event_at,
+           resume_count, last_resumed_at, active_session_id,
+           last_sequence_number, state_revision,
+           last_welcome_shown_at, last_started_at, last_completed_at,
+           last_dismissed_at, last_skipped_at,
+           started_count, completed_count, skipped_count, dismissed_count, replay_count,
+           updated_at
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6,
+           $7, $8, $9, CASE WHEN $10 THEN CURRENT_TIMESTAMP ELSE NULL END,
+           $11, $12::jsonb, $13, CURRENT_TIMESTAMP,
+           $14, CASE WHEN $13 = 'resumed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+           $15, $16, 1,
+           CASE WHEN $13 = 'welcome_shown' THEN CURRENT_TIMESTAMP ELSE NULL END,
+           CASE WHEN $13 IN ('started', 'replayed', 'resumed') THEN CURRENT_TIMESTAMP ELSE NULL END,
+           CASE WHEN $13 = 'completed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+           CASE WHEN $13 = 'dismissed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+           CASE WHEN $13 = 'skipped' THEN CURRENT_TIMESTAMP ELSE NULL END,
+           $17, $18, $19, $20, $21,
+           CURRENT_TIMESTAMP
+         )
+         RETURNING *`,
+        [
+          userId, platform, tourKey, dashboardType, tourVersion, status,
+          nextCurrentStep, nextStepId, nextTotalSteps, updatesProgress,
+          nextLocale, JSON.stringify(nextContext), eventType, resumeIncrement,
+          nextSessionId, nextSequenceNumber,
+          startedIncrement, completedIncrement, skippedIncrement,
+          dismissedIncrement, replayIncrement,
+        ]
+      );
+    } else {
+      stateResult = await client.query(
+        `UPDATE user_tour_states
+         SET dashboard_type = COALESCE($4, dashboard_type),
+             tour_version = $5,
+             status = $6,
+             current_step = $7,
+             current_step_id = $8,
+             total_steps = $9,
+             progress_updated_at = CASE WHEN $10 THEN CURRENT_TIMESTAMP ELSE progress_updated_at END,
+             locale = $11,
+             context = $12::jsonb,
+             last_event_type = $13,
+             last_event_at = CURRENT_TIMESTAMP,
+             resume_count = resume_count + $14,
+             last_resumed_at = CASE WHEN $13 = 'resumed' THEN CURRENT_TIMESTAMP ELSE last_resumed_at END,
+             active_session_id = $15,
+             last_sequence_number = $16,
+             state_revision = state_revision + 1,
+             last_welcome_shown_at = CASE WHEN $13 = 'welcome_shown' THEN CURRENT_TIMESTAMP ELSE last_welcome_shown_at END,
+             last_started_at = CASE WHEN $13 IN ('started', 'replayed', 'resumed') THEN CURRENT_TIMESTAMP ELSE last_started_at END,
+             last_completed_at = CASE WHEN $13 = 'completed' THEN CURRENT_TIMESTAMP ELSE last_completed_at END,
+             last_dismissed_at = CASE WHEN $13 = 'dismissed' THEN CURRENT_TIMESTAMP ELSE last_dismissed_at END,
+             last_skipped_at = CASE WHEN $13 = 'skipped' THEN CURRENT_TIMESTAMP ELSE last_skipped_at END,
+             started_count = started_count + $17,
+             completed_count = completed_count + $18,
+             skipped_count = skipped_count + $19,
+             dismissed_count = dismissed_count + $20,
+             replay_count = replay_count + $21,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1 AND platform = $2 AND tour_key = $3
+         RETURNING *`,
+        [
+          userId, platform, tourKey, dashboardType, tourVersion, status,
+          nextCurrentStep, nextStepId, nextTotalSteps, updatesProgress,
+          nextLocale, JSON.stringify(nextContext), eventType, resumeIncrement,
+          nextSessionId, nextSequenceNumber,
+          startedIncrement, completedIncrement, skippedIncrement,
+          dismissedIncrement, replayIncrement,
+        ]
+      );
+    }
 
     await client.query('COMMIT');
-    return stateResult.rows[0];
+    return {
+      state: serializeTourState(stateResult.rows[0]),
+      deduplicated: false,
+    };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
@@ -809,16 +1301,32 @@ router.get('/tour', authenticate, async (req, res) => {
       platform,
       tourKey,
     });
+    const serializedState = serializeTourState(state);
 
     return res.json({
       success: true,
-      data: state || {
+      data: serializedState || {
         user_id: req.user.id,
         platform,
         tour_key: tourKey || dashboardType || 'default',
         dashboard_type: dashboardType,
         status: 'not_started',
         tour_version: '3',
+        current_step: null,
+        current_step_id: null,
+        last_step_id: null,
+        total_steps: null,
+        progress_updated_at: null,
+        locale: null,
+        context: {},
+        can_resume: false,
+        state_revision: 0,
+        resume_count: 0,
+        active_session_id: null,
+        last_sequence_number: null,
+        last_event_type: null,
+        last_event_at: null,
+        last_resumed_at: null,
         started_count: 0,
         completed_count: 0,
         skipped_count: 0,
@@ -837,11 +1345,13 @@ router.get('/tour', authenticate, async (req, res) => {
 
 router.post('/tour/events', authenticate, async (req, res) => {
   try {
-    const state = await recordTourEvent(req.user.id, req.body || {});
+    const result = await recordTourEvent(req.user.id, req.body || {});
 
-    return res.status(201).json({
+    return res.status(result.deduplicated ? 200 : 201).json({
       success: true,
-      data: state,
+      data: result.state,
+      deduplicated: result.deduplicated,
+      ...(result.state_ignored ? { state_ignored: result.state_ignored } : {}),
     });
   } catch (error) {
     req.logger.error('Tour event record error:', error);
@@ -852,8 +1362,56 @@ router.post('/tour/events', authenticate, async (req, res) => {
   }
 });
 
+const buildTourAnalyticsWhere = (filters, source = 'events') => {
+  const isState = source === 'states';
+  const alias = isState ? 'states' : 'events';
+  const timestampColumn = isState ? 'updated_at' : 'created_at';
+  const values = [filters.days];
+  const clauses = [
+    `${alias}.${timestampColumn} >= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day')`,
+  ];
+  const addFilter = (column, value) => {
+    if (value === null || value === undefined) return;
+    values.push(value);
+    clauses.push(`${alias}.${column} = $${values.length}`);
+  };
+
+  addFilter('platform', filters.platform);
+  addFilter('tour_key', filters.tourKey);
+  addFilter('dashboard_type', filters.dashboardType);
+  addFilter('locale', filters.locale);
+
+  return {
+    sql: clauses.join(' AND '),
+    values,
+  };
+};
+
+const toTourMetricNumber = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+};
+
+const calculateTourRate = (numerator, denominator) => {
+  const top = toTourMetricNumber(numerator);
+  const bottom = toTourMetricNumber(denominator);
+  return bottom > 0 ? Number(((top / bottom) * 100).toFixed(1)) : 0;
+};
+
+const normalizeTourMetricRow = (row, fields) => {
+  const normalized = { ...row };
+  fields.forEach((field) => {
+    normalized[field] = toTourMetricNumber(row?.[field]);
+  });
+  return normalized;
+};
+
 router.get('/tour/analytics', authenticate, [
   query('days').optional().isInt({ min: 1, max: 365 }).withMessage('Days must be between 1 and 365'),
+  query('platform').optional().isLength({ max: 20 }).withMessage('Platform must be 20 characters or fewer'),
+  query('tour_key').optional().isLength({ max: 120 }).withMessage('Tour key must be 120 characters or fewer'),
+  query('dashboard_type').optional().isLength({ max: 80 }).withMessage('Dashboard type must be 80 characters or fewer'),
+  query('locale').optional().isLength({ max: 35 }).withMessage('Locale must be 35 characters or fewer'),
   validateRequest,
 ], async (req, res) => {
   try {
@@ -866,44 +1424,394 @@ router.get('/tour/analytics', authenticate, [
 
     await ensureTourSchema();
     const days = Number(req.query.days || 30);
-    const [summaryResult, dailyResult] = await Promise.all([
+    const platform = req.query.platform == null
+      ? null
+      : normalizeTourPlatform(req.query.platform, null);
+    const tourKey = req.query.tour_key == null
+      ? null
+      : normalizeTourKey(req.query.tour_key);
+    const dashboardType = normalizeTourText(req.query.dashboard_type, null, {
+      field: 'Dashboard type',
+      maxLength: 80,
+      lowercase: true,
+    });
+    const locale = normalizeTourLocale(req.query.locale, null);
+    const filters = { days, platform, tourKey, dashboardType, locale };
+    const eventWhere = buildTourAnalyticsWhere(filters, 'events');
+    const stateWhere = buildTourAnalyticsWhere(filters, 'states');
+
+    const [
+      eventOverviewResult,
+      stateOverviewResult,
+      summaryResult,
+      dailyResult,
+      platformResult,
+      tourResult,
+      tourProgressResult,
+      stepResult,
+      localeResult,
+      statusResult,
+      issueResult,
+    ] = await Promise.all([
       db.query(
         `SELECT
-           event_type,
-           COUNT(*)::int AS event_count,
-           COUNT(DISTINCT user_id)::int AS unique_users
-         FROM user_tour_events
-         WHERE created_at >= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day')
-         GROUP BY event_type
-         ORDER BY event_type`,
-        [days]
+           COUNT(DISTINCT events.user_id)::int AS unique_users,
+           COUNT(DISTINCT events.user_id) FILTER (
+             WHERE events.event_type IN (
+               'started', 'replayed', 'resumed', 'step_viewed',
+               'step_completed', 'action_completed', 'completed', 'skipped', 'dismissed'
+             )
+           )::int AS engaged_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'welcome_shown')::int AS welcome_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type IN ('started', 'replayed'))::int AS started_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'resumed')::int AS resumed_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'completed')::int AS completed_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'skipped')::int AS skipped_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'dismissed')::int AS dismissed_users,
+           COUNT(*) FILTER (WHERE events.event_type = 'target_missing')::int AS target_missing_events,
+           COUNT(*) FILTER (WHERE events.event_type = 'step_unavailable')::int AS step_unavailable_events
+         FROM user_tour_events events
+         WHERE ${eventWhere.sql}`,
+        eventWhere.values
       ),
       db.query(
         `SELECT
-           DATE(created_at) AS event_date,
-           event_type,
-           COUNT(*)::int AS event_count
-         FROM user_tour_events
-         WHERE created_at >= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day')
-         GROUP BY DATE(created_at), event_type
-         ORDER BY event_date DESC, event_type`,
-        [days]
+           COUNT(*)::int AS tracked_tours,
+           COUNT(*) FILTER (WHERE states.status IN ('in_progress', 'paused'))::int AS active_in_progress,
+           COUNT(*) FILTER (
+             WHERE states.status IN ('in_progress', 'paused')
+               AND states.current_step IS NOT NULL
+           )::int AS resumable_tours,
+           COUNT(*) FILTER (WHERE states.status = 'paused')::int AS paused_tours,
+           ROUND(COALESCE(AVG(
+             CASE
+               WHEN states.status = 'completed' THEN 100.0
+               WHEN states.total_steps > 0 AND states.current_step IS NOT NULL THEN
+                 LEAST(100.0, GREATEST(0.0, (states.current_step::numeric + 1) * 100.0 / states.total_steps))
+               ELSE 0.0
+             END
+           ), 0), 1)::float AS average_progress_percent
+         FROM user_tour_states states
+         WHERE ${stateWhere.sql}`,
+        stateWhere.values
+      ),
+      db.query(
+        `SELECT
+           events.event_type,
+           COUNT(*)::int AS event_count,
+           COUNT(DISTINCT events.user_id)::int AS unique_users
+         FROM user_tour_events events
+         WHERE ${eventWhere.sql}
+         GROUP BY events.event_type
+         ORDER BY events.event_type`,
+        eventWhere.values
+      ),
+      db.query(
+        `SELECT
+           TO_CHAR(DATE(events.created_at), 'YYYY-MM-DD') AS event_date,
+           events.event_type,
+           COUNT(*)::int AS event_count,
+           COUNT(DISTINCT events.user_id)::int AS unique_users
+         FROM user_tour_events events
+         WHERE ${eventWhere.sql}
+         GROUP BY DATE(events.created_at), events.event_type
+         ORDER BY event_date DESC, events.event_type`,
+        eventWhere.values
+      ),
+      db.query(
+        `SELECT
+           events.platform,
+           COUNT(DISTINCT events.user_id)::int AS unique_users,
+           COUNT(DISTINCT events.user_id) FILTER (
+             WHERE events.event_type IN (
+               'started', 'replayed', 'resumed', 'step_viewed',
+               'step_completed', 'action_completed', 'completed', 'skipped', 'dismissed'
+             )
+           )::int AS engaged_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type IN ('started', 'replayed'))::int AS started_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'resumed')::int AS resumed_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'completed')::int AS completed_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'skipped')::int AS skipped_users
+         FROM user_tour_events events
+         WHERE ${eventWhere.sql}
+         GROUP BY events.platform
+         ORDER BY events.platform`,
+        eventWhere.values
+      ),
+      db.query(
+        `SELECT
+           events.platform,
+           events.tour_key,
+           COALESCE(events.dashboard_type, events.tour_key) AS dashboard_type,
+           COUNT(DISTINCT events.user_id)::int AS unique_users,
+           COUNT(DISTINCT events.user_id) FILTER (
+             WHERE events.event_type IN (
+               'started', 'replayed', 'resumed', 'step_viewed',
+               'step_completed', 'action_completed', 'completed', 'skipped', 'dismissed'
+             )
+           )::int AS engaged_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type IN ('started', 'replayed'))::int AS started_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'resumed')::int AS resumed_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'completed')::int AS completed_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'skipped')::int AS skipped_users
+         FROM user_tour_events events
+         WHERE ${eventWhere.sql}
+         GROUP BY events.platform, events.tour_key, COALESCE(events.dashboard_type, events.tour_key)
+         ORDER BY events.platform, events.tour_key`,
+        eventWhere.values
+      ),
+      db.query(
+        `SELECT
+           states.platform,
+           states.tour_key,
+           ROUND(COALESCE(AVG(
+             CASE
+               WHEN states.status = 'completed' THEN 100.0
+               WHEN states.total_steps > 0 AND states.current_step IS NOT NULL THEN
+                 LEAST(100.0, GREATEST(0.0, (states.current_step::numeric + 1) * 100.0 / states.total_steps))
+               ELSE 0.0
+             END
+           ), 0), 1)::float AS average_progress_percent
+         FROM user_tour_states states
+         WHERE ${stateWhere.sql}
+         GROUP BY states.platform, states.tour_key`,
+        stateWhere.values
+      ),
+      db.query(
+        `SELECT
+           events.platform,
+           events.tour_key,
+           events.step_id,
+           MAX(events.current_step)::int AS step_number,
+           MAX(events.target_id) AS target_id,
+           COUNT(*) FILTER (WHERE events.event_type = 'step_viewed')::int AS views,
+           COUNT(*) FILTER (WHERE events.event_type = 'step_completed')::int AS completions,
+           COUNT(*) FILTER (WHERE events.event_type = 'action_completed')::int AS action_completions,
+           COUNT(*) FILTER (WHERE events.event_type IN ('step_skipped', 'skipped'))::int AS skips,
+           COUNT(*) FILTER (WHERE events.event_type = 'target_missing')::int AS target_missing,
+           COUNT(*) FILTER (WHERE events.event_type = 'step_unavailable')::int AS unavailable,
+           COUNT(DISTINCT events.user_id)::int AS unique_users,
+           ROUND(AVG(events.duration_ms) FILTER (WHERE events.duration_ms IS NOT NULL), 1)::float AS average_duration_ms
+         FROM user_tour_events events
+         WHERE ${eventWhere.sql}
+           AND events.step_id IS NOT NULL
+         GROUP BY events.platform, events.tour_key, events.step_id
+         ORDER BY events.platform, events.tour_key, step_number, events.step_id`,
+        eventWhere.values
+      ),
+      db.query(
+        `SELECT
+           COALESCE(events.locale, 'unknown') AS locale,
+           COUNT(*)::int AS event_count,
+           COUNT(DISTINCT events.user_id)::int AS unique_users,
+           COUNT(DISTINCT events.user_id) FILTER (WHERE events.event_type = 'completed')::int AS completed_users
+         FROM user_tour_events events
+         WHERE ${eventWhere.sql}
+         GROUP BY COALESCE(events.locale, 'unknown')
+         ORDER BY event_count DESC, locale`,
+        eventWhere.values
+      ),
+      db.query(
+        `SELECT
+           states.status,
+           COUNT(*)::int AS tour_count,
+           COUNT(DISTINCT states.user_id)::int AS unique_users
+         FROM user_tour_states states
+         WHERE ${stateWhere.sql}
+         GROUP BY states.status
+         ORDER BY states.status`,
+        stateWhere.values
+      ),
+      db.query(
+        `SELECT
+           events.platform,
+           events.tour_key,
+           events.event_type,
+           events.step_id,
+           events.target_id,
+           events.reason_code,
+           events.route,
+           COUNT(*)::int AS event_count,
+           COUNT(DISTINCT events.user_id)::int AS unique_users,
+           MAX(events.created_at) AS last_seen_at
+         FROM user_tour_events events
+         WHERE ${eventWhere.sql}
+           AND events.event_type IN ('target_missing', 'step_unavailable', 'step_skipped')
+         GROUP BY
+           events.platform,
+           events.tour_key,
+           events.event_type,
+           events.step_id,
+           events.target_id,
+           events.reason_code,
+           events.route
+         ORDER BY event_count DESC, last_seen_at DESC
+         LIMIT 100`,
+        eventWhere.values
       ),
     ]);
+
+    const overviewEvents = normalizeTourMetricRow(eventOverviewResult.rows[0] || {}, [
+      'unique_users',
+      'engaged_users',
+      'welcome_users',
+      'started_users',
+      'resumed_users',
+      'completed_users',
+      'skipped_users',
+      'dismissed_users',
+      'target_missing_events',
+      'step_unavailable_events',
+    ]);
+    const overviewState = normalizeTourMetricRow(stateOverviewResult.rows[0] || {}, [
+      'tracked_tours',
+      'active_in_progress',
+      'resumable_tours',
+      'paused_tours',
+      'average_progress_percent',
+    ]);
+    const overview = {
+      ...overviewEvents,
+      ...overviewState,
+      completion_rate: calculateTourRate(
+        overviewEvents.completed_users,
+        overviewEvents.engaged_users
+      ),
+      skip_rate: calculateTourRate(
+        overviewEvents.skipped_users,
+        overviewEvents.engaged_users
+      ),
+      dismissal_rate: calculateTourRate(
+        overviewEvents.dismissed_users,
+        overviewEvents.engaged_users || overviewEvents.welcome_users
+      ),
+    };
+    const byPlatform = platformResult.rows.map((row) => {
+      const normalized = normalizeTourMetricRow(row, [
+        'unique_users',
+        'engaged_users',
+        'started_users',
+        'resumed_users',
+        'completed_users',
+        'skipped_users',
+      ]);
+      return {
+        ...normalized,
+        completion_rate: calculateTourRate(normalized.completed_users, normalized.engaged_users),
+        skip_rate: calculateTourRate(normalized.skipped_users, normalized.engaged_users),
+      };
+    });
+    const progressByTour = new Map(
+      tourProgressResult.rows.map((row) => [
+        `${row.platform}\u0000${row.tour_key}`,
+        toTourMetricNumber(row.average_progress_percent),
+      ])
+    );
+    const byTour = tourResult.rows.map((row) => {
+      const normalized = normalizeTourMetricRow(row, [
+        'unique_users',
+        'engaged_users',
+        'started_users',
+        'resumed_users',
+        'completed_users',
+        'skipped_users',
+      ]);
+      return {
+        ...normalized,
+        completion_rate: calculateTourRate(normalized.completed_users, normalized.engaged_users),
+        skip_rate: calculateTourRate(normalized.skipped_users, normalized.engaged_users),
+        average_progress_percent: progressByTour.get(
+          `${row.platform}\u0000${row.tour_key}`
+        ) || 0,
+      };
+    });
+    const steps = stepResult.rows.map((row) => {
+      const normalized = normalizeTourMetricRow(row, [
+        'step_number',
+        'views',
+        'completions',
+        'action_completions',
+        'skips',
+        'target_missing',
+        'unavailable',
+        'unique_users',
+        'average_duration_ms',
+      ]);
+      return {
+        ...normalized,
+        completion_rate: calculateTourRate(normalized.completions, normalized.views),
+        action_rate: calculateTourRate(normalized.action_completions, normalized.views),
+        problem_rate: calculateTourRate(
+          normalized.target_missing + normalized.unavailable + normalized.skips,
+          normalized.views
+        ),
+      };
+    });
+    const problems = steps
+      .map((step) => ({
+        platform: step.platform,
+        tour_key: step.tour_key,
+        step_id: step.step_id,
+        target_id: step.target_id,
+        target_missing: step.target_missing,
+        unavailable: step.unavailable,
+        skips: step.skips,
+        total_problems: step.target_missing + step.unavailable + step.skips,
+      }))
+      .filter((problem) => problem.total_problems > 0)
+      .sort((left, right) => right.total_problems - left.total_problems);
 
     return res.json({
       success: true,
       data: {
         days,
-        summary: summaryResult.rows,
-        daily: dailyResult.rows,
+        filters: {
+          platform,
+          tour_key: tourKey,
+          dashboard_type: dashboardType,
+          locale,
+        },
+        overview,
+        summary: summaryResult.rows.map((row) => normalizeTourMetricRow(
+          row,
+          ['event_count', 'unique_users']
+        )),
+        daily: dailyResult.rows.map((row) => normalizeTourMetricRow(
+          row,
+          ['event_count', 'unique_users']
+        )),
+        by_platform: byPlatform,
+        by_tour: byTour,
+        steps,
+        locales: localeResult.rows.map((row) => {
+          const normalized = normalizeTourMetricRow(
+            row,
+            ['event_count', 'unique_users', 'completed_users']
+          );
+          return {
+            ...normalized,
+            completion_rate: calculateTourRate(
+              normalized.completed_users,
+              normalized.unique_users
+            ),
+          };
+        }),
+        statuses: statusResult.rows.map((row) => normalizeTourMetricRow(
+          row,
+          ['tour_count', 'unique_users']
+        )),
+        problems,
+        issues: issueResult.rows.map((row) => normalizeTourMetricRow(
+          row,
+          ['event_count', 'unique_users']
+        )),
       },
     });
   } catch (error) {
     req.logger.error('Tour analytics error:', error);
-    return res.status(500).json({
+    return res.status(error.status || 500).json({
       success: false,
-      message: 'Failed to load tour analytics',
+      message: error.status ? error.message : 'Failed to load tour analytics',
     });
   }
 });
@@ -1478,6 +2386,22 @@ router.get('/passport-photo/:filename', authenticate, async (req, res) => {
 router._userSecurityForTest = {
   canViewPassportPhoto,
   requireLiveCaptureSession: REQUIRE_LIVE_CAPTURE_SESSION,
+};
+
+router._tourForTest = {
+  TOUR_EVENTS,
+  buildTourAnalyticsWhere,
+  calculateTourRate,
+  compareTourVersions,
+  deriveTourStateTransition,
+  getTourState,
+  normalizeTourLocale,
+  normalizeTourObject,
+  recordTourEvent,
+  serializeTourState,
+  resetSchemaCheck: () => {
+    tourSchemaPromise = null;
+  },
 };
 
 module.exports = router;

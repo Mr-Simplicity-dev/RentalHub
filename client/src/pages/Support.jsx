@@ -303,6 +303,7 @@ const Support = () => {
           </div>
           <button
             onClick={() => setShowForm((p) => !p)}
+            data-tour-id="support-new-ticket-workflow"
             className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-700"
           >
             <FaPaperPlane /> {showForm ? t('support.cancel') : t('support.new_ticket')}
@@ -310,7 +311,7 @@ const Support = () => {
         </div>
 
         {showForm && (
-          <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm" data-tour-id="support-form-workflow">
             <h2 className="text-lg font-semibold text-gray-900">{t('support.form_title')}</h2>
             <p className="mt-1 text-sm text-gray-500">{t('support.form_desc')}</p>
             <div className="mt-5 space-y-4">
@@ -389,7 +390,7 @@ const Support = () => {
             <p className="mt-2 text-sm text-gray-600">{t('support.no_tickets_desc')}</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3" data-tour-id="support-tickets-workflow">
             {tickets.map((ticket) => {
               const isExpanded = expandedTicket === ticket.id;
               const conv = conversations[ticket.id] || [];

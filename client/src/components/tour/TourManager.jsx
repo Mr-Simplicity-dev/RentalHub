@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import WelcomeModal from './WelcomeModal';
 import TourOverlay from './TourOverlay';
 import { useTour } from '../../hooks/useTour';
@@ -36,6 +37,7 @@ const getEffectiveTourRole = (user) => (
  * This should be rendered at the app level within TourProvider context
  */
 const TourManager = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const prevPathRef = useRef(location.pathname + location.search);
@@ -46,11 +48,15 @@ const TourManager = () => {
     currentStep,
     currentDashboard,
     tourSteps,
+    hasResumableTour,
     startTour,
     nextStep,
     previousStep,
+    skipCurrentStep,
     skipTour,
     dismissWelcomeModal,
+    completeStepAction,
+    reportStepAvailability,
   } = useTour();
 
   const { user } = useAuth();
@@ -93,7 +99,7 @@ const TourManager = () => {
   const handleStartTour = () => {
     if (user) {
       const tourRole = getEffectiveTourRole(user);
-      const roleSteps = getTourStepsByUserRole(tourRole);
+      const roleSteps = getTourStepsByUserRole(tourRole, t, { user });
       startTour(tourRole, roleSteps);
 
       const desiredRoute = roleSteps[0]?.route || getTourDashboardRoute(tourRole);
@@ -115,6 +121,7 @@ const TourManager = () => {
         onStartTour={handleStartTour}
         onSkip={dismissWelcomeModal}
         isReturningUser={!!isReturningUser}
+        canResume={hasResumableTour}
       />
 
       <TourOverlay
@@ -123,11 +130,16 @@ const TourManager = () => {
         currentStep={currentStep}
         onNext={nextStep}
         onPrevious={previousStep}
+        onSkipStep={skipCurrentStep}
         onSkip={skipTour}
+        onActionComplete={completeStepAction}
+        onTargetUnavailable={reportStepAvailability}
         dashboardTitle={
           currentDashboard
-            ? `${String(currentDashboard).replace(/_/g, ' ')} dashboard`
-            : 'RentalHub dashboard'
+            ? t(`tour.dashboard_titles.${currentDashboard}`, {
+              defaultValue: String(currentDashboard).replace(/_/g, ' '),
+            })
+            : t('tour.dashboard_titles.default', 'RentalHub dashboard')
         }
       />
     </>

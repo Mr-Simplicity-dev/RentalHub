@@ -148,7 +148,7 @@ const AgentEarningsPage = () => {
   if (loading) return <Loader />;
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="container mx-auto px-4 py-8 space-y-8" data-tour-id="agent-earnings-workflow">
       {/* Header */}
       <div className="rounded-2xl bg-gradient-to-r from-green-600 to-emerald-700 p-6 text-white shadow-lg">
         <div className="flex items-start justify-between gap-4">

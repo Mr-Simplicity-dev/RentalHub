@@ -37,7 +37,7 @@ const MyProperties = () => {
   const isAgent = user?.user_type === 'agent';
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8" data-tour-id="my-properties-workflow">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h1 className="text-2xl font-bold">
           {isAgent ? t('my_properties.managed_title') : t('my_properties.title')}

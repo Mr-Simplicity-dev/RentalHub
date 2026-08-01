@@ -114,7 +114,7 @@ const AgentWithdrawalPage = () => {
   if (loading && landlordId) return <Loader />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour-id="agent-withdrawals-workflow">
       {/* Header */}
       <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white shadow-lg">
         <div className="flex items-start justify-between gap-4">

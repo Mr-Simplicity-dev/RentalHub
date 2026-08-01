@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   FaCheck,
   FaClock,
@@ -28,7 +29,9 @@ const WelcomeModal = ({
   onStartTour,
   onSkip,
   isReturningUser = false,
+  canResume = false,
 }) => {
+  const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
   const dialogRef = useRef(null);
   const startButtonRef = useRef(null);
@@ -91,9 +94,9 @@ const WelcomeModal = ({
     : { type: 'spring', stiffness: 280, damping: 27, mass: 0.85 };
 
   const benefits = [
-    'Highlights the real controls on your dashboard',
-    'Personalized for your RentalHub account role',
-    'Available to replay whenever you need a refresher',
+    t('tour.welcome.benefit_controls', 'Highlights the real controls on your dashboard'),
+    t('tour.welcome.benefit_role', 'Personalized for your RentalHub account role'),
+    t('tour.welcome.benefit_replay', 'Available to replay whenever you need a refresher'),
   ];
 
   return createPortal(
@@ -115,7 +118,7 @@ const WelcomeModal = ({
               background: 'rgba(3, 12, 30, 0.76)',
               backdropFilter: 'blur(7px)',
             }}
-            aria-label="Close guided tour introduction"
+            aria-label={t('tour.welcome.close_intro', 'Close guided tour introduction')}
             onClick={onSkip}
           />
 
@@ -164,7 +167,7 @@ const WelcomeModal = ({
               <button
                 type="button"
                 onClick={onSkip}
-                aria-label="Skip the guided tour"
+                aria-label={t('tour.welcome.skip_label', 'Skip the guided tour')}
                 className="absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2"
                 style={{
                   '--tw-ring-color': BRAND.gold,
@@ -194,21 +197,27 @@ const WelcomeModal = ({
                 className="relative mb-2 text-[11px] font-extrabold uppercase tracking-[0.22em]"
                 style={{ color: BRAND.goldSoft }}
               >
-                Your personal dashboard guide
+                {t('tour.welcome.eyebrow', 'Your personal dashboard guide')}
               </p>
               <h1
                 id="rentalhub-tour-welcome-title"
                 className="relative text-2xl font-black leading-tight text-white sm:text-3xl"
               >
-                {isReturningUser ? 'Welcome back to RentalHub' : 'Welcome to RentalHub NG'}
+                {canResume
+                  ? t('tour.welcome.resume_title', 'Continue where you stopped')
+                  : isReturningUser
+                    ? t('tour.welcome.returning_title', 'Welcome back to RentalHub')
+                    : t('tour.welcome.new_title', 'Welcome to RentalHub NG')}
               </h1>
               <p
                 id="rentalhub-tour-welcome-description"
                 className="relative mx-auto mt-3 max-w-md text-sm leading-6 text-slate-200 sm:text-[15px]"
               >
-                {isReturningUser
-                  ? 'Take a quick refresher and rediscover the controls that matter most for your account.'
-                  : 'Let us show you the most useful controls for your account with a short, focused walkthrough.'}
+                {canResume
+                  ? t('tour.welcome.resume_description', 'Your progress is saved. Resume from the last step you viewed, or restart later from your profile.')
+                  : isReturningUser
+                    ? t('tour.welcome.returning_description', 'Take a quick refresher and rediscover the controls that matter most for your account.')
+                    : t('tour.welcome.new_description', 'Let us show you the most useful controls for your account with a short, focused walkthrough.')}
               </p>
             </div>
 
@@ -239,7 +248,7 @@ const WelcomeModal = ({
                   className="order-2 inline-flex min-h-[48px] items-center justify-center rounded-xl border-2 border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 sm:order-1"
                   style={{ '--tw-ring-color': BRAND.navySoft }}
                 >
-                  Maybe later
+                  {t('tour.welcome.maybe_later', 'Maybe later')}
                 </button>
                 <button
                   ref={startButtonRef}
@@ -254,13 +263,15 @@ const WelcomeModal = ({
                   }}
                 >
                   <FaCompass size={14} aria-hidden="true" />
-                  Start guided tour
+                  {canResume
+                    ? t('tour.welcome.resume_button', 'Resume guided tour')
+                    : t('tour.welcome.start_button', 'Start guided tour')}
                 </button>
               </div>
 
               <p className="mt-5 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
                 <FaClock size={12} aria-hidden="true" />
-                About 2 minutes · you remain in control
+                {t('tour.welcome.duration', 'About 2 minutes · you remain in control')}
               </p>
             </div>
           </motion.section>
