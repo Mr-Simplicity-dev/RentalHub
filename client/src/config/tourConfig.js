@@ -760,17 +760,35 @@ const getTranslatedValue = (t, key, fallback) => (
   typeof t === 'function' ? t(key, { defaultValue: fallback }) : fallback
 );
 
-export const localizeTourSteps = (steps = [], t) => steps.map((step) => ({
-  ...step,
-  titleKey: `tour.steps.${step.id}.title`,
-  descriptionKey: `tour.steps.${step.id}.description`,
-  actionHintKey: step.actionHint ? `tour.steps.${step.id}.action_hint` : undefined,
-  title: getTranslatedValue(t, `tour.steps.${step.id}.title`, step.title),
-  description: getTranslatedValue(t, `tour.steps.${step.id}.description`, step.description),
-  actionHint: step.actionHint
-    ? getTranslatedValue(t, `tour.steps.${step.id}.action_hint`, step.actionHint)
-    : undefined,
-}));
+export const localizeTourSteps = (steps = [], t) => {
+  const localeCode = getTranslatedValue(t, 'tour.locale_code', 'en');
+  return steps.map((step) => {
+    const titleKey = `tour.titles.${step.id}`;
+    const localizedTitle = getTranslatedValue(t, titleKey, step.title);
+    const useOriginalCopy = localeCode === 'en' || typeof t !== 'function';
+    return {
+      ...step,
+      titleKey,
+      title: localizedTitle,
+      description: useOriginalCopy
+        ? step.description
+        : getTranslatedValue(
+          t,
+          'tour.ui.generic_step_description',
+          step.description,
+        ).replace('__TITLE__', localizedTitle),
+      actionHint: step.actionHint
+        ? useOriginalCopy
+          ? step.actionHint
+          : getTranslatedValue(
+            t,
+            'tour.ui.generic_action_hint',
+            step.actionHint,
+          )
+        : undefined,
+    };
+  });
+};
 
 export const isTourStepEligible = (step, context = {}) => {
   if (!step) return false;

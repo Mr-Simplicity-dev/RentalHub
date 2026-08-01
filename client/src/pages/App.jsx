@@ -114,6 +114,7 @@ const StateAdminDashboard = React.lazy(() => import('./admin/StateAdminDashboard
 const StateSupportAdminDashboard = React.lazy(() => import('./admin/StateSupportAdminDashboard'));
 const SuperSupportAdminDashboard = React.lazy(() => import('./admin/SuperSupportAdminDashboard'));
 const RecruitmentAdminDashboard = React.lazy(() => import('./admin/RecruitmentAdminDashboard'));
+const TourAnalytics = React.lazy(() => import('./admin/TourAnalytics'));
 
 const queryClient = new QueryClient();
 const LANGUAGE_OPTIONS = [
@@ -398,6 +399,18 @@ const AdminShellRoute = ({ children }) => {
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (!ADMIN_SHELL_ROLES.includes(user?.user_type) && !isRecruitmentAdminUser(user)) return <Navigate to="/dashboard" />;
 
+  return children;
+};
+
+const TourAnalyticsRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center">{i18n.t('app.loading')}</div>;
+  }
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!['admin', 'super_admin'].includes(user?.user_type)) {
+    return <Navigate to="/dashboard" replace />;
+  }
   return children;
 };
 
@@ -754,6 +767,7 @@ function App() {
                 <Route path="support-governance" element={<SupportGovernancePanel />} />
                 <Route path="transportation" element={<TransportationSuperAdminDashboard />} />
                 <Route path="fumigation-cleaning" element={<FumigationOversightPanel />} />
+                <Route path="tour-analytics" element={<TourAnalyticsRoute><TourAnalytics /></TourAnalyticsRoute>} />
               </Route>
               <Route
                 path="/admin/seo"
@@ -890,6 +904,7 @@ function App() {
                 <Route path="state-support-dashboard" element={<StateSupportAdminRoute><StateSupportAdminDashboard /></StateSupportAdminRoute>} />
                 <Route path="super-support-dashboard" element={<SuperSupportAdminRoute><SuperSupportAdminDashboard /></SuperSupportAdminRoute>} />
                 <Route path="recruitment" element={<RecruitmentAdminRoute><RecruitmentAdminDashboard /></RecruitmentAdminRoute>} />
+                <Route path="tour-analytics" element={<TourAnalyticsRoute><TourAnalytics /></TourAnalyticsRoute>} />
               </Route>
 
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

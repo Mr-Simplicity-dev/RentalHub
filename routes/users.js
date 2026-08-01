@@ -1395,7 +1395,9 @@ const toTourMetricNumber = (value) => {
 const calculateTourRate = (numerator, denominator) => {
   const top = toTourMetricNumber(numerator);
   const bottom = toTourMetricNumber(denominator);
-  return bottom > 0 ? Number(((top / bottom) * 100).toFixed(1)) : 0;
+  return bottom > 0
+    ? Number(Math.min(100, (top / bottom) * 100).toFixed(1))
+    : 0;
 };
 
 const normalizeTourMetricRow = (row, fields) => {
