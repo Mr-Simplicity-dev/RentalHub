@@ -637,6 +637,7 @@ function Layout({ children }) {
   const handleLanguageSelect = (event) => {
     const nextLanguage = event.target.value;
     setActiveLanguage(nextLanguage);
+    window.localStorage.setItem('rentalhub_language', nextLanguage);
     i18n.changeLanguage(nextLanguage);
   };
 

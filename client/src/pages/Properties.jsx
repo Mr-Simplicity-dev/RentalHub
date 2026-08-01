@@ -537,10 +537,12 @@ const Properties = () => {
         <AdSpace placement="properties_top" className="mb-6" />
 
         {/* Filters */}
-        <PropertyFilters
-          onFilterChange={handleFilterChange}
-          initialFilters={filters}
-        />
+        <div data-tour-id="property-search-workflow">
+          <PropertyFilters
+            onFilterChange={handleFilterChange}
+            initialFilters={filters}
+          />
+        </div>
 
         {locationAccessRequirement && (
           <div className="card mb-6 border border-amber-200 bg-amber-50">
@@ -619,12 +621,14 @@ const Properties = () => {
         </div>
 
         {/* Property List */}
-        <PropertyList
-          properties={properties}
-          loading={loading}
-          onSave={handleSaveProperty}
-          savedPropertyIds={savedPropertyIds}
-        />
+        <div data-tour-id="property-results-workflow">
+          <PropertyList
+            properties={properties}
+            loading={loading}
+            onSave={handleSaveProperty}
+            savedPropertyIds={savedPropertyIds}
+          />
+        </div>
 
         <AdSpace placement="properties_inline" className="mt-8" />
 

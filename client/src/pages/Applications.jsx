@@ -138,7 +138,7 @@ const Applications = () => {
         <BackToDashboard />
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3" data-tour-id="applications-workflow">
         <div className="card text-center">
           <p className="mb-1 text-sm text-gray-600">{t('dashboard.total_apps')}</p>
           <p className="text-3xl font-bold text-gray-900">{totalApplications}</p>
@@ -153,7 +153,7 @@ const Applications = () => {
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4" data-tour-id="applications-list-workflow">
         {apps.map((app) => (
           <div key={app.id} className="card">
             <div className="flex flex-wrap items-start justify-between gap-4">

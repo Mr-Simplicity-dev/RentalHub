@@ -58,7 +58,7 @@ const MyDisputes = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8" data-tour-id="my-disputes-workflow">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{t('my_disputes.title')}</h1>

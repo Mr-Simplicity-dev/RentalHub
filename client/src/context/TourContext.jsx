@@ -1,23 +1,39 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
+import i18n from '../i18n';
 import { getTourDashboardType } from '../config/tourConfig';
 
 export const TourContext = createContext();
 
 const TOUR_CONFIG = {
   INACTIVITY_THRESHOLD_DAYS: 7,
-  VERSION: '3',
+  VERSION: '4',
   LOCAL_STORAGE_KEYS: {
     LAST_TOUR_DISMISSAL: 'tour_last_dismissal',
     TOUR_COMPLETED: 'tour_completed',
     TOUR_SHOWN_VERSION: 'tour_version',
+    TOUR_RESUME_STATE: 'tour_resume_state',
+    TOUR_SESSION: 'tour_session',
   },
 };
 
 const normalizeDashboardType = (value, fallbackRole) => {
-  const candidate = String(value || '').trim();
-  if (candidate.endsWith('_dashboard')) return candidate;
+  const candidate = String(value || '').trim().toLowerCase();
+  if (
+    candidate.endsWith('_dashboard')
+    || candidate.startsWith('workflow_')
+    || candidate.endsWith('_workflow')
+  ) {
+    return candidate;
+  }
   return getTourDashboardType(candidate || fallbackRole);
 };
 
@@ -41,6 +57,16 @@ const getLatestTourActivity = (...values) => values.reduce((latest, value) => {
     : latest;
 }, null)?.value || null;
 
+const parseStepIndex = (state, steps) => {
+  const savedStepId = state?.current_step_id || state?.last_step_id;
+  if (savedStepId) {
+    const index = steps.findIndex(({ id }) => id === savedStepId);
+    if (index >= 0) return index;
+  }
+  const numericIndex = Number(state?.current_step);
+  return Number.isInteger(numericIndex) && numericIndex >= 0 ? numericIndex : 0;
+};
+
 export const TourProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -50,55 +76,133 @@ export const TourProvider = ({ children }) => {
   const [tourSteps, setTourSteps] = useState([]);
   const [userTourData, setUserTourData] = useState(null);
   const [tourDataLoaded, setTourDataLoaded] = useState(false);
+  const activeSessionRef = useRef(null);
+  const eventSequenceRef = useRef(0);
+  const lastStepViewRef = useRef(null);
+  const pauseSentRef = useRef(false);
+
   const effectiveTourRole =
     user?.is_recruitment_admin === true && user?.user_type !== 'super_admin'
       ? 'recruitment_admin'
       : user?.user_type;
   const userDashboardType = getTourDashboardType(effectiveTourRole);
 
+  const getScopedStorageKey = useCallback((key, tourKey = userDashboardType) => (
+    `${key}_${user?.id}_${tourKey}`
+  ), [user?.id, userDashboardType]);
+
+  const getLocalResumeState = useCallback((tourKey = userDashboardType) => {
+    if (!user?.id) return null;
+    try {
+      const value = localStorage.getItem(
+        getScopedStorageKey(TOUR_CONFIG.LOCAL_STORAGE_KEYS.TOUR_RESUME_STATE, tourKey)
+      );
+      const parsed = value ? JSON.parse(value) : null;
+      if (!parsed || parsed.tourVersion !== TOUR_CONFIG.VERSION) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, [getScopedStorageKey, user?.id, userDashboardType]);
+
+  const saveLocalResumeState = useCallback((state, tourKey = userDashboardType) => {
+    if (!user?.id || !state) return;
+    localStorage.setItem(
+      getScopedStorageKey(TOUR_CONFIG.LOCAL_STORAGE_KEYS.TOUR_RESUME_STATE, tourKey),
+      JSON.stringify({
+        ...state,
+        tourVersion: TOUR_CONFIG.VERSION,
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  }, [getScopedStorageKey, user?.id, userDashboardType]);
+
+  const clearLocalResumeState = useCallback((tourKey = userDashboardType) => {
+    if (!user?.id) return;
+    localStorage.removeItem(
+      getScopedStorageKey(TOUR_CONFIG.LOCAL_STORAGE_KEYS.TOUR_RESUME_STATE, tourKey)
+    );
+  }, [getScopedStorageKey, user?.id, userDashboardType]);
+
+  const getSessionId = useCallback((tourKey = userDashboardType, forceNew = false) => {
+    if (!user?.id) return createTourEventId();
+    const key = getScopedStorageKey(TOUR_CONFIG.LOCAL_STORAGE_KEYS.TOUR_SESSION, tourKey);
+    let sessionId = forceNew ? null : sessionStorage.getItem(key);
+    if (!sessionId) {
+      sessionId = createTourEventId();
+      sessionStorage.setItem(key, sessionId);
+    }
+    activeSessionRef.current = sessionId;
+    return sessionId;
+  }, [getScopedStorageKey, user?.id, userDashboardType]);
+
   const getLocalLastDismissal = useCallback(() => {
     if (!user?.id) return null;
     return localStorage.getItem(
-      `${TOUR_CONFIG.LOCAL_STORAGE_KEYS.LAST_TOUR_DISMISSAL}_${user.id}_${userDashboardType}`
+      getScopedStorageKey(TOUR_CONFIG.LOCAL_STORAGE_KEYS.LAST_TOUR_DISMISSAL)
     );
-  }, [user?.id, userDashboardType]);
+  }, [getScopedStorageKey, user?.id]);
 
   const saveLocalLastDismissal = useCallback((value) => {
     if (!user?.id || !value) return;
     localStorage.setItem(
-      `${TOUR_CONFIG.LOCAL_STORAGE_KEYS.LAST_TOUR_DISMISSAL}_${user.id}_${userDashboardType}`,
+      getScopedStorageKey(TOUR_CONFIG.LOCAL_STORAGE_KEYS.LAST_TOUR_DISMISSAL),
       value
     );
     localStorage.setItem(
-      `${TOUR_CONFIG.LOCAL_STORAGE_KEYS.TOUR_SHOWN_VERSION}_${user.id}_${userDashboardType}`,
+      getScopedStorageKey(TOUR_CONFIG.LOCAL_STORAGE_KEYS.TOUR_SHOWN_VERSION),
       TOUR_CONFIG.VERSION
     );
-  }, [user?.id, userDashboardType]);
+  }, [getScopedStorageKey, user?.id]);
 
   const trackTourEvent = useCallback(async (eventType, details = {}) => {
     if (!isAuthenticated || !user) return null;
 
     try {
-      const dashboardType =
-        details.dashboardType || currentDashboard || userDashboardType;
+      const tourKey = details.dashboardType || currentDashboard || userDashboardType;
+      const route = typeof window === 'undefined'
+        ? null
+        : `${window.location.pathname}${window.location.search}`;
+      const locale = i18n.resolvedLanguage || i18n.language || 'en';
+      const sessionId = details.sessionId
+        || activeSessionRef.current
+        || getSessionId(tourKey);
+      eventSequenceRef.current += 1;
+
       const response = await api.post('/users/tour/events', {
         event_id: createTourEventId(),
         platform: 'web',
-        tour_key: dashboardType,
+        tour_key: tourKey,
         event_type: eventType,
-        dashboard_type: dashboardType,
+        dashboard_type: tourKey,
         tour_version: TOUR_CONFIG.VERSION,
         step_id: details.stepId,
         current_step: details.currentStep,
         total_steps: details.totalSteps,
+        locale,
+        route,
+        target_id: details.targetId,
+        reason_code: details.reasonCode,
+        session_id: sessionId,
+        sequence_number: eventSequenceRef.current,
+        duration_ms: details.durationMs,
+        client_created_at: new Date().toISOString(),
+        context: {
+          route,
+          locale,
+          ...(details.context || {}),
+        },
         metadata: {
           ...(details.metadata || {}),
           platform: 'web',
+          locale,
         },
       });
 
       if (response.data?.success) {
-        setUserTourData(response.data.data);
+        if (tourKey === userDashboardType) {
+          setUserTourData(response.data.data);
+        }
         return response.data.data;
       }
     } catch (error) {
@@ -106,25 +210,32 @@ export const TourProvider = ({ children }) => {
     }
 
     return null;
-  }, [currentDashboard, isAuthenticated, user, userDashboardType]);
+  }, [currentDashboard, getSessionId, isAuthenticated, user, userDashboardType]);
 
-  // Check if tour should be shown based on 7-day inactivity
+  const hasResumableTour = useMemo(() => {
+    const serverCanResume = Boolean(
+      userTourData?.can_resume
+      && String(userTourData?.tour_version) === TOUR_CONFIG.VERSION
+      && (userTourData?.tour_key || userDashboardType) === userDashboardType
+    );
+    return serverCanResume || Boolean(getLocalResumeState());
+  }, [getLocalResumeState, userDashboardType, userTourData]);
+
   const shouldShowTour = useCallback(() => {
     if (!isAuthenticated || !user || !tourDataLoaded) return false;
+    if (hasResumableTour) return true;
 
     if (
-      userTourData?.tour_version &&
-      String(userTourData.tour_version) !== TOUR_CONFIG.VERSION
+      userTourData?.tour_version
+      && String(userTourData.tour_version) !== TOUR_CONFIG.VERSION
     ) {
       return true;
     }
 
     const localVersion = localStorage.getItem(
-      `${TOUR_CONFIG.LOCAL_STORAGE_KEYS.TOUR_SHOWN_VERSION}_${user.id}_${userDashboardType}`
+      getScopedStorageKey(TOUR_CONFIG.LOCAL_STORAGE_KEYS.TOUR_SHOWN_VERSION)
     );
-    if (!userTourData && localVersion !== TOUR_CONFIG.VERSION) {
-      return true;
-    }
+    if (!userTourData && localVersion !== TOUR_CONFIG.VERSION) return true;
 
     const lastDismissal = getLatestTourActivity(
       userTourData?.last_dismissed_at,
@@ -132,23 +243,19 @@ export const TourProvider = ({ children }) => {
       userTourData?.last_skipped_at,
       getLocalLastDismissal()
     );
+    if (!lastDismissal) return true;
 
-    if (!lastDismissal) {
-      // First time user - always show
-      return true;
-    }
-
-    const lastDismissalDate = new Date(lastDismissal);
-    const now = new Date();
-    const daysSinceDismissal = Math.floor((now - lastDismissalDate) / (1000 * 60 * 60 * 24));
-
+    const daysSinceDismissal = Math.floor(
+      (Date.now() - new Date(lastDismissal).getTime()) / (1000 * 60 * 60 * 24)
+    );
     return daysSinceDismissal >= TOUR_CONFIG.INACTIVITY_THRESHOLD_DAYS;
   }, [
     getLocalLastDismissal,
+    getScopedStorageKey,
+    hasResumableTour,
     isAuthenticated,
     tourDataLoaded,
     user,
-    userDashboardType,
     userTourData,
   ]);
 
@@ -156,11 +263,12 @@ export const TourProvider = ({ children }) => {
     if (!isAuthenticated || !user) {
       setUserTourData(null);
       setTourDataLoaded(false);
+      setShowWelcomeModal(false);
+      setShowTourOverlay(false);
       return undefined;
     }
 
     let cancelled = false;
-
     const loadTourState = async () => {
       try {
         const response = await api.get('/users/tour', {
@@ -170,44 +278,34 @@ export const TourProvider = ({ children }) => {
             tour_key: userDashboardType,
           },
         });
-        if (!cancelled) {
-          setUserTourData(response.data?.data || null);
-        }
+        if (!cancelled) setUserTourData(response.data?.data || null);
       } catch (error) {
         console.error('Tour state load failed:', error);
-        if (!cancelled) {
-          setUserTourData(null);
-        }
+        if (!cancelled) setUserTourData(null);
       } finally {
-        if (!cancelled) {
-          setTourDataLoaded(true);
-        }
+        if (!cancelled) setTourDataLoaded(true);
       }
     };
-
     loadTourState();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [isAuthenticated, user, userDashboardType]);
 
-  // Initialize tour when user logs in
   useEffect(() => {
     if (
-      isAuthenticated &&
-      user &&
-      !showWelcomeModal &&
-      !showTourOverlay &&
-      shouldShowTour()
+      isAuthenticated
+      && user
+      && !showWelcomeModal
+      && !showTourOverlay
+      && shouldShowTour()
     ) {
       setShowWelcomeModal(true);
       trackTourEvent('welcome_shown', {
         dashboardType: userDashboardType,
-        metadata: { source: 'auto_prompt' },
+        metadata: { source: hasResumableTour ? 'resume_prompt' : 'auto_prompt' },
       });
     }
   }, [
+    hasResumableTour,
     isAuthenticated,
     shouldShowTour,
     showTourOverlay,
@@ -218,92 +316,319 @@ export const TourProvider = ({ children }) => {
   ]);
 
   const startTour = useCallback((dashboardType, steps, options = {}) => {
-    const normalizedDashboardType = normalizeDashboardType(
-      dashboardType,
-      user?.user_type
+    const tourKey = normalizeDashboardType(dashboardType, user?.user_type);
+    const safeSteps = Array.isArray(steps) ? steps : [];
+    const localResume = getLocalResumeState(tourKey);
+    const serverResume = userTourData?.can_resume
+      && String(userTourData?.tour_version) === TOUR_CONFIG.VERSION
+      && (userTourData?.tour_key || tourKey) === tourKey
+      ? userTourData
+      : null;
+    const resumeState = options.resume === false ? null : (serverResume || localResume);
+    const requestedStep = Number.isInteger(options.initialStep)
+      ? options.initialStep
+      : parseStepIndex(resumeState, safeSteps);
+    const initialStep = Math.min(
+      Math.max(requestedStep, 0),
+      Math.max(safeSteps.length - 1, 0)
     );
-    setCurrentDashboard(normalizedDashboardType);
-    setTourSteps(steps);
-    setCurrentStep(0);
+    const isResume = Boolean(resumeState && safeSteps.length);
+    const sessionId = getSessionId(tourKey, !isResume || options.replay);
+
+    setCurrentDashboard(tourKey);
+    setTourSteps(safeSteps);
+    setCurrentStep(initialStep);
     setShowWelcomeModal(false);
-    setShowTourOverlay(true);
-    trackTourEvent(options.replay ? 'replayed' : 'started', {
-      dashboardType: normalizedDashboardType,
-      currentStep: 0,
-      totalSteps: steps?.length || 0,
+    setShowTourOverlay(safeSteps.length > 0);
+    pauseSentRef.current = false;
+    lastStepViewRef.current = null;
+
+    if (!safeSteps.length) return;
+    saveLocalResumeState({
+      current_step: initialStep,
+      current_step_id: safeSteps[initialStep]?.id || null,
+      total_steps: safeSteps.length,
+      status: 'in_progress',
+      tourKey,
+    }, tourKey);
+
+    const eventType = options.replay ? 'replayed' : isResume ? 'resumed' : 'started';
+    trackTourEvent(eventType, {
+      dashboardType: tourKey,
+      currentStep: initialStep,
+      totalSteps: safeSteps.length,
+      stepId: safeSteps[initialStep]?.id,
+      sessionId,
+      context: {
+        workflow_key: options.workflowKey || null,
+        resumed_from: isResume ? (serverResume ? 'server' : 'device') : null,
+      },
       metadata: { source: options.source || 'tour_manager' },
     });
-  }, [trackTourEvent, user?.user_type]);
+  }, [
+    getLocalResumeState,
+    getSessionId,
+    saveLocalResumeState,
+    trackTourEvent,
+    user?.user_type,
+    userTourData,
+  ]);
 
   const completeTour = useCallback((eventType = 'completed') => {
     const now = new Date().toISOString();
-    if (user) {
-      saveLocalLastDismissal(now);
-    }
+    if (user) saveLocalLastDismissal(now);
     trackTourEvent(eventType, {
       dashboardType: currentDashboard,
       currentStep,
       totalSteps: tourSteps.length,
       stepId: tourSteps[currentStep]?.id,
     });
+    clearLocalResumeState(currentDashboard);
     setShowTourOverlay(false);
     setShowWelcomeModal(false);
     setCurrentStep(0);
     setCurrentDashboard(null);
     setTourSteps([]);
-  }, [currentDashboard, currentStep, saveLocalLastDismissal, tourSteps, trackTourEvent, user]);
+    activeSessionRef.current = null;
+  }, [
+    clearLocalResumeState,
+    currentDashboard,
+    currentStep,
+    saveLocalLastDismissal,
+    tourSteps,
+    trackTourEvent,
+    user,
+  ]);
 
   const nextStep = useCallback(() => {
-    setCurrentStep((prev) => {
-      if (prev < tourSteps.length - 1) {
-        return prev + 1;
-      }
-
-      completeTour('completed');
-      return prev;
+    const activeStep = tourSteps[currentStep];
+    trackTourEvent('step_completed', {
+      dashboardType: currentDashboard,
+      currentStep,
+      totalSteps: tourSteps.length,
+      stepId: activeStep?.id,
+      targetId: activeStep?.targetId || activeStep?.id,
     });
-  }, [completeTour, tourSteps.length]);
+
+    if (currentStep >= tourSteps.length - 1) {
+      completeTour('completed');
+      return;
+    }
+
+    const nextIndex = currentStep + 1;
+    saveLocalResumeState({
+      current_step: nextIndex,
+      current_step_id: tourSteps[nextIndex]?.id || null,
+      total_steps: tourSteps.length,
+      status: 'in_progress',
+      tourKey: currentDashboard,
+    }, currentDashboard);
+    setCurrentStep(nextIndex);
+  }, [
+    completeTour,
+    currentDashboard,
+    currentStep,
+    saveLocalResumeState,
+    tourSteps,
+    trackTourEvent,
+  ]);
 
   const previousStep = useCallback(() => {
-    setCurrentStep((prev) => Math.max(prev - 1, 0));
-  }, []);
+    const previousIndex = Math.max(currentStep - 1, 0);
+    saveLocalResumeState({
+      current_step: previousIndex,
+      current_step_id: tourSteps[previousIndex]?.id || null,
+      total_steps: tourSteps.length,
+      status: 'in_progress',
+      tourKey: currentDashboard,
+    }, currentDashboard);
+    setCurrentStep(previousIndex);
+  }, [currentDashboard, currentStep, saveLocalResumeState, tourSteps]);
 
-  const skipTour = useCallback(() => {
-    completeTour('skipped');
-  }, [completeTour]);
+  const skipCurrentStep = useCallback((reasonCode = 'user_skipped_step') => {
+    const activeStep = tourSteps[currentStep];
+    trackTourEvent('step_skipped', {
+      dashboardType: currentDashboard,
+      currentStep,
+      totalSteps: tourSteps.length,
+      stepId: activeStep?.id,
+      targetId: activeStep?.targetId || activeStep?.id,
+      reasonCode,
+    });
+
+    if (currentStep >= tourSteps.length - 1) {
+      completeTour('completed');
+      return;
+    }
+    const nextIndex = currentStep + 1;
+    saveLocalResumeState({
+      current_step: nextIndex,
+      current_step_id: tourSteps[nextIndex]?.id || null,
+      total_steps: tourSteps.length,
+      status: 'in_progress',
+      tourKey: currentDashboard,
+    }, currentDashboard);
+    setCurrentStep(nextIndex);
+  }, [
+    completeTour,
+    currentDashboard,
+    currentStep,
+    saveLocalResumeState,
+    tourSteps,
+    trackTourEvent,
+  ]);
+
+  const completeStepAction = useCallback((actionDetails = {}) => {
+    const activeStep = tourSteps[currentStep];
+    trackTourEvent('action_completed', {
+      dashboardType: currentDashboard,
+      currentStep,
+      totalSteps: tourSteps.length,
+      stepId: activeStep?.id,
+      targetId: activeStep?.targetId || activeStep?.id,
+      context: {
+        action_type: actionDetails.actionType || activeStep?.action?.event || 'click',
+        workflow_key: activeStep?.workflowKey || null,
+      },
+    });
+    if (actionDetails.autoAdvance !== false && activeStep?.action?.autoAdvance !== false) {
+      nextStep();
+    }
+  }, [currentDashboard, currentStep, nextStep, tourSteps, trackTourEvent]);
+
+  const reportStepAvailability = useCallback((status, details = {}) => {
+    const activeStep = tourSteps[currentStep];
+    trackTourEvent(status === 'missing' ? 'target_missing' : 'step_unavailable', {
+      dashboardType: currentDashboard,
+      currentStep,
+      totalSteps: tourSteps.length,
+      stepId: activeStep?.id,
+      targetId: activeStep?.targetId || activeStep?.id,
+      reasonCode: details.reasonCode
+        || (status === 'missing' ? 'target_not_found' : 'context_unavailable'),
+      context: details.context,
+    });
+  }, [currentDashboard, currentStep, tourSteps, trackTourEvent]);
+
+  const skipTour = useCallback(() => completeTour('skipped'), [completeTour]);
 
   const replayTour = useCallback((dashboardType, steps) => {
-    startTour(dashboardType, steps, { replay: true, source: 'settings' });
+    startTour(dashboardType, steps, {
+      replay: true,
+      resume: false,
+      source: 'settings',
+    });
   }, [startTour]);
 
   const dismissWelcomeModal = useCallback(() => {
     const now = new Date().toISOString();
     saveLocalLastDismissal(now);
-    trackTourEvent('dismissed', {
-      dashboardType: userDashboardType,
-      metadata: { source: 'welcome_modal' },
-    });
+    if (hasResumableTour) {
+      const resumeState = userTourData || getLocalResumeState();
+      trackTourEvent('paused', {
+        dashboardType: userDashboardType,
+        currentStep: Number.isInteger(Number(resumeState?.current_step))
+          ? Number(resumeState.current_step)
+          : undefined,
+        totalSteps: resumeState?.total_steps,
+        stepId: resumeState?.current_step_id || resumeState?.last_step_id,
+        reasonCode: 'resume_prompt_deferred',
+        metadata: { source: 'welcome_modal' },
+      });
+    } else {
+      trackTourEvent('dismissed', {
+        dashboardType: userDashboardType,
+        metadata: { source: 'welcome_modal' },
+      });
+    }
     setShowWelcomeModal(false);
-  }, [saveLocalLastDismissal, trackTourEvent, userDashboardType]);
+  }, [
+    getLocalResumeState,
+    hasResumableTour,
+    saveLocalLastDismissal,
+    trackTourEvent,
+    userDashboardType,
+    userTourData,
+  ]);
+
+  useEffect(() => {
+    const activeStep = tourSteps[currentStep];
+    if (!showTourOverlay || !activeStep || !currentDashboard) return;
+    const viewKey = `${currentDashboard}:${currentStep}:${activeStep.id}`;
+    if (lastStepViewRef.current === viewKey) return;
+    lastStepViewRef.current = viewKey;
+    trackTourEvent('step_viewed', {
+      dashboardType: currentDashboard,
+      currentStep,
+      totalSteps: tourSteps.length,
+      stepId: activeStep.id,
+      targetId: activeStep.targetId || activeStep.id,
+      context: { workflow_key: activeStep.workflowKey || null },
+    });
+  }, [currentDashboard, currentStep, showTourOverlay, tourSteps, trackTourEvent]);
+
+  useEffect(() => {
+    if (!showTourOverlay || typeof window === 'undefined') return undefined;
+    const pause = (reasonCode) => {
+      if (pauseSentRef.current) return;
+      pauseSentRef.current = true;
+      const activeStep = tourSteps[currentStep];
+      saveLocalResumeState({
+        current_step: currentStep,
+        current_step_id: activeStep?.id || null,
+        total_steps: tourSteps.length,
+        status: 'paused',
+        tourKey: currentDashboard,
+      }, currentDashboard);
+      trackTourEvent('paused', {
+        dashboardType: currentDashboard,
+        currentStep,
+        totalSteps: tourSteps.length,
+        stepId: activeStep?.id,
+        reasonCode,
+      });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') pause('document_hidden');
+      else pauseSentRef.current = false;
+    };
+    const handlePageHide = () => pause('page_hidden');
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [
+    currentDashboard,
+    currentStep,
+    saveLocalResumeState,
+    showTourOverlay,
+    tourSteps,
+    trackTourEvent,
+  ]);
 
   const value = {
-    // State
     showWelcomeModal,
     showTourOverlay,
     currentStep,
     currentDashboard,
     tourSteps,
     userTourData,
+    hasResumableTour,
     shouldShowTour: shouldShowTour(),
-
-    // Actions
     startTour,
     nextStep,
     previousStep,
+    skipCurrentStep,
     skipTour,
     completeTour,
     replayTour,
     dismissWelcomeModal,
+    completeStepAction,
+    reportStepAvailability,
+    trackTourEvent,
     setCurrentDashboard,
     setTourSteps,
   };

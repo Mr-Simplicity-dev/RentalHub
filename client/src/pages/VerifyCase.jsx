@@ -113,7 +113,7 @@ export default function VerifyCase() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-3xl bg-white border border-soft rounded-xl2 shadow-card p-8 space-y-6 animate-fadeIn">
+      <div className="w-full max-w-3xl bg-white border border-soft rounded-xl2 shadow-card p-8 space-y-6 animate-fadeIn" data-tour-id="verify-case-workflow">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="text-center sm:text-left">
             <h1 className="text-2xl font-semibold">
