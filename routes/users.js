@@ -9,7 +9,10 @@ const crypto = require('crypto');
 const { body, query } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 const { uploadPassportLocal, validateFileMagicBytesMiddleware } = require('../config/middleware/upload');
-const { sensitiveActionLimiter } = require('../config/middleware/securityRateLimiters');
+const {
+  sensitiveActionLimiter,
+  tourEventLimiter,
+} = require('../config/middleware/securityRateLimiters');
 const { decryptNIN } = require('../config/utils/ninEncryption');
 const { checkPasswordBreached } = require('../config/utils/breachCheck');
 const credentialRevalidationCtrl = require('../controllers/credentialRevalidationController');
@@ -457,6 +460,18 @@ const normalizeTourTimestamp = (value, field = 'Client event time') => {
   return timestamp.toISOString();
 };
 
+const normalizeTourRoute = (value) => {
+  const route = normalizeTourText(value, null, {
+    field: 'Tour route',
+    maxLength: 255,
+  });
+  if (!route) return null;
+
+  // Analytics must not retain query strings or fragments because these can
+  // carry search text, payment references, reset tokens, and other PII.
+  return route.split(/[?#]/, 1)[0].trim() || null;
+};
+
 const compareTourVersions = (left, right) => {
   if (left === right) return 0;
   if (/^\d+$/.test(String(left)) && /^\d+$/.test(String(right))) {
@@ -485,12 +500,6 @@ const serializeTourState = (state) => {
     context: state.context && typeof state.context === 'object' ? state.context : {},
     can_resume: canResume,
   };
-};
-
-const getTourTimestamp = (value) => {
-  if (!value) return null;
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? timestamp : null;
 };
 
 /**
@@ -529,18 +538,6 @@ const deriveTourStateTransition = (state, event) => {
 
   if (sessionChanged && !newerVersion && !TOUR_SESSION_START_EVENTS.has(event.eventType)) {
     return { applied: false, reason: 'inactive_session' };
-  }
-
-  if (sessionChanged && !newerVersion) {
-    const clientCreatedAt = getTourTimestamp(event.clientCreatedAt);
-    const lastEventAt = getTourTimestamp(state.last_event_at);
-    if (
-      clientCreatedAt !== null &&
-      lastEventAt !== null &&
-      clientCreatedAt <= lastEventAt
-    ) {
-      return { applied: false, reason: 'older_session' };
-    }
   }
 
   const sameSession = Boolean(
@@ -589,7 +586,7 @@ const deriveTourStateTransition = (state, event) => {
 
   // Keep the database invariant valid when a newer client reports a shorter
   // tour definition without also reporting a replacement cursor.
-  if (currentStep !== null && totalSteps !== null && currentStep > totalSteps) {
+  if (currentStep !== null && totalSteps !== null && currentStep >= totalSteps) {
     if (event.currentStep === null) {
       currentStep = null;
       currentStepId = null;
@@ -701,8 +698,8 @@ const recordTourEvent = async (userId, payload = {}) => {
   });
   const currentStep = normalizeTourInteger(payload.current_step, 'Current step');
   const totalSteps = normalizeTourInteger(payload.total_steps, 'Total steps');
-  if (currentStep !== null && totalSteps !== null && currentStep > totalSteps) {
-    throw tourInputError('Current step cannot be greater than total steps');
+  if (currentStep !== null && totalSteps !== null && currentStep >= totalSteps) {
+    throw tourInputError('Current step must be lower than total steps');
   }
   if (['step_viewed', 'step_completed', 'step_skipped'].includes(eventType)) {
     if (currentStep === null || !stepId) {
@@ -717,10 +714,8 @@ const recordTourEvent = async (userId, payload = {}) => {
     payload.locale ?? context.locale ?? rawMetadata.locale ?? rawMetadata.language,
     null
   );
-  const route = normalizeTourText(
-    payload.route ?? context.route ?? context.screen ?? rawMetadata.route ?? rawMetadata.screen,
-    null,
-    { field: 'Tour route', maxLength: 255 }
+  const route = normalizeTourRoute(
+    payload.route ?? context.route ?? context.screen ?? rawMetadata.route ?? rawMetadata.screen
   );
   const targetId = normalizeTourText(
     payload.target_id ?? context.target_id ?? rawMetadata.target_id,
@@ -892,7 +887,6 @@ const recordTourEvent = async (userId, payload = {}) => {
       contextProvided: contextProvided || Boolean(route),
       sessionId,
       sequenceNumber,
-      clientCreatedAt,
     });
 
     // Keep the analytics row for diagnostics, but never let an older version,
@@ -1343,7 +1337,7 @@ router.get('/tour', authenticate, async (req, res) => {
   }
 });
 
-router.post('/tour/events', authenticate, async (req, res) => {
+router.post('/tour/events', authenticate, tourEventLimiter, async (req, res) => {
   try {
     const result = await recordTourEvent(req.user.id, req.body || {});
 
@@ -2399,6 +2393,7 @@ router._tourForTest = {
   getTourState,
   normalizeTourLocale,
   normalizeTourObject,
+  normalizeTourRoute,
   recordTourEvent,
   serializeTourState,
   resetSchemaCheck: () => {
