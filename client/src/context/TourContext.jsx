@@ -50,7 +50,11 @@ export const TourProvider = ({ children }) => {
   const [tourSteps, setTourSteps] = useState([]);
   const [userTourData, setUserTourData] = useState(null);
   const [tourDataLoaded, setTourDataLoaded] = useState(false);
-  const userDashboardType = getTourDashboardType(user?.user_type);
+  const effectiveTourRole =
+    user?.is_recruitment_admin === true && user?.user_type !== 'super_admin'
+      ? 'recruitment_admin'
+      : user?.user_type;
+  const userDashboardType = getTourDashboardType(effectiveTourRole);
 
   const getLocalLastDismissal = useCallback(() => {
     if (!user?.id) return null;

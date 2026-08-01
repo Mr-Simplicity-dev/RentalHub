@@ -30,6 +30,8 @@ const DEFAULT_TOOLTIP_HEIGHT = 300;
 const DEFAULT_TARGET_WAIT_MS = 4500;
 const POSITION_UPDATE_DELAY_MS = 80;
 const LAYER_BASE = 2147483000;
+const MAX_SPOTLIGHT_HEIGHT = 300;
+const MAX_SPOTLIGHT_HEIGHT_RATIO = 0.36;
 
 const clamp = (value, min, max) => {
   if (max < min) return min;
@@ -118,11 +120,18 @@ const getPaddedTargetBox = (element, viewport) => {
     left + 2,
     viewport.right - 6,
   );
-  const bottom = clamp(
+  let bottom = clamp(
     rect.bottom + HIGHLIGHT_PADDING,
     top + 2,
     viewport.bottom - 6,
   );
+  const maximumSpotlightHeight = Math.min(
+    MAX_SPOTLIGHT_HEIGHT,
+    viewport.height * MAX_SPOTLIGHT_HEIGHT_RATIO,
+  );
+  if (bottom - top > maximumSpotlightHeight) {
+    bottom = Math.min(top + maximumSpotlightHeight, viewport.bottom - 6);
+  }
 
   return {
     left,
@@ -494,14 +503,14 @@ const TourOverlay = ({
           block: window.innerWidth < 680 ? 'center' : 'nearest',
           inline: 'nearest',
         });
+        delayedUpdates.push(window.setTimeout(schedulePositionUpdate, POSITION_UPDATE_DELAY_MS));
+        delayedUpdates.push(window.setTimeout(
+          schedulePositionUpdate,
+          prefersReducedMotion ? 120 : 420,
+        ));
       }
 
       schedulePositionUpdate();
-      delayedUpdates.push(window.setTimeout(schedulePositionUpdate, POSITION_UPDATE_DELAY_MS));
-      delayedUpdates.push(window.setTimeout(
-        schedulePositionUpdate,
-        prefersReducedMotion ? 120 : 420,
-      ));
     };
 
     const seekTarget = () => {
@@ -526,7 +535,11 @@ const TourOverlay = ({
       updatePosition(null);
     }
 
-    pollTimer = window.setInterval(seekTarget, 240);
+    pollTimer = window.setInterval(() => {
+      if (!targetRef.current || !isUsableTarget(targetRef.current)) {
+        seekTarget();
+      }
+    }, 400);
     missingTimer = window.setTimeout(() => {
       if (!cancelled && !resolveTarget(step.target)) {
         targetRef.current = null;
@@ -537,12 +550,15 @@ const TourOverlay = ({
     }, waitMs);
 
     if (typeof MutationObserver !== 'undefined') {
-      mutationObserver = new MutationObserver(seekTarget);
+      mutationObserver = new MutationObserver((mutations) => {
+        const hasDashboardMutation = mutations.some(({ target }) => (
+          !target?.closest?.('[data-testid="rentalhub-tour-overlay"]')
+        ));
+        if (hasDashboardMutation) seekTarget();
+      });
       mutationObserver.observe(document.body, {
         childList: true,
         subtree: true,
-        attributes: true,
-        attributeFilter: ['class', 'style', 'hidden', 'aria-hidden'],
       });
     }
 
