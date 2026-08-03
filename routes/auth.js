@@ -140,6 +140,7 @@ router.post(
 router.post(
   '/lawyer/accept-invite',
   [
+    requireTurnstile,
     body('token').trim().notEmpty(),
     body('full_name').trim().notEmpty(),
     body('chamber_name').trim().notEmpty(),
@@ -162,6 +163,7 @@ router.post(
 router.post(
   '/lawyer/accept-platform-invite',
   [
+    requireTurnstile,
     body('token').trim().notEmpty(),
     body('full_name').trim().notEmpty(),
     body('chamber_name').trim().notEmpty(),
@@ -184,6 +186,7 @@ router.post(
 router.post(
   '/agent/accept-invite',
   [
+    requireTurnstile,
     body('token').trim().notEmpty(),
     body('full_name').trim().notEmpty(),
     body('phone')
@@ -260,6 +263,7 @@ router.post('/logout', authenticate, authController.logout);
 
 router.post(
   '/forgot-password',
+  requireTurnstile,
   authSensitiveLimiter,
   [body('email').isEmail().normalizeEmail()],
   authController.forgotPassword
@@ -267,6 +271,7 @@ router.post(
 
 router.post(
   '/reset-password/:token',
+  requireTurnstile,
   passwordResetLimiter,
   [body('password')
     .isLength({ min: 10 })

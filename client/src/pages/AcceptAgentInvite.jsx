@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import { setAuthSession } from '../services/authStorage';
 import { useTranslation } from 'react-i18next';
+import TurnstileWidget from '../components/common/TurnstileWidget';
 
 const AcceptAgentInvite = () => {
   const { t } = useTranslation();
@@ -20,6 +21,8 @@ const AcceptAgentInvite = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+  const turnstileRef = useRef(null);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -62,6 +65,9 @@ const AcceptAgentInvite = () => {
       return;
     }
 
+    if (!turnstileToken && process.env.REACT_APP_TURNSTILE_SITE_KEY)
+      return toast.error('Please complete the security check.');
+
     setLoading(true);
 
     try {
@@ -70,6 +76,7 @@ const AcceptAgentInvite = () => {
         full_name: formData.full_name,
         phone: formData.phone,
         password: formData.password,
+        turnstile_token: turnstileToken,
       });
 
       if (res.data?.success && res.data?.data?.token) {
@@ -82,10 +89,14 @@ const AcceptAgentInvite = () => {
       }
 
       toast.error(res.data?.message || t('accept_agent_invite.activation_failed'));
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } catch (error) {
       toast.error(
         error.response?.data?.message || t('accept_agent_invite.activation_failed')
       );
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -189,6 +200,15 @@ const AcceptAgentInvite = () => {
             >
               {loading ? t('accept_agent_invite.activating') : t('accept_agent_invite.submit')}
             </button>
+
+            <div className="flex justify-center mt-3">
+              <TurnstileWidget
+                ref={turnstileRef}
+                onToken={setTurnstileToken}
+                onExpire={() => setTurnstileToken(null)}
+                onError={() => setTurnstileToken(null)}
+              />
+            </div>
           </form>
 
           <p className="text-center text-sm text-gray-500">
