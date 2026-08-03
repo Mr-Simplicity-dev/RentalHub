@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import api from '../services/api';
 import { setAuthSession } from '../services/authStorage';
 import { useTranslation } from 'react-i18next';
+import TurnstileWidget from '../components/common/TurnstileWidget';
 
 const getPasswordStrength = (password) => {
   let score = 0;
@@ -39,6 +40,8 @@ const AcceptLawyerInvite = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+  const turnstileRef = useRef(null);
 
   const strength = getPasswordStrength(formData.password);
 
@@ -60,6 +63,8 @@ const AcceptLawyerInvite = () => {
       return toast.error(t('accept_lawyer_invite.password_min_length'));
     if (formData.password !== formData.confirm_password)
       return toast.error(t('accept_lawyer_invite.password_mismatch'));
+    if (!turnstileToken && process.env.REACT_APP_TURNSTILE_SITE_KEY)
+      return toast.error('Please complete the security check.');
 
     setLoading(true);
     try {
@@ -75,6 +80,7 @@ const AcceptLawyerInvite = () => {
         phone: formData.phone,
         password: formData.password,
         nationality: formData.nationality,
+        turnstile_token: turnstileToken,
       });
 
       if (res.data.success) {
@@ -82,6 +88,8 @@ const AcceptLawyerInvite = () => {
         setStep('otp');
       } else {
         toast.error('Failed to send OTP');
+        setTurnstileToken(null);
+        turnstileRef.current?.reset();
       }
     } catch (err) {
       toast.error(
@@ -90,6 +98,8 @@ const AcceptLawyerInvite = () => {
             ? 'Error processing platform lawyer invite'
             : 'Error processing lawyer invite')
       );
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -378,6 +388,15 @@ const AcceptLawyerInvite = () => {
               >
                 {loading ? t('accept_lawyer_invite.sending_otp') : t('accept_lawyer_invite.continue')}
               </button>
+
+              <div className="flex justify-center mt-3">
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  onToken={setTurnstileToken}
+                  onExpire={() => setTurnstileToken(null)}
+                  onError={() => setTurnstileToken(null)}
+                />
+              </div>
             </>
           )}
 

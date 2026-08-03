@@ -1,22 +1,31 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 import { toast } from 'react-toastify';
+import TurnstileWidget from '../components/common/TurnstileWidget';
 
 const ForgotPassword = () => {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+  const turnstileRef = useRef(null);
 
   const submit = async (e) => {
     e.preventDefault();
     if (loading) return;
+
+    if (!turnstileToken && process.env.REACT_APP_TURNSTILE_SITE_KEY)
+      return toast.error('Please complete the security check.');
+
     setLoading(true);
     try {
-      await api.post('/auth/forgot-password', { email });
+      await api.post('/auth/forgot-password', { email, turnstile_token: turnstileToken });
       toast.success(t('forgot_password.toast.success'));
     } catch {
       toast.error(t('forgot_password.toast.error'));
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -33,6 +42,15 @@ const ForgotPassword = () => {
           onChange={e => setEmail(e.target.value)}
         />
         <button className="btn btn-primary w-full" disabled={loading}>{loading ? t('forgot_password.sending') : t('forgot_password.send_reset_link')}</button>
+
+        <div className="flex justify-center mt-3">
+          <TurnstileWidget
+            ref={turnstileRef}
+            onToken={setTurnstileToken}
+            onExpire={() => setTurnstileToken(null)}
+            onError={() => setTurnstileToken(null)}
+          />
+        </div>
       </form>
     </div>
   );
