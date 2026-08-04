@@ -98,31 +98,37 @@ const LawyerLayout = () => {
         label: dashboardLabel,
         icon: FaTachometerAlt,
         end: true,
+        dataTourId: 'sidebar-dashboard',
       },
       {
         to: '/verify-case',
         label: t('lawyer_layout.verify_evidence'),
         icon: FaCheckCircle,
+        dataTourId: 'sidebar-evidence',
       },
       {
         to: '/messages',
         label: t('lawyer_layout.messages'),
         icon: FaEnvelope,
+        dataTourId: 'sidebar-messages',
       },
       {
         to: '/legal-support',
         label: t('lawyer_layout.legal_support'),
         icon: FaGavel,
+        dataTourId: 'sidebar-legal-support',
       },
       {
         to: '/verification-status',
         label: t('lawyer_layout.verification_status'),
         icon: FaIdCard,
+        dataTourId: 'sidebar-verification',
       },
       {
         to: '/profile',
         label: t('lawyer_layout.profile'),
         icon: FaUserCircle,
+        dataTourId: 'sidebar-profile',
       },
     ],
     [dashboardLabel, config.homePath, t]
@@ -212,6 +218,7 @@ const LawyerLayout = () => {
                 to={item.to}
                 end={item.end}
                 className={linkClassName}
+                data-tour-id={item.dataTourId}
                 onClick={() => {
                   setMobileMenuOpen(false);
                   scrollDashboardToTarget('', mainContentRef.current);

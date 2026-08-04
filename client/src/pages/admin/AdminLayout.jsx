@@ -837,55 +837,55 @@ const AdminLayout = () => {
 
             <div className="space-y-2">
 
-              <NavLink to="/admin" end className={navItem}>
+              <NavLink to="/admin" end className={navItem} data-tour-id="sidebar-dashboard">
                 <FaTachometerAlt className="mr-3" />
                 Dashboard
               </NavLink>
 
-              <NavLink to="/admin/users" className={navItem}>
+              <NavLink to="/admin/users" className={navItem} data-tour-id="sidebar-users">
                 <FaUsers className="mr-3" />
                 Users
               </NavLink>
 
-              <NavLink to="/admin/properties" className={navItem}>
+              <NavLink to="/admin/properties" className={navItem} data-tour-id="sidebar-properties">
                 <FaHome className="mr-3" />
                 Properties
               </NavLink>
 
-              <NavLink to="/admin/applications" className={navItem}>
+              <NavLink to="/admin/applications" className={navItem} data-tour-id="sidebar-applications">
                 <FaFileAlt className="mr-3" />
                 Applications
               </NavLink>
 
               {role === 'admin' && (
-                <NavLink to="/admin/tour-analytics" className={navItem}>
+                <NavLink to="/admin/tour-analytics" className={navItem} data-tour-id="sidebar-tour-analytics">
                   <FaChartLine className="mr-3" />
                   {t('tour.analytics.nav_label', 'Tour Analytics')}
                 </NavLink>
               )}
 
-              <NavLink to="/admin?tab=property_requests" className={navItem}>
+              <NavLink to="/admin?tab=property_requests" className={navItem} data-tour-id="sidebar-property-requests">
                 <FaHome className="mr-3" />
                 Property Requests
               </NavLink>
 
-              <NavLink to="/admin/transportation" className={navItem}>
+              <NavLink to="/admin/transportation" className={navItem} data-tour-id="sidebar-transportation">
                 <FaTruck className="mr-3" />
                 Transportation
               </NavLink>
 
-                            <NavLink to="/admin/fumigation-cleaning" className={navItem}>
+                            <NavLink to="/admin/fumigation-cleaning" className={navItem} data-tour-id="sidebar-fumigation">
                 <FaSprayCan className="mr-3" />
                 Fumigation
               </NavLink>
 
-              <NavLink to="/admin/inspections" className={navItem}>
+              <NavLink to="/admin/inspections" className={navItem} data-tour-id="sidebar-inspections">
                 <FaClipboardList className="mr-3" />
                 Inspections
               </NavLink>
 
               {role === 'admin' && (
-              <NavLink to="/admin/agents" className={navItem}>
+              <NavLink to="/admin/agents" className={navItem} data-tour-id="sidebar-agent-management">
                 <FaUserShield className="mr-3" />
                 Agent Management
               </NavLink>
@@ -968,24 +968,24 @@ const AdminLayout = () => {
 
             <div className="space-y-2">
 
-              <NavLink to="/admin/verifications" className={navItem}>
+              <NavLink to="/admin/verifications" className={navItem} data-tour-id="sidebar-verification">
                 <FaCheckCircle className="mr-3" />
                 Identity Verification
                 {badgePill(liveBadges.pendingVerifications, 'amber')}
               </NavLink>
 
-              <NavLink to="/admin/lawyer-invites" className={navItem}>
+              <NavLink to="/admin/lawyer-invites" className={navItem} data-tour-id="sidebar-lawyer-invites">
                 <FaEnvelope className="mr-3" />
                 Lawyer Invites
               </NavLink>
 
-              <NavLink to="/admin/evidence-verifications" className={navItem}>
+              <NavLink to="/admin/evidence-verifications" className={navItem} data-tour-id="sidebar-evidence">
                 <FaShieldAlt className="mr-3" />
                 Evidence Verification
               </NavLink>
 
               {role === 'admin' && (
-              <NavLink to="/admin/compliance" className={navItem}>
+              <NavLink to="/admin/compliance" className={navItem} data-tour-id="sidebar-compliance">
                 <FaShieldAlt className="mr-3" />
                 Compliance & Risk
 
@@ -1013,7 +1013,7 @@ const AdminLayout = () => {
 
             <div className="space-y-2">
 
-              <NavLink to="/admin/ledger" className={navItem}>
+              <NavLink to="/admin/ledger" className={navItem} data-tour-id="sidebar-ledger-integrity">
                 <FaLock className="mr-3" />
                 Ledger Integrity
 
@@ -1267,6 +1267,7 @@ const AdminLayout = () => {
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+            data-tour-id="sidebar-logout"
           >
             <FaSignOutAlt className="mr-2" />
             Logout

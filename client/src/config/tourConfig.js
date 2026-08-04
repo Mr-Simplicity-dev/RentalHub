@@ -756,6 +756,86 @@ export const TOUR_STEPS = {
   ],
 };
 
+export const SHARED_HEADER_STEPS = [
+  {
+    id: 'header_messages',
+    target: '[data-tour-id="header-messages"]',
+    title: 'Messages',
+    description: 'The envelope shows unread messages from tenants, landlords, agents, or admins. Tap to open your inbox.',
+    placement: 'bottom',
+  },
+  {
+    id: 'header_notifications',
+    target: '[data-tour-id="header-notifications"]',
+    title: 'Notifications',
+    description: 'The bell shows admin reminders, verification requests, and system alerts. Tap to view details and take action.',
+    placement: 'bottom',
+  },
+  {
+    id: 'header_user_menu',
+    target: '[data-tour-id="header-user-menu"]',
+    title: 'Account Menu',
+    description: 'Open your profile avatar menu to switch accounts, check verification, view applications, or sign out.',
+    placement: 'bottom',
+  },
+];
+
+export const ADMIN_SIDEBAR_STEPS = [
+  {
+    id: 'sidebar_intro',
+    target: '[data-tour-id="sidebar-dashboard"]',
+    title: 'Sidebar Navigation',
+    description: 'Use the sidebar to move between dashboard sections — Users, Properties, Applications, Transportation, Fumigation, and more.',
+    placement: 'right',
+  },
+];
+
+export const LAWYER_SIDEBAR_STEPS = [
+  {
+    id: 'lawyer_sidebar_intro',
+    target: '[data-tour-id="sidebar-dashboard"]',
+    title: 'Lawyer Navigation',
+    description: 'Your legal console sidebar — access cases, evidence verification, client messages, and legal support.',
+    placement: 'right',
+  },
+];
+
+export const DASHBOARD_ICON_STEPS = [
+  {
+    id: 'dash_stats',
+    target: '[data-tour-id="stat-unlocked"]',
+    title: 'Dashboard Stats',
+    description: 'These cards show key numbers — unlocked details, subscription status, bookings, rent savings, refunds, and grace requests at a glance.',
+    placement: 'top',
+  },
+  {
+    id: 'dash_referral',
+    target: '[data-tour-id="section-referral"]',
+    title: 'Invite & Earn',
+    description: 'Share your referral link to invite others. Earn rewards when they sign up and complete their first verified activity.',
+    placement: 'top',
+  },
+];
+
+const mergeSharedSteps = (baseSteps, userRole) => {
+  let steps = [...baseSteps];
+  const isAdmin = ['admin', 'lga_admin', 'state_admin', 'financial_admin', 'lga_financial_admin', 'super_financial_admin', 'transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin', 'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin', 'recruitment_admin', 'state_financial_admin', 'lga_support_admin', 'state_support_admin', 'super_support_admin', 'super_admin'].includes(userRole);
+  const isLawyer = ['lawyer', 'state_lawyer', 'super_lawyer'].includes(userRole);
+  const isDashboard = ['tenant', 'user', 'landlord', 'agent'].includes(userRole);
+
+  if (isDashboard) {
+    steps = [...DASHBOARD_ICON_STEPS, ...steps];
+  }
+  if (isAdmin) {
+    steps = [...ADMIN_SIDEBAR_STEPS, ...steps];
+  }
+  if (isLawyer) {
+    steps = [...LAWYER_SIDEBAR_STEPS, ...steps];
+  }
+  steps = [...SHARED_HEADER_STEPS, ...steps];
+  return steps;
+};
+
 const getTranslatedValue = (t, key, fallback) => (
   typeof t === 'function' ? t(key, { defaultValue: fallback }) : fallback
 );
@@ -845,9 +925,12 @@ export const getTourStepsByUserRole = (userRole, t, context = {}) => {
   };
 
   return localizeTourSteps(
-    getEligibleTourSteps(
-      roleToTourMap[userRole] || TOUR_STEPS.TENANT_DASHBOARD,
-      { ...context, role: userRole },
+    mergeSharedSteps(
+      getEligibleTourSteps(
+        roleToTourMap[userRole] || TOUR_STEPS.TENANT_DASHBOARD,
+        { ...context, role: userRole },
+      ),
+      userRole,
     ),
     t,
   );

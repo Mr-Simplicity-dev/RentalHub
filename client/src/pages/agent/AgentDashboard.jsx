@@ -19,8 +19,8 @@ const PermissionBadge = ({ enabled, label }) => (
   </span>
 );
 
-const StatCard = ({ icon, label, value }) => (
-  <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition hover:shadow-md">
+const StatCard = ({ icon, label, value, dataTourId }) => (
+  <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition hover:shadow-md" data-tour-id={dataTourId}>
     <div className="flex items-center gap-3">
       <div className="rounded-lg bg-indigo-50 p-2.5 text-indigo-600">{icon}</div>
       <div>
@@ -31,10 +31,11 @@ const StatCard = ({ icon, label, value }) => (
   </div>
 );
 
-const QuickActionLink = ({ to, icon, label, description }) => (
+const QuickActionLink = ({ to, icon, label, description, dataTourId }) => (
   <Link
     to={to}
     className="group flex items-start gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-100 hover:shadow-md"
+    data-tour-id={dataTourId}
   >
     <div className="rounded-lg bg-indigo-50 p-2.5 text-indigo-600 transition group-hover:bg-indigo-100">
       {icon}
@@ -153,10 +154,10 @@ const AgentDashboard = () => {
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard icon={<FaHome />} label={t('agent_dashboard.assigned_state')} value={profile?.assigned_state || t('agent_dashboard.not_configured')} />
-              <StatCard icon={<FaClipboardList />} label={t('agent_dashboard.landlord')} value={assignment.landlord_name} />
-              <StatCard icon={<FaShieldAlt />} label={t('agent_dashboard.assignment_status')} value={assignment.status || t('agent_dashboard.active')} />
-              <StatCard icon={<FaExchangeAlt />} label={t('agent_dashboard.migration_requests')} value={migrationRequests.length} />
+              <StatCard icon={<FaHome />} label={t('agent_dashboard.assigned_state')} value={profile?.assigned_state || t('agent_dashboard.not_configured')} dataTourId="stat-assigned-state" />
+              <StatCard icon={<FaClipboardList />} label={t('agent_dashboard.landlord')} value={assignment.landlord_name} dataTourId="stat-landlord" />
+              <StatCard icon={<FaShieldAlt />} label={t('agent_dashboard.assignment_status')} value={assignment.status || t('agent_dashboard.active')} dataTourId="stat-assignment" />
+              <StatCard icon={<FaExchangeAlt />} label={t('agent_dashboard.migration_requests')} value={migrationRequests.length} dataTourId="stat-migration" />
             </div>
 
             <div className="agent-commissions-section rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -282,16 +283,16 @@ const AgentDashboard = () => {
                   </div>
 
                   <div className="mt-5 space-y-3">
-                    <Link to="/my-properties" className="btn btn-primary flex w-full items-center justify-center gap-2">
+                    <Link to="/my-properties" className="btn btn-primary flex w-full items-center justify-center gap-2" data-tour-id="action-manage-properties">
                       <FaHome /> {t('agent_dashboard.manage_properties')}
                     </Link>
-                    <Link to="/add-property" className="btn flex w-full items-center justify-center gap-2 border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
+                    <Link to="/add-property" className="btn flex w-full items-center justify-center gap-2 border-gray-200 bg-white text-gray-700 hover:bg-gray-50" data-tour-id="action-add-property">
                       <FaBuilding /> {t('agent_dashboard.add_property')}
                     </Link>
-                    <Link to="/agent/earnings" className="btn flex w-full items-center justify-center gap-2 border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
+                    <Link to="/agent/earnings" className="btn flex w-full items-center justify-center gap-2 border-gray-200 bg-white text-gray-700 hover:bg-gray-50" data-tour-id="action-earnings">
                       <FaCoins /> {t('agent_dashboard.view_earnings')}
                     </Link>
-                    <Link to="/agent/withdrawals" className="btn flex w-full items-center justify-center gap-2 border-gray-200 bg-white text-gray-700 hover:bg-gray-50">
+                    <Link to="/agent/withdrawals" className="btn flex w-full items-center justify-center gap-2 border-gray-200 bg-white text-gray-700 hover:bg-gray-50" data-tour-id="action-withdrawal">
                       <FaMoneyBillWave /> {t('agent_dashboard.request_withdrawal')}
                     </Link>
                   </div>
@@ -332,10 +333,10 @@ const AgentDashboard = () => {
               <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <QuickActionLink to="/my-properties" icon={<FaHome />} label={t('agent_dashboard.managed_properties')} description={t('agent_dashboard.managed_properties_desc')} />
                 <QuickActionLink to="/add-property" icon={<FaBuilding />} label={t('agent_dashboard.maintenance_assessments')} description={t('agent_dashboard.maintenance_assessments_desc')} />
-                <QuickActionLink to="/messages" icon={<FaCommentDots />} label={t('agent_dashboard.dispute_evidence')} description={t('agent_dashboard.dispute_evidence_desc')} />
-                <QuickActionLink to="/messages" icon={<FaGavel />} label={t('agent_dashboard.legal_messages')} description={t('agent_dashboard.legal_messages_desc')} />
-                <QuickActionLink to="/agent/earnings" icon={<FaCoins />} label={t('agent_dashboard.commission_ledger')} description={t('agent_dashboard.commission_ledger_desc')} />
-                <QuickActionLink to="/agent/withdrawals" icon={<FaMoneyBillWave />} label={t('agent_dashboard.withdrawals')} description={t('agent_dashboard.withdrawals_desc')} />
+                <QuickActionLink to="/messages" icon={<FaCommentDots />} label={t('agent_dashboard.dispute_evidence')} description={t('agent_dashboard.dispute_evidence_desc')} dataTourId="action-dispute-evidence" />
+                <QuickActionLink to="/messages" icon={<FaGavel />} label={t('agent_dashboard.legal_messages')} description={t('agent_dashboard.legal_messages_desc')} dataTourId="action-legal-messages" />
+                <QuickActionLink to="/agent/earnings" icon={<FaCoins />} label={t('agent_dashboard.commission_ledger')} description={t('agent_dashboard.commission_ledger_desc')} dataTourId="action-commission-ledger" />
+                <QuickActionLink to="/agent/withdrawals" icon={<FaMoneyBillWave />} label={t('agent_dashboard.withdrawals')} description={t('agent_dashboard.withdrawals_desc')} dataTourId="action-withdrawals" />
               </div>
             </div>
           </>

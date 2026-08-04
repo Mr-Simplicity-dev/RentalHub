@@ -743,6 +743,7 @@ return (
                 to="/messages"
                 onClick={() => handleHeaderNavigation('/messages')}
                 className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 shrink-0"
+                data-tour-id="header-messages"
               >
                 <FaEnvelope className="text-lg" />
 
@@ -756,7 +757,7 @@ return (
               </Link>
 
               {/* Notification Bell */}
-              <div className="relative shrink-0" ref={notifRef}>
+              <div className="relative shrink-0" ref={notifRef} data-tour-id="header-notifications">
                 <button
                   onClick={() =>
                     setShowNotifications(!showNotifications)
@@ -857,7 +858,7 @@ return (
               </div>
 
               {/* User Menu */}
-              <div className="relative shrink-0" ref={menuRef}>
+              <div className="relative shrink-0" ref={menuRef} data-tour-id="header-user-menu">
                 <button
                   onClick={() =>
                     setShowUserMenu((prev) => !prev)
