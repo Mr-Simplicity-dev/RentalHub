@@ -1,11 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   FaGavel,
   FaBars,
+  FaBell,
   FaCheckCircle,
   FaEnvelope,
+  FaExclamationTriangle,
+  FaHeadset,
+  FaHome,
   FaIdCard,
   FaSignOutAlt,
   FaTachometerAlt,
@@ -13,6 +17,7 @@ import {
   FaUserCircle,
 } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
+import api from '../../services/api';
 import { useTranslation } from 'react-i18next';
 
 const ROLE_CONFIG = {
@@ -53,12 +58,29 @@ const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = '
   }, 0);
 };
 
+const LAWYER_SUPPORTED_TYPES = ['message', 'case_update', 'verification', 'appeal', 'reminder', 'admin', 'system'];
+
+const getNotificationAction = (link) => {
+  if (!link) return { icon: FaIdCard, labelKey: 'take_action' };
+  const l = link.toLowerCase();
+  if (l.includes('/verification-status')) return { icon: FaIdCard, labelKey: 'verify_now' };
+  if (l.includes('tab=verifications')) return { icon: FaCheckCircle, labelKey: 'review_submission' };
+  if (l.includes('support') || l.includes('ticket') || l.includes('escalation')) return { icon: FaHeadset, labelKey: 'view_ticket' };
+  if (l.includes('refund')) return { icon: FaExclamationTriangle, labelKey: 'view_refund' };
+  if (l.includes('/dashboard')) return { icon: FaHome, labelKey: 'go_to_dashboard' };
+  return { icon: FaIdCard, labelKey: 'take_action' };
+};
+
 const LawyerLayout = () => {
   const { user, logout } = useAuth();
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notifUnreadCount, setNotifUnreadCount] = useState(0);
+  const [selectedNotification, setSelectedNotification] = useState(null);
   const mainContentRef = useRef(null);
   const previousRouteRef = useRef('');
 
@@ -109,6 +131,36 @@ const LawyerLayout = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await api.get('/notifications', { params: { limit: 10 } });
+      if (res.data?.success) {
+        setNotifications(res.data.data || []);
+      }
+    } catch {}
+    try {
+      const countRes = await api.get('/notifications/unread/count');
+      if (countRes.data?.success) {
+        setNotifUnreadCount(Number(countRes.data?.data?.unread_count || 0));
+      }
+    } catch {}
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchNotifications();
+    const intervalId = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(intervalId);
+  }, [fetchNotifications]);
+
+  const markNotifAsRead = async (notifId) => {
+    try {
+      await api.patch(`/notifications/${notifId}/read`);
+      setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, is_read: true } : n)));
+      setNotifUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {}
   };
 
   useEffect(() => {
@@ -195,13 +247,29 @@ const LawyerLayout = () => {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('lawyer_layout.lawyer_menu')}</p>
               <p className="text-sm font-semibold text-slate-900">{roleTitle}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen((current) => !current)}
-              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 shadow-sm"
-            >
-              {mobileMenuOpen ? <FaTimes /> : <FaBars />}
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="relative rounded-xl border border-slate-200 bg-white p-2 text-slate-700 shadow-sm"
+                  aria-label="Notifications"
+                >
+                  <FaBell />
+                  {notifUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                      {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen((current) => !current)}
+                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 shadow-sm"
+              >
+                {mobileMenuOpen ? <FaTimes /> : <FaBars />}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -234,10 +302,125 @@ const LawyerLayout = () => {
           {sidebarContent}
         </aside>
 
-        <main ref={mainContentRef} className="min-w-0 flex-1">
-          <Outlet />
+        <main ref={mainContentRef} className="min-w-0 flex-1 flex flex-col">
+          <header className="sticky top-0 z-30 hidden items-center justify-end gap-4 border-b border-slate-200 bg-white/95 px-6 py-3 shadow-sm backdrop-blur lg:flex">
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative rounded-xl p-2.5 text-slate-600 hover:text-primary-600 hover:bg-primary-50 transition"
+                aria-label="Notifications"
+              >
+                <FaBell className="text-lg" />
+                {notifUnreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                    {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </header>
+          <div className="flex-1">
+            <Outlet />
+          </div>
         </main>
       </div>
+
+      {showNotifications && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowNotifications(false)} />
+          <div className="fixed left-2 right-2 top-16 z-50 max-h-[70vh] w-auto max-w-[calc(100vw-16px)] mx-auto flex-col rounded-2xl border border-slate-200 bg-white py-2 shadow-elevated-lg flex sm:left-auto sm:right-4 sm:top-16 sm:w-96 sm:mx-0">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
+              <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <FaBell className="mx-auto mb-2 text-2xl text-slate-300" />
+                  <p className="text-sm text-slate-500">No notifications yet</p>
+                </div>
+              ) : (
+                notifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`cursor-pointer border-b border-slate-50 px-4 py-3 transition-colors hover:bg-slate-50 ${!notif.is_read ? 'bg-primary-50/40' : ''}`}
+                    onClick={() => {
+                      setSelectedNotification(notif);
+                      if (!notif.is_read) markNotifAsRead(notif.id);
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-900">{notif.title}</p>
+                        <p className="mt-0.5 truncate text-xs text-slate-600">{notif.message}</p>
+                        <p className="mt-1 text-[10px] text-slate-400">
+                          {new Date(notif.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      {!notif.is_read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary-500" />}
+                    </div>
+                    {notif.link && (
+                      <div className="mt-2 flex justify-end">
+                        {(() => {
+                          const action = getNotificationAction(notif.link);
+                          const ActionIcon = action.icon;
+                          return (
+                            <Link
+                              to={notif.link}
+                              onClick={(e) => { e.stopPropagation(); setShowNotifications(false); }}
+                              className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700"
+                            >
+                              <ActionIcon className="text-[10px]" />
+                              {t(`header.${action.labelKey}`, 'Take Action')}
+                            </Link>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {selectedNotification && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setSelectedNotification(null)} />
+          <div className="fixed left-4 right-4 top-1/2 z-50 max-h-[80vh] -translate-y-1/2 overflow-y-auto rounded-2xl bg-white shadow-2xl mx-auto max-w-md">
+            <div className="border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">{selectedNotification.title}</h3>
+              <button onClick={() => setSelectedNotification(null)} className="rounded-full p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+                <FaTimes />
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{selectedNotification.message}</p>
+              <p className="mt-4 text-xs text-slate-400">
+                {new Date(selectedNotification.created_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+            {selectedNotification.link && (
+              <div className="flex justify-center border-t border-slate-100 px-6 py-4">
+                {(() => {
+                  const action = getNotificationAction(selectedNotification.link);
+                  const ActionIcon = action.icon;
+                  return (
+                    <Link
+                      to={selectedNotification.link}
+                      onClick={() => { setSelectedNotification(null); setShowNotifications(false); }}
+                      className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                    >
+                      <ActionIcon className="text-xs" />
+                      {t(`header.${action.labelKey}`, 'Take Action')}
+                    </Link>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };
