@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaTimes, FaCheckCircle, FaRedo } from 'react-icons/fa';
-import api from '../services/api';
+import api from '../../services/api';
 import { toast } from 'react-toastify';
 
 const DEFAULT_LIVENESS = {
