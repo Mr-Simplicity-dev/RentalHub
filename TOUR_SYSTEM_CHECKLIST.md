@@ -1,151 +1,97 @@
-# Tour System Implementation Checklist
+# Tour System Checklist
 
-## ✅ Completed
-
-- [x] Tour Context (`TourContext.jsx`) - Manages tour state and logic
-- [x] Tour Hook (`useTour.js`) - Custom hook for accessing tour state
-- [x] Tour Configuration (`tourConfig.js`) - All tour steps for each dashboard
-- [x] Welcome Modal Component (`WelcomeModal.jsx`) - First-stage onboarding
-- [x] Tour Overlay Component (`TourOverlay.jsx`) - Step-by-step guided tour
-- [x] Tour Manager Component (`TourManager.jsx`) - Orchestrates tour flow
-- [x] App Integration - Wrapped app with TourProvider and added TourManager
-- [x] Integration Guide (`TOUR_INTEGRATION_GUIDE.md`) - Developer documentation
-
-## 📋 TODO - Per Dashboard Integration
-
-### Tenant/User Dashboard
-- [ ] Add CSS classes to dashboard sections:
-  - `.dashboard-properties-section`
-  - `.dashboard-bookings-section`
-  - `.dashboard-earnings-section`
-  - `.dashboard-analytics-section`
-  - `.dashboard-messages-section`
-
-### Agent Dashboard  
-- [ ] Add CSS classes to agent dashboard sections:
-  - `.agent-commissions-section`
-  - `.agent-bookings-section`
-  - `.agent-earnings-section`
-  - `.agent-profile-section`
-- [ ] Test tour with agent user type
-
-### Lawyer Dashboard
-- [ ] Add CSS classes to lawyer dashboard sections:
-  - `.lawyer-cases-section`
-  - `.lawyer-evidence-section`
-  - `.lawyer-clients-section`
-  - `.lawyer-earnings-section`
-
-### Admin Dashboard
-- [ ] Add CSS classes to admin dashboard sections:
-  - `.admin-users-section`
-  - `.admin-properties-section`
-  - `.admin-disputes-section`
-  - `.admin-payments-section`
-  - `.admin-reports-section`
-
-### Financial Admin Dashboard
-- [ ] Add CSS classes to financial admin sections:
-  - `.fin-admin-payments-section`
-  - `.fin-admin-settlements-section`
-  - `.fin-admin-refunds-section`
-  - `.fin-admin-reports-section`
-
-### Transportation Admin Dashboard
-- [ ] Add CSS classes to transportation sections:
-  - `.trans-admin-bookings-section`
-  - `.trans-admin-routes-section`
-  - `.trans-admin-drivers-section`
-  - `.trans-admin-revenue-section`
-
-### Fumigation Admin Dashboard
-- [ ] Add CSS classes to fumigation sections:
-  - `.fum-admin-bookings-section`
-  - `.fum-admin-services-section`
-  - `.fum-admin-providers-section`
-  - `.fum-admin-payments-section`
-
-### Recruitment Admin Dashboard
-- [ ] Add CSS classes to recruitment sections:
-  - `.rec-admin-jobs-section`
-  - `.rec-admin-applications-section`
-  - `.rec-admin-candidates-section`
-
-### Super Admin Dashboard
-- [ ] Add CSS classes to super admin sections:
-  - `.super-admin-users-section`
-  - `.super-admin-admins-section`
-  - `.super-admin-platform-section`
-  - `.super-admin-analytics-section`
-  - `.super-admin-support-section`
-
-## 🔧 Optional Enhancements
-
-- [ ] Add "Replay Tour" button to user settings/profile page
-- [ ] Create backend API endpoints to persist tour state in database
-- [ ] Add tour analytics to track user engagement
-- [ ] Create admin panel to manage/update tour content
-- [ ] Add multilingual support to tour steps
-- [ ] Create video/image support in tour steps
-- [ ] Add tour skip survey to gather feedback
-- [ ] Implement A/B testing for different tour flows
-
-## 🧪 Testing Checklist
-
-- [ ] Test first-time user experience (tour shows immediately)
-- [ ] Test returning user within 7 days (tour hidden)
-- [ ] Test returning user after 7 days (tour shows again)
-- [ ] Test tour navigation (next, previous, skip buttons)
-- [ ] Test tour on mobile devices
-- [ ] Test tour on tablet devices
-- [ ] Test tour on desktop
-- [ ] Verify highlight overlay works correctly
-- [ ] Verify tooltip positioning for all placements
-- [ ] Test localStorage persistence
-- [ ] Test with different user roles
-- [ ] Verify all target elements exist in DOM
-
-## 📝 Notes
-
-- Tour state is currently stored in localStorage with keys: `tour_last_dismissal_{userId}`
-- 7-day inactivity threshold can be modified in `TourContext.jsx`
-- Tour steps can be customized in `tourConfig.js`
-- All tour components use Framer Motion for animations
-- Tour system is RTL-ready (works with Arabic, etc.)
-
-## 🚀 Quick Start for Developers
-
-1. **View existing tour structure**:
-   - Check `client/src/config/tourConfig.js` for examples
-   
-2. **Add tour to your dashboard**:
-   ```jsx
-   // 1. Add CSS classes to your sections
-   <section className="dashboard-properties-section">
-   
-   // 2. Tours automatically show for authenticated users
-   // 3. Test by clearing localStorage and reloading
-   ```
-
-3. **Customize tour steps**:
-   - Edit tour steps in `tourConfig.js`
-   - Update target CSS selectors
-   - Modify descriptions
-   - Adjust tooltip placement
-
-4. **Add replay button**:
-   - Import `useTour` and `getTourStepsByUserRole`
-   - Create button that calls `replayTour()`
-
-## 📞 Support Resources
-
-- **Integration Guide**: See `TOUR_INTEGRATION_GUIDE.md`
-- **Tour Configuration**: `client/src/config/tourConfig.js`
-- **Context Documentation**: `client/src/context/TourContext.jsx`
-- **Component Guide**: Check JSDoc comments in components
+Last Updated: August 2026
 
 ---
 
-**Status**: Core system complete, awaiting dashboard integration
-**Maintained by**: Development Team
-**Last Updated**: June 13, 2026
+## Core System (COMPLETE)
+
+- [x] **TourContext** (`client/src/context/TourContext.jsx`) — State management, event tracking, resume logic, 14 event types, server-backed persistence, version migration, 7-day inactivity threshold
+- [x] **useTour hook** (`client/src/hooks/useTour.js`) — Access tour state from any component
+- [x] **TourProvider** — Wraps app in `App.jsx` (line 931)
+- [x] **TourManager** (`client/src/components/tour/TourManager.jsx`) — Welcomes user, tracks session, renders `WelcomeModal` then `TourOverlay`
+- [x] **WelcomeModal** (`client/src/components/tour/WelcomeModal.jsx`) — Branded intro with benefits, role-aware new/returning/resume flow
+- [x] **TourOverlay** (`client/src/components/tour/TourOverlay.jsx`) — Spotlight highlight, smart positioning, progress bar, step counter, keyboard navigation, screen reader support, `advanceOn` auto-advance, action steps
+- [x] **tourConfig** (`client/src/config/tourConfig.js`) — 21+ dashboard role configurations with targets, steps, icons, actions, action hints
+- [x] **Workflow tours** (`client/src/config/tourWorkflows.js`) — 6 guided workflow tours for profile-based discovery
+
+---
+
+## Per Dashboard Integration (COMPLETE)
+
+All dashboard components have their required CSS classes / `data-tour-id` attributes:
+
+| Dashboard                | Component File                                      | Selectors Verified |
+|--------------------------|-----------------------------------------------------|---------------------|
+| Tenant                   | `client/src/pages/Dashboard.jsx`                    | 8 of 8              |
+| Landlord                 | `client/src/pages/Dashboard.jsx`                    | 8 of 8              |
+| Agent                    | `client/src/pages/agent/AgentDashboard.jsx`         | 4 of 4              |
+| Lawyer                   | `client/src/pages/lawyer/LawyerDashboard.jsx`       | 4 of 4              |
+| Admin                    | `client/src/pages/admin/AdminDashboard.jsx`         | 5 of 5              |
+| Financial Admin          | `client/src/pages/admin/FinancialAdminDashboard.jsx`| 4 of 4              |
+| LGA Financial Admin      | `client/src/pages/admin/FinancialAdminDashboard.jsx`| 3 of 3              |
+| State Admin              | `client/src/pages/admin/StateAdminDashboard.jsx`    | 4 of 4              |
+| Super Admin              | `client/src/pages/SuperAdminDashboard.jsx`          | 5 of 5              |
+| Super Financial Admin    | `client/src/pages/admin/SuperFinancialAdminDashboard.jsx` | 4 of 4         |
+| Transportation Admin     | `client/src/pages/admin/TransportationAdminDashboard.jsx` | 4 of 4        |
+| State Transportation     | `client/src/pages/admin/TransportationAdminStateDashboard.jsx` | 4 of 4 |
+| Super Transportation     | `client/src/pages/admin/TransportationSuperAdminDashboard.jsx` | 4 of 4 |
+| Fumigation Admin         | `client/src/components/fumigation/FumigationCleaningAdmin.jsx` | 4 of 4 |
+| Super Fumigation         | `client/src/components/admin/FumigationOversightPanel.jsx` | 4 of 4   |
+| Recruitment Admin        | `client/src/pages/admin/RecruitmentAdminDashboard.jsx` | 3 of 3          |
+| LGA Support Admin        | `client/src/pages/admin/LgaSupportAdminDashboard.jsx` | 3 of 3          |
+| State Support Admin      | `client/src/pages/admin/StateSupportAdminDashboard.jsx` | 3 of 3        |
+| Super Support Admin      | `client/src/pages/admin/SuperSupportAdminDashboard.jsx` | 4 of 4       |
+
+---
+
+## Mobile Tour System (COMPLETE)
+
+- [x] **Mobile TourContext** (`RentalHubMobile/src/context/TourContext.js`) — 916 lines, state management, event tracking, resume logic
+- [x] **NativeTourManager** (`RentalHubMobile/src/components/tour/NativeTourManager.js`) — Welcome modal + coach mark overlay in a single component
+- [x] **TourTarget** (`RentalHubMobile/src/components/tour/TourTarget.js`) — View registration for tour step targeting
+- [x] **TourNavigationBridge** (`RentalHubMobile/src/components/tour/TourNavigationBridge.js`) — Handles navigation to correct screen before measuring targets
+- [x] **TourScrollContext** (`RentalHubMobile/src/components/tour/TourScrollContext.js`) — Scrolls to reveal off-screen targets
+- [x] **Mobile tourConfig** (`RentalHubMobile/src/config/tourConfig.js`) — 14 role-based step sets with icons (Ionicons), actions, destinations
+- [x] **Tour service** (`RentalHubMobile/src/services/tourService.js`) — Backend API for tour state/events
+- [x] **55 tour step IDs** — All registered via `TourTarget` or `useTourTarget` in their respective screens
+- [x] **17 navigation destinations** — All exist in AppNavigator
+- [x] **34 Ionicons** — All valid and available
+
+---
+
+## i18n / Multilingual (COMPLETE)
+
+- [x] **Web** — `tourTranslations.js` (395 lines) with `tour.ui.*`, `tour.welcome.*`, `tour.welcomeNamed`, `tour.welcomeDefault`, `tour.welcomeText`, `tour.resumeText`, `tour.duration`, `tour.openControl`, `tour.focusedLabel`, `tour.missing`, `tour.stepCount`, `tour.guidedWalkthrough`, `tour.openControlHint`, `tour.openingControl`, `tour.progressLabel` and dynamic step titles/descriptions for all 5 languages
+- [x] **Mobile catalog.cjs** — 61 `tour.*` UI keys per language
+- [x] **Mobile tourStepCatalog.cjs** — Step titles + descriptions for all 55 step IDs across 5 languages
+- [x] **Mobile translations.js** — Alternative translations module with all tour keys
+- [x] **Available locales:** English (en), French (fr), Arabic (ar), Russian (ru), Chinese (zh)
+- [x] **i18n.js integration** — tourTranslations merged into i18next resource bundle
+
+---
+
+## Optional Enhancements (Status)
+
+| Enhancement                         | Status           |
+|-------------------------------------|------------------|
+| Replay Tour (Profile/Settings page) | **DONE**         |
+| Backend API for tour state/events   | **DONE**         |
+| Tour analytics dashboard            | **DONE**         |
+| Resume support (cross-session)      | **DONE**         |
+| Multilingual (5 languages)          | **DONE**         |
+| Screen reader accessibility         | **DONE**         |
+| RTL support (Arabic)                | **DONE**         |
+| Admin panel for tour content        | Not implemented   |
+| Video/image in tour steps           | Not implemented   |
+| Tour skip survey                    | Not implemented   |
+| A/B testing for tour flows          | Not implemented   |
+
+---
+
+## Test Coverage
+
+- [x] `tests/tourSystemCoverage.test.js` (203 lines) — Web target registration coverage
+- [x] `tests/tourEngagement.test.js` (509 lines) — Backend analytics event handling
+- [x] `tests/webTourRuntimeTranslations.test.js` — Runtime translation testing
+- [x] `RentalHubMobile/scripts/verify-tour-system.cjs` — Mobile tour system verification (55 step IDs, 5 locales, 14 event types, screen registration, icon validation, PII sanitization, Android RTL, iOS locale declaration, Babel transforms)
