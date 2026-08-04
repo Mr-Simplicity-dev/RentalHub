@@ -32,6 +32,19 @@ const rollbackQuietly = async (client) => {
   }
 };
 
+const createFraudFlag = async (userId, rule, metadata = {}, score = 80) => {
+  try {
+    await db.query(
+      `INSERT INTO fraud_flags (entity_type, entity_id, rule, score, metadata, created_at)
+       VALUES ($1, $2, $3, $4, $5::jsonb, NOW())
+       ON CONFLICT (entity_type, entity_id, rule) WHERE resolved = false DO NOTHING`,
+      ['user', userId, rule, score, JSON.stringify(metadata)]
+    );
+  } catch (error) {
+    // Log silently - don't fail the main operation if fraud flag creation fails
+  }
+};
+
 const serializeRequest = (row) => {
   if (!row) return null;
   const copy = { ...row };
@@ -309,6 +322,12 @@ exports.submitRequest = async (req, res) => {
       );
       if (duplicate.rows.length) {
         await client.query('ROLLBACK');
+        await createFraudFlag(req.user.id, 'CREDENTIAL_REVALIDATION_FAILED', {
+          reason: 'duplicate_nin',
+          detail: 'User submitted a NIN that belongs to another account',
+          revalidation_request_id: requestId,
+          duplicate_user_id: duplicate.rows[0].id,
+        }, 85);
         return res.status(409).json({ success: false, message: 'This NIN is already used by another account' });
       }
 
@@ -365,6 +384,12 @@ exports.submitRequest = async (req, res) => {
       );
       if (duplicate.rows.length) {
         await client.query('ROLLBACK');
+        await createFraudFlag(req.user.id, 'CREDENTIAL_REVALIDATION_FAILED', {
+          reason: 'duplicate_passport',
+          detail: 'User submitted a passport number that belongs to another account',
+          revalidation_request_id: requestId,
+          duplicate_user_id: duplicate.rows[0].id,
+        }, 85);
         return res.status(409).json({ success: false, message: 'This passport is already used by another account' });
       }
       if (!isValidBirthDate(dateOfBirth)) {
@@ -555,6 +580,12 @@ exports.submitRequest = async (req, res) => {
     });
   }
   if (finalResult.status === 'not_verified') {
+    createFraudFlag(req.user.id, 'CREDENTIAL_REVALIDATION_FAILED', {
+      reason: 'prembly_not_verified',
+      detail: finalResult.message || 'Prembly could not verify this credential',
+      revalidation_request_id: requestId,
+      identity_type: identityType,
+    }, 70).catch(() => {});
     return res.status(422).json({
       success: false,
       code: 'PREMBLY_NOT_VERIFIED',

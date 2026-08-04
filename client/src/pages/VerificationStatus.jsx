@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCheckCircle, FaClock, FaExclamationTriangle, FaUserCircle } from 'react-icons/fa';
+import { FaCheckCircle, FaClock, FaExclamationTriangle, FaUserCircle, FaCamera } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import BackToDashboard from '../components/common/BackToDashboard';
 import AppealModal from '../components/common/AppealModal';
+import LivePassportCaptureModal from '../components/common/LivePassportCaptureModal';
 import { useTranslation } from 'react-i18next';
+
+const INITIAL_FORM = { nin: '', date_of_birth: '', international_passport_number: '', nationality: '' };
 
 const VerificationStatus = () => {
   const { t } = useTranslation();
@@ -15,14 +18,12 @@ const VerificationStatus = () => {
   const [error, setError] = useState('');
   const [showAppealModal, setShowAppealModal] = useState(false);
   const [revalidationRequests, setRevalidationRequests] = useState([]);
-  const [revalidationForm, setRevalidationForm] = useState({
-    nin: '',
-    date_of_birth: '',
-    international_passport_number: '',
-    nationality: '',
-  });
+  const [revalidationForm, setRevalidationForm] = useState(INITIAL_FORM);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [submittingRevalidation, setSubmittingRevalidation] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
+  const [showLiveCamera, setShowLiveCamera] = useState(false);
+  const [livePhotoCaptured, setLivePhotoCaptured] = useState(false);
   const hasLoadedOnMount = useRef(false);
 
   const loadLatestStatus = useCallback(async () => {
@@ -42,12 +43,8 @@ const VerificationStatus = () => {
             : []
         );
       }
-      if (profileResult.status === 'rejected') {
-        throw profileResult.reason;
-      }
-      if (revalidationResult.status === 'rejected') {
-        throw revalidationResult.reason;
-      }
+      if (profileResult.status === 'rejected') throw profileResult.reason;
+      if (revalidationResult.status === 'rejected') throw revalidationResult.reason;
     } catch (err) {
       setError(err?.response?.data?.message || t('verification_status.load_error'));
     }
@@ -58,34 +55,47 @@ const VerificationStatus = () => {
     [revalidationRequests]
   );
 
+  const baselineSnapshot = activeRevalidation?.baseline_snapshot || {};
+  const existingIdentity = useMemo(() => ({
+    nin: user?.nin ? `••••••${String(user.nin).slice(-3)}` : (baselineSnapshot?.nin ? `••••••${String(baselineSnapshot.nin).slice(-3)}` : ''),
+    passport: user?.international_passport_number || baselineSnapshot?.international_passport_number || '',
+    nationality: user?.nationality || baselineSnapshot?.nationality || '',
+    documentType: user?.identity_document_type || baselineSnapshot?.identity_document_type || '',
+  }), [user, baselineSnapshot]);
+
+  const clearFieldErrors = () => setFieldErrors({});
+
+  const validateRevalidation = () => {
+    if (!activeRevalidation) return false;
+    const errors = {};
+    const requestedFields = activeRevalidation.requested_fields || [];
+
+    if (requestedFields.includes('nin')) {
+      if (!/^\d{11}$/.test(revalidationForm.nin)) {
+        errors.nin = t('verification_status.nin_error');
+      }
+      if (!revalidationForm.date_of_birth) {
+        errors.date_of_birth = t('verification_status.dob_error');
+      }
+    }
+    if (requestedFields.includes('international_passport')) {
+      if (!/^[A-Z0-9]{6,20}$/.test(revalidationForm.international_passport_number.trim())) {
+        errors.international_passport_number = t('verification_status.passport_number_error');
+      }
+      if (revalidationForm.nationality.trim().length < 2) {
+        errors.nationality = t('verification_status.nationality_error');
+      }
+      if (!revalidationForm.date_of_birth) {
+        errors.date_of_birth = t('verification_status.dob_error');
+      }
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const submitRevalidation = async () => {
     if (!activeRevalidation) return;
-    const requestedFields = activeRevalidation.requested_fields || [];
-    if (requestedFields.includes('nin') && !/^\d{11}$/.test(revalidationForm.nin)) {
-      setError(t('verification_status.nin_error'));
-      return;
-    }
-    if (
-      requestedFields.includes('international_passport') &&
-      !/^[A-Z0-9]{6,20}$/.test(revalidationForm.international_passport_number.trim())
-    ) {
-      setError(t('verification_status.passport_number_error'));
-      return;
-    }
-    if (
-      requestedFields.includes('international_passport') &&
-      revalidationForm.nationality.trim().length < 2
-    ) {
-      setError(t('verification_status.nationality_error'));
-      return;
-    }
-    if (
-      requestedFields.some((field) => ['nin', 'international_passport'].includes(field)) &&
-      !revalidationForm.date_of_birth
-    ) {
-      setError(t('verification_status.dob_error'));
-      return;
-    }
+    if (!validateRevalidation()) return;
 
     setSubmittingRevalidation(true);
     setError('');
@@ -95,12 +105,9 @@ const VerificationStatus = () => {
         `/users/credential-revalidations/${activeRevalidation.id}/submit`,
         revalidationForm
       );
-      setRevalidationForm({
-        nin: '',
-        date_of_birth: '',
-        international_passport_number: '',
-        nationality: '',
-      });
+      setRevalidationForm(INITIAL_FORM);
+      setFieldErrors({});
+      setLivePhotoCaptured(false);
       await loadLatestStatus();
       setActionMessage(t('verification_status.credentials_submitted'));
     } catch (err) {
@@ -118,52 +125,49 @@ const VerificationStatus = () => {
 
   const verificationStatus = useMemo(() => {
     const hasSubmittedVerification = !!user?.passport_photo_url;
-    return (
-      user?.identity_verification_status ||
-      (user?.identity_verified
-        ? 'verified'
-        : hasSubmittedVerification
-          ? 'pending'
-          : 'not_submitted')
-    );
+    if (user?.identity_verification_status === 'provider_pending') return 'provider_pending';
+    if (user?.identity_verified) return 'verified';
+    if (user?.identity_verification_status === 'rejected') return 'rejected';
+    if (user?.identity_verification_status === 'revalidation_required') return 'revalidation_required';
+    if (user?.identity_verification_status === 'pending' || hasSubmittedVerification) return 'pending';
+    return 'not_submitted';
   }, [user?.identity_verification_status, user?.identity_verified, user?.passport_photo_url]);
 
   const statusDetails = useMemo(() => {
-    if (verificationStatus === 'verified') {
-      return {
+    const statuses = {
+      verified: {
         title: t('verification_status.verified_title'),
         description: t('verification_status.verified_desc'),
         icon: <FaCheckCircle className="text-emerald-600 text-3xl" />,
         cardClass: 'bg-emerald-50 border-emerald-200',
         titleClass: 'text-emerald-800',
         textClass: 'text-emerald-700',
-      };
-    }
-
-    if (verificationStatus === 'rejected') {
-      return {
+      },
+      rejected: {
         title: t('verification_status.rejected_title'),
         description: t('verification_status.rejected_desc'),
         icon: <FaExclamationTriangle className="text-red-600 text-3xl" />,
         cardClass: 'bg-red-50 border-red-200',
         titleClass: 'text-red-800',
         textClass: 'text-red-700',
-      };
-    }
-
-    if (verificationStatus === 'revalidation_required') {
-      return {
+      },
+      revalidation_required: {
         title: t('verification_status.revalidation_title'),
         description: t('verification_status.revalidation_desc'),
         icon: <FaExclamationTriangle className="text-amber-600 text-3xl" />,
         cardClass: 'bg-amber-50 border-amber-200',
         titleClass: 'text-amber-800',
         textClass: 'text-amber-700',
-      };
-    }
-
-    if (verificationStatus === 'pending') {
-      return {
+      },
+      provider_pending: {
+        title: t('verification_status.provider_pending_title') || 'Verification in Progress',
+        description: t('verification_status.provider_pending_desc') || 'Your credential is being verified by our identity partner. This usually takes a few minutes. Please check back shortly.',
+        icon: <FaClock className="text-indigo-600 text-3xl" />,
+        cardClass: 'bg-indigo-50 border-indigo-200',
+        titleClass: 'text-indigo-800',
+        textClass: 'text-indigo-700',
+      },
+      pending: {
         title: t('verification_status.pending_title'),
         description: activeRevalidation
           ? t('verification_status.pending_desc_revalidation')
@@ -172,17 +176,17 @@ const VerificationStatus = () => {
         cardClass: 'bg-blue-50 border-blue-200',
         titleClass: 'text-blue-800',
         textClass: 'text-blue-700',
-      };
-    }
-
-    return {
-      title: t('verification_status.not_submitted_title'),
-      description: t('verification_status.not_submitted_desc'),
-      icon: <FaUserCircle className="text-yellow-600 text-3xl" />,
-      cardClass: 'bg-yellow-50 border-yellow-200',
-      titleClass: 'text-yellow-800',
-      textClass: 'text-yellow-700',
+      },
+      not_submitted: {
+        title: t('verification_status.not_submitted_title'),
+        description: t('verification_status.not_submitted_desc'),
+        icon: <FaUserCircle className="text-yellow-600 text-3xl" />,
+        cardClass: 'bg-yellow-50 border-yellow-200',
+        titleClass: 'text-yellow-800',
+        textClass: 'text-yellow-700',
+      },
     };
+    return statuses[verificationStatus] || statuses.not_submitted;
   }, [activeRevalidation, verificationStatus]);
 
   const handleRefresh = async () => {
@@ -190,6 +194,26 @@ const VerificationStatus = () => {
     await loadLatestStatus();
     setRefreshing(false);
   };
+
+  const handleLivePhotoCapture = () => {
+    setShowLiveCamera(true);
+  };
+
+  const handleLiveCameraClose = () => {
+    setShowLiveCamera(false);
+  };
+
+  const handleLivePhotoCaptured = () => {
+    setLivePhotoCaptured(true);
+    setShowLiveCamera(false);
+  };
+
+  const inputClass = (field) =>
+    `input mt-1 ${fieldErrors[field] ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}`;
+
+  const requestedFields = activeRevalidation?.requested_fields || [];
+  const hasIdentityFields = requestedFields.some((f) => ['nin', 'international_passport'].includes(f));
+  const hasLivePhoto = requestedFields.includes('live_photo');
 
   return (
     <div className="min-h-screen bg-gray-50 py-10">
@@ -247,13 +271,28 @@ const VerificationStatus = () => {
                 </div>
               )}
 
+              {existingIdentity.documentType && activeRevalidation.status !== 'submitted' && (
+                <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                  <strong>Your current credentials on file:</strong>
+                  <ul className="mt-1 space-y-0.5 list-disc list-inside">
+                    {existingIdentity.documentType === 'nin' && existingIdentity.nin && (
+                      <li>NIN: {existingIdentity.nin}</li>
+                    )}
+                    {existingIdentity.documentType === 'passport' && existingIdentity.passport && (
+                      <li>Passport: {existingIdentity.passport}</li>
+                    )}
+                    {existingIdentity.nationality && <li>Nationality: {existingIdentity.nationality}</li>}
+                  </ul>
+                </div>
+              )}
+
               {activeRevalidation.status === 'submitted' ? (
                 <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700">
                   {t('verification_status.awaiting_review')}
                 </div>
               ) : (
                 <div className="mt-5 space-y-4">
-                  {(activeRevalidation.requested_fields || []).includes('nin') && (
+                  {requestedFields.includes('nin') && (
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="text-sm font-medium text-gray-700">
                         {t('verification_status.nin_label')}
@@ -262,30 +301,39 @@ const VerificationStatus = () => {
                           inputMode="numeric"
                           maxLength={11}
                           value={revalidationForm.nin}
-                          onChange={(event) => setRevalidationForm((previous) => ({
-                            ...previous,
-                            nin: event.target.value.replace(/\D/g, ''),
-                          }))}
-                          className="input mt-1"
+                          onChange={(event) => {
+                            clearFieldErrors();
+                            setRevalidationForm((previous) => ({
+                              ...previous,
+                              nin: event.target.value.replace(/\D/g, ''),
+                            }));
+                          }}
+                          className={inputClass('nin')}
                           autoComplete="off"
+                          placeholder="Enter 11-digit NIN"
                         />
+                        {fieldErrors.nin && <p className="mt-1 text-xs text-red-500">{fieldErrors.nin}</p>}
                       </label>
                       <label className="text-sm font-medium text-gray-700">
                         Date of birth
                         <input
                           type="date"
                           value={revalidationForm.date_of_birth}
-                          onChange={(event) => setRevalidationForm((previous) => ({
-                            ...previous,
-                            date_of_birth: event.target.value,
-                          }))}
-                          className="input mt-1"
+                          onChange={(event) => {
+                            clearFieldErrors();
+                            setRevalidationForm((previous) => ({
+                              ...previous,
+                              date_of_birth: event.target.value,
+                            }));
+                          }}
+                          className={inputClass('date_of_birth')}
                         />
+                        {fieldErrors.date_of_birth && <p className="mt-1 text-xs text-red-500">{fieldErrors.date_of_birth}</p>}
                       </label>
                     </div>
                   )}
 
-                  {(activeRevalidation.requested_fields || []).includes('international_passport') && (
+                  {requestedFields.includes('international_passport') && (
                     <div className="grid gap-3 sm:grid-cols-3">
                       <label className="text-sm font-medium text-gray-700">
                         {t('verification_status.passport_label')}
@@ -293,13 +341,18 @@ const VerificationStatus = () => {
                           type="text"
                           maxLength={20}
                           value={revalidationForm.international_passport_number}
-                          onChange={(event) => setRevalidationForm((previous) => ({
-                            ...previous,
-                            international_passport_number: event.target.value.toUpperCase(),
-                          }))}
-                          className="input mt-1"
+                          onChange={(event) => {
+                            clearFieldErrors();
+                            setRevalidationForm((previous) => ({
+                              ...previous,
+                              international_passport_number: event.target.value.toUpperCase(),
+                            }));
+                          }}
+                          className={inputClass('international_passport_number')}
                           autoComplete="off"
+                          placeholder="e.g. A12345678"
                         />
+                        {fieldErrors.international_passport_number && <p className="mt-1 text-xs text-red-500">{fieldErrors.international_passport_number}</p>}
                       </label>
                       <label className="text-sm font-medium text-gray-700">
                         {t('verification_status.nationality_label')}
@@ -307,34 +360,49 @@ const VerificationStatus = () => {
                           type="text"
                           maxLength={80}
                           value={revalidationForm.nationality}
-                          onChange={(event) => setRevalidationForm((previous) => ({
-                            ...previous,
-                            nationality: event.target.value,
-                          }))}
-                          className="input mt-1"
+                          onChange={(event) => {
+                            clearFieldErrors();
+                            setRevalidationForm((previous) => ({
+                              ...previous,
+                              nationality: event.target.value,
+                            }));
+                          }}
+                          className={inputClass('nationality')}
+                          placeholder="e.g. Nigeria"
                         />
+                        {fieldErrors.nationality && <p className="mt-1 text-xs text-red-500">{fieldErrors.nationality}</p>}
                       </label>
                       <label className="text-sm font-medium text-gray-700">
                         {t('verification_status.dob_label')}
                         <input
                           type="date"
                           value={revalidationForm.date_of_birth}
-                          onChange={(event) => setRevalidationForm((previous) => ({
-                            ...previous,
-                            date_of_birth: event.target.value,
-                          }))}
-                          className="input mt-1"
+                          onChange={(event) => {
+                            clearFieldErrors();
+                            setRevalidationForm((previous) => ({
+                              ...previous,
+                              date_of_birth: event.target.value,
+                            }));
+                          }}
+                          className={inputClass('date_of_birth')}
                         />
+                        {fieldErrors.date_of_birth && <p className="mt-1 text-xs text-red-500">{fieldErrors.date_of_birth}</p>}
                       </label>
                     </div>
                   )}
 
-                  {(activeRevalidation.requested_fields || []).includes('live_photo') && (
+                  {hasLivePhoto && (
                     <div className="rounded-lg border border-gray-200 bg-white p-4">
                       <p className="text-sm font-semibold text-gray-800">{t('verification_status.live_photo_required')}</p>
-                      <p className="mt-1 text-xs text-gray-600">{t('verification_status.live_photo_instruction')}</p>
-                      <button type="button" onClick={() => navigate('/profile')} className="btn btn-secondary mt-3">
-                        {t('verification_status.open_camera')}
+                      <p className="mt-1 text-xs text-gray-600">
+                        {livePhotoCaptured
+                          ? 'New live photo captured. Ready to submit.'
+                          : t('verification_status.live_photo_instruction')}
+                      </p>
+                      <button type="button" onClick={handleLivePhotoCapture}
+                        className={`btn mt-3 inline-flex items-center gap-2 ${livePhotoCaptured ? 'btn-secondary' : 'btn-primary'}`}>
+                        <FaCamera />
+                        {livePhotoCaptured ? 'Retake live photo' : 'Open Camera (liveness check)'}
                       </button>
                     </div>
                   )}
@@ -387,10 +455,18 @@ const VerificationStatus = () => {
         </div>
       </div>
 
+      {showLiveCamera && (
+        <LivePassportCaptureModal
+          title="Live Passport Capture - Credential Revalidation"
+          onCapture={handleLivePhotoCaptured}
+          onClose={handleLiveCameraClose}
+        />
+      )}
+
       {showAppealModal && (
         <AppealModal
           appealType="verification"
-          targetId={user.id}
+          targetId={user?.id}
           onClose={() => setShowAppealModal(false)}
           onSuccess={() => loadLatestStatus()}
         />

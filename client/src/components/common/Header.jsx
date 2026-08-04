@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDown, FaIdCard, FaTachometerAlt, FaFileAlt } from 'react-icons/fa';
+import { FaBell, FaUser, FaSignOutAlt, FaEnvelope, FaBars, FaTimes, FaChevronDown, FaIdCard, FaTachometerAlt, FaFileAlt, FaCheckCircle, FaHeadset, FaExclamationTriangle, FaHome } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
@@ -30,6 +30,17 @@ const scrollToLinkedRoute = (to) => {
 
     window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
   }, 0);
+};
+
+const getNotificationAction = (link) => {
+  if (!link) return { icon: FaIdCard, labelKey: 'take_action' };
+  const l = link.toLowerCase();
+  if (l.includes('/verification-status')) return { icon: FaIdCard, labelKey: 'verify_now' };
+  if (l.includes('tab=verifications')) return { icon: FaCheckCircle, labelKey: 'review_submission' };
+  if (l.includes('support') || l.includes('ticket') || l.includes('escalation')) return { icon: FaHeadset, labelKey: 'view_ticket' };
+  if (l.includes('refund')) return { icon: FaExclamationTriangle, labelKey: 'view_refund' };
+  if (l.includes('/dashboard')) return { icon: FaHome, labelKey: 'go_to_dashboard' };
+  return { icon: FaIdCard, labelKey: 'take_action' };
 };
 
 const Header = () => {
@@ -815,8 +826,12 @@ return (
                               )}
                             </div>
 
-                            {notif.link && (
-                              <div className="mt-2 flex justify-end">
+                        {notif.link && (
+                          <div className="mt-2 flex justify-end">
+                            {(() => {
+                              const action = getNotificationAction(notif.link);
+                              const ActionIcon = action.icon;
+                              return (
                                 <Link
                                   to={notif.link}
                                   onClick={(e) => {
@@ -826,11 +841,13 @@ return (
                                   }}
                                   className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700"
                                 >
-                                  <FaIdCard className="text-[10px]" />
-                                  {t('header.take_action')}
+                                  <ActionIcon className="text-[10px]" />
+                                  {t(`header.${action.labelKey}`, 'Take Action')}
                                 </Link>
-                              </div>
-                            )}
+                              );
+                            })()}
+                          </div>
+                        )}
                           </div>
                         ))
                       )}
@@ -984,18 +1001,24 @@ return (
 
                     {selectedNotification.link && (
                       <div className="flex justify-center border-t border-gray-100 px-6 py-4">
-                        <Link
-                          to={selectedNotification.link}
-                          onClick={() => {
-                            setSelectedNotification(null);
-                            setShowNotifications(false);
-                            scrollToLinkedRoute(selectedNotification.link);
-                          }}
-                          className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-                        >
-                          <FaIdCard className="text-xs" />
-                          {t('header.take_action')}
-                        </Link>
+                        {(() => {
+                          const action = getNotificationAction(selectedNotification.link);
+                          const ActionIcon = action.icon;
+                          return (
+                            <Link
+                              to={selectedNotification.link}
+                              onClick={() => {
+                                setSelectedNotification(null);
+                                setShowNotifications(false);
+                                scrollToLinkedRoute(selectedNotification.link);
+                              }}
+                              className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                            >
+                              <ActionIcon className="text-xs" />
+                              {t(`header.${action.labelKey}`, 'Take Action')}
+                            </Link>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
