@@ -1461,6 +1461,7 @@ const Dashboard = () => {
                 title="Unlocked Details"
                 value={stats?.unlocked_properties_count || 0}
                 onClick={() => navigate('/properties')}
+                dataTourId="stat-unlocked"
               />
               <StatCard
                 icon={<FaEnvelope className="text-green-500" />}
@@ -1474,18 +1475,21 @@ const Dashboard = () => {
                 title="Subscription"
                 value={getTenantSubscriptionValue()}
                 onClick={() => navigate('/subscribe')}
+                dataTourId="stat-subscription"
               />
               <StatCard
                 title="Transport Bookings"
                 value={transportStats?.total_bookings || 0}
                 icon={<FaTruck className="text-sky-500" />}
                 onClick={() => setShowTransportModal(true)}
+                dataTourId="stat-transport"
               />
               <StatCard
                 icon={<FaPiggyBank className="text-emerald-500" />}
                 title="Rent Savings"
                 value={getRentSavingsValue()}
                 onClick={openRentSavingsAgreement}
+                dataTourId="stat-savings"
               />
               <StatCard
                 icon={<FaMoneyBillWave className="text-orange-500" />}
@@ -1494,6 +1498,7 @@ const Dashboard = () => {
                 onClick={openRefundModal}
                 note={refundCountdown?.label}
                 noteClass={refundCountdown?.className}
+                dataTourId="stat-refunds"
               />
               <StatCard
                 icon={<FaClock className="text-indigo-500" />}
@@ -1502,6 +1507,7 @@ const Dashboard = () => {
                 onClick={openGraceModal}
                 note={graceCountdown?.label}
                 noteClass={graceCountdown?.className}
+                dataTourId="stat-grace"
               />
               <StatCard
                 icon={<FaWallet className="text-teal-500" />}
@@ -1525,12 +1531,14 @@ const Dashboard = () => {
                 title={t('dashboard.available_props')}
                 value={stats?.available_properties || 0}
                 onClick={() => navigate('/my-properties?status=available')}
+                dataTourId="stat-available"
               />
               <StatCard
                 icon={<FaFileAlt className="text-yellow-500" />}
                 title={t('dashboard.pending_apps')}
                 value={stats?.pending_applications || 0}
                 onClick={() => navigate('/applications?status=pending')}
+                dataTourId="stat-pending"
               />
               <StatCard
                 icon={<FaEnvelope className="text-purple-500" />}
@@ -1546,6 +1554,7 @@ const Dashboard = () => {
                 onClick={() => openLandlordRefundModal('pending')}
                 note={refundCountdown?.label}
                 noteClass={refundCountdown?.className}
+                dataTourId="stat-refunds"
               />
               <StatCard
                 icon={<FaClock className="text-indigo-500" />}
@@ -1554,6 +1563,7 @@ const Dashboard = () => {
                 onClick={() => openLandlordGraceModal('enabled')}
                 note={graceCountdown?.label}
                 noteClass={graceCountdown?.className}
+                dataTourId="stat-grace"
               />
               <StatCard
                 icon={<FaPiggyBank className="text-teal-500" />}
@@ -1567,6 +1577,7 @@ const Dashboard = () => {
                 title="Subscription"
                 value={getTenantSubscriptionValue()}
                 onClick={() => navigate('/subscribe')}
+                dataTourId="stat-subscription"
               />
             </>
           )}
@@ -1662,6 +1673,7 @@ const Dashboard = () => {
           <section
             className="mb-8 overflow-hidden rounded-lg border border-emerald-200 bg-white shadow-sm"
             aria-labelledby="referral-invite-title"
+            data-tour-id="section-referral"
           >
             <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
               <div className="p-5 sm:p-6">
@@ -1827,6 +1839,7 @@ const Dashboard = () => {
                 description="View and manage disputes you are involved in"
                 icon={<FaBalanceScale />}
                 onClick={() => navigate('/my-disputes')}
+                dataTourId="action-disputes"
               />
               <QuickActionCard
                 title="Damage Reports"
@@ -1837,6 +1850,7 @@ const Dashboard = () => {
                 }
                 icon={<FaTools />}
                 onClick={() => navigate('/my-damage-reports')}
+                dataTourId="action-damage"
               />
               <QuickActionCard
                 title="Subscription"
@@ -1849,6 +1863,7 @@ const Dashboard = () => {
                 description="View properties you have unlocked access to"
                 icon={<FaKey />}
                 onClick={() => navigate('/subscribed-properties')}
+                dataTourId="action-subscribed"
               />
               <QuickActionCard
                 title="Request Legal Help"
@@ -1862,12 +1877,14 @@ const Dashboard = () => {
                 description="Submit a support ticket or view your requests"
                 icon={<FaTicketAlt />}
                 onClick={() => navigate('/support')}
+                dataTourId="action-support"
               />
               <QuickActionCard
                 title="Fumigation & Cleaning"
                 description="Browse certified fumigation and cleaning services for your property"
                 icon={<FaSprayCan />}
                 onClick={() => navigate('/fumigation-cleaning/catalog')}
+                dataTourId="action-fumigation"
               />
               <QuickActionCard
                 title={hasCompletedInspections ? 'Inspections' : 'Inspection Fee'}
@@ -1895,6 +1912,7 @@ const Dashboard = () => {
                     : 'bg-gray-100 text-gray-600 border-gray-200'
                 }
                 disabled={!hasPropertyInspectionOptions && !hasCompletedInspections}
+                dataTourId="action-inspection"
               />
               <QuickActionCard
                 title="Request a Refund"
@@ -1903,6 +1921,7 @@ const Dashboard = () => {
                 onClick={openRefundModal}
                 note={refundCountdown?.label}
                 noteClass={refundCountdown?.className}
+                dataTourId="action-refund"
               />
               <QuickActionCard
                 title="Request Grace Period"
@@ -1911,6 +1930,7 @@ const Dashboard = () => {
                 onClick={openGraceModal}
                 note={graceCountdown?.label}
                 noteClass={graceCountdown?.className}
+                dataTourId="action-grace"
               />
               <QuickActionCard
                 title="Withdraw Funds"
@@ -1929,6 +1949,7 @@ const Dashboard = () => {
                 description="Save toward rent, contribute monthly, and manage withdrawals"
                 icon={<FaPiggyBank />}
                 onClick={openRentSavingsAgreement}
+                dataTourId="action-savings"
               />
             </>
           ) : (
@@ -3438,8 +3459,8 @@ const LandlordPropertyFeeModal = ({
 };
 
 // Stat Card Component
-const StatCard = ({ icon, title, value, onClick, note, noteClass = 'bg-gray-100 text-gray-700 border-gray-200', className = '' }) => (
-  <div onClick={onClick} className={`card cursor-pointer ${className}`}>
+const StatCard = ({ icon, title, value, onClick, note, noteClass = 'bg-gray-100 text-gray-700 border-gray-200', className = '', dataTourId }) => (
+  <div onClick={onClick} className={`card cursor-pointer ${className}`} data-tour-id={dataTourId}>
     <div className="flex items-center justify-between">
       <div>
         <p className="text-gray-600 text-sm mb-1">{title}</p>
@@ -3542,6 +3563,7 @@ const QuickActionCard = ({
   noteClass = 'bg-gray-100 text-gray-700 border-gray-200',
   disabled = false,
   className = '',
+  dataTourId,
 }) => (
   <div
     onClick={onClick}
@@ -3549,6 +3571,7 @@ const QuickActionCard = ({
       disabled ? 'border-gray-200 bg-gray-50 opacity-80' : 'hover:-translate-y-0.5'
     }`}
     aria-disabled={disabled}
+    data-tour-id={dataTourId}
   >
     <div className="text-4xl text-primary-600 mb-3">{icon}</div>
     <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>
