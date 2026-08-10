@@ -737,6 +737,14 @@
     "go_home": "Go Home",
     "back": "Back"
   },
+  "install_prompt": {
+    "eyebrow": "APPLICATION ANDROID",
+    "title": "Installer l'application RentalHub",
+    "subtitle": "Installez l'application native complète sur votre appareil.",
+    "install": "Installer",
+    "downloading": "Téléchargement en cours…",
+    "not_now": "Plus tard"
+  },
   "mobile_app": {
     "title": "RentalHub Mobile App",
     "subtitle": "Manage your rentals, chat with landlords and tenants, and access legal support — all from your phone.",

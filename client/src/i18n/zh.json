@@ -742,6 +742,14 @@
     "go_home": "Go Home",
     "back": "Back"
   },
+  "install_prompt": {
+    "eyebrow": "安卓应用",
+    "title": "安装 RentalHub 应用",
+    "subtitle": "在您的设备上获得完整的原生应用体验。",
+    "install": "安装",
+    "downloading": "开始下载…",
+    "not_now": "暂不"
+  },
   "mobile_app": {
     "title": "RentalHub Mobile App",
     "subtitle": "Manage your rentals, chat with landlords and tenants, and access legal support — all from your phone.",

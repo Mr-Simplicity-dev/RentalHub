@@ -19,6 +19,7 @@ import Footer from '../components/common/Footer';
 import TourManager from '../components/tour/TourManager';
 import LiveRatingFlyIn from '../components/ratings/LiveRatingFlyIn';
 import PlatformRatingPrompt from '../components/ratings/PlatformRatingPrompt';
+import InstallAppBanner from '../components/InstallAppBanner';
 
 
 import Home from './Home';
@@ -697,6 +698,7 @@ function Layout({ children }) {
 
       <LiveRatingFlyIn disabled={isDashboardShell || isLegalPage} />
       <PlatformRatingPrompt disabled={isDashboardShell || isLegalPage} />
+      <InstallAppBanner disabled={isDashboardShell || isVerificationPage || isLegalPage} />
 
 
       {showPublicHeaderFooter && <div className="app-public-footer"><Footer /></div>}
