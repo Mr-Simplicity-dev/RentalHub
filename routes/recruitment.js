@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const recruitmentController = require('../controllers/recruitmentController');
 const { authenticate } = require('../config/middleware/auth');
 const validateRequest = require('../config/middleware/validateRequest');
+const { requireTurnstile } = require('../config/middleware/turnstileVerify');
 const {
   recruitmentApplyLimiter,
   recruitmentPaymentLimiter,
@@ -140,6 +141,7 @@ router.get('/locations/lgas/:state', recruitmentController.getLGAs);
 
 // Applicant routes (no authentication required - guests can apply)
 router.post('/apply',
+  requireTurnstile,
   [body('full_name').optional().isString().trim().isLength({ max: 255 }),
    body('email').optional().isEmail().normalizeEmail(),
    body('phone').optional().isString().trim().isLength({ max: 20 }),
