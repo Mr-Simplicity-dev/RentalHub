@@ -50,6 +50,12 @@ const EMPTY_FILTERS = {
 const statusOptions = ['', 'draft', 'submitted', 'under_review', 'shortlisted', 'approved', 'rejected', 'disqualified'];
 const paymentOptions = ['', 'pending', 'paid', 'failed', 'refunded'];
 
+const ACTION_LABELS = {
+  'reopen-interview': 'Interview session reopened',
+  'extend-interview': 'Interview session extended',
+  'set-interview': 'Interview date set',
+};
+
 const downloadBlob = async (path, filename, params = {}) => {
   try {
     const res = await api.get(path, { params, responseType: 'blob' });
@@ -1612,7 +1618,7 @@ export function RecruitmentInterviewTab({ cycles, roles, onRefreshCore }) {
     setActionKey(key);
     try {
       await api.post(`/recruitment/admin/applicants/${id}/${action}`, body);
-      toast.success(`Applicant ${action}ed`);
+      toast.success(ACTION_LABELS[action] || `Applicant ${action}ed`);
       await loadApplicants(pagination.page);
       if (onRefreshCore) await onRefreshCore();
     } catch (error) {
@@ -1830,6 +1836,25 @@ export function RecruitmentInterviewTab({ cycles, roles, onRefreshCore }) {
                         Interview: {formatDateTime(applicant.interview_date)}
                       </p>
                     )}
+                    {applicant.interview_completed && (
+                      <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        <FaCheckCircle className="text-[10px]" />
+                        Completed{applicant.interview_score != null ? ` · Score ${Math.round(applicant.interview_score)}%` : ''}
+                        {applicant.interview_expired ? ' · Time expired' : ''}
+                      </p>
+                    )}
+                    {applicant.interview_started_at && !applicant.interview_completed && !applicant.interview_abandoned_at && (
+                      <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700">
+                        <FaVideo className="text-[10px]" />
+                        Active session{applicant.interview_session_expires_at ? ` · expires ${formatDateTime(applicant.interview_session_expires_at)}` : ''}
+                      </p>
+                    )}
+                    {applicant.interview_abandoned_at && !applicant.interview_completed && (
+                      <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-600">
+                        <FaTimes className="text-[10px]" />
+                        Session abandoned {formatDateTime(applicant.interview_abandoned_at)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 shrink-0">
                     <ActionButton
@@ -1840,6 +1865,26 @@ export function RecruitmentInterviewTab({ cycles, roles, onRefreshCore }) {
                     >
                       Set Date
                     </ActionButton>
+                    {applicant.interview_started_at && !applicant.interview_completed && (
+                      <ActionButton
+                        onClick={() => updateApplicant(applicant.id, 'extend-interview', { minutes: 15 })}
+                        disabled={actionKey.startsWith(applicant.id)}
+                        variant="primary"
+                        size="sm"
+                      >
+                        Extend +15m
+                      </ActionButton>
+                    )}
+                    {(applicant.interview_abandoned_at || applicant.interview_expired) && (
+                      <ActionButton
+                        onClick={() => updateApplicant(applicant.id, 'reopen-interview')}
+                        disabled={actionKey.startsWith(applicant.id)}
+                        variant="success"
+                        size="sm"
+                      >
+                        Reopen Session
+                      </ActionButton>
+                    )}
                     <ActionButton
                       onClick={() => downloadBlob(
                         `/recruitment/admin/reports/applicant/${applicant.id}`,

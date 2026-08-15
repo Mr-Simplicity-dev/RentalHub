@@ -18,6 +18,10 @@ const RECRUITMENT_EMAIL = process.env.RECRUITMENT_EMAIL || 'recruitment@rentalhu
 const RECRUITMENT_CLOSURE_CRON = process.env.RECRUITMENT_CLOSURE_CRON || '15 0 * * *';
 const MAX_EMAIL_ATTACHMENT_BYTES = Number(process.env.RECRUITMENT_MAX_EMAIL_ATTACHMENT_BYTES || 18 * 1024 * 1024);
 const STALE_PAYMENT_HOURS = Number(process.env.RECRUITMENT_STALE_PAYMENT_HOURS || 24);
+const INTERVIEW_SESSION_INACTIVITY_MINUTES = Number(process.env.RECRUITMENT_SESSION_INACTIVITY_MINUTES || 5);
+const INTERVIEW_SESSION_CAP_MINUTES = Number(process.env.RECRUITMENT_SESSION_CAP_MINUTES || 60);
+const INTERVIEW_SESSION_SCAN_CRON = process.env.RECRUITMENT_SESSION_SCAN_CRON || '*/5 * * * *';
+const { finalizeInterviewSession } = require('../services/recruitmentService');
 
 const safeFileSegment = (value) =>
   String(value || 'file')
@@ -218,6 +222,64 @@ const cleanupStaleRecruitmentPayments = async () => {
   }
 };
 
+const markAbandonedInterviewSessions = async () => {
+  const result = await db.query(
+    `UPDATE recruitment_applications
+     SET interview_abandoned_at = COALESCE(interview_abandoned_at, NOW()),
+         interview_abandoned_reason = COALESCE(interview_abandoned_reason, $1),
+         updated_at = NOW()
+     WHERE interview_started_at IS NOT NULL
+       AND interview_completed = FALSE
+       AND interview_abandoned_at IS NULL
+       AND interview_last_ping_at IS NOT NULL
+       AND interview_last_ping_at < NOW() - ($2::int * INTERVAL '1 minute')
+     RETURNING id`,
+    [`Session abandoned: no activity for ${INTERVIEW_SESSION_INACTIVITY_MINUTES} minutes`, INTERVIEW_SESSION_INACTIVITY_MINUTES]
+  );
+
+  if (result.rowCount) {
+    logger.info(`Marked ${result.rowCount} abandoned recruitment interview session(s)`);
+  }
+  return result.rowCount || 0;
+};
+
+const autoExpireInterviewSessions = async () => {
+  const result = await db.query(
+    `SELECT id
+     FROM recruitment_applications
+     WHERE interview_started_at IS NOT NULL
+       AND interview_completed = FALSE
+       AND interview_abandoned_at IS NULL
+       AND COALESCE(
+             interview_session_expires_at,
+             interview_started_at + ($1::int * INTERVAL '1 minute')
+           ) < NOW()
+     LIMIT 200`,
+    [INTERVIEW_SESSION_CAP_MINUTES]
+  );
+
+  for (const row of result.rows) {
+    try {
+      await finalizeInterviewSession(row.id, {
+        expired: true,
+        reason: `Session auto-completed after ${INTERVIEW_SESSION_CAP_MINUTES} minute cap`,
+      });
+    } catch (error) {
+      logger.error(`Failed to auto-complete interview session ${row.id}:`, error.message);
+    }
+  }
+
+  if (result.rows.length) {
+    logger.info(`Auto-completed ${result.rows.length} expired recruitment interview session(s)`);
+  }
+  return result.rows.length;
+};
+
+const scanInterviewSessions = async () => {
+  await markAbandonedInterviewSessions();
+  await autoExpireInterviewSessions();
+};
+
 const startRecruitmentJobs = () => {
   const runJobs = async () => {
     await cleanupStaleRecruitmentPayments();
@@ -225,11 +287,16 @@ const startRecruitmentJobs = () => {
   };
 
   cron.schedule(RECRUITMENT_CLOSURE_CRON, runJobs);
+  cron.schedule(INTERVIEW_SESSION_SCAN_CRON, scanInterviewSessions);
   logger.info(`Recruitment closure scheduler started (${RECRUITMENT_CLOSURE_CRON})`);
+  logger.info(`Recruitment interview session scan started (${INTERVIEW_SESSION_SCAN_CRON})`);
 };
 
 module.exports = {
   cleanupStaleRecruitmentPayments,
   runRecruitmentClosureJob,
+  markAbandonedInterviewSessions,
+  autoExpireInterviewSessions,
+  scanInterviewSessions,
   startRecruitmentJobs,
 };
