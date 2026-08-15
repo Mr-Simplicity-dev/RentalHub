@@ -26,6 +26,85 @@ import {
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
+import TurnstileWidget from '../components/common/TurnstileWidget';
+
+// ============================================================
+// Validation Constants
+// ============================================================
+const VALID_PHONE_PATTERN = /^(\+?234|0)\d{10}$/;
+const VALID_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_DOCUMENT_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_DOCUMENT_EXTENSIONS = new Set(['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']);
+
+const validateApplicationForm = (values) => {
+  if (values.phone_number && !VALID_PHONE_PATTERN.test(String(values.phone_number).replace(/[\s-]/g, ''))) {
+    return i18n.t('careers.phone_invalid');
+  }
+  if (values.email_address && !VALID_EMAIL_PATTERN.test(values.email_address)) {
+    return i18n.t('careers.email_invalid');
+  }
+  if (values.date_of_birth) {
+    const dob = new Date(values.date_of_birth);
+    const today = new Date();
+    const eighteenYearsAgo = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+    if (Number.isNaN(dob.getTime()) || dob > today) return i18n.t('careers.dob_future');
+    if (dob > eighteenYearsAgo) return i18n.t('careers.dob_underage');
+  }
+  return '';
+};
+
+// ============================================================
+// A11y focus trap for modals / full-screen overlays
+// ============================================================
+const useFocusTrap = (active, { onEscape } = {}) => {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!active) return undefined;
+    const container = containerRef.current;
+    const previouslyFocused = document.activeElement;
+
+    const getFocusables = () => {
+      if (!container) return [];
+      return Array.from(
+        container.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.disabled && el.offsetParent !== null);
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onEscape?.();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const list = getFocusables();
+      if (!list.length) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    // Move focus into the trap on open.
+    const first = getFocusables()[0];
+    if (first && !container.contains(document.activeElement)) first.focus();
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [active, onEscape]);
+
+  return containerRef;
+};
 
 // ============================================================
 // Interview Constants
@@ -252,6 +331,12 @@ export default function Careers() {
   const [sessionEndedReason, setSessionEndedReason] = useState('');
   const [inactivityWarning, setInactivityWarning] = useState(false);
   const [interviewConsent, setInterviewConsent] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+  const turnstileRef = useRef(null);
+
+  // ─── A11y focus traps for overlays ────────────────────────
+  const cvModalRef = useFocusTrap(cvModal, { onEscape: () => setCvModal(false) });
+  const interviewRoomRef = useFocusTrap(interviewMode);
 
   // ─── Refs ──────────────────────────────────────────────────
   const videoRef = useRef(null);
@@ -500,9 +585,21 @@ export default function Careers() {
 
   const startApplication = async (event) => {
     event.preventDefault();
+    const validationError = validateApplicationForm(form);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+    if (process.env.REACT_APP_TURNSTILE_SITE_KEY && !turnstileToken) {
+      toast.error(t('careers.security_check_required'));
+      return;
+    }
     setSubmitting(true);
     try {
-      const res = await api.post('/recruitment/apply', form);
+      const res = await api.post('/recruitment/apply', {
+        ...form,
+        turnstile_token: turnstileToken || '',
+      });
       const newApplication = res.data?.data || null;
       setApplication(newApplication);
       window.localStorage?.removeItem(CAREERS_DRAFT_STORAGE_KEY);
@@ -512,6 +609,8 @@ export default function Careers() {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to start application');
     } finally {
+      if (turnstileRef.current) turnstileRef.current.reset();
+      setTurnstileToken(null);
       setSubmitting(false);
     }
   };
@@ -555,6 +654,22 @@ export default function Careers() {
 
   const handleDocumentChange = (event) => {
     const { name, files } = event.target;
+    const selected = Array.from(files || []);
+    const oversized = selected.find((file) => file.size > MAX_DOCUMENT_FILE_SIZE_BYTES);
+    if (oversized) {
+      toast.error(t('careers.file_too_large', { name: oversized.name }));
+      event.target.value = '';
+      return;
+    }
+    const unsupported = selected.find((file) => {
+      const extension = `.${(file.name.split('.').pop() || '').toLowerCase()}`;
+      return !ALLOWED_DOCUMENT_EXTENSIONS.has(extension);
+    });
+    if (unsupported) {
+      toast.error(t('careers.file_type_invalid', { name: unsupported.name }));
+      event.target.value = '';
+      return;
+    }
     setDocuments((prev) => ({ ...prev, [name]: files }));
   };
 
@@ -1365,6 +1480,17 @@ export default function Careers() {
         </div>
       </div>
 
+      {process.env.REACT_APP_TURNSTILE_SITE_KEY && (
+        <div className="lg:col-span-2 flex justify-center">
+          <TurnstileWidget
+            ref={turnstileRef}
+            onToken={setTurnstileToken}
+            onExpire={() => setTurnstileToken(null)}
+            onError={() => setTurnstileToken(null)}
+          />
+        </div>
+      )}
+
       <button
         type="submit"
         disabled={submitting || roles.length === 0}
@@ -1733,6 +1859,10 @@ export default function Careers() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
+        ref={interviewRoomRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Proctored Interview"
         className="fixed inset-0 z-50 overflow-y-auto bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-4 py-6"
       >
         {/* Top Navigation Bar */}
@@ -2012,6 +2142,10 @@ export default function Careers() {
             initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            ref={cvModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Platform CV Template"
             className="w-full max-w-3xl rounded-3xl bg-white p-5 shadow-elevated-lg sm:p-6"
           >
             <div className="flex items-start justify-between gap-4">
