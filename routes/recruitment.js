@@ -140,7 +140,10 @@ router.get('/locations/lgas/:state', recruitmentController.getLGAs);
 // ==================== PUBLIC / GUEST ROUTES ====================
 
 // Applicant routes (no authentication required - guests can apply)
+// The rate limiter runs BEFORE Turnstile verification so bots cannot burn
+// the Cloudflare siteverify quota with garbage tokens.
 router.post('/apply',
+  recruitmentApplyLimiter,
   requireTurnstile,
   [body('full_name').optional().isString().trim().isLength({ max: 255 }),
    body('email').optional().isEmail().normalizeEmail(),
@@ -149,7 +152,7 @@ router.post('/apply',
    body('lga_id').optional().isInt(),
    body('role_id').optional().isInt()],
   validateRequest,
-  recruitmentApplyLimiter, recruitmentController.createApplication);
+  recruitmentController.createApplication);
 router.put(
   '/applications/:id',
   recruitmentApplicantActionLimiter,
