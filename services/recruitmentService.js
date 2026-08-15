@@ -738,10 +738,27 @@ exports.startInterview = async (req, res) => {
     const application = app.rows[0];
     if (!requirePublicApplicationAccess(req, res, application)) return;
 
+    if (application.interview_completed) {
+      return res.status(410).json({ success: false, message: INTERVIEW_SESSION_COMPLETED_MESSAGE });
+    }
+    if (application.violation_detected) {
+      return res.status(403).json({ success: false, message: 'Interview disqualified due to violation' });
+    }
+    if (!(await enforceInterviewSession(application, res))) return;
+
     if (normalizePhoneForCheck(application.phone_number) !== submittedPhone) {
       return res.status(403).json({
         success: false,
         message: 'Phone number does not match this recruitment application',
+      });
+    }
+
+    // Explicit consent to video/audio recording is required once per session
+    // (recorded permanently as interview_consent_at).
+    if (!application.interview_consent_at && req.body?.consent !== true) {
+      return res.status(403).json({
+        success: false,
+        message: 'You must consent to video and audio recording before starting the interview',
       });
     }
     
@@ -809,17 +826,36 @@ exports.startInterview = async (req, res) => {
            interview_user_agent = COALESCE(NULLIF($3, ''), interview_user_agent),
            interview_challenge_token = $4,
            interview_last_ping_at = NOW(),
+           interview_session_expires_at = COALESCE(
+             interview_session_expires_at,
+             NOW() + ($5::int * INTERVAL '1 minute')
+           ),
+           interview_consent_at = COALESCE(interview_consent_at, $6),
            updated_at = NOW()
        WHERE id = $1`,
-      [application.id, fingerprint, userAgent, challengeToken]
+      [
+        application.id,
+        fingerprint,
+        userAgent,
+        challengeToken,
+        INTERVIEW_SESSION_CAP_MINUTES,
+        req.body?.consent === true ? new Date().toISOString() : application.interview_consent_at,
+      ]
     );
-    
+
+    const sessionRow = await db.query(
+      'SELECT interview_session_expires_at FROM recruitment_applications WHERE id = $1',
+      [application.id]
+    );
+
     res.json({
       success: true,
       data: {
         application_id: application.id,
         total_questions: questions.rows.length,
         challenge_token: challengeToken,
+        session_expires_at: sessionRow.rows[0]?.interview_session_expires_at || null,
+        session_inactivity_limit_seconds: INTERVIEW_SESSION_INACTIVITY_MINUTES * 60,
         questions: questions.rows.map(q => ({
           id: q.id,
           question: q.question,
@@ -857,7 +893,8 @@ exports.submitAnswer = async (req, res) => {
     // Get application
     const appResult = await db.query(
       `SELECT id, interview_started_at, interview_challenge_token, interview_fingerprint,
-              interview_user_agent, interview_security_log
+              interview_user_agent, interview_security_log,
+              interview_session_expires_at, interview_abandoned_at, interview_last_ping_at
        FROM recruitment_applications
        WHERE id = $1
          AND interview_started_at IS NOT NULL
@@ -872,6 +909,8 @@ exports.submitAnswer = async (req, res) => {
     const applicationId = application.id;
 
     if (!requireInterviewChallenge(res, challenge_token, application.interview_challenge_token)) return;
+
+    if (!(await enforceInterviewSession(application, res))) return;
 
     if (
       application.interview_fingerprint &&
@@ -957,6 +996,17 @@ exports.submitAnswer = async (req, res) => {
         [applicationId, appendSecurityLog(application.interview_security_log, reason)]
       );
     }
+
+    // Any successful answer counts as live activity for the session scanner,
+    // so an actively answering candidate can never be flagged as abandoned
+    // just because a heartbeat ping was lost.
+    await db.query(
+      `UPDATE recruitment_applications
+       SET interview_last_ping_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [applicationId]
+    );
     
     res.json({ success: true, data: { is_correct: isCorrect, timing_violation: timingViolation } });
   } catch (err) {
@@ -1027,7 +1077,9 @@ exports.interviewPing = async (req, res) => {
     }
 
     const appResult = await db.query(
-      `SELECT id, interview_challenge_token, interview_fingerprint, interview_security_log
+      `SELECT id, interview_challenge_token, interview_fingerprint, interview_security_log,
+              interview_started_at, interview_session_expires_at,
+              interview_abandoned_at, interview_last_ping_at
        FROM recruitment_applications
        WHERE id = $1
          AND interview_started_at IS NOT NULL
@@ -1043,6 +1095,8 @@ exports.interviewPing = async (req, res) => {
     const application = appResult.rows[0];
     if (!requireInterviewChallenge(res, challenge_token, application.interview_challenge_token)) return;
 
+    if (!(await enforceInterviewSession(application, res))) return;
+
     if (
       application.interview_fingerprint &&
       fingerprint &&
@@ -1056,6 +1110,22 @@ exports.interviewPing = async (req, res) => {
         [application.id, appendSecurityLog(application.interview_security_log, 'Browser fingerprint changed on interview ping')]
       );
       return res.status(403).json({ success: false, message: 'Interview browser fingerprint changed' });
+    }
+
+    // Soft client-side events (tab switches, window blur) are recorded in the
+    // security log. They are informational — they never auto-disqualify.
+    const clientEvents = Array.isArray(req.body?.client_events)
+      ? req.body.client_events.map((event) => normalizeText(event)).filter(Boolean).slice(0, 20)
+      : [];
+
+    if (clientEvents.length) {
+      await db.query(
+        `UPDATE recruitment_applications
+         SET interview_security_log = $2,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [application.id, appendSecurityLog(application.interview_security_log, `Client events: ${clientEvents.join(', ')}`)]
+      );
     }
 
     await db.query(
@@ -1083,7 +1153,9 @@ exports.completeInterview = async (req, res) => {
     
     const appResult = await db.query(
       `SELECT id, interview_last_ping_at, interview_security_log,
-              interview_challenge_token, interview_fingerprint
+              interview_challenge_token, interview_fingerprint,
+              interview_started_at, interview_session_expires_at,
+              interview_abandoned_at
        FROM recruitment_applications
        WHERE id = $1
          AND interview_started_at IS NOT NULL
@@ -1098,6 +1170,8 @@ exports.completeInterview = async (req, res) => {
     const applicationId = application.id;
 
     if (!requireInterviewChallenge(res, challenge_token, application.interview_challenge_token)) return;
+
+    if (!(await enforceInterviewSession(application, res))) return;
 
     if (
       application.interview_fingerprint &&
@@ -1126,34 +1200,16 @@ exports.completeInterview = async (req, res) => {
       );
     }
     
-    // Calculate score
-    const answered = await db.query(
-      `SELECT COUNT(*) as total, SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as correct
-       FROM recruitment_interview_assignments WHERE application_id = $1`,
-      [applicationId]
-    );
-    
-    const total = parseInt(answered.rows[0].total) || 0;
-    const correct = parseInt(answered.rows[0].correct) || 0;
-    const score = total > 0 ? (correct / total) * 100 : 0;
-    const passed = score >= 50; // Pass mark 50%
-    
-    await db.query(
-      `UPDATE recruitment_applications 
-       SET interview_score = $1, interview_passed = $2, 
-           interview_completed = TRUE, interview_completed_at = NOW(),
-           updated_at = NOW()
-       WHERE id = $3`,
-      [score, passed, applicationId]
-    );
+    // Calculate score and finalize the session
+    const result = await finalizeInterviewSession(applicationId, { expired: false });
     
     res.json({
       success: true,
       data: {
-        total_questions: total,
-        correct_answers: correct,
-        score: Math.round(score),
-        passed
+        total_questions: result.total,
+        correct_answers: result.correct,
+        score: result.score,
+        passed: result.passed
       }
     });
   } catch (err) {
@@ -2043,6 +2099,12 @@ const QUESTION_TIME_LIMIT_SECONDS = Number(process.env.RECRUITMENT_QUESTION_TIME
 const QUESTION_TIME_GRACE_SECONDS = Number(process.env.RECRUITMENT_QUESTION_GRACE_SECONDS || 12);
 const MIN_ANSWER_SECONDS = Number(process.env.RECRUITMENT_MIN_ANSWER_SECONDS || 1);
 const INTERVIEW_PING_STALE_SECONDS = Number(process.env.RECRUITMENT_INTERVIEW_PING_STALE_SECONDS || 90);
+const INTERVIEW_SESSION_INACTIVITY_MINUTES = Number(process.env.RECRUITMENT_SESSION_INACTIVITY_MINUTES || 5);
+const INTERVIEW_SESSION_CAP_MINUTES = Number(process.env.RECRUITMENT_SESSION_CAP_MINUTES || 60);
+// The client uploads the recorded video immediately after the interview is
+// completed, so uploads must stay permitted inside a short post-completion
+// window instead of being rejected outright.
+const RECRUITMENT_RECORDING_UPLOAD_GRACE_MINUTES = Number(process.env.RECRUITMENT_RECORDING_UPLOAD_GRACE_MINUTES || 10);
 const PAYSTACK_WEBHOOK_IP_ALLOWLIST = String(process.env.PAYSTACK_WEBHOOK_IPS || '')
   .split(',')
   .map((value) => value.trim())
@@ -2137,6 +2199,10 @@ const PUBLIC_APPLICATION_FIELDS = new Set([
   'interview_completed',
   'interview_started_at',
   'interview_completed_at',
+  'interview_session_expires_at',
+  'interview_abandoned_at',
+  'interview_expired',
+  'interview_consent_at',
   'disqualified_reason',
   'disqualified_at',
   'violation_detected',
@@ -2219,14 +2285,23 @@ exports.authorizeDocumentUpload = async (req, res, next) => {
 
 exports.authorizeInterviewRecording = async (req, res, next) => {
   try {
+    // Recording uploads happen right after the interview completes, so the
+    // completed-session guard is relaxed for a short post-completion window.
     const result = await db.query(
       `SELECT id, interview_challenge_token, interview_fingerprint
        FROM recruitment_applications
        WHERE id = $1
          AND interview_started_at IS NOT NULL
-         AND interview_completed = FALSE
+         AND (
+           interview_completed = FALSE
+           OR (
+             interview_completed = TRUE
+             AND interview_completed_at IS NOT NULL
+             AND interview_completed_at >= NOW() - ($2::int * INTERVAL '1 minute')
+           )
+         )
        LIMIT 1`,
-      [req.query.application_id]
+      [req.query.application_id, RECRUITMENT_RECORDING_UPLOAD_GRACE_MINUTES]
     );
     const application = result.rows[0];
     if (!application) {
@@ -2347,6 +2422,103 @@ const appendSecurityLog = (currentLog, message) =>
     .filter(Boolean)
     .join('\n')
     .slice(-5000);
+
+// ==================== Interview Session Controls ====================
+
+const INTERVIEW_SESSION_EXPIRED_MESSAGE = 'Interview session expired. Please contact recruitment support.';
+const INTERVIEW_SESSION_ABANDONED_MESSAGE = 'Interview session locked due to inactivity. Please contact recruitment support.';
+const INTERVIEW_SESSION_COMPLETED_MESSAGE = 'Interview session has already been completed';
+
+// Pure decision helper (unit-testable without a database). Every interview
+// endpoint and the cron session scan rely on this single source of truth.
+const evaluateInterviewSessionState = (application, nowMs = Date.now()) => {
+  if (!application) return { active: false, status: 'unknown' };
+  if (application.interview_abandoned_at) {
+    return { active: false, status: 'abandoned', message: INTERVIEW_SESSION_ABANDONED_MESSAGE };
+  }
+  if (application.interview_completed) {
+    return { active: false, status: 'completed', message: INTERVIEW_SESSION_COMPLETED_MESSAGE };
+  }
+  if (!application.interview_started_at) {
+    return { active: true };
+  }
+  if (application.interview_session_expires_at) {
+    const expiresAt = new Date(application.interview_session_expires_at).getTime();
+    if (nowMs >= expiresAt) {
+      return { active: false, status: 'expired', message: INTERVIEW_SESSION_EXPIRED_MESSAGE };
+    }
+  }
+  if (application.interview_last_ping_at) {
+    const lastPing = new Date(application.interview_last_ping_at).getTime();
+    if ((nowMs - lastPing) / 60000 > INTERVIEW_SESSION_INACTIVITY_MINUTES) {
+      return { active: false, status: 'abandoned', message: INTERVIEW_SESSION_ABANDONED_MESSAGE };
+    }
+  }
+  return { active: true };
+};
+
+// Computes the score from answered assignments and finalizes the session.
+// Used by the normal completion path, the lazy expiry enforcement and the
+// cron auto-completion scan so scoring never diverges.
+const finalizeInterviewSession = async (applicationId, { expired = false, reason = null } = {}) => {
+  const answered = await db.query(
+    `SELECT COUNT(*)::INT AS total,
+            COALESCE(SUM(CASE WHEN is_correct THEN 1 ELSE 0 END), 0)::INT AS correct
+     FROM recruitment_interview_assignments
+     WHERE application_id = $1`,
+    [applicationId]
+  );
+  const total = answered.rows[0]?.total || 0;
+  const correct = answered.rows[0]?.correct || 0;
+  const score = total > 0 ? (correct / total) * 100 : 0;
+  const passed = score >= 50;
+
+  await db.query(
+    `UPDATE recruitment_applications
+     SET interview_score = $1,
+         interview_passed = $2,
+         interview_completed = TRUE,
+         interview_completed_at = NOW(),
+         interview_expired = $3,
+         interview_abandoned_reason = COALESCE($4, interview_abandoned_reason),
+         interview_last_ping_at = NOW(),
+         updated_at = NOW()
+     WHERE id = $5`,
+    [score, passed, expired, reason, applicationId]
+  );
+
+  return { total, correct, score: Math.round(score), passed };
+};
+
+// Lazy enforcement for interview endpoints. Expired sessions are finalized
+// (auto-completed); stale sessions are marked abandoned and locked until an
+// admin re-opens them. Responds 410 Gone when the session is no longer usable.
+const enforceInterviewSession = async (application, res) => {
+  const session = evaluateInterviewSessionState(application);
+  if (session.active) return true;
+
+  if (session.status === 'expired') {
+    await finalizeInterviewSession(application.id, {
+      expired: true,
+      reason: `Session auto-completed after ${INTERVIEW_SESSION_CAP_MINUTES} minute cap`,
+    });
+  } else if (session.status === 'abandoned' && !application.interview_abandoned_at) {
+    await db.query(
+      `UPDATE recruitment_applications
+       SET interview_abandoned_at = NOW(),
+           interview_abandoned_reason = $2,
+           updated_at = NOW()
+       WHERE id = $1 AND interview_completed = FALSE`,
+      [application.id, `Session abandoned: no activity for ${INTERVIEW_SESSION_INACTIVITY_MINUTES} minutes`]
+    );
+  }
+
+  res.status(410).json({
+    success: false,
+    message: session.message || INTERVIEW_SESSION_ABANDONED_MESSAGE,
+  });
+  return false;
+};
 
 const safeJson = (value) => {
   try {
@@ -3515,6 +3687,102 @@ exports.triggerInterview = async (req, res) => {
   }
 };
 
+exports.adminReopenInterview = async (req, res) => {
+  try {
+    await ensureRecruitmentOperationsSchema();
+    if (!(await isRecruitmentAdmin(req.user.id))) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    // A reopened session starts fresh: a new start timestamp, a new expiry
+    // window and a new challenge token are issued on the next startInterview.
+    const result = await db.query(
+      `UPDATE recruitment_applications
+       SET interview_abandoned_at = NULL,
+           interview_abandoned_reason = NULL,
+           interview_expired = FALSE,
+           interview_completed = FALSE,
+           interview_completed_at = NULL,
+           interview_score = NULL,
+           interview_passed = NULL,
+           interview_started_at = NULL,
+           interview_session_expires_at = NULL,
+           interview_challenge_token = NULL,
+           interview_last_ping_at = NULL,
+           interview_activated = TRUE,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id`,
+      [req.params.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    await createRecruitmentOperation({
+      applicationId: req.params.id,
+      adminId: req.user.id,
+      actorName: getActorName(req.user),
+      eventType: 'interview_reopened',
+      note: 'Interview session reopened by admin',
+    });
+
+    res.json({ success: true, message: 'Interview session reopened. The applicant can now restart the interview.' });
+  } catch (error) {
+    req.logger.error('adminReopenInterview error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reopen interview session' });
+  }
+};
+
+exports.adminExtendInterview = async (req, res) => {
+  try {
+    await ensureRecruitmentOperationsSchema();
+    if (!(await isRecruitmentAdmin(req.user.id))) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const minutes = Math.min(Math.max(Number(req.body?.minutes) || 15, 1), 120);
+
+    // GREATEST keeps the existing deadline when it is later than "now", so an
+    // extension can never shrink the remaining session window.
+    const result = await db.query(
+      `UPDATE recruitment_applications
+       SET interview_session_expires_at =
+             GREATEST(COALESCE(interview_session_expires_at, NOW()), NOW())
+             + ($1::int * INTERVAL '1 minute'),
+           interview_abandoned_at = NULL,
+           interview_abandoned_reason = NULL,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, interview_session_expires_at`,
+      [minutes, req.params.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    await createRecruitmentOperation({
+      applicationId: req.params.id,
+      adminId: req.user.id,
+      actorName: getActorName(req.user),
+      eventType: 'interview_extended',
+      note: `Interview session extended by ${minutes} minute(s)`,
+      metadata: { minutes },
+    });
+
+    res.json({
+      success: true,
+      data: { interview_session_expires_at: result.rows[0].interview_session_expires_at },
+      message: `Interview session extended by ${minutes} minute(s)`,
+    });
+  } catch (error) {
+    req.logger.error('adminExtendInterview error:', error);
+    res.status(500).json({ success: false, message: 'Failed to extend interview session' });
+  }
+};
+
 const appendApplicationToPdf = async (doc, application, index) => {
   if (doc.y > 640) doc.addPage();
   doc.fontSize(12).font('Helvetica-Bold').text(`${index}. ${application.full_name || 'Applicant'} (${application.reference_number || 'No reference'})`);
@@ -3949,6 +4217,88 @@ exports.uploadInterviewRecording = async (req, res) => {
   }
 };
 
+// ==================== ADMIN RECORDING REVIEW ====================
+
+const RECORDING_UPLOADS_ROOT = path.join(__dirname, '..', 'uploads', 'recruitment');
+
+const resolveRecordingPath = (recordingPath) => {
+  const normalized = path.normalize(String(recordingPath || ''));
+  const root = path.normalize(RECORDING_UPLOADS_ROOT);
+  const resolved = path.resolve(root, normalized.startsWith(root) ? path.relative(root, normalized) : normalized);
+  return resolved.startsWith(root) ? resolved : null;
+};
+
+exports.adminListRecordings = async (req, res) => {
+  try {
+    if (!(await isRecruitmentAdmin(req.user.id))) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const result = await db.query(
+      `SELECT id, application_id, recording_path, recording_duration,
+              violation_log, created_at
+       FROM recruitment_interview_recordings
+       WHERE application_id = $1
+       ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows.map((row) => ({
+        id: row.id,
+        application_id: row.application_id,
+        recording_duration: row.recording_duration,
+        violation_log: row.violation_log,
+        created_at: row.created_at,
+        file_exists: Boolean(row.recording_path && fs.existsSync(row.recording_path)),
+        file_size: row.recording_path && fs.existsSync(row.recording_path)
+          ? fs.statSync(row.recording_path).size
+          : 0,
+      })),
+    });
+  } catch (error) {
+    req.logger.error('adminListRecordings error:', error);
+    res.status(500).json({ success: false, message: 'Failed to list interview recordings' });
+  }
+};
+
+exports.adminStreamRecording = async (req, res) => {
+  try {
+    if (!(await isRecruitmentAdmin(req.user.id))) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const result = await db.query(
+      `SELECT recording_path
+       FROM recruitment_interview_recordings
+       WHERE id = $1 AND application_id = $2`,
+      [req.params.recordingId, req.params.id]
+    );
+    const recording = result.rows[0];
+    if (!recording || !recording.recording_path) {
+      return res.status(404).json({ success: false, message: 'Recording not found' });
+    }
+
+    const filePath = resolveRecordingPath(recording.recording_path);
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'Recording file is missing from storage' });
+    }
+
+    res.sendFile(filePath, {
+      headers: {
+        'Content-Type': 'video/webm',
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  } catch (error) {
+    req.logger.error('adminStreamRecording error:', error);
+    res.status(500).json({ success: false, message: 'Failed to stream interview recording' });
+  }
+};
+
 if (process.env.NODE_ENV === 'test') {
   exports.__test = {
     generateReferenceNumber,
@@ -3956,5 +4306,8 @@ if (process.env.NODE_ENV === 'test') {
     stripPublicDocumentSecrets,
     getApplicationFeeKobo,
     validateRecruitmentGatewayTransaction,
+    evaluateInterviewSessionState,
   };
 }
+
+exports.finalizeInterviewSession = finalizeInterviewSession;

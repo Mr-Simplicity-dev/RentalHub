@@ -29,6 +29,7 @@ import api from '../services/api';
 // Interview Constants
 // ============================================================
 const QUESTION_TIME_LIMIT_SECONDS = 30;
+const SESSION_INACTIVITY_WARNING_LEAD_SECONDS = 30;
 const FACE_DETECTION_INTERVAL_MS = 800;
 const MIN_FACE_CONFIDENCE = 0.65;
 const CONSECUTIVE_FACE_VIOLATIONS = 3;
@@ -37,6 +38,14 @@ const TINY_FACE_DETECTOR_MODEL_URLS = [
   'https://cdn.jsdelivr.net/npm/@xkeshi/face-api.js-models@0.0.1/models/tiny_face_detector',
   'https://cdn.jsdelivr.net/gh/vladmandic/face-api/model',
 ];
+const FACE_LANDMARK_MODEL_URLS = [
+  'https://cdn.jsdelivr.net/npm/@xkeshi/face-api.js-models@0.0.1/models/face_landmark_68_model',
+  'https://cdn.jsdelivr.net/gh/vladmandic/face-api/model',
+];
+// 30s window at the 800ms sampling rate: enough time for several blinks,
+// so a zero-blink window strongly suggests a static photo/video.
+const LIVENESS_NO_BLINK_WINDOW_MS = 30000;
+const EYE_ASPECT_RATIO_CLOSED_THRESHOLD = 0.2;
 const CAREERS_DRAFT_STORAGE_KEY = 'rentalhub_careers_application_draft';
 const CAREERS_EMAIL_STORAGE_KEY = 'rentalhub_careers_applicant_email';
 const CAREERS_REFERENCE_STORAGE_KEY = 'rentalhub_careers_application_reference';
@@ -59,13 +68,25 @@ const loadTinyFaceDetectorModel = async () => {
   return false;
 };
 
+const loadFaceLandmarkModel = async () => {
+  for (const modelUrl of FACE_LANDMARK_MODEL_URLS) {
+    try {
+      await window.faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl);
+      return true;
+    } catch (error) {
+      console.warn(`faceLandmark68Net model failed from ${modelUrl}`, error);
+    }
+  }
+  return false;
+};
+
 const loadFaceApi = () => {
-  if (faceApiLoaded) return Promise.resolve(true);
+  if (faceApiLoaded) return Promise.resolve(faceApiLoaded);
   if (faceApiLoading) return faceApiLoading;
 
   faceApiLoading = new Promise((resolve) => {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
-      resolve(false);
+      resolve(null);
       return;
     }
 
@@ -73,14 +94,17 @@ const loadFaceApi = () => {
       if (!window.faceapi?.nets?.tinyFaceDetector || !window.faceapi?.TinyFaceDetectorOptions) {
         console.warn('face-api.js loaded without TinyFaceDetector support');
         faceApiLoading = null;
-        resolve(false);
+        resolve(null);
         return;
       }
 
-      const modelReady = await loadTinyFaceDetectorModel();
-      faceApiLoaded = modelReady;
-      if (!modelReady) faceApiLoading = null;
-      resolve(modelReady);
+      const faceDetection = await loadTinyFaceDetectorModel();
+      const liveness = faceDetection && window.faceapi.nets.faceLandmark68Net
+        ? await loadFaceLandmarkModel()
+        : false;
+      faceApiLoaded = { face: faceDetection, liveness };
+      if (!faceDetection) faceApiLoading = null;
+      resolve(faceApiLoaded);
     };
 
     // Check if already available
@@ -97,9 +121,9 @@ const loadFaceApi = () => {
     script.dataset.rentalhubFaceApi = 'true';
     script.onload = markFaceApiReady;
     script.onerror = () => {
-      console.warn('face-api.js CDN unavailable, falling back to motion detection');
+      console.warn('face-api.js CDN unavailable, falling back to recording-only monitoring');
       faceApiLoading = null;
-      resolve(false);
+      resolve(null);
     };
     if (!existingScript) document.head.appendChild(script);
   });
@@ -211,10 +235,21 @@ export default function Careers() {
   const [questionTimeLeft, setQuestionTimeLeft] = useState(QUESTION_TIME_LIMIT_SECONDS);
   const [faceDetectionReady, setFaceDetectionReady] = useState(false);
   const [faceStatus, setFaceStatus] = useState({ faces: 0, status: 'idle' }); // idle | monitoring | violation | locked
+  const [livenessReady, setLivenessReady] = useState(false);
+  const [livenessStatus, setLivenessStatus] = useState('unavailable'); // ok | no_blink | unavailable
   const [interviewStarting, setInterviewStarting] = useState(false);
   const [interviewStartupStep, setInterviewStartupStep] = useState('');
   const [interviewChallengeToken, setInterviewChallengeToken] = useState('');
   const [interviewResult, setInterviewResult] = useState(null);
+
+  // ─── Interview Session Controls ───────────────────────────
+  const [sessionExpiresAt, setSessionExpiresAt] = useState(null);
+  const [sessionInactivityLimitSeconds, setSessionInactivityLimitSeconds] = useState(300);
+  const [sessionTimeLeft, setSessionTimeLeft] = useState(0);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const [sessionEndedReason, setSessionEndedReason] = useState('');
+  const [inactivityWarning, setInactivityWarning] = useState(false);
+  const [interviewConsent, setInterviewConsent] = useState(false);
 
   // ─── Refs ──────────────────────────────────────────────────
   const videoRef = useRef(null);
@@ -227,9 +262,28 @@ export default function Careers() {
   const interviewPingTimerRef = useRef(null);
   const verifiedPaymentReferenceRef = useRef('');
   const interviewFingerprintRef = useRef('');
+  const lastPingAckRef = useRef(0);
+  const clientEventsRef = useRef([]);
+  const tabSwitchWarningShownRef = useRef(false);
   const consecutiveNoFaceRef = useRef(0);
   const consecutiveMultiFaceRef = useRef(0);
   const interviewLockedRef = useRef(false);
+  // Liveness (blink) tracking
+  const eyeClosedFramesRef = useRef(0);
+  const lastBlinkAtRef = useRef(0);
+  const lastLivenessEventAtRef = useRef(0);
+
+  const getEyeAspectRatio = (positions, indices) => {
+    const vertical = Math.hypot(
+      positions[indices[1]].x - positions[indices[5]].x,
+      positions[indices[1]].y - positions[indices[5]].y
+    );
+    const horizontal = Math.hypot(
+      positions[indices[0]].x - positions[indices[3]].x,
+      positions[indices[0]].y - positions[indices[3]].y
+    );
+    return vertical / (horizontal || 1);
+  };
 
   const selectedRole = useMemo(
     () => roles.find((role) => String(role.id) === String(form.role_id)),
@@ -605,17 +659,69 @@ export default function Careers() {
 
     try {
       if (typeof window === 'undefined' || !window.faceapi || !window.faceapi.detectAllFaces) {
-        // Fall back to basic motion detection
         return;
       }
 
-      const detections = await window.faceapi
-        .detectAllFaces(video, new window.faceapi.TinyFaceDetectorOptions({
-          inputSize: 224,
-          scoreThreshold: MIN_FACE_CONFIDENCE,
-        }));
+      const options = new window.faceapi.TinyFaceDetectorOptions({
+        inputSize: 224,
+        scoreThreshold: MIN_FACE_CONFIDENCE,
+      });
+
+      // Liveness verification needs the 68-point landmark model for
+      // eye-aspect-ratio (blink) analysis. If the model failed to load,
+      // fall back to face-count monitoring only.
+      let detections;
+      if (livenessReady && window.faceapi.nets?.faceLandmark68Net?.isLoaded) {
+        detections = await window.faceapi.detectAllFaces(video, options).withFaceLandmarks();
+      } else {
+        detections = await window.faceapi.detectAllFaces(video, options);
+      }
 
       const faceCount = detections.length;
+
+      // ── Blink / liveness analysis (single face in frame) ──
+      if (livenessReady && faceCount === 1 && detections[0]?.landmarks?.positions?.length >= 68) {
+        const positions = detections[0].landmarks.positions;
+        const leftEAR = getEyeAspectRatio(positions, [36, 37, 38, 39, 40, 41]);
+        const rightEAR = getEyeAspectRatio(positions, [42, 43, 44, 45, 46, 47]);
+        const ear = (leftEAR + rightEAR) / 2;
+
+        if (ear < EYE_ASPECT_RATIO_CLOSED_THRESHOLD) {
+          eyeClosedFramesRef.current += 1;
+        } else {
+          // A blink is a closed-eye frame followed by an open-eye frame.
+          if (eyeClosedFramesRef.current >= 2) {
+            lastBlinkAtRef.current = Date.now();
+            setLivenessStatus('ok');
+          }
+          eyeClosedFramesRef.current = 0;
+        }
+
+        // Seed the baseline the moment a face enters the frame so the
+        // no-blink window is measured from face appearance, not session start.
+        if (!lastBlinkAtRef.current) {
+          lastBlinkAtRef.current = Date.now();
+        }
+
+        // A continuously-present face with zero blinks inside the window
+        // strongly suggests a static photo or pre-recorded video. Flag it
+        // softly (security log only) so honest candidates are never punished
+        // for a model glitch.
+        const now = Date.now();
+        if (now - lastBlinkAtRef.current > LIVENESS_NO_BLINK_WINDOW_MS) {
+          setLivenessStatus('no_blink');
+          if (now - lastLivenessEventAtRef.current > LIVENESS_NO_BLINK_WINDOW_MS) {
+            lastLivenessEventAtRef.current = now;
+            clientEventsRef.current.push('possible_liveness_failure');
+          }
+        } else if (livenessStatus === 'no_blink') {
+          setLivenessStatus('ok');
+        }
+      } else if (faceCount !== 1) {
+        // No face or multiple faces resets the liveness baseline.
+        lastBlinkAtRef.current = 0;
+        eyeClosedFramesRef.current = 0;
+      }
 
       // Multiple faces → other person in frame → disqualify
       if (faceCount > 1) {
@@ -679,6 +785,9 @@ export default function Careers() {
       toast.error(error.response?.data?.message || t('careers.interview_violation'));
     } finally {
       stopInterviewMedia();
+      // Preserve the proctoring evidence captured up to the violation.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await uploadRecording();
       await loadMyApplication();
     }
   };
@@ -708,11 +817,82 @@ export default function Careers() {
     recorderRef.current = null;
   }, []);
 
+  // ─── Session Ended (410 / timeout) ───────────────────────
+  const formatSessionTime = (totalSeconds) => {
+    const safe = Math.max(Number(totalSeconds) || 0, 0);
+    const hours = Math.floor(safe / 3600);
+    const minutes = Math.floor((safe % 3600) / 60);
+    const seconds = safe % 60;
+    const pad = (value) => String(value).padStart(2, '0');
+    return hours > 0 ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
+  };
+
+  const handleSessionEnd = useCallback(async (error) => {
+    if (error?.response?.status !== 410) return;
+    const message = error?.response?.data?.message || '';
+    stopInterviewMedia();
+    interviewLockedRef.current = true;
+    setInterviewLocked(true);
+    setInterviewMode(false);
+    setInterviewChallengeToken('');
+    setInterviewQuestions([]);
+    setSessionEnded(true);
+    setSessionEndedReason(
+      /abandoned|inactivit/i.test(message) ? 'abandoned'
+        : /expired|cap|time/i.test(message) ? 'expired'
+        : 'ended'
+    );
+    toast.error(message || 'Interview session ended');
+    // Preserve the recording captured before the session was locked.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await uploadRecording();
+    await loadMyApplication();
+  }, [loadMyApplication, stopInterviewMedia, uploadRecording]);
+
+  // ─── Session countdown + inactivity warning ──────────────
+  useEffect(() => {
+    if (!interviewMode || !sessionExpiresAt || interviewLocked || sessionEnded) return undefined;
+
+    const tick = () => {
+      const left = Math.max(0, Math.floor((new Date(sessionExpiresAt).getTime() - Date.now()) / 1000));
+      setSessionTimeLeft(left);
+
+      if (left <= 0) {
+        setSessionEnded(true);
+        setSessionEndedReason('expired');
+        stopInterviewMedia();
+        // Let the server finalize the session; a 410 here is expected.
+        api.post('/recruitment/interview/complete', {
+          application_id: application?.id,
+          challenge_token: interviewChallengeToken,
+          fingerprint: interviewFingerprintRef.current,
+        }).catch((error) => {
+          if (error?.response?.status !== 410) {
+            console.error('Failed to finalize expired interview:', error);
+          }
+        });
+        // Upload the recording captured up to the deadline.
+        setTimeout(() => uploadRecording(), 500);
+        return;
+      }
+
+      if (sessionInactivityLimitSeconds > 0 && lastPingAckRef.current) {
+        const idleSeconds = (Date.now() - lastPingAckRef.current) / 1000;
+        setInactivityWarning(idleSeconds >= sessionInactivityLimitSeconds - SESSION_INACTIVITY_WARNING_LEAD_SECONDS);
+      }
+    };
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [application?.id, interviewChallengeToken, interviewLocked, interviewMode, sessionEnded, sessionExpiresAt, sessionInactivityLimitSeconds, stopInterviewMedia, uploadRecording]);
+
   // ─── Start Interview ───────────────────────────────────
   useEffect(() => {
     // Pre-load face-api models in the background
     loadFaceApi().then((ready) => {
-      if (ready) setFaceDetectionReady(true);
+      if (ready?.face) setFaceDetectionReady(true);
+      if (ready?.liveness) setLivenessReady(true);
     });
     return () => {
       stopInterviewMedia();
@@ -776,10 +956,22 @@ export default function Careers() {
         application_id: application.id,
         phone_number: phoneCheck,
         fingerprint,
+        consent: Boolean(interviewConsent),
         ...getApplicantAccessPayload(),
       });
       setInterviewQuestions(res.data?.data?.questions || []);
       setInterviewChallengeToken(res.data?.data?.challenge_token || '');
+      setSessionExpiresAt(
+        res.data?.data?.session_expires_at ? new Date(res.data.data.session_expires_at) : null
+      );
+      setSessionInactivityLimitSeconds(
+        Number(res.data?.data?.session_inactivity_limit_seconds) || 300
+      );
+      setSessionEnded(false);
+      setSessionEndedReason('');
+      setSessionTimeLeft(0);
+      setInactivityWarning(false);
+      lastPingAckRef.current = Date.now();
       setQuestionIndex(0);
       setInterviewMode(true);
       setInterviewResult(null);
@@ -788,6 +980,10 @@ export default function Careers() {
       consecutiveNoFaceRef.current = 0;
       consecutiveMultiFaceRef.current = 0;
     } catch (error) {
+      if (error.response?.status === 410) {
+        await handleSessionEnd(error);
+        return;
+      }
       toast.error(error.response?.data?.message || error.message || t('careers.camera_permission'));
       stopInterviewMedia();
     } finally {
@@ -799,7 +995,7 @@ export default function Careers() {
   // ─── Submit Answer (with empty timeout) ─────────────────
   const uploadRecording = useCallback(async () => {
     const chunks = recordingChunksRef.current || [];
-    if (!chunks.length) return;
+    if (!chunks.length) return true;
     const blob = new Blob(chunks, { type: 'video/webm' });
     const formData = new FormData();
     formData.append('recording', blob, `recruitment-interview-${Date.now()}.webm`);
@@ -807,16 +1003,29 @@ export default function Careers() {
     formData.append('challenge_token', interviewChallengeToken);
     formData.append('fingerprint', interviewFingerprintRef.current);
     formData.append('violation_log', interviewLocked ? 'Interview locked by proctoring' : '');
+    const recordingParams = new URLSearchParams({
+      application_id: String(application?.id || ''),
+      challenge_token: interviewChallengeToken,
+    });
+    const attemptUpload = async () =>
+      api.post(`/recruitment/interview/recording?${recordingParams.toString()}`, formData);
     try {
-      const recordingParams = new URLSearchParams({
-        application_id: String(application?.id || ''),
-        challenge_token: interviewChallengeToken,
-      });
-      await api.post(`/recruitment/interview/recording?${recordingParams.toString()}`, formData);
-    } catch (error) {
-      console.error('Interview recording upload failed:', error);
+      await attemptUpload();
+      return true;
+    } catch (firstError) {
+      // One automatic retry for transient network blips, then tell the
+      // applicant so the issue is never silent.
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await attemptUpload();
+        return true;
+      } catch (secondError) {
+        console.error('Interview recording upload failed after retry:', secondError);
+        toast.error(t('careers.recording_upload_failed'));
+        return false;
+      }
     }
-  }, [application?.id, interviewChallengeToken, interviewLocked]);
+  }, [application?.id, interviewChallengeToken, interviewLocked, t]);
 
   const completeInterview = useCallback(async () => {
     try {
@@ -834,9 +1043,13 @@ export default function Careers() {
       setInterviewChallengeToken('');
       await loadMyApplication();
     } catch (error) {
+      if (error.response?.status === 410) {
+        handleSessionEnd(error);
+        return;
+      }
       toast.error(error.response?.data?.message || 'Failed to complete interview');
     }
-  }, [application?.id, interviewChallengeToken, loadMyApplication, stopInterviewMedia, uploadRecording, t]);
+  }, [application?.id, handleSessionEnd, interviewChallengeToken, loadMyApplication, stopInterviewMedia, uploadRecording, t]);
 
   const submitEmptyAnswer = useCallback(async () => {
     const question = interviewQuestions[questionIndex];
@@ -855,9 +1068,13 @@ export default function Careers() {
         setQuestionIndex((prev) => prev + 1);
       }
     } catch (error) {
+      if (error.response?.status === 410) {
+        handleSessionEnd(error);
+        return;
+      }
       toast.error(error.response?.data?.message || 'Failed to submit answer');
     }
-  }, [application?.id, completeInterview, questionIndex, interviewQuestions, interviewChallengeToken]);
+  }, [application?.id, completeInterview, handleSessionEnd, questionIndex, interviewQuestions, interviewChallengeToken]);
 
   const startQuestionTimer = useCallback(() => {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
@@ -901,6 +1118,10 @@ export default function Careers() {
         setQuestionIndex((prev) => prev + 1);
       }
     } catch (error) {
+      if (error.response?.status === 410) {
+        handleSessionEnd(error);
+        return;
+      }
       toast.error(error.response?.data?.message || 'Failed to submit answer');
     }
   };
@@ -919,13 +1140,22 @@ export default function Careers() {
     if (!interviewMode || !interviewChallengeToken || interviewLocked) return undefined;
 
     const sendPing = async () => {
+      const bufferedEvents = clientEventsRef.current;
+      clientEventsRef.current = [];
       try {
         await api.post('/recruitment/interview/ping', {
           application_id: application?.id,
           challenge_token: interviewChallengeToken,
           fingerprint: interviewFingerprintRef.current,
+          ...(bufferedEvents.length ? { client_events: bufferedEvents } : {}),
         });
+        lastPingAckRef.current = Date.now();
+        setInactivityWarning(false);
       } catch (error) {
+        if (error.response?.status === 410) {
+          handleSessionEnd(error);
+          return;
+        }
         console.error('Interview heartbeat failed:', error);
       }
     };
@@ -939,7 +1169,40 @@ export default function Careers() {
         interviewPingTimerRef.current = null;
       }
     };
-  }, [application?.id, interviewMode, interviewChallengeToken, interviewLocked]);
+  }, [application?.id, interviewMode, interviewChallengeToken, interviewLocked, handleSessionEnd]);
+
+  // ─── Tab switch / page leave detection ─────────────────
+  useEffect(() => {
+    if (!interviewMode || interviewLocked || sessionEnded) return undefined;
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && !interviewLockedRef.current) {
+        clientEventsRef.current.push('tab_switch');
+        if (!tabSwitchWarningShownRef.current) {
+          tabSwitchWarningShownRef.current = true;
+          toast.warn(t('careers.tab_switch_warning'));
+        }
+      }
+    };
+    const handleBlur = () => {
+      if (interviewLockedRef.current) return;
+      clientEventsRef.current.push('window_blur');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [interviewLocked, interviewMode, sessionEnded, t]);
 
   // ─── Speech Recognition ────────────────────────────────
   const listenForAnswer = () => {
@@ -1113,7 +1376,11 @@ export default function Careers() {
     const docsByType = new Set((application?.documents || []).map((doc) => doc.document_type));
     const canUpload = application?.payment_status === 'paid' && application?.access_code_used;
     const isSubmitted = application?.status && application.status !== 'draft';
-    const canJoinInterview = application?.status === 'shortlisted' && application?.interview_activated;
+    const canJoinInterview = application?.status === 'shortlisted'
+      && application?.interview_activated
+      && !application?.interview_completed
+      && !application?.interview_abandoned_at
+      && !application?.interview_expired;
 
     return (
       <motion.div
@@ -1311,10 +1578,32 @@ export default function Careers() {
                 <FaCheckCircle />
               </div>
               <div>
-                <p className="font-bold text-emerald-950">Interview Completed</p>
+                <p className="font-bold text-emerald-950">{t('careers.interview_completed_title')}</p>
                 <p className="mt-1 text-sm text-emerald-800">
                   Score: {Math.round(interviewResult?.score ?? application.interview_score ?? 0)}%.
                   Status: {(interviewResult?.passed ?? application.interview_passed) ? ' Passed' : ' Under admin review'}.
+                </p>
+                {application.interview_expired && (
+                  <p className="mt-1 text-xs font-semibold text-amber-700">
+                    {t('careers.interview_expired_note')}
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Abandoned Session */}
+        {application.interview_abandoned_at && !application.interview_completed && (
+          <section className="rounded-3xl border border-red-200 bg-gradient-to-br from-red-50 to-rose-50 p-6 shadow-elevated">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white">
+                <FaLock />
+              </div>
+              <div>
+                <p className="font-bold text-red-950">{t('careers.session_abandoned_title')}</p>
+                <p className="mt-1 text-sm text-red-800">
+                  {t('careers.session_abandoned_desc')}
                 </p>
               </div>
             </div>
@@ -1366,16 +1655,27 @@ export default function Careers() {
                   <button
                     type="button"
                     onClick={startInterview}
-                    disabled={interviewStarting}
+                    disabled={interviewStarting || !interviewConsent}
                     className="btn bg-gradient-to-r from-indigo-700 to-indigo-600 text-white hover:from-indigo-800 hover:to-indigo-700 shadow-lg shadow-indigo-500/20"
                   >
                     {interviewStarting ? (
-                      <><FaSpinner className="animate-spin mr-2" /> Starting...</>
+                      <><FaSpinner className="animate-spin mr-2" /> {t('careers.starting')}</>
                     ) : (
                       <><FaVideo className="mr-2" /> {t('careers.start_interview')}</>
                     )}
                   </button>
                 </div>
+                <label className="mt-4 flex max-w-xl items-start gap-3 rounded-xl border border-indigo-100 bg-white/70 p-3.5">
+                  <input
+                    type="checkbox"
+                    checked={interviewConsent}
+                    onChange={(event) => setInterviewConsent(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
+                  />
+                  <span className="text-xs leading-5 text-indigo-900">
+                    {t('careers.interview_consent')}
+                  </span>
+                </label>
                 {interviewStarting && interviewStartupStep && (
                   <p className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 text-xs font-semibold text-indigo-800">
                     <FaSpinner className="animate-spin" /> {interviewStartupStep}
@@ -1399,7 +1699,7 @@ export default function Careers() {
 
     const getFaceStatusBadge = () => {
       if (!faceDetectionReady) {
-        return { icon: <FaShieldAlt />, text: 'Basic monitoring', color: 'bg-amber-500/20 text-amber-300' };
+        return { icon: <FaVideo />, text: t('careers.recording_only'), color: 'bg-amber-500/20 text-amber-300' };
       }
       switch (faceStatus.status) {
         case 'monitoring':
@@ -1411,7 +1711,7 @@ export default function Careers() {
         case 'locked':
           return { icon: <FaLock />, text: 'Interview locked', color: 'bg-red-500/20 text-red-300 animate-pulse' };
         default:
-          return { icon: <FaShieldAlt />, text: 'Monitoring inactive', color: 'bg-slate-500/20 text-slate-300' };
+          return { icon: <FaVideo />, text: t('careers.monitoring_offline'), color: 'bg-slate-500/20 text-slate-300' };
       }
     };
 
@@ -1437,11 +1737,65 @@ export default function Careers() {
             <span className="text-white/60 hidden sm:inline">Proctored Interview</span>
           </div>
           <div className="flex items-center gap-3">
+            {sessionExpiresAt && !interviewLocked && (
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                sessionTimeLeft <= 300
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'bg-white/10 text-white/80'
+              }`}>
+                <FaHourglassHalf />
+                {t('careers.session_time_remaining', { time: formatSessionTime(sessionTimeLeft) })}
+              </span>
+            )}
             <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${faceBadge.color}`}>
               {faceBadge.icon} {faceBadge.text}
             </span>
           </div>
         </div>
+
+        {/* Inactivity Warning Overlay */}
+        <AnimatePresence>
+          {inactivityWarning && !interviewLocked && !sessionEnded && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed inset-x-0 top-0 z-[60] bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-center shadow-xl"
+            >
+              <p className="text-sm font-bold text-white">
+                {t('careers.inactivity_warning', { seconds: SESSION_INACTIVITY_WARNING_LEAD_SECONDS })}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Session Ended Overlay */}
+        <AnimatePresence>
+          {sessionEnded && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/90 px-4 text-center backdrop-blur-sm"
+            >
+              <div className="max-w-md rounded-3xl border border-white/10 bg-white/5 p-8">
+                <div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl ${
+                  sessionEndedReason === 'expired' ? 'bg-amber-500/20' : 'bg-red-500/20'
+                }`}>
+                  <FaHourglassHalf className={`text-3xl ${sessionEndedReason === 'expired' ? 'text-amber-400' : 'text-red-400'}`} />
+                </div>
+                <p className="text-xl font-bold text-white">
+                  {sessionEndedReason === 'expired' ? t('careers.session_expired_title') : t('careers.session_locked_title')}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {sessionEndedReason === 'expired'
+                    ? t('careers.session_expired_desc')
+                    : t('careers.session_locked_desc')}
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
           {/* Video Panel */}
@@ -1511,7 +1865,7 @@ export default function Careers() {
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/20 px-2.5 py-1 text-[10px] font-medium text-slate-300 backdrop-blur-sm border border-slate-500/10">
-                    <FaShieldAlt /> Motion
+                    <FaVideo /> {t('careers.recording_only')}
                   </span>
                 )}
               </div>
@@ -1598,12 +1952,16 @@ export default function Careers() {
             {/* Proctoring Rules */}
             <div className="mt-6 rounded-xl border border-amber-100 bg-amber-50/50 p-3">
               <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-800">
-                <FaShieldAlt /> Proctoring Rules
+                <FaShieldAlt /> {t('careers.proctoring_rules')}
               </p>
               <ul className="mt-2 space-y-1 text-[11px] text-amber-700">
-                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> Keep your face visible in the camera</li>
-                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> No other person should enter the frame</li>
-                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> You have {QUESTION_TIME_LIMIT_SECONDS}s per question</li>
+                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.rule_face_visible')}</li>
+                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.rule_no_others')}</li>
+                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.rule_time_per_question', { seconds: QUESTION_TIME_LIMIT_SECONDS })}</li>
+                <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.tab_switch_rule')}</li>
+                {!faceDetectionReady && (
+                  <li className="flex items-start gap-1.5"><FaExclamationTriangle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.monitoring_unavailable_note')}</li>
+                )}
               </ul>
             </div>
           </aside>

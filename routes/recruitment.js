@@ -361,6 +361,12 @@ router.post('/admin/applicants/bulk-process', authenticate, [
 // Interview management
 router.post('/admin/applicants/:id/set-interview', authenticate, [param('id').isInt(), body('interview_date').isString().trim().isLength({ min: 1 })], validateRequest, recruitmentController.setInterviewDate);
 router.post('/admin/interviews/trigger', authenticate, [body('cycle_id').optional().isInt()], validateRequest, recruitmentController.triggerInterview);
+router.post('/admin/applicants/:id/reopen-interview', authenticate, [param('id').isInt()], validateRequest, recruitmentController.adminReopenInterview);
+router.post('/admin/applicants/:id/extend-interview', authenticate, [param('id').isInt(), body('minutes').optional().isInt({ min: 1, max: 120 })], validateRequest, recruitmentController.adminExtendInterview);
+
+// Interview recording review
+router.get('/admin/applicants/:id/recordings', authenticate, [param('id').isInt()], validateRequest, recruitmentController.adminListRecordings);
+router.get('/admin/applicants/:id/recordings/:recordingId/stream', authenticate, [param('id').isInt(), param('recordingId').isInt()], validateRequest, recruitmentController.adminStreamRecording);
 
 // Document download (admin)
 router.get('/admin/documents/download/:applicationId', authenticate, recruitmentController.downloadApplicationDocs);
