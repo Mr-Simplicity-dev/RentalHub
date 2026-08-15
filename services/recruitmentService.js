@@ -50,6 +50,68 @@ const generateReferenceNumber = () => {
   return `RH-APP-${crypto.randomBytes(16).toString('hex').toUpperCase()}`;
 };
 
+// ==================== Access Code Encryption at Rest ====================
+// Access codes are low-entropy (36^5), so at-rest encryption with AES-256-GCM
+// protects them against a database leak while preserving the admin resend and
+// payment-time reuse flows. The key must be a 64-char hex string.
+
+const ACCESS_CODE_ENCRYPTION_KEY = process.env.RECRUITMENT_ACCESS_CODE_KEY;
+
+const hasAccessCodeEncryptionKey = () =>
+  Boolean(ACCESS_CODE_ENCRYPTION_KEY) && /^[0-9a-fA-F]{64}$/.test(ACCESS_CODE_ENCRYPTION_KEY);
+
+const encryptAccessCode = (code) => {
+  const key = Buffer.from(ACCESS_CODE_ENCRYPTION_KEY, 'hex');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(String(code || ''), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `v1:${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
+};
+
+// Returns the plaintext code, or null when the stored value cannot be
+// decrypted (wrong key / corrupted value). Legacy plaintext is returned
+// unchanged so old rows keep working until they are migrated.
+const decryptAccessCode = (stored) => {
+  if (!stored) return null;
+  if (typeof stored !== 'string' || !stored.startsWith('v1:')) {
+    return stored;
+  }
+  try {
+    const [, ivHex, tagHex, dataHex] = stored.split(':');
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      Buffer.from(ACCESS_CODE_ENCRYPTION_KEY, 'hex'),
+      Buffer.from(ivHex, 'hex')
+    );
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+    return Buffer.concat([
+      decipher.update(Buffer.from(dataHex, 'hex')),
+      decipher.final(),
+    ]).toString('utf8');
+  } catch {
+    return null;
+  }
+};
+
+// Stores a code encrypted when the key is available; falls back to legacy
+// plaintext only outside production (local development) so the app remains
+// runnable without credentials.
+const storeAccessCodeEncrypted = (code) => {
+  if (hasAccessCodeEncryptionKey()) return encryptAccessCode(code);
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('RECRUITMENT_ACCESS_CODE_KEY not set - access codes stored as plaintext (non-production)');
+    return null;
+  }
+  return null;
+};
+
+const requireAccessCodeEncryption = () => {
+  if (hasAccessCodeEncryptionKey()) return true;
+  if (process.env.NODE_ENV !== 'production') return true;
+  return false;
+};
+
 const isRecruitmentAdmin = async (userId) => {
   let result;
   try {
@@ -364,9 +426,27 @@ exports.verifyAccessCode = async (req, res) => {
     if (application.access_code_used) {
       return res.status(400).json({ success: false, message: 'Access code has already been used' });
     }
-    
-    if (!timingSafeEqualText(application.access_code, access_code.trim().toUpperCase())) {
+
+    // Prefer the encrypted value; fall back to legacy plaintext and migrate
+    // the row to encryption on the first successful use.
+    const storedPlaintext = decryptAccessCode(application.access_code_encrypted) || application.access_code;
+    if (!storedPlaintext) {
+      return res.status(400).json({ success: false, message: 'No access code has been issued for this application' });
+    }
+
+    if (!timingSafeEqualText(storedPlaintext, access_code.trim().toUpperCase())) {
       return res.status(400).json({ success: false, message: 'Invalid access code' });
+    }
+
+    if (!application.access_code_encrypted && application.access_code) {
+      await db.query(
+        `UPDATE recruitment_applications
+         SET access_code_encrypted = $2,
+             access_code = NULL,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [application_id, storeAccessCodeEncrypted(application.access_code)]
+      );
     }
     
     // Check expiry in the database timezone (based on cycle close/extension date)
@@ -1595,12 +1675,21 @@ exports.updateApplicationStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
     
-    // Generate access code if shortlisted
+    // Generate access code if shortlisted (stored encrypted at rest; the
+    // plaintext is returned to the admin in this response only).
     if (status === 'shortlisted') {
+      if (!requireAccessCodeEncryption()) {
+        return res.status(503).json({ success: false, message: 'Access code encryption is not configured' });
+      }
       const accessCode = generateAccessCode();
       await db.query(
-        'UPDATE recruitment_applications SET access_code = $1 WHERE id = $2',
-        [accessCode, id]
+        `UPDATE recruitment_applications
+         SET access_code_encrypted = $1,
+             access_code = NULL,
+             access_code_used = FALSE,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [storeAccessCodeEncrypted(accessCode), id]
       );
       result.rows[0].access_code = accessCode;
     }
@@ -2732,9 +2821,14 @@ const markApplicationPaid = async ({ application, reference, gatewayPayload }) =
       throw integrityError;
     }
 
-    const accessCode = current.access_code || await ensureUniqueAccessCode();
+    if (!requireAccessCodeEncryption()) {
+      throw new Error('RECRUITMENT_ACCESS_CODE_KEY must be configured in production');
+    }
 
-    if (current.payment_status === 'paid' && current.access_code) {
+    const accessCode = decryptAccessCode(current.access_code_encrypted) || current.access_code || await ensureUniqueAccessCode();
+    const accessCodeEncrypted = storeAccessCodeEncrypted(accessCode);
+
+    if (current.payment_status === 'paid' && (current.access_code || current.access_code_encrypted)) {
       paid = current;
     } else {
       const result = await client.query(
@@ -2743,16 +2837,21 @@ const markApplicationPaid = async ({ application, reference, gatewayPayload }) =
              payment_reference = COALESCE($2, payment_reference),
              payment_date = COALESCE(payment_date, NOW()),
              payment_processed_at = COALESCE(payment_processed_at, NOW()),
-             payment_gateway_payload = COALESCE($4::jsonb, payment_gateway_payload),
-             access_code = $3,
+             payment_gateway_payload = COALESCE($3::jsonb, payment_gateway_payload),
+             access_code_encrypted = $4,
+             access_code = NULL,
              updated_at = NOW()
          WHERE id = $1
          RETURNING *`,
-        [current.id, reference, accessCode, safeJson(gatewayPayload)]
+        [current.id, reference, safeJson(gatewayPayload), accessCodeEncrypted]
       );
       paid = result.rows[0];
       shouldSendNotice = true;
     }
+
+    // Attach the plaintext only to the in-memory row so the one-time email/SMS
+    // notice and the single API response can use it; it is never written back.
+    paid.access_code = accessCode;
 
     await client.query('COMMIT');
   } catch (error) {
@@ -3202,11 +3301,14 @@ exports.verifyPayment = async (req, res) => {
     const application = appResult.rows[0];
     if (!requirePublicApplicationAccess(req, res, application)) return;
 
-    if (application.payment_status === 'paid' && application.access_code) {
+    if (application.payment_status === 'paid' && (application.access_code || application.access_code_encrypted)) {
       return res.json({
         success: true,
         message: 'Payment already verified',
-        data: { application: stripPublicApplicationSecrets(application), access_code: application.access_code },
+        data: {
+          application: stripPublicApplicationSecrets(application),
+          access_code: decryptAccessCode(application.access_code_encrypted) || application.access_code,
+        },
       });
     }
 
