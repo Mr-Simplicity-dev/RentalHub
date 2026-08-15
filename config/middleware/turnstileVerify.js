@@ -1,8 +1,19 @@
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
+const TURNSTILE_SITEVERIFY_TIMEOUT_MS = Number(process.env.TURNSTILE_SITEVERIFY_TIMEOUT_MS || 8000);
+const TURNSTILE_EXPECTED_ACTION = 'rentalhub_form';
 
-const verifyTurnstileToken = async (token) => {
+// Cloudflare recommends binding verification to a widget action so a token
+// minted on one page cannot be replayed against a different protected action.
+const verifyTurnstileToken = async (token, remoteIp = '') => {
   if (!TURNSTILE_SECRET_KEY) {
-    console.warn('TURNSTILE_SECRET_KEY not set — skipping verification');
+    // Fail closed in production: a missing secret must not silently disable
+    // the security check. In local development the check is skipped so the
+    // app remains runnable without credentials.
+    if (process.env.NODE_ENV === 'production') {
+      console.error('TURNSTILE_SECRET_KEY is not set - Turnstile verification disabled');
+      return false;
+    }
+    console.warn('TURNSTILE_SECRET_KEY not set - skipping verification');
     return true;
   }
 
@@ -10,12 +21,12 @@ const verifyTurnstileToken = async (token) => {
     const https = require('https');
     const querystring = require('querystring');
 
-    const data = querystring.stringify({
-      secret: TURNSTILE_SECRET_KEY,
-      response: token,
-    });
+    const payload = { secret: TURNSTILE_SECRET_KEY, response: token };
+    if (remoteIp) payload.remoteip = remoteIp;
 
-    return new Promise((resolve, reject) => {
+    const data = querystring.stringify(payload);
+
+    return new Promise((resolve) => {
       const req = https.request(
         {
           hostname: 'challenges.cloudflare.com',
@@ -32,13 +43,19 @@ const verifyTurnstileToken = async (token) => {
           res.on('end', () => {
             try {
               const result = JSON.parse(body);
-              resolve(result.success === true);
+              const actionMatches = !result.action || result.action === TURNSTILE_EXPECTED_ACTION;
+              resolve(result.success === true && actionMatches);
             } catch {
               resolve(false);
             }
           });
         }
       );
+
+      // A slow Siteverify connection must never leave the request hanging.
+      req.setTimeout(TURNSTILE_SITEVERIFY_TIMEOUT_MS, () => {
+        req.destroy(new Error('Turnstile siteverify timed out'));
+      });
       req.on('error', () => resolve(false));
       req.write(data);
       req.end();
@@ -58,7 +75,7 @@ const requireTurnstile = (req, res, next) => {
     });
   }
 
-  verifyTurnstileToken(token).then((valid) => {
+  verifyTurnstileToken(token, req.ip).then((valid) => {
     if (!valid) {
       return res.status(400).json({
         success: false,

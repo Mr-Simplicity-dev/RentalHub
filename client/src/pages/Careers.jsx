@@ -332,11 +332,22 @@ export default function Careers() {
   const [inactivityWarning, setInactivityWarning] = useState(false);
   const [interviewConsent, setInterviewConsent] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState(null);
+  const [turnstileStalled, setTurnstileStalled] = useState(false);
   const turnstileRef = useRef(null);
 
   // ─── A11y focus traps for overlays ────────────────────────
   const cvModalRef = useFocusTrap(cvModal, { onEscape: () => setCvModal(false) });
   const interviewRoomRef = useFocusTrap(interviewMode);
+
+  // ─── Turnstile stall detection ────────────────────────────
+  useEffect(() => {
+    if (!process.env.REACT_APP_TURNSTILE_SITE_KEY || turnstileToken) {
+      setTurnstileStalled(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setTurnstileStalled(true), 6000);
+    return () => clearTimeout(timer);
+  }, [turnstileToken]);
 
   // ─── Refs ──────────────────────────────────────────────────
   const videoRef = useRef(null);
@@ -1481,19 +1492,24 @@ export default function Careers() {
       </div>
 
       {process.env.REACT_APP_TURNSTILE_SITE_KEY && (
-        <div className="lg:col-span-2 flex justify-center">
+        <div className="lg:col-span-2 flex flex-col items-center gap-2">
           <TurnstileWidget
             ref={turnstileRef}
             onToken={setTurnstileToken}
             onExpire={() => setTurnstileToken(null)}
             onError={() => setTurnstileToken(null)}
           />
+          {turnstileStalled && (
+            <p className="text-xs font-medium text-amber-600">
+              The security check is taking longer than usual. If it does not complete, please refresh the page.
+            </p>
+          )}
         </div>
       )}
 
       <button
         type="submit"
-        disabled={submitting || roles.length === 0}
+        disabled={submitting || roles.length === 0 || (process.env.REACT_APP_TURNSTILE_SITE_KEY && !turnstileToken)}
         className="btn btn-primary w-full py-3.5 text-base lg:col-span-2"
       >
         {submitting ? (

@@ -38,6 +38,12 @@ const TurnstileWidget = forwardRef(({ onToken, onExpire, onError }, ref) => {
       try {
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: SITE_KEY,
+          action: 'rentalhub_form',
+          appearance: 'interaction-only',
+          execution: 'render',
+          theme: 'auto',
+          retry: 'auto',
+          refreshExpired: 'auto',
           callback: (token) => callbacksRef.current.onToken?.(token),
           'expired-callback': () => {
             callbacksRef.current.onExpire?.();
