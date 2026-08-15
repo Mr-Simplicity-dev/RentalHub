@@ -1571,6 +1571,46 @@ export function RecruitmentInterviewTab({ cycles, roles, onRefreshCore }) {
   const [triggerModal, setTriggerModal] = useState(false);
   const [triggerForm, setTriggerForm] = useState({ cycle_id: "", role_id: "", interview_date: "" });
   const [actionKey, setActionKey] = useState("");
+  const [reviewApplicant, setReviewApplicant] = useState(null);
+  const [recordings, setRecordings] = useState([]);
+  const [recordingsLoading, setRecordingsLoading] = useState(false);
+  const [recordingUrls, setRecordingUrls] = useState({});
+
+  const formatDuration = (seconds) => {
+    const safe = Math.max(Number(seconds) || 0, 0);
+    const minutes = Math.floor(safe / 60);
+    const secs = Math.floor(safe % 60);
+    return minutes > 0 ? `${minutes}m ${secs}s` : `${secs}s`;
+  };
+
+  const openRecordingReview = async (applicant) => {
+    setReviewApplicant(applicant);
+    setRecordings([]);
+    setRecordingUrls({});
+    setRecordingsLoading(true);
+    try {
+      const res = await api.get(`/recruitment/admin/applicants/${applicant.id}/recordings`);
+      setRecordings(res.data?.data || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load interview recordings");
+    } finally {
+      setRecordingsLoading(false);
+    }
+  };
+
+  const loadRecordingBlob = async (recording) => {
+    if (recordingUrls[recording.id] || !reviewApplicant) return;
+    try {
+      const res = await api.get(
+        `/recruitment/admin/applicants/${reviewApplicant.id}/recordings/${recording.id}/stream`,
+        { responseType: "blob" }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "video/webm" }));
+      setRecordingUrls((prev) => ({ ...prev, [recording.id]: url }));
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load recording");
+    }
+  };
 
   const loadApplicants = useCallback(async (page = 1) => {
     setLoading(true);
@@ -1755,6 +1795,112 @@ export function RecruitmentInterviewTab({ cycles, roles, onRefreshCore }) {
         )}
       </AnimatePresence>
 
+      {/* ── Recording Review Modal ────────────────────── */}
+      <AnimatePresence>
+        {reviewApplicant && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 12 }}
+              className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">Interview Recording</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {reviewApplicant.full_name} &middot; {reviewApplicant.reference_number}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReviewApplicant(null);
+                    Object.values(recordingUrls).forEach((url) => window.URL.revokeObjectURL(url));
+                    setRecordingUrls({});
+                  }}
+                  className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {recordingsLoading ? (
+                  <LoadingState label="Loading recordings..." />
+                ) : recordings.length === 0 ? (
+                  <EmptyState
+                    title="No recordings found"
+                    description="This applicant has no saved interview recordings."
+                  />
+                ) : (
+                  recordings.map((recording) => (
+                    <div
+                      key={recording.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700">
+                            Recorded {formatDateTime(recording.created_at)}
+                          </span>
+                          {recording.recording_duration != null && (
+                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                              {formatDuration(recording.recording_duration)}
+                            </span>
+                          )}
+                          {recording.file_size > 0 && (
+                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                              {(recording.file_size / 1024 / 1024).toFixed(1)} MB
+                            </span>
+                          )}
+                        </div>
+                        <ActionButton
+                          onClick={() => loadRecordingBlob(recording)}
+                          disabled={Boolean(recordingUrls[recording.id]) || !recording.file_exists}
+                          variant={recording.file_exists ? "primary" : "danger"}
+                          size="sm"
+                          icon={FaVideo}
+                        >
+                          {recordingUrls[recording.id] ? "Loaded" : "Load Recording"}
+                        </ActionButton>
+                      </div>
+
+                      {recording.violation_log && (
+                        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-[11px] font-medium text-red-700">
+                          {recording.violation_log}
+                        </p>
+                      )}
+
+                      {!recording.file_exists && (
+                        <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">
+                          The recording file is missing from storage.
+                        </p>
+                      )}
+
+                      {recordingUrls[recording.id] && (
+                        <video
+                          controls
+                          playsInline
+                          preload="metadata"
+                          src={recordingUrls[recording.id]}
+                          className="aspect-video w-full rounded-xl bg-black"
+                        />
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Shortlisted Applicants Table ─────────── */}
       <SectionCard
         title="Shortlisted applicants"
@@ -1883,6 +2029,15 @@ export function RecruitmentInterviewTab({ cycles, roles, onRefreshCore }) {
                         size="sm"
                       >
                         Reopen Session
+                      </ActionButton>
+                    )}
+                    {applicant.interview_started_at && (
+                      <ActionButton
+                        onClick={() => openRecordingReview(applicant)}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        <FaVideo /> Recording
                       </ActionButton>
                     )}
                     <ActionButton

@@ -11,6 +11,8 @@ import {
   FaCopy,
   FaDownload,
   FaExclamationTriangle,
+  FaEye,
+  FaEyeSlash,
   FaFileUpload,
   FaHourglassHalf,
   FaLock,
@@ -236,7 +238,7 @@ export default function Careers() {
   const [faceDetectionReady, setFaceDetectionReady] = useState(false);
   const [faceStatus, setFaceStatus] = useState({ faces: 0, status: 'idle' }); // idle | monitoring | violation | locked
   const [livenessReady, setLivenessReady] = useState(false);
-  const [livenessStatus, setLivenessStatus] = useState('unavailable'); // ok | no_blink | unavailable
+  const [livenessStatus, setLivenessStatus] = useState('unavailable'); // unavailable | waiting | ok | no_blink
   const [interviewStarting, setInterviewStarting] = useState(false);
   const [interviewStartupStep, setInterviewStartupStep] = useState('');
   const [interviewChallengeToken, setInterviewChallengeToken] = useState('');
@@ -721,6 +723,9 @@ export default function Careers() {
         // No face or multiple faces resets the liveness baseline.
         lastBlinkAtRef.current = 0;
         eyeClosedFramesRef.current = 0;
+        if (livenessStatus !== 'unavailable' && livenessReady) {
+          setLivenessStatus('waiting');
+        }
       }
 
       // Multiple faces → other person in frame → disqualify
@@ -941,9 +946,11 @@ export default function Careers() {
       // Load face-api
       setInterviewStartupStep(t('careers.loading_model'));
       const faceReady = await loadFaceApi();
-      setFaceDetectionReady(faceReady);
+      setFaceDetectionReady(Boolean(faceReady?.face));
+      setLivenessReady(Boolean(faceReady?.liveness));
+      if (faceReady?.liveness) setLivenessStatus('waiting');
 
-      if (faceReady) {
+      if (faceReady?.face) {
         setFaceStatus({ faces: 0, status: 'monitoring' });
         // Start face detection
         faceDetectionTimerRef.current = setInterval(detectFaceWithApi, FACE_DETECTION_INTERVAL_MS);
@@ -1868,6 +1875,24 @@ export default function Careers() {
                     <FaVideo /> {t('careers.recording_only')}
                   </span>
                 )}
+                {livenessReady && (
+                  <span
+                    title={livenessStatus === 'ok'
+                      ? t('careers.liveness_ok')
+                      : livenessStatus === 'no_blink'
+                      ? t('careers.liveness_no_blink')
+                      : t('careers.liveness_waiting')}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium backdrop-blur-sm border ${
+                      livenessStatus === 'ok'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/10'
+                        : livenessStatus === 'no_blink'
+                        ? 'bg-red-500/20 text-red-300 border-red-500/10 animate-pulse'
+                        : 'bg-slate-500/20 text-slate-300 border-slate-500/10'
+                    }`}
+                  >
+                    {livenessStatus === 'no_blink' ? <FaEyeSlash /> : <FaEye />} Liveness
+                  </span>
+                )}
               </div>
             </div>
           </section>
@@ -1959,6 +1984,9 @@ export default function Careers() {
                 <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.rule_no_others')}</li>
                 <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.rule_time_per_question', { seconds: QUESTION_TIME_LIMIT_SECONDS })}</li>
                 <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.tab_switch_rule')}</li>
+                {livenessReady && (
+                  <li className="flex items-start gap-1.5"><FaCheckCircle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.rule_eyes_open')}</li>
+                )}
                 {!faceDetectionReady && (
                   <li className="flex items-start gap-1.5"><FaExclamationTriangle className="mt-0.5 shrink-0 text-[9px]" /> {t('careers.monitoring_unavailable_note')}</li>
                 )}
