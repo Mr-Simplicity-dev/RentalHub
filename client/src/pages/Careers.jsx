@@ -126,6 +126,11 @@ const FACE_LANDMARK_MODEL_URLS = [
 // 30s window at the 800ms sampling rate: enough time for several blinks,
 // so a zero-blink window strongly suggests a static photo/video.
 const LIVENESS_NO_BLINK_WINDOW_MS = 30000;
+// Randomized challenge-response every ~45s defeats pre-recorded video replay:
+// a recording cannot react to prompts it did not expect.
+const LIVENESS_CHALLENGE_INTERVAL_MS = 45000;
+const LIVENESS_CHALLENGE_TIMEOUT_MS = 6000;
+const LIVENESS_CHALLENGE_YAW_THRESHOLD = 0.35;
 const EYE_ASPECT_RATIO_CLOSED_THRESHOLD = 0.2;
 const CAREERS_DRAFT_STORAGE_KEY = 'rentalhub_careers_application_draft';
 const CAREERS_EMAIL_STORAGE_KEY = 'rentalhub_careers_applicant_email';
@@ -318,6 +323,7 @@ export default function Careers() {
   const [faceStatus, setFaceStatus] = useState({ faces: 0, status: 'idle' }); // idle | monitoring | violation | locked
   const [livenessReady, setLivenessReady] = useState(false);
   const [livenessStatus, setLivenessStatus] = useState('unavailable'); // unavailable | waiting | ok | no_blink
+  const [livenessChallenge, setLivenessChallenge] = useState(null); // null | blink | left | right
   const [interviewStarting, setInterviewStarting] = useState(false);
   const [interviewStartupStep, setInterviewStartupStep] = useState('');
   const [interviewChallengeToken, setInterviewChallengeToken] = useState('');
@@ -370,6 +376,10 @@ export default function Careers() {
   const eyeClosedFramesRef = useRef(0);
   const lastBlinkAtRef = useRef(0);
   const lastLivenessEventAtRef = useRef(0);
+  // Liveness challenge-response tracking
+  const livenessChallengeAtRef = useRef(0);
+  const lastLivenessChallengeAtRef = useRef(0);
+  const challengePassFramesRef = useRef(0);
 
   const getEyeAspectRatio = (positions, indices) => {
     const vertical = Math.hypot(
@@ -381,6 +391,25 @@ export default function Careers() {
       positions[indices[0]].y - positions[indices[3]].y
     );
     return vertical / (horizontal || 1);
+  };
+
+  // Rough head-yaw estimate from the 68-point landmarks: positive means the
+  // nose moved right relative to the eyes, i.e. the head turned left.
+  const estimateYaw = (positions) => {
+    const noseTip = positions[30];
+    const leftEyeOuter = positions[36];
+    const rightEyeOuter = positions[45];
+    const midEyeX = (leftEyeOuter.x + rightEyeOuter.x) / 2;
+    const faceWidth = Math.abs(rightEyeOuter.x - leftEyeOuter.x) || 1;
+    return (noseTip.x - midEyeX) / faceWidth;
+  };
+
+  const issueLivenessChallenge = () => {
+    const types = ['blink', 'left', 'right'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    livenessChallengeAtRef.current = Date.now();
+    challengePassFramesRef.current = 0;
+    setLivenessChallenge(type);
   };
 
   const selectedRole = useMemo(
@@ -825,6 +854,31 @@ export default function Careers() {
           eyeClosedFramesRef.current = 0;
         }
 
+        // ── Challenge-response resolution ──
+        if (livenessChallenge) {
+          let passed = false;
+          if (livenessChallenge === 'blink') {
+            // A blink after the challenge was issued counts as a response.
+            passed = lastBlinkAtRef.current >= livenessChallengeAtRef.current;
+          } else {
+            const yaw = estimateYaw(positions);
+            const matches = livenessChallenge === 'left'
+              ? yaw > LIVENESS_CHALLENGE_YAW_THRESHOLD
+              : yaw < -LIVENESS_CHALLENGE_YAW_THRESHOLD;
+            if (matches) {
+              challengePassFramesRef.current += 1;
+              passed = challengePassFramesRef.current >= 2;
+            } else {
+              challengePassFramesRef.current = 0;
+            }
+          }
+          if (passed) {
+            setLivenessChallenge(null);
+            setLivenessStatus('ok');
+            lastLivenessChallengeAtRef.current = Date.now();
+          }
+        }
+
         // Seed the baseline the moment a face enters the frame so the
         // no-blink window is measured from face appearance, not session start.
         if (!lastBlinkAtRef.current) {
@@ -1011,12 +1065,26 @@ export default function Careers() {
         const idleSeconds = (Date.now() - lastPingAckRef.current) / 1000;
         setInactivityWarning(idleSeconds >= sessionInactivityLimitSeconds - SESSION_INACTIVITY_WARNING_LEAD_SECONDS);
       }
+
+      // ── Randomized liveness challenge scheduling ──
+      if (livenessReady && !interviewLocked && !sessionEnded) {
+        if (!livenessChallenge) {
+          if (Date.now() - lastLivenessChallengeAtRef.current >= LIVENESS_CHALLENGE_INTERVAL_MS) {
+            issueLivenessChallenge();
+          }
+        } else if (Date.now() - livenessChallengeAtRef.current >= LIVENESS_CHALLENGE_TIMEOUT_MS) {
+          // No response within the window: a pre-recorded video cannot react.
+          clientEventsRef.current.push(`liveness_challenge_failed:${livenessChallenge}`);
+          setLivenessChallenge(null);
+          lastLivenessChallengeAtRef.current = Date.now();
+        }
+      }
     };
 
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [application?.id, interviewChallengeToken, interviewLocked, interviewMode, sessionEnded, sessionExpiresAt, sessionInactivityLimitSeconds, stopInterviewMedia, uploadRecording]);
+  }, [application?.id, interviewChallengeToken, interviewLocked, interviewMode, issueLivenessChallenge, livenessChallenge, livenessReady, sessionEnded, sessionExpiresAt, sessionInactivityLimitSeconds, stopInterviewMedia, uploadRecording]);
 
   // ─── Start Interview ───────────────────────────────────
   useEffect(() => {
@@ -1905,6 +1973,30 @@ export default function Careers() {
             </span>
           </div>
         </div>
+
+        {/* Liveness Challenge Banner */}
+        <AnimatePresence>
+          {livenessChallenge && !interviewLocked && (
+            <motion.div
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              className="fixed left-1/2 top-20 z-[65] w-[min(92vw,480px)] -translate-x-1/2 rounded-2xl border border-emerald-400/30 bg-emerald-950/90 px-5 py-4 text-center shadow-2xl backdrop-blur"
+            >
+              <p className="flex items-center justify-center gap-2 text-sm font-bold text-emerald-300">
+                <FaEye className="text-base" />
+                {livenessChallenge === 'blink'
+                  ? t('careers.liveness_challenge_blink')
+                  : livenessChallenge === 'left'
+                  ? t('careers.liveness_challenge_left')
+                  : t('careers.liveness_challenge_right')}
+              </p>
+              <p className="mt-1 text-[11px] text-emerald-500">
+                {t('careers.liveness_challenge_hint', { seconds: LIVENESS_CHALLENGE_TIMEOUT_MS / 1000 })}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Inactivity Warning Overlay */}
         <AnimatePresence>
