@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
 import { FaFileAlt, FaSearch } from 'react-icons/fa';
+import { useAuth } from '../../hooks/useAuth';
 
 const PAGE_SIZE = 20;
 
 const AdminApplications = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +26,7 @@ const AdminApplications = () => {
   const loadApplications = useCallback(async (p = 1, query = '') => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/applications', {
+      const res = await api.get(user?.user_type === 'zonal_admin' ? '/zonal-admin/applications' : '/admin/applications', {
         params: {
           search: query,
           page: p,
@@ -41,7 +43,7 @@ const AdminApplications = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.user_type]);
 
   useEffect(() => {
     const delay = setTimeout(() => {

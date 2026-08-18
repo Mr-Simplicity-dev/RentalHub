@@ -24,8 +24,11 @@ const AdminDashboard = () => {
   const role = String(user?.user_type || '').trim().toLowerCase();
   const isLgaOperationsAdmin = ['admin', 'lga_admin'].includes(role);
   const isLgaSupportAdmin = role === 'lga_support_admin';
+  const isZonalAdmin = role === 'zonal_admin';
   const dashboardTitle = isLgaSupportAdmin
     ? 'LGA Support Dashboard'
+    : isZonalAdmin
+    ? 'Zonal Admin Dashboard'
     : isLgaOperationsAdmin
     ? 'LGA Admin Dashboard'
     : 'Admin Dashboard';
@@ -38,6 +41,7 @@ const AdminDashboard = () => {
   });
 
   const [scope, setScope] = useState({ assignedState: null, assignedCity: null });
+  const [statePerformance, setStatePerformance] = useState([]);
   const [escalationLoading, setEscalationLoading] = useState('');
 
   useEffect(() => {
@@ -51,7 +55,7 @@ const AdminDashboard = () => {
       }
 
       try {
-        const { data } = await api.get('/admin/stats');
+        const { data } = await api.get(isZonalAdmin ? '/zonal-admin/dashboard' : '/admin/stats');
 
         if (data.success) {
           setStats({
@@ -63,6 +67,7 @@ const AdminDashboard = () => {
           if (data.data.scope) {
             setScope(data.data.scope);
           }
+          setStatePerformance(data.data.statePerformance || []);
         }
       } catch (err) {
         console.error('Failed to load admin stats', err);
@@ -70,7 +75,7 @@ const AdminDashboard = () => {
     };
 
     loadStats();
-  }, [role, user?.assigned_city, user?.assigned_state]);
+  }, [role, user?.assigned_city, user?.assigned_state, user?.assigned_zone, isZonalAdmin]);
 
   const requestEscalation = async (actionType, summary) => {
     try {
@@ -143,6 +148,14 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {isZonalAdmin && scope.assignedZone && (
+          <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-center">
+            <p className="text-sm font-semibold text-indigo-900">Your Jurisdiction</p>
+            <p className="mt-1 text-lg font-bold text-indigo-800">{scope.assignedZone}</p>
+            <p className="mt-1 text-xs text-indigo-700">{(scope.states || []).join(', ')}</p>
+          </div>
+        )}
+
         {isLgaOperationsAdmin && (
           <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm font-semibold text-amber-900">
@@ -181,11 +194,11 @@ const AdminDashboard = () => {
         )}
 
         {/* Commission Withdrawal Banner */}
-        <div className="mb-6">
+        {!isZonalAdmin && <div className="mb-6">
           <CommissionWithdrawalBanner />
-        </div>
+        </div>}
 
-        {activeTab === 'property_requests' && (
+        {!isZonalAdmin && activeTab === 'property_requests' && (
           <div className="space-y-6">
             <PropertyRequestWorkflowPanel
               mode="state"
@@ -224,6 +237,19 @@ const AdminDashboard = () => {
           />
         </div>
 
+        {isZonalAdmin && (
+          <div className="admin-reports-section overflow-x-auto rounded-lg bg-white p-4 shadow">
+            <h2 className="mb-3 text-lg font-semibold">State Performance</h2>
+            <table className="min-w-full text-sm">
+              <thead><tr><th className="p-2 text-left">State</th><th className="p-2 text-right">Properties</th><th className="p-2 text-right">Applications</th></tr></thead>
+              <tbody>{statePerformance.map((item) => (
+                <tr key={item.state_name} className="border-t"><td className="p-2">{item.state_name}</td><td className="p-2 text-right">{item.properties}</td><td className="p-2 text-right">{item.applications}</td></tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+
+        {!isZonalAdmin && (
         <div className="admin-reports-section grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-7">
           <QuickCard title="Manage Users" href="/admin/users" />
           <QuickCard
@@ -249,6 +275,7 @@ const AdminDashboard = () => {
             icon={<FaChartLine className="text-emerald-500" />}
           />
         </div>
+        )}
           </>
         )}
       </div>

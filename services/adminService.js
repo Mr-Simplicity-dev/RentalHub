@@ -12,6 +12,26 @@ const {
 } = require('../config/utils/emailService');
 const { notifyAlertsForProperty } = require('../config/utils/propertyAlertService');
 const bcrypt = require('bcryptjs');
+const { CREATABLE_ADMIN_ROLES } = require('../config/utils/roleHierarchy');
+const { canonicalZone } = require('../config/utils/territorialZones');
+
+const enforceTerritoryActivation = () => String(process.env.ENFORCE_TERRITORY_ACTIVATION || '').trim().toLowerCase() === 'true';
+const requireActiveTerritory = async (type, name, parentName = null) => {
+  if (!enforceTerritoryActivation()) return;
+  const result = await db.query(
+    `SELECT is_active FROM operational_territories
+     WHERE territory_type = $1 AND LOWER(territory_name) = LOWER($2)
+       AND (($3::text IS NULL AND parent_name IS NULL) OR LOWER(parent_name) = LOWER($3))
+     LIMIT 1`,
+    [type, name, parentName]
+  );
+  if (!result.rows[0]?.is_active) {
+    const error = new Error(`${type.toUpperCase()} territory is not operationally active`);
+    error.statusCode = 400;
+    throw error;
+  }
+};
+exports._territoryActivationForTest = { enforceTerritoryActivation, requireActiveTerritory };
 
 let verificationAuditSchemaReady = false;
 let lawyerScopeSchemaReady = false;
@@ -78,6 +98,7 @@ const ensureAdminRoleSchema = async () => {
       ADD COLUMN IF NOT EXISTS nin_verified BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS assigned_state VARCHAR(100),
       ADD COLUMN IF NOT EXISTS assigned_city VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS assigned_zone VARCHAR(50),
       ADD COLUMN IF NOT EXISTS lawyer_client_scope VARCHAR(20),
       ADD COLUMN IF NOT EXISTS is_recruitment_admin BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
@@ -153,6 +174,7 @@ const ensureAdminRoleSchema = async () => {
           'lga_admin',
           'lga_support_admin',
           'state_admin',
+          'zonal_admin',
           'lga_financial_admin',
           'lga_transportation_admin',
           'state_transportation_admin',
@@ -2297,32 +2319,11 @@ exports.createAdmin = async (req, res) => {
       user_type,
       assigned_state,
       assigned_city,
+      assigned_zone,
       lawyer_client_scope,
     } = req.body;
 
-    const allowedCreateRoles = [
-      'admin',
-      'lga_admin',
-      'lga_support_admin',
-      'state_admin',
-      'lga_financial_admin',
-      'lga_transportation_admin',
-      'state_transportation_admin',
-      'super_transportation_admin',
-      'lga_fumigation_admin',
-      'state_fumigation_admin',
-      'super_fumigation_admin',
-      'state_financial_admin',
-      'state_support_admin',
-      'super_financial_admin',
-      'super_support_admin',
-      'recruitment_admin',
-      'lawyer',
-      'state_lawyer',
-      'super_lawyer',
-      'fumigation_admin',
-      'transportation_admin',
-    ];
+    const allowedCreateRoles = CREATABLE_ADMIN_ROLES;
 
     const fallbackStates = [
       'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta',
@@ -2383,6 +2384,7 @@ exports.createAdmin = async (req, res) => {
 
     const normalizedState = String(assigned_state || '').trim();
     const normalizedCity = String(assigned_city || '').trim();
+    const normalizedZone = canonicalZone(assigned_zone);
     let canonicalAssignedState = normalizedState;
 
     if (stateBoundRoles.has(user_type)) {
@@ -2440,6 +2442,16 @@ exports.createAdmin = async (req, res) => {
       });
     }
 
+    if (user_type === 'zonal_admin' && !normalizedZone) {
+      return res.status(400).json({ success: false, message: 'A valid assigned zone is required for Zonal Admin' });
+    }
+
+    if (user_type === 'zonal_admin') await requireActiveTerritory('zone', normalizedZone);
+    if (stateBoundRoles.has(user_type)) await requireActiveTerritory('state', canonicalAssignedState);
+    if (['lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(user_type)) {
+      await requireActiveTerritory('lga', normalizedCity, canonicalAssignedState);
+    }
+
     let normalizedLawyerScope = null;
     if (lawyerRoles.has(user_type)) {
       normalizedLawyerScope = String(lawyer_client_scope || '').trim().toLowerCase();
@@ -2473,6 +2485,7 @@ exports.createAdmin = async (req, res) => {
       'state_fumigation_admin',
       'super_fumigation_admin',
       'state_admin',
+      'zonal_admin',
       'financial_admin',
       'super_financial_admin',
       'state_financial_admin',
@@ -2495,12 +2508,12 @@ exports.createAdmin = async (req, res) => {
     const result = await db.query(
       `INSERT INTO users (
         user_type, email, phone, password_hash,
-        full_name, nin, assigned_state, assigned_city, lawyer_client_scope,
+        full_name, nin, assigned_state, assigned_city, assigned_zone, lawyer_client_scope,
         email_verified, phone_verified, identity_verified, approval_status,
         is_recruitment_admin, is_lead, is_active
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,TRUE,TRUE,$10,$11,$12,TRUE)
-      RETURNING id, email, user_type, assigned_state, assigned_city, lawyer_client_scope, is_lead, approval_status, is_recruitment_admin`,
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE,TRUE,TRUE,$11,$12,$13,TRUE)
+      RETURNING id, email, user_type, assigned_state, assigned_city, assigned_zone, lawyer_client_scope, is_lead, approval_status, is_recruitment_admin`,
       [
         user_type,
         normalizedEmail,
@@ -2510,6 +2523,7 @@ exports.createAdmin = async (req, res) => {
         normalizedNin || null,
         canonicalAssignedState || null,
         ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(user_type) ? normalizedCity : null,
+        user_type === 'zonal_admin' ? normalizedZone : null,
         normalizedLawyerScope,
         pendingApproval ? 'pending' : 'approved',
         user_type === 'recruitment_admin',
@@ -2548,6 +2562,8 @@ exports.createAdmin = async (req, res) => {
 
   } catch (err) {
     req.logger.error(err);
+
+    if (err.statusCode) return res.status(err.statusCode).json({ success: false, message: err.message });
 
     if (err.code === '23505') {
       const detail = String(err.detail || 'A user with one of those details already exists.');

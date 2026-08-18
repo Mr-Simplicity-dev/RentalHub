@@ -147,6 +147,22 @@ test('support admin ticket scope follows LGA, state, assignment, and super hiera
 
   assert.equal(
     canSupportAdminAccessTicket(
+      { id: 25, user_type: 'zonal_admin', assigned_zone: 'South West' },
+      lagosIkejaTicket
+    ),
+    true
+  );
+
+  assert.equal(
+    canSupportAdminAccessTicket(
+      { id: 25, user_type: 'zonal_admin', assigned_zone: 'South West' },
+      abujaTicket
+    ),
+    false
+  );
+
+  assert.equal(
+    canSupportAdminAccessTicket(
       { id: 30, user_type: 'lga_support_admin', assigned_state: 'Oyo', assigned_city: 'Ibadan' },
       { ...lagosIkejaTicket, assigned_to: 30 }
     ),
@@ -186,6 +202,11 @@ test('support dashboard scope is derived from the authenticated role', () => {
   assert.deepEqual(
     resolveSupportDashboardScope({ user_type: 'super_support_admin' }),
     { level: 'super', assignedState: null, assignedCity: null }
+  );
+
+  assert.deepEqual(
+    resolveSupportDashboardScope({ user_type: 'zonal_admin', assigned_zone: 'South West' }),
+    { level: 'zone', assignedZone: 'South West', states: ['Ekiti', 'Lagos', 'Ogun', 'Ondo', 'Osun', 'Oyo'], assignedState: null, assignedCity: null }
   );
 
   assert.throws(

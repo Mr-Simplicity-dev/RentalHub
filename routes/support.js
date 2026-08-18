@@ -7,6 +7,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { body, param } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
+const { ZONE_STATES, canonicalZone, zoneContainsState, zoneForState } = require('../config/utils/territorialZones');
 
 const router = express.Router();
 const logger = require('../config/utils/logger');
@@ -32,6 +33,7 @@ const {
 const SUPPORT_ADMIN_ROLES = new Set([
   'super_admin',
   'super_support_admin',
+  'zonal_admin',
   'state_support_admin',
   'lga_support_admin',
 ]);
@@ -550,6 +552,7 @@ const resolveSupportDashboardScope = (user = {}) => {
   const role = normalizeText(user.user_type || user.userType);
   const assignedState = String(user.assigned_state || '').trim();
   const assignedCity = String(user.assigned_city || '').trim();
+  const assignedZone = canonicalZone(user.assigned_zone);
 
   if (role === 'super_admin' || role === 'super_support_admin') {
     return { level: 'super', assignedState: null, assignedCity: null };
@@ -562,6 +565,15 @@ const resolveSupportDashboardScope = (user = {}) => {
       throw error;
     }
     return { level: 'state', assignedState, assignedCity: null };
+  }
+
+  if (role === 'zonal_admin') {
+    if (!assignedZone) {
+      const error = new Error('Zonal admin account is missing assigned_zone');
+      error.statusCode = 403;
+      throw error;
+    }
+    return { level: 'zone', assignedZone, states: ZONE_STATES[assignedZone], assignedState: null, assignedCity: null };
   }
 
   if (role === 'lga_support_admin') {
@@ -933,6 +945,10 @@ const canSupportAdminAccessTicket = (user, ticket = {}) => {
     return Boolean(userState && ticketState && userState === ticketState);
   }
 
+  if (role === 'zonal_admin') {
+    return Boolean(user.assigned_zone && ticket.state && zoneContainsState(user.assigned_zone, ticket.state));
+  }
+
   if (role === 'lga_support_admin') {
     return Boolean(userState && userLga && ticketState && ticketLga && userState === ticketState && userLga === ticketLga);
   }
@@ -950,6 +966,14 @@ const addSupportTicketScope = (where, params, user, alias = 'st') => {
     params.push(normalizeText(user.assigned_state));
     const stateParam = `$${params.length}`;
     where.push(`(${alias}.assigned_to = ${assignedParam} OR LOWER(COALESCE(${alias}.state, '')) = ${stateParam})`);
+    return;
+  }
+
+  if (role === 'zonal_admin') {
+    const zone = canonicalZone(user.assigned_zone);
+    if (!zone) { where.push('1 = 0'); return; }
+    params.push(ZONE_STATES[zone].map(normalizeText));
+    where.push(`LOWER(COALESCE(${alias}.state, '')) = ANY($${params.length})`);
     return;
   }
 
@@ -1678,7 +1702,24 @@ router.post('/tickets/escalate', authenticate, requireSupportAdmin, async (req, 
       }
     }
 
-    if (!nextAssigneeId && (currentUserType === 'lga_support_admin' || currentUserType === 'state_support_admin')) {
+    if (!nextAssigneeId && currentUserType === 'state_support_admin' && ticketState) {
+      const ticketZone = zoneForState(ticketState);
+      if (ticketZone) {
+        const zonalResult = await db.query(
+          `SELECT id FROM users
+           WHERE user_type = 'zonal_admin' AND assigned_zone = $1
+             AND deleted_at IS NULL AND account_suspended_at IS NULL
+           ORDER BY id ASC LIMIT 1`,
+          [ticketZone]
+        );
+        if (zonalResult.rows.length > 0) {
+          nextAssigneeId = zonalResult.rows[0].id;
+          escalationNote = `Escalated from state support (User #${currentUserId}) to ${ticketZone} Zonal Admin`;
+        }
+      }
+    }
+
+    if (!nextAssigneeId && ['lga_support_admin', 'state_support_admin', 'zonal_admin'].includes(currentUserType)) {
       const superResult = await db.query(
         `SELECT id FROM users
          WHERE user_type = 'super_support_admin'
