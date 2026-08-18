@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const db = require('./database');
 const { getAuthTokenFromRequest } = require('../utils/authCookies');
 const { getSessionTokenIdentity } = require('../utils/sessionToken');
+const { GENERAL_ADMIN_ROLES, normalizeRole } = require('../utils/roleHierarchy');
 
 let userSuspensionSchemaReady = false;
 
@@ -33,7 +34,7 @@ const authenticate = async (req, res, next) => {
 
     const result = await db.query(
       `SELECT id, email, user_type, identity_verified, subscription_active,
-              assigned_state, assigned_city, is_recruitment_admin,
+              assigned_state, assigned_city, assigned_zone, is_recruitment_admin,
               preferred_state_id, preferred_lga_name,
               deleted_at, is_active,
               account_suspended_reason,
@@ -104,7 +105,7 @@ const optionalAuthenticate = async (req, res, next) => {
 
     const result = await db.query(
       `SELECT id, email, user_type, identity_verified, subscription_active,
-              assigned_state, assigned_city, is_recruitment_admin,
+              assigned_state, assigned_city, assigned_zone, is_recruitment_admin,
               preferred_state_id, preferred_lga_name,
               deleted_at, is_active,
               account_suspended_reason,
@@ -193,7 +194,11 @@ const requireAdminOrSuperAdmin = (req, res, next) => {
     });
   }
 
-  if (!['admin', 'lga_admin', 'super_admin', 'state_admin', 'state_financial_admin'].includes(req.user.user_type)) {
+  if (normalizeRole(req.user.user_type) === 'zonal_admin') {
+    return res.status(403).json({ success: false, message: 'This endpoint is not yet zone-scoped' });
+  }
+
+  if (!GENERAL_ADMIN_ROLES.includes(normalizeRole(req.user.user_type))) {
     return res.status(403).json({
       success: false,
       message: 'Access denied. Admin or Super Admin only.',

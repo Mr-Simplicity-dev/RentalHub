@@ -9,7 +9,6 @@ const NIGERIAN_STATES = [
 ];
 
 const STATE_BOUND_ROLES = new Set([
-  'admin',
   'lga_admin',
   'lga_support_admin',
   'lga_financial_admin',
@@ -47,12 +46,14 @@ const CreateAdminTab = () => {
     assigned_state: "",
     assigned_city: "",
     lawyer_client_scope: "",
+    assigned_zone: '',
     is_lead: false,
   });
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [locationOptions, setLocationOptions] = useState([]);
+  const [roleContract, setRoleContract] = useState({ general_role_labels: {}, zones: [] });
 
   useEffect(() => {
     let active = true;
@@ -72,6 +73,9 @@ const CreateAdminTab = () => {
     };
 
     loadLocationOptions();
+    api.get('/admin/role-contract')
+      .then((response) => { if (active && response.data?.success) setRoleContract(response.data.data); })
+      .catch((error) => console.error('Failed to load role contract', error));
 
     return () => {
       active = false;
@@ -123,6 +127,7 @@ const CreateAdminTab = () => {
           assigned_city: ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(formData.user_type)
             ? String(formData.assigned_city || '').trim()
             : null,
+          assigned_zone: formData.user_type === 'zonal_admin' ? formData.assigned_zone : null,
           lawyer_client_scope: LAWYER_ROLES.has(formData.user_type)
             ? formData.lawyer_client_scope
             : null,
@@ -147,6 +152,7 @@ const CreateAdminTab = () => {
         assigned_state: "",
         assigned_city: "",
         lawyer_client_scope: "",
+        assigned_zone: '',
       });
 
     } catch (err) {
@@ -221,8 +227,9 @@ const CreateAdminTab = () => {
           onChange={handleChange}
         >
           <optgroup label="Operations">
-            <option value="admin">LGA Admin</option>
-            <option value="state_admin">State Admin</option>
+            {Object.entries(roleContract.general_role_labels)
+              .filter(([role]) => role !== 'super_admin')
+              .map(([role, label]) => <option key={role} value={role}>{label}</option>)}
           </optgroup>
           <optgroup label="Support">
             <option value="lga_support_admin">LGA Support Admin</option>
@@ -254,6 +261,13 @@ const CreateAdminTab = () => {
           </optgroup>
         </select>
                                                                                                                                                                      
+        {formData.user_type === 'zonal_admin' && (
+          <select name="assigned_zone" value={formData.assigned_zone} onChange={handleChange} required>
+            <option value="">Select Assigned Zone</option>
+            {roleContract.zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+          </select>
+        )}
+
         {STATE_BOUND_ROLES.has(formData.user_type) && (
           <>
             <select
@@ -268,7 +282,7 @@ const CreateAdminTab = () => {
               ))}
             </select>
 
-            {['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(formData.user_type) && (
+            {['lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(formData.user_type) && (
               <select
                 name="assigned_city"
                 value={formData.assigned_city}

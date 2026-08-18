@@ -2,10 +2,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
 import { FaCheckCircle, FaTimesCircle, FaIdCard, FaSearch } from 'react-icons/fa';
+import { useAuth } from '../../hooks/useAuth';
 
 const PAGE_SIZE = 20;
 
 const AdminVerifications = () => {
+  const { user } = useAuth();
+  const isZonalAdmin = user?.user_type === 'zonal_admin';
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
@@ -18,7 +21,7 @@ const AdminVerifications = () => {
   const loadPending = useCallback(async (p = 1, query = '') => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/verifications/pending', {
+      const res = await api.get(isZonalAdmin ? '/zonal-admin/verifications' : '/admin/verifications/pending', {
         params: { search: query, page: p, limit: PAGE_SIZE },
       });
       if (res.data?.success) {
@@ -30,7 +33,7 @@ const AdminVerifications = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isZonalAdmin]);
 
   useEffect(() => {
     const delay = setTimeout(() => {
@@ -134,7 +137,7 @@ const AdminVerifications = () => {
                 </div>
               </div>
 
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              {!isZonalAdmin && <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <button
                   onClick={() => approveUser(u.id)}
                   disabled={processingId === u.id}
@@ -152,7 +155,7 @@ const AdminVerifications = () => {
                   <FaTimesCircle className="mr-2" />
                   Reject
                 </button>
-              </div>
+              </div>}
             </div>
           );
         })}

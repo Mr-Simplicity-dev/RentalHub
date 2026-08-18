@@ -129,6 +129,7 @@ const LANGUAGE_OPTIONS = [
 const FINANCIAL_ADMIN_ROLES = ['financial_admin', 'lga_financial_admin'];
 const SUPER_FINANCIAL_ADMIN_ROLES = ['super_financial_admin'];
 const STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin'];
+const ZONAL_ADMIN_ROLES = ['zonal_admin'];
 const LGA_SUPPORT_ADMIN_ROLES = ['lga_support_admin'];
 const STATE_SUPPORT_ADMIN_ROLES = ['state_support_admin'];
 const SUPER_SUPPORT_ADMIN_ROLES = ['super_support_admin'];
@@ -317,7 +318,7 @@ const LandlordRoute = ({ children }) => {
     if (user?.user_type === 'lawyer') return <Navigate to="/lawyer" />;
     if (user?.user_type === 'state_lawyer') return <Navigate to="/lawyer/state" />;
     if (user?.user_type === 'super_lawyer') return <Navigate to="/lawyer/super" />;
-    if (user?.user_type === 'admin' || user?.user_type === 'lga_admin') return <Navigate to="/admin" />;
+    if (user?.user_type === 'admin' || user?.user_type === 'lga_admin' || ZONAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
     if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/financial-dashboard" />;
     if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/super-financial-dashboard" />;
     if (STATE_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;

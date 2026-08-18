@@ -1,6 +1,7 @@
 const {
   ROLE_GROUPS,
   SUPER_SCOPED_ROLES,
+  ZONAL_SCOPED_ROLES,
   roleIn,
 } = require('./roleHierarchy');
 
@@ -15,6 +16,7 @@ const isSuperAdminOrSuperFinancialAdmin = (userType) =>
 
 const isLgaAdmin = (userType) =>
   roleIn(userType, ROLE_GROUPS.lgaOperations);
+const isZonalAdmin = (userType) => roleIn(userType, ZONAL_SCOPED_ROLES);
 
 const isLgaFinancialAdmin = (userType) =>
   roleIn(userType, ROLE_GROUPS.lgaFinance);
@@ -49,6 +51,7 @@ module.exports = {
   isSuperFinancialAdmin,
   isSuperAdminOrSuperFinancialAdmin,
   isLgaAdmin,
+  isZonalAdmin,
   isStateAdmin,
   isSuperAdmin,
   canMonitorLgaAdmins,

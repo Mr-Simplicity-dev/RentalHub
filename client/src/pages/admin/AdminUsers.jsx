@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../../components/common/Loader';
 import { FaSearch } from 'react-icons/fa';
+import { useAuth } from '../../hooks/useAuth';
 
 const PAGE_SIZE = 20;
 
 const AdminUsers = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +29,7 @@ const AdminUsers = () => {
   const loadUsers = useCallback(async (p = 1, query = '', roleFilter = 'all', stateQuery = '') => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/users', {
+      const res = await api.get(user?.user_type === 'zonal_admin' ? '/zonal-admin/users' : '/admin/users', {
         params: {
           search: query,
           state: stateQuery,
@@ -49,7 +51,7 @@ const AdminUsers = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.user_type]);
 
   useEffect(() => {
     const delay = setTimeout(() => {

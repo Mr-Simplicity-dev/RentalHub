@@ -83,6 +83,7 @@ const complianceRoutes = require('./routes/compliance');
 const exportRoutes = require('./routes/export');
 const financialAdminRoutes = require('./routes/financialAdmin');
 const stateAdminRoutes = require('./routes/stateAdmin');
+const zonalAdminRoutes = require('./routes/zonalAdmin');
 
 const verificationRoutes = require('./routes/evidenceVerification.routes');
 const agentCommissionRoutes = require('./routes/agentCommissions');
@@ -694,6 +695,7 @@ app.use('/api/compliance', generalOpsLimiter, complianceRoutes);
 app.use('/api/export', generalOpsLimiter, exportRoutes);
 app.use('/api/financial-admin', financeOpsLimiter, financialAdminRoutes);
 app.use('/api/state-admin', adminLimiter, stateAdminRoutes);
+app.use('/api/zonal-admin', adminLimiter, zonalAdminRoutes);
 
 app.use('/api/evidence', verificationOpsLimiter, verificationRoutes);
 app.use('/api/commissions', financeOpsLimiter, agentCommissionRoutes);

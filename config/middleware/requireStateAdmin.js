@@ -1,4 +1,4 @@
-const { isStateFinancialAdmin } = require('../utils/roleScopes');
+const { ROLE_GROUPS, roleIn } = require('../utils/roleHierarchy');
 
 module.exports.requireStateAdmin = (req, res, next) => {
   if (!req.user) {
@@ -8,10 +8,10 @@ module.exports.requireStateAdmin = (req, res, next) => {
     });
   }
 
-  if (!isStateFinancialAdmin(req.user.user_type)) {
+  if (!roleIn(req.user.user_type, ROLE_GROUPS.stateOperations)) {
     return res.status(403).json({
       success: false,
-      message: 'State Financial Admin access only',
+      message: 'State Admin access only',
     });
   }
 

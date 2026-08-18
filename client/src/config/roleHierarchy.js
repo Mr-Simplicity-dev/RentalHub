@@ -30,13 +30,19 @@ export const ROLE_META = {
     label: 'State Admin',
     department: 'Operations',
     tier: 'State',
+    reportsTo: 'Zonal Admin',
+  },
+  zonal_admin: {
+    label: 'Zonal Admin',
+    department: 'Operations',
+    tier: 'Zone',
     reportsTo: 'Super Admin',
   },
   super_admin: {
     label: 'Super Admin',
     department: 'Platform Control',
     tier: 'Super',
-    reportsTo: 'Platform Owner',
+    reportsTo: 'Founder / CEO / Owner',
   },
   lga_support_admin: {
     label: 'LGA Support Admin',
@@ -157,6 +163,7 @@ export const ROLE_META = {
 export const ROLE_GROUPS = {
   lgaOperations: ['admin', 'lga_admin'],
   stateOperations: ['state_admin'],
+  zonalOperations: ['zonal_admin'],
   superOperations: ['super_admin'],
   lgaSupport: ['lga_support_admin'],
   stateSupport: ['state_support_admin'],
@@ -199,6 +206,7 @@ export const STATE_SCOPED_ROLES = [
 export const ADMIN_SHELL_ROLES = [
   ...ROLE_GROUPS.lgaOperations,
   ...ROLE_GROUPS.stateOperations,
+  ...ROLE_GROUPS.zonalOperations,
   ...ROLE_GROUPS.superOperations,
   ...ROLE_GROUPS.lgaSupport,
   ...ROLE_GROUPS.stateSupport,

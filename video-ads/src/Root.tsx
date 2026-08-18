@@ -8,6 +8,9 @@ import TextAd5 from './ads/TextAd5';
 import CartoonAd1 from './ads/CartoonAd1';
 import CartoonAd2 from './ads/CartoonAd2';
 import CartoonAd3 from './ads/CartoonAd3';
+import AspirationAd1 from './ads/AspirationAd1';
+import BelongingAd1 from './ads/BelongingAd1';
+import JoyAd1 from './ads/JoyAd1';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -72,6 +75,30 @@ export const RemotionRoot: React.FC = () => {
         id="CartoonAd3"
         component={CartoonAd3}
         durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="AspirationAd1"
+        component={AspirationAd1}
+        durationInFrames={30 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="BelongingAd1"
+        component={BelongingAd1}
+        durationInFrames={30 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="JoyAd1"
+        component={JoyAd1}
+        durationInFrames={30 * 30}
         fps={30}
         width={1080}
         height={1920}

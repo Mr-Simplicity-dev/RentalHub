@@ -9,6 +9,8 @@ const evidenceVerificationController = require('../controllers/evidenceVerificat
 const { allowRoles } = require('../config/middleware/roleMiddleware');
 const superAdminOnly = require('../config/middleware/superAdminOnly');
 const validateRequest = require('../config/middleware/validateRequest');
+const { CREATABLE_ADMIN_ROLES, GENERAL_ADMIN_LABELS } = require('../config/utils/roleHierarchy');
+const { ZONES } = require('../config/utils/territorialZones');
 
 
 /**
@@ -54,6 +56,11 @@ router.get(
   requireAdmin,
   adminController.getPendingVerifications
 );
+
+router.get('/role-contract', superAdminOnly, (req, res) => res.json({
+  success: true,
+  data: { creatable_roles: CREATABLE_ADMIN_ROLES, general_role_labels: GENERAL_ADMIN_LABELS, zones: ZONES },
+}));
 
 router.post(
   '/verifications/:id/approve',
@@ -190,13 +197,10 @@ router.post(
     body('phone').isString().trim().isLength({ min: 5, max: 20 }),
     body('full_name').isString().trim().isLength({ min: 1, max: 200 }),
     body('password').isString().isLength({ min: 8, max: 128 }),
-    body('user_type').isString().trim().isIn([
-      'admin', 'lga_admin', 'state_admin', 'state_financial_admin',
-      'lga_support_admin', 'state_support_admin', 'super_support_admin',
-      'recruitment_admin',
-    ]),
+    body('user_type').isString().trim().isIn(CREATABLE_ADMIN_ROLES),
     body('assigned_state').optional().isString().trim().isLength({ max: 200 }),
     body('assigned_city').optional().isString().trim().isLength({ max: 200 }),
+    body('assigned_zone').optional().isString().trim().isLength({ max: 50 }),
   ],
   validateRequest,
   authenticate,

@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import Loader from "../../components/common/Loader";
+import { useAuth } from '../../hooks/useAuth';
 import { FaHome, FaSearch } from "react-icons/fa";
 
 const PAGE_SIZE = 20;
 
 const AdminProperties = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +27,7 @@ const AdminProperties = () => {
     setLoading(true);
 
     try {
-      const res = await api.get("/admin/properties", {
+      const res = await api.get(user?.user_type === 'zonal_admin' ? '/zonal-admin/properties' : '/admin/properties', {
         params: {
           search: query,
           page: p,
@@ -42,7 +44,7 @@ const AdminProperties = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.user_type]);
 
   useEffect(() => {
     const delay = setTimeout(() => {
