@@ -106,7 +106,7 @@ test('web workflow tours use real targets and registered routes', () => {
 });
 
 test('web tour dictionaries have complete keys and real translations', () => {
-  const languageCodes = ['en', 'fr', 'ar', 'ru', 'zh'];
+  const languageCodes = ['en', 'fr', 'ar', 'ru', 'zh', 'ha', 'yo', 'ig'];
   const dictionaries = Object.fromEntries(languageCodes.map((code) => [
     code,
     JSON.parse(read(path.join(WEB_SOURCE, 'i18n', `${code}.json`))),

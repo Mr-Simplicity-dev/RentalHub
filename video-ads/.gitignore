@@ -1,0 +1,9 @@
+# Rendered ad output
+out/
+
+# Generated media assets (fetched stock photos, TTS voiceovers, generated SFX)
+# Regenerate with scripts/fetch-*.ps1, scripts/generate-vo.ps1, scripts/generate-sfx.ps1
+public/
+
+# Install artifacts
+install_log.txt

@@ -124,6 +124,9 @@ const LANGUAGE_OPTIONS = [
   { value: 'fr', label: 'Français' },
   { value: 'ar', label: 'العربية' },
   { value: 'zh', label: '中文' },
+  { value: 'ha', label: 'Hausa' },
+  { value: 'yo', label: 'Yorùbá' },
+  { value: 'ig', label: 'Igbo' },
 ];
 
 const FINANCIAL_ADMIN_ROLES = ['financial_admin', 'lga_financial_admin'];
