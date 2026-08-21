@@ -203,6 +203,40 @@ const FloatingContactWidget = () => {
   // Keep ref in sync
   activeTicketRef.current = activeTicket;
 
+  const resetTimerRef = useRef(null);
+  const reset = useCallback(() => {
+    authRecorder.reset();
+    contactRecorder.reset();
+    if (guestSocketRef.current) {
+      guestSocketRef.current.disconnect();
+      guestSocketRef.current = null;
+    }
+    setForm({ name: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
+    setError('');
+    setView('form');
+    setActiveTicket(null);
+    setConversation([]);
+    setReplyText('');
+    setAttachmentFile(null);
+    setTypingUser(null);
+    setSentConfirm(null);
+    setContactReplyText('');
+    setContactReplyFile(null);
+    setLookupEmail('');
+    setLookupTickets([]);
+    setContactConv([]);
+    setViewingContactTicket(null);
+    setAdminTypingName(null);
+    setAdminViewingName(null);
+    if (typingPollRef.current) clearInterval(typingPollRef.current);
+  }, [authRecorder, contactRecorder]);
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+    clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(reset, 300);
+  }, [reset]);
+
   // Restore identity
   useEffect(() => {
     const savedEmail = localStorage.getItem(LS_EMAIL);
@@ -354,40 +388,6 @@ const FloatingContactWidget = () => {
     if (!ALLOWED_TYPES.includes(file.type)) return t('widget.file_type_not_allowed', 'File type not supported');
     return null;
   };
-
-  const reset = useCallback(() => {
-    authRecorder.reset();
-    contactRecorder.reset();
-    if (guestSocketRef.current) {
-      guestSocketRef.current.disconnect();
-      guestSocketRef.current = null;
-    }
-    setForm({ name: '', email: '', state: '', lga: '', subject: '', message: '', priority: 'medium' });
-    setError('');
-    setView('form');
-    setActiveTicket(null);
-    setConversation([]);
-    setReplyText('');
-    setAttachmentFile(null);
-    setTypingUser(null);
-    setSentConfirm(null);
-    setContactReplyText('');
-    setContactReplyFile(null);
-    setLookupEmail('');
-    setLookupTickets([]);
-    setContactConv([]);
-    setViewingContactTicket(null);
-    setAdminTypingName(null);
-    setAdminViewingName(null);
-    if (typingPollRef.current) clearInterval(typingPollRef.current);
-  }, []);
-
-  const resetTimerRef = useRef(null);
-  const handleClose = useCallback(() => {
-    setOpen(false);
-    clearTimeout(resetTimerRef.current);
-    resetTimerRef.current = setTimeout(reset, 300);
-  }, [reset]);
 
   // ── Contact form submit ──
   const handleSubmit = async (e) => {
@@ -743,50 +743,6 @@ const FloatingContactWidget = () => {
       <button onClick={handleClose} className="text-white/80 hover:text-white p-1" aria-label={t('widget.close', 'Close')}><FaTimes /></button>
     </div>
   );
-
-  const fileInput = (onFile, currentFile, isRecording) => (
-    <>
-      {currentFile && !isRecording && (
-        <div className="mb-1 flex items-center gap-1 rounded bg-slate-100 dark:bg-gray-700 px-2 py-1 text-xs text-slate-600 dark:text-gray-300">
-          <FaPaperclip size={8} /> {currentFile.name}
-          <button onClick={() => onFile(null)} className="ml-auto text-red-500"><FaTimes size={8} /></button>
-        </div>
-      )}
-      <label className="flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 dark:border-gray-600 text-slate-500 dark:text-gray-400 hover:bg-slate-50 shrink-0">
-        <FaPaperclip size={12} />
-        <input type="file" className="hidden" onChange={(e) => {
-          const f = e.target.files[0];
-          const err = validateFile(f);
-          if (err) { setError(err); return; }
-          onFile(f);
-        }} />
-      </label>
-    </>
-  );
-
-  const voiceButton = (recorder, onFile) => {
-    if (recorder.isRecording) {
-      return (
-        <button onClick={recorder.stop}
-          className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0">
-          <FaStopCircle size={14} />
-        </button>
-      );
-    }
-    return (
-      <button onClick={async () => {
-        try {
-          await recorder.start();
-        } catch (err) {
-          setError(err.message);
-        }
-      }}
-        className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 dark:border-gray-600 text-slate-500 dark:text-gray-400 hover:bg-slate-50 shrink-0"
-        title={t('widget.record_voice', 'Record voice message')}>
-        <FaMicrophone size={12} />
-      </button>
-    );
-  };
 
   return (
     <WidgetErrorBoundary name="FloatingContactWidget">
