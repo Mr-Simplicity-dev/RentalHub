@@ -82,7 +82,7 @@ export default function LocationPage() {
     return () => {
       cancelled = true;
     };
-  }, [stateSlug, lgaSlug]);
+  }, [stateSlug, lgaSlug, t]);
 
   if (loading) {
     return <div className="px-4 py-16 text-center text-gray-600">{t('location_page.loading')}</div>;

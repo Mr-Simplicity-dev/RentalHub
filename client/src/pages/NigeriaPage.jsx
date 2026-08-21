@@ -40,7 +40,7 @@ export default function NigeriaPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   if (loading) {
     return <div className="px-4 py-16 text-center text-gray-600">{t('nigeria_page.loading')}</div>;

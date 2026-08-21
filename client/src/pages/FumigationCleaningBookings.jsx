@@ -75,7 +75,7 @@ const FumigationCleaningBookings = () => {
     };
     
     loadData();
-  }, [user, navigate]);
+  }, [user, navigate, t]);
   
   // Filter and sort bookings
   const filteredAndSortedBookings = bookings

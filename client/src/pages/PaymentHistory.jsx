@@ -66,7 +66,7 @@ const PaymentHistory = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadPayments();

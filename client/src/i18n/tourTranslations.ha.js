@@ -1,4 +1,4 @@
-export default {
+const tourHaTranslations = {
   titleTranslations: {
     'Your Properties': 'Gidajen Ka', 'Property Location': 'Wurin Gida', 'Wallet & Payments': 'Wallet & Biyan Kuɗi',
     'Recent Activity': 'Ayyuka Na Baya-Bayan Nan', 'Quick Actions': 'Ayyuka Masu Sauri', 'Request Legal Help': 'Nemi Taimakon Shari\'a',
@@ -83,3 +83,5 @@ export default {
     no_language_data: 'Babu bayanan harshe tukuna.', problem_count_sr: 'An gano matakan matsala {{count}}.',
   },
 };
+
+export default tourHaTranslations;

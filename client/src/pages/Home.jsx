@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import PropertyCard from '../components/properties/PropertyCard';
@@ -29,7 +29,6 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAppPrompt, setShowAppPrompt] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
   const [heroLoaded, setHeroLoaded] = useState(false);
   const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [propertiesLoaded, setPropertiesLoaded] = useState(false);
@@ -80,8 +79,6 @@ const Home = () => {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-      
       // Trigger animations when sections come into view
       const scrollPosition = window.scrollY + window.innerHeight;
       
