@@ -48,20 +48,22 @@ const VerificationStatus = () => {
     } catch (err) {
       setError(err?.response?.data?.message || t('verification_status.load_error'));
     }
-  }, [updateUser]);
+  }, [updateUser, t]);
 
   const activeRevalidation = useMemo(
     () => revalidationRequests.find((request) => ['requested', 'rejected', 'submitted'].includes(request.status)) || null,
     [revalidationRequests]
   );
 
-  const baselineSnapshot = activeRevalidation?.baseline_snapshot || {};
-  const existingIdentity = useMemo(() => ({
-    nin: user?.nin ? `••••••${String(user.nin).slice(-3)}` : (baselineSnapshot?.nin ? `••••••${String(baselineSnapshot.nin).slice(-3)}` : ''),
-    passport: user?.international_passport_number || baselineSnapshot?.international_passport_number || '',
-    nationality: user?.nationality || baselineSnapshot?.nationality || '',
-    documentType: user?.identity_document_type || baselineSnapshot?.identity_document_type || '',
-  }), [user, baselineSnapshot]);
+  const existingIdentity = useMemo(() => {
+    const baselineSnapshot = activeRevalidation?.baseline_snapshot || {};
+    return {
+      nin: user?.nin ? `••••••${String(user.nin).slice(-3)}` : (baselineSnapshot?.nin ? `••••••${String(baselineSnapshot.nin).slice(-3)}` : ''),
+      passport: user?.international_passport_number || baselineSnapshot?.international_passport_number || '',
+      nationality: user?.nationality || baselineSnapshot?.nationality || '',
+      documentType: user?.identity_document_type || baselineSnapshot?.identity_document_type || '',
+    };
+  }, [user, activeRevalidation]);
 
   const clearFieldErrors = () => setFieldErrors({});
 
@@ -187,7 +189,7 @@ const VerificationStatus = () => {
       },
     };
     return statuses[verificationStatus] || statuses.not_submitted;
-  }, [activeRevalidation, verificationStatus]);
+  }, [activeRevalidation, verificationStatus, t]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -212,7 +214,6 @@ const VerificationStatus = () => {
     `input mt-1 ${fieldErrors[field] ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}`;
 
   const requestedFields = activeRevalidation?.requested_fields || [];
-  const hasIdentityFields = requestedFields.some((f) => ['nin', 'international_passport'].includes(f));
   const hasLivePhoto = requestedFields.includes('live_photo');
 
   return (

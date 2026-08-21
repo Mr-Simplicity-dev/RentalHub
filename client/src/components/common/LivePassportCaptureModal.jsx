@@ -59,9 +59,6 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
   const metricsRef = useRef({ baselineEar: null, eyesClosed: false, baseArea: null });
   const autoCaptureTriggeredRef = useRef(false);
 
-  const LEFT_EYE = [33, 160, 158, 133, 153, 144];
-  const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
-
   const canCaptureLive = useMemo(() => (
     livenessChecks.faceDetected && livenessChecks.centered && livenessChecks.blink &&
     livenessChecks.mouthOpen && livenessChecks.headLeft && livenessChecks.headRight &&
@@ -94,6 +91,8 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
   }, []);
 
   const handleFaceResults = useCallback((results) => {
+    const LEFT_EYE = [33, 160, 158, 133, 153, 144];
+    const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
     const landmarks = results?.multiFaceLandmarks?.[0];
     if (!landmarks) {
       setFaceBox(null);
@@ -145,7 +144,7 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
       movedCloser: prev.movedCloser || movedCloser,
       movedFarther: prev.movedFarther || movedFarther,
     }));
-  }, [LEFT_EYE, RIGHT_EYE]);
+  }, []);
 
   const startCamera = useCallback(async () => {
     setCameraLoading(true);

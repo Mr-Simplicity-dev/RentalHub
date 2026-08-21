@@ -404,13 +404,13 @@ export default function Careers() {
     return (noseTip.x - midEyeX) / faceWidth;
   };
 
-  const issueLivenessChallenge = () => {
+  const issueLivenessChallenge = useCallback(() => {
     const types = ['blink', 'left', 'right'];
     const type = types[Math.floor(Math.random() * types.length)];
     livenessChallengeAtRef.current = Date.now();
     challengePassFramesRef.current = 0;
     setLivenessChallenge(type);
-  };
+  }, []);
 
   const selectedRole = useMemo(
     () => roles.find((role) => String(role.id) === String(form.role_id)),
@@ -940,6 +940,40 @@ export default function Careers() {
   };
 
   // ─── Question Timer ─────────────────────────────────────
+  const uploadRecording = useCallback(async () => {
+    const chunks = recordingChunksRef.current || [];
+    if (!chunks.length) return true;
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const formData = new FormData();
+    formData.append('recording', blob, `recruitment-interview-${Date.now()}.webm`);
+    formData.append('application_id', application?.id || '');
+    formData.append('challenge_token', interviewChallengeToken);
+    formData.append('fingerprint', interviewFingerprintRef.current);
+    formData.append('violation_log', interviewLocked ? 'Interview locked by proctoring' : '');
+    const recordingParams = new URLSearchParams({
+      application_id: String(application?.id || ''),
+      challenge_token: interviewChallengeToken,
+    });
+    const attemptUpload = async () =>
+      api.post(`/recruitment/interview/recording?${recordingParams.toString()}`, formData);
+    try {
+      await attemptUpload();
+      return true;
+    } catch (firstError) {
+      // One automatic retry for transient network blips, then tell the
+      // applicant so the issue is never silent.
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await attemptUpload();
+        return true;
+      } catch (secondError) {
+        console.error('Interview recording upload failed after retry:', secondError);
+        toast.error(t('careers.recording_upload_failed'));
+        return false;
+      }
+    }
+  }, [application?.id, interviewChallengeToken, interviewLocked, t]);
+
   // ─── Report Violation ──────────────────────────────────
   const reportInterviewViolation = async (type, details) => {
     if (interviewLockedRef.current) return;
@@ -1194,40 +1228,6 @@ export default function Careers() {
   };
 
   // ─── Submit Answer (with empty timeout) ─────────────────
-  const uploadRecording = useCallback(async () => {
-    const chunks = recordingChunksRef.current || [];
-    if (!chunks.length) return true;
-    const blob = new Blob(chunks, { type: 'video/webm' });
-    const formData = new FormData();
-    formData.append('recording', blob, `recruitment-interview-${Date.now()}.webm`);
-    formData.append('application_id', application?.id || '');
-    formData.append('challenge_token', interviewChallengeToken);
-    formData.append('fingerprint', interviewFingerprintRef.current);
-    formData.append('violation_log', interviewLocked ? 'Interview locked by proctoring' : '');
-    const recordingParams = new URLSearchParams({
-      application_id: String(application?.id || ''),
-      challenge_token: interviewChallengeToken,
-    });
-    const attemptUpload = async () =>
-      api.post(`/recruitment/interview/recording?${recordingParams.toString()}`, formData);
-    try {
-      await attemptUpload();
-      return true;
-    } catch (firstError) {
-      // One automatic retry for transient network blips, then tell the
-      // applicant so the issue is never silent.
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        await attemptUpload();
-        return true;
-      } catch (secondError) {
-        console.error('Interview recording upload failed after retry:', secondError);
-        toast.error(t('careers.recording_upload_failed'));
-        return false;
-      }
-    }
-  }, [application?.id, interviewChallengeToken, interviewLocked, t]);
-
   const completeInterview = useCallback(async () => {
     try {
       const res = await api.post('/recruitment/interview/complete', {
