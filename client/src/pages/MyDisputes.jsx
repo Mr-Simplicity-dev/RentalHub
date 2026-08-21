@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { toast } from 'react-toastify';
-import { FaExclamationTriangle, FaSearch, FaTimes, FaCheckCircle, FaClock, FaLock, FaSpinner, FaBalanceScale } from 'react-icons/fa';
+import { FaSearch, FaLock, FaBalanceScale } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { useTranslation } from 'react-i18next';
 
@@ -23,7 +22,6 @@ const PRIORITY_COLORS = {
 
 const MyDisputes = () => {
   const { t } = useTranslation();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [disputes, setDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +29,7 @@ const MyDisputes = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
 
-  const fetchDisputes = async (page = 1) => {
+  const fetchDisputes = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const params = { page, limit: 20 };
@@ -45,11 +43,11 @@ const MyDisputes = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, search, t]);
 
   useEffect(() => {
     fetchDisputes();
-  }, [statusFilter]);
+  }, [statusFilter, fetchDisputes]);
 
   const handleSearch = (e) => {
     e.preventDefault();

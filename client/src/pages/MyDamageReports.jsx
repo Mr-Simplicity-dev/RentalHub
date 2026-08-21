@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import { toast } from 'react-toastify';
-import { FaTools, FaSearch, FaCheckCircle, FaClock, FaExclamationTriangle, FaHome } from 'react-icons/fa';
+import { FaTools, FaSearch, FaHome } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { useTranslation } from 'react-i18next';
 
@@ -24,7 +24,7 @@ const MyDamageReports = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get('/damage-reports/my');
@@ -34,11 +34,11 @@ const MyDamageReports = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     fetchReports();
-  }, []);
+  }, [fetchReports]);
 
   const filtered = reports.filter((r) => {
     if (!search) return true;

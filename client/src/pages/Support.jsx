@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { toast } from 'react-toastify';
-import { FaTicketAlt, FaPaperPlane, FaClock, FaCheckCircle, FaExclamationCircle, FaBug, FaLightbulb, FaQuestionCircle, FaSpinner, FaChevronDown, FaChevronUp, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaTicketAlt, FaPaperPlane, FaClock, FaExclamationCircle, FaBug, FaLightbulb, FaQuestionCircle, FaSpinner, FaChevronDown, FaChevronUp, FaUser, FaShieldAlt, FaPaperclip, FaFile, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { useSocket } from '../hooks/useSocket';
 import SupportReplyActionModal from '../components/common/SupportReplyActionModal';
@@ -119,7 +119,7 @@ const Support = () => {
   const [loadingConv, setLoadingConv] = useState({});
   const [typingUsers, setTypingUsers] = useState({});
   const [attachmentFiles, setAttachmentFiles] = useState({});
-  const [conversationMeta, setConversationMeta] = useState({});
+  const [, setConversationMeta] = useState({});
   const typingTimers = useRef({});
 
   const loadTickets = useCallback(async () => {
@@ -131,7 +131,7 @@ const Support = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadConversation = useCallback(async (ticketId) => {
     setLoadingConv((prev) => ({ ...prev, [ticketId]: true }));
@@ -145,7 +145,7 @@ const Support = () => {
     } finally {
       setLoadingConv((prev) => ({ ...prev, [ticketId]: false }));
     }
-  }, []);
+  }, [conversations]);
 
   useEffect(() => {
     if (!socket) return;
@@ -486,7 +486,7 @@ const Support = () => {
                               placeholder={t('support.reply_placeholder')} rows={2}
                               className="flex-1 resize-none rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400"
                               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(ticket.id); } }} />
-                            <button onClick={() => handleSendReply(ticket.id)} disabled={!((replyTexts[ticket.id] || '').trim()) && !attachmentFiles[ticket.id] || sendingReply}
+                            <button onClick={() => handleSendReply(ticket.id)} disabled={(!((replyTexts[ticket.id] || '').trim()) && !attachmentFiles[ticket.id]) || sendingReply}
                               className="flex h-[42px] w-[42px] items-center justify-center rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40">
                               {sendingReply ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={14} />}
                             </button>
