@@ -85,7 +85,7 @@ const AgentDashboard = () => {
     };
 
     loadProfile();
-  }, []);
+  }, [t]);
 
   const submitMigrationRequest = async () => {
     if (!migrationForm.to_state || !migrationForm.reason.trim()) {

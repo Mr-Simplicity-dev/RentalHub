@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import {
-  FaEnvelope, FaUsers, FaChartBar, FaPaperPlane, FaPlus, FaTrash, FaPlay,
+  FaUsers, FaChartBar, FaPaperPlane, FaPlus, FaTrash, FaPlay,
   FaSyncAlt, FaSearch, FaTimes, FaEdit, FaFileAlt, FaChevronLeft, FaChevronRight,
   FaPhone, FaUpload, FaRedo, FaDollarSign, FaClock,
 } from 'react-icons/fa';
@@ -463,7 +463,6 @@ const SmsMarketingTab = () => {
 
   const segments = getSegments(campaignForm.content);
   const segCost = segments * COST_PER_SEGMENT;
-  const totalCost = segCost * Math.max(estimatedRecipients, 0);
 
   const renderOverview = () => (
     <div className="space-y-6">

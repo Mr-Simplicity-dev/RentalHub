@@ -29,7 +29,7 @@ const SubscribedProperties = () => {
       }
     };
     load();
-  }, []);
+  }, [t]);
 
   if (loading) return <Loader />;
 

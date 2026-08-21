@@ -1,20 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
-  FaBriefcase,
-  FaCalendarAlt,
   FaCheckCircle,
   FaDownload,
   FaEdit,
   FaEnvelope,
-  FaMapMarkerAlt,
   FaPaperPlane,
   FaPlus,
   FaSave,
   FaSearch,
   FaSortAmountDown,
   FaTimes,
-  FaUsers,
   FaVideo,
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -79,7 +75,7 @@ const downloadBlob = async (path, filename, params = {}) => {
 export function RecruitmentOverviewTab({ analytics, cycles, roles, locations, activeLocations, status, onRefresh }) {
   const [loadingChart, setLoadingChart] = useState(false);
   const [chartError, setChartError] = useState('');
-  const [chartData, setChartData] = useState(null);
+  const [, setChartData] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -1565,7 +1561,7 @@ export function RecruitmentInterviewTab({ cycles, roles, onRefreshCore }) {
   const [applicants, setApplicants] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS, status: "shortlisted" });
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [, setSelectedIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [triggerModal, setTriggerModal] = useState(false);

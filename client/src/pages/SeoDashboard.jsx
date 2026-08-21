@@ -29,7 +29,7 @@ const SeoDashboard = () => {
     } finally {
       if (isInitial) setLoading(false); else setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   const loadRankings = useCallback(async () => {
     try {
@@ -38,7 +38,7 @@ const SeoDashboard = () => {
     } catch (err) {
       toast.error(err.response?.data?.message || t('seo_dashboard.rankings_load_failed'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadData(true);

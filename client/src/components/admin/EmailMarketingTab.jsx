@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import {
   FaEnvelope, FaUsers, FaChartBar, FaPaperPlane, FaPlus, FaTrash, FaPlay,
-  FaCopy, FaEye, FaSyncAlt, FaSearch, FaTimes, FaCheck, FaExternalLinkAlt,
+  FaSyncAlt, FaSearch, FaTimes,
   FaChevronLeft, FaChevronRight, FaEdit, FaFileAlt,
 } from 'react-icons/fa';
 import api from '../../services/api';

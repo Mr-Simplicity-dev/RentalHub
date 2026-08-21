@@ -46,7 +46,6 @@ const TourManager = () => {
     showWelcomeModal,
     showTourOverlay,
     currentStep,
-    currentDashboard,
     tourSteps,
     hasResumableTour,
     startTour,

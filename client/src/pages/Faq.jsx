@@ -16,7 +16,6 @@ import {
   FaPhoneAlt,
   FaEnvelope,
 } from 'react-icons/fa';
-import { toast } from 'react-toastify';
 import ShareMenu from '../components/common/ShareMenu';
 
 const ShareButton = ({ section, title, description, t }) => {

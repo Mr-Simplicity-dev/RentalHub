@@ -355,7 +355,7 @@ const FloatingContactWidget = () => {
     return null;
   };
 
-  const reset = () => {
+  const reset = useCallback(() => {
     authRecorder.reset();
     contactRecorder.reset();
     if (guestSocketRef.current) {
@@ -380,14 +380,14 @@ const FloatingContactWidget = () => {
     setAdminTypingName(null);
     setAdminViewingName(null);
     if (typingPollRef.current) clearInterval(typingPollRef.current);
-  };
+  }, []);
 
   const resetTimerRef = useRef(null);
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setOpen(false);
     clearTimeout(resetTimerRef.current);
     resetTimerRef.current = setTimeout(reset, 300);
-  };
+  }, [reset]);
 
   // ── Contact form submit ──
   const handleSubmit = async (e) => {

@@ -58,8 +58,6 @@ const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = '
   }, 0);
 };
 
-const LAWYER_SUPPORTED_TYPES = ['message', 'case_update', 'verification', 'appeal', 'reminder', 'admin', 'system'];
-
 const getNotificationAction = (link) => {
   if (!link) return { icon: FaIdCard, labelKey: 'take_action' };
   const l = link.toLowerCase();
