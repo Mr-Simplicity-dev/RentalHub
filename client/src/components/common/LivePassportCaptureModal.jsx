@@ -145,7 +145,7 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
       movedCloser: prev.movedCloser || movedCloser,
       movedFarther: prev.movedFarther || movedFarther,
     }));
-  }, []);
+  }, [LEFT_EYE, RIGHT_EYE]);
 
   const startCamera = useCallback(async () => {
     setCameraLoading(true);
@@ -203,7 +203,6 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
       if (canvas) {
         canvas.toBlob((blob) => {
           if (!blob) return;
-          const file = new File([blob], `passport-capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
           setCapturedImage(URL.createObjectURL(blob));
           setCaptured(true);
         }, 'image/jpeg', 0.92);
