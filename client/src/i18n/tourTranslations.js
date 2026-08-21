@@ -1,5 +1,8 @@
 import { TOUR_STEPS } from '../config/tourConfig';
 import { WORKFLOW_TOURS } from '../config/tourWorkflows';
+import tourHa from './tourTranslations.ha.js';
+import tourYo from './tourTranslations.yo.js';
+import tourIg from './tourTranslations.ig.js';
 
 const allSteps = [
   ...Object.values(TOUR_STEPS).flat(),
@@ -176,6 +179,9 @@ const titleTranslations = {
     'Match bookings to payments': '核对预订与付款', 'Get service support': '获取服务支持', 'Keep profile details current': '保持资料最新',
     'Monitor verification status': '跟踪验证状态', 'Replay help whenever you need it': '需要时重播帮助',
   },
+  ha: tourHa.titleTranslations,
+  yo: tourYo.titleTranslations,
+  ig: tourIg.titleTranslations,
 };
 
 const common = {
@@ -204,15 +210,18 @@ const common = {
     welcome: { benefit_controls: '高亮控制台中的真实控件', benefit_role: '根据您的 RentalHub 账户角色定制', benefit_replay: '需要复习时可随时重播', close_intro: '关闭引导介绍', skip_label: '跳过引导', eyebrow: '您的个人控制台向导', resume_title: '从上次停止的位置继续', returning_title: '欢迎回到 RentalHub', new_title: '欢迎使用 RentalHub NG', resume_description: '您的进度已保存。可从上次查看的步骤继续。', returning_description: '快速复习对您的账户最重要的控件。', new_description: '通过简短、专注的向导了解最有用的控件。', maybe_later: '稍后', resume_button: '继续引导', start_button: '开始引导', duration: '约 2 分钟 · 全程由您掌控' },
     profile: { title: '引导', description: '重播控制台向导或开始专项流程。', last_completed: '上次完成于 {{date}}', replay: '重播控制台引导', workflow_library: '专项流程向导', workflow_library_description: '通过安全且符合情境的提示练习完整任务。向导不会代您提交付款或表单。', start_workflow: '开始流程向导' },
   },
+  ha: tourHa.common,
+  yo: tourYo.common,
+  ig: tourIg.common,
 };
 
 const workflowTranslations = {
-  tenant_rental: { fr: ['Parcourir votre location de bout en bout', 'Recherchez, enregistrez, candidatez, échangez, contrôlez les paiements et obtenez de l’aide.'], ar: ['إكمال رحلة الإيجار', 'ابحث واحفظ وقدّم وتواصل وراجع المدفوعات واحصل على الدعم.'], ru: ['Пройдите весь путь аренды', 'Ищите, сохраняйте, подавайте заявку, общайтесь, проверяйте платежи и получайте помощь.'], zh: ['完成您的租房流程', '学习搜索、收藏、申请、沟通、查看付款并获取帮助。'] },
-  landlord_listing: { fr: ['Gérer un bien de l’annonce au paiement', 'Parcourez les annonces, la publication, les candidatures, les retraits et l’assistance.'], ar: ['إدارة العقار من الإعلان إلى الدفع', 'تابع الإعلان والنشر والطلبات والسحب والدعم.'], ru: ['Управляйте объектом от объявления до оплаты', 'Пройдите публикацию, заявки, вывод средств и поддержку.'], zh: ['从发布到收款管理房源', '了解发布、申请、提现和支持流程。'] },
-  agent_operations: { fr: ['Piloter vos opérations d’agent', 'Consultez affectations, revenus, retraits, biens, messages et assistance.'], ar: ['إدارة عمليات الوكيل', 'راجع التعيينات والأرباح والسحب والعقارات والرسائل والدعم.'], ru: ['Ведите работу агента', 'Просматривайте назначения, доходы, выводы, объекты, сообщения и поддержку.'], zh: ['管理代理运营', '查看分配、收益、提现、房源、消息和支持。'] },
-  lawyer_casework: { fr: ['Traiter un dossier juridique de bout en bout', 'Parcourez dossiers, preuves, litiges, messages et assistance.'], ar: ['إدارة العمل القانوني بالكامل', 'تابع القضايا والأدلة والنزاعات والرسائل والدعم.'], ru: ['Ведите юридическое дело от начала до конца', 'Пройдите дела, доказательства, споры, сообщения и поддержку.'], zh: ['端到端处理法律案件', '了解案件、证据、纠纷、消息和支持。'] },
-  service_bookings: { fr: ['Réserver et suivre des services fiables', 'Suivez réservations, paiements et assistance de service.'], ar: ['حجز الخدمات الموثوقة ومتابعتها', 'تابع الحجوزات والمدفوعات ودعم الخدمة.'], ru: ['Бронируйте и отслеживайте надёжные услуги', 'Следите за бронированиями, платежами и поддержкой.'], zh: ['预订并跟踪可信服务', '跟踪预订、付款和服务支持。'] },
-  account_settings: { fr: ['Sécuriser et personnaliser votre compte', 'Vérifiez profil, identité, préférences et commandes des visites.'], ar: ['تأمين حسابك وتخصيصه', 'راجع الملف والتحقق والتفضيلات وعناصر الجولة.'], ru: ['Защитите и настройте аккаунт', 'Проверьте профиль, верификацию, настройки и управление турами.'], zh: ['保护并个性化您的账户', '查看资料、验证、偏好和引导设置。'] },
+  tenant_rental: { fr: ['Parcourir votre location de bout en bout', 'Recherchez, enregistrez, candidatez, échangez, contrôlez les paiements et obtenez de l’aide.'], ar: ['إكمال رحلة الإيجار', 'ابحث واحفظ وقدّم وتواصل وراجع المدفوعات واحصل على الدعم.'], ru: ['Пройдите весь путь аренды', 'Ищите, сохраняйте, подавайте заявку, общайтесь, проверяйте платежи и получайте помощь.'], zh: ['完成您的租房流程', '学习搜索、收藏、申请、沟通、查看付款并获取帮助。'], ha: tourHa.workflowTranslations.tenant_rental, yo: tourYo.workflowTranslations.tenant_rental, ig: tourIg.workflowTranslations.tenant_rental },
+  landlord_listing: { fr: ['Gérer un bien de l’annonce au paiement', 'Parcourez les annonces, la publication, les candidatures, les retraits et l’assistance.'], ar: ['إدارة العقار من الإعلان إلى الدفع', 'تابع الإعلان والنشر والطلبات والسحب والدعم.'], ru: ['Управляйте объектом от объявления до оплаты', 'Пройдите публикацию, заявки, вывод средств и поддержку.'], zh: ['从发布到收款管理房源', '了解发布、申请、提现和支持流程。'], ha: tourHa.workflowTranslations.landlord_listing, yo: tourYo.workflowTranslations.landlord_listing, ig: tourIg.workflowTranslations.landlord_listing },
+  agent_operations: { fr: ['Piloter vos opérations d’agent', 'Consultez affectations, revenus, retraits, biens, messages et assistance.'], ar: ['إدارة عمليات الوكيل', 'راجع التعيينات والأرباح والسحب والعقارات والرسائل والدعم.'], ru: ['Ведите работу агента', 'Просматривайте назначения, доходы, выводы, объекты, сообщения и поддержку.'], zh: ['管理代理运营', '查看分配、收益、提现、房源、消息和支持。'], ha: tourHa.workflowTranslations.agent_operations, yo: tourYo.workflowTranslations.agent_operations, ig: tourIg.workflowTranslations.agent_operations },
+  lawyer_casework: { fr: ['Traiter un dossier juridique de bout en bout', 'Parcourez dossiers, preuves, litiges, messages et assistance.'], ar: ['إدارة العمل القانوني بالكامل', 'تابع القضايا والأدلة والنزاعات والرسائل والدعم.'], ru: ['Ведите юридическое дело от начала до конца', 'Пройдите дела, доказательства, споры, сообщения и поддержку.'], zh: ['端到端处理法律案件', '了解案件、证据、纠纷、消息和支持。'], ha: tourHa.workflowTranslations.lawyer_casework, yo: tourYo.workflowTranslations.lawyer_casework, ig: tourIg.workflowTranslations.lawyer_casework },
+  service_bookings: { fr: ['Réserver et suivre des services fiables', 'Suivez réservations, paiements et assistance de service.'], ar: ['حجز الخدمات الموثوقة ومتابعتها', 'تابع الحجوزات والمدفوعات ودعم الخدمة.'], ru: ['Бронируйте и отслеживайте надёжные услуги', 'Следите за бронированиями, платежами и поддержкой.'], zh: ['预订并跟踪可信服务', '跟踪预订、付款和服务支持。'], ha: tourHa.workflowTranslations.service_bookings, yo: tourYo.workflowTranslations.service_bookings, ig: tourIg.workflowTranslations.service_bookings },
+  account_settings: { fr: ['Sécuriser et personnaliser votre compte', 'Vérifiez profil, identité, préférences et commandes des visites.'], ar: ['تأمين حسابك وتخصيصه', 'راجع الملف والتحقق والتفضيلات وعناصر الجولة.'], ru: ['Защитите и настройте аккаунт', 'Проверьте профиль, верификацию, настройки и управление турами.'], zh: ['保护并个性化您的账户', '查看资料、验证、偏好和引导设置。'], ha: tourHa.workflowTranslations.account_settings, yo: tourYo.workflowTranslations.account_settings, ig: tourIg.workflowTranslations.account_settings },
 };
 
 const genericWorkflowLabels = {
@@ -220,6 +229,9 @@ const genericWorkflowLabels = {
   ar: ['دليل العمليات', 'اتبع المسار التشغيلي الأساسي لدورك بخطوات آمنة ومراعية للسياق.'],
   ru: ['Операционный сценарий', 'Пройдите основной рабочий процесс своей роли с безопасными контекстными подсказками.'],
   zh: ['运营流程向导', '通过安全且符合情境的步骤了解您角色的主要运营流程。'],
+  ha: tourHa.genericWorkflowLabels,
+  yo: tourYo.genericWorkflowLabels,
+  ig: tourIg.genericWorkflowLabels,
 };
 
 const adminWorkflowIds = [
@@ -235,6 +247,9 @@ const descriptionTemplates = {
   ar: (title) => `تعرّف على «${title}» واتبع الإجراءات المعروضة بأمان.`,
   ru: (title) => `Изучите раздел «${title}» и безопасно выполните показанные действия.`,
   zh: (title) => `了解“${title}”，并安全地按照显示的操作继续。`,
+  ha: tourHa.descriptionTemplate,
+  yo: tourYo.descriptionTemplate,
+  ig: tourIg.descriptionTemplate,
 };
 
 const actionHints = {
@@ -242,6 +257,9 @@ const actionHints = {
   ar: 'استخدم العنصر المميز للمتابعة تلقائيًا.',
   ru: 'Используйте выделенный элемент, чтобы продолжить автоматически.',
   zh: '使用高亮控件即可自动继续。',
+  ha: tourHa.actionHint,
+  yo: tourYo.actionHint,
+  ig: tourIg.actionHint,
 };
 
 const buildStepResources = (locale) => Object.fromEntries(allSteps.map((step, index) => {
@@ -365,9 +383,12 @@ const analytics = {
     no_issues: '未记录缺失目标或不可用步骤。', languages: '语言采用情况', users_lower: '位用户', no_language_data: '暂无语言数据。',
     problem_count_sr: '检测到 {{count}} 个问题步骤。',
   },
+  ha: tourHa.analytics,
+  yo: tourYo.analytics,
+  ig: tourIg.analytics,
 };
 
-const tourTranslations = Object.fromEntries(['en', 'fr', 'ar', 'ru', 'zh'].map((locale) => [locale, {
+const tourTranslations = Object.fromEntries(['en', 'fr', 'ar', 'ru', 'zh', 'ha', 'yo', 'ig'].map((locale) => [locale, {
   ...common[locale],
   locale_code: locale,
   ui: {

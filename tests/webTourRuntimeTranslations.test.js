@@ -19,8 +19,13 @@ const countObjectKey = (source, key) => {
   return (source.match(new RegExp(`(?:^|[,{\\s])${escaped}\\s*:`, 'gm')) || []).length;
 };
 
-test('runtime tour resources localize every literal web tour key in all five languages', () => {
-  const translations = read('client', 'src', 'i18n', 'tourTranslations.js');
+test('runtime tour resources localize every literal web tour key in all eight languages', () => {
+  const translations = [
+    'tourTranslations.js',
+    'tourTranslations.ha.js',
+    'tourTranslations.yo.js',
+    'tourTranslations.ig.js',
+  ].map((file) => read('client', 'src', 'i18n', file)).join('\n');
   const sourcesByNamespace = {
     'tour.ui': read('client', 'src', 'components', 'tour', 'TourOverlay.jsx'),
     'tour.welcome': read('client', 'src', 'components', 'tour', 'WelcomeModal.jsx'),
@@ -31,8 +36,8 @@ test('runtime tour resources localize every literal web tour key in all five lan
   Object.entries(sourcesByNamespace).forEach(([namespace, source]) => {
     collectLiteralKeys(source, namespace).forEach((key) => {
       assert.ok(
-        countObjectKey(translations, key) >= 5,
-        `${namespace}.${key} must have an explicit runtime value for en/fr/ar/ru/zh`,
+        countObjectKey(translations, key) >= 8,
+        `${namespace}.${key} must have an explicit runtime value for en/fr/ar/ru/zh/ha/yo/ig`,
       );
     });
   });

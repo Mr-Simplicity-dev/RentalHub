@@ -188,6 +188,9 @@ const TourAnalytics = () => {
                 <option value="ar">العربية</option>
                 <option value="ru">Русский</option>
                 <option value="zh">中文</option>
+                <option value="ha">Hausa</option>
+                <option value="yo">Yorùbá</option>
+                <option value="ig">Igbo</option>
               </select>
             </label>
             <label className="text-xs font-bold text-slate-600 lg:col-span-2">
