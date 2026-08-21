@@ -70,7 +70,7 @@ const TransportationBookingDetails = () => {
     };
     
     loadBookingDetails();
-  }, [bookingId, user, navigate]);
+  }, [bookingId, user, navigate, t]);
   
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';

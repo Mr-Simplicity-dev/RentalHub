@@ -101,7 +101,7 @@ const TransportationBooking = () => {
     };
 
     loadData();
-  }, [user, propertyId, navigate]);
+  }, [user, propertyId, navigate, t]);
 
   // Calculate price when service or distance changes
   useEffect(() => {
@@ -134,7 +134,7 @@ const TransportationBooking = () => {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [selectedService, formData.estimated_distance_km]);
+  }, [selectedService, formData.estimated_distance_km, t]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

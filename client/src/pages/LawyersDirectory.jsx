@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 const LegalSupport = () => {
   const { t } = useTranslation();
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [hasCoverage, setHasCoverage] = useState(false);
   const [requests, setRequests] = useState([]);

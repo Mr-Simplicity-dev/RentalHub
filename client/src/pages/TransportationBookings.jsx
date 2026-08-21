@@ -63,7 +63,7 @@ const TransportationBookings = () => {
     };
     
     loadData();
-  }, [user, navigate]);
+  }, [user, navigate, t]);
   
   const filteredBookings = bookings.filter(booking => {
     if (filter === 'all') return true;

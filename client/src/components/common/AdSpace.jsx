@@ -5,7 +5,6 @@ import {
   FaVolumeMute,
   FaVolumeUp,
 } from 'react-icons/fa';
-import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import ShareMenu from '../common/ShareMenu';

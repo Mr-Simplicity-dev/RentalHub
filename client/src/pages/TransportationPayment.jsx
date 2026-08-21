@@ -73,7 +73,7 @@ const TransportationPayment = () => {
     };
     
     loadBookingDetails();
-  }, [bookingId, user, navigate]);
+  }, [bookingId, user, navigate, t]);
   
   const initializePayment = async (paymentMethod = 'paystack') => {
     if (!booking) return;

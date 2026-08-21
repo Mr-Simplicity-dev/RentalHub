@@ -12,7 +12,6 @@ import {
   FaPhoneAlt,
   FaEnvelope,
 } from 'react-icons/fa';
-import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import ShareMenu from '../components/common/ShareMenu';
 

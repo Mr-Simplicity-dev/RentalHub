@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FaArrowDown, FaArrowUp, FaCheckCircle, FaSyncAlt, FaTimesCircle } from 'react-icons/fa';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FaArrowDown, FaArrowUp, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import InputDialog from '../../components/common/InputDialog';

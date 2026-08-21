@@ -380,7 +380,7 @@ const Register = () => {
     return () => {
       active = false;
     };
-  }, [formData.user_type, formData.state_id, formData.lga_name, selectedStateOption?.state_name]);
+  }, [formData.user_type, formData.state_id, formData.lga_name, selectedStateOption?.state_name, t]);
 
   useEffect(() => {
     let active = true;
@@ -430,7 +430,7 @@ const Register = () => {
     return () => {
       active = false;
     };
-  }, [registrationReference]);
+  }, [registrationReference, t]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -488,7 +488,7 @@ const Register = () => {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [premblyPending?.attempt_id, premblyPending?.status]);
+  }, [premblyPending?.attempt_id, premblyPending?.status, t]);
 
   const setApplicantType = (isForeigner) => {
     setFormData((prev) => ({

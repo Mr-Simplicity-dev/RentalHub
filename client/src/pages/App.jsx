@@ -447,21 +447,6 @@ const TransportationStateAdminRoute = ({ children }) => {
   return children;
 };
 
-const TransportationSuperAdminRoute = ({ children }) => {
-  const { isAuthenticated, loading, user } = useAuth();
-
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
-  }
-
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!SUPER_TRANSPORTATION_ADMIN_ROLES.includes(user?.user_type)) {
-    return <Navigate to="/admin" replace />;
-  }
-
-  return children;
-};
-
 const LgaFumigationAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -484,19 +469,6 @@ const StateFumigationAdminRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (!STATE_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
-
-  return children;
-};
-
-const SuperFumigationAdminRoute = ({ children }) => {
-  const { isAuthenticated, loading, user } = useAuth();
-
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
-  }
-
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!SUPER_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
 
   return children;
 };

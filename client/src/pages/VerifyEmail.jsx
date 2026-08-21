@@ -48,7 +48,7 @@ const VerifyEmail = () => {
     };
 
     verify();
-  }, [token, navigate]);
+  }, [token, navigate, t]);
 
   // Countdown + redirect when successful
   useEffect(() => {

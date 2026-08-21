@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { FaEdit, FaExternalLinkAlt, FaFilm, FaImage, FaPlus, FaShareAlt, FaTrash, FaUpload } from 'react-icons/fa';
 import api from '../../services/api';
