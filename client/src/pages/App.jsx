@@ -142,10 +142,8 @@ const FUMIGATION_ADMIN_ROLES = ['fumigation_admin', 'lga_fumigation_admin', 'sta
 const TRANSPORTATION_ADMIN_ROLES = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin'];
 const LGA_TRANSPORTATION_ADMIN_ROLES = ['admin', 'lga_admin', 'transportation_admin', 'lga_transportation_admin'];
 const STATE_TRANSPORTATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin'];
-const SUPER_TRANSPORTATION_ADMIN_ROLES = ['super_admin', 'super_financial_admin', 'super_support_admin', 'super_transportation_admin'];
 const LGA_FUMIGATION_ADMIN_ROLES = ['admin', 'lga_admin', 'fumigation_admin', 'lga_fumigation_admin'];
 const STATE_FUMIGATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_fumigation_admin'];
-const SUPER_FUMIGATION_ADMIN_ROLES = ['super_admin', 'super_fumigation_admin'];
 const isRecruitmentAdminUser = (user) =>
   RECRUITMENT_ADMIN_ROLES.includes(user?.user_type) || user?.is_recruitment_admin === true;
 const ADMIN_SHELL_ROLES = [
