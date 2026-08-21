@@ -222,7 +222,7 @@ const FloatingContactWidget = () => {
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open]);
+  }, [open, handleClose]);
 
   // Click-outside close
   useEffect(() => {

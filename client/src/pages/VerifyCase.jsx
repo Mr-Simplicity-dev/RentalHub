@@ -53,7 +53,7 @@ export default function VerifyCase() {
         setLoading(false);
       }
     },
-    [disputeId]
+    [disputeId, t]
   );
 
   const startVerification = useCallback(async () => {
@@ -97,7 +97,7 @@ export default function VerifyCase() {
       );
       setLoading(false);
     }
-  }, [disputeId, payerEmail, payerName]);
+  }, [disputeId, payerEmail, payerName, t]);
 
   useEffect(() => {
     if (disputeFromUrl) {
