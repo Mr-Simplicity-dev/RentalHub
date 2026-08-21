@@ -46,7 +46,6 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
   const [livenessError, setLivenessError] = useState('');
   const [livenessChecks, setLivenessChecks] = useState(DEFAULT_LIVENESS);
   const [faceBox, setFaceBox] = useState(null);
-  const [faceMeshReady, setFaceMeshReady] = useState(false);
   const [liveCaptureToken, setLiveCaptureToken] = useState('');
   const [captured, setCaptured] = useState(false);
   const [capturedImage, setCapturedImage] = useState(null);
@@ -76,7 +75,6 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraActive(false);
-    setFaceMeshReady(false);
     setFaceBox(null);
     setLivenessChecks(DEFAULT_LIVENESS);
     setLivenessError('');
@@ -178,7 +176,6 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
         detectionLoopRef.current = requestAnimationFrame(loop);
       };
       loop();
-      setFaceMeshReady(true);
       setCameraActive(true);
       setCameraLoading(false);
       setCaptured(false);
