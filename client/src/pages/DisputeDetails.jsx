@@ -58,7 +58,7 @@ export default function DisputeDetails() {
     return () => {
       cancelled = true;
     };
-  }, [disputeId]);
+  }, [disputeId, t]);
 
   const handleFileSelect = (e) => {
     setSelectedFile(e.target.files[0] || null);

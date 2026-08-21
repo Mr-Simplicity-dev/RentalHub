@@ -114,7 +114,7 @@ const FumigationCleaningBookingDetails = () => {
     };
     
     loadBookingDetails();
-  }, [bookingId, user, navigate]);
+  }, [bookingId, user, navigate, t]);
   
   const handleCancelBooking = async () => {
     if (!cancellationReason.trim()) {

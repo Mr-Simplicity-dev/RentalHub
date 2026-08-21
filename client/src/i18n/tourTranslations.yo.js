@@ -1,4 +1,4 @@
-export default {
+const tourYoTranslations = {
   titleTranslations: {
     'Your Properties': 'Àwọn Ohun-Inì Rẹ',
     'Property Location': 'Ibi Ohun-Inì',
@@ -226,3 +226,5 @@ export default {
     problem_count_sr: 'A rí àwọn ìgbésẹ̀ ìṣòro {{count}}.',
   },
 };
+
+export default tourYoTranslations;

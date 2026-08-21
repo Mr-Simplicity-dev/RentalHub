@@ -39,7 +39,7 @@ const normalizeDashboardType = (value, fallbackRole) => {
 
 let tourEventSequence = 0;
 const createTourEventId = () => {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  if (typeof window !== 'undefined' && window.crypto?.randomUUID) return window.crypto.randomUUID();
   tourEventSequence = (tourEventSequence + 1) % 1000000;
   return [
     'web',

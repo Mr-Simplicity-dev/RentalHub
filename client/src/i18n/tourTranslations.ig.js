@@ -88,7 +88,7 @@ const analytics = {
   no_language_data: 'Enwebeghị data asụsụ.', problem_count_sr: 'Achọpụtara nkeji nsogbu {{count}}.',
 };
 
-export default {
+const tourIgTranslations = {
   titleTranslations,
   common,
   workflowTranslations,
@@ -97,3 +97,5 @@ export default {
   actionHint,
   analytics,
 };
+
+export default tourIgTranslations;

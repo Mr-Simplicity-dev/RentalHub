@@ -46,7 +46,7 @@ export default function AreaPage() {
     return () => {
       cancelled = true;
     };
-  }, [areaSlug, citySlug, stateSlug]);
+  }, [areaSlug, citySlug, stateSlug, t]);
 
   if (loading) {
     return <div className="px-4 py-16 text-center text-gray-600">{t('area_page.loading')}</div>;

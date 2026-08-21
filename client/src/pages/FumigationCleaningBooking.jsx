@@ -124,7 +124,7 @@ const [loading, setLoading] = useState(true);
     };
 
     loadData();
-  }, [user, propertyId, navigate]);
+  }, [user, propertyId, navigate, t]);
 
   // Load addons when service is selected
   useEffect(() => {
@@ -182,7 +182,7 @@ const [loading, setLoading] = useState(true);
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [formData.service_id, formData.property_size_sqm, formData.selected_addons]);
+  }, [formData.service_id, formData.property_size_sqm, formData.selected_addons, t]);
 
   // Load available dates when service and month/year are known
   useEffect(() => {
