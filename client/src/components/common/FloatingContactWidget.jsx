@@ -233,7 +233,7 @@ const FloatingContactWidget = () => {
     };
     const timer = setTimeout(() => { if (mounted) document.addEventListener('mousedown', handler); }, 0);
     return () => { mounted = false; clearTimeout(timer); document.removeEventListener('mousedown', handler); };
-  }, [open]);
+  }, [open, handleClose]);
 
   // Close other widget on mobile when this opens
   const widgetInstanceId = useRef(`fcw-${Date.now()}`);
@@ -787,41 +787,6 @@ const FloatingContactWidget = () => {
       </button>
     );
   };
-
-  const replyInput = (value, onChange, onSend, sending, recorder, file, setFile) => (
-    <div className="border-t border-slate-200 p-3">
-      {recorder.isRecording && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600">
-          <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-          {t('widget.recording', 'Recording...')} {recorder.formatDuration(recorder.duration)}
-          <button onClick={recorder.stop} className="ml-auto flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-white hover:bg-red-600">
-            <FaStopCircle size={10} /> {t('widget.stop', 'Stop')}
-          </button>
-        </div>
-      )}
-      {file && !recorder.isRecording && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 dark:bg-gray-700 px-3 py-1.5 text-xs text-slate-600 dark:text-gray-300">
-          <FaPaperclip size={10} /> {file.name}
-          <button onClick={() => setFile(null)} className="ml-auto text-red-500 hover:text-red-700"><FaTimes size={10} /></button>
-        </div>
-      )}
-      <div className="flex items-end gap-2">
-        {!file && <>{fileInput(setFile, file, recorder.isRecording)}</>}
-        {!recorder.isRecording && !file && (
-          <textarea value={value} onChange={(e) => { onChange(e.target.value); if (emitTyping) emitTyping(); }}
-            placeholder={t('widget.type_message', 'Type your message...')} rows={1}
-            className="flex-1 resize-none rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } }} />
-        )}
-        {recorder.isRecording && <div className="flex-1" />}
-        {voiceButton(recorder, setFile)}
-        <button onClick={onSend} disabled={(!value.trim() && !file && !recorder.recordedFile) || sending}
-          className="flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 shrink-0">
-          {sending ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <FaPaperPlane size={12} />}
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <WidgetErrorBoundary name="FloatingContactWidget">

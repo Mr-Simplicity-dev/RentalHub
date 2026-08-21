@@ -462,7 +462,6 @@ const SmsMarketingTab = () => {
   const totalPages = Math.ceil(subTotal / 30);
 
   const segments = getSegments(campaignForm.content);
-  const segCost = segments * COST_PER_SEGMENT;
 
   const renderOverview = () => (
     <div className="space-y-6">
