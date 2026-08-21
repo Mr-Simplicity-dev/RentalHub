@@ -1205,7 +1205,7 @@ const runSupportSlaMonitor = async () => {
       emitTicketUpdated(ticket);
     }
   } catch (err) {
-    req.logger.error('Support SLA monitor error:', err);
+    logger.error('Support SLA monitor error:', err);
   }
 };
 
