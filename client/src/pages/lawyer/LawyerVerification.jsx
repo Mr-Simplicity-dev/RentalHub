@@ -118,7 +118,7 @@ const LawyerVerification = ({ children }) => {
     if (!livenessChecks.movedCloser) checks.push(t('lawyer_verification.move_closer'));
     if (!livenessChecks.movedFarther) checks.push(t('lawyer_verification.move_farther'));
     return checks;
-  }, [livenessChecks]);
+  }, [livenessChecks, t]);
 
   const stopCamera = useCallback(() => {
     detectionEnabledRef.current = false;
@@ -301,7 +301,7 @@ const LawyerVerification = ({ children }) => {
       setLivenessError(t('lawyer_verification.live_checks_unavailable'));
       setFaceMeshReady(false);
     }
-  }, [handleFaceResults, runDetectionLoop]);
+  }, [handleFaceResults, runDetectionLoop, t]);
 
   const startCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -401,7 +401,7 @@ const LawyerVerification = ({ children }) => {
       setShowCameraModal(false);
       stopCamera();
     }, 'image/jpeg', 0.92);
-  }, [canCaptureLive, setPassportFromFile, stopCamera]);
+  }, [canCaptureLive, setPassportFromFile, stopCamera, t]);
 
   useEffect(() => {
     if (!showCameraModal || !cameraActive || !streamRef.current || !videoRef.current) return;
