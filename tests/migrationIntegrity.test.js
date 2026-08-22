@@ -9,6 +9,7 @@ const {
   extractMigrationNumber,
   findDuplicateMigrationNumbers,
   findMissingAppliedMigrationFiles,
+  findRenamedAppliedMigrations,
   isStoredMigrationHashCompatible,
   normalizeMigrationContent,
   stripOuterMigrationTransaction,
@@ -60,6 +61,35 @@ test('an applied migration missing from a release is detected', () => {
     ),
     ['002_applied.sql']
   );
+});
+
+test('an applied migration renamed in a later release is matched by content', () => {
+  const content = 'ALTER TABLE appeals ADD COLUMN active_uniqueness TEXT;\n';
+  const applied = [
+    { filename: '001_base.sql', hash: hash('-- base\n') },
+    { filename: '106_admin_appeal_active_uniqueness.sql', hash: hash(content) },
+  ];
+  const migrations = [
+    { filename: '001_base.sql', content: '-- base\n' },
+    { filename: '110_admin_appeal_active_uniqueness.sql', content },
+  ];
+
+  assert.deepEqual(
+    findRenamedAppliedMigrations(applied, migrations),
+    [{ from: '106_admin_appeal_active_uniqueness.sql', to: '110_admin_appeal_active_uniqueness.sql' }]
+  );
+});
+
+test('renamed migration detection still rejects changed or unrelated content', () => {
+  const applied = [
+    { filename: '002_edited.sql', hash: hash('ALTER TABLE t ADD COLUMN a TEXT;\n') },
+    { filename: '003_deleted.sql', hash: hash('-- gone\n') },
+  ];
+  const migrations = [
+    { filename: '002_edited.sql', content: 'ALTER TABLE t ADD COLUMN a INTEGER;\n' },
+  ];
+
+  assert.deepEqual(findRenamedAppliedMigrations(applied, migrations), []);
 });
 
 test('legacy outer transactions are stripped without touching procedural BEGIN blocks', () => {

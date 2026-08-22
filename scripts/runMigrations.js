@@ -11,8 +11,19 @@
  *   node scripts/runMigrations.js --file=045         # Run from a specific number onward
  *   node scripts/runMigrations.js --reset            # Reset migration tracking (DANGER)
  *   node scripts/runMigrations.js --skip-hash-check  # Skip hash integrity checks on already-applied migrations
+ *   node scripts/runMigrations.js --allow-missing-files # Continue when an applied migration file is missing
  *   node scripts/runMigrations.js --continue-on-error # Continue running remaining migrations after a failure
- * 
+ *
+ * Environment variables (alternatives to the CLI flags above, so production
+ * deployments can simply run `npm run migrate` after every git pull):
+ *   MIGRATIONS_SKIP_HASH_CHECK=true     Same as --skip-hash-check
+ *   MIGRATIONS_ALLOW_MISSING_FILES=true Same as --allow-missing-files
+ *
+ * Rename reconciliation: if an applied migration's file was renamed in a later
+ * release (for example 106_foo.sql -> 110_foo.sql), the runner detects it by
+ * content hash, renames the tracking row to the current filename, and continues
+ * automatically. No manual SQL or flag is required.
+ *
  * Production-safe features:
  *   - Each migration runs in its own transaction (or respects existing BEGIN/COMMIT)
  *   - Uses ON CONFLICT for tracking table UPSERTS
@@ -30,6 +41,7 @@ const {
   extractMigrationNumber,
   findDuplicateMigrationNumbers,
   findMissingAppliedMigrationFiles,
+  findRenamedAppliedMigrations,
   isStoredMigrationHashCompatible,
   stripOuterMigrationTransaction,
 } = require('./migrationIntegrity');
@@ -64,7 +76,12 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const DOWN_MODE = args.includes('--down');
 const RESET_MODE = args.includes('--reset');
-const SKIP_HASH_CHECK = args.includes('--skip-hash-check');
+const SKIP_HASH_CHECK =
+  args.includes('--skip-hash-check') ||
+  process.env.MIGRATIONS_SKIP_HASH_CHECK === 'true';
+const ALLOW_MISSING_FILES =
+  args.includes('--allow-missing-files') ||
+  process.env.MIGRATIONS_ALLOW_MISSING_FILES === 'true';
 const CONTINUE_ON_ERROR = args.includes('--continue-on-error');
 const RESET_CONFIRMED = args.includes('--confirm-reset=RESET_SCHEMA_MIGRATION_TRACKING');
 const fileArg = args.find(a => a.startsWith('--file='));
@@ -183,14 +200,51 @@ const runPendingMigrations = async () => {
       await client.query('COMMIT');
     }
 
-    const applied = hasTrackingTable ? await getAppliedMigrations(client) : [];
-    const appliedFilenames = new Set(applied.map(r => r.filename));
-    const appliedHashes = new Map(applied.map(r => [r.filename, r.hash]));
+    let applied = hasTrackingTable ? await getAppliedMigrations(client) : [];
+    let appliedFilenames = new Set(applied.map(r => r.filename));
+    let appliedHashes = new Map(applied.map(r => [r.filename, r.hash]));
     const missingAppliedFiles = findMissingAppliedMigrationFiles(applied, migrations);
     if (missingAppliedFiles.length) {
-      throw new Error(
-        `Applied migration files are missing from this release: ${missingAppliedFiles.join(', ')}`
+      // Reconcile renamed applied migrations by matching stored hashes against
+      // the current repository content, so renumbering a migration file (e.g.
+      // 106_foo.sql -> 110_foo.sql) never blocks a release or re-runs SQL.
+      const renamed = findRenamedAppliedMigrations(applied, migrations);
+      if (renamed.length) {
+        console.log('\n♻️  Renamed applied migrations detected (content match):');
+        if (!DRY_RUN) {
+          await client.query('BEGIN');
+          for (const rename of renamed) {
+            await client.query(
+              `UPDATE ${TRACKING_TABLE} SET filename = $1 WHERE filename = $2`,
+              [rename.to, rename.from]
+            );
+            console.log(`   ${rename.from} → ${rename.to} ✅`);
+          }
+          await client.query('COMMIT');
+        } else {
+          renamed.forEach(rename =>
+            console.log(`   ${rename.from} → ${rename.to} (dry-run: rename not persisted)`));
+        }
+        applied = applied.map((row) => {
+          const match = renamed.find((rename) => rename.from === row.filename);
+          return match ? { ...row, filename: match.to } : row;
+        });
+        appliedFilenames = new Set(applied.map(r => r.filename));
+        appliedHashes = new Map(applied.map(r => [r.filename, r.hash]));
+      }
+
+      const stillMissing = missingAppliedFiles.filter(
+        filename => !renamed.some(rename => rename.from === filename)
       );
+      if (stillMissing.length) {
+        const message = `Applied migration files are missing from this release: ${stillMissing.join(', ')}`;
+        if (ALLOW_MISSING_FILES) {
+          console.warn(`\n⚠️  ${message}`);
+          console.warn('   Continuing because MIGRATIONS_ALLOW_MISSING_FILES / --allow-missing-files is set.');
+        } else {
+          throw new Error(message);
+        }
+      }
     }
 
     console.log(`Found ${migrations.length} migration files, ${appliedFilenames.size} already applied.`);
@@ -243,11 +297,11 @@ const runPendingMigrations = async () => {
 
       if (hashChanged) {
         throw new Error(
-          'Applied migration content has changed. Restore the original files or use --skip-hash-check only after a documented review.'
+          'Applied migration content has changed. Restore the original files, or use --skip-hash-check / MIGRATIONS_SKIP_HASH_CHECK=true after a documented review.'
         );
       }
     } else {
-      console.log('🔓 Hash check skipped (--skip-hash-check flag set).');
+      console.log('🔓 Hash check skipped (--skip-hash-check flag or MIGRATIONS_SKIP_HASH_CHECK=true).');
     }
 
     if (pending.length === 0) {

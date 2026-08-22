@@ -83,11 +83,31 @@ const findMissingAppliedMigrationFiles = (applied, migrations) => {
     .filter((filename) => !repositoryFilenames.has(filename));
 };
 
+const findRenamedAppliedMigrations = (applied, migrations) => {
+  const missing = new Set(findMissingAppliedMigrationFiles(applied, migrations));
+  if (missing.size === 0) return [];
+
+  return applied
+    .filter((migration) => missing.has(migration.filename))
+    .map((migration) => {
+      const candidate = migrations.find(
+        (file) =>
+          file.filename !== migration.filename &&
+          isStoredMigrationHashCompatible(migration.hash, file.content)
+      );
+      return candidate
+        ? { from: migration.filename, to: candidate.filename }
+        : null;
+    })
+    .filter(Boolean);
+};
+
 module.exports = {
   computeCanonicalMigrationHash,
   extractMigrationNumber,
   findDuplicateMigrationNumbers,
   findMissingAppliedMigrationFiles,
+  findRenamedAppliedMigrations,
   getCompatibleMigrationHashes,
   isStoredMigrationHashCompatible,
   normalizeMigrationContent,
