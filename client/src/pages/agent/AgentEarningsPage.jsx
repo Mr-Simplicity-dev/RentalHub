@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaDollarSign, FaCheckCircle, FaClock, FaHistory } from 'react-icons/fa';
 import { toast } from 'react-toastify';
@@ -110,11 +110,7 @@ const AgentEarningsPage = () => {
   const [loading, setLoading] = useState(true);
   const [commissionLoading, setCommissionLoading] = useState(false);
 
-  useEffect(() => {
-    loadEarningsData();
-  }, []);
-
-  const loadEarningsData = async () => {
+  const loadEarningsData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -143,7 +139,11 @@ const AgentEarningsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadEarningsData();
+  }, [loadEarningsData]);
 
   if (loading) return <Loader />;
 

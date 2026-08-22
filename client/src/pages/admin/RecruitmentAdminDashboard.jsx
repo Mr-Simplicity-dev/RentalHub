@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FaVideo, FaToggleOn, FaToggleOff, FaSyncAlt } from 'react-icons/fa';
+import { FaToggleOn, FaToggleOff, FaSyncAlt } from 'react-icons/fa';
 import api from '../../services/api';
 import {
   PageHeader,
@@ -9,7 +9,6 @@ import {
   SectionTabs,
   LoadingState,
   ErrorState,
-  EmptyState,
   formatCurrency,
 } from '../../components/admin/RecruitmentAdminUi';
 import {
@@ -61,7 +60,7 @@ export default function RecruitmentAdminDashboard() {
     if (tabFromUrl && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
     }
-  }, [location.search]);
+  }, [location.search, activeTab]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -70,7 +69,7 @@ export default function RecruitmentAdminDashboard() {
       params.set('tab', activeTab);
       navigate({ search: params.toString() }, { replace: true });
     }
-  }, [activeTab, navigate]);
+  }, [activeTab, navigate, location.search]);
 
   // ─── Load core data ───────────────────────────────────
   const loadCore = useCallback(async (showRefresh = false) => {

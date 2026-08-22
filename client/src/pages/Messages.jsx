@@ -40,7 +40,7 @@ const detectPhone = (text) => {
   const lines = text.split('\n');
   const leadingDigits = [];
   for (const line of lines) {
-    const m = line.trim().match(/^(\d+)\s*[.):\]>\-]/);
+    const m = line.trim().match(/^(\d+)\s*[.):\]>-]/);
     if (m) leadingDigits.push(m[1][0]);
   }
   for (let i = 0; i <= leadingDigits.length - 11; i++) {
