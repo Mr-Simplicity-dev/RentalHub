@@ -384,8 +384,8 @@ const FloatingContactWidget = () => {
 
   const validateFile = (file) => {
     if (!file) return null;
-    if (file.size > MAX_FILE_SIZE) return t('widget.file_too_large', 'File must be under 15MB');
-    if (!ALLOWED_TYPES.includes(file.type)) return t('widget.file_type_not_allowed', 'File type not supported');
+    if (file.size > MAX_FILE_SIZE) return t('messages.widget.file_too_large', 'File must be under 15MB');
+    if (!ALLOWED_TYPES.includes(file.type)) return t('messages.widget.file_type_not_allowed', 'File type not supported');
     return null;
   };
 
@@ -393,7 +393,7 @@ const FloatingContactWidget = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim() || !form.email.trim() || !form.state || !form.message.trim()) {
-      setError(t('widget.fill_required', 'Please fill in name, email, state, and message.'));
+      setError(t('messages.widget.fill_required', 'Please fill in name, email, state, and message.'));
       return;
     }
     setSending(true);
@@ -412,7 +412,7 @@ const FloatingContactWidget = () => {
       });
       setView('success');
     } catch (err) {
-      setError(err.response?.data?.message || t('widget.send_failed', 'Could not send message.'));
+      setError(err.response?.data?.message || t('messages.widget.send_failed', 'Could not send message.'));
     } finally { setSending(false); }
   };
 
@@ -441,8 +441,8 @@ const FloatingContactWidget = () => {
       setSentConfirm('sent');
       setTimeout(() => setSentConfirm(null), 2000);
     } catch (err) {
-      setConversation((prev) => prev.map((r) => r.id === tempId ? { ...r, _failed: true, _error: err.response?.data?.message || t('widget.send_failed', 'Failed to send') } : r));
-      setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
+      setConversation((prev) => prev.map((r) => r.id === tempId ? { ...r, _failed: true, _error: err.response?.data?.message || t('messages.widget.send_failed', 'Failed to send') } : r));
+      setError(err.response?.data?.message || t('messages.widget.send_failed', 'Failed to send'));
     } finally { setSendingReply(false); }
   };
 
@@ -460,7 +460,7 @@ const FloatingContactWidget = () => {
       setTimeout(() => setSentConfirm(null), 2000);
     } catch (err) {
       setConversation((prev) => prev.map((r) => r.id === failedMsg.id ? { ...r, _failed: true } : r));
-      setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
+      setError(err.response?.data?.message || t('messages.widget.send_failed', 'Failed to send'));
     } finally { setSendingReply(false); }
   };
 
@@ -534,7 +534,7 @@ const FloatingContactWidget = () => {
         ));
       }
     } catch {
-      setError(t('widget.lookup_failed', 'Could not load saved tickets. Please try again.'));
+      setError(t('messages.widget.lookup_failed', 'Could not load saved tickets. Please try again.'));
     } finally {
       setLookupLoading(false);
     }
@@ -639,7 +639,7 @@ const FloatingContactWidget = () => {
     });
     gs.on('ticket:typing', (data) => {
       if (!data.isAdmin) return;
-      setAdminTypingName(data.userName || t('widget.support_team', 'Support'));
+      setAdminTypingName(data.userName || t('messages.widget.support_team', 'Support'));
       clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(() => setAdminTypingName(null), 3000);
     });
@@ -693,8 +693,8 @@ const FloatingContactWidget = () => {
       if (credential && isRejectedGuestCredential(err)) {
         removeGuestSupportCredential(viewingContactTicket.id);
       }
-      setContactConv((prev) => prev.map((r) => r.id === tempId ? { ...r, _failed: true, _error: err.response?.data?.message || t('widget.send_failed', 'Failed to send') } : r));
-      setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
+      setContactConv((prev) => prev.map((r) => r.id === tempId ? { ...r, _failed: true, _error: err.response?.data?.message || t('messages.widget.send_failed', 'Failed to send') } : r));
+      setError(err.response?.data?.message || t('messages.widget.send_failed', 'Failed to send'));
     } finally { setSendingContactReply(false); }
   };
 
@@ -721,7 +721,7 @@ const FloatingContactWidget = () => {
         removeGuestSupportCredential(viewingContactTicket.id);
       }
       setContactConv((prev) => prev.map((r) => r.id === failedMsg.id ? { ...r, _failed: true } : r));
-      setError(err.response?.data?.message || t('widget.send_failed', 'Failed to send'));
+      setError(err.response?.data?.message || t('messages.widget.send_failed', 'Failed to send'));
     } finally { setSendingContactReply(false); }
   };
 
@@ -730,17 +730,17 @@ const FloatingContactWidget = () => {
     <div className="flex items-center justify-between bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-3 text-white">
       <div className="flex items-center gap-2">
         {view !== 'form' && view !== 'success' && (
-          <button onClick={() => { setView(isAuthenticated ? 'tickets' : 'form'); setActiveTicket(null); setConversation([]); setContactConv([]); setViewingContactTicket(null); }} className="text-white/80 hover:text-white p-0.5" aria-label={t('widget.back', 'Back')}>
+          <button onClick={() => { setView(isAuthenticated ? 'tickets' : 'form'); setActiveTicket(null); setConversation([]); setContactConv([]); setViewingContactTicket(null); }} className="text-white/80 hover:text-white p-0.5" aria-label={t('messages.widget.back', 'Back')}>
             <FaArrowLeft size={14} />
           </button>
         )}
         <FaHeadset size={16} />
         <div>
-          <p className="text-sm font-semibold">{t('widget.support_title', 'RentalHub Support')}</p>
-          <p className="text-[10px] text-indigo-200">{t('widget.reply_minutes', 'We typically reply within minutes')}</p>
+          <p className="text-sm font-semibold">{t('messages.widget.support_title', 'RentalHub Support')}</p>
+          <p className="text-[10px] text-indigo-200">{t('messages.widget.reply_minutes', 'We typically reply within minutes')}</p>
         </div>
       </div>
-      <button onClick={handleClose} className="text-white/80 hover:text-white p-1" aria-label={t('widget.close', 'Close')}><FaTimes /></button>
+      <button onClick={handleClose} className="text-white/80 hover:text-white p-1" aria-label={t('messages.widget.close', 'Close')}><FaTimes /></button>
     </div>
   );
 
@@ -757,14 +757,14 @@ const FloatingContactWidget = () => {
               className="relative bg-white rounded-xl shadow-xl p-3 max-w-[220px]"
             >
               <div className="absolute -bottom-1.5 right-5 w-3 h-3 bg-white rotate-45" />
-              <p className="text-sm text-gray-700 font-medium">{t('widget.need_help', 'Need help? Chat with us!')}</p>
+              <p className="text-sm text-gray-700 font-medium">{t('messages.widget.need_help', 'Need help? Chat with us!')}</p>
             </motion.div>
           )}
         </AnimatePresence>
         <button
           onClick={() => { setOpen((p) => !p); setShowGreeting(false); }}
           className={`tour-support-widget flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-110 hover:shadow-xl active:scale-95 ${!open ? 'animate-bounce' : ''}`}
-          aria-label={t('widget.contact_support', 'Contact support')}
+          aria-label={t('messages.widget.contact_support', 'Contact support')}
         >
           {unreadCount > 0 && !open && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{unreadCount}</span>
@@ -779,7 +779,7 @@ const FloatingContactWidget = () => {
             ref={widgetRef}
             role="dialog"
             aria-modal="true"
-            aria-label={t('widget.support_title', 'RentalHub Support')}
+            aria-label={t('messages.widget.support_title', 'RentalHub Support')}
             initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
@@ -792,7 +792,7 @@ const FloatingContactWidget = () => {
           {isAuthenticated && !connected && (
             <div className="flex items-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-700">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
-              {t('widget.reconnecting', 'Reconnecting...')}
+              {t('messages.widget.reconnecting', 'Reconnecting...')}
             </div>
           )}
 
@@ -800,26 +800,26 @@ const FloatingContactWidget = () => {
             {/* ─── FORM VIEW (anonymous/fallback) ─── */}
             {view === 'form' && !isAuthenticated && (
               <form onSubmit={handleSubmit} className="space-y-3">
-                <p className="text-xs text-slate-500 dark:text-gray-400">{t('widget.fill_form', "Fill this form and we'll get back to you via email.")}</p>
+                <p className="text-xs text-slate-500 dark:text-gray-400">{t('messages.widget.fill_form', "Fill this form and we'll get back to you via email.")}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.name', 'Name')} *</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('messages.widget.name', 'Name')} *</label>
                     <input type="text" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
                       className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
-                      placeholder={t('widget.your_name', 'Your name')} />
+                      placeholder={t('messages.widget.your_name', 'Your name')} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.email', 'Email')} *</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('messages.widget.email', 'Email')} *</label>
                     <input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                       className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
                       placeholder="you@example.com" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.state', 'State')} *</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('messages.widget.state', 'State')} *</label>
                   <select value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value, lga: '' }))}
                     className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                    <option value="">{t('widget.select_state', 'Select state')}</option>
+                    <option value="">{t('messages.widget.select_state', 'Select state')}</option>
                     {states.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
@@ -828,41 +828,41 @@ const FloatingContactWidget = () => {
                     <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">LGA</label>
                     <select value={form.lga} onChange={(e) => setForm((p) => ({ ...p, lga: e.target.value }))}
                       className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                      <option value="">{t('widget.select_lga', 'Select LGA')}</option>
+                      <option value="">{t('messages.widget.select_lga', 'Select LGA')}</option>
                       {lgas.map((l) => <option key={l} value={l}>{l}</option>)}
                     </select>
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.subject', 'Subject')}</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('messages.widget.subject', 'Subject')}</label>
                   <input type="text" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
                     className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500"
-                    placeholder={t('widget.how_can_we_help', 'How can we help?')} />
+                    placeholder={t('messages.widget.how_can_we_help', 'How can we help?')} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.priority', 'Priority')}</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('messages.widget.priority', 'Priority')}</label>
                   <select value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
                     className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                    <option value="medium">{t('widget.medium', 'Medium')}</option>
-                    <option value="low">{t('widget.low', 'Low')}</option>
-                    <option value="high">{t('widget.high', 'High')}</option>
-                    <option value="urgent">{t('widget.urgent', 'Urgent')}</option>
+                    <option value="medium">{t('messages.widget.medium', 'Medium')}</option>
+                    <option value="low">{t('messages.widget.low', 'Low')}</option>
+                    <option value="high">{t('messages.widget.high', 'High')}</option>
+                    <option value="urgent">{t('messages.widget.urgent', 'Urgent')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.message', 'Message')} *</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('messages.widget.message', 'Message')} *</label>
                   <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
                     className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none"
-                    placeholder={t('widget.tell_us_more', 'Tell us more...')} />
+                    placeholder={t('messages.widget.tell_us_more', 'Tell us more...')} />
                 </div>
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 <button type="submit" disabled={sending}
                   className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 transition">
-                  {sending ? t('widget.sending', 'Sending...') : <><FaPaperPlane className="w-3.5 h-3.5" /> {t('widget.send_message', 'Send message')}</>}
+                  {sending ? t('messages.widget.sending', 'Sending...') : <><FaPaperPlane className="w-3.5 h-3.5" /> {t('messages.widget.send_message', 'Send message')}</>}
                 </button>
                 <button type="button" onClick={() => { setView('check-status'); setLookupEmail(localStorage.getItem(LS_EMAIL) || ''); }}
                   className="w-full text-center text-xs text-indigo-600 hover:underline">
-                  {t('widget.check_status', 'Already contacted us? Check your ticket status')}
+                  {t('messages.widget.check_status', 'Already contacted us? Check your ticket status')}
                 </button>
               </form>
             )}
@@ -870,23 +870,23 @@ const FloatingContactWidget = () => {
             {/* ─── FORM VIEW (authenticated, no tickets) ─── */}
             {view === 'form' && isAuthenticated && (
               <div className="py-2 text-left">
-                <p className="text-sm text-slate-600 dark:text-gray-300 mb-3 font-medium">{t('widget.start_conversation', 'Start a new conversation')}</p>
+                <p className="text-sm text-slate-600 dark:text-gray-300 mb-3 font-medium">{t('messages.widget.start_conversation', 'Start a new conversation')}</p>
                 <div className="space-y-3">
                   <div className="flex gap-2">
                     <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
-                      <span className="text-slate-400 dark:text-gray-400">{t('widget.name', 'Name')}</span>
+                      <span className="text-slate-400 dark:text-gray-400">{t('messages.widget.name', 'Name')}</span>
                       <p className="text-slate-800 font-medium truncate">{user?.full_name || form.name}</p>
                     </div>
                     <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
-                      <span className="text-slate-400 dark:text-gray-400">{t('widget.email', 'Email')}</span>
+                      <span className="text-slate-400 dark:text-gray-400">{t('messages.widget.email', 'Email')}</span>
                       <p className="text-slate-800 truncate">{user?.email || form.email}</p>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.state', 'State')} *</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('messages.widget.state', 'State')} *</label>
                     <select value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value, lga: '' }))}
                       className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                      <option value="">{t('widget.select_state', 'Select state')}</option>
+                      <option value="">{t('messages.widget.select_state', 'Select state')}</option>
                       {states.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
@@ -895,31 +895,31 @@ const FloatingContactWidget = () => {
                       <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">LGA</label>
                       <select value={form.lga} onChange={(e) => setForm((p) => ({ ...p, lga: e.target.value }))}
                         className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                        <option value="">{t('widget.select_lga', 'Select LGA')}</option>
+                        <option value="">{t('messages.widget.select_lga', 'Select LGA')}</option>
                         {lgas.map((l) => <option key={l} value={l}>{l}</option>)}
                       </select>
                     </div>
                   )}
                   <input type="text" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
-                    placeholder={t('widget.subject_optional', 'Subject (optional)')}
+                    placeholder={t('messages.widget.subject_optional', 'Subject (optional)')}
                     className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                   <textarea value={form.message} onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))} rows={3}
-                    placeholder={t('widget.how_can_we_help', 'How can we help you?')}
+                    placeholder={t('messages.widget.how_can_we_help', 'How can we help you?')}
                     className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none" />
                   <div className="pt-1">
-                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('widget.priority', 'Priority')}</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-gray-300 mb-1">{t('messages.widget.priority', 'Priority')}</label>
                     <select value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
                       className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                      <option value="medium">{t('widget.medium', 'Medium')}</option>
-                      <option value="low">{t('widget.low', 'Low')}</option>
-                      <option value="high">{t('widget.high', 'High')}</option>
-                      <option value="urgent">{t('widget.urgent', 'Urgent')}</option>
+                      <option value="medium">{t('messages.widget.medium', 'Medium')}</option>
+                      <option value="low">{t('messages.widget.low', 'Low')}</option>
+                      <option value="high">{t('messages.widget.high', 'High')}</option>
+                      <option value="urgent">{t('messages.widget.urgent', 'Urgent')}</option>
                     </select>
                   </div>
                   {error && <p className="text-xs text-red-600">{error}</p>}
                   <button onClick={async () => {
-                    if (!form.state) { setError(t('widget.select_state_error', 'Please select your state.')); return; }
-                    if (!form.message.trim()) { setError(t('widget.write_message_error', 'Please write a message.')); return; }
+                    if (!form.state) { setError(t('messages.widget.select_state_error', 'Please select your state.')); return; }
+                    if (!form.message.trim()) { setError(t('messages.widget.write_message_error', 'Please write a message.')); return; }
                     setSending(true); setError('');
                     try {
                       const payload = {
@@ -932,11 +932,11 @@ const FloatingContactWidget = () => {
                       const res = await api.post('/support/tickets', payload);
                       localStorage.setItem(LS_TICKET_ID, String(res.data?.data?.id || ''));
                       openTicketChat(res.data?.data);
-                    } catch (err) { setError(err.response?.data?.message || t('widget.create_failed', 'Failed to create ticket')); }
+                    } catch (err) { setError(err.response?.data?.message || t('messages.widget.create_failed', 'Failed to create ticket')); }
                     finally { setSending(false); }
                   }} disabled={sending}
                     className="flex items-center justify-center gap-2 w-full bg-indigo-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
-                    {sending ? t('widget.creating', 'Creating...') : <><FaPaperPlane className="w-3.5 h-3.5" /> {t('widget.start_conversation_btn', 'Start conversation')}</>}
+                    {sending ? t('messages.widget.creating', 'Creating...') : <><FaPaperPlane className="w-3.5 h-3.5" /> {t('messages.widget.start_conversation_btn', 'Start conversation')}</>}
                   </button>
                 </div>
               </div>
@@ -946,14 +946,14 @@ const FloatingContactWidget = () => {
             {view === 'success' && (
               <div className="flex flex-col items-center py-4 text-center">
                 <FaCheckCircle className="text-green-500 text-4xl mb-3" />
-                <p className="font-semibold text-slate-900 dark:text-gray-100">{t('widget.message_sent', 'Message sent!')}</p>
-                <p className="text-sm text-slate-600 dark:text-gray-300 mt-1">{t('widget.will_reply', "We'll get back to you shortly.")}</p>
+                <p className="font-semibold text-slate-900 dark:text-gray-100">{t('messages.widget.message_sent', 'Message sent!')}</p>
+                <p className="text-sm text-slate-600 dark:text-gray-300 mt-1">{t('messages.widget.will_reply', "We'll get back to you shortly.")}</p>
                 {localStorage.getItem(LS_TICKET_ID) && (
-                  <p className="mt-2 text-xs text-slate-400 dark:text-gray-400">{t('widget.ticket', 'Ticket')} #<span className="font-mono">{localStorage.getItem(LS_TICKET_ID)}</span></p>
+                  <p className="mt-2 text-xs text-slate-400 dark:text-gray-400">{t('messages.widget.ticket', 'Ticket')} #<span className="font-mono">{localStorage.getItem(LS_TICKET_ID)}</span></p>
                 )}
-                <button onClick={handleClose} className="mt-4 text-sm text-indigo-600 hover:underline">{t('widget.close_btn', 'Close')}</button>
+                <button onClick={handleClose} className="mt-4 text-sm text-indigo-600 hover:underline">{t('messages.widget.close_btn', 'Close')}</button>
                 {sentConfirm && (
-                  <p className="mt-2 text-xs text-green-600 flex items-center gap-1"><FaCheck size={10} /> {t('widget.sent', 'Sent!')}</p>
+                  <p className="mt-2 text-xs text-green-600 flex items-center gap-1"><FaCheck size={10} /> {t('messages.widget.sent', 'Sent!')}</p>
                 )}
               </div>
             )}
@@ -961,15 +961,15 @@ const FloatingContactWidget = () => {
             {/* ─── TICKET LIST (authenticated) ─── */}
             {view === 'tickets' && isAuthenticated && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider">{t('widget.your_tickets', 'Your Tickets')}</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider">{t('messages.widget.your_tickets', 'Your Tickets')}</p>
                 {loadingTickets ? (
                   <div className="space-y-2 py-2">
                     {[1,2,3].map((i) => <div key={i} className="h-16 rounded-xl bg-slate-100 dark:bg-gray-700 animate-pulse" />)}
                   </div>
                 ) : tickets.length === 0 ? (
                   <div className="text-center py-4">
-                    <p className="text-sm text-slate-500 dark:text-gray-400 mb-3">{t('widget.no_tickets', 'No tickets yet.')}</p>
-                    <button onClick={() => setView('form')} className="text-sm text-indigo-600 hover:underline">{t('widget.start_new', 'Start a new conversation')}</button>
+                    <p className="text-sm text-slate-500 dark:text-gray-400 mb-3">{t('messages.widget.no_tickets', 'No tickets yet.')}</p>
+                    <button onClick={() => setView('form')} className="text-sm text-indigo-600 hover:underline">{t('messages.widget.start_new', 'Start a new conversation')}</button>
                   </div>
                 ) : (
                   tickets.map((ticket) => (
@@ -984,7 +984,7 @@ const FloatingContactWidget = () => {
                       </div>
                       <p className="mt-1 text-[11px] text-slate-400 dark:text-gray-400">#{ticket.id} &middot; {new Date(ticket.created_at).toLocaleDateString()}</p>
                       {ticket.unread_admin_replies > 0 && (
-                        <span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{ticket.unread_admin_replies} {t('widget.new', 'new')}</span>
+                        <span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{ticket.unread_admin_replies} {t('messages.widget.new', 'new')}</span>
                       )}
                     </button>
                   ))
@@ -1002,14 +1002,14 @@ const FloatingContactWidget = () => {
                   </div>
                 ) : (
                   <>
-                    {conversation.length === 0 && <p className="text-sm text-slate-400 dark:text-gray-400 text-center py-4">{t('widget.no_messages', 'No messages yet.')}</p>}
+                    {conversation.length === 0 && <p className="text-sm text-slate-400 dark:text-gray-400 text-center py-4">{t('messages.widget.no_messages', 'No messages yet.')}</p>}
                     {conversation.map((reply) => (
                       <ChatBubble key={reply.id} msg={reply} isOwn={!reply.is_admin} onRetry={retrySend} />
                     ))}
                     {typingUser && (
                       <div className="flex justify-start">
                         <div className="rounded-2xl bg-slate-100 dark:bg-gray-700 px-4 py-2.5 text-sm text-slate-400 dark:text-gray-400 italic">
-                          {typingUser.userName} {t('widget.is_typing', 'is typing...')}
+                          {typingUser.userName} {t('messages.widget.is_typing', 'is typing...')}
                         </div>
                       </div>
                     )}
@@ -1021,18 +1021,18 @@ const FloatingContactWidget = () => {
             {/* ─── CHECK STATUS (anonymous) ─── */}
             {view === 'check-status' && (
               <div className="space-y-3">
-                <p className="text-xs text-slate-500 dark:text-gray-400">{t('widget.enter_email', 'Enter the email you used to contact us.')}</p>
+                <p className="text-xs text-slate-500 dark:text-gray-400">{t('messages.widget.enter_email', 'Enter the email you used to contact us.')}</p>
                 <input type="email" value={lookupEmail} onChange={(e) => setLookupEmail(e.target.value)}
                   placeholder="your@email.com"
                   className="w-full rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                 <button onClick={handleLookup} disabled={lookupLoading}
                   className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
-                  {lookupLoading ? t('widget.searching', 'Searching...') : t('widget.lookup', 'Check Tickets Status')}
+                  {lookupLoading ? t('messages.widget.searching', 'Searching...') : t('messages.widget.lookup', 'Check Tickets Status')}
                 </button>
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 {lookupTickets.length > 0 && (
                   <div className="space-y-2 mt-3">
-                    <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase">{t('widget.your_tickets', 'Your tickets')}</p>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase">{t('messages.widget.your_tickets', 'Your tickets')}</p>
                     {lookupTickets.map((ticket) => (
                       <div key={ticket.id}>
                         <button onClick={() => viewContactConversation(ticket)}
@@ -1047,7 +1047,7 @@ const FloatingContactWidget = () => {
                         </button>
                         {viewingContactTicket?.id === ticket.id && (
                           <div className="mt-2 space-y-2 pl-2 border-l-2 border-indigo-300">
-                            {contactConv.length === 0 ? <p className="text-xs text-slate-400 dark:text-gray-400">{t('widget.no_replies', 'No replies yet.')}</p> : (
+                            {contactConv.length === 0 ? <p className="text-xs text-slate-400 dark:text-gray-400">{t('messages.widget.no_replies', 'No replies yet.')}</p> : (
                               contactConv.map((r) => (
                                 <div key={r.id} className={`rounded-xl px-3 py-2 text-sm ${r._failed ? 'bg-red-50 border border-red-200' : r.is_admin ? 'bg-indigo-50 border border-indigo-200' : 'bg-slate-50'}`}>
                                   <div className="flex items-center justify-between gap-2">
@@ -1080,13 +1080,13 @@ const FloatingContactWidget = () => {
                             {adminViewingName && (
                               <p className="text-[10px] text-green-600 italic flex items-center gap-1">
                                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
-                                {adminViewingName} {t('widget.is_viewing', 'is viewing this conversation')}
+                                {adminViewingName} {t('messages.widget.is_viewing', 'is viewing this conversation')}
                               </p>
                             )}
                             {adminTypingName && (
                               <p className="text-[10px] text-indigo-600 italic flex items-center gap-1">
                                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                                {adminTypingName} {t('widget.is_typing', 'is typing...')}
+                                {adminTypingName} {t('messages.widget.is_typing', 'is typing...')}
                               </p>
                             )}
                             {/* Reply input for anonymous contact */}
@@ -1094,9 +1094,9 @@ const FloatingContactWidget = () => {
                               {contactRecorder.isRecording && (
                                 <div className="mb-1 flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs text-red-600">
                                   <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                                  {t('widget.recording', 'Recording...')} {contactRecorder.formatDuration(contactRecorder.duration)}
+                                  {t('messages.widget.recording', 'Recording...')} {contactRecorder.formatDuration(contactRecorder.duration)}
                                   <button onClick={contactRecorder.stop} className="ml-auto flex items-center gap-1 rounded bg-red-500 px-1.5 py-0.5 text-white hover:bg-red-600">
-                                    <FaStopCircle size={8} /> {t('widget.stop', 'Stop')}
+                                    <FaStopCircle size={8} /> {t('messages.widget.stop', 'Stop')}
                                   </button>
                                 </div>
                               )}
@@ -1117,7 +1117,7 @@ const FloatingContactWidget = () => {
                                   }} />
                                 </label>
                                 <textarea value={contactReplyText} onChange={(e) => { setContactReplyText(e.target.value); if (!guestTypingThrottleRef.current) { guestTypingThrottleRef.current = setTimeout(() => { guestTypingThrottleRef.current = null; }, 2000); guestSocketRef.current?.emit('ticket:typing'); } }}
-                                  placeholder={t('widget.type_reply', 'Type a reply...')} rows={1}
+                                  placeholder={t('messages.widget.type_reply', 'Type a reply...')} rows={1}
                                   className="flex-1 resize-none rounded border border-slate-300 dark:border-gray-600 px-2 py-2 text-xs outline-none focus:border-indigo-400"
                                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleContactReply(); } }} />
                                 {contactRecorder.isRecording ? (
@@ -1131,7 +1131,7 @@ const FloatingContactWidget = () => {
                                     catch (err) { setError(err.message); }
                                   }}
                                     className="flex h-[36px] w-[36px] items-center justify-center rounded border border-slate-300 dark:border-gray-600 text-slate-400 dark:text-gray-400 hover:bg-slate-50 shrink-0"
-                                    title={t('widget.record_voice', 'Record voice message')}>
+                                    title={t('messages.widget.record_voice', 'Record voice message')}>
                                     <FaMicrophone size={10} />
                                   </button>
                                 )}
@@ -1148,9 +1148,9 @@ const FloatingContactWidget = () => {
                   </div>
                 )}
                 {lookupTickets.length === 0 && !lookupLoading && lookupEmail.trim() && !error && (
-                  <p className="text-xs text-slate-400 dark:text-gray-400 text-center">{t('widget.no_tickets_email', 'No tickets found for this email.')}</p>
+                  <p className="text-xs text-slate-400 dark:text-gray-400 text-center">{t('messages.widget.no_tickets_email', 'No tickets found for this email.')}</p>
                 )}
-                <button onClick={() => setView('form')} className="w-full text-center text-xs text-indigo-600 hover:underline">{t('widget.start_new', 'Start a new conversation')}</button>
+                <button onClick={() => setView('form')} className="w-full text-center text-xs text-indigo-600 hover:underline">{t('messages.widget.start_new', 'Start a new conversation')}</button>
               </div>
             )}
           </div>
@@ -1161,9 +1161,9 @@ const FloatingContactWidget = () => {
               {authRecorder.isRecording && (
                 <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600">
                   <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                  {t('widget.recording', 'Recording...')} {authRecorder.formatDuration(authRecorder.duration)}
+                  {t('messages.widget.recording', 'Recording...')} {authRecorder.formatDuration(authRecorder.duration)}
                   <button onClick={authRecorder.stop} className="ml-auto flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-white hover:bg-red-600">
-                    <FaStopCircle size={10} /> {t('widget.stop', 'Stop')}
+                    <FaStopCircle size={10} /> {t('messages.widget.stop', 'Stop')}
                   </button>
                 </div>
               )}
@@ -1187,7 +1187,7 @@ const FloatingContactWidget = () => {
                   <div className="flex-1" />
                 ) : (
                   <textarea value={replyText} onChange={(e) => { setReplyText(e.target.value); emitTyping(); }}
-                    placeholder={t('widget.type_message', 'Type your message...')} rows={1}
+                    placeholder={t('messages.widget.type_message', 'Type your message...')} rows={1}
                     className="flex-1 resize-none rounded-lg border border-slate-300 dark:border-gray-600 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }} />
                 )}
@@ -1202,7 +1202,7 @@ const FloatingContactWidget = () => {
                     catch (err) { setError(err.message); }
                   }}
                     className="flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-slate-300 dark:border-gray-600 text-slate-500 dark:text-gray-400 hover:bg-slate-50 shrink-0"
-                    title={t('widget.record_voice', 'Record voice message')}>
+                    title={t('messages.widget.record_voice', 'Record voice message')}>
                     <FaMicrophone size={12} />
                   </button>
                 )}

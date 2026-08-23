@@ -162,6 +162,7 @@
   .ad-marquee-item {
     flex: 0 0 auto;
     width: min(82vw, 560px);
+    max-width: 100%;
   }
 
   @keyframes adMarqueeScroll {
@@ -189,6 +190,8 @@
 
     .ad-marquee-item {
       flex-shrink: 0;
+      width: min(74vw, 560px);
+      max-width: 100%;
     }
   }
 

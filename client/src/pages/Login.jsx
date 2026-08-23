@@ -215,16 +215,16 @@ const Login = () => {
 
         {/* TITLE */}
         <h1 className="text-4xl font-bold">
-          Welcome Back
+          {t('login.welcome_back')}
         </h1>
 
         {/* DESCRIPTION */}
         <p className="text-lg text-white/80 max-w-md">
-          Sign in to manage your properties, tenants, and legal activities securely.
+          {t('login.left_panel_desc')}
         </p>
 
         <p className="text-sm text-white/60">
-          Trusted by landlords, tenants, and legal professionals.
+          {t('login.trusted')}
         </p>
       </div>
     </div>

@@ -234,7 +234,7 @@ const AdSpace = ({
             <div
               className={`shrink-0 overflow-hidden bg-gray-100 ${
                 isMarquee
-                  ? 'w-24 h-14 sm:w-36 sm:h-16 md:w-52 md:h-20'
+                  ? 'w-20 h-12 sm:w-28 sm:h-14 md:w-52 md:h-20'
                   : hasMultipleAds
                     ? 'h-40'
                     : 'h-40 md:h-auto md:w-56 lg:w-72'
@@ -248,14 +248,14 @@ const AdSpace = ({
               />
             </div>
           ) : ad.media_type === 'video' && failedMedia[ad.id] ? (
-            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-24 h-14 sm:w-36 sm:h-16 md:w-52 md:h-20' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
+            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-20 h-12 sm:w-28 sm:h-14 md:w-52 md:h-20' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
               <MediaErrorFallback type="video" title={ad.title} />
             </div>
           ) : ad.image_url && !failedMedia[ad.id] ? (
             <div
               className={`shrink-0 overflow-hidden bg-gray-100 ${
                 isMarquee
-                  ? 'w-24 h-14 sm:w-36 sm:h-16 md:w-52 md:h-20'
+                  ? 'w-20 h-12 sm:w-28 sm:h-14 md:w-52 md:h-20'
                   : hasMultipleAds
                     ? 'h-40'
                     : 'h-40 md:h-auto md:w-56 lg:w-72'
@@ -270,12 +270,12 @@ const AdSpace = ({
               />
             </div>
           ) : ad.image_url && failedMedia[ad.id] ? (
-            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-24 h-14 sm:w-36 sm:h-16 md:w-52 md:h-20' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
+            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-20 h-12 sm:w-28 sm:h-14 md:w-52 md:h-20' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
               <MediaErrorFallback type="image" title={ad.title} />
             </div>
           ) : null}
 
-          <div className={`flex flex-1 flex-col justify-center gap-3 ${isMarquee ? 'min-h-[112px] p-4 md:p-5' : 'min-h-[140px] p-5 md:p-6'}`}>
+          <div className={`flex flex-1 flex-col justify-center gap-3 ${isMarquee ? 'min-h-[96px] p-3 sm:p-4 md:p-5' : 'min-h-[140px] p-5 md:p-6'}`}>
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide opacity-75">
               <span>{t('ads.sponsored')}</span>
               {ad.sponsor_name && (
@@ -287,18 +287,18 @@ const AdSpace = ({
             </div>
 
             <div>
-              <h2 className="text-lg font-bold leading-snug md:text-xl">
+              <h2 className={`${isMarquee ? 'text-base sm:text-lg ' : 'text-lg '}font-bold leading-snug md:text-xl`}>
                 {ad.title}
               </h2>
               {ad.description && (
-                <div className="mt-1 max-w-3xl text-sm leading-relaxed opacity-80 md:text-base whitespace-pre-line">
+                <div className={`mt-1 max-w-3xl ${isMarquee ? 'text-xs sm:text-sm ' : 'text-sm '}leading-relaxed opacity-80 md:text-base whitespace-pre-line`}>
                   {ad.description}
                 </div>
               )}
             </div>
 
             {hasTarget && (
-              <span className="inline-flex w-fit items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-300 group-hover:bg-primary-700">
+              <span className={`inline-flex w-fit items-center rounded-lg bg-primary-600 ${isMarquee ? 'px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm ' : 'px-4 py-2 text-sm '}font-semibold text-white transition-colors duration-300 group-hover:bg-primary-700`}>
                 {ctaLabel}
               </span>
             )}

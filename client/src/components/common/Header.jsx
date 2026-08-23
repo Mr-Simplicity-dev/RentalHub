@@ -701,7 +701,7 @@ return (
           <img
             src="/rentalhub-mark.svg"
             alt="RentalHub NG"
-            className="h-10 w-10 shrink-0 rounded-xl object-contain shadow-sm transition-transform duration-300 group-hover:scale-105 md:h-12 md:w-12"
+            className="h-9 shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 md:h-12 lg:h-14"
           />
 
           {/* FIXED */}
