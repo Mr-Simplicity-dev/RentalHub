@@ -3759,9 +3759,15 @@ exports.getCurrentUser = async (req, res) => {
 
     const user = result.rows[0];
 
-    // Decrypt NIN before returning
+    // Decrypt NIN before returning — then mask it. The full national ID must
+    // never leave the server; the client only needs it for display/revalidation.
     if (user.nin) {
-      user.nin = decryptNIN(user.nin);
+      const { maskCredentialValue } = require('../config/utils/credentialRevalidation');
+      user.nin = maskCredentialValue(decryptNIN(user.nin));
+    }
+    if (user.international_passport_number) {
+      const { maskCredentialValue } = require('../config/utils/credentialRevalidation');
+      user.international_passport_number = maskCredentialValue(user.international_passport_number);
     }
 
     res.json({

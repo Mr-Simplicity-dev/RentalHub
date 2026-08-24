@@ -490,6 +490,16 @@ class TransportationController {
               message: 'Payment verification failed: ' + verifyResponse.data.data.status
             });
           }
+
+          // Amount cross-check: Paystack returns kobo, booking total is naira
+          const paidAmountKobo = Number(verifyResponse.data.data.amount);
+          const expectedKobo = Math.round(Number(booking.total_price) * 100);
+          if (!Number.isFinite(paidAmountKobo) || paidAmountKobo !== expectedKobo) {
+            return res.status(400).json({
+              success: false,
+              message: 'Paid amount does not match the booking amount'
+            });
+          }
         } catch (verifyError) {
           req.logger.error('Paystack verification error:', verifyError.response?.data || verifyError.message);
           return res.status(502).json({

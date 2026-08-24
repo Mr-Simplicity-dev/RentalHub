@@ -490,11 +490,7 @@ class FumigationCleaningController {
         number_of_rooms,
         property_condition,
         special_instructions,
-        selected_addons,
-        base_service_price,
-        addons_total_price,
-        discount_amount,
-        total_price
+        selected_addons
       } = req.body;
 
       // Validate booking date and time
@@ -520,6 +516,22 @@ class FumigationCleaningController {
         });
       }
 
+      // Prices are ALWAYS computed server-side. Client-supplied price fields are
+      // ignored to prevent under-pricing/amount tampering.
+      let priceCalculation;
+      try {
+        priceCalculation = await FumigationCleaningService.calculateServicePrice(
+          service_id,
+          property_size_sqm,
+          selected_addons || []
+        );
+      } catch (priceError) {
+        return res.status(400).json({
+          success: false,
+          message: priceError.message || 'Invalid service or add-on selection',
+        });
+      }
+
       const bookingData = {
         tenant_id: tenantId,
         property_id,
@@ -532,10 +544,10 @@ class FumigationCleaningController {
         property_condition: property_condition || 'normal',
         special_instructions,
         selected_addons,
-        base_service_price,
-        addons_total_price,
-        discount_amount: discount_amount || 0,
-        total_price
+        base_service_price: priceCalculation.base_price,
+        addons_total_price: priceCalculation.addons_total,
+        discount_amount: 0,
+        total_price: priceCalculation.total_price
       };
 
       const booking = await FumigationCleaningService.createBooking(bookingData);
@@ -823,13 +835,37 @@ class FumigationCleaningController {
         });
       }
       
-      // Get payment record
-      const paymentRecord = await FumigationCleaningService.getPaymentByReference(reference);
+      // Get payment record — MUST belong to the authenticated tenant
+      const paymentRecord = await FumigationCleaningService.getPaymentByReference(reference, req.user.id);
       
       if (!paymentRecord) {
         return res.status(404).json({
           success: false,
           message: 'Payment record not found'
+        });
+      }
+
+      // Amount cross-check: the amount verified at Paystack must match the
+      // server-computed booking total.
+      const verifiedAmount = Number(verificationResult.data.amount);
+      if (
+        !Number.isFinite(verifiedAmount) ||
+        Math.round(Number(paymentRecord.amount) * 100) !== Math.round(verifiedAmount * 100)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Paid amount does not match the booking amount'
+        });
+      }
+
+      if (paymentRecord.payment_status === 'completed') {
+        return res.json({
+          success: true,
+          data: {
+            payment: paymentRecord,
+            booking_id: paymentRecord.booking_id
+          },
+          message: 'Payment already verified'
         });
       }
       

@@ -6,11 +6,25 @@ const PRICING_TARGETS = {
     key: 'tenant_registration',
     label: 'Tenant Registration',
     base_amount: 3000,
+    currency: 'NGN',
   },
   landlord_registration: {
     key: 'landlord_registration',
     label: 'Landlord Registration',
     base_amount: 5000,
+    currency: 'NGN',
+  },
+  tenant_registration_diaspora: {
+    key: 'tenant_registration_diaspora',
+    label: 'Diaspora Tenant Registration',
+    base_amount: 12.85,
+    currency: 'USD',
+  },
+  landlord_registration_diaspora: {
+    key: 'landlord_registration_diaspora',
+    label: 'Diaspora Landlord Registration',
+    base_amount: 12.85,
+    currency: 'USD',
   },
   property_alert_request: {
     key: 'property_alert_request',
@@ -69,13 +83,16 @@ const ensureLocationPricingSchema = async () => {
           'landlord_monthly_subscription',
           'tenant_multiple_property_subscription',
           'landlord_annual_listing_renewal_fee',
-          'landlord_monthly_maintenance_fee'
+          'landlord_monthly_maintenance_fee',
+          'tenant_registration_diaspora',
+          'landlord_registration_diaspora'
         )
       ),
       state_id INTEGER NOT NULL REFERENCES states(id) ON DELETE CASCADE,
       lga_name VARCHAR(120),
       location_key VARCHAR(160) NOT NULL DEFAULT '',
       amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
+      currency VARCHAR(3) NOT NULL DEFAULT 'NGN',
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -94,6 +111,9 @@ const ensureLocationPricingSchema = async () => {
       ON location_pricing_rules(applies_to, state_id, location_key, is_active);
 
     ALTER TABLE location_pricing_rules
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'NGN';
+
+    ALTER TABLE location_pricing_rules
       DROP CONSTRAINT IF EXISTS location_pricing_rules_applies_to_check;
 
     ALTER TABLE location_pricing_rules
@@ -108,7 +128,9 @@ const ensureLocationPricingSchema = async () => {
           'landlord_monthly_subscription',
           'tenant_multiple_property_subscription',
           'landlord_annual_listing_renewal_fee',
-          'landlord_monthly_maintenance_fee'
+          'landlord_monthly_maintenance_fee',
+          'tenant_registration_diaspora',
+          'landlord_registration_diaspora'
         )
       );
   `);
@@ -156,6 +178,7 @@ const getLocationPricingQuote = async ({
   await ensureLocationPricingSchema();
 
   const baseAmount = getBaseAmountForTarget(appliesTo);
+  const quoteCurrency = PRICING_TARGETS[appliesTo]?.currency || 'NGN';
   const hasState = Number.isFinite(Number.parseInt(stateId, 10));
   const hasLga = Boolean(String(lgaName || '').trim());
 
@@ -176,7 +199,7 @@ const getLocationPricingQuote = async ({
   if (resolvedLocation?.location_key) {
     const lgaRuleResult = await db.query(
       `SELECT r.id, r.applies_to, r.state_id, s.state_name, r.lga_name,
-              r.location_key, r.amount, r.is_active, r.created_at, r.updated_at
+              r.location_key, r.amount, r.currency, r.is_active, r.created_at, r.updated_at
        FROM location_pricing_rules r
        JOIN states s ON s.id = r.state_id
        WHERE r.applies_to = $1
@@ -192,6 +215,7 @@ const getLocationPricingQuote = async ({
         applies_to: appliesTo,
         base_amount: baseAmount,
         amount: Number(lgaRuleResult.rows[0].amount),
+        currency: lgaRuleResult.rows[0].currency || quoteCurrency,
         rule_scope: 'lga',
         location_complete: hasState && hasLga,
         matched_rule: mapPricingRuleRow(lgaRuleResult.rows[0]),
@@ -202,7 +226,7 @@ const getLocationPricingQuote = async ({
   if (resolvedLocation?.state_id) {
     const stateRuleResult = await db.query(
       `SELECT r.id, r.applies_to, r.state_id, s.state_name, r.lga_name,
-              r.location_key, r.amount, r.is_active, r.created_at, r.updated_at
+              r.location_key, r.amount, r.currency, r.is_active, r.created_at, r.updated_at
        FROM location_pricing_rules r
        JOIN states s ON s.id = r.state_id
        WHERE r.applies_to = $1
@@ -218,6 +242,7 @@ const getLocationPricingQuote = async ({
         applies_to: appliesTo,
         base_amount: baseAmount,
         amount: Number(stateRuleResult.rows[0].amount),
+        currency: stateRuleResult.rows[0].currency || quoteCurrency,
         rule_scope: 'state',
         location_complete: hasState && hasLga,
         matched_rule: mapPricingRuleRow(stateRuleResult.rows[0]),
@@ -229,6 +254,7 @@ const getLocationPricingQuote = async ({
     applies_to: appliesTo,
     base_amount: baseAmount,
     amount: baseAmount,
+    currency: quoteCurrency,
     rule_scope: 'base',
     location_complete: hasState && hasLga,
     matched_rule: null,
@@ -240,7 +266,7 @@ const listLocationPricingRules = async () => {
 
   const result = await db.query(
     `SELECT r.id, r.applies_to, r.state_id, s.state_name, r.lga_name,
-            r.location_key, r.amount, r.is_active, r.created_at, r.updated_at
+            r.location_key, r.amount, r.currency, r.is_active, r.created_at, r.updated_at
      FROM location_pricing_rules r
      JOIN states s ON s.id = r.state_id
      ORDER BY r.applies_to ASC, s.state_name ASC, r.location_key ASC, r.created_at DESC`
@@ -254,12 +280,15 @@ const createLocationPricingRule = async ({
   stateId,
   lgaName = null,
   amount,
+  currency = null,
   isActive = true,
 }) => {
   await ensureLocationPricingSchema();
   getBaseAmountForTarget(appliesTo);
 
   const parsedAmount = parseAmount(amount);
+  const ruleCurrency =
+    currency || PRICING_TARGETS[appliesTo]?.currency || 'NGN';
   const resolvedLocation = await resolveLocationSelection({
     stateId,
     lgaName,
@@ -273,16 +302,18 @@ const createLocationPricingRule = async ({
        lga_name,
        location_key,
        amount,
+       currency,
        is_active
      )
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, applies_to, state_id, lga_name, location_key, amount, is_active, created_at, updated_at`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, applies_to, state_id, lga_name, location_key, amount, currency, is_active, created_at, updated_at`,
     [
       appliesTo,
       resolvedLocation.state_id,
       resolvedLocation.lga_name,
       resolvedLocation.location_key,
       parsedAmount,
+      ruleCurrency,
       isActive === true,
     ]
   );
@@ -296,12 +327,14 @@ const createLocationPricingRule = async ({
 
 const updateLocationPricingRule = async (
   ruleId,
-  { appliesTo, stateId, lgaName = null, amount, isActive }
+  { appliesTo, stateId, lgaName = null, amount, currency = null, isActive }
 ) => {
   await ensureLocationPricingSchema();
   getBaseAmountForTarget(appliesTo);
 
   const parsedAmount = parseAmount(amount);
+  const ruleCurrency =
+    currency || PRICING_TARGETS[appliesTo]?.currency || 'NGN';
   const resolvedLocation = await resolveLocationSelection({
     stateId,
     lgaName,
@@ -315,10 +348,11 @@ const updateLocationPricingRule = async (
          lga_name = $4,
          location_key = $5,
          amount = $6,
-         is_active = $7,
+         currency = $7,
+         is_active = $8,
          updated_at = NOW()
      WHERE id = $1
-     RETURNING id, applies_to, state_id, lga_name, location_key, amount, is_active, created_at, updated_at`,
+     RETURNING id, applies_to, state_id, lga_name, location_key, amount, currency, is_active, created_at, updated_at`,
     [
       ruleId,
       appliesTo,
@@ -326,6 +360,7 @@ const updateLocationPricingRule = async (
       resolvedLocation.lga_name,
       resolvedLocation.location_key,
       parsedAmount,
+      ruleCurrency,
       isActive === true,
     ]
   );

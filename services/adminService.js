@@ -1878,13 +1878,72 @@ exports.assignAgentToLandlord = async (req, res) => {
       });
     }
 
+    // Enforce jurisdiction scope for state/LGA admins — same rules as getUserById.
+    const { assignedState, assignedCity } = await getRequesterScope(req.user);
+
+    if (STATE_ADMIN_ROLES.has(req.user?.user_type) && !assignedState) {
+      return res.status(403).json({ success: false, message: 'State admin account is missing assigned_state' });
+    }
+
+    if (isLgaAdminRole(req.user?.user_type) && (!assignedState || !assignedCity)) {
+      return res.status(403).json({ success: false, message: 'Admin account is missing assigned state or local government' });
+    }
+
+    const landlordParams = [id];
+    let landlordScopeClause = '';
+
+    if (assignedState) {
+      const stateIdx = landlordParams.length + 1;
+      landlordParams.push(assignedState);
+      landlordScopeClause += `
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM properties sp
+             JOIN states sp_st ON sp_st.id = sp.state_id
+             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+               AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications sa
+             JOIN properties sp ON sp.id = sa.property_id
+             JOIN states sp_st ON sp_st.id = sp.state_id
+             WHERE sa.tenant_id = users.id
+               AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
+           )
+         )`;
+    }
+
+    if (assignedCity) {
+      const cityIdx = landlordParams.length + 1;
+      landlordParams.push(assignedCity);
+      landlordScopeClause += `
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM properties sp
+             WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+               AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM applications sa
+             JOIN properties sp ON sp.id = sa.property_id
+             WHERE sa.tenant_id = users.id
+               AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+           )
+         )`;
+    }
+
     const landlordResult = await db.query(
       `SELECT id, full_name, email, phone, user_type
        FROM users
        WHERE id = $1
          AND deleted_at IS NULL
+         ${landlordScopeClause}
        LIMIT 1`,
-      [id]
+      landlordParams
     );
 
     if (!landlordResult.rows.length) {

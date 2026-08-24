@@ -50,6 +50,21 @@ const DEFAULT_FEATURE_FLAGS = [
     description: 'Require and allow passport collection for foreign registrations.',
   },
   {
+    key: 'diaspora_registration',
+    enabled: false,
+    description: 'Allow foreign (diaspora) registrations with international passport verification and USD pricing.',
+  },
+  {
+    key: 'diaspora_registration_payment',
+    enabled: false,
+    description: 'Require a USD-quoted registration payment before diaspora account creation.',
+  },
+  {
+    key: 'diaspora_require_foreign_card',
+    enabled: false,
+    description: 'Reject diaspora registration payments funded by Nigerian-issued cards (default: review flag only).',
+  },
+  {
     key: 'tenant_registration_payment',
     enabled: false,
     description: 'Require ₦3,000 payment before tenant account creation.',

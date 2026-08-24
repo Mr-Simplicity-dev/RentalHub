@@ -588,7 +588,14 @@ class FumigationCleaningService {
   }
 
   // Get payment by reference
-  static async getPaymentByReference(paymentReference) {
+  static async getPaymentByReference(paymentReference, tenantId = null) {
+    const params = [paymentReference];
+    let tenantClause = '';
+    if (tenantId) {
+      params.push(tenantId);
+      tenantClause = ' AND fcb.tenant_id = $2';
+    }
+
     const result = await db.query(
       `SELECT 
         fp.*,
@@ -597,8 +604,8 @@ class FumigationCleaningService {
         fcb.total_price
        FROM fumigation_payments fp
        JOIN fumigation_cleaning_bookings fcb ON fp.booking_id = fcb.id
-       WHERE fp.payment_reference = $1`,
-      [paymentReference]
+       WHERE fp.payment_reference = $1${tenantClause}`,
+      params
     );
     
     return result.rows[0];

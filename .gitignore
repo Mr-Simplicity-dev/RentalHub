@@ -85,3 +85,8 @@ tmp/
 temp/
 build_output.txt
 build_output2.txt
+
+# One-off diagnostic scripts (keep them out of git — they have held real credentials before)
+check_*.js
+run_*_migration.js
+run_migration.js

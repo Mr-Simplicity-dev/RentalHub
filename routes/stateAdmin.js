@@ -151,7 +151,13 @@ router.get('/managed-users',
       
       let query = `
         SELECT 
-          u.*,
+          u.id, u.full_name, u.email, u.phone, u.user_type,
+          u.is_active, u.created_at, u.updated_at,
+          u.assigned_state, u.assigned_city, u.assigned_zone,
+          u.preferred_state_id, u.preferred_lga_name,
+          u.identity_verified, u.nin_verified,
+          u.subscription_active, u.subscription_expires_at,
+          u.approval_status,
           COUNT(p.id) as total_transactions,
           SUM(CASE WHEN p.payment_status = 'completed' THEN p.amount ELSE 0 END) as total_spent
         FROM users u

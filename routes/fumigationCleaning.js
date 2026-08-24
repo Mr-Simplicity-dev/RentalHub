@@ -100,10 +100,10 @@ router.post('/bookings',
     body('property_condition').optional().isIn(['normal', 'dirty', 'very_dirty', 'infested']),
     body('special_instructions').optional().isString(),
     body('selected_addons').optional().isArray(),
-    body('base_service_price').isFloat({ min: 0 }).withMessage('Base service price is required'),
-    body('addons_total_price').isFloat({ min: 0 }).withMessage('Addons total price is required'),
+    body('base_service_price').optional().isFloat({ min: 0 }).withMessage('Base service price must be a positive number'),
+    body('addons_total_price').optional().isFloat({ min: 0 }).withMessage('Addons total price must be a positive number'),
     body('discount_amount').optional().isFloat({ min: 0 }),
-    body('total_price').isFloat({ min: 0 }).withMessage('Total price is required')
+    body('total_price').optional().isFloat({ min: 0 }).withMessage('Total price must be a positive number')
   ],
   fumigationCleaningController.createBooking
 );

@@ -1352,10 +1352,10 @@ exports.verifySubscription = async (req, res) => {
       });
     }
 
-    // Get payment record
+    // Get payment record — MUST belong to the authenticated user
     const paymentResult = await db.query(
-      "SELECT * FROM payments WHERE transaction_reference = $1",
-      [reference]
+      "SELECT * FROM payments WHERE transaction_reference = $1 AND user_id = $2",
+      [reference, userId]
     );
 
     if (paymentResult.rows.length === 0) {
@@ -1367,19 +1367,44 @@ exports.verifySubscription = async (req, res) => {
 
     const payment = paymentResult.rows[0];
 
+    if (!['tenant_subscription', 'landlord_subscription', 'tenant_multiple_property_subscription'].includes(payment.payment_type)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid subscription payment reference"
+      });
+    }
+
+    // Amount cross-check: Paystack returns kobo, payment.amount is NGN
+    if (Math.round(Number(payment.amount) * 100) !== transaction.amount) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount does not match the recorded amount"
+      });
+    }
+
+    if (payment.payment_status === 'completed') {
+      return res.json({
+        success: true,
+        message: "Subscription already active",
+        data: {
+          amount_paid: transaction.amount / 100
+        }
+      });
+    }
+
     // Update payment status
     await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = CURRENT_TIMESTAMP,
            gateway_response = $1
-       WHERE id = $2`,
+       WHERE id = $2 AND payment_status = 'pending'`,
       [JSON.stringify(transaction), payment.id]
     );
 
     // Update user subscription
     const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + payment.subscription_duration_days);
+    expiryDate.setDate(expiryDate.getDate() + (payment.subscription_duration_days || 30));
 
     await db.query(
       `UPDATE users 
@@ -2802,8 +2827,8 @@ exports.verifyListingPayment = async (req, res) => {
     }
 
     const paymentResult = await db.query(
-      "SELECT * FROM payments WHERE transaction_reference = $1",
-      [reference]
+      "SELECT * FROM payments WHERE transaction_reference = $1 AND user_id = $2",
+      [reference, userId]
     );
 
     if (paymentResult.rows.length === 0) {
@@ -2816,13 +2841,39 @@ exports.verifyListingPayment = async (req, res) => {
     const payment = paymentResult.rows[0];
     const metadata = transaction.metadata;
 
+    if (payment.payment_type !== 'landlord_listing') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid listing payment reference"
+      });
+    }
+
+    // Amount cross-check: Paystack returns kobo, payment.amount is NGN
+    if (Math.round(Number(payment.amount) * 100) !== transaction.amount) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount does not match the recorded amount"
+      });
+    }
+
+    if (payment.payment_status === 'completed') {
+      return res.json({
+        success: true,
+        message: "Listing payment already verified",
+        data: {
+          property_id: payment.property_id,
+          amount_paid: transaction.amount / 100
+        }
+      });
+    }
+
     // Update payment status
     await db.query(
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = CURRENT_TIMESTAMP,
            gateway_response = $1
-       WHERE id = $2`,
+       WHERE id = $2 AND payment_status = 'pending'`,
       [JSON.stringify(transaction), payment.id]
     );
 
@@ -2889,9 +2940,17 @@ exports.initializeRentPayment = async (req, res) => {
     const userId = req.user.id;
     const { property_id, amount, payment_method } = req.body;
 
+    const MIN_RENT_PAYMENT_NGN = 1000;
+    if (!Number.isFinite(Number(amount)) || Number(amount) < MIN_RENT_PAYMENT_NGN) {
+      return res.status(400).json({
+        success: false,
+        message: `Minimum rent payment amount is ₦${MIN_RENT_PAYMENT_NGN}`,
+      });
+    }
+
     // Validate property
     const propertyResult = await db.query(
-      `SELECT p.id, p.landlord_id, p.title,
+      `SELECT p.id, p.landlord_id, p.title, p.rent_amount, p.payment_frequency,
               u.email AS landlord_email, 
               u.full_name AS landlord_name
        FROM properties p
@@ -2908,6 +2967,23 @@ exports.initializeRentPayment = async (req, res) => {
     }
 
     const property = propertyResult.rows[0];
+
+    // Reject amounts that are unreasonably below the listed rent for the period.
+    // rent_amount is stored per payment_frequency (monthly or yearly).
+    const listedRent = Number(property.rent_amount);
+    if (Number.isFinite(listedRent) && listedRent > 0) {
+      const monthlyEquivalent =
+        String(property.payment_frequency || '').toLowerCase() === 'yearly'
+          ? listedRent / 12
+          : listedRent;
+      const MIN_PAYMENT_RATIO = 0.5;
+      if (Number(amount) < monthlyEquivalent * MIN_PAYMENT_RATIO) {
+        return res.status(400).json({
+          success: false,
+          message: 'Amount is significantly below the listed rent for this property',
+        });
+      }
+    }
 
     // Get tenant info
     const userResult = await db.query(
@@ -3060,8 +3136,8 @@ exports.verifyRentPayment = async (req, res) => {
     }
 
     const paymentResult = await db.query(
-      "SELECT * FROM payments WHERE transaction_reference = $1",
-      [reference]
+      "SELECT * FROM payments WHERE transaction_reference = $1 AND user_id = $2",
+      [reference, userId]
     );
 
     if (paymentResult.rows.length === 0) {
@@ -3073,6 +3149,21 @@ exports.verifyRentPayment = async (req, res) => {
 
     const payment = paymentResult.rows[0];
 
+    if (payment.payment_type !== 'rent_payment') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid rent payment reference"
+      });
+    }
+
+    // Amount cross-check: Paystack returns kobo, payment.amount is NGN
+    if (Math.round(Number(payment.amount) * 100) !== transaction.amount) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount does not match the recorded amount"
+      });
+    }
+
     const wasAlreadyCompleted = payment.payment_status === 'completed';
 
     await db.query(
@@ -3080,14 +3171,16 @@ exports.verifyRentPayment = async (req, res) => {
        SET payment_status = 'completed',
            completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
            gateway_response = $1
-       WHERE id = $2`,
+       WHERE id = $2 AND payment_status = 'pending'`,
       [JSON.stringify(transaction), payment.id]
     );
 
-    await creditLandlordRentPayment({
-      paymentId: payment.id,
-      reference,
-    });
+    if (!wasAlreadyCompleted) {
+      await creditLandlordRentPayment({
+        paymentId: payment.id,
+        reference,
+      });
+    }
 
     if (!wasAlreadyCompleted) {
       // Calculate commission for rent payment

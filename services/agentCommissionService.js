@@ -15,6 +15,23 @@ class AgentCommissionService {
     } = options;
 
     try {
+      // Commissions may only be recorded for an agent actively assigned to the
+      // landlord — prevents inflating arbitrary agents' earnings summaries.
+      const assignment = await db.query(
+        `SELECT id
+         FROM landlord_agents
+         WHERE landlord_user_id = $1
+           AND agent_user_id = $2
+           AND status = 'active'
+           AND revoked_at IS NULL
+         LIMIT 1`,
+        [landlordUserId, agentUserId]
+      );
+
+      if (assignment.rows.length === 0) {
+        throw new Error('Agent is not actively assigned to this landlord');
+      }
+
       const result = await db.query(
         `INSERT INTO agent_commission_ledger 
          (agent_user_id, landlord_user_id, transaction_type, related_entity_type, 

@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const { body, param } = require('express-validator');
 const router = express.Router();
 const { authenticate } = require('../config/middleware/auth');
@@ -53,6 +53,26 @@ const requireTransportationAdminAccess = (req, res, next) => {
     return res.status(403).json({
       success: false,
       message: 'Transportation admin access only',
+    });
+  }
+
+  return next();
+};
+
+// Super-level guard for /super-admin/* endpoints. LGA/state-level roles must
+// never manage global state-admin jurisdictions or oversight.
+const requireTransportationSuperAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Unauthorized',
+    });
+  }
+
+  if (!GLOBAL_TRANSPORTATION_ADMIN_ROLES.has(req.user.user_type)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Transportation super admin access required.',
     });
   }
 
@@ -1436,7 +1456,7 @@ router.get('/analytics', async (req, res) => {
         LIMIT 30
       `, params),
 
-      // FIX: Revenue trends — proper WHERE clause (not bare AND)
+      // FIX: Revenue trends â€” proper WHERE clause (not bare AND)
       db.query(`
         SELECT 
           DATE(tb.created_at) as date,
@@ -1451,7 +1471,7 @@ router.get('/analytics', async (req, res) => {
         LIMIT 30
       `, params),
 
-      // FIX: Service performance — use explicit JOIN date filter instead of fragile string replace
+      // FIX: Service performance â€” use explicit JOIN date filter instead of fragile string replace
       db.query(`
         SELECT 
           ts.service_name,
@@ -1472,7 +1492,7 @@ router.get('/analytics', async (req, res) => {
         ORDER BY booking_count DESC
       `, params),
 
-      // FIX: Property analytics — use explicit JOIN date filter
+      // FIX: Property analytics â€” use explicit JOIN date filter
       db.query(`
         SELECT 
           p.id,
@@ -1493,7 +1513,7 @@ router.get('/analytics', async (req, res) => {
         LIMIT 20
       `, params),
 
-      // FIX: Tenant analytics — use explicit JOIN date filter
+      // FIX: Tenant analytics â€” use explicit JOIN date filter
       db.query(`
         SELECT 
           u.id,
@@ -2882,7 +2902,7 @@ router.get('/state-admin/bookings', async (req, res) => {
 
 /**
  * Get super admin transportation oversight dashboard
- * FIX: Completed the truncated route — added missing stats, closing brackets, and response.
+ * FIX: Completed the truncated route â€” added missing stats, closing brackets, and response.
  */
 router.get('/super-admin/dashboard', async (req, res) => {
   try {
@@ -3026,7 +3046,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
    * Get all state admin transportation jurisdictions
    */
   
-  router.get('/super-admin/state-admins', async (req, res) => {
+router.get('/super-admin/state-admins', requireTransportationSuperAdmin, async (req, res) => {
     try {
       const { 
         page = 1, 
@@ -3131,7 +3151,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
   /**
    * Assign or update state admin transportation jurisdiction
    */
-  router.post('/super-admin/state-admins/assign', async (req, res) => {
+router.post('/super-admin/state-admins/assign', requireTransportationSuperAdmin, async (req, res) => {
     try {
       const superAdminId = req.user.id;
       const { 
@@ -3244,7 +3264,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
   /**
    * Remove state admin transportation jurisdiction
    */
-  router.delete('/super-admin/state-admins/:jurisdictionId', async (req, res) => {
+  router.delete('/super-admin/state-admins/:jurisdictionId', requireTransportationSuperAdmin, async (req, res) => {
     try {
       const superAdminId = req.user.id;
       const { jurisdictionId } = req.params;
@@ -3293,7 +3313,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
   /**
    * Get super admin transportation oversight configuration
    */
-  router.get('/super-admin/oversight', async (req, res) => {
+router.get('/super-admin/oversight', requireTransportationSuperAdmin, async (req, res) => {
     try {
       const superAdminId = req.user.id;
       
@@ -3322,7 +3342,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
   /**
    * Update super admin transportation oversight
    */
-  router.patch('/super-admin/oversight/:oversightId', async (req, res) => {
+  router.patch('/super-admin/oversight/:oversightId', requireTransportationSuperAdmin, async (req, res) => {
     try {
       const superAdminId = req.user.id;
       const { oversightId } = req.params;
@@ -3407,7 +3427,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
   /**
    * Get system-wide transportation alerts
    */
-  router.get('/super-admin/alerts', async (req, res) => {
+router.get('/super-admin/alerts', requireTransportationSuperAdmin, async (req, res) => {
     try {
       const { 
         page = 1, 
@@ -3534,7 +3554,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
   /**
    * Get transportation system performance metrics
    */
-  router.get('/super-admin/performance-metrics', async (req, res) => {
+router.get('/super-admin/performance-metrics', requireTransportationSuperAdmin, async (req, res) => {
     try {
       const { 
         metric_type, 
@@ -3604,7 +3624,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
   /**
    * Get transportation system health report
    */
-  router.get('/super-admin/system-health', async (req, res) => {
+router.get('/super-admin/system-health', requireTransportationSuperAdmin, async (req, res) => {
     try {
       const rawDays = req.query.days;
       const days = rawDays && /^\d+$/.test(rawDays) ? parseInt(rawDays, 10) : 30;
@@ -3680,7 +3700,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
    /**
    * Generate transportation system report
    */
-  router.post('/super-admin/generate-report', async (req, res) => {
+router.post('/super-admin/generate-report', requireTransportationSuperAdmin, async (req, res) => {
     try {
       const superAdminId = req.user.id;
       const { 
