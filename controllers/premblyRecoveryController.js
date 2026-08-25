@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const db = require('../config/middleware/database');
 const {
   normalizePremblyResponse,
   verifyPremblyWebhookSignature,
@@ -66,7 +67,35 @@ exports.getRegistrationAttempt = async (req, res) => {
   }
 
   try {
-    const attempt = await getRegistrationAttemptStatus(attemptId);
+    // Only return the attempt if it belongs to the requesting user's own
+    // identity (matched via the stored subject hash of NIN/passport).
+    const crypto = require('crypto');
+    const { decryptNIN } = require('../config/utils/ninEncryption');
+    const userResult = await db.query(
+      `SELECT nin, international_passport_number
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [req.user.id]
+    );
+    const user = userResult.rows[0];
+
+    const identityValues = [];
+    if (user?.nin) {
+      try {
+        const decrypted = decryptNIN(user.nin);
+        if (decrypted) identityValues.push(decrypted);
+      } catch { /* ignore malformed stored NIN */ }
+    }
+    if (user?.international_passport_number) {
+      identityValues.push(user.international_passport_number);
+    }
+
+    const subjectHashes = identityValues.map((value) =>
+      crypto.createHash('sha256').update(String(value).trim().toUpperCase()).digest('hex')
+    );
+
+    const attempt = await getRegistrationAttemptStatus(attemptId, subjectHashes);
     if (!attempt) {
       return res.status(404).json({ success: false, message: 'Verification attempt not found' });
     }

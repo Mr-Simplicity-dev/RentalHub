@@ -4,6 +4,9 @@ const db = require('../config/middleware/database');
 const { validationResult } = require("express-validator");
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { getLocationPricingQuote } = require('../config/utils/locationPricing');
+
+// Per-user quota for paid account-name lookups (see verifyBankAccount)
+const accountLookupQuota = new Map();
 const {
   LAWYER_DIRECTORY_UNLOCK_PRICE_NGN,
   ensureLawyerDirectoryUnlockSchema,
@@ -4147,6 +4150,24 @@ exports.verifyBankAccount = async (req, res) => {
         errors: errors.array() 
       });
     }
+
+    // Per-user quota — prevents using this endpoint as an account-name
+    // enumeration oracle (each call also costs a paid Paystack API request).
+    const ACCOUNT_LOOKUP_LIMIT = 30;
+    const ACCOUNT_LOOKUP_WINDOW_MS = 60 * 60 * 1000;
+    const now = Date.now();
+    const quotaKey = req.user.id;
+    const quota = (accountLookupQuota.get(quotaKey) || { count: 0, resetAt: 0 });
+    if (quota.resetAt <= now) {
+      accountLookupQuota.set(quotaKey, { count: 0, resetAt: now + ACCOUNT_LOOKUP_WINDOW_MS });
+    } else if (quota.count >= ACCOUNT_LOOKUP_LIMIT) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many account verification attempts. Please try again later.',
+      });
+    }
+    quota.count += 1;
+    accountLookupQuota.set(quotaKey, quota);
 
     const { bank_code, bank_name, account_number } = req.body;
     

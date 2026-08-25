@@ -520,6 +520,17 @@ const touchGuestAccessToken = async (ticketId) => {
   );
 };
 
+const GUEST_TOKEN_LIFETIME_DAYS = 30;
+
+const isGuestTokenWithinLifetime = (ticket, now = new Date()) => {
+  const createdAt = ticket?.guest_access_token_created_at;
+  if (!createdAt) return false;
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return false;
+  const ageMs = now.getTime() - created.getTime();
+  return ageMs >= 0 && ageMs <= GUEST_TOKEN_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
+};
+
 const getGuestTicketForRequest = async (ticketId, req) => {
   const result = await db.query(
     `SELECT *
@@ -535,6 +546,7 @@ const getGuestTicketForRequest = async (ticketId, req) => {
   const tokenAuthorized = Boolean(
     !ticket.guest_access_token_revoked_at
       && ticket.guest_access_token_hash
+      && isGuestTokenWithinLifetime(ticket)
       && verifyGuestAccessToken(accessToken, ticket.guest_access_token_hash)
   );
   const legacyAuthorized = canUseLegacyGuestEmailAccess(

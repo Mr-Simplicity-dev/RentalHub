@@ -501,14 +501,22 @@ const executeRegistrationVerificationWithRecovery = async ({
   return attemptToResult(updated);
 };
 
-const getRegistrationAttemptStatus = async (attemptId) => {
+const getRegistrationAttemptStatus = async (attemptId, subjectHashes = []) => {
+  const params = [attemptId];
+  let ownershipClause = '';
+
+  if (subjectHashes.length > 0) {
+    params.push(subjectHashes);
+    ownershipClause = ' AND subject_hash = ANY($2)';
+  }
+
   const result = await db.query(
     `SELECT id, status, provider_message, response_code, verification_status,
             billing_status, updated_at
      FROM prembly_verification_attempts
-     WHERE id = $1 AND context_type = 'registration'
+     WHERE id = $1 AND context_type = 'registration'${ownershipClause}
      LIMIT 1`,
-    [attemptId]
+    params
   );
   return result.rows[0] ? attemptToResult(result.rows[0]) : null;
 };

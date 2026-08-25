@@ -226,6 +226,7 @@ router.post('/banks/refresh',
 // Verify bank account for withdrawals
 router.post('/verify-account',
   authenticate,
+  isVerified,
   criticalFinanceOpsLimiter,
   [
     body('bank_code').optional({ checkFalsy: true }).trim().isLength({ min: 2 }).withMessage('Bank code is invalid'),

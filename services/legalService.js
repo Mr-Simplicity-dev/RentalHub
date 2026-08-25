@@ -639,6 +639,7 @@ exports.resolveDispute = async (req, res) => {
 exports.getLegalAuditLogs = async (req, res) => {
   try {
     const { disputeId = null, limit = 50 } = req.query;
+    const isLawyerRole = ['lawyer', 'state_lawyer', 'super_lawyer'].includes(req.user?.user_type);
     const params = [];
     const where = [];
 
@@ -650,6 +651,29 @@ exports.getLegalAuditLogs = async (req, res) => {
         l.target_type = 'dispute'
         OR l.action ILIKE '%lawyer%'
         OR l.action ILIKE '%legal%'
+      )`);
+    }
+
+    if (isLawyerRole) {
+      // Lawyers may only see audit entries for disputes they are authorized to
+      // access (active legal_authorizations), plus their own audit actions.
+      const lawyerIdx = params.length + 1;
+      params.push(req.user.id);
+      where.push(`(
+        (
+          l.target_type = 'dispute'
+          AND EXISTS (
+            SELECT 1
+            FROM legal_authorizations la
+            JOIN disputes d2
+              ON (d2.property_id = la.property_id
+                  OR la.client_user_id IN (d2.opened_by, d2.against_user))
+            WHERE la.lawyer_user_id = $${lawyerIdx}
+              AND la.status = 'active'
+              AND l.target_id = d2.id
+          )
+        )
+        OR l.actor_id = $${lawyerIdx}
       )`);
     }
 

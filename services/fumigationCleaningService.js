@@ -1638,9 +1638,33 @@ class FumigationCleaningController {
         });
       }
 
+      const provider = result.rows[0];
+
+      // Tenants only see contact details for providers assigned to one of
+      // their OWN bookings — no PII for arbitrary providers.
+      const isAdminRole = FUMIGATION_ADMIN_ROLES.has(req.user?.user_type);
+      if (!isAdminRole) {
+        const assignment = await db.query(
+          `SELECT bpa.id
+           FROM booking_provider_assignments bpa
+           JOIN fumigation_cleaning_bookings fcb ON fcb.id = bpa.booking_id
+           WHERE bpa.provider_id = $1
+             AND fcb.tenant_id = $2
+           LIMIT 1`,
+          [providerId, req.user.id]
+        );
+
+        if (assignment.rows.length === 0) {
+          delete provider.contact_phone;
+          delete provider.contact_email;
+          delete provider.license_number;
+          delete provider.certifications;
+        }
+      }
+
       res.json({
         success: true,
-        data: result.rows[0],
+        data: provider,
         message: 'Provider retrieved successfully'
       });
     } catch (error) {

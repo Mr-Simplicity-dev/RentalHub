@@ -44,6 +44,9 @@ export const clearAuthSession = () => {
 
   if (session) {
     session.removeItem(USER_KEY);
+    // Never leave a stored original admin session behind on logout.
+    session.removeItem(IMPERSONATION_ORIGINAL_TOKEN_KEY);
+    session.removeItem(IMPERSONATION_ORIGINAL_USER_KEY);
   }
 
   // Backward compatibility cleanup for old global auth storage.
@@ -68,6 +71,24 @@ export const getAuthToken = () => {
   return null;
 };
 
+const KNOWN_USER_TYPES = new Set([
+  'landlord', 'tenant', 'admin', 'super_admin', 'lawyer', 'state_lawyer', 'super_lawyer',
+  'state_admin', 'state_financial_admin', 'state_support_admin', 'lga_admin',
+  'lga_support_admin', 'super_financial_admin', 'super_support_admin',
+  'zonal_admin', 'transportation_admin', 'lga_transportation_admin',
+  'state_transportation_admin', 'super_transportation_admin',
+  'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin',
+  'super_fumigation_admin', 'financial_admin', 'support_admin', 'recruitment_admin',
+]);
+
+const isValidStoredUser = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (!value.id && !Number.isInteger(Number(value.id))) return false;
+  if (typeof value.email !== 'string' || !value.email.includes('@')) return false;
+  if (!KNOWN_USER_TYPES.has(value.user_type)) return false;
+  return true;
+};
+
 export const getAuthUser = () => {
   const session = getSessionStorage();
   const local = getLocalStorage();
@@ -75,7 +96,8 @@ export const getAuthUser = () => {
   const sessionUser = session?.getItem(USER_KEY);
   if (sessionUser) {
     try {
-      return JSON.parse(sessionUser);
+      const parsed = JSON.parse(sessionUser);
+      return isValidStoredUser(parsed) ? parsed : null;
     } catch {
       return null;
     }
@@ -90,7 +112,8 @@ export const getAuthUser = () => {
   if (!legacyUser) return null;
 
   try {
-    return JSON.parse(legacyUser);
+    const parsed = JSON.parse(legacyUser);
+    return isValidStoredUser(parsed) ? parsed : null;
   } catch {
     return null;
   }

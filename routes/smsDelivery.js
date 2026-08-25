@@ -1,4 +1,6 @@
 const express = require('express');
+const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const { param } = require('express-validator');
 const { processSmsDeliveryStatus } = require('../config/utils/smsService');
 const validateRequest = require('../config/middleware/validateRequest');
@@ -6,6 +8,15 @@ const validateRequest = require('../config/middleware/validateRequest');
 const router = express.Router();
 
 const clean = (value) => String(value || '').trim();
+
+function timingSafeEqualStrings(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length || bufA.length === 0) {
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 function isWebhookAuthorized(req) {
   const webhookSecret = clean(process.env.SMS_WEBHOOK_SECRET);
@@ -19,8 +30,18 @@ function isWebhookAuthorized(req) {
     req.query?.token,
     req.body?.token,
     req.body?.secret,
-  ].some((value) => clean(value) === webhookSecret);
+  ].some((value) => timingSafeEqualStrings(clean(value), webhookSecret));
 }
+
+// Dedicated limiter so the secret cannot be brute-forced and the SMS fallback
+// cannot be spammed via this webhook (the global /api limiter is far too loose).
+const smsWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many SMS webhook requests. Please slow down.' },
+});
 
 async function handleStatusCallback(req, res) {
   try {
@@ -47,7 +68,7 @@ async function handleStatusCallback(req, res) {
   }
 }
 
-router.post('/status/:provider', [param('provider').isString().trim().isLength({ min: 1 })], validateRequest, handleStatusCallback);
-router.get('/status/:provider', [param('provider').isString().trim().isLength({ min: 1 })], validateRequest, handleStatusCallback);
+router.post('/status/:provider', smsWebhookLimiter, [param('provider').isString().trim().isLength({ min: 1 })], validateRequest, handleStatusCallback);
+router.get('/status/:provider', smsWebhookLimiter, [param('provider').isString().trim().isLength({ min: 1 })], validateRequest, handleStatusCallback);
 
 module.exports = router;
