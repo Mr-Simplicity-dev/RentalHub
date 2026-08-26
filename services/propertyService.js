@@ -1109,7 +1109,7 @@ exports.getPropertyUsers = async (req, res) => {
 
     const participants = propertyData.participants || [];
     const participantIds = new Set(participants.map((item) => Number(item.id)));
-    const isPrivileged = ['admin', 'super_admin'].includes(requesterType);
+    const isPrivileged = ['super_admin'].includes(requesterType);
 
     if (!isPrivileged && !participantIds.has(Number(requesterId))) {
       return res.status(403).json({
@@ -2099,6 +2099,46 @@ exports.saveDamageReport = async (req, res) => {
 exports.getDamageReports = async (req, res) => {
   try {
     const { propertyId } = req.params;
+    const userId = req.user.id;
+    const userRole = String(req.user.user_type || '').toLowerCase();
+
+    // Ownership gate: only the property landlord, an authorized agent, or an
+    // admin tier may read damage reports. Without this, any authenticated
+    // user can enumerate property IDs and read every landlord's reports.
+    if (userRole !== 'admin' && userRole !== 'lga_admin' && userRole !== 'super_admin') {
+      const propertyResult = await db.query(
+        `SELECT landlord_id FROM properties WHERE id = $1`,
+        [propertyId]
+      );
+
+      if (propertyResult.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Property not found' });
+      }
+
+      const landlordId = propertyResult.rows[0].landlord_id;
+      let authorized = landlordId === userId;
+
+      if (!authorized && userRole === 'agent') {
+        const assignment = await db.query(
+          `SELECT 1
+           FROM landlord_agents
+           WHERE landlord_user_id = $1
+             AND agent_user_id = $2
+             AND status = 'active'
+             AND can_manage_damage_reports = TRUE
+           LIMIT 1`,
+          [landlordId, userId]
+        );
+        authorized = assignment.rows.length > 0;
+      }
+
+      if (!authorized) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to access these reports',
+        });
+      }
+    }
 
     const result = await db.query(
       `SELECT dr.*, u.full_name AS landlord_name

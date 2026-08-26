@@ -3,7 +3,9 @@ const db = require('../config/middleware/database');
 
 const canManageDamageReport = async (reportId, user) => {
   if (!user) return false;
-  if (user.user_type === 'admin' || user.user_type === 'super_admin') return true;
+  // Only super_admin bypasses ownership — legacy 'admin'/'lga_admin' accounts
+  // must not manage any landlord's damage reports platform-wide.
+  if (user.user_type === 'super_admin') return true;
 
   const reportResult = await db.query(
     `SELECT landlord_id
@@ -75,7 +77,7 @@ class DamageReportController {
       const { status, limit = 50, offset = 0 } = req.query;
 
       // Verify authorization: owner or admin
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
+      if (req.user.user_type !== 'super_admin') {
         // Verify property ownership
         const propertyResult = await db.query(
           `SELECT landlord_id FROM properties WHERE id = $1`,
@@ -264,8 +266,8 @@ class DamageReportController {
     try {
       const { propertyId } = req.params;
 
-      // Verify authorization: owner/admin/super-admin/authorized agent
-      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
+      // Verify authorization: owner/super-admin/authorized agent
+      if (req.user.user_type !== 'super_admin') {
         const propertyResult = await db.query(
           `SELECT landlord_id FROM properties WHERE id = $1`,
           [propertyId]
@@ -363,7 +365,7 @@ class DamageReportController {
            LIMIT $3 OFFSET $4`,
           [userId, status || '', parseInt(limit), parseInt(offset)]
         );
-      } else if (['admin', 'super_admin'].includes(userType)) {
+      } else if (['super_admin'].includes(userType)) {
         reports = await db.query(
           `SELECT
              r.*,

@@ -131,6 +131,32 @@ const lawyerOtpDelete = async (phone) => {
     lawyerOtpStore.delete(phone);
   }
 };
+
+// Per-phone OTP attempt counter — a 6-digit code keyed only by phone must not
+// be brute-forceable with distributed IPs within its 10-minute TTL.
+const MAX_LAWYER_OTP_ATTEMPTS = 5;
+const lawyerOtpAttemptStore = new Map();
+
+const lawyerOtpIncrementAttempts = async (phone) => {
+  if (redis) {
+    const key = `otp:lawyer:${phone}:attempts`;
+    const attempts = await redis.incr(key);
+    await redis.expire(key, 600);
+    return attempts;
+  }
+  const current = Number(lawyerOtpAttemptStore.get(phone) || 0);
+  const next = current + 1;
+  lawyerOtpAttemptStore.set(phone, next);
+  return next;
+};
+
+const lawyerOtpClearAttempts = async (phone) => {
+  if (redis) {
+    await redis.del(`otp:lawyer:${phone}:attempts`);
+  } else {
+    lawyerOtpAttemptStore.delete(phone);
+  }
+};
 let identitySchemaReady = false;
 let lawyerInviteSchemaReady = false;
 let tenantRegistrationPaymentSchemaReady = false;
@@ -2740,6 +2766,7 @@ exports.acceptLawyerInvite = async (req, res) => {
       lawyerUserId,
       expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
     });
+    await lawyerOtpClearAttempts(cleanPhone);
 
     return res.json({
       success: true,
@@ -2969,6 +2996,7 @@ exports.acceptPlatformLawyerInvite = async (req, res) => {
       lawyerUserId,
       expiresAt: Date.now() + 10 * 60 * 1000
     });
+    await lawyerOtpClearAttempts(cleanPhone);
 
     return res.json({
       success: true,
@@ -3232,11 +3260,24 @@ exports.verifyLawyerOtp = async (req, res) => {
     const storedStr = String(storedOTP.code);
     if (otpStr.length !== storedStr.length ||
         !crypto.timingSafeEqual(Buffer.from(otpStr), Buffer.from(storedStr))) {
+      // Hard-fail after a small number of wrong guesses: delete the OTP so
+      // the invitee must request a fresh code (which resets attempts).
+      const attempts = await lawyerOtpIncrementAttempts(cleanPhone);
+      if (attempts >= MAX_LAWYER_OTP_ATTEMPTS) {
+        await lawyerOtpDelete(cleanPhone);
+        await lawyerOtpClearAttempts(cleanPhone);
+        return res.status(429).json({
+          success: false,
+          message: 'Too many failed attempts. Please resubmit the form to receive a new OTP.'
+        });
+      }
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP. Please try again.'
       });
     }
+
+    await lawyerOtpClearAttempts(cleanPhone);
 
     // OTP correct — mark phone as verified
     await db.query(
@@ -3329,7 +3370,11 @@ exports.getLawyerInvites = async (req, res) => {
          lawyer.chamber_phone AS lawyer_chamber_phone,
          lawyer.passport_photo_url AS lawyer_passport_photo_url,
          lawyer.identity_document_type AS lawyer_identity_document_type,
-         lawyer.international_passport_number AS lawyer_passport_number,
+         CASE
+           WHEN lawyer.international_passport_number IS NULL OR lawyer.international_passport_number = '' THEN NULL
+           WHEN LENGTH(lawyer.international_passport_number) <= 4 THEN '****'
+           ELSE CONCAT('****', RIGHT(lawyer.international_passport_number, 4))
+         END AS lawyer_passport_number,
          lawyer.nationality AS lawyer_nationality,
          lawyer.nin_verified AS lawyer_nin_verified
        FROM lawyer_invites li
@@ -4153,9 +4198,10 @@ exports.refreshToken = async (req, res) => {
     const decoded = jwt.verify(sessionToken, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     const sessionIdentity = getSessionTokenIdentity(decoded);
 
-    // Fetch current token_version from DB
+    // Fetch current token_version from DB. Suspended (is_active = FALSE)
+    // accounts must never receive fresh session tokens.
     const userResult = await db.query(
-      `SELECT token_version FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      `SELECT token_version FROM users WHERE id = $1 AND deleted_at IS NULL AND is_active = TRUE`,
       [sessionIdentity.userId]
     );
     if (userResult.rows.length === 0) {

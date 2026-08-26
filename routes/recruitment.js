@@ -44,9 +44,11 @@ const referenceBodyValidation = body('reference_number')
   .matches(/^RH-APP-[A-Z0-9]+$/i)
   .withMessage('A valid application reference is required');
 
+// NOTE: no normalizeEmail() on applicant emails — stored emails are lowercased
+// verbatim, so transforming Gmail dot/+ addresses here would lock the
+// applicant out of their own application (email+reference must match exactly).
 const emailBodyValidation = body('applicant_email')
   .isEmail()
-  .normalizeEmail()
   .withMessage('A valid applicant email is required');
 
 const referenceQueryValidation = query('reference_number')
@@ -58,7 +60,6 @@ const referenceQueryValidation = query('reference_number')
 
 const emailQueryValidation = query('email')
   .isEmail()
-  .normalizeEmail()
   .withMessage('A valid applicant email is required');
 
 const challengeBodyValidation = body('challenge_token')
@@ -70,7 +71,10 @@ const challengeBodyValidation = body('challenge_token')
 
 const requireRecruitmentAdmin = (req, res, next) => {
   const role = String(req.user?.user_type || '').trim().toLowerCase();
-  if (role === 'recruitment_admin' || req.user?.is_recruitment_admin === true) {
+  // Aligned with isRecruitmentAdmin() in the service: super_admin, dedicated
+  // recruitment_admin, or any user with is_recruitment_admin=true. Legacy
+  // raw 'admin' accounts are NOT admission here — they map to lga_admin.
+  if (role === 'recruitment_admin' || role === 'super_admin' || req.user?.is_recruitment_admin === true) {
     return next();
   }
 
@@ -146,7 +150,7 @@ router.post('/apply',
   recruitmentApplyLimiter,
   requireTurnstile('rentalhub_careers'),
   [body('full_name').optional().isString().trim().isLength({ max: 255 }),
-   body('email').optional().isEmail().normalizeEmail(),
+   body('email').optional().isEmail(),
    body('phone').optional().isString().trim().isLength({ max: 20 }),
    body('state_id').optional().isInt(),
    body('lga_id').optional().isInt(),

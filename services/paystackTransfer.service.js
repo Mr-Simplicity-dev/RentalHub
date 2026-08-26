@@ -81,12 +81,20 @@ const isValidPaystackSignature = (rawBody, signature) => {
     return false;
   }
 
+  // Signature must be a 128-char lowercase hex SHA-512 digest before any
+  // comparison — guards against timing attacks on malformed signatures.
+  if (!/^[a-f0-9]{128}$/i.test(String(signature))) {
+    return false;
+  }
+
   const digest = crypto
     .createHmac('sha512', PAYSTACK_SECRET_KEY)
     .update(rawBody)
     .digest('hex');
 
-  return digest === signature;
+  const expected = Buffer.from(digest, 'hex');
+  const supplied = Buffer.from(String(signature).toLowerCase(), 'hex');
+  return expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
 };
 
 module.exports = {

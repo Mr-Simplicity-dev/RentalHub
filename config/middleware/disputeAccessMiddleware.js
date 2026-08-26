@@ -50,7 +50,7 @@ exports.canAccessDispute = async (req, res, next) => {
       [disputeId, userId]
     );
 
-    if (result.rows.length === 0 && req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
+    if (result.rows.length === 0 && req.user.user_type !== 'super_admin') {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to this dispute'

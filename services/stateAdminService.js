@@ -124,7 +124,10 @@ exports.getAllStateAdmins = async (req, res) => {
     
     let query = `
       SELECT 
-        u.*,
+        u.id, u.full_name, u.email, u.phone, u.user_type,
+        u.assigned_state, u.assigned_city, u.is_active, u.approval_status,
+        u.admin_commission_rate, u.admin_wallet_balance,
+        u.is_funds_frozen, u.created_at, u.updated_at,
         COUNT(DISTINCT ac.id) as total_commissions,
         SUM(CASE WHEN ac.status = 'pending' THEN ac.amount ELSE 0 END) as pending_commission,
         SUM(CASE WHEN ac.status = 'paid' THEN ac.amount ELSE 0 END) as paid_commission,

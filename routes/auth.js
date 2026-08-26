@@ -104,6 +104,7 @@ router.post(
 
 router.post(
   '/register/payment/complete/:reference',
+  registrationLimiter,
   authController.completeRegistrationAfterPayment
 );
 
@@ -117,6 +118,7 @@ router.post(
 
 router.post(
   '/register/tenant-payment/complete/:reference',
+  registrationLimiter,
   authController.completeRegistrationAfterPayment
 );
 

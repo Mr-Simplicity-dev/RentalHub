@@ -468,6 +468,110 @@ const getRequesterScope = async (user) => {
   return { assignedState, assignedCity: null };
 };
 
+// Builds the jurisdiction-scoped SQL clauses + params for a properties-table
+// query. Mirrors approveProperty/rejectProperty so no admin tier can act on
+// properties outside its assigned state / LGA.
+const buildPropertyScopeClause = async (user) => {
+  const { assignedState, assignedCity } = await getRequesterScope(user);
+
+  if (STATE_ADMIN_ROLES.has(user?.user_type) && !assignedState) {
+    const err = new Error('State admin account is missing assigned_state');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (isLgaAdminRole(user?.user_type) && (!assignedState || !assignedCity)) {
+    const err = new Error('Admin account is missing assigned state or local government');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const params = [];
+  const clauses = [];
+
+  if (assignedState) {
+    clauses.push(`AND state_id IN (
+      SELECT id FROM states WHERE LOWER(TRIM(state_name)) = LOWER(TRIM($${params.length + 1}))
+    )`);
+    params.push(assignedState);
+  }
+
+  if (assignedCity) {
+    clauses.push(`AND LOWER(TRIM(COALESCE(lga_name, ''))) = LOWER(TRIM($${params.length + 1}))`);
+    params.push(assignedCity);
+  }
+
+  return { clause: clauses.join(' '), params };
+};
+
+// Builds the jurisdiction-scoped SQL clauses + params for a users-table
+// query: the target user must own a property or application inside the
+// requester's assigned state / LGA.
+const buildUserScopeClause = async (user) => {
+  const { assignedState, assignedCity } = await getRequesterScope(user);
+
+  if (STATE_ADMIN_ROLES.has(user?.user_type) && !assignedState) {
+    const err = new Error('State admin account is missing assigned_state');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (isLgaAdminRole(user?.user_type) && (!assignedState || !assignedCity)) {
+    const err = new Error('Admin account is missing assigned state or local government');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const params = [];
+  let clause = '';
+
+  if (assignedState) {
+    const stateIdx = params.length + 1;
+    params.push(assignedState);
+    clause += `
+      AND (
+        EXISTS (
+          SELECT 1
+          FROM properties sp
+          JOIN states sp_st ON sp_st.id = sp.state_id
+          WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+            AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM applications sa
+          JOIN properties sp ON sp.id = sa.property_id
+          JOIN states sp_st ON sp_st.id = sp.state_id
+          WHERE sa.tenant_id = users.id
+            AND LOWER(TRIM(sp_st.state_name)) = LOWER(TRIM($${stateIdx}))
+        )
+      )`;
+  }
+
+  if (assignedCity) {
+    const cityIdx = params.length + 1;
+    params.push(assignedCity);
+    clause += `
+      AND (
+        EXISTS (
+          SELECT 1
+          FROM properties sp
+          WHERE (sp.user_id = users.id OR sp.landlord_id = users.id)
+            AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM applications sa
+          JOIN properties sp ON sp.id = sa.property_id
+          WHERE sa.tenant_id = users.id
+            AND LOWER(TRIM(COALESCE(sp.lga_name, ''))) = LOWER(TRIM($${cityIdx}))
+        )
+      )`;
+  }
+
+  return { clause, params };
+};
+
 // GET /api/admin/stats
 exports.getStats = async (req, res) => {
   try {
@@ -1634,7 +1738,11 @@ exports.deleteUser = async (req, res) => {
       });
     }
 
-    await db.query(
+    // Jurisdiction guard: an LGA/state admin may only disable users within
+    // their assigned territory.
+    const { clause: userScopeClause, params: userScopeParams } = await buildUserScopeClause(req.user);
+
+    const updateResult = await db.query(
       `UPDATE users
        SET deleted_at = NOW(),
            is_active = FALSE,
@@ -1642,9 +1750,16 @@ exports.deleteUser = async (req, res) => {
            account_suspended_at = NOW(),
            account_suspended_by = $3,
            updated_at = NOW()
-       WHERE id = $1 AND deleted_at IS NULL`,
-      [id, reason, currentUserId]
+       WHERE id = $1 AND deleted_at IS NULL ${userScopeClause}`,
+      [id, reason, currentUserId, ...userScopeParams]
     );
+
+    if (!updateResult.rowCount) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found in your jurisdiction',
+      });
+    }
 
     await recordUserAccountOperation({
       userId: targetUser.id,
@@ -1681,6 +1796,10 @@ exports.verifyUser = async (req, res) => {
     const adminId = req.user.id;
     const note = requireOperationNote(req.body, 'A verification note is required');
 
+    // Jurisdiction guard: an LGA/state admin may only verify users within
+    // their assigned territory.
+    const { clause: userScopeClause, params: userScopeParams } = await buildUserScopeClause(req.user);
+
     const result = await db.query(
       `UPDATE users
        SET identity_verified = TRUE,
@@ -1693,8 +1812,9 @@ exports.verifyUser = async (req, res) => {
          AND user_type IN ${VERIFICATION_TARGET_USER_TYPES}
          AND passport_photo_url IS NOT NULL
          AND (nin IS NOT NULL OR international_passport_number IS NOT NULL)
+         ${userScopeClause}
        RETURNING id, full_name, email, user_type`,
-      [id, adminId]
+      [id, adminId, ...userScopeParams]
     );
 
     if (!result.rows.length) {
@@ -2640,6 +2760,9 @@ exports.unlistProperty = async (req, res) => {
     const { id } = req.params;
     const note = requireOperationNote(req.body, 'An unlist reason is required');
 
+    // Jurisdiction guard: admins may only unlist properties in their territory.
+    const { clause: propertyScopeClause, params: propertyScopeParams } = await buildPropertyScopeClause(req.user);
+
     const result = await db.query(
       `
       UPDATE properties
@@ -2647,9 +2770,10 @@ exports.unlistProperty = async (req, res) => {
           updated_at = NOW()
       WHERE id = $1
         AND deleted_at IS NULL
+        ${propertyScopeClause}
       RETURNING id, title, is_available
       `,
-      [id]
+      [id, ...propertyScopeParams]
     );
 
     if (!result.rows.length) {
@@ -2695,6 +2819,9 @@ exports.relistProperty = async (req, res) => {
     const { id } = req.params;
     const note = requireOperationNote(req.body, 'A relist reason is required');
 
+    // Jurisdiction guard: admins may only relist properties in their territory.
+    const { clause: propertyScopeClause, params: propertyScopeParams } = await buildPropertyScopeClause(req.user);
+
     const result = await db.query(
       `
       UPDATE properties
@@ -2702,9 +2829,10 @@ exports.relistProperty = async (req, res) => {
           updated_at = NOW()
       WHERE id = $1
         AND deleted_at IS NULL
+        ${propertyScopeClause}
       RETURNING id, title, is_available
       `,
-      [id]
+      [id, ...propertyScopeParams]
     );
 
     if (!result.rows.length) {
@@ -2745,6 +2873,9 @@ exports.featureProperty = async (req, res) => {
     const { id } = req.params;
     const note = requireOperationNote(req.body, 'A feature reason is required');
 
+    // Jurisdiction guard: admins may only feature properties in their territory.
+    const { clause: propertyScopeClause, params: propertyScopeParams } = await buildPropertyScopeClause(req.user);
+
     const result = await db.query(
       `
       UPDATE properties
@@ -2752,9 +2883,10 @@ exports.featureProperty = async (req, res) => {
           updated_at = NOW()
       WHERE id = $1
         AND deleted_at IS NULL
+        ${propertyScopeClause}
       RETURNING id, title, featured
       `,
-      [id]
+      [id, ...propertyScopeParams]
     );
 
     if (!result.rows.length) {
@@ -2795,6 +2927,9 @@ exports.unfeatureProperty = async (req, res) => {
     const { id } = req.params;
     const note = requireOperationNote(req.body, 'An unfeature reason is required');
 
+    // Jurisdiction guard: admins may only unfeature properties in their territory.
+    const { clause: propertyScopeClause, params: propertyScopeParams } = await buildPropertyScopeClause(req.user);
+
     const result = await db.query(
       `
       UPDATE properties
@@ -2802,9 +2937,10 @@ exports.unfeatureProperty = async (req, res) => {
           updated_at = NOW()
       WHERE id = $1
         AND deleted_at IS NULL
+        ${propertyScopeClause}
       RETURNING id, title, featured
       `,
-      [id]
+      [id, ...propertyScopeParams]
     );
 
     if (!result.rows.length) {

@@ -6,6 +6,7 @@ const { allowRoles } = require('../config/middleware/roleMiddleware');
 const disputeController = require('../controllers/disputeController');
 const courtBundleController = require('../controllers/courtBundleController');
 const validateRequest = require('../config/middleware/validateRequest');
+const { canAccessDispute } = require('../config/middleware/disputeAccessMiddleware');
 
 router.post(
   '/disputes/:disputeId/seal',
@@ -22,6 +23,9 @@ router.get(
   '/:disputeId/court-bundle',
   authenticate,
   allowRoles('admin','lawyer','super_admin'),
+  canAccessDispute,
+  [param('disputeId').isInt()],
+  validateRequest,
   courtBundleController.downloadCourtBundle
 );
 

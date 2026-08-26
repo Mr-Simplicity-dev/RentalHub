@@ -179,15 +179,22 @@ router.get('/funds/frozen',
 
 /**
  * Create state admin (super admin only)
+ * NOTE: requireSuperAdmin (not requireSuperAdminOrSuperFinancialAdmin) so a
+ * mid-tier financial_admin cannot mint state-finance admins with weak
+ * passwords and self-granted commission rates.
  */
 router.post('/state-admins/create',
-  requireSuperAdminOrSuperFinancialAdmin,
+  requireSuperAdmin,
   criticalFinanceOpsLimiter,
   [
     body('full_name').notEmpty().withMessage('Full name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
     body('phone').notEmpty().withMessage('Phone number is required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+    body('password')
+      .isLength({ min: 10 })
+      .withMessage('Password must be at least 10 characters')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/)
+      .withMessage('Password must include uppercase, lowercase, number, and special character'),
     body('assigned_state').notEmpty().withMessage('Assigned state is required'),
     body('assigned_city').optional(),
     body('commission_rate').optional().isFloat({ min: 0.01, max: 0.20 }).withMessage('Commission rate must be between 1% and 20%')
@@ -205,7 +212,11 @@ router.post('/super-financial-admins/create',
     body('full_name').notEmpty().withMessage('Full name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
     body('phone').notEmpty().withMessage('Phone number is required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+    body('password')
+      .isLength({ min: 10 })
+      .withMessage('Password must be at least 10 characters')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/)
+      .withMessage('Password must include uppercase, lowercase, number, and special character')
   ],
   stateAdminController.createSuperFinancialAdmin
 );

@@ -678,7 +678,7 @@ exports.withdrawAtMaturity = async (req, res) => {
     const userId = req.user.id;
 
     const planResult = await client.query(
-      `SELECT * FROM rent_savings_plans WHERE id = $1 AND tenant_id = $2 AND status = 'active'`,
+      `SELECT * FROM rent_savings_plans WHERE id = $1 AND tenant_id = $2 AND status = 'active' FOR UPDATE`,
       [id, userId]
     );
 
@@ -794,7 +794,7 @@ exports.requestEarlyWithdrawal = async (req, res) => {
     const { reason } = req.body;
 
     const planResult = await client.query(
-      `SELECT * FROM rent_savings_plans WHERE id = $1 AND tenant_id = $2 AND status = 'active'`,
+      `SELECT * FROM rent_savings_plans WHERE id = $1 AND tenant_id = $2 AND status = 'active' FOR UPDATE`,
       [id, userId]
     );
 
@@ -1089,7 +1089,7 @@ exports.adminApproveEarlyWithdrawal = async (req, res) => {
     const adminId   = req.user.id;
 
     const requestResult = await client.query(
-      `SELECT * FROM rent_savings_early_withdrawals WHERE id = $1 AND status = 'pending'`,
+      `SELECT * FROM rent_savings_early_withdrawals WHERE id = $1 AND status = 'pending' FOR UPDATE`,
       [id]
     );
 

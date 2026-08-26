@@ -41,6 +41,9 @@ const getPropertyDisputeParticipants = async (propertyId) => {
        FROM applications a
        JOIN users tenant ON tenant.id = a.tenant_id
        WHERE a.property_id = $1
+         -- Only approved tenancies are real participants; pending/rejected
+         -- applicants must not be able to see other applicants' PII here.
+         AND a.status = 'approved'
      )
      SELECT DISTINCT
        id,

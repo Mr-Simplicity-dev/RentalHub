@@ -128,10 +128,27 @@ const isRecruitmentAdmin = async (userId) => {
   }
   if (!result.rows.length) return false;
   const user = result.rows[0];
-  return user.user_type === 'super_admin' || 
-         user.user_type === 'admin' || 
+  return user.user_type === 'super_admin' ||
          user.user_type === 'recruitment_admin' ||
          user.is_recruitment_admin === true;
+};
+
+// Territorial scope for recruitment admin operations. Dedicated
+// recruitment_admin and super_admin accounts are national; any other role
+// carrying is_recruitment_admin (e.g. a state_admin or financial_admin) may
+// only see and act on applicants in their assigned state.
+const getRecruitmentAdminStateScope = (user) => {
+  if (!user) return null;
+  const role = String(user.user_type || '').trim().toLowerCase();
+  if (role === 'super_admin' || role === 'recruitment_admin') return null;
+  if (user.is_recruitment_admin !== true) return null;
+  return String(user.assigned_state || '').trim() || null;
+};
+
+const applicantInAdminScope = (application, scope) => {
+  if (!scope) return true;
+  const appState = String(application?.state_name || '').trim().toLowerCase();
+  return appState === String(scope).trim().toLowerCase();
 };
 
 let recruitmentOperationsSchemaReady = false;
@@ -1584,7 +1601,12 @@ exports.getApplicationDetail = async (req, res) => {
     if (!result.rows.length) {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
-    
+
+    // Territorial guard: scoped admins may only view applicants in their state.
+    if (!applicantInAdminScope(result.rows[0], getRecruitmentAdminStateScope(req.user))) {
+      return res.status(403).json({ success: false, message: 'Application is outside your jurisdiction' });
+    }
+
     // Get documents
     const docs = await db.query(
       'SELECT * FROM recruitment_documents WHERE application_id = $1',
@@ -1640,6 +1662,18 @@ exports.updateApplicationStatus = async (req, res) => {
     const validStatuses = ['submitted', 'under_review', 'shortlisted', 'approved', 'rejected', 'disqualified'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    // Territorial guard: scoped admins may only act on applicants in their state.
+    const scopeCheck = await db.query(
+      `SELECT state_name FROM recruitment_applications WHERE id = $1`,
+      [id]
+    );
+    if (!scopeCheck.rows.length) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+    if (!applicantInAdminScope(scopeCheck.rows[0], getRecruitmentAdminStateScope(req.user))) {
+      return res.status(403).json({ success: false, message: 'Application is outside your jurisdiction' });
     }
     
     const updateFields = ['status = $1', 'updated_at = NOW()'];
@@ -2414,7 +2448,7 @@ const addSqlParam = (params, value) => {
   return `$${params.length}`;
 };
 
-const getApplicantWhere = (query = {}) => {
+const getApplicantWhere = (query = {}, { stateScope = null } = {}) => {
   const where = [];
   const params = [];
   const addClause = (sql, ...values) => {
@@ -2433,6 +2467,8 @@ const getApplicantWhere = (query = {}) => {
   if (query.state) addClause('a.state_name ILIKE ?', normalizeText(query.state));
   if (query.lga) addClause('a.lga_name ILIKE ?', normalizeText(query.lga));
   if (query.area) addClause('a.area_locality ILIKE ?', `%${normalizeText(query.area)}%`);
+  // Territorial guard: scoped admins can only list applicants from their state.
+  if (stateScope) addClause('LOWER(TRIM(a.state_name)) = LOWER(TRIM(?))', stateScope);
   if (query.search) {
     const searchParam = addSqlParam(params, [`%${normalizeText(query.search)}%`]);
     where.push(
@@ -2449,8 +2485,9 @@ const getApplicantWhere = (query = {}) => {
   };
 };
 
-const getApplicationRows = async (query = {}, { paginate = false } = {}) => {
-  const { whereSQL, params } = getApplicantWhere(query);
+const getApplicationRows = async (query = {}, { paginate = false, user = null } = {}) => {
+  const stateScope = user ? getRecruitmentAdminStateScope(user) : null;
+  const { whereSQL, params } = getApplicantWhere(query, { stateScope });
   const page = parsePage(query.page);
   const limit = parseLimit(query.limit);
   const offset = (page - 1) * limit;
@@ -3454,7 +3491,7 @@ exports.getApplicants = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { rows, pagination } = await getApplicationRows(req.query, { paginate: true });
+    const { rows, pagination } = await getApplicationRows(req.query, { paginate: true, user: req.user });
     res.json({ success: true, data: rows, pagination });
   } catch (error) {
     req.logger.error('getApplicants error:', error);
@@ -3530,11 +3567,26 @@ exports.bulkProcessApplicants = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const ids = Array.isArray(req.body?.application_ids) ? req.body.application_ids : [];
+    let ids = Array.isArray(req.body?.application_ids) ? req.body.application_ids : [];
     const status = normalizeLower(req.body?.status);
     const allowed = new Set(['under_review', 'shortlisted', 'approved', 'rejected', 'disqualified']);
     if (!ids.length || !allowed.has(status)) {
       return res.status(400).json({ success: false, message: 'Application IDs and valid status are required' });
+    }
+
+    // Territorial guard: scoped admins can only bulk-process applicants from
+    // their own state — IDs outside the jurisdiction are silently excluded.
+    const adminScope = getRecruitmentAdminStateScope(req.user);
+    if (adminScope) {
+      const scopedResult = await db.query(
+        `SELECT id FROM recruitment_applications
+         WHERE id = ANY($1::int[]) AND LOWER(TRIM(state_name)) = LOWER(TRIM($2))`,
+        [ids, adminScope]
+      );
+      ids = scopedResult.rows.map((row) => row.id);
+      if (!ids.length) {
+        return res.status(403).json({ success: false, message: 'No applicants found within your jurisdiction' });
+      }
     }
 
     const result = await db.query(
@@ -3954,7 +4006,7 @@ exports.generateApplicantPdf = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const result = await getApplicationRows({ ...req.query, search: undefined }, { paginate: false });
+    const result = await getApplicationRows({ ...req.query, search: undefined }, { paginate: false, user: req.user });
     const application = result.rows.find((row) => String(row.id) === String(req.params.id));
     if (!application) {
       const direct = await db.query(
@@ -3979,7 +4031,7 @@ const generateFilteredPdf = async (req, res, filter, filename, title) => {
   if (!(await isRecruitmentAdmin(req.user.id))) {
     return res.status(403).json({ success: false, message: 'Access denied' });
   }
-  const { rows } = await getApplicationRows({ ...req.query, ...filter }, { paginate: false });
+  const { rows } = await getApplicationRows({ ...req.query, ...filter }, { paginate: false, user: req.user });
   return sendApplicantsPdf(res, rows, filename, title);
 };
 
@@ -4020,6 +4072,20 @@ exports.downloadApplicationDocs = async (req, res) => {
     if (!(await isRecruitmentAdmin(req.user.id))) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
+
+    // Territorial guard: scoped admins may only download docs of applicants
+    // in their own state.
+    const appCheck = await db.query(
+      `SELECT state_name FROM recruitment_applications WHERE id = $1`,
+      [req.params.applicationId]
+    );
+    if (!appCheck.rows.length) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+    if (!applicantInAdminScope(appCheck.rows[0], getRecruitmentAdminStateScope(req.user))) {
+      return res.status(403).json({ success: false, message: 'Application is outside your jurisdiction' });
+    }
+
     const docs = await db.query(
       `SELECT d.*, a.reference_number
        FROM recruitment_documents d
@@ -4039,7 +4105,7 @@ exports.bulkDownloadDocs = async (req, res) => {
     if (!(await isRecruitmentAdmin(req.user.id))) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    const { rows } = await getApplicationRows(req.query, { paginate: false });
+    const { rows } = await getApplicationRows(req.query, { paginate: false, user: req.user });
     const ids = rows.map((row) => row.id);
     if (!ids.length) {
       return res.status(404).json({ success: false, message: 'No applicants matched this filter' });
@@ -4154,7 +4220,7 @@ exports.emailDocuments = async (req, res) => {
     if (!(await isRecruitmentAdmin(req.user.id))) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    const { rows } = await getApplicationRows(req.body || req.query || {}, { paginate: false });
+    const { rows } = await getApplicationRows(req.body || req.query || {}, { paginate: false, user: req.user });
     const csvRows = [
       ['Reference', 'Name', 'Email', 'Phone', 'Role', 'State', 'LGA', 'Area', 'Payment', 'Status'].join(','),
       ...rows.map((row) => [

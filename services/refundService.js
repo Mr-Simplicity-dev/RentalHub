@@ -847,6 +847,7 @@ exports.getLandlordRefundRequests = async (req, res) => {
 // approved_amount: custom amount (for partial_custom)
 // =====================================================
 exports.approveRefundRequest = async (req, res) => {
+  const client = await db.connect();
   try {
     await ensureRefundSchema();
 
@@ -859,8 +860,13 @@ exports.approveRefundRequest = async (req, res) => {
       approved_amount,           // custom amount  — used when refund_type = partial_custom
     } = req.body;
 
-    // Fetch refund + original payment details
-    const refundResult = await db.query(
+    await client.query('BEGIN');
+
+    // Fetch refund + original payment details. FOR UPDATE serializes
+    // concurrent approvals of the same request — the second caller blocks
+    // here and then finds the row no longer 'pending' (404), so the
+    // Paystack refund can never be double-fired.
+    const refundResult = await client.query(
       `SELECT rr.*, p.transaction_reference, p.amount AS original_amount,
               p.payment_frequency, prop.rent_amount AS monthly_rent
        FROM refund_requests rr
@@ -872,11 +878,13 @@ exports.approveRefundRequest = async (req, res) => {
          AND (
            rr.request_category <> 'early_exit_refund'
            OR rr.feature_enabled = TRUE
-         )`,
+         )
+       FOR UPDATE OF rr`,
       [refundId, landlordId]
     );
 
     if (refundResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         message: 'Refund request not found, does not belong to you, or is no longer pending.',
@@ -1950,27 +1958,49 @@ exports.requestWithdrawal = async (req, res) => {
       // (admin reviews all withdrawals before processing)
     }
 
-    // Deduct from wallet
-    await db.query(
-      `UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $2`,
-      [withdrawAmount, userId]
-    );
+    // Deduct from wallet atomically. The balance guard (WHERE balance >= $1)
+    // closes the check-then-deduct race so concurrent requests can never
+    // over-withdraw below zero.
+    const txn = await db.connect();
+    try {
+      await txn.query('BEGIN');
 
-    // Create withdrawal request
-    const result = await db.query(
-      `INSERT INTO withdrawal_requests
-         (user_id, amount, bank_name, bank_code, account_number, account_name)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [userId, withdrawAmount, bank_name, bank_code || null, account_number, account_name]
-    );
+      const deductResult = await txn.query(
+        `UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $2 AND balance >= $1`,
+        [withdrawAmount, userId]
+      );
 
-    res.status(201).json({
-      success: true,
-      message: 'Withdrawal request submitted. It will be processed within 1–3 business days.',
-      data: result.rows[0],
-    });
+      if (!deductResult.rowCount) {
+        await txn.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient wallet balance. Withdrawal could not be processed.',
+        });
+      }
+
+      // Create withdrawal request
+      const result = await txn.query(
+        `INSERT INTO withdrawal_requests
+           (user_id, amount, bank_name, bank_code, account_number, account_name)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [userId, withdrawAmount, bank_name, bank_code || null, account_number, account_name]
+      );
+
+      await txn.query('COMMIT');
+
+      res.status(201).json({
+        success: true,
+        message: 'Withdrawal request submitted. It will be processed within 1–3 business days.',
+        data: result.rows[0],
+      });
+    } catch (error) {
+      await txn.query('ROLLBACK');
+      throw error;
+    } finally {
+      txn.release();
+    }
   } catch (error) {
     req.logger.error('Request withdrawal error:', error);
     res.status(500).json({ success: false, message: 'Failed to submit withdrawal request' });

@@ -262,6 +262,21 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
 
 exports.processPaymentCommission = async (paymentId) => {
   try {
+    // Idempotency guard: a payment must never mint commissions twice. The
+    // verify-* endpoints and Paystack webhook can both fire for the same
+    // payment (retries, client polling), which previously credited admin
+    // wallets repeatedly for a single transaction.
+    const existingCommission = await db.query(
+      `SELECT id FROM admin_commissions
+       WHERE payment_id = $1 AND status <> 'cancelled'
+       LIMIT 1`,
+      [paymentId]
+    );
+    if (existingCommission.rows.length > 0) {
+      logger.info(`Commission already processed for payment ${paymentId} - skipping duplicate`);
+      return false;
+    }
+
     const paymentResult = await db.query(
       `SELECT p.*, prop_state.state_name as property_state, prop.city as property_city
        FROM payments p

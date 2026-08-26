@@ -95,7 +95,7 @@ exports.createDispute = async (req, res) => {
     const participants = propertyData.participants || [];
     const participantIds = new Set(participants.map((item) => Number(item.id)));
     const targetUserId = Number(against_user);
-    const isPrivileged = ['admin', 'super_admin'].includes(openedByRole);
+    const isPrivileged = ['super_admin'].includes(openedByRole);
 
     if (!isPrivileged && !participantIds.has(Number(openedBy))) {
       return res.status(403).json({
@@ -786,7 +786,7 @@ exports.getEvidence = async (req, res) => {
   }
 
   const evidence = result.rows[0];
-  const isPrivileged = ['admin', 'super_admin'].includes(userType);
+  const isPrivileged = ['super_admin'].includes(userType);
   const isParticipant = [evidence.opened_by, evidence.against_user].includes(Number(userId));
 
   if (!isPrivileged && !isParticipant) {
@@ -849,7 +849,7 @@ exports.verifyEvidenceIntegrity = async (req, res) => {
     }
 
     const evidence = result.rows[0];
-    const isPrivileged = ['admin', 'super_admin'].includes(userType);
+    const isPrivileged = ['super_admin'].includes(userType);
     const isParticipant = [evidence.opened_by, evidence.against_user].includes(Number(userId));
 
     if (!isPrivileged && !isParticipant) {
