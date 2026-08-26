@@ -51,6 +51,7 @@ const ResetPassword = () => {
         <div className="flex justify-center mt-3">
           <TurnstileWidget
             ref={turnstileRef}
+            action="rentalhub_reset_password"
             onToken={setTurnstileToken}
             onExpire={() => setTurnstileToken(null)}
             onError={() => setTurnstileToken(null)}

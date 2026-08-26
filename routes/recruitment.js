@@ -144,7 +144,7 @@ router.get('/locations/lgas/:state', recruitmentController.getLGAs);
 // the Cloudflare siteverify quota with garbage tokens.
 router.post('/apply',
   recruitmentApplyLimiter,
-  requireTurnstile,
+  requireTurnstile('rentalhub_careers'),
   [body('full_name').optional().isString().trim().isLength({ max: 255 }),
    body('email').optional().isEmail().normalizeEmail(),
    body('phone').optional().isString().trim().isLength({ max: 20 }),

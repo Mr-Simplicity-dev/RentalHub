@@ -1,20 +1,25 @@
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
-const TURNSTILE_SITEVERIFY_TIMEOUT_MS = Number(process.env.TURNSTILE_SITEVERIFY_TIMEOUT_MS || 8000);
-const TURNSTILE_EXPECTED_ACTION = 'rentalhub_form';
+const TURNSTILE_SITEVERIFY_TIMEOUT_MS = Number(process.env.TURNSTILE_SITEVERIFY_TIMEOUT_MS || 3000);
+// Fail-closed policy: verification is skipped ONLY when explicitly opted in
+// with TURNSTILE_SKIP_VERIFICATION=true (local development). A missing secret
+// key or misconfigured environment is NEVER silently ignored.
+const TURNSTILE_SKIP_VERIFICATION = process.env.TURNSTILE_SKIP_VERIFICATION === 'true';
 
 // Cloudflare recommends binding verification to a widget action so a token
 // minted on one page cannot be replayed against a different protected action.
-const verifyTurnstileToken = async (token, remoteIp = '') => {
-  if (!TURNSTILE_SECRET_KEY) {
-    // Fail closed in production: a missing secret must not silently disable
-    // the security check. In local development the check is skipped so the
-    // app remains runnable without credentials.
-    if (process.env.NODE_ENV === 'production') {
-      console.error('TURNSTILE_SECRET_KEY is not set - Turnstile verification disabled');
-      return false;
+// Every protected route MUST pass the exact action its form's widget uses.
+const verifyTurnstileToken = async (token, remoteIp = '', expectedAction = '') => {
+  if (TURNSTILE_SKIP_VERIFICATION) {
+    if (!TURNSTILE_SECRET_KEY) {
+      console.warn('Turnstile verification is explicitly SKIPPED (TURNSTILE_SKIP_VERIFICATION=true). Never use this in production.');
     }
-    console.warn('TURNSTILE_SECRET_KEY not set - skipping verification');
     return true;
+  }
+
+  if (!TURNSTILE_SECRET_KEY) {
+    // Fail closed: a missing secret must never silently disable the check.
+    console.error('TURNSTILE_SECRET_KEY is not set - rejecting Turnstile-protected request (fail closed)');
+    return false;
   }
 
   try {
@@ -43,7 +48,7 @@ const verifyTurnstileToken = async (token, remoteIp = '') => {
           res.on('end', () => {
             try {
               const result = JSON.parse(body);
-              const actionMatches = !result.action || result.action === TURNSTILE_EXPECTED_ACTION;
+              const actionMatches = !expectedAction || result.action === expectedAction;
               resolve(result.success === true && actionMatches);
             } catch {
               resolve(false);
@@ -65,25 +70,33 @@ const verifyTurnstileToken = async (token, remoteIp = '') => {
   }
 };
 
-const requireTurnstile = (req, res, next) => {
-  const token = req.body?.turnstile_token;
-
-  if (!token) {
-    return res.status(400).json({
-      success: false,
-      message: 'Security check required. Please refresh and try again.',
-    });
+// Factory: every protected route declares the exact widget action it accepts,
+// so a token minted on one form cannot be replayed on another endpoint.
+const requireTurnstile = (expectedAction) => {
+  if (!expectedAction) {
+    throw new Error('requireTurnstile requires an expected action (e.g. requireTurnstile("rentalhub_login"))');
   }
 
-  verifyTurnstileToken(token, req.ip).then((valid) => {
-    if (!valid) {
+  return (req, res, next) => {
+    const token = req.body?.turnstile_token;
+
+    if (!token) {
       return res.status(400).json({
         success: false,
-        message: 'Security check failed. Please refresh and try again.',
+        message: 'Security check required. Please refresh and try again.',
       });
     }
-    next();
-  });
+
+    verifyTurnstileToken(token, req.ip, expectedAction).then((valid) => {
+      if (!valid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Security check failed. Please refresh and try again.',
+        });
+      }
+      next();
+    });
+  };
 };
 
 module.exports = { requireTurnstile, verifyTurnstileToken };

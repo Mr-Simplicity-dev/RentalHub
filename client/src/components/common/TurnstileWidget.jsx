@@ -2,7 +2,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react
 
 const SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY;
 
-const TurnstileWidget = forwardRef(({ onToken, onExpire, onError }, ref) => {
+const TurnstileWidget = forwardRef(({ action, onToken, onExpire, onError }, ref) => {
   const containerRef = useRef(null);
   const widgetIdRef = useRef(null);
   const callbacksRef = useRef({ onToken, onExpire, onError });
@@ -18,6 +18,12 @@ const TurnstileWidget = forwardRef(({ onToken, onExpire, onError }, ref) => {
 
   useEffect(() => {
     if (!SITE_KEY || !containerRef.current) return;
+    // The server rejects tokens whose action does not match the protected
+    // route, so every form must declare its own action.
+    if (!action) {
+      console.error('TurnstileWidget requires an "action" prop (e.g. action="rentalhub_login"). Tokens without a matching action will be rejected by the server.');
+      return;
+    }
 
     const id = 'cf-turnstile-script';
     if (!document.getElementById(id)) {
@@ -38,7 +44,7 @@ const TurnstileWidget = forwardRef(({ onToken, onExpire, onError }, ref) => {
       try {
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: SITE_KEY,
-          action: 'rentalhub_form',
+          action,
           appearance: 'interaction-only',
           execution: 'render',
           theme: 'auto',

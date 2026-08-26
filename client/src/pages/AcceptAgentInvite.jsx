@@ -204,6 +204,7 @@ const AcceptAgentInvite = () => {
             <div className="flex justify-center mt-3">
               <TurnstileWidget
                 ref={turnstileRef}
+                action="rentalhub_agent_invite"
                 onToken={setTurnstileToken}
                 onExpire={() => setTurnstileToken(null)}
                 onError={() => setTurnstileToken(null)}

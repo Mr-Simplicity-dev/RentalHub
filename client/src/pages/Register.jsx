@@ -1845,6 +1845,7 @@ return (
 
                 <TurnstileWidget
                   ref={turnstileRef}
+                  action="rentalhub_register"
                   onToken={setTurnstileToken}
                   onExpire={() => setTurnstileToken(null)}
                   onError={() => setTurnstileToken(null)}

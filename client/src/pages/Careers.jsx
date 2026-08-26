@@ -1563,6 +1563,7 @@ export default function Careers() {
         <div className="lg:col-span-2 flex flex-col items-center gap-2">
           <TurnstileWidget
             ref={turnstileRef}
+            action="rentalhub_careers"
             onToken={setTurnstileToken}
             onExpire={() => setTurnstileToken(null)}
             onError={() => setTurnstileToken(null)}

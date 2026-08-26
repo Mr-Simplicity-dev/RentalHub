@@ -311,6 +311,7 @@ const Login = () => {
           {/* TURNSTILE */}
           <TurnstileWidget
             ref={turnstileRef}
+            action="rentalhub_login"
             onToken={setTurnstileToken}
             onExpire={() => setTurnstileToken(null)}
             onError={() => setTurnstileToken(null)}

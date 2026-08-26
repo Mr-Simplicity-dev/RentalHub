@@ -96,7 +96,7 @@ router.get('/registration-flags', authController.getRegistrationFlags);
 
 router.post(
   '/register/payment',
-  requireTurnstile,
+  requireTurnstile('rentalhub_register'),
   registrationLimiter,
   registerValidators,
   authController.initializeRegistrationPayment
@@ -109,7 +109,7 @@ router.post(
 
 router.post(
   '/register/tenant-payment',
-  requireTurnstile,
+  requireTurnstile('rentalhub_register'),
   registrationLimiter,
   registerValidators,
   authController.initializeRegistrationPayment
@@ -123,7 +123,7 @@ router.post(
 // Register new user (Landlord or Tenant)
 router.post(
   '/register',
-  requireTurnstile,
+  requireTurnstile('rentalhub_register'),
   registrationLimiter,
   registerValidators,
   authController.register
@@ -132,7 +132,7 @@ router.post(
 
 router.post(
   '/login',
-  requireTurnstile,
+  requireTurnstile('rentalhub_login'),
   checkLoginRateLimit,
   authController.login
 );
@@ -140,7 +140,7 @@ router.post(
 router.post(
   '/lawyer/accept-invite',
   [
-    requireTurnstile,
+    requireTurnstile('rentalhub_lawyer_invite'),
     body('token').trim().notEmpty(),
     body('full_name').trim().notEmpty(),
     body('chamber_name').trim().notEmpty(),
@@ -163,7 +163,7 @@ router.post(
 router.post(
   '/lawyer/accept-platform-invite',
   [
-    requireTurnstile,
+    requireTurnstile('rentalhub_lawyer_invite'),
     body('token').trim().notEmpty(),
     body('full_name').trim().notEmpty(),
     body('chamber_name').trim().notEmpty(),
@@ -186,7 +186,7 @@ router.post(
 router.post(
   '/agent/accept-invite',
   [
-    requireTurnstile,
+    requireTurnstile('rentalhub_agent_invite'),
     body('token').trim().notEmpty(),
     body('full_name').trim().notEmpty(),
     body('phone')
@@ -263,7 +263,7 @@ router.post('/logout', authenticate, authController.logout);
 
 router.post(
   '/forgot-password',
-  requireTurnstile,
+  requireTurnstile('rentalhub_forgot_password'),
   authSensitiveLimiter,
   [body('email').isEmail().normalizeEmail()],
   authController.forgotPassword
@@ -271,7 +271,7 @@ router.post(
 
 router.post(
   '/reset-password/:token',
-  requireTurnstile,
+  requireTurnstile('rentalhub_reset_password'),
   passwordResetLimiter,
   [body('password')
     .isLength({ min: 10 })
