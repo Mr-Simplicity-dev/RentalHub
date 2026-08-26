@@ -2382,6 +2382,19 @@ exports.getRegistrationFlags = async (req, res) => {
     const anyRoleRegistrationEnabled =
       allowTenantRegistration || allowLandlordRegistration;
 
+    // Diaspora fee preview for the registration form: USD base plus an
+    // estimated naira equivalent using the current FX rate and markup.
+    let diasporaBaseFeeUsd = null;
+    let diasporaBaseFeeNgnEstimate = null;
+    if (flags.diaspora_registration === true) {
+      try {
+        diasporaBaseFeeUsd = await getDiasporaBaseFeeUsd();
+        diasporaBaseFeeNgnEstimate = await usdToNgn(diasporaBaseFeeUsd);
+      } catch (fxError) {
+        req.logger.warn('Failed to compute diaspora fee estimate:', fxError.message);
+      }
+    }
+
     res.json({
       success: true,
       data: {
@@ -2404,6 +2417,8 @@ exports.getRegistrationFlags = async (req, res) => {
         diaspora_registration: flags.diaspora_registration === true,
         diaspora_registration_payment: flags.diaspora_registration_payment === true,
         diaspora_require_foreign_card: flags.diaspora_require_foreign_card === true,
+        diaspora_base_fee_usd: diasporaBaseFeeUsd,
+        diaspora_base_fee_ngn_estimate: diasporaBaseFeeNgnEstimate,
         tenant_registration_payment: flags.tenant_registration_payment === true,
         landlord_registration_payment: flags.landlord_registration_payment === true,
         pricing,

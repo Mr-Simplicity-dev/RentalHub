@@ -16,6 +16,7 @@ const LAWYER_ACCESS_FEE = 2000; // Fee for using RentalHub NG lawyers during reg
 const AGENT_ACCESS_FEE = 5000; // Fee for using RentalHub NG agents during registration
 const TENANT_REGISTRATION_FEE = 3000;
 const LANDLORD_REGISTRATION_FEE = 5000;
+const DIASPORA_BASE_FEE_USD = 12.85; // Fallback until the server provides the live setting
 
 const buildInitialRegistrationForm = (referralCode = '') => ({
   user_type: 'tenant',
@@ -50,6 +51,9 @@ const initialRegistrationFlags = {
   registration_access_message: null,
   nin_number: true,
   passport_number: true,
+  diaspora_registration: false,
+  diaspora_base_fee_usd: null,
+  diaspora_base_fee_ngn_estimate: null,
   tenant_registration_payment: false,
   landlord_registration_payment: false,
 };
@@ -69,6 +73,7 @@ const buildInitialRegistrationPricing = (userType = 'tenant') => {
 };
 
 const formatNaira = (amount) => `₦${Number(amount || 0).toLocaleString()}`;
+const formatUsd = (amount) => `$${Number(amount || 0).toFixed(2)}`;
 
 const Register = () => {
   const [searchParams] = useSearchParams();
@@ -234,6 +239,15 @@ const Register = () => {
           registration_access_message: data.registration_access_message || null,
           nin_number: data.nin_number !== false,
           passport_number: data.passport_number !== false,
+          diaspora_registration: data.diaspora_registration === true,
+          diaspora_base_fee_usd:
+            Number(data.diaspora_base_fee_usd) > 0
+              ? Number(data.diaspora_base_fee_usd)
+              : null,
+          diaspora_base_fee_ngn_estimate:
+            Number(data.diaspora_base_fee_ngn_estimate) > 0
+              ? Number(data.diaspora_base_fee_ngn_estimate)
+              : null,
           tenant_registration_payment: data.tenant_registration_payment === true,
           landlord_registration_payment: data.landlord_registration_payment === true,
         });
@@ -989,6 +1003,27 @@ return (
                 {t('register.modal_landlord_desc')} <strong>{formatNaira(LANDLORD_REGISTRATION_FEE)}</strong>.
               </p>
             </div>
+
+            {registrationFlags.diaspora_registration && (
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+                <p className="font-semibold text-emerald-900">{t('register.modal_diaspora')}</p>
+                <p className="mt-1">
+                  {t('register.modal_diaspora_desc')}{' '}
+                  <strong>
+                    {formatUsd(registrationFlags.diaspora_base_fee_usd ?? DIASPORA_BASE_FEE_USD)}
+                  </strong>
+                  {registrationFlags.diaspora_base_fee_ngn_estimate ? (
+                    <>
+                      . {t('register.modal_diaspora_ngn')}{' '}
+                      <strong>{formatNaira(registrationFlags.diaspora_base_fee_ngn_estimate)}</strong>.
+                    </>
+                  ) : (
+                    '.'
+                  )}
+                </p>
+                <p className="mt-1 text-xs opacity-80">{t('register.modal_diaspora_vary')}</p>
+              </div>
+            )}
 
             <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
               <p className="font-semibold text-amber-900">{t('register.modal_optional')}</p>
