@@ -235,6 +235,25 @@ export const TourProvider = ({ children }) => {
 
   const shouldShowTour = useCallback(() => {
     if (!isAuthenticated || !user || !tourDataLoaded) return false;
+
+    // A recent dismissal suppresses the prompt even when a resumable tour
+    // exists. Without this, "Maybe later" would be overridden by
+    // hasResumableTour and the welcome modal would instantly reappear.
+    const lastDismissal = getLatestTourActivity(
+      userTourData?.last_dismissed_at,
+      userTourData?.last_completed_at,
+      userTourData?.last_skipped_at,
+      getLocalLastDismissal()
+    );
+    if (lastDismissal) {
+      const daysSinceDismissal = Math.floor(
+        (Date.now() - new Date(lastDismissal).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (daysSinceDismissal < TOUR_CONFIG.INACTIVITY_THRESHOLD_DAYS) {
+        return false;
+      }
+    }
+
     if (hasResumableTour) return true;
 
     if (
@@ -249,18 +268,9 @@ export const TourProvider = ({ children }) => {
     );
     if (!userTourData && localVersion !== TOUR_CONFIG.VERSION) return true;
 
-    const lastDismissal = getLatestTourActivity(
-      userTourData?.last_dismissed_at,
-      userTourData?.last_completed_at,
-      userTourData?.last_skipped_at,
-      getLocalLastDismissal()
-    );
-    if (!lastDismissal) return true;
-
-    const daysSinceDismissal = Math.floor(
-      (Date.now() - new Date(lastDismissal).getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return daysSinceDismissal >= TOUR_CONFIG.INACTIVITY_THRESHOLD_DAYS;
+    // Reaching here means either the tour was never dismissed or the last
+    // dismissal is older than the inactivity threshold, so the prompt is due.
+    return true;
   }, [
     getLocalLastDismissal,
     getScopedStorageKey,
