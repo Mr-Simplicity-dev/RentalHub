@@ -482,6 +482,22 @@ const getDiasporaBaseFeeUsd = async () => {
   return Number.isFinite(configured) && configured > 0 ? configured : 12.85;
 };
 
+const getDiasporaAddonFeesUsd = async () => {
+  const result = await db.query(
+    `SELECT key, value FROM app_settings
+     WHERE key IN ('diaspora_lawyer_fee_usd', 'diaspora_agent_fee_usd')`
+  );
+  const values = new Map(result.rows.map((row) => [row.key, Number(row.value?.value)]));
+  const readFee = (key, fallback) => {
+    const value = values.get(key);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  };
+  return {
+    lawyerUsd: readFee('diaspora_lawyer_fee_usd', 15),
+    agentUsd: readFee('diaspora_agent_fee_usd', 15),
+  };
+};
+
 const withPreparedRegistrationLocation = (
   preparedRegistration,
   resolvedLocation = null
@@ -1243,6 +1259,7 @@ const createUserFromPreparedRegistration = async ({
   await ensureTenantRegistrationPaymentSchema();
   const crypto = require('crypto');
   const { encryptNIN } = require('../config/utils/ninEncryption');
+  const storedPayloadForBase = tenantRegistrationPayment?.registration_payload || {};
 
   // Ensure the nin_hash column exists
   await db.query(`
@@ -1355,9 +1372,9 @@ const createUserFromPreparedRegistration = async ({
       }
 
       // Record only the base registration fee here. Add-on fees (lawyer
-      // access ₦2,000 and agent access ₦5,000) are recorded separately
-      // below so they are not double-counted in the payments ledger.
-      const storedPayloadForBase = tenantRegistrationPayment.registration_payload || {};
+      // access ₦2,000 and agent access ₦5,000 locally, USD-converted for
+      // diaspora) are recorded separately below so they are not
+      // double-counted in the payments ledger.
       const basePlatformFeeAmount =
         Number(storedPayloadForBase.base_registration_amount) ||
         Number(tenantRegistrationPayment.amount) ||
@@ -1462,7 +1479,10 @@ const createUserFromPreparedRegistration = async ({
         req.logger.error('Round-robin lawyer assignment error (non-fatal):', roundRobinError);
       }
 
-      // Create a separate payment record for the N2000 lawyer access fee
+      // Create a separate payment record for the lawyer access fee (the
+      // charged amount — ₦2,000 locally, USD-converted for diaspora)
+      const lawyerFeeAmount =
+        Number(storedPayloadForBase.lawyer_access_fee_ngn) || 2000;
       const lawyerFeePaymentResult = await db.query(
         `INSERT INTO payments (
            user_id,
@@ -1479,7 +1499,7 @@ const createUserFromPreparedRegistration = async ({
          RETURNING id`,
         [
           newUser.id,
-          2000,
+          lawyerFeeAmount,
           tenantRegistrationPayment.currency,
           tenantRegistrationPayment.payment_method,
           `${tenantRegistrationPayment.transaction_reference}_LAWYER_FEE`,
@@ -1577,7 +1597,7 @@ const createUserFromPreparedRegistration = async ({
          RETURNING id`,
         [
           newUser.id,
-          5000,
+          Number(storedPayloadForBase.agent_access_fee_ngn) || 5000,
           tenantRegistrationPayment.currency,
           tenantRegistrationPayment.payment_method,
           `${tenantRegistrationPayment.transaction_reference}_AGENT_FEE`,
@@ -1843,14 +1863,34 @@ exports.initializeRegistrationPayment = async (req, res) => {
 
     // Preserve the pure base amount before adding on fees
     const baseAmount = Number(registrationPricing.amount || 0);
+
+    // Diaspora add-ons are USD-priced ($15 each by default, super-admin
+    // editable) and converted to the NGN charge alongside the base fee.
+    let lawyerFeeNgn = LAWYER_ACCESS_FEE_NGN;
+    let agentFeeNgn = AGENT_ACCESS_FEE_NGN;
+    let diasporaLawyerUsd = null;
+    let diasporaAgentUsd = null;
     let chargeableAmountNgn = baseAmountNgn;
 
-    if (useRentalHubLawyers) {
-      chargeableAmountNgn += LAWYER_ACCESS_FEE_NGN;
-    }
-
-    if (useRentalHubAgents) {
-      chargeableAmountNgn += AGENT_ACCESS_FEE_NGN;
+    if (isDiasporaQuote) {
+      const addons = await getDiasporaAddonFeesUsd();
+      if (useRentalHubLawyers) {
+        diasporaLawyerUsd = addons.lawyerUsd;
+        lawyerFeeNgn = await usdToNgn(addons.lawyerUsd);
+        chargeableAmountNgn += lawyerFeeNgn;
+      }
+      if (useRentalHubAgents) {
+        diasporaAgentUsd = addons.agentUsd;
+        agentFeeNgn = await usdToNgn(addons.agentUsd);
+        chargeableAmountNgn += agentFeeNgn;
+      }
+    } else {
+      if (useRentalHubLawyers) {
+        chargeableAmountNgn += LAWYER_ACCESS_FEE_NGN;
+      }
+      if (useRentalHubAgents) {
+        chargeableAmountNgn += AGENT_ACCESS_FEE_NGN;
+      }
     }
     // ──────────────────────────────────────────────────────────────────────
 
@@ -1883,11 +1923,15 @@ exports.initializeRegistrationPayment = async (req, res) => {
       lga_name: registrationPricing.location?.lga_name || null,
       password_hash: passwordHash,
       kycResult: kycResult || null,
-      base_registration_amount: baseAmountNgn,
-      quote_amount_usd: quoteUsd,
-      fx_rate: fxRate,
-      fx_markup_pct: fxMarkupPct,
-      utm_source: req.body.utm_source || null,
+          base_registration_amount: baseAmountNgn,
+          quote_amount_usd: quoteUsd,
+          fx_rate: fxRate,
+          fx_markup_pct: fxMarkupPct,
+          lawyer_access_fee_ngn: useRentalHubLawyers ? lawyerFeeNgn : null,
+          agent_access_fee_ngn: useRentalHubAgents ? agentFeeNgn : null,
+          diasporaLawyerUsd,
+          diasporaAgentUsd,
+          utm_source: req.body.utm_source || null,
       utm_medium: req.body.utm_medium || null,
       utm_campaign: req.body.utm_campaign || null,
       utm_term: req.body.utm_term || null,
@@ -1950,9 +1994,11 @@ exports.initializeRegistrationPayment = async (req, res) => {
           state_id: registrationPricing.location?.state_id || null,
           lga_name: registrationPricing.location?.lga_name || null,
           use_rentalhub_lawyers: useRentalHubLawyers,
-          lawyer_access_fee: useRentalHubLawyers ? LAWYER_ACCESS_FEE_NGN : 0,
+          lawyer_access_fee: lawyerFeeNgn,
+          lawyer_access_fee_usd: diasporaLawyerUsd,
           use_rentalhub_agents: useRentalHubAgents,
-          agent_access_fee: useRentalHubAgents ? AGENT_ACCESS_FEE_NGN : 0,
+          agent_access_fee: agentFeeNgn,
+          agent_access_fee_usd: diasporaAgentUsd,
           total_amount: chargeableAmountNgn,
           quote_currency: isDiasporaQuote ? 'USD' : 'NGN',
           quote_amount_usd: quoteUsd,
@@ -1979,8 +2025,10 @@ exports.initializeRegistrationPayment = async (req, res) => {
         quote_amount_usd: quoteUsd,
         fx_rate: fxRate,
         fx_markup_pct: fxMarkupPct,
-        lawyer_access_fee: useRentalHubLawyers ? LAWYER_ACCESS_FEE_NGN : 0,
-        agent_access_fee: useRentalHubAgents ? AGENT_ACCESS_FEE_NGN : 0,
+        lawyer_access_fee: lawyerFeeNgn,
+        agent_access_fee: agentFeeNgn,
+        lawyer_access_fee_usd: diasporaLawyerUsd,
+        agent_access_fee_usd: diasporaAgentUsd,
         rule_scope: registrationPricing.rule_scope,
         reference,
         authorization_url: paystackResponse.data.data.authorization_url,
@@ -2422,10 +2470,19 @@ exports.getRegistrationFlags = async (req, res) => {
     // estimated naira equivalent using the current FX rate and markup.
     let diasporaBaseFeeUsd = null;
     let diasporaBaseFeeNgnEstimate = null;
+    let diasporaLawyerFeeUsd = null;
+    let diasporaLawyerFeeNgnEstimate = null;
+    let diasporaAgentFeeUsd = null;
+    let diasporaAgentFeeNgnEstimate = null;
     if (flags.diaspora_registration === true) {
       try {
         diasporaBaseFeeUsd = await getDiasporaBaseFeeUsd();
         diasporaBaseFeeNgnEstimate = await usdToNgn(diasporaBaseFeeUsd);
+        const addons = await getDiasporaAddonFeesUsd();
+        diasporaLawyerFeeUsd = addons.lawyerUsd;
+        diasporaLawyerFeeNgnEstimate = await usdToNgn(addons.lawyerUsd);
+        diasporaAgentFeeUsd = addons.agentUsd;
+        diasporaAgentFeeNgnEstimate = await usdToNgn(addons.agentUsd);
       } catch (fxError) {
         req.logger.warn('Failed to compute diaspora fee estimate:', fxError.message);
       }
@@ -2455,6 +2512,10 @@ exports.getRegistrationFlags = async (req, res) => {
         diaspora_require_foreign_card: flags.diaspora_require_foreign_card === true,
         diaspora_base_fee_usd: diasporaBaseFeeUsd,
         diaspora_base_fee_ngn_estimate: diasporaBaseFeeNgnEstimate,
+        diaspora_lawyer_fee_usd: diasporaLawyerFeeUsd,
+        diaspora_lawyer_fee_ngn_estimate: diasporaLawyerFeeNgnEstimate,
+        diaspora_agent_fee_usd: diasporaAgentFeeUsd,
+        diaspora_agent_fee_ngn_estimate: diasporaAgentFeeNgnEstimate,
         tenant_registration_payment: flags.tenant_registration_payment === true,
         landlord_registration_payment: flags.landlord_registration_payment === true,
         pricing,

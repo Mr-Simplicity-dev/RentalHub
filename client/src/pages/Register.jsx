@@ -1022,6 +1022,25 @@ return (
                   )}
                 </p>
                 <p className="mt-1 text-xs opacity-80">{t('register.modal_diaspora_vary')}</p>
+                <p className="mt-2 border-t border-emerald-200 pt-2 text-xs">
+                  {t('register.modal_diaspora_optional')}{' '}
+                  {t('register.modal_diaspora_lawyer')}{' '}
+                  <strong>
+                    {formatUsd(registrationFlags.diaspora_lawyer_fee_usd ?? 15)}
+                  </strong>
+                  {registrationFlags.diaspora_lawyer_fee_ngn_estimate ? (
+                    <> ({t('register.modal_approx')}{' '}<strong>{formatNaira(registrationFlags.diaspora_lawyer_fee_ngn_estimate)}</strong>)</>
+                  ) : null}
+                  {' · '}
+                  {t('register.modal_diaspora_agent')}{' '}
+                  <strong>
+                    {formatUsd(registrationFlags.diaspora_agent_fee_usd ?? 15)}
+                  </strong>
+                  {registrationFlags.diaspora_agent_fee_ngn_estimate ? (
+                    <> ({t('register.modal_approx')}{' '}<strong>{formatNaira(registrationFlags.diaspora_agent_fee_ngn_estimate)}</strong>)</>
+                  ) : null}
+                  .
+                </p>
               </div>
             )}
 
