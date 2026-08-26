@@ -24,6 +24,10 @@ const responseContainers = (body = {}) => [
   body.data?.verification_response,
   body.data?.verification_response?.data,
   body.data?.verification_response?.verification,
+  body.data?.verification?.data,
+  body.verification?.data,
+  body.data?.data,
+  body.result?.data,
 ].filter((value) => value && typeof value === 'object');
 
 const firstValue = (containers, keys) => {
@@ -65,6 +69,15 @@ const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
   const message =
     cleanText(firstValue(containers, ['message', 'detail', 'error'])) ||
     'Prembly verification response received';
+  const documentCountry = cleanText(
+    firstValue(containers, [
+      'document_country',
+      'issuing_country',
+      'country_code',
+      'country',
+      'nationality',
+    ])
+  );
 
   let status = 'service_error';
   if (verificationStatus === 'VERIFIED') {
@@ -96,6 +109,7 @@ const normalizePremblyResponse = (body = {}, fallbackReference = null) => {
     response_code: responseCode,
     verification_status: verificationStatus,
     billing_status: billingStatus,
+    document_country: documentCountry,
   };
 };
 

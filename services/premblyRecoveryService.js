@@ -85,6 +85,7 @@ const attemptToResult = (attempt) => {
     verification_status: attempt.verification_status || null,
     billing_status: attempt.billing_status,
     attempt_id: attempt.id,
+    document_country: attempt.document_country || null,
   };
 };
 
@@ -219,6 +220,7 @@ const applyResultWithClient = async (client, attempt, result, source) => {
          verification_status = COALESCE($5, verification_status),
          billing_status = COALESCE($6, billing_status),
          provider_message = $7,
+         document_country = COALESCE($10, document_country),
          next_check_at = CASE
            WHEN $8::boolean OR $9::integer IS NULL THEN NULL
            ELSE NOW() + ($9::text || ' minutes')::interval
@@ -237,6 +239,7 @@ const applyResultWithClient = async (client, attempt, result, source) => {
       providerMessage,
       isFinal,
       nextCheckMinutes,
+      typeof result.document_country === 'string' ? result.document_country.slice(0, 80) : null,
     ]
   );
   const updated = updatedAttempt.rows[0];

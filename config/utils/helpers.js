@@ -58,6 +58,36 @@ const validatePhone = (phone) => {
   return /^(\+234|0)[789]\d{9}$/.test(phone);
 };
 
+/**
+ * Validate a phone number against the registration tier's expected format.
+ * - local: Nigerian mobile numbers (+234/0 followed by 7/8/9 and nine digits)
+ * - diaspora: any E.164 international number (+[country][national number])
+ */
+const validatePhoneForTier = (phone, tier = 'local') => {
+  const value = String(phone || '').replace(/\s+/g, '');
+  if (!value) {
+    return { valid: false, message: 'Phone number is required' };
+  }
+
+  if (tier === 'diaspora') {
+    if (!/^\+[1-9]\d{7,14}$/.test(value)) {
+      return {
+        valid: false,
+        message: 'Enter a valid international phone number in E.164 format (for example +447911123456)',
+      };
+    }
+    return { valid: true, value, message: 'Phone number format is valid' };
+  }
+
+  if (!/^(\+234|0)[789]\d{9}$/.test(value)) {
+    return {
+      valid: false,
+      message: 'Enter a valid Nigerian mobile number (for example 08031234567 or +2348031234567)',
+    };
+  }
+  return { valid: true, value, message: 'Phone number format is valid' };
+};
+
 const getStatusColor = (status) => {
   const colors = {
     pending: 'bg-yellow-100 text-yellow-800',
@@ -78,5 +108,6 @@ module.exports = {
   truncateText,
   validateNIN,
   validatePhone,
+  validatePhoneForTier,
   getStatusColor,
 };

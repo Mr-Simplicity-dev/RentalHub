@@ -33,6 +33,13 @@ const {
   sendAgentAssignmentNoticeEmail,
 } = require('../config/utils/emailService');
 const { sendVerificationCode } = require('../config/utils/smsService');
+const { validatePhoneForTier } = require('../config/utils/helpers');
+const { isCountryNameValid } = require('../config/utils/countryWhitelist');
+const {
+  usdToNgn,
+  getUsdToNgnRate,
+  getDiasporaMarkupPct,
+} = require('../config/utils/fxRates');
 const {
   ensurePlatformLawyerSchema,
   hashPlatformLawyerInviteToken,
@@ -140,6 +147,11 @@ const FRONTEND_URL = getFrontendUrl();
 const REGISTRATION_PRICING_TARGETS = {
   tenant: 'tenant_registration',
   landlord: 'landlord_registration',
+};
+
+const REGISTRATION_PRICING_TARGETS_DIASPORA = {
+  tenant: 'tenant_registration_diaspora',
+  landlord: 'landlord_registration_diaspora',
 };
 
 const hashInviteToken = (token) =>
@@ -321,18 +333,22 @@ const ensureTenantRegistrationPaymentSchema = async () => {
   tenantRegistrationPaymentSchemaReady = true;
 };
 
-const getRegistrationPaymentConfig = (userType, flags) => {
+const getRegistrationPaymentConfig = (userType, flags, isDiaspora = false) => {
   if (userType === 'tenant') {
     return {
-      enabled: flags.tenant_registration_payment === true,
-      amount: TENANT_REGISTRATION_FEE_NGN,
+      enabled: isDiaspora
+        ? flags.diaspora_registration_payment === true
+        : flags.tenant_registration_payment === true,
+      amount: isDiaspora ? 12.85 : TENANT_REGISTRATION_FEE_NGN,
     };
   }
 
   if (userType === 'landlord') {
     return {
-      enabled: flags.landlord_registration_payment === true,
-      amount: LANDLORD_REGISTRATION_FEE_NGN,
+      enabled: isDiaspora
+        ? flags.diaspora_registration_payment === true
+        : flags.landlord_registration_payment === true,
+      amount: isDiaspora ? 12.85 : LANDLORD_REGISTRATION_FEE_NGN,
     };
   }
 
@@ -348,21 +364,61 @@ const buildRegistrationPricingQuote = async ({
   stateId,
   lgaName,
   strictLocation = false,
+  tier = 'local',
 }) => {
-  const paymentConfig = getRegistrationPaymentConfig(userType, flags);
-  const pricingTarget = REGISTRATION_PRICING_TARGETS[userType] || null;
+  const isDiaspora = tier === 'diaspora';
+  const pricingTarget = isDiaspora
+    ? REGISTRATION_PRICING_TARGETS_DIASPORA[userType] || null
+    : REGISTRATION_PRICING_TARGETS[userType] || null;
 
   if (!pricingTarget) {
     return {
+      enabled: false,
+      amount: 0,
+    };
+  }
+
+  const paymentConfig = getRegistrationPaymentConfig(userType, flags, isDiaspora);
+
+  if (!paymentConfig.enabled) {
+    return {
       ...paymentConfig,
-      pricing_target: null,
-      base_amount: paymentConfig.amount,
-      amount: paymentConfig.amount,
-      rule_scope: 'base',
-      matched_rule: null,
-      location_required: false,
-      location_complete: false,
-      location: null,
+      amount: 0,
+    };
+  }
+
+  // Diaspora pricing: the fee depends on the Nigerian state the applicant
+  // wants to rent in (mineral states carry a higher premium). Only the state
+  // is required — LGA is a local-tier detail.
+  if (isDiaspora) {
+    if (!stateId) {
+      const error = new Error('The Nigerian state you want to rent in is required to calculate the diaspora fee');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const quote = await getLocationPricingQuote({
+      appliesTo: pricingTarget,
+      stateId,
+      lgaName: null,
+    });
+
+    const baseFeeUsd = await getDiasporaBaseFeeUsd();
+    const amountUsd = Number(quote.amount || baseFeeUsd);
+
+    return {
+      ...paymentConfig,
+      pricing_target: pricingTarget,
+      base_amount: baseFeeUsd,
+      amount: amountUsd,
+      currency: 'USD',
+      rule_scope: quote.rule_scope,
+      matched_rule: quote.matched_rule,
+      location_required: true,
+      location_complete: Boolean(quote.matched_rule || stateId),
+      location: quote.matched_rule?.state_id
+        ? { state_id: quote.matched_rule.state_id }
+        : null,
     };
   }
 
@@ -407,6 +463,7 @@ const buildRegistrationPricingQuote = async ({
     pricing_target: pricingTarget,
     base_amount: quote.base_amount,
     amount: quote.amount,
+    currency: quote.currency || 'NGN',
     rule_scope: quote.rule_scope,
     matched_rule: quote.matched_rule,
     location_required: paymentConfig.enabled,
@@ -415,6 +472,14 @@ const buildRegistrationPricingQuote = async ({
     ),
     location: resolvedLocation,
   };
+};
+
+const getDiasporaBaseFeeUsd = async () => {
+  const result = await db.query(
+    `SELECT value FROM app_settings WHERE key = 'diaspora_base_fee_usd'`
+  );
+  const configured = Number(result.rows[0]?.value?.value);
+  return Number.isFinite(configured) && configured > 0 ? configured : 12.85;
 };
 
 const withPreparedRegistrationLocation = (
@@ -670,6 +735,23 @@ const validateAndPrepareRegistration = async (payload) => {
     is_foreigner === 1 ||
     is_foreigner === '1';
 
+  const registrationTier = isForeigner ? 'diaspora' : 'local';
+
+  // Diaspora registrations are opt-in via feature flag — fail before any
+  // paid identity verification is attempted.
+  if (registrationTier === 'diaspora' && flags.diaspora_registration !== true) {
+    const error = new Error('Diaspora registration is currently disabled');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const phoneValidation = validatePhoneForTier(phone, registrationTier);
+  if (!phoneValidation.valid) {
+    const error = new Error(phoneValidation.message);
+    error.statusCode = 400;
+    throw error;
+  }
+
   const isNINEnabled = flags.nin_number !== false;
   const isPassportEnabled = flags.passport_number !== false;
   const submittedNIN = String(nin || '').trim();
@@ -678,8 +760,21 @@ const validateAndPrepareRegistration = async (payload) => {
   let cleanNIN = null;
   let cleanPassportNumber = null;
   const submittedNationality = nationality ? String(nationality).trim() : '';
-  const cleanNationality = submittedNationality || (isForeigner ? 'Foreign' : 'Nigeria');
-  const isNigerianNationality = /^nigeria(n)?$/i.test(cleanNationality);
+  const isNigerianNationality = /^nigeria(n)?$/i.test(submittedNationality);
+
+  if (isForeigner && !submittedNationality) {
+    const error = new Error('Nationality is required for diaspora registration');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (isForeigner && !isCountryNameValid(submittedNationality)) {
+    const error = new Error('Nationality must be a recognised country name');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cleanNationality = submittedNationality || 'Nigeria';
 
   let ninVerified = false;
   let verificationMeta = null;
@@ -859,6 +954,21 @@ const validateAndPrepareRegistration = async (payload) => {
     }
   }
 
+  let passportIssuingCountry = null;
+  if (identityType === 'passport') {
+    // The passport's actual issuing country comes from the Prembly response.
+    // A passport issued by Nigeria must use the local NIN path — a Nigerian
+    // cannot claim diaspora status with a Nigerian document.
+    passportIssuingCountry = passportResult?.document_country || null;
+    if (passportIssuingCountry && /^nigeria(n)?$/i.test(String(passportIssuingCountry))) {
+      const error = new Error(
+        'Nigerian-issued passports must register with NIN using the local path'
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
   await assertUniqueUserFields(db, {
     email: cleanEmail,
     phone: cleanPhone,
@@ -905,6 +1015,9 @@ const validateAndPrepareRegistration = async (payload) => {
       identityType,
       cleanPassportNumber,
       cleanNationality,
+      registrationTier,
+      passportIssuingCountry,
+      diasporaCountry: registrationTier === 'diaspora' ? cleanNationality : null,
       optionalAgentInvite,
       referralCode: cleanReferralCode || null,
     },
@@ -1177,6 +1290,11 @@ const createUserFromPreparedRegistration = async ({
          preferred_state_id,
          preferred_lga_name,
          kyc_metadata,
+         registration_tier,
+         passport_issuing_country,
+         diaspora_country,
+         billing_country,
+         card_brand,
          utm_source,
          utm_medium,
          utm_campaign,
@@ -1184,7 +1302,7 @@ const createUserFromPreparedRegistration = async ({
          utm_content,
          utm_captured_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
        RETURNING id, email, full_name, user_type, created_at,
                  identity_document_type, nin_verified, nationality,
                  preferred_state_id, preferred_lga_name`,
@@ -1203,6 +1321,11 @@ const createUserFromPreparedRegistration = async ({
         preparedRegistration.preferredStateId,
         preparedRegistration.preferredLgaName,
         kycMetadata,
+        preparedRegistration.registrationTier || 'local',
+        preparedRegistration.passportIssuingCountry || null,
+        preparedRegistration.diasporaCountry || null,
+        preparedRegistration.billingCountry || null,
+        preparedRegistration.cardBrand || null,
         utm?.utm_source || null,
         utm?.utm_medium || null,
         utm?.utm_campaign || null,
@@ -1560,6 +1683,7 @@ exports.register = async (req, res) => {
       stateId: req.body.state_id,
       lgaName: req.body.lga_name,
       strictLocation: false,
+      tier: preparedRegistration.registrationTier,
     });
     await assertRegistrationAllowed({
       userType: preparedRegistration.user_type,
@@ -1580,6 +1704,7 @@ exports.register = async (req, res) => {
         data: {
           amount: registrationPricing.amount,
           base_amount: registrationPricing.base_amount,
+          currency: registrationPricing.currency || 'NGN',
           location_required: registrationPricing.location_required,
           location_complete: registrationPricing.location_complete,
           rule_scope: registrationPricing.rule_scope,
@@ -1675,6 +1800,7 @@ exports.initializeRegistrationPayment = async (req, res) => {
       stateId: req.body.state_id,
       lgaName: req.body.lga_name,
       strictLocation: true,
+      tier: preparedRegistration.registrationTier,
     });
 
     if (!registrationPricing.enabled) {
@@ -1682,6 +1808,23 @@ exports.initializeRegistrationPayment = async (req, res) => {
         success: false,
         message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment is currently disabled`
       });
+    }
+
+    const isDiasporaQuote = preparedRegistration.registrationTier === 'diaspora';
+
+    // ── Diaspora: convert the USD quote to the NGN charge (Paystack settles
+    //    in naira). The USD quote, FX rate and markup are stored for audit.
+    let quoteUsd = null;
+    let fxRate = null;
+    let fxMarkupPct = null;
+    let baseAmountNgn = 0;
+    if (isDiasporaQuote) {
+      quoteUsd = Number(registrationPricing.amount || 0);
+      fxMarkupPct = await getDiasporaMarkupPct();
+      fxRate = await getUsdToNgnRate();
+      baseAmountNgn = await usdToNgn(quoteUsd);
+    } else {
+      baseAmountNgn = Number(registrationPricing.amount || 0);
     }
 
     // ── Add optional add-on fees to the base registration amount ──────────
@@ -1700,15 +1843,14 @@ exports.initializeRegistrationPayment = async (req, res) => {
 
     // Preserve the pure base amount before adding on fees
     const baseAmount = Number(registrationPricing.amount || 0);
+    let chargeableAmountNgn = baseAmountNgn;
 
     if (useRentalHubLawyers) {
-      registrationPricing.amount = baseAmount + LAWYER_ACCESS_FEE_NGN;
-      registrationPricing.lawyer_access_fee = LAWYER_ACCESS_FEE_NGN;
+      chargeableAmountNgn += LAWYER_ACCESS_FEE_NGN;
     }
 
     if (useRentalHubAgents) {
-      registrationPricing.amount = Number(registrationPricing.amount || 0) + AGENT_ACCESS_FEE_NGN;
-      registrationPricing.agent_access_fee = AGENT_ACCESS_FEE_NGN;
+      chargeableAmountNgn += AGENT_ACCESS_FEE_NGN;
     }
     // ──────────────────────────────────────────────────────────────────────
 
@@ -1730,15 +1872,23 @@ exports.initializeRegistrationPayment = async (req, res) => {
         amount,
         transaction_reference,
         registration_payload,
-        verification_meta
+        verification_meta,
+        registration_tier,
+        target_state_id,
+        quote_currency,
+        quote_amount_usd,
+        fx_rate,
+        fx_markup_pct,
+        amount_ngn,
+        passport_issuing_country
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
         preparedRegistrationWithLocation.user_type,
         preparedRegistrationWithLocation.email,
         preparedRegistrationWithLocation.phone,
         preparedRegistrationWithLocation.full_name,
-        registrationPricing.amount,
+        chargeableAmountNgn,
         reference,
         JSON.stringify({
           ...preparedRegistrationWithLocation,
@@ -1746,14 +1896,25 @@ exports.initializeRegistrationPayment = async (req, res) => {
           lga_name: registrationPricing.location?.lga_name || null,
           password_hash: passwordHash,
           kycResult: kycResult || null,
-          base_registration_amount: baseAmount,
+          base_registration_amount: baseAmountNgn,
+          quote_amount_usd: quoteUsd,
+          fx_rate: fxRate,
+          fx_markup_pct: fxMarkupPct,
           utm_source: req.body.utm_source || null,
           utm_medium: req.body.utm_medium || null,
           utm_campaign: req.body.utm_campaign || null,
           utm_term: req.body.utm_term || null,
           utm_content: req.body.utm_content || null,
         }),
-        verificationMeta ? JSON.stringify(verificationMeta) : null
+        verificationMeta ? JSON.stringify(verificationMeta) : null,
+        preparedRegistrationWithLocation.registrationTier,
+        registrationPricing.location?.state_id || req.body.state_id || null,
+        isDiasporaQuote ? 'USD' : 'NGN',
+        quoteUsd,
+        fxRate,
+        fxMarkupPct,
+        baseAmountNgn,
+        preparedRegistrationWithLocation.passportIssuingCountry || null,
       ]
     );
 
@@ -1761,12 +1922,13 @@ exports.initializeRegistrationPayment = async (req, res) => {
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
         email: preparedRegistration.email,
-        amount: registrationPricing.amount * 100,
+        amount: chargeableAmountNgn * 100,
         reference,
         callback_url: `${FRONTEND_URL}/register`,
         metadata: {
           payment_type: 'registration_fee',
           user_type: preparedRegistration.user_type,
+          registration_tier: preparedRegistrationWithLocation.registrationTier,
           email: preparedRegistration.email,
           phone: preparedRegistration.phone,
           state_id: registrationPricing.location?.state_id || null,
@@ -1775,7 +1937,11 @@ exports.initializeRegistrationPayment = async (req, res) => {
           lawyer_access_fee: useRentalHubLawyers ? LAWYER_ACCESS_FEE_NGN : 0,
           use_rentalhub_agents: useRentalHubAgents,
           agent_access_fee: useRentalHubAgents ? AGENT_ACCESS_FEE_NGN : 0,
-          total_amount: registrationPricing.amount,
+          total_amount: chargeableAmountNgn,
+          quote_currency: isDiasporaQuote ? 'USD' : 'NGN',
+          quote_amount_usd: quoteUsd,
+          fx_rate: fxRate,
+          fx_markup_pct: fxMarkupPct,
         }
       },
       {
@@ -1790,8 +1956,13 @@ exports.initializeRegistrationPayment = async (req, res) => {
       success: true,
       message: `${preparedRegistration.user_type === 'tenant' ? 'Tenant' : 'Landlord'} registration payment initialized`,
       data: {
-        amount: registrationPricing.amount,
-        base_amount: baseAmount,
+        amount: chargeableAmountNgn,
+        currency: 'NGN',
+        base_amount: baseAmountNgn,
+        quote_currency: isDiasporaQuote ? 'USD' : 'NGN',
+        quote_amount_usd: quoteUsd,
+        fx_rate: fxRate,
+        fx_markup_pct: fxMarkupPct,
         lawyer_access_fee: useRentalHubLawyers ? LAWYER_ACCESS_FEE_NGN : 0,
         agent_access_fee: useRentalHubAgents ? AGENT_ACCESS_FEE_NGN : 0,
         rule_scope: registrationPricing.rule_scope,
@@ -1884,21 +2055,61 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
         });
       }
 
+      // Capture the funding card's issuing country and brand from Paystack's
+      // authorization details — used to detect Nigerian-funded diaspora payments.
+      const authorization = transaction.authorization || {};
+      const billingCountry = String(
+        authorization.bin_country ||
+        authorization.country_code ||
+        ''
+      ).trim().toUpperCase() || null;
+      const cardBrand = String(
+        authorization.brand ||
+        authorization.card_type ||
+        ''
+      ).trim() || null;
+
       await db.query(
         `UPDATE tenant_registration_payments
          SET payment_status = 'completed',
              completed_at = CURRENT_TIMESTAMP,
-             gateway_response = $1
+             gateway_response = $1,
+             billing_country = $3,
+             card_brand = $4
          WHERE transaction_reference = $2`,
-        [JSON.stringify(transaction), reference]
+        [JSON.stringify(transaction), reference, billingCountry, cardBrand]
       );
 
       tenantRegistrationPayment.payment_status = 'completed';
       tenantRegistrationPayment.completed_at = new Date();
       tenantRegistrationPayment.gateway_response = transaction;
+      tenantRegistrationPayment.billing_country = billingCountry;
+      tenantRegistrationPayment.card_brand = cardBrand;
     }
 
+    // Diaspora tier: a Nigerian-funded card is only a review flag unless the
+    // super admin enables diaspora_require_foreign_card, which hard-blocks it.
     const storedPayload = tenantRegistrationPayment.registration_payload || {};
+    const storedTier = storedPayload.registrationTier || 'local';
+    if (storedTier === 'diaspora') {
+      const diasporaFlags = await getFeatureFlagsMap();
+      const billingCountry = String(
+        tenantRegistrationPayment.billing_country ||
+        tenantRegistrationPayment.gateway_response?.authorization?.bin_country ||
+        ''
+      ).toUpperCase();
+
+      if (
+        diasporaFlags.diaspora_require_foreign_card === true &&
+        billingCountry === 'NG'
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Diaspora registration requires a foreign-issued payment card. Nigerian-issued cards are not accepted for diaspora registrations.'
+        });
+      }
+    }
+
     const verificationMeta = tenantRegistrationPayment.verification_meta || null;
     const kycResult = storedPayload.kycResult || null;
     const preparedRegistration = {
@@ -1916,6 +2127,13 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       identityType: storedPayload.identityType || null,
       cleanPassportNumber: storedPayload.cleanPassportNumber || null,
       cleanNationality: storedPayload.cleanNationality || 'Nigeria',
+      registrationTier: storedTier,
+      passportIssuingCountry: storedPayload.passportIssuingCountry || null,
+      diasporaCountry: storedTier === 'diaspora'
+        ? (storedPayload.diasporaCountry || storedPayload.cleanNationality || null)
+        : null,
+      billingCountry: tenantRegistrationPayment.billing_country || null,
+      cardBrand: tenantRegistrationPayment.card_brand || null,
       optionalAgentInvite: storedPayload.optionalAgentInvite || null,
       referralCode: normalizeReferralCode(storedPayload.referralCode || storedPayload.referral_code),
       preferredStateId:
@@ -2133,13 +2351,28 @@ exports.getRegistrationFlags = async (req, res) => {
         lgaName: req.query.lga_name,
       });
 
-      pricing = await buildRegistrationPricingQuote({
-        userType,
-        flags,
-        stateId: req.query.state_id,
-        lgaName: req.query.lga_name,
-        strictLocation: false,
-      });
+      const tier = ['diaspora', 'local'].includes(String(req.query.tier || '').toLowerCase())
+        ? String(req.query.tier).toLowerCase()
+        : 'local';
+
+      if (tier === 'diaspora' && !req.query.state_id) {
+        pricing = {
+          enabled: flags.diaspora_registration_payment === true,
+          location_required: true,
+          location_complete: false,
+          currency: 'USD',
+          message: 'Select the Nigerian state you want to rent in to see your diaspora fee',
+        };
+      } else {
+        pricing = await buildRegistrationPricingQuote({
+          userType,
+          flags,
+          stateId: req.query.state_id,
+          lgaName: req.query.lga_name,
+          strictLocation: false,
+          tier,
+        });
+      }
     }
 
     const registrationMasterEnabled = isRegistrationMasterEnabled(flags);
@@ -2168,6 +2401,9 @@ exports.getRegistrationFlags = async (req, res) => {
         registration_access_message: registrationAccess?.message || null,
         nin_number: flags.nin_number !== false,
         passport_number: flags.passport_number !== false,
+        diaspora_registration: flags.diaspora_registration === true,
+        diaspora_registration_payment: flags.diaspora_registration_payment === true,
+        diaspora_require_foreign_card: flags.diaspora_require_foreign_card === true,
         tenant_registration_payment: flags.tenant_registration_payment === true,
         landlord_registration_payment: flags.landlord_registration_payment === true,
         pricing,
