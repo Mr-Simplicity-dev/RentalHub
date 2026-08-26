@@ -1861,26 +1861,57 @@ exports.initializeRegistrationPayment = async (req, res) => {
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(plainPassword, salt);
-    const reference = `REGPAY_${preparedRegistration.user_type.toUpperCase()}_${Date.now()}`;
+    // Unguessable reference: a timestamp-only reference lets an attacker
+    // enumerate pending registrations and complete (hijack) them first.
+    const reference = `REGPAY_${preparedRegistration.user_type.toUpperCase()}_${Date.now()}_${require('crypto').randomBytes(6).toString('hex')}`;
+
+    // NIN / passport numbers are stored encrypted at rest (same AES-256-GCM
+    // used for users.nin). Falls back to plaintext only when the encryption
+    // key is not configured, so a DB dump never exposes raw identity numbers.
+    const { encryptNIN } = require('../config/utils/ninEncryption');
+    const storeIdentityAtRest = (value) => {
+      if (typeof value !== 'string' || !value.trim()) return null;
+      const encrypted = encryptNIN(value);
+      return encrypted || value.trim();
+    };
+
+    const registrationPayload = {
+      ...preparedRegistrationWithLocation,
+      cleanNIN: storeIdentityAtRest(preparedRegistrationWithLocation.cleanNIN),
+      cleanPassportNumber: storeIdentityAtRest(preparedRegistrationWithLocation.cleanPassportNumber),
+      state_id: registrationPricing.location?.state_id || null,
+      lga_name: registrationPricing.location?.lga_name || null,
+      password_hash: passwordHash,
+      kycResult: kycResult || null,
+      base_registration_amount: baseAmountNgn,
+      quote_amount_usd: quoteUsd,
+      fx_rate: fxRate,
+      fx_markup_pct: fxMarkupPct,
+      utm_source: req.body.utm_source || null,
+      utm_medium: req.body.utm_medium || null,
+      utm_campaign: req.body.utm_campaign || null,
+      utm_term: req.body.utm_term || null,
+      utm_content: req.body.utm_content || null,
+    };
 
     await db.query(
       `INSERT INTO tenant_registration_payments (
          user_type,
          email,
          phone,
-        full_name,
-        amount,
-        transaction_reference,
-        registration_payload,
-        verification_meta,
-        registration_tier,
-        target_state_id,
-        quote_currency,
-        quote_amount_usd,
-        fx_rate,
-        fx_markup_pct,
-        amount_ngn,
-        passport_issuing_country
+         full_name,
+         amount,
+         transaction_reference,
+         registration_payload,
+         verification_meta,
+         registration_tier,
+         target_state_id,
+         quote_currency,
+         quote_amount_usd,
+         fx_rate,
+         fx_markup_pct,
+         amount_ngn,
+         passport_issuing_country
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
@@ -1890,22 +1921,7 @@ exports.initializeRegistrationPayment = async (req, res) => {
         preparedRegistrationWithLocation.full_name,
         chargeableAmountNgn,
         reference,
-        JSON.stringify({
-          ...preparedRegistrationWithLocation,
-          state_id: registrationPricing.location?.state_id || null,
-          lga_name: registrationPricing.location?.lga_name || null,
-          password_hash: passwordHash,
-          kycResult: kycResult || null,
-          base_registration_amount: baseAmountNgn,
-          quote_amount_usd: quoteUsd,
-          fx_rate: fxRate,
-          fx_markup_pct: fxMarkupPct,
-          utm_source: req.body.utm_source || null,
-          utm_medium: req.body.utm_medium || null,
-          utm_campaign: req.body.utm_campaign || null,
-          utm_term: req.body.utm_term || null,
-          utm_content: req.body.utm_content || null,
-        }),
+        JSON.stringify(registrationPayload),
         verificationMeta ? JSON.stringify(verificationMeta) : null,
         preparedRegistrationWithLocation.registrationTier,
         registrationPricing.location?.state_id || req.body.state_id || null,
@@ -2055,6 +2071,17 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
         });
       }
 
+      // Bind the payment to the person who initialized it: reject completions
+      // where the Paystack customer email does not match the registration.
+      const txEmail = String(transaction.customer?.email || '').trim().toLowerCase();
+      const registrationEmail = String(tenantRegistrationPayment.email || '').trim().toLowerCase();
+      if (txEmail && registrationEmail && txEmail !== registrationEmail) {
+        return res.status(402).json({
+          success: false,
+          message: 'Payment was made by a different email - please re-register with the correct details'
+        });
+      }
+
       // Capture the funding card's issuing country and brand from Paystack's
       // authorization details — used to detect Nigerian-funded diaspora payments.
       const authorization = transaction.authorization || {};
@@ -2112,6 +2139,15 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
 
     const verificationMeta = tenantRegistrationPayment.verification_meta || null;
     const kycResult = storedPayload.kycResult || null;
+    // Identity numbers were encrypted at rest during initialization; decrypt
+    // them back to their plaintext form only when the payload value carries
+    // the iv:authTag:ciphertext envelope (legacy plaintext passes through).
+    const decryptStoredIdentity = (value) => {
+      if (typeof value === 'string' && value.split(':').length === 3) {
+        return decryptNIN(value);
+      }
+      return value || null;
+    };
     const preparedRegistration = {
       email: storedPayload.email,
       phone: storedPayload.phone,
@@ -2122,10 +2158,10 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
         user_type:
         tenantRegistrationPayment.user_type ||
         storedPayload.user_type,
-      cleanNIN: storedPayload.cleanNIN || null,
+      cleanNIN: decryptStoredIdentity(storedPayload.cleanNIN),
       ninVerified: storedPayload.ninVerified === true,
       identityType: storedPayload.identityType || null,
-      cleanPassportNumber: storedPayload.cleanPassportNumber || null,
+      cleanPassportNumber: decryptStoredIdentity(storedPayload.cleanPassportNumber),
       cleanNationality: storedPayload.cleanNationality || 'Nigeria',
       registrationTier: storedTier,
       passportIssuingCountry: storedPayload.passportIssuingCountry || null,
