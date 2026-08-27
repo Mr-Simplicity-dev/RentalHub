@@ -5,6 +5,7 @@ const nigeriaLocations = require('../data/nigeriaLocations');
 const { getSitemapUrls } = require('../config/utils/seoPageService');
 const { generateSitemap } = require('../config/utils/sitemapGenerator');
 const { submitUrl } = require('../config/utils/googleIndexing');
+const slugify = require('../config/utils/slugify');
 const Ranking = require('../models/Ranking');
 const { runConfiguredRankingChecks } = require('../config/utils/rankChecker');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
@@ -24,7 +25,7 @@ router.get('/', authenticate, requireAdminOrSuperAdmin, async (req, res) => {
       db.query(`SELECT COUNT(*)::INT AS total FROM states`),
       db.query(
         `SELECT
-           s.id, s.state_name, s.state_slug,
+           s.id, s.state_name,
            COALESCE(prop.property_count, 0)::INT AS property_count
          FROM states s
          LEFT JOIN (
@@ -68,6 +69,12 @@ router.get('/', authenticate, requireAdminOrSuperAdmin, async (req, res) => {
     const statesWithPages = stateBreakdown.rows.filter(s => s.property_count > 0).length;
     const statesWithNoProperties = stateBreakdown.rows.filter(s => s.property_count === 0).length;
 
+    // state_slug is derived from state_name — the states table has no slug column
+    const normalizedStateBreakdown = stateBreakdown.rows.map((state) => ({
+      ...state,
+      state_slug: slugify(state.state_name),
+    }));
+
     res.json({
       success: true,
       summary: {
@@ -80,7 +87,7 @@ router.get('/', authenticate, requireAdminOrSuperAdmin, async (req, res) => {
         statesWithPages,
         statesWithNoProperties,
       },
-      stateBreakdown: stateBreakdown.rows,
+      stateBreakdown: normalizedStateBreakdown,
     });
   } catch (error) {
     req.logger.error('SEO summary error:', error);
