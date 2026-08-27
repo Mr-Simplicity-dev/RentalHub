@@ -390,6 +390,43 @@ router.get('/wallet/landlord-balance',
   refundController.getLandlordWalletBalance
 );
 
+// Tenant + Landlord: full wallet transaction history (funding, rent credits,
+// refunds, withdrawals) with optional payment_id filter for receipt detail.
+router.get('/wallet/transactions',
+  authenticate,
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+      const paymentId = req.query.payment_id
+        ? Number.parseInt(req.query.payment_id, 10)
+        : null;
+      const params = [userId, limit];
+      let paymentFilter = '';
+      if (Number.isInteger(paymentId) && paymentId > 0) {
+        params.push(paymentId);
+        paymentFilter = ' AND wt.payment_id = $3';
+      }
+      const result = await db.query(
+        `SELECT wt.id, wt.payment_id, wt.amount, wt.type, wt.status, wt.source,
+                wt.description, wt.reference, wt.available_at, wt.cleared_at,
+                wt.metadata, wt.created_at,
+                p.transaction_reference
+         FROM wallet_transactions wt
+         LEFT JOIN payments p ON p.id = wt.payment_id
+         WHERE wt.user_id = $1${paymentFilter}
+         ORDER BY wt.created_at DESC, wt.id DESC
+         LIMIT $2`,
+        params
+      );
+      res.json({ success: true, data: result.rows });
+    } catch (error) {
+      req.logger.error('Get wallet transactions error:', error);
+      res.status(500).json({ success: false, message: 'Failed to load wallet transactions' });
+    }
+  }
+);
+
 // Tenant + Landlord: request a withdrawal to bank account
 router.post('/wallet/withdraw',
   authenticate,

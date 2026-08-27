@@ -74,6 +74,12 @@ export const paymentService = {
     return response.data;
   },
 
+  // Get wallet transaction history (optional payment_id filter for receipts)
+  getWalletTransactions: async (params) => {
+    const response = await api.get('/payments/wallet/transactions', { params });
+    return response.data;
+  },
+
   // Get payment details
   getPaymentDetails: async (paymentId) => {
     const response = await api.get(`/payments/${paymentId}`);

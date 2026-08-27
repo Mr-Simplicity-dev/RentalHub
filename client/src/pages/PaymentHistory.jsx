@@ -56,6 +56,23 @@ const PaymentHistory = () => {
   const [loading, setLoading] = useState(true);
   const [payingPaymentId, setPayingPaymentId] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [receiptDeductions, setReceiptDeductions] = useState([]);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+
+  const openReceipt = async (payment) => {
+    setSelectedReceipt(payment);
+    setReceiptDeductions([]);
+    if (!payment.id) return;
+    setReceiptLoading(true);
+    try {
+      const res = await paymentService.getWalletTransactions({ payment_id: payment.id, limit: 20 });
+      setReceiptDeductions(res.data || []);
+    } catch {
+      setReceiptDeductions([]);
+    } finally {
+      setReceiptLoading(false);
+    }
+  };
 
   const loadPayments = useCallback(async () => {
     setLoading(true);
@@ -154,7 +171,7 @@ const PaymentHistory = () => {
                   )}
                   {payment.payment_status === 'completed' && (
                     <button
-                      onClick={() => setSelectedReceipt(payment)}
+                      onClick={() => openReceipt(payment)}
                       className="mt-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
                     >
                       <FaReceipt className="mr-1.5" /> View Receipt
@@ -252,6 +269,33 @@ const PaymentHistory = () => {
                     {selectedReceipt.payment_method || 'Paystack'}
                   </span>
                 </div>
+                {receiptDeductions.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs font-semibold text-gray-700">Breakdown</p>
+                    {receiptDeductions.map((tx) => {
+                      const fee = Number(tx.metadata?.platform_fee || 0);
+                      return (
+                        <div key={tx.id} className="mt-1.5 space-y-0.5 text-xs text-gray-600">
+                          <div className="flex items-center justify-between">
+                            <span>{tx.type === 'credit' ? 'Amount credited' : 'Amount deducted'}</span>
+                            <span className="font-semibold text-gray-900">
+                              {tx.type === 'credit' ? '+' : '−'}₦{Number(tx.amount).toLocaleString()}
+                            </span>
+                          </div>
+                          {fee > 0 && (
+                            <div className="flex items-center justify-between">
+                              <span>Platform fee deducted ({tx.metadata?.platform_fee_rate ? `${Number(tx.metadata.platform_fee_rate) * 100}%` : ''})</span>
+                              <span className="font-semibold text-red-600">−₦{fee.toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {receiptLoading && (
+                  <p className="mt-2 text-xs text-gray-400">Loading breakdown…</p>
+                )}
               </div>
               <div className="mt-6 border-t border-gray-200 pt-4 text-center text-xs text-gray-400">
                 Thank you for using RentalHub NG.

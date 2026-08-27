@@ -1,5 +1,23 @@
-import React, { useMemo, useState } from 'react';
-import { FaCheckCircle, FaTimes, FaWallet } from 'react-icons/fa';
+import React, { useEffect, useMemo, useState } from 'react';
+import { FaCheckCircle, FaTimes, FaWallet, FaHistory } from 'react-icons/fa';
+import api from '../services/api';
+
+const TYPE_LABELS = {
+  wallet_funding: 'Wallet Funding',
+  rent_payment: 'Rent Credit',
+  rent_refund: 'Refund Reversal',
+  refund: 'Refund',
+  rent_savings: 'Rent Savings',
+  withdrawal: 'Withdrawal',
+  general: 'General',
+};
+
+const STATUS_STYLES = {
+  pending: 'bg-amber-100 text-amber-700',
+  cleared: 'bg-green-100 text-green-700',
+  reversed: 'bg-red-100 text-red-700',
+  withdrawn: 'bg-slate-100 text-slate-600',
+};
 
 export default function WalletFundModal({
   isOpen,
@@ -12,6 +30,19 @@ export default function WalletFundModal({
   onSwitchToWithdraw,
 }) {
   const [amount, setAmount] = useState('');
+  const [transactions, setTransactions] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setShowHistory(false);
+    setHistoryLoading(true);
+    api.get('/payments/wallet/transactions', { params: { limit: 20 } })
+      .then((res) => setTransactions(res.data?.data || []))
+      .catch(() => setTransactions([]))
+      .finally(() => setHistoryLoading(false));
+  }, [isOpen]);
 
   const selectedBalance = useMemo(() => {
     if (userType === 'tenant') return walletBalance;
@@ -103,6 +134,62 @@ export default function WalletFundModal({
           >
             Need to withdraw instead? Open Withdraw Funds
           </button>
+
+          {/* Wallet transaction history (real data) */}
+          <div className="border-t border-gray-100 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowHistory((prev) => !prev)}
+              className="flex w-full items-center justify-between text-sm font-semibold text-gray-700 hover:text-teal-700"
+            >
+              <span className="flex items-center gap-2">
+                <FaHistory className="text-teal-500" /> Transaction History
+              </span>
+              <span>{showHistory ? 'Hide' : `Show (${transactions.length})`}</span>
+            </button>
+
+            {showHistory && (
+              <div className="mt-3 max-h-64 overflow-y-auto rounded-xl border border-gray-200">
+                {historyLoading ? (
+                  <p className="px-4 py-6 text-center text-sm text-gray-400">Loading transactions…</p>
+                ) : transactions.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-sm text-gray-400">No wallet transactions yet.</p>
+                ) : (
+                  transactions.map((tx) => {
+                    const fee = Number(tx.metadata?.platform_fee || 0);
+                    return (
+                      <div key={tx.id} className="border-b border-gray-100 px-4 py-3 last:border-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-gray-900">
+                              {TYPE_LABELS[tx.source] || tx.source?.replace(/_/g, ' ') || 'Transaction'}
+                            </p>
+                            <p className="truncate text-xs text-gray-500">
+                              {new Date(tx.created_at).toLocaleString()}
+                              {tx.reference ? ` • ${tx.reference}` : ''}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className={`text-sm font-bold ${tx.type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
+                              {tx.type === 'credit' ? '+' : '−'}₦{Number(tx.amount).toLocaleString()}
+                            </p>
+                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[tx.status] || 'bg-gray-100 text-gray-600'}`}>
+                              {tx.status}
+                            </span>
+                          </div>
+                        </div>
+                        {fee > 0 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Platform fee deducted: ₦{fee.toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
