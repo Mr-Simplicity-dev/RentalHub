@@ -142,6 +142,7 @@ const AdminLayout = () => {
   const [selectedNotification, setSelectedNotification] = useState(null);
   const notifRef = useRef(null);
   const notifRefMobile = useRef(null);
+  const notifDropdownRef = useRef(null);
   const prevUnreadRef = useRef(0);
   const prevLanguageRef = useRef(null);
 
@@ -304,7 +305,11 @@ const AdminLayout = () => {
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target) && notifRefMobile.current && !notifRefMobile.current.contains(e.target)) setShowNotifications(false);
+      if (
+        notifRef.current && !notifRef.current.contains(e.target) &&
+        notifRefMobile.current && !notifRefMobile.current.contains(e.target) &&
+        notifDropdownRef.current && !notifDropdownRef.current.contains(e.target)
+      ) setShowNotifications(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -1429,7 +1434,10 @@ const AdminLayout = () => {
         </header>
 
         {showNotifications && (
-          <div className="fixed left-2 right-2 top-20 z-50 flex max-h-[70vh] w-auto max-w-[calc(100vw-16px)] origin-top-right flex-col rounded-2xl border border-gray-100 bg-white py-2 shadow-elevated-lg lg:left-auto lg:right-4 lg:top-16 lg:w-96">
+          <div
+            ref={notifDropdownRef}
+            className="fixed left-2 right-2 top-20 z-50 flex max-h-[70vh] w-auto max-w-[calc(100vw-16px)] origin-top-right flex-col rounded-2xl border border-gray-100 bg-white py-2 shadow-elevated-lg lg:left-auto lg:right-4 lg:top-16 lg:w-96"
+          >
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
               <h3 className="text-sm font-semibold text-gray-900">{t('header.notifications')}</h3>
               {notifUnreadCount > 0 && (
