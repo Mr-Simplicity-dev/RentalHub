@@ -171,9 +171,9 @@ const fetchStateStats = async (stateId) => {
   const statsResult = await db.query(
     `SELECT
        COUNT(*)::INT AS total_properties,
-       ROUND(AVG(COALESCE(p.rent_amount, p.price))::numeric, 0) AS avg_rent,
-       MIN(COALESCE(p.rent_amount, p.price)) AS min_rent,
-       MAX(COALESCE(p.rent_amount, p.price)) AS max_rent
+       ROUND(AVG(p.rent_amount)::numeric, 0) AS avg_rent,
+       MIN(p.rent_amount) AS min_rent,
+       MAX(p.rent_amount) AS max_rent
      FROM properties p
      WHERE p.state_id = $1
        AND ${ACTIVE_PROPERTY_FILTER}`,
@@ -229,7 +229,7 @@ const fetchProperties = async ({
        p.id,
        p.title,
        p.property_type,
-       COALESCE(p.rent_amount, p.price) AS rent_amount,
+       p.rent_amount,
        p.city,
        p.area,
        p.bedrooms,
@@ -272,9 +272,9 @@ const fetchAreaRows = async ({ stateId = null, limit = null } = {}) => {
          COALESCE(NULLIF(TRIM(p.city), ''), s.state_name) AS city_name,
          COALESCE(NULLIF(TRIM(p.area), ''), NULLIF(TRIM(p.city), ''), s.state_name) AS area_name,
          COUNT(*)::INT AS property_count,
-         ROUND(AVG(COALESCE(p.rent_amount, p.price))::numeric, 0) AS avg_rent,
-         MIN(COALESCE(p.rent_amount, p.price)) AS min_rent,
-         MAX(COALESCE(p.rent_amount, p.price)) AS max_rent
+         ROUND(AVG(p.rent_amount)::numeric, 0) AS avg_rent,
+         MIN(p.rent_amount) AS min_rent,
+         MAX(p.rent_amount) AS max_rent
        FROM properties p
        JOIN states s ON s.id = p.state_id
        WHERE ${where.join(' AND ')}

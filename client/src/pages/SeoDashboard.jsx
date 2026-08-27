@@ -36,7 +36,7 @@ const SeoDashboard = () => {
       const res = await api.get('/admin/seo/rankings');
       setRankings(res.data?.data || { latestByKeyword: [], history: [] });
     } catch (err) {
-      toast.error(err.response?.data?.message || t('seo_dashboard.rankings_load_failed'));
+      toast.error(err.response?.data?.message || t('seo_dashboard.rankings_failed'));
     }
   }, [t]);
 
@@ -53,7 +53,7 @@ const SeoDashboard = () => {
       toast.success(t('seo_dashboard.regenerated', { count: res.data?.data?.urlCount || 0 }));
       await loadData();
     } catch (err) {
-      toast.error(err.response?.data?.message || t('seo_dashboard.regenerate_failed'));
+      toast.error(err.response?.data?.message || t('seo_dashboard.regen_failed'));
     } finally {
       setRefreshing(false);
     }
@@ -75,22 +75,22 @@ const SeoDashboard = () => {
   const handlePingGoogle = async () => {
     try {
       const res = await api.post('/admin/seo/ping-google');
-      toast.success(res.data?.data?.success ? t('seo_dashboard.ping_success') : t('seo_dashboard.ping_completed'));
+      toast.success(res.data?.data?.success ? t('seo_dashboard.google_pinged') : t('seo_dashboard.google_ping_alt'));
     } catch (err) {
-      toast.error(err.response?.data?.message || t('seo_dashboard.ping_failed'));
+      toast.error(err.response?.data?.message || t('seo_dashboard.google_ping_failed'));
     }
   };
 
   const handleRankingCheck = async () => {
-    if (!window.confirm(t('seo_dashboard.check_confirm'))) return;
+    if (!window.confirm(t('seo_dashboard.ranking_confirm'))) return;
 
     try {
       setCheckingRankings(true);
       const res = await api.post('/admin/seo/rankings/check');
-      toast.success(res.data?.message || t('seo_dashboard.check_completed'));
+      toast.success(res.data?.message || t('seo_dashboard.ranking_checked'));
       await loadRankings();
     } catch (err) {
-      toast.error(err.response?.data?.message || t('seo_dashboard.check_failed'));
+      toast.error(err.response?.data?.message || t('seo_dashboard.ranking_check_failed'));
     } finally {
       setCheckingRankings(false);
     }
@@ -107,11 +107,11 @@ const SeoDashboard = () => {
     : stateBreakdown;
 
   const statCards = [
-    { label: t('seo_dashboard.state_pages'), value: summary.statePages, icon: FaGlobe, color: 'bg-blue-50 text-blue-600' },
-    { label: t('seo_dashboard.lga_pages'), value: summary.lgaPages, icon: FaMapMarkedAlt, color: 'bg-green-50 text-green-600' },
-    { label: t('seo_dashboard.area_pages'), value: summary.areaPages, icon: FaHome, color: 'bg-purple-50 text-purple-600' },
-    { label: t('seo_dashboard.property_pages'), value: summary.propertyPages, icon: FaFileCode, color: 'bg-orange-50 text-orange-600' },
-    { label: t('seo_dashboard.sitemap_urls'), value: summary.sitemapUrls, icon: FaLink, color: 'bg-teal-50 text-teal-600' },
+    { label: t('seo_dashboard.stat_state_pages'), value: summary.statePages, icon: FaGlobe, color: 'bg-blue-50 text-blue-600' },
+    { label: t('seo_dashboard.stat_lga_pages'), value: summary.lgaPages, icon: FaMapMarkedAlt, color: 'bg-green-50 text-green-600' },
+    { label: t('seo_dashboard.stat_area_pages'), value: summary.areaPages, icon: FaHome, color: 'bg-purple-50 text-purple-600' },
+    { label: t('seo_dashboard.stat_property_pages'), value: summary.propertyPages, icon: FaFileCode, color: 'bg-orange-50 text-orange-600' },
+    { label: t('seo_dashboard.stat_sitemap_urls'), value: summary.sitemapUrls, icon: FaLink, color: 'bg-teal-50 text-teal-600' },
   ];
 
   const maxValue = Math.max(
@@ -120,10 +120,10 @@ const SeoDashboard = () => {
   );
 
   const barData = [
-    { label: t('seo_dashboard.states_bar'), value: summary.statePages || 0, color: 'bg-blue-500' },
-    { label: t('seo_dashboard.lgas_bar'), value: summary.lgaPages || 0, color: 'bg-green-500' },
-    { label: t('seo_dashboard.areas_bar'), value: summary.areaPages || 0, color: 'bg-purple-500' },
-    { label: t('seo_dashboard.properties_bar'), value: summary.propertyPages || 0, color: 'bg-orange-500' },
+    { label: t('seo_dashboard.chart_states'), value: summary.statePages || 0, color: 'bg-blue-500' },
+    { label: t('seo_dashboard.chart_lgas'), value: summary.lgaPages || 0, color: 'bg-green-500' },
+    { label: t('seo_dashboard.chart_areas'), value: summary.areaPages || 0, color: 'bg-purple-500' },
+    { label: t('seo_dashboard.chart_properties'), value: summary.propertyPages || 0, color: 'bg-orange-500' },
   ];
 
   return (
@@ -133,13 +133,13 @@ const SeoDashboard = () => {
         <div className="flex flex-wrap items-center gap-2">
           {refreshing && <span className="text-xs text-slate-400 animate-pulse">{t('seo_dashboard.syncing')}</span>}
           <button onClick={handleRegenerate} disabled={refreshing} className="btn btn-secondary gap-2">
-            <FaSyncAlt className={refreshing ? 'animate-spin' : ''} /> {t('seo_dashboard.regenerate_btn')}
+            <FaSyncAlt className={refreshing ? 'animate-spin' : ''} /> {t('seo_dashboard.regenerate')}
           </button>
           <button onClick={handleViewSitemap} disabled={refreshing} className="btn btn-secondary gap-2">
-            <FaSearch /> {t('seo_dashboard.view_sitemap_btn')}
+            <FaSearch /> {t('seo_dashboard.view_sitemap')}
           </button>
           <button onClick={handlePingGoogle} className="btn btn-primary gap-2">
-            <FaExternalLinkAlt /> {t('seo_dashboard.ping_btn')}
+            <FaExternalLinkAlt /> {t('seo_dashboard.ping_google')}
           </button>
         </div>
       </div>
@@ -162,7 +162,7 @@ const SeoDashboard = () => {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-soft bg-white p-5 shadow-sm">
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">{t('seo_dashboard.page_type_dist')}</h3>
+          <h3 className="mb-3 text-sm font-semibold text-gray-900">{t('seo_dashboard.page_type_distribution')}</h3>
           <div className="space-y-3">
             {barData.map((item) => (
               <div key={item.label}>
@@ -182,20 +182,20 @@ const SeoDashboard = () => {
         </div>
 
         <div className="rounded-xl border border-soft bg-white p-5 shadow-sm">
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">{t('seo_dashboard.total_pages')}</h3>
+          <h3 className="mb-3 text-sm font-semibold text-gray-900">{t('seo_dashboard.total_seo_pages')}</h3>
           <div className="flex items-center justify-center py-6">
             <div className="text-center">
               <p className="text-5xl font-bold text-primary-600">{summary.totalSeoPages ?? 0}</p>
-              <p className="mt-1 text-sm text-gray-500">{t('seo_dashboard.indexable_pages')}</p>
+              <p className="mt-1 text-sm text-gray-500">{t('seo_dashboard.indexable')}</p>
             </div>
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2 text-green-600">
-              <FaCheckCircle /> {t('seo_dashboard.states_with_properties', { count: summary.statesWithPages ?? 0 })}
+              <FaCheckCircle /> {t('seo_dashboard.states_with_props', { count: summary.statesWithPages ?? 0 })}
             </div>
             {summary.statesWithNoProperties > 0 && (
               <div className="flex items-center gap-2 text-amber-600">
-                <FaExclamationTriangle /> {t('seo_dashboard.states_no_properties', { count: summary.statesWithNoProperties })}
+                <FaExclamationTriangle /> {t('seo_dashboard.states_no_props', { count: summary.statesWithNoProperties })}
               </div>
             )}
           </div>
@@ -221,7 +221,7 @@ const SeoDashboard = () => {
               <span className="text-orange-600">{summary.propertyPages}</span>
             </div>
             <div className="flex items-center justify-between rounded-lg bg-teal-50 p-3">
-              <span className="font-medium text-teal-700">{t('seo_dashboard.health_sitemap_urls')}</span>
+              <span className="font-medium text-teal-700">{t('seo_dashboard.health_sitemap')}</span>
               <span className="text-teal-600">{summary.sitemapUrls}</span>
             </div>
           </div>
@@ -235,7 +235,7 @@ const SeoDashboard = () => {
               <FaChartBar className="text-primary-600" /> {t('seo_dashboard.ranking_history')}
             </h3>
             <p className="mt-1 text-xs text-gray-500">
-              {t('seo_dashboard.ranking_desc')}
+              {t('seo_dashboard.ranking_note')}
             </p>
           </div>
           <button
@@ -244,7 +244,7 @@ const SeoDashboard = () => {
             className="btn btn-primary gap-2"
           >
             <FaSyncAlt className={checkingRankings ? 'animate-spin' : ''} />
-            {checkingRankings ? t('seo_dashboard.checking_google') : t('seo_dashboard.check_now_btn')}
+            {checkingRankings ? t('seo_dashboard.checking_google') : t('seo_dashboard.check_google')}
           </button>
         </div>
 
@@ -285,7 +285,7 @@ const SeoDashboard = () => {
                   <td className="px-5 py-3 font-medium text-gray-900">{ranking.keyword}</td>
                   <td className="px-5 py-3">
                     <span className={`font-semibold ${ranking.found ? 'text-green-600' : 'text-gray-500'}`}>
-                      {ranking.found ? `#${ranking.position}` : t('seo_dashboard.not_found_top', { depth: ranking.searchDepth || 100 })}
+                      {ranking.found ? `#${ranking.position}` : t('seo_dashboard.not_found', { depth: ranking.searchDepth || 100 })}
                     </span>
                   </td>
                   <td className="max-w-xs px-5 py-3">
@@ -330,11 +330,11 @@ const SeoDashboard = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
-                <th className="px-5 py-3">{t('seo_dashboard.state')}</th>
-                <th className="px-5 py-3">{t('seo_dashboard.slug')}</th>
-                <th className="px-5 py-3">{t('seo_dashboard.properties')}</th>
-                <th className="px-5 py-3">{t('seo_dashboard.seo_url')}</th>
-                <th className="px-5 py-3">{t('seo_dashboard.status')}</th>
+                <th className="px-5 py-3">{t('seo_dashboard.col_state')}</th>
+                <th className="px-5 py-3">{t('seo_dashboard.col_slug')}</th>
+                <th className="px-5 py-3">{t('seo_dashboard.col_properties')}</th>
+                <th className="px-5 py-3">{t('seo_dashboard.col_seo_url')}</th>
+                <th className="px-5 py-3">{t('seo_dashboard.col_status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -361,9 +361,9 @@ const SeoDashboard = () => {
                   </td>
                   <td className="px-5 py-3">
                     {s.property_count > 0 ? (
-                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">{t('seo_dashboard.active')}</span>
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">{t('seo_dashboard.badge_active')}</span>
                     ) : (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">{t('seo_dashboard.no_properties')}</span>
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">{t('seo_dashboard.badge_no_properties')}</span>
                     )}
                   </td>
                 </tr>
@@ -376,7 +376,7 @@ const SeoDashboard = () => {
       {showSitemap && sitemapXml && (
         <div className="rounded-xl border border-soft bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-            <h3 className="text-sm font-semibold text-gray-900">{t('seo_dashboard.sitemap_title')}</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('seo_dashboard.sitemap_xml')}</h3>
             <button onClick={() => setShowSitemap(false)} className="text-sm text-gray-500 hover:text-gray-700">{t('seo_dashboard.close')}</button>
           </div>
           <div className="max-h-96 overflow-auto p-5">
