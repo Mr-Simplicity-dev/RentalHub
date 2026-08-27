@@ -1496,6 +1496,17 @@
     "enter_email": "Tinye email gị ka ị kwụọ ụgwọ nyocha.",
     "payment_error": "Enweghị ike ịmalite ịkwụ ụgwọ. Gbalịa ọzọ.",
     "init_failed": "Ịmalite ịkwụ ụgwọ nyocha dara.",
+    "method": "Ụzọ",
+    "ref": "Ntụaka",
+    "payment_opened": "Emegheela ibe ịkwụ ụgwọ na taabụ ọhụrụ. Biko mechaa ịkwụ.",
+    "general_payment": "Ọ̀kwụ ụgwọ izugbe",
+    "date": "Ụbọchị",
+    "payer": "Onye na-akwụ",
+    "payment_for": "Ọ̀kwụ ụgwọ maka",
+    "amount": "Ọ̀nụ́ba ego",
+    "status": "Ọnọ̀dị",
+    "type_registration_fee": "Ego ndebanye aha",
+    "type_general_platform_fee": "Ọ̀kwụ ụgwọ ikpo",
     "fee": "N20,000"
   },
   "subscribe": {

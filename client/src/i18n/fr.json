@@ -1486,6 +1486,17 @@
     "enter_email": "Enter your email to pay for verification.",
     "payment_error": "Unable to start payment. Try again.",
     "init_failed": "Failed to initialize verification payment.",
+    "method": "Méthode",
+    "ref": "Réf",
+    "payment_opened": "La page de paiement s’est ouverte dans un nouvel onglet. Veuillez finaliser le paiement.",
+    "general_payment": "Paiement général de la plateforme",
+    "date": "Date",
+    "payer": "Payeur",
+    "payment_for": "Paiement pour",
+    "amount": "Montant",
+    "status": "Statut",
+    "type_registration_fee": "Frais d’inscription",
+    "type_general_platform_fee": "Paiement de plateforme",
     "fee": "N20,000"
   },
   "subscribe": {

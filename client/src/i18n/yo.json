@@ -1496,6 +1496,17 @@
     "enter_email": "Tẹ iméèlì rẹ sílẹ̀ láti sanwó fún ìmúdájú.",
     "payment_error": "Sísanwó kò ṣeé bẹ̀rẹ̀. Tun gbìyànjú.",
     "init_failed": "Sísanwó ìmúdájú kò ṣeé bẹ̀rẹ̀.",
+    "method": "Ọ̀nà",
+    "ref": "Ìtọ́kasí",
+    "payment_opened": "Ojú-ẹlẹ́ sísẹ̀nwó àtí àlápọ̀n tuntun. Jọ̀wá parí sísẹ̀nwó.",
+    "general_payment": "Sísẹ̀nwó gbogbogbò",
+    "date": "Ọjọ́",
+    "payer": "Olúà á àmó",
+    "payment_for": "Sísẹ̀nwó fún",
+    "amount": "Iye owó",
+    "status": "Ọpọ̀",
+    "type_registration_fee": "Owó ìforúkọ́sílẹ̀",
+    "type_general_platform_fee": "Sísẹ̀nwó pẹ̀pẹ̀",
     "fee": "N20,000"
   },
   "subscribe": {

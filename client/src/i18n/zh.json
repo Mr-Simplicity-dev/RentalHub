@@ -1491,6 +1491,17 @@
     "enter_email": "Enter your email to pay for verification.",
     "payment_error": "Unable to start payment. Try again.",
     "init_failed": "Failed to initialize verification payment.",
+    "method": "支付方式",
+    "ref": "引用",
+    "payment_opened": "支付页面已在新标签页打开，请完成支付。",
+    "general_payment": "平台一般付款",
+    "date": "日期",
+    "payer": "付款人",
+    "payment_for": "付款用途",
+    "amount": "金额",
+    "status": "状态",
+    "type_registration_fee": "注册费",
+    "type_general_platform_fee": "平台付款",
     "fee": "N20,000"
   },
   "subscribe": {

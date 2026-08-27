@@ -1491,6 +1491,17 @@
     "enter_email": "Enter your email to pay for verification.",
     "payment_error": "Unable to start payment. Try again.",
     "init_failed": "Failed to initialize verification payment.",
+    "method": "الطريقة",
+    "ref": "المرجع",
+    "payment_opened": "فتحت صفحة الدفع في تبويب جديد. يرجى إكمال الدفع.",
+    "general_payment": "دفع عام للمنصة",
+    "date": "التاريخ",
+    "payer": "الدافع",
+    "payment_for": "الدفع مقابل",
+    "amount": "المبلغ",
+    "status": "الحالة",
+    "type_registration_fee": "رسوم التسجيل",
+    "type_general_platform_fee": "دفع المنصة",
     "fee": "N20,000"
   },
   "subscribe": {

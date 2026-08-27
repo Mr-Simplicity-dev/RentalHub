@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
+import { FaReceipt, FaPrint } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
 import { paymentService } from '../services/paymentService';
 import BackToDashboard from '../components/common/BackToDashboard';
+import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 
 const PAYMENT_TYPE_LABELS = {
@@ -13,7 +15,8 @@ const PAYMENT_TYPE_LABELS = {
   landlord_listing: 'Listing Payment',
   rent_payment: 'Rent Payment',
   wallet_funding: 'Wallet Funding',
-  general_platform_fee: 'General Platform Payment',
+  registration_fee: 'Registration Fee',
+  general_platform_fee: 'Platform Payment',
 };
 
 const PAYMENT_STATUS_STYLES = {
@@ -48,9 +51,11 @@ const formatPaymentType = (paymentType, tFn) => {
 
 const PaymentHistory = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [payingPaymentId, setPayingPaymentId] = useState(null);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
 
   const loadPayments = useCallback(async () => {
     setLoading(true);
@@ -147,6 +152,14 @@ const PaymentHistory = () => {
                       {t('payment_history.ref')}: {payment.transaction_reference}
                     </div>
                   )}
+                  {payment.payment_status === 'completed' && (
+                    <button
+                      onClick={() => setSelectedReceipt(payment)}
+                      className="mt-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+                    >
+                      <FaReceipt className="mr-1.5" /> View Receipt
+                    </button>
+                  )}
                   {payment.payment_status === 'pending' && PAYMENT_TYPES_WITH_RETRY.includes(payment.payment_type) && (
                     <button
                       onClick={() => handlePayNow(payment)}
@@ -170,6 +183,95 @@ const PaymentHistory = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {selectedReceipt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setSelectedReceipt(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="receipt-print-area p-6">
+              <div className="border-b border-gray-200 pb-4 text-center">
+                <img
+                  src="/rentalhub-mark.svg"
+                  alt="RentalHub NG"
+                  className="mx-auto h-10 w-10 rounded-xl object-contain"
+                />
+                <h2 className="mt-2 text-lg font-bold text-gray-900">RentalHub NG</h2>
+                <p className="text-xs text-gray-500">Official Payment Receipt</p>
+              </div>
+              <div className="mt-4 space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">{t('payment_history.ref')}</span>
+                  <span className="break-all text-right font-medium text-gray-900">
+                    {selectedReceipt.transaction_reference}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">{t('payment_history.date')}</span>
+                  <span className="text-right font-medium text-gray-900">
+                    {new Date(selectedReceipt.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">{t('payment_history.payer')}</span>
+                  <span className="text-right font-medium text-gray-900">
+                    {user?.full_name || user?.email}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">{t('payment_history.payment_for')}</span>
+                  <span className="text-right font-medium text-gray-900">
+                    {formatPaymentType(selectedReceipt.payment_type, t)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">{t('payment_history.amount')}</span>
+                  <span className="text-right text-base font-bold text-gray-900">
+                    {formatAmount(selectedReceipt.amount, selectedReceipt.currency || 'NGN')}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">{t('payment_history.status')}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      PAYMENT_STATUS_STYLES[selectedReceipt.payment_status] || 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {selectedReceipt.payment_status}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">{t('payment_history.method')}</span>
+                  <span className="text-right font-medium text-gray-900">
+                    {selectedReceipt.payment_method || 'Paystack'}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-6 border-t border-gray-200 pt-4 text-center text-xs text-gray-400">
+                Thank you for using RentalHub NG.
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-100 p-4 print:hidden">
+              <button
+                onClick={() => setSelectedReceipt(null)}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+              >
+                <FaPrint className="mr-1.5" /> Print
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

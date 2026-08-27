@@ -1496,6 +1496,17 @@
     "enter_email": "Shigar da imelinka don biyan kuɗin tabbatarwa.",
     "payment_error": "Ba a iya fara biyan kuɗi ba. Sake gwadawa.",
     "init_failed": "An kasa ƙaddamar da biyan kuɗin tabbatarwa.",
+    "method": "Hanya",
+    "ref": "Lambar",
+    "payment_opened": "An buɗe shafin biya a sabon shafi. Da fatan za a kammala biyan.",
+    "general_payment": "Biyan dandali gama gari",
+    "date": "Kwanan wata",
+    "payer": "Mai biya",
+    "payment_for": "Biyan domin",
+    "amount": "Adadi",
+    "status": "Matsayi",
+    "type_registration_fee": "Kuɗin rajista",
+    "type_general_platform_fee": "Biyan dandali",
     "fee": "N20,000"
   },
   "subscribe": {
