@@ -119,6 +119,100 @@ const SuperSupportAdminDashboard = () => {
     }
   };
 
+  // ── Withdrawal review tickets (real data) ───────────────────────────────
+  const [pendingWithdrawals, setPendingWithdrawals] = useState([]);
+  const [withdrawalLoading, setWithdrawalLoading] = useState(false);
+  const [withdrawalError, setWithdrawalError] = useState('');
+  const [withdrawalDecision, setWithdrawalDecision] = useState({
+    open: false,
+    withdrawal: null,
+    action: '',
+    note: '',
+  });
+  const [withdrawalActionLoadingIds, setWithdrawalActionLoadingIds] = useState([]);
+  const [governancePolicies, setGovernancePolicies] = useState(null);
+  const [satisfactionStats, setSatisfactionStats] = useState({ avg: 0, count: 0, loaded: false });
+
+  const fetchWithdrawalTickets = useCallback(async () => {
+    setWithdrawalLoading(true);
+    setWithdrawalError('');
+    try {
+      const res = await api.get('/financial-admin/withdrawals/pending');
+      const data = res.data?.data;
+      if (Array.isArray(data)) {
+        setPendingWithdrawals(data);
+      } else {
+        setPendingWithdrawals(data?.pending || []);
+      }
+    } catch (error) {
+      setWithdrawalError(error.response?.data?.message || 'Unable to load pending withdrawals');
+    } finally {
+      setWithdrawalLoading(false);
+    }
+  }, []);
+
+  const openWithdrawalDecision = (withdrawal, action) => {
+    setWithdrawalDecision({
+      open: true,
+      withdrawal,
+      action,
+      note: action === 'approve' ? 'Approved via Super Support review' : '',
+    });
+  };
+
+  const closeWithdrawalDecision = () => {
+    setWithdrawalDecision({ open: false, withdrawal: null, action: '', note: '' });
+  };
+
+  const submitWithdrawalDecision = async () => {
+    const { withdrawal, action, note } = withdrawalDecision;
+    if (!withdrawal || !action) return;
+
+    if (action === 'reject' && !String(note || '').trim()) {
+      toast.error('Add a rejection reason before rejecting this withdrawal');
+      return;
+    }
+
+    setWithdrawalActionLoadingIds((prev) => [...prev, withdrawal.id]);
+    try {
+      await api.post(`/financial-admin/withdrawals/${withdrawal.id}/${action}`, {
+        admin_note: String(note || '').trim(),
+      });
+      toast.success(
+        action === 'approve'
+          ? 'Withdrawal approved and payout initiated'
+          : 'Withdrawal rejected and funds returned'
+      );
+      closeWithdrawalDecision();
+      await fetchWithdrawalTickets();
+    } catch (error) {
+      toast.error(error.response?.data?.message || `Failed to ${action} withdrawal`);
+    } finally {
+      setWithdrawalActionLoadingIds((prev) => prev.filter((id) => id !== withdrawal.id));
+    }
+  };
+
+  const loadGovernancePolicies = useCallback(async () => {
+    try {
+      const res = await api.get('/support/governance/policies');
+      setGovernancePolicies(res.data?.data || null);
+    } catch { /* ignore */ }
+  }, []);
+
+  const loadSatisfaction = useCallback(async () => {
+    try {
+      const res = await api.get('/super/platform-ratings');
+      const ratings = res.data?.data?.ratings || [];
+      const approved = ratings.filter((r) => r.status === 'approved' && Number(r.rating) > 0);
+      const avg = approved.length
+        ? approved.reduce((sum, r) => sum + Number(r.rating), 0) / approved.length
+        : 0;
+      setSatisfactionStats({ avg, count: approved.length, loaded: true });
+    } catch {
+      setSatisfactionStats((prev) => ({ ...prev, loaded: true }));
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'activity') loadActivityLogs();
     if (activeTab === 'pool') loadAdminPool();
@@ -228,7 +322,11 @@ const SuperSupportAdminDashboard = () => {
 
   useEffect(() => {
     loadDashboardData(true);
-  }, [loadDashboardData]);
+    loadGovernancePolicies();
+    loadSatisfaction();
+    loadActivityLogs();
+    loadAdminPool();
+  }, [loadDashboardData, loadGovernancePolicies, loadSatisfaction, loadActivityLogs, loadAdminPool]);
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
@@ -382,6 +480,25 @@ const SuperSupportAdminDashboard = () => {
     };
   }, [dashboardData]);
 
+  // Real support metrics for the Reports tab
+  const ticketResolution = useMemo(() => {
+    const tickets = dashboardData?.supportTickets || [];
+    const resolved = tickets.filter((t) => t.status === 'resolved').length;
+    const rate = tickets.length ? Math.round((resolved / tickets.length) * 1000) / 10 : 0;
+    return { total: tickets.length, resolved, rate };
+  }, [dashboardData?.supportTickets]);
+
+  const avgSlaWindow = useMemo(() => {
+    const tickets = dashboardData?.supportTickets || [];
+    const open = tickets.filter((t) => t.status !== 'resolved' && t.sla_due_at && t.created_at);
+    if (!open.length) return null;
+    const totalMs = open.reduce(
+      (sum, t) => sum + (new Date(t.sla_due_at).getTime() - new Date(t.created_at).getTime()),
+      0
+    );
+    return Math.max(0, Math.round((totalMs / open.length / 3600000) * 10) / 10);
+  }, [dashboardData?.supportTickets]);
+
   if (loading) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
@@ -425,7 +542,10 @@ const SuperSupportAdminDashboard = () => {
               {commissionCheck.label}
             </span>
             <button
-              onClick={() => setActiveTab('tickets')}
+              onClick={() => {
+                fetchWithdrawalTickets();
+                openModal('withdrawal-review');
+              }}
               className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
               Review Withdrawal Tickets
@@ -1075,37 +1195,46 @@ const SuperSupportAdminDashboard = () => {
               </div>
             </div>
 
-            {/* Report Cards */}
+            {/* Report Cards (real data) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="rounded-lg border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-slate-500">Monthly Performance</p>
-                    <p className="mt-1 text-lg font-bold text-slate-900">98.2%</p>
+                    <p className="text-xs font-medium text-slate-500">Ticket Resolution Rate</p>
+                    <p className="mt-1 text-lg font-bold text-slate-900">
+                      {ticketResolution.total ? `${ticketResolution.rate}%` : '—'}
+                    </p>
                   </div>
                   <FaChartLine className="text-green-600" size={20} />
                 </div>
                 <div className="mt-3">
                   <div className="h-2 w-full rounded-full bg-slate-200">
-                    <div className="h-full w-4/5 rounded-full bg-green-500"></div>
+                    <div
+                      className="h-full rounded-full bg-green-500"
+                      style={{ width: ticketResolution.total ? `${Math.min(100, ticketResolution.rate)}%` : '0%' }}
+                    />
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">Above target by 3.2%</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {ticketResolution.resolved} resolved of {ticketResolution.total} tickets
+                  </p>
                 </div>
               </div>
 
               <div className="rounded-lg border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-slate-500">Response Time Avg</p>
-                    <p className="mt-1 text-lg font-bold text-slate-900">2.4s</p>
+                    <p className="text-xs font-medium text-slate-500">Avg SLA Window (open tickets)</p>
+                    <p className="mt-1 text-lg font-bold text-slate-900">
+                      {avgSlaWindow !== null ? `${avgSlaWindow}h` : '—'}
+                    </p>
                   </div>
                   <FaClock className="text-blue-600" size={20} />
                 </div>
                 <div className="mt-3">
                   <div className="h-2 w-full rounded-full bg-slate-200">
-                    <div className="h-full w-3/4 rounded-full bg-blue-500"></div>
+                    <div className="h-3/4 w-full rounded-full bg-blue-500" />
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">18% improvement</p>
+                  <p className="mt-1 text-xs text-slate-500">Time until SLA breach on open tickets</p>
                 </div>
               </div>
 
@@ -1113,15 +1242,22 @@ const SuperSupportAdminDashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-slate-500">User Satisfaction</p>
-                    <p className="mt-1 text-lg font-bold text-slate-900">4.8/5.0</p>
+                    <p className="mt-1 text-lg font-bold text-slate-900">
+                      {satisfactionStats.loaded && satisfactionStats.count ? `${satisfactionStats.avg.toFixed(1)}/5.0` : '—'}
+                    </p>
                   </div>
                   <FaRegStar className="text-amber-600" size={20} />
                 </div>
                 <div className="mt-3">
                   <div className="h-2 w-full rounded-full bg-slate-200">
-                    <div className="h-full w-9/10 rounded-full bg-amber-500"></div>
+                    <div
+                      className="h-full rounded-full bg-amber-500"
+                      style={{ width: satisfactionStats.count ? `${Math.min(100, (satisfactionStats.avg / 5) * 100)}%` : '0%' }}
+                    />
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">Based on 1,234 reviews</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Based on {satisfactionStats.count} approved reviews
+                  </p>
                 </div>
               </div>
             </div>
@@ -1195,22 +1331,28 @@ const SuperSupportAdminDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* System Configuration */}
+              {/* System Configuration (real governance policies) */}
               <div className="space-y-4">
                 <div className="rounded-lg border border-slate-200 p-4">
-                  <h4 className="text-sm font-semibold text-slate-900 mb-3">System Configuration</h4>
+                  <h4 className="text-sm font-semibold text-slate-900 mb-3">Support Governance Policies</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700">Auto-approval threshold</span>
-                      <span className="text-sm font-medium text-slate-900">85% confidence</span>
+                      <span className="text-sm text-slate-700">SLA due-soon window</span>
+                      <span className="text-sm font-medium text-slate-900">
+                        {governancePolicies?.sla_due_soon_hours != null ? `${governancePolicies.sla_due_soon_hours}h` : '—'}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700">Audit retention period</span>
-                      <span className="text-sm font-medium text-slate-900">90 days</span>
+                      <span className="text-sm text-slate-700">Escalation acknowledgement</span>
+                      <span className="text-sm font-medium text-slate-900">
+                        {governancePolicies?.escalation_acknowledgement_hours != null ? `${governancePolicies.escalation_acknowledgement_hours}h` : '—'}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700">Response time SLA</span>
-                      <span className="text-sm font-medium text-slate-900">4 hours</span>
+                      <span className="text-sm text-slate-700">Department resolution</span>
+                      <span className="text-sm font-medium text-slate-900">
+                        {governancePolicies?.department_resolution_hours != null ? `${governancePolicies.department_resolution_hours}h` : '—'}
+                      </span>
                     </div>
                     <button
                       onClick={() => openModal('system-config')}
@@ -1221,33 +1363,39 @@ const SuperSupportAdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Notification Settings */}
+                {/* Notification Settings (real policy toggle) */}
                 <div className="rounded-lg border border-slate-200 p-4">
                   <h4 className="text-sm font-semibold text-slate-900 mb-3">Notification Settings</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700">Email notifications</span>
-                      <div className="relative inline-block w-10 h-6">
-                        <input type="checkbox" className="sr-only" defaultChecked />
-                        <div className="block w-10 h-6 rounded-full bg-green-500"></div>
-                        <div className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform"></div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700">SMS alerts</span>
-                      <div className="relative inline-block w-10 h-6">
-                        <input type="checkbox" className="sr-only" />
-                        <div className="block w-10 h-6 rounded-full bg-slate-300"></div>
-                        <div className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform"></div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700">Push notifications</span>
-                      <div className="relative inline-block w-10 h-6">
-                        <input type="checkbox" className="sr-only" defaultChecked />
-                        <div className="block w-10 h-6 rounded-full bg-green-500"></div>
-                        <div className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform"></div>
-                      </div>
+                      <span className="text-sm text-slate-700">Super Admin SLA breach alerts</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={governancePolicies?.notify_super_admin_on_breach === true}
+                        onClick={async () => {
+                          const next = governancePolicies?.notify_super_admin_on_breach !== true;
+                          try {
+                            await api.put('/support/governance/policies', {
+                              ...(governancePolicies || {}),
+                              notify_super_admin_on_breach: next,
+                            });
+                            setGovernancePolicies((prev) => ({ ...(prev || {}), notify_super_admin_on_breach: next }));
+                            toast.success('Policy updated');
+                          } catch (error) {
+                            toast.error(error.response?.data?.message || 'Failed to update policy');
+                          }
+                        }}
+                        className={`relative inline-block h-6 w-10 rounded-full transition-colors ${
+                          governancePolicies?.notify_super_admin_on_breach === true ? 'bg-green-500' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${
+                            governancePolicies?.notify_super_admin_on_breach === true ? 'translate-x-4' : ''
+                          }`}
+                        />
+                      </button>
                     </div>
                     <button
                       onClick={() => openModal('notification-settings')}
@@ -1259,22 +1407,24 @@ const SuperSupportAdminDashboard = () => {
                 </div>
               </div>
 
-              {/* User Management & Security */}
+              {/* User Management & Security (real data) */}
               <div className="space-y-4">
                 <div className="rounded-lg border border-slate-200 p-4">
                   <h4 className="text-sm font-semibold text-slate-900 mb-3">User Management</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-700">Active admin users</span>
-                      <span className="text-sm font-medium text-slate-900">24</span>
+                      <span className="text-sm font-medium text-slate-900">{adminPool.length || '—'}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-700">Last user activity</span>
-                      <span className="text-sm font-medium text-slate-900">2 minutes ago</span>
+                      <span className="text-sm font-medium text-slate-900">
+                        {activityLogs[0]?.created_at ? formatDate(activityLogs[0].created_at) : '—'}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700">Failed login attempts</span>
-                      <span className="text-sm font-medium text-slate-900">3 (last 24h)</span>
+                      <span className="text-sm text-slate-700">Failed login attempts (24h)</span>
+                      <span className="text-sm font-medium text-slate-900">—</span>
                     </div>
                     <button
                       onClick={() => openModal('user-management')}
@@ -1291,23 +1441,15 @@ const SuperSupportAdminDashboard = () => {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-700">Two-factor authentication</span>
-                      <div className="relative inline-block w-10 h-6">
-                        <input type="checkbox" className="sr-only" defaultChecked />
-                        <div className="block w-10 h-6 rounded-full bg-green-500"></div>
-                        <div className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform"></div>
-                      </div>
+                      <span className="text-sm font-medium text-slate-400">Managed per account</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-700">Session timeout</span>
-                      <span className="text-sm font-medium text-slate-900">30 minutes</span>
+                      <span className="text-sm font-medium text-slate-900">—</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-700">IP whitelisting</span>
-                      <div className="relative inline-block w-10 h-6">
-                        <input type="checkbox" className="sr-only" />
-                        <div className="block w-10 h-6 rounded-full bg-slate-300"></div>
-                        <div className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform"></div>
-                      </div>
+                      <span className="text-sm font-medium text-slate-400">Not configured</span>
                     </div>
                     <button
                       onClick={() => openModal('security-settings')}
@@ -1443,7 +1585,117 @@ const SuperSupportAdminDashboard = () => {
           />
         )}
 
-        {isModalOpen && modalType !== 'view-ticket' && (
+        {modalType === 'withdrawal-review' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl bg-white p-6 shadow-xl">
+              <div className="flex shrink-0 items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Withdrawal Review Tickets</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Pending commission withdrawals awaiting a decision.
+                  </p>
+                </div>
+                <button onClick={closeModal} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+                  <FaTimesCircle size={20} />
+                </button>
+              </div>
+
+              <div className="mt-4 flex-1 overflow-y-auto">
+                {withdrawalLoading ? (
+                  <div className="py-10 text-center text-sm text-slate-500">Loading withdrawals…</div>
+                ) : withdrawalError ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {withdrawalError}
+                  </div>
+                ) : pendingWithdrawals.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center">
+                    <FaMoneyBill className="mx-auto text-slate-400" size={28} />
+                    <p className="mt-2 text-sm text-slate-500">No pending withdrawals to review</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingWithdrawals.map((w) => (
+                      <div key={w.id} className="rounded-lg border border-slate-200 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {w.admin_name || w.user_name || `Admin #${w.admin_id || ''}`}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {formatCurrency(w.amount)} • {w.bank_name || 'Bank'} •{' '}
+                              {formatDate(w.requested_at || w.created_at)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openWithdrawalDecision(w, 'approve')}
+                              className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => openWithdrawalDecision(w, 'reject')}
+                              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                        {withdrawalActionLoadingIds.includes(w.id) && (
+                          <p className="mt-2 text-xs text-slate-500">Processing…</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {withdrawalDecision.open && withdrawalDecision.withdrawal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+            <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">
+                {withdrawalDecision.action === 'approve' ? 'Approve Withdrawal' : 'Reject Withdrawal'}
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                {formatCurrency(withdrawalDecision.withdrawal.amount)} •{' '}
+                {withdrawalDecision.withdrawal.admin_name || withdrawalDecision.withdrawal.user_name || ''}
+              </p>
+              <textarea
+                value={withdrawalDecision.note}
+                onChange={(e) => setWithdrawalDecision((prev) => ({ ...prev, note: e.target.value }))}
+                placeholder={withdrawalDecision.action === 'reject' ? 'Rejection reason (required)' : 'Note (optional)'}
+                rows={4}
+                className="input mt-4 w-full"
+              />
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  onClick={closeWithdrawalDecision}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitWithdrawalDecision}
+                  disabled={withdrawalActionLoadingIds.includes(withdrawalDecision.withdrawal.id)}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
+                    withdrawalDecision.action === 'approve'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                >
+                  {withdrawalActionLoadingIds.includes(withdrawalDecision.withdrawal.id)
+                    ? 'Processing…'
+                    : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isModalOpen && modalType !== 'view-ticket' && modalType !== 'withdrawal-review' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             {modalType === 'view-details' && selectedItem && (

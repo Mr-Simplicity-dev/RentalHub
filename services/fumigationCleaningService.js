@@ -2,6 +2,7 @@ const FumigationCleaningService = require('../models/FumigationCleaning');
 const { validationResult } = require('express-validator');
 const NotificationService = require('../services/notificationService');
 const db = require('../config/middleware/database');
+const logger = require('../config/utils/logger');
 
 const FUMIGATION_ADMIN_ROLES = new Set([
   'admin',
@@ -153,7 +154,7 @@ const allowMockPayments = () =>
 const PaymentService = {
   initializePayment: async (paymentData, paymentMethod) => {
     if (!PAYSTACK_SECRET_KEY && allowMockPayments()) {
-      req.logger.warn('PAYSTACK_SECRET_KEY not configured; using explicitly enabled local mock payment');
+      logger.warn('PAYSTACK_SECRET_KEY not configured; using explicitly enabled local mock payment');
       return {
         authorization_url: `https://paystack.com/pay/${paymentData.reference}`,
         reference: paymentData.reference
@@ -190,14 +191,14 @@ const PaymentService = {
         access_code: response.data.data.access_code
       };
     } catch (error) {
-      req.logger.error('Paystack initialization error:', error.response?.data || error.message);
+      logger.error('Paystack initialization error:', error.response?.data || error.message);
       throw new Error(error.response?.data?.message || 'Failed to initialize payment with Paystack');
     }
   },
 
   verifyPayment: async (reference) => {
     if (!PAYSTACK_SECRET_KEY && allowMockPayments()) {
-      req.logger.warn('PAYSTACK_SECRET_KEY not configured; using explicitly enabled local mock verification');
+      logger.warn('PAYSTACK_SECRET_KEY not configured; using explicitly enabled local mock verification');
       return {
         success: true,
         data: {
@@ -240,7 +241,7 @@ const PaymentService = {
         }
       };
     } catch (error) {
-      req.logger.error('Paystack verification error:', error.response?.data || error.message);
+      logger.error('Paystack verification error:', error.response?.data || error.message);
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to verify payment with Paystack'

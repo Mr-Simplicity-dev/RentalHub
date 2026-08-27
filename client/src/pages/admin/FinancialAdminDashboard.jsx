@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LineChart, Line, PieChart, Pie, Cell,
@@ -47,6 +47,55 @@ const FinancialAdminDashboard = () => {
     reason: '',
   });
   const [showPersonalWithdrawDialog, setShowPersonalWithdrawDialog] = useState(false);
+  const [txTypeFilter, setTxTypeFilter] = useState('');
+  const [txStartDate, setTxStartDate] = useState('');
+  const [txEndDate, setTxEndDate] = useState('');
+  const [stateAdminFilter, setStateAdminFilter] = useState('');
+
+  // Real week-over-week volume delta computed from the 30-day stats
+  const weekOverWeek = useMemo(() => {
+    const rows = Array.isArray(stats?.month) ? stats.month : [];
+    const dated = rows
+      .map((r) => ({
+        date: new Date(r.date || r.month).getTime(),
+        amount: Number(r.month_amount || r.amount || 0),
+      }))
+      .filter((r) => Number.isFinite(r.date));
+    const now = Date.now();
+    const day = 86400000;
+    const currentWeek = dated
+      .filter((r) => r.date >= now - 7 * day)
+      .reduce((sum, r) => sum + r.amount, 0);
+    const prevWeek = dated
+      .filter((r) => r.date >= now - 14 * day && r.date < now - 7 * day)
+      .reduce((sum, r) => sum + r.amount, 0);
+    if (!prevWeek) return null;
+    return ((currentWeek - prevWeek) / prevWeek) * 100;
+  }, [stats?.month]);
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((tx) => {
+      if (txTypeFilter && tx.payment_type !== txTypeFilter) return false;
+      const createdTime = tx.created_at ? new Date(tx.created_at).getTime() : null;
+      if (txStartDate && createdTime && createdTime < new Date(txStartDate).getTime()) return false;
+      if (txEndDate && createdTime && createdTime > new Date(txEndDate).getTime() + 86399999) return false;
+      return true;
+    });
+  }, [transactions, txTypeFilter, txStartDate, txEndDate]);
+
+  const filteredStateAdmins = useMemo(() => {
+    if (!stateAdminFilter) return stateAdmins;
+    return stateAdmins.filter((admin) => String(admin.assigned_state || '').toLowerCase().includes(stateAdminFilter.toLowerCase()));
+  }, [stateAdmins, stateAdminFilter]);
+
+  const availableTxTypes = useMemo(
+    () => [...new Set(transactions.map((tx) => tx.payment_type).filter(Boolean))].sort(),
+    [transactions]
+  );
+  const availableAdminStates = useMemo(
+    () => [...new Set(stateAdmins.map((admin) => admin.assigned_state).filter(Boolean))].sort(),
+    [stateAdmins]
+  );
 
   const freezeFundsAction = useRetryableAction(
     async (inputs) => {
@@ -450,7 +499,14 @@ const FinancialAdminDashboard = () => {
             <div className="mt-4">
               <div className="flex items-center text-sm text-green-600">
                 <FaChartLine className="h-4 w-4 mr-1" />
-                <span>+12.5% from last week</span>
+                {weekOverWeek !== null ? (
+                  <span>
+                    {weekOverWeek >= 0 ? '+' : ''}
+                    {weekOverWeek.toFixed(1)}% vs previous week
+                  </span>
+                ) : (
+                  <span className="text-gray-400">No prior week data yet</span>
+                )}
               </div>
             </div>
           </div>
@@ -677,20 +733,27 @@ const FinancialAdminDashboard = () => {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">All Transactions</h3>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <select className="rounded border px-3 py-1 text-sm">
-                      <option>All Types</option>
-                      <option>rent_payment</option>
-                      <option>tenant_subscription</option>
-                      <option>landlord_subscription</option>
-                      <option>landlord_listing</option>
+                    <select
+                      value={txTypeFilter}
+                      onChange={(e) => setTxTypeFilter(e.target.value)}
+                      className="rounded border px-3 py-1 text-sm"
+                    >
+                      <option value="">All Types</option>
+                      {availableTxTypes.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
                     </select>
                     <input
                       type="date"
+                      value={txStartDate}
+                      onChange={(e) => setTxStartDate(e.target.value)}
                       className="rounded border px-3 py-1 text-sm"
                       placeholder="Start Date"
                     />
                     <input
                       type="date"
+                      value={txEndDate}
+                      onChange={(e) => setTxEndDate(e.target.value)}
                       className="rounded border px-3 py-1 text-sm"
                       placeholder="End Date"
                     />
@@ -727,7 +790,7 @@ const FinancialAdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {transactions.map((transaction) => (
+                      {filteredTransactions.map((transaction) => (
                         <tr key={transaction.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {transaction.id}
@@ -795,11 +858,15 @@ const FinancialAdminDashboard = () => {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">State Admin Performance</h3>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <select className="rounded border px-3 py-1 text-sm">
-                      <option>All States</option>
-                      <option>Lagos</option>
-                      <option>Abuja</option>
-                      <option>Rivers</option>
+                    <select
+                      value={stateAdminFilter}
+                      onChange={(e) => setStateAdminFilter(e.target.value)}
+                      className="rounded border px-3 py-1 text-sm"
+                    >
+                      <option value="">All States</option>
+                      {availableAdminStates.map((stateName) => (
+                        <option key={stateName} value={stateName}>{stateName}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -831,7 +898,7 @@ const FinancialAdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {stateAdmins.map((admin) => (
+                      {filteredStateAdmins.map((admin) => (
                         <tr key={admin.id}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
