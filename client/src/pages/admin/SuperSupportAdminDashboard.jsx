@@ -175,13 +175,28 @@ const SuperSupportAdminDashboard = () => {
       try { return await api.get(url); } catch { return fallback; }
     };
 
-    const [queueRes, auditRes, ticketsRes, alertsRes, metricsRes] = await Promise.all([
+    const [queueRes, auditRes, ticketsRes, alertsRes, metricsRes, finStatsRes, stateAdminPerfRes] = await Promise.all([
       safeGet(`/state-migrations/support/queue?stage=all&status=${f.status}`, { data: { data: [] } }),
       safeGet(`/state-migrations/support/audit?status=${f.status}`, { data: { data: [] } }),
       safeGet('/support/tickets', { data: { data: [] } }),
       safeGet('/property-alerts', { data: { data: [] } }),
       safeGet('/dashboard/metrics', { data: { data: {} } }),
+      safeGet('/financial-admin/stats/realtime', { data: { data: {} } }),
+      safeGet('/financial-admin/performance/state-admins', { data: { data: [], statistics: null } }),
     ]);
+
+    // Real commission/financial figures (no mock data):
+    // - totalRevenue: completed payments over the last 30 days
+    // - pendingPayments: pending admin commissions
+    // - processedPayments: withdrawn commissions
+    const finStats = finStatsRes?.data?.data || {};
+    const monthAmount = (finStats.month || []).reduce(
+      (sum, item) => sum + Number(item.month_amount || 0),
+      0
+    );
+    const perfStatistics = stateAdminPerfRes?.data?.statistics || {};
+    const pendingCommissions = Number(perfStatistics.total_pending_commissions || 0);
+    const withdrawnCommissions = Number(perfStatistics.total_withdrawn_amount || 0);
 
     setDashboardData({
       overview: {
@@ -189,8 +204,8 @@ const SuperSupportAdminDashboard = () => {
         pendingApprovals: queueRes?.data?.data?.filter(item => item.status === 'pending').length || 0,
         resolvedTickets: ticketsRes?.data?.data?.filter(ticket => ticket.status === 'resolved').length || 0,
         activeAlerts: alertsRes?.data?.data?.length || 0,
-        systemHealth: '98%',
-        responseTime: '2.4s',
+        systemHealth: null,
+        responseTime: null,
       },
       migrationQueue: queueRes?.data?.data || [],
       auditLogs: auditRes?.data?.data || [],
@@ -199,10 +214,12 @@ const SuperSupportAdminDashboard = () => {
       performanceMetrics: metricsRes?.data?.data || {},
       userActivity: [],
       financialOverview: {
-        totalRevenue: 45000000,
-        pendingPayments: 12000000,
-        processedPayments: 33000000,
-        avgTransaction: 150000,
+        totalRevenue: monthAmount,
+        pendingPayments: pendingCommissions,
+        processedPayments: withdrawnCommissions,
+        avgTransaction: monthAmount > 0 && (finStats.month || []).length > 0
+          ? Math.round(monthAmount / finStats.month.length)
+          : 0,
       },
     });
 

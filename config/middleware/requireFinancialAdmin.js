@@ -12,10 +12,10 @@ module.exports.requireFinancialAdmin = (req, res, next) => {
     });
   }
 
-  if (!isSuperFinancialAdmin(req.user.user_type)) {
+  if (!isSuperAdminOrSuperFinancialAdmin(req.user.user_type)) {
     return res.status(403).json({
       success: false,
-      message: 'Super Financial Admin access only',
+      message: 'Super Admin or Super Financial Admin access only',
     });
   }
 
