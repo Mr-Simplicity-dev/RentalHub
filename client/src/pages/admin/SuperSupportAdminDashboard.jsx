@@ -242,6 +242,13 @@ const SuperSupportAdminDashboard = () => {
         notify_super_admin_on_breach: governancePolicies?.notify_super_admin_on_breach !== false,
       });
     }
+    if (type === 'view-report' && item?.name) {
+      const preview = buildQuickReport(item.name);
+      setReportPreview({ count: preview.count, filename: preview.filename, needsFetch: preview.needsFetch });
+    }
+    if (type === 'configure-alerts') {
+      loadAlertConfig();
+    }
     setModalType(type);
     setSelectedItem(item);
     setShowModal(true);
@@ -532,6 +539,58 @@ const SuperSupportAdminDashboard = () => {
         String(admin.assigned_state || '').toLowerCase().includes(q)
     );
   }, [adminPool, adminSearch]);
+
+  // Quick reports + alert details (real data)
+  const [reportPreview, setReportPreview] = useState({ count: 0, filename: '', needsFetch: false });
+  const [downloadingReport, setDownloadingReport] = useState(false);
+  const [alertConfig, setAlertConfig] = useState(null);
+
+  const buildQuickReport = (name) => {
+    const defs = {
+      'Daily Migration Summary': { type: 'queue', days: 1, filename: 'daily-migration-summary.csv' },
+      'Weekly Performance Report': { type: 'tickets', days: 7, filename: 'weekly-performance-report.csv' },
+      'Monthly Audit Trail': { type: 'audit', days: 30, filename: 'monthly-audit-trail.csv' },
+      'Quarterly Financial Review': { type: 'finance', days: 90, filename: 'quarterly-financial-review.csv' },
+    };
+    const def = defs[name];
+    if (!def) return { count: 0, filename: '', needsFetch: false };
+    if (def.type === 'finance') return { count: null, filename: def.filename, needsFetch: true };
+
+    const since = Date.now() - def.days * 86400000;
+    const source =
+      def.type === 'queue'
+        ? dashboardData.migrationQueue
+        : def.type === 'tickets'
+          ? dashboardData.supportTickets
+          : dashboardData.auditLogs;
+    const rows = source.filter((r) => (r.created_at ? new Date(r.created_at).getTime() >= since : true));
+    return { count: rows.length, filename: def.filename, rows, needsFetch: false };
+  };
+
+  const downloadQuickReport = async (report) => {
+    const preview = buildQuickReport(report.name);
+    setDownloadingReport(true);
+    try {
+      if (preview.needsFetch) {
+        const res = await api.get('/financial-admin/transactions?limit=200');
+        const tx = res.data?.data || [];
+        downloadCsv(preview.filename, tx);
+      } else {
+        downloadCsv(preview.filename, preview.rows || []);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to generate report');
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
+
+  const loadAlertConfig = useCallback(async () => {
+    try {
+      const res = await api.get('/property-alerts/config');
+      setAlertConfig(res.data?.data || null);
+    } catch { /* ignore */ }
+  }, []);
 
   const commissionCheck = useMemo(() => {
     const totalRevenue = Number(dashboardData?.financialOverview?.totalRevenue || 0);
@@ -2068,7 +2127,127 @@ const SuperSupportAdminDashboard = () => {
           </div>
         )}
 
-        {isModalOpen && modalType !== 'view-ticket' && modalType !== 'withdrawal-review' && modalType !== 'generate-report' && modalType !== 'custom-report' && modalType !== 'schedule-report' && modalType !== 'system-config' && modalType !== 'notification-settings' && modalType !== 'user-management' && modalType !== 'security-settings' && (
+        {modalType === 'view-report' && selectedItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">{selectedItem.name}</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {reportPreview.needsFetch
+                  ? 'Fetched live from the payment ledger on download.'
+                  : 'Generated from live dashboard data.'}
+              </p>
+              <div className="mt-4 rounded-lg border border-slate-200 p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Records in period</span>
+                  <span className="font-semibold text-slate-900">
+                    {reportPreview.needsFetch ? 'Live' : reportPreview.count}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  onClick={closeModal}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => downloadQuickReport(selectedItem)}
+                  disabled={downloadingReport}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                >
+                  <FaDownload size={12} /> {downloadingReport ? 'Generating…' : 'Download'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {modalType === 'alert-details' && selectedItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">{selectedItem.title}</h3>
+              <div className="mt-4 space-y-3 text-sm">
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Severity</p>
+                  <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass(selectedItem.severity)}`}>
+                    {selectedItem.severity}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Source</p>
+                  <p className="mt-0.5 text-slate-900">{selectedItem.source || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Reported</p>
+                  <p className="mt-0.5 text-slate-900">{formatDate(selectedItem.created_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Description</p>
+                  <p className="mt-0.5 text-slate-900 whitespace-pre-wrap">{selectedItem.description}</p>
+                </div>
+                {selectedItem.resolution && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Resolution</p>
+                    <p className="mt-0.5 text-slate-900">{selectedItem.resolution}</p>
+                  </div>
+                )}
+              </div>
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={closeModal}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {modalType === 'configure-alerts' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">System Alerts</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Alerts come from the property alert system. Current policy:
+              </p>
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                  <span className="text-slate-700">Payment required for alert requests</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${alertConfig?.payment_required ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                    {alertConfig?.payment_required ? 'On' : 'Off'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                  <span className="text-slate-700">Location required</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${alertConfig?.location_required ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                    {alertConfig?.location_required ? 'On' : 'Off'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                  <span className="text-slate-700">Active alerts now</span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {dashboardData.systemAlerts.length}
+                  </span>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-slate-400">
+                Toggle payment requirements from the Super Admin feature flags.
+              </p>
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={closeModal}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isModalOpen && modalType !== 'view-ticket' && modalType !== 'withdrawal-review' && modalType !== 'generate-report' && modalType !== 'custom-report' && modalType !== 'schedule-report' && modalType !== 'system-config' && modalType !== 'notification-settings' && modalType !== 'user-management' && modalType !== 'security-settings' && modalType !== 'view-report' && modalType !== 'alert-details' && modalType !== 'configure-alerts' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             {modalType === 'view-details' && selectedItem && (

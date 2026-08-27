@@ -1013,7 +1013,17 @@ const Profile = () => {
           appealType="verification"
           targetId={user.id}
           onClose={() => setShowAppealModal(false)}
-          onSuccess={() => {}}
+          onSuccess={async () => {
+            try {
+              const res = await api.get('/auth/me');
+              if (res.data?.success) {
+                updateUser(res.data.data);
+                toast.success('Appeal submitted successfully');
+              }
+            } catch {
+              toast.error('Appeal submitted, but we could not refresh your status. Please refresh the page.');
+            }
+          }}
         />
       )}
     </div>
