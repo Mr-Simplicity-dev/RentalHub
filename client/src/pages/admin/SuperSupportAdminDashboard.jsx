@@ -404,27 +404,7 @@ const SuperSupportAdminDashboard = () => {
   };
 
   // Export functions
-  const exportData = (type) => {
-    let data = [];
-    let filename = '';
-    
-    switch (type) {
-      case 'queue':
-        data = dashboardData.migrationQueue;
-        filename = 'migration-queue-export.csv';
-        break;
-      case 'audit':
-        data = dashboardData.auditLogs;
-        filename = 'audit-logs-export.csv';
-        break;
-      case 'tickets':
-        data = dashboardData.supportTickets;
-        filename = 'support-tickets-export.csv';
-        break;
-      default:
-        return;
-    }
-
+  const downloadCsv = (filename, data) => {
     if (!data.length) {
       toast.error('No data available for export');
       return;
@@ -450,6 +430,64 @@ const SuperSupportAdminDashboard = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const exportData = (type) => {
+    let data = [];
+    let filename = '';
+    
+    switch (type) {
+      case 'queue':
+        data = dashboardData.migrationQueue;
+        filename = 'migration-queue-export.csv';
+        break;
+      case 'audit':
+        data = dashboardData.auditLogs;
+        filename = 'audit-logs-export.csv';
+        break;
+      case 'tickets':
+        data = dashboardData.supportTickets;
+        filename = 'support-tickets-export.csv';
+        break;
+      default:
+        return;
+    }
+
+    downloadCsv(filename, data);
+  };
+
+  // Report generation (real data + optional date range)
+  const [reportType, setReportType] = useState('tickets');
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+
+  const generateReport = () => {
+    let source = [];
+    let filename = '';
+
+    if (reportType === 'tickets') {
+      source = dashboardData.supportTickets;
+      filename = 'support-tickets-report.csv';
+    } else if (reportType === 'queue') {
+      source = dashboardData.migrationQueue;
+      filename = 'migration-queue-report.csv';
+    } else if (reportType === 'audit') {
+      source = dashboardData.auditLogs;
+      filename = 'audit-logs-report.csv';
+    }
+
+    let rows = source;
+    if (reportStartDate || reportEndDate) {
+      rows = source.filter((row) => {
+        const ts = row.created_at ? new Date(row.created_at).getTime() : null;
+        if (!ts) return true;
+        if (reportStartDate && ts < new Date(reportStartDate).getTime()) return false;
+        if (reportEndDate && ts > new Date(reportEndDate).getTime() + 86399999) return false;
+        return true;
+      });
+    }
+
+    downloadCsv(filename, rows);
   };
 
   const commissionCheck = useMemo(() => {
@@ -1695,7 +1733,94 @@ const SuperSupportAdminDashboard = () => {
           </div>
         )}
 
-        {isModalOpen && modalType !== 'view-ticket' && modalType !== 'withdrawal-review' && (
+        {(modalType === 'generate-report' || modalType === 'custom-report') && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">Generate Report</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Export real support data as CSV with an optional date range.
+              </p>
+
+              <label className="mt-4 block text-xs font-medium text-slate-600">Report type</label>
+              <select
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+                className="input mt-1 w-full"
+              >
+                <option value="tickets">Support Tickets</option>
+                <option value="queue">Migration Queue</option>
+                <option value="audit">Audit Logs</option>
+              </select>
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600">Start date</label>
+                  <input
+                    type="date"
+                    value={reportStartDate}
+                    onChange={(e) => setReportStartDate(e.target.value)}
+                    className="input mt-1 w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600">End date</label>
+                  <input
+                    type="date"
+                    value={reportEndDate}
+                    onChange={(e) => setReportEndDate(e.target.value)}
+                    className="input mt-1 w-full"
+                  />
+                </div>
+              </div>
+
+              <p className="mt-3 text-xs text-slate-500">
+                {reportType === 'tickets'
+                  ? dashboardData.supportTickets.length
+                  : reportType === 'queue'
+                    ? dashboardData.migrationQueue.length
+                    : dashboardData.auditLogs.length}{' '}
+                matching record(s) available
+              </p>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  onClick={closeModal}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={generateReport}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+                >
+                  <FaDownload size={12} /> Generate & Download
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {modalType === 'schedule-report' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">Schedule Reports</h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Scheduled report delivery is not available yet. You can generate and download reports
+                manually from the Reports tab.
+              </p>
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={closeModal}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isModalOpen && modalType !== 'view-ticket' && modalType !== 'withdrawal-review' && modalType !== 'generate-report' && modalType !== 'custom-report' && modalType !== 'schedule-report' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             {modalType === 'view-details' && selectedItem && (
