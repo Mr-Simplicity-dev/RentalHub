@@ -512,6 +512,12 @@ const Register = () => {
       international_passport_number: isForeigner ? prev.international_passport_number : '',
       nationality: isForeigner ? prev.nationality : '',
     }));
+
+    // Show the fee modal (if dismissed) so diaspora applicants see the
+    // diaspora pricing right when they select the foreigner option.
+    if (isForeigner && registrationFlags.diaspora_registration) {
+      setShowRegistrationFeeModal(true);
+    }
   };
 
  const handleSubmit = async (e) => {
@@ -536,6 +542,11 @@ const Register = () => {
       registrationFlags.registration_access_message ||
         t('register.location_blocked')
     );
+    return;
+  }
+
+  if (formData.is_foreigner && !registrationFlags.diaspora_registration) {
+    toast.error(t('register.disabled_diaspora'));
     return;
   }
 
@@ -1005,7 +1016,11 @@ return (
             </div>
 
             {registrationFlags.diaspora_registration && (
-              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+              <div className={`rounded-lg border p-3 ${
+                formData.is_foreigner
+                  ? 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-200'
+                  : 'border-emerald-100 bg-emerald-50'
+              }`}>
                 <p className="font-semibold text-emerald-900">{t('register.modal_diaspora')}</p>
                 <p className="mt-1">
                   {t('register.modal_diaspora_desc')}{' '}

@@ -3230,6 +3230,7 @@
     "modal_diaspora_lawyer": "Add a RentalHub NG lawyer for",
     "modal_diaspora_agent": "Add a RentalHub NG agent for",
     "modal_approx": "≈",
+    "disabled_diaspora": "Diaspora registration is currently disabled. Please try again later.",
     "modal_skip": "Skip",
     "modal_understand": "I Understand",
     "logo_alt": "RentalHub NG logo",
