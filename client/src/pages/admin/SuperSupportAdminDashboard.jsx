@@ -234,6 +234,14 @@ const SuperSupportAdminDashboard = () => {
   };
 
   const openModal = (type, item = null) => {
+    if (type === 'system-config' || type === 'notification-settings') {
+      setPolicyDraft({
+        sla_due_soon_hours: governancePolicies?.sla_due_soon_hours ?? 2,
+        escalation_acknowledgement_hours: governancePolicies?.escalation_acknowledgement_hours ?? 4,
+        department_resolution_hours: governancePolicies?.department_resolution_hours ?? 24,
+        notify_super_admin_on_breach: governancePolicies?.notify_super_admin_on_breach !== false,
+      });
+    }
     setModalType(type);
     setSelectedItem(item);
     setShowModal(true);
@@ -489,6 +497,41 @@ const SuperSupportAdminDashboard = () => {
 
     downloadCsv(filename, rows);
   };
+
+  // Governance policy editor (real GET/PUT /support/governance/policies)
+  const [policyDraft, setPolicyDraft] = useState({
+    sla_due_soon_hours: 2,
+    escalation_acknowledgement_hours: 4,
+    department_resolution_hours: 24,
+    notify_super_admin_on_breach: true,
+  });
+  const [savingPolicies, setSavingPolicies] = useState(false);
+  const [adminSearch, setAdminSearch] = useState('');
+
+  const saveGovernancePolicies = async () => {
+    setSavingPolicies(true);
+    try {
+      await api.put('/support/governance/policies', policyDraft);
+      setGovernancePolicies(policyDraft);
+      toast.success('Governance policies updated');
+      closeModal();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update policies');
+    } finally {
+      setSavingPolicies(false);
+    }
+  };
+
+  const filteredAdminPool = useMemo(() => {
+    if (!adminSearch) return adminPool;
+    const q = adminSearch.toLowerCase();
+    return adminPool.filter(
+      (admin) =>
+        String(admin.full_name || '').toLowerCase().includes(q) ||
+        String(admin.email || '').toLowerCase().includes(q) ||
+        String(admin.assigned_state || '').toLowerCase().includes(q)
+    );
+  }, [adminPool, adminSearch]);
 
   const commissionCheck = useMemo(() => {
     const totalRevenue = Number(dashboardData?.financialOverview?.totalRevenue || 0);
@@ -1820,7 +1863,212 @@ const SuperSupportAdminDashboard = () => {
           </div>
         )}
 
-        {isModalOpen && modalType !== 'view-ticket' && modalType !== 'withdrawal-review' && modalType !== 'generate-report' && modalType !== 'custom-report' && modalType !== 'schedule-report' && (
+        {(modalType === 'system-config' || modalType === 'notification-settings') && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">
+                {modalType === 'system-config' ? 'Support Governance Policies' : 'Notification Settings'}
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {modalType === 'system-config'
+                  ? 'These control SLA timing and escalation windows.'
+                  : 'Real notification policy for SLA breach alerts.'}
+              </p>
+
+              {modalType === 'system-config' && (
+                <div className="mt-4 space-y-3">
+                  <label className="block">
+                    <span className="text-xs font-medium text-slate-600">SLA due-soon window (hours)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="24"
+                      value={policyDraft.sla_due_soon_hours ?? 2}
+                      onChange={(e) => setPolicyDraft((prev) => ({ ...prev, sla_due_soon_hours: Number(e.target.value) }))}
+                      className="input mt-1 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium text-slate-600">Escalation acknowledgement (hours)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="72"
+                      value={policyDraft.escalation_acknowledgement_hours ?? 4}
+                      onChange={(e) => setPolicyDraft((prev) => ({ ...prev, escalation_acknowledgement_hours: Number(e.target.value) }))}
+                      className="input mt-1 w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium text-slate-600">Department resolution (hours)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="168"
+                      value={policyDraft.department_resolution_hours ?? 24}
+                      onChange={(e) => setPolicyDraft((prev) => ({ ...prev, department_resolution_hours: Number(e.target.value) }))}
+                      className="input mt-1 w-full"
+                    />
+                  </label>
+                </div>
+              )}
+
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-sm text-slate-700">Notify Super Admin on SLA breach</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={policyDraft.notify_super_admin_on_breach === true}
+                  onClick={() =>
+                    setPolicyDraft((prev) => ({
+                      ...prev,
+                      notify_super_admin_on_breach: prev.notify_super_admin_on_breach !== true,
+                    }))
+                  }
+                  className={`relative inline-block h-6 w-10 rounded-full transition-colors ${
+                    policyDraft.notify_super_admin_on_breach === true ? 'bg-green-500' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${
+                      policyDraft.notify_super_admin_on_breach === true ? 'translate-x-4' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  onClick={closeModal}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveGovernancePolicies}
+                  disabled={savingPolicies}
+                  className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {savingPolicies ? 'Saving…' : 'Save Policies'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {modalType === 'user-management' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl bg-white p-6 shadow-xl">
+              <div className="flex shrink-0 items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Support Admin Pool</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {adminPool.length} support admins currently on duty.
+                  </p>
+                </div>
+                <button onClick={closeModal} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+                  <FaTimesCircle size={20} />
+                </button>
+              </div>
+
+              <div className="mt-4 shrink-0">
+                <input
+                  value={adminSearch}
+                  onChange={(e) => setAdminSearch(e.target.value)}
+                  placeholder="Search by name, email or state…"
+                  className="input w-full"
+                />
+              </div>
+
+              <div className="mt-4 flex-1 overflow-y-auto">
+                {filteredAdminPool.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center">
+                    <FaUserShield className="mx-auto text-slate-400" size={28} />
+                    <p className="mt-2 text-sm text-slate-500">No support admins found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredAdminPool.map((admin) => (
+                      <div key={admin.id} className="rounded-lg border border-slate-200 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-900">
+                              {admin.full_name}
+                              {admin.is_lead && (
+                                <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                  Lead
+                                </span>
+                              )}
+                            </p>
+                            <p className="mt-0.5 truncate text-xs text-slate-500">
+                              {admin.email} • {admin.user_type}
+                              {admin.assigned_state ? ` • ${admin.assigned_state}` : ''}
+                              {admin.assigned_city ? `, ${admin.assigned_city}` : ''}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-3">
+                            <span className="text-xs text-slate-500">
+                              {admin.open_tickets || 0} open tickets
+                            </span>
+                            {!admin.is_lead && (
+                              <button
+                                onClick={() => {
+                                  promoteToLead(admin.id);
+                                  closeModal();
+                                }}
+                                className="rounded-lg border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                              >
+                                Promote to Lead
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {modalType === 'security-settings' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-slate-900">Security Settings</h3>
+              <p className="mt-1 text-xs text-slate-500">Account-level security controls.</p>
+              <div className="mt-4 space-y-3">
+                <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+                  <p className="font-medium text-slate-900">Two-factor authentication</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Managed per account — users enable it from their profile.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+                  <p className="font-medium text-slate-900">Failed login lockout</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Repeated failed logins temporarily lock the account automatically. No dashboard
+                    override is exposed yet.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+                  <p className="font-medium text-slate-900">Session timeout</p>
+                  <p className="mt-1 text-xs text-slate-500">Not configurable from this dashboard.</p>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={closeModal}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isModalOpen && modalType !== 'view-ticket' && modalType !== 'withdrawal-review' && modalType !== 'generate-report' && modalType !== 'custom-report' && modalType !== 'schedule-report' && modalType !== 'system-config' && modalType !== 'notification-settings' && modalType !== 'user-management' && modalType !== 'security-settings' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             {modalType === 'view-details' && selectedItem && (
