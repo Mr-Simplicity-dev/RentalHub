@@ -3427,7 +3427,13 @@ exports.getPaymentHistory = async (req, res) => {
     let query = `
       SELECT
         p.*,
-        prop.title AS property_title
+        prop.title AS property_title,
+        CASE
+          WHEN p.transaction_reference LIKE '%\\_LAWYER_FEE'
+            OR p.transaction_reference LIKE '%\\_AGENT_FEE'
+          THEN regexp_replace(p.transaction_reference, '_(LAWYER|AGENT)_FEE$', '')
+          ELSE p.transaction_reference
+        END AS group_key
       FROM payments p
       LEFT JOIN properties prop ON p.property_id = prop.id
       WHERE p.user_id = $1

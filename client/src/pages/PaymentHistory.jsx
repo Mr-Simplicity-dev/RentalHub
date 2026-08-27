@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { FaReceipt, FaPrint } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
@@ -56,23 +56,49 @@ const PaymentHistory = () => {
   const [loading, setLoading] = useState(true);
   const [payingPaymentId, setPayingPaymentId] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [selectedReceiptGroup, setSelectedReceiptGroup] = useState([]);
   const [receiptDeductions, setReceiptDeductions] = useState([]);
   const [receiptLoading, setReceiptLoading] = useState(false);
 
-  const openReceipt = async (payment) => {
-    setSelectedReceipt(payment);
+  // Group payments that were paid in ONE combined transaction (registration
+  // base + lawyer + agent share a base reference). Separate transactions keep
+  // their own groups, so each gets its own receipt.
+  const paymentGroups = useMemo(() => {
+    const map = new Map();
+    for (const p of payments) {
+      const key = p.group_key || p.transaction_reference || String(p.id);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(p);
+    }
+    return [...map.values()];
+  }, [payments]);
+
+  const openReceipt = async (group) => {
+    setSelectedReceiptGroup(group);
+    setSelectedReceipt(group[0] || null);
     setReceiptDeductions([]);
-    if (!payment.id) return;
+    const ids = group.map((p) => p.id).filter(Boolean);
+    if (!ids.length) return;
     setReceiptLoading(true);
     try {
-      const res = await paymentService.getWalletTransactions({ payment_id: payment.id, limit: 20 });
-      setReceiptDeductions(res.data || []);
+      const all = [];
+      for (const id of ids) {
+        const res = await paymentService.getWalletTransactions({ payment_id: id, limit: 20 });
+        if (res.data) all.push(...res.data);
+      }
+      setReceiptDeductions(all);
     } catch {
       setReceiptDeductions([]);
     } finally {
       setReceiptLoading(false);
     }
   };
+
+  const groupTotal = (group) =>
+    group.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+  const formatReceiptNumber = (payment) =>
+    `RCPT-${String(payment?.id || 0).padStart(6, '0')}`;
 
   const loadPayments = useCallback(async () => {
     setLoading(true);
@@ -126,80 +152,150 @@ const PaymentHistory = () => {
         <BackToDashboard />
       </div>
 
-      {payments.length === 0 ? (
+      {paymentGroups.length === 0 ? (
         <div className="card text-center py-10 text-gray-500">
           {t('payment_history.no_history')}
         </div>
       ) : (
         <div className="space-y-4">
-          {payments.map((payment) => (
-            <div key={payment.id} className="card">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <div className="font-semibold text-gray-900">
-                    {formatPaymentType(payment.payment_type, t)}
-                  </div>
-                  <div className="text-sm text-gray-600 mt-1">
-                    {payment.property_title || t('payment_history.general_payment')}
-                  </div>
-                  <div className="text-sm text-gray-500 mt-2">
-                    {new Date(payment.created_at).toLocaleString()}
+          {paymentGroups.map((group) => {
+            const first = group[0];
+            const isCombined = group.length > 1;
+            const combinedStatus = group.some((p) => p.payment_status === 'pending')
+              ? 'pending'
+              : group.every((p) => p.payment_status === 'completed')
+                ? 'completed'
+                : first.payment_status;
+
+            if (!isCombined) {
+              return (
+                <div key={first.id} className="card">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="font-semibold text-gray-900">
+                        {formatPaymentType(first.payment_type, t)}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {first.property_title || t('payment_history.general_payment')}
+                      </div>
+                      <div className="text-sm text-gray-500 mt-2">
+                        {new Date(first.created_at).toLocaleString()}
+                      </div>
+                    </div>
+
+                    <div className="text-left md:text-right">
+                      <div className="text-lg font-bold text-gray-900">
+                        {formatAmount(first.amount, first.currency || 'NGN')}
+                      </div>
+                      <div className="mt-2">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                            PAYMENT_STATUS_STYLES[first.payment_status] ||
+                            'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          {first.payment_status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        {t('payment_history.method')}: {first.payment_method || 'N/A'}
+                      </div>
+                      {first.transaction_reference && (
+                        <div className="text-xs text-gray-500 mt-1 break-all">
+                          {t('payment_history.ref')}: {first.transaction_reference}
+                        </div>
+                      )}
+                      {first.payment_status === 'completed' && (
+                        <button
+                          onClick={() => openReceipt(group)}
+                          className="mt-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+                        >
+                          <FaReceipt className="mr-1.5" /> View Receipt
+                        </button>
+                      )}
+                      {first.payment_status === 'pending' && PAYMENT_TYPES_WITH_RETRY.includes(first.payment_type) && (
+                        <button
+                          onClick={() => handlePayNow(first)}
+                          disabled={payingPaymentId === first.id}
+                          className="mt-3 inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {payingPaymentId === first.id ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-1.5 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              {t('payment_history.processing')}
+                            </>
+                          ) : (
+                            t('payment_history.pay_now')
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
+              );
+            }
 
-                <div className="text-left md:text-right">
-                  <div className="text-lg font-bold text-gray-900">
-                    {formatAmount(payment.amount, payment.currency || 'NGN')}
-                  </div>
-                  <div className="mt-2">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        PAYMENT_STATUS_STYLES[payment.payment_status] ||
-                        'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {payment.payment_status}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500 mt-2">
-                    {t('payment_history.method')}: {payment.payment_method || 'N/A'}
-                  </div>
-                  {payment.transaction_reference && (
-                    <div className="text-xs text-gray-500 mt-1 break-all">
-                      {t('payment_history.ref')}: {payment.transaction_reference}
+            // Combined payment (one transaction, multiple line items)
+            return (
+              <div key={first.group_key || first.transaction_reference} className="card">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-gray-900">
+                      Combined Payment ({group.length} items)
                     </div>
-                  )}
-                  {payment.payment_status === 'completed' && (
-                    <button
-                      onClick={() => openReceipt(payment)}
-                      className="mt-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
-                    >
-                      <FaReceipt className="mr-1.5" /> View Receipt
-                    </button>
-                  )}
-                  {payment.payment_status === 'pending' && PAYMENT_TYPES_WITH_RETRY.includes(payment.payment_type) && (
-                    <button
-                      onClick={() => handlePayNow(payment)}
-                      disabled={payingPaymentId === payment.id}
-                      className="mt-3 inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {payingPaymentId === payment.id ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-1.5 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          {t('payment_history.processing')}
-                        </>
-                      ) : (
-                        t('payment_history.pay_now')
-                      )}
-                    </button>
-                  )}
+                    <div className="mt-2 space-y-1">
+                      {group.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between gap-4 text-sm">
+                          <span className="text-gray-600">{formatPaymentType(item.payment_type, t)}</span>
+                          <span className="font-medium text-gray-900">
+                            {formatAmount(item.amount, item.currency || 'NGN')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-4 border-t border-gray-100 pt-2 text-sm font-bold text-gray-900">
+                      <span>Total</span>
+                      <span>{formatAmount(groupTotal(group), first.currency || 'NGN')}</span>
+                    </div>
+                    <div className="text-sm text-gray-500 mt-2">
+                      {new Date(first.created_at).toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div className="text-left md:text-right">
+                    <div className="mt-2">
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                          PAYMENT_STATUS_STYLES[combinedStatus] || 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {combinedStatus}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      {t('payment_history.method')}: {first.payment_method || 'N/A'}
+                    </div>
+                    {first.transaction_reference && (
+                      <div className="text-xs text-gray-500 mt-1 break-all">
+                        {t('payment_history.ref')}: {first.group_key || first.transaction_reference}
+                      </div>
+                    )}
+                    {combinedStatus === 'completed' && (
+                      <button
+                        onClick={() => openReceipt(group)}
+                        className="mt-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+                      >
+                        <FaReceipt className="mr-1.5" /> View Receipt
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -221,12 +317,15 @@ const PaymentHistory = () => {
                 />
                 <h2 className="mt-2 text-lg font-bold text-gray-900">RentalHub NG</h2>
                 <p className="text-xs text-gray-500">Official Payment Receipt</p>
+                <p className="mt-1 text-xs font-semibold text-gray-700">
+                  {formatReceiptNumber(selectedReceipt)}
+                </p>
               </div>
               <div className="mt-4 space-y-2 text-sm">
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">{t('payment_history.ref')}</span>
                   <span className="break-all text-right font-medium text-gray-900">
-                    {selectedReceipt.transaction_reference}
+                    {selectedReceipt.group_key || selectedReceipt.transaction_reference}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
@@ -241,16 +340,48 @@ const PaymentHistory = () => {
                     {user?.full_name || user?.email}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-gray-500">{t('payment_history.payment_for')}</span>
-                  <span className="text-right font-medium text-gray-900">
+              </div>
+
+              {selectedReceiptGroup.length > 1 && (
+                <div className="mt-3 rounded-lg border border-gray-200">
+                  {selectedReceiptGroup.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center justify-between gap-4 px-3 py-2 text-sm ${
+                        index > 0 ? 'border-t border-gray-100' : ''
+                      }`}
+                    >
+                      <span className="text-gray-700">{formatPaymentType(item.payment_type, t)}</span>
+                      <span className="font-medium text-gray-900">
+                        {formatAmount(item.amount, item.currency || 'NGN')}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between gap-4 border-t border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-gray-900">
+                    <span>Total Paid</span>
+                    <span>{formatAmount(groupTotal(selectedReceiptGroup), selectedReceipt.currency || 'NGN')}</span>
+                  </div>
+                </div>
+              )}
+              {selectedReceiptGroup.length === 1 && (
+                <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  <span className="text-gray-700">{t('payment_history.payment_for')}</span>
+                  <span className="font-medium text-gray-900">
                     {formatPaymentType(selectedReceipt.payment_type, t)}
                   </span>
                 </div>
+              )}
+
+              <div className="mt-3 space-y-2 text-sm">
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">{t('payment_history.amount')}</span>
                   <span className="text-right text-base font-bold text-gray-900">
-                    {formatAmount(selectedReceipt.amount, selectedReceipt.currency || 'NGN')}
+                    {formatAmount(
+                      selectedReceiptGroup.length > 1
+                        ? groupTotal(selectedReceiptGroup)
+                        : selectedReceipt.amount,
+                      selectedReceipt.currency || 'NGN'
+                    )}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">

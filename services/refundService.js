@@ -1988,6 +1988,21 @@ exports.requestWithdrawal = async (req, res) => {
         [userId, withdrawAmount, bank_name, bank_code || null, account_number, account_name]
       );
 
+      // Record the withdrawal in the wallet ledger so the transaction
+      // history is complete (balance deduction + ledger debit).
+      await txn.query(
+        `INSERT INTO wallet_transactions
+           (user_id, payment_id, amount, type, status, source, description, reference)
+         VALUES ($1, NULL, $2, 'debit', 'withdrawn', 'withdrawal', $3, $4)
+         ON CONFLICT (reference, user_id, type, source) DO NOTHING`,
+        [
+          userId,
+          withdrawAmount,
+          `Withdrawal request #${result.rows[0].id} to ${bank_name}`,
+          `WITHDRAWAL_${userId}_${result.rows[0].id}`,
+        ]
+      );
+
       await txn.query('COMMIT');
 
       res.status(201).json({
