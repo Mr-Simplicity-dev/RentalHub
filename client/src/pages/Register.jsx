@@ -979,9 +979,9 @@ const inputClass = (field) =>
 return (
   <div className="min-h-screen flex dark:bg-gray-900">
     {showRegistrationFeeModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-        <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-          <div className="flex items-start justify-between gap-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-4">
+        <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="flex shrink-0 items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
                 {t('register.modal_before')}
@@ -1000,7 +1000,7 @@ return (
             </button>
           </div>
 
-          <div className="mt-5 space-y-3 text-sm text-gray-700">
+          <div className="mt-5 space-y-3 overflow-y-auto pr-1 text-sm text-gray-700">
             <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
               <p className="font-semibold text-blue-900">{t('register.modal_tenant')}</p>
               <p className="mt-1">
@@ -1072,7 +1072,7 @@ return (
             </p>
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-6 flex shrink-0 flex-col gap-3 sm:flex-row">
             <button
               type="button"
               onClick={() => setShowRegistrationFeeModal(false)}
