@@ -562,6 +562,23 @@ exports.makeContribution = async (req, res) => {
       'rent_savings_plan'
     );
 
+    // Email the savings receipt (same itemization as the PDF receipt)
+    try {
+      const { sendSavingsReceiptEmail } = require('../config/utils/emailService');
+      await sendSavingsReceiptEmail({
+        email: req.user.email,
+        fullName: req.user.full_name,
+        amount: contributionAmount,
+        fee: commission1pct,
+        net: netSaved,
+        month,
+        planId: id,
+        reference: ref,
+      });
+    } catch (emailError) {
+      req.logger.warn('Savings receipt email failed (non-fatal):', emailError.message);
+    }
+
     res.status(201).json({
       success: true,
       message: `Contribution of ₦${contributionAmount.toLocaleString()} saved successfully!`,

@@ -15,6 +15,7 @@ import {
   FaBan,
 } from 'react-icons/fa';
 import api from '../../services/api';
+import { paymentService } from '../../services/paymentService';
 import { toast } from 'react-toastify';
 
 const TABS = ['overview', 'contribute', 'withdraw', 'history'];
@@ -1166,6 +1167,27 @@ function HistoryTab({ plan, planDetails }) {
               <div className="text-right">
                 <p className="text-sm font-bold text-gray-800">₦{formatCurrency(c.amount)}</p>
                 <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">saved</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const blob = await paymentService.downloadSavingsReceipt(c.id);
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `savings-receipt-${c.id}.pdf`;
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      URL.revokeObjectURL(url);
+                    } catch (error) {
+                      toast.error(error?.response?.data?.message || 'Failed to download receipt');
+                    }
+                  }}
+                  className="mt-1 block text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                >
+                  Receipt ↓
+                </button>
               </div>
             </div>
           ))}

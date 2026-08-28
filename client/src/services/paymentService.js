@@ -96,6 +96,15 @@ export const paymentService = {
     return response.data;
   },
 
+  // Download a rent savings contribution receipt as PDF
+  downloadSavingsReceipt: async (contributionId) => {
+    const response = await api.get('/payments/savings-receipt.pdf', {
+      params: { contribution_id: contributionId },
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
   // Get payment details
   getPaymentDetails: async (paymentId) => {
     const response = await api.get(`/payments/${paymentId}`);

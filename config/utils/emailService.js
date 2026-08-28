@@ -152,6 +152,58 @@ exports.sendCompleteRegistrationEmail = async ({
   }
 };
 
+// Send rent savings contribution receipt
+exports.sendSavingsReceiptEmail = async ({
+  email,
+  fullName,
+  amount,
+  fee,
+  net,
+  month,
+  planId,
+  reference,
+}) => {
+  try {
+    await sendEmail({
+      to: email,
+      subject: `Rent Savings Receipt — ${month}`,
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto;">
+          <div style="text-align:center; padding-bottom:16px; border-bottom:2px solid #059669;">
+            <h2 style="margin:0; color:#0f172a;">RentalHub NG</h2>
+            <p style="margin:4px 0 0; color:#64748b;">Rent Savings Contribution Receipt</p>
+          </div>
+          <div style="padding:16px 0; font-size:14px; color:#334155;">
+            <p>Hello ${esc(fullName || email)},</p>
+            <p>Your rent savings contribution for <strong>${esc(month)}</strong> was received.</p>
+            <table style="width:100%; border-collapse:collapse; margin-top:8px; font-size:13px;">
+              <tr>
+                <td style="padding:6px 0; color:#64748b;">Contribution</td>
+                <td style="padding:6px 0; text-align:right; font-weight:600;">₦${Number(amount || 0).toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0; color:#64748b;">Platform fee (1%)</td>
+                <td style="padding:6px 0; text-align:right;">₦${Number(fee || 0).toLocaleString()}</td>
+              </tr>
+              <tr style="border-top:1px solid #e2e8f0;">
+                <td style="padding:6px 0; font-weight:700;">Net saved</td>
+                <td style="padding:6px 0; text-align:right; font-weight:700; color:#059669;">₦${Number(net || 0).toLocaleString()}</td>
+              </tr>
+            </table>
+            <p style="font-size:12px; color:#94a3b8; margin-top:8px;">
+              Plan #${esc(String(planId))} · Reference: ${esc(reference || '')}
+            </p>
+          </div>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (error) {
+    logger.error('Savings receipt email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send welcome email
 exports.sendWelcomeEmail = async (email, fullName, userType) => {
   try {

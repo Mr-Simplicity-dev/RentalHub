@@ -536,6 +536,101 @@ router.get('/receipt-pdf/:paymentId',
   }
 );
 
+// Tenant: downloadable PDF receipt for a rent savings contribution
+router.get('/savings-receipt.pdf',
+  authenticate,
+  async (req, res) => {
+    try {
+      const PDFDocument = require('pdfkit');
+      const db = require('../config/middleware/database');
+
+      const contributionId = Number.parseInt(req.query.contribution_id, 10);
+      if (!Number.isInteger(contributionId) || contributionId <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid contribution id' });
+      }
+
+      const result = await db.query(
+        `SELECT c.*, p.monthly_savings_amount, p.target_savings_amount
+         FROM rent_savings_contributions c
+         JOIN rent_savings_plans p ON p.id = c.plan_id
+         WHERE c.id = $1`,
+        [contributionId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Contribution not found' });
+      }
+
+      const contribution = result.rows[0];
+
+      if (Number(contribution.tenant_id) !== Number(req.user.id)) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+
+      const amount = Number(contribution.amount || 0);
+      const fee = Number(contribution.commission_1pct || 0);
+      const net = Number(contribution.net_saved || 0);
+
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="savings-receipt-${String(contributionId).padStart(6, '0')}.pdf"`
+      );
+      doc.pipe(res);
+
+      doc.fontSize(20).text('RentalHub NG', { align: 'center' });
+      doc.moveDown(0.2);
+      doc.fontSize(11).fillColor('#64748b').text('Rent Savings Contribution Receipt', { align: 'center' });
+      doc.fontSize(11).fillColor('#0f172a').text(`RCPT-SAV-${String(contributionId).padStart(6, '0')}`, { align: 'center' });
+      doc.moveDown();
+
+      doc.fontSize(10).fillColor('#334155');
+      doc.text(`Payer: ${req.user.full_name || req.user.email}`);
+      doc.text(`Date: ${new Date(contribution.contributed_at).toLocaleString('en-NG')}`);
+      doc.text(`Reference: ${contribution.payment_reference || `RSC_${contribution.plan_id}`}`);
+      doc.text(`Savings Month: ${contribution.saved_for_month}`);
+      doc.text(`Status: Saved`);
+      doc.text(`Method: Wallet Balance`);
+      doc.moveDown();
+
+      const tableTop = doc.y;
+      doc.font('Helvetica-Bold');
+      doc.text('Item', 50, tableTop);
+      doc.text('Amount', 400, tableTop, { width: 150, align: 'right' });
+      doc.moveTo(50, tableTop + 16).lineTo(545, tableTop + 16).strokeColor('#e2e8f0').stroke();
+
+      let y = tableTop + 26;
+      doc.font('Helvetica');
+      const rows = [
+        ['Contribution', `₦${amount.toLocaleString()}`],
+        ['Platform fee (1%)', `₦${fee.toLocaleString()}`],
+        ['Net saved', `₦${net.toLocaleString()}`],
+      ];
+      rows.forEach(([label, value]) => {
+        doc.fillColor('#334155').text(label, 50, y, { width: 330 });
+        doc.text(value, 400, y, { width: 150, align: 'right' });
+        y += 22;
+      });
+
+      doc.moveTo(50, y).lineTo(545, y).strokeColor('#e2e8f0').stroke();
+      doc.moveDown();
+      doc.font('Helvetica-Bold');
+      doc.fillColor('#0f172a').text('Amount Saved', 50, doc.y);
+      doc.text(`₦${net.toLocaleString()}`, 400, doc.y - 14, { width: 150, align: 'right' });
+      doc.moveDown(2);
+      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for saving with RentalHub NG.', { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      req.logger.error('Savings receipt PDF error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Failed to generate savings receipt PDF' });
+      }
+    }
+  }
+);
+
 // Admin/agent commission earnings statement as PDF
 router.get('/commission-statement.pdf',
   authenticate,
