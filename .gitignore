@@ -69,12 +69,13 @@ build/Release
 ehthumbs.db
 Thumbs.db
 
-# WhatsApp Web.js session data
+# WhatsApp Web.js session data (root-level only — these patterns previously
+# hid real source dirs like client/src/pages/auth/)
 .wwebjs_auth/
 .wwebjs_cache/
-sessions/
-auth/
-media/
+/sessions/
+/auth/
+/media/
 
 # User uploads (passports, property images, evidence)
 uploads/
