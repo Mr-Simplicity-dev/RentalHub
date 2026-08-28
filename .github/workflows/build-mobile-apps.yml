@@ -2,7 +2,7 @@ name: Build Mobile Apps
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'RentalHubMobile/**'
   workflow_dispatch:

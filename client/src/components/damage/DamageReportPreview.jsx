@@ -1,4 +1,4 @@
-// Removed — DamageReportPreview was unused; DamageReportCard is the active component.
+﻿// Removed ΓÇö DamageReportPreview was unused; DamageReportCard is the active component.
 import React from 'react';
 
 const DamageReportPreview = () => null;
@@ -7,14 +7,14 @@ const DamageReportPreview = () => null;
 
   const getDamageTypeLabel = (type) => {
     const TYPES = {
-      scratch: '🔨 Scratch',
-      crack: '⚡ Crack',
-      hole: '🕳️ Hole',
-      dent: '▼ Dent',
-      stain: '🩹 Stain',
-      water_damage: '💧 Water Damage',
-      mold: '🍃 Mold',
-      other: '❓ Other',
+      scratch: '≡ƒö¿ Scratch',
+      crack: 'ΓÜí Crack',
+      hole: '≡ƒò│∩╕Å Hole',
+      dent: 'Γû╝ Dent',
+      stain: '≡ƒ⌐╣ Stain',
+      water_damage: '≡ƒÆº Water Damage',
+      mold: '≡ƒìâ Mold',
+      other: 'Γ¥ô Other',
     };
     return TYPES[type] || type;
   };
@@ -54,7 +54,7 @@ const DamageReportPreview = () => null;
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between border-b border-blue-200 pb-3">
-        <h3 className="text-lg font-semibold text-blue-900">📋 Property Condition Report</h3>
+        <h3 className="text-lg font-semibold text-blue-900">≡ƒôï Property Condition Report</h3>
         <time className="text-xs text-blue-700">Updated: {reportDate}</time>
       </div>
 
@@ -88,7 +88,7 @@ const DamageReportPreview = () => null;
           {/* Dimensions if available */}
           {(latestReport.width_cm || latestReport.height_cm) && (
             <p className="mb-3 text-sm text-gray-700">
-              <strong>Size:</strong> {latestReport.width_cm || '?'} cm × {latestReport.height_cm || '?'} cm
+              <strong>Size:</strong> {latestReport.width_cm || '?'} cm ├ù {latestReport.height_cm || '?'} cm
             </p>
           )}
 
@@ -102,7 +102,7 @@ const DamageReportPreview = () => null;
         {/* AI Analysis if available */}
         {latestReport.ai_analysis && (
           <div className="rounded-lg bg-emerald-50 p-4">
-            <p className="mb-2 text-xs font-semibold text-emerald-900">🤖 AI Assessment</p>
+            <p className="mb-2 text-xs font-semibold text-emerald-900">≡ƒñû AI Assessment</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
               {latestReport.ai_analysis.damage_type && (
                 <div>
@@ -121,7 +121,7 @@ const DamageReportPreview = () => null;
               {latestReport.ai_analysis.estimated_width_cm || latestReport.ai_analysis.estimated_height_cm ? (
                 <div>
                   <p className="text-emerald-700">
-                    <strong>Size:</strong> {latestReport.ai_analysis.estimated_width_cm || '?'} ×{' '}
+                    <strong>Size:</strong> {latestReport.ai_analysis.estimated_width_cm || '?'} ├ù{' '}
                     {latestReport.ai_analysis.estimated_height_cm || '?'} cm
                   </p>
                 </div>

@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FaCheckCircle, FaTimes, FaWallet, FaHistory, FaReceipt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 
 const TYPE_LABELS = {
-  wallet_funding: 'Wallet Funding',
-  rent_payment: 'Rent Credit',
-  rent_refund: 'Refund Reversal',
-  refund: 'Refund',
-  rent_savings: 'Rent Savings',
-  withdrawal: 'Withdrawal',
-  general: 'General',
+  wallet_funding: 'wallet_fund.type.wallet_funding',
+  rent_payment: 'wallet_fund.type.rent_payment',
+  rent_refund: 'wallet_fund.type.rent_refund',
+  refund: 'wallet_fund.type.refund',
+  rent_savings: 'wallet_fund.type.rent_savings',
+  withdrawal: 'wallet_fund.type.withdrawal',
+  general: 'wallet_fund.type.general',
 };
 
 const STATUS_STYLES = {
@@ -30,6 +31,7 @@ export default function WalletFundModal({
   landlordWallet,
   onSwitchToWithdraw,
 }) {
+  const { t } = useTranslation();
   const [amount, setAmount] = useState('');
   const [transactions, setTransactions] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -61,7 +63,7 @@ export default function WalletFundModal({
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
           <div className="flex items-center gap-3">
             <FaWallet className="text-teal-500 text-2xl" />
-            <h2 className="text-lg font-bold text-gray-800">Fund Wallet</h2>
+            <h2 className="text-lg font-bold text-gray-800">{t('wallet_fund.title', 'Fund Wallet')}</h2>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FaTimes className="text-xl" />
@@ -72,7 +74,7 @@ export default function WalletFundModal({
           {selectedBalance !== null && (
             <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
               <div>
-                <p className="text-xs text-teal-600">Current Balance</p>
+                <p className="text-xs text-teal-600">{t('wallet_fund.current_balance', 'Current Balance')}</p>
                 <p className="text-2xl font-bold text-teal-800">₦{Number(selectedBalance || 0).toLocaleString()}</p>
               </div>
               <FaWallet className="text-teal-400 text-3xl" />
@@ -80,7 +82,7 @@ export default function WalletFundModal({
           )}
 
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Select or enter amount</p>
+            <p className="text-sm font-medium text-gray-700 mb-2">{t('wallet_fund.select_amount', 'Select or enter amount')}</p>
             <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {presetAmounts.map((amt) => (
                 <button
@@ -96,36 +98,40 @@ export default function WalletFundModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Custom Amount (₦)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('wallet_fund.custom_amount', 'Custom Amount (₦)')}</label>
             <input
               type="number"
               min="100"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="input w-full text-lg font-semibold"
-              placeholder="Enter amount e.g. 15000"
+              placeholder={t('wallet_fund.amount_placeholder', 'Enter amount e.g. 15000')}
             />
             {amount && Number(amount) >= 100 && (
               <p className="text-xs text-teal-600 mt-1">
-                You will be charged <strong>₦{Number(amount).toLocaleString()}</strong> to fund your wallet.
+                {t('wallet_fund.charge_notice', 'You will be charged')}{' '}
+                <strong>₦{Number(amount).toLocaleString()}</strong>{' '}
+                {t('wallet_fund.to_fund', 'to fund your wallet.')}
               </p>
             )}
           </div>
 
           <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-xs text-green-700">
             <FaCheckCircle className="mt-0.5 shrink-0 text-green-500" />
-            <span>Payment is processed securely. Your wallet will be credited immediately after successful payment.</span>
+            <span>{t('wallet_fund.secure_notice', 'Payment is processed securely. Your wallet will be credited immediately after successful payment.')}</span>
           </div>
 
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="btn w-full">Cancel</button>
+            <button type="button" onClick={onClose} className="btn w-full">{t('wallet_fund.cancel', 'Cancel')}</button>
             <button
               type="button"
               onClick={() => onSubmit(amount)}
               disabled={isLoading || !amount || Number(amount) < 100}
               className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Redirecting...' : `Pay ₦${amount ? Number(amount).toLocaleString() : '0'}`}
+              {isLoading
+                ? t('wallet_fund.redirecting', 'Redirecting...')
+                : `${t('wallet_fund.pay', 'Pay')} ₦${amount ? Number(amount).toLocaleString() : '0'}`}
             </button>
           </div>
 
@@ -134,7 +140,7 @@ export default function WalletFundModal({
             onClick={onSwitchToWithdraw}
             className="w-full text-center text-sm text-indigo-600 hover:text-indigo-800"
           >
-            Need to withdraw instead? Open Withdraw Funds
+            {t('wallet_fund.withdraw_link', 'Need to withdraw instead? Open Withdraw Funds')}
           </button>
 
           {/* Wallet transaction history (real data) */}
@@ -145,17 +151,21 @@ export default function WalletFundModal({
               className="flex w-full items-center justify-between text-sm font-semibold text-gray-700 hover:text-teal-700"
             >
               <span className="flex items-center gap-2">
-                <FaHistory className="text-teal-500" /> Transaction History
+                <FaHistory className="text-teal-500" /> {t('wallet_fund.history', 'Transaction History')}
               </span>
-              <span>{showHistory ? 'Hide' : `Show (${transactions.length})`}</span>
+              <span>
+                {showHistory
+                  ? t('wallet_fund.hide', 'Hide')
+                  : t('wallet_fund.show_count', 'Show ({{count}})', { count: transactions.length })}
+              </span>
             </button>
 
             {showHistory && (
               <div className="mt-3 max-h-64 overflow-y-auto rounded-xl border border-gray-200">
                 {historyLoading ? (
-                  <p className="px-4 py-6 text-center text-sm text-gray-400">Loading transactions…</p>
+                  <p className="px-4 py-6 text-center text-sm text-gray-400">{t('wallet_fund.loading', 'Loading transactions…')}</p>
                 ) : transactions.length === 0 ? (
-                  <p className="px-4 py-6 text-center text-sm text-gray-400">No wallet transactions yet.</p>
+                  <p className="px-4 py-6 text-center text-sm text-gray-400">{t('wallet_fund.no_transactions', 'No wallet transactions yet.')}</p>
                 ) : (
                   transactions.map((tx) => {
                     const fee = Number(tx.metadata?.platform_fee || 0);
@@ -164,7 +174,7 @@ export default function WalletFundModal({
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium text-gray-900">
-                              {TYPE_LABELS[tx.source] || tx.source?.replace(/_/g, ' ') || 'Transaction'}
+                              {t(TYPE_LABELS[tx.source] || 'wallet_fund.type.transaction', 'Transaction')}
                             </p>
                             <p className="truncate text-xs text-gray-500">
                               {new Date(tx.created_at).toLocaleString()}
@@ -184,14 +194,14 @@ export default function WalletFundModal({
                                 onClick={() => navigate(`/payment-history?payment=${tx.payment_id}`)}
                                 className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-teal-600 hover:text-teal-800"
                               >
-                                <FaReceipt /> View Receipt
+                                <FaReceipt /> {t('wallet_fund.view_receipt', 'View Receipt')}
                               </button>
                             )}
                           </div>
                         </div>
                         {fee > 0 && (
                           <p className="mt-1 text-xs text-gray-500">
-                            Platform fee deducted: ₦{fee.toLocaleString()}
+                            {t('wallet_fund.fee_deducted', 'Platform fee deducted: ₦{{fee}}', { fee: fee.toLocaleString() })}
                           </p>
                         )}
                       </div>

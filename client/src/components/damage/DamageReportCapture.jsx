@@ -2,41 +2,42 @@ import React, { useCallback, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import Modal from '../common/Modal';
 import Loader from '../common/Loader';
+import { useTranslation } from 'react-i18next';
 import { propertyService } from '../../services/propertyService';
 
-const DAMAGE_TYPES = [
-  ['scratch', '🔨 Scratch', 'Surface-level marks or scrapes'],
-  ['crack', '⚡ Crack', 'Line or fissure in material'],
-  ['hole', '🕳️ Hole', 'Opening or puncture'],
-  ['dent', '▼ Dent', 'Indentation or depression'],
-  ['stain', '🩹 Stain', 'Discoloration or marking'],
-  ['water_damage', '💧 Water Damage', 'Moisture damage or mold'],
-  ['mold', '🍃 Mold', 'Fungal growth'],
-  ['other', '❓ Other', 'Something else'],
+const DAMAGE_TYPES = (t) => [
+  ['scratch', t('damage_capture.type_scratch', '🔨 Scratch'), t('damage_capture.type_scratch_desc', 'Surface-level marks or scrapes')],
+  ['crack', t('damage_capture.type_crack', '⚡ Crack'), t('damage_capture.type_crack_desc', 'Line or fissure in material')],
+  ['hole', t('damage_capture.type_hole', '🕳️ Hole'), t('damage_capture.type_hole_desc', 'Opening or puncture')],
+  ['dent', t('damage_capture.type_dent', '▼ Dent'), t('damage_capture.type_dent_desc', 'Indentation or depression')],
+  ['stain', t('damage_capture.type_stain', '🩹 Stain'), t('damage_capture.type_stain_desc', 'Discoloration or marking')],
+  ['water_damage', t('damage_capture.type_water', '💧 Water Damage'), t('damage_capture.type_water_desc', 'Moisture damage or mold')],
+  ['mold', t('damage_capture.type_mold', '🍃 Mold'), t('damage_capture.type_mold_desc', 'Fungal growth')],
+  ['other', t('damage_capture.type_other', '❓ Other'), t('damage_capture.type_other_desc', 'Something else')],
 ];
 
-const SEVERITY_LEVELS = [
-  { value: 'minor', label: '🟢 Minor', description: 'Cosmetic only, no functional impact' },
-  { value: 'moderate', label: '🟡 Moderate', description: 'Noticeable, may need attention' },
-  { value: 'severe', label: '🔴 Severe', description: 'Significant damage, repair needed' },
+const SEVERITY_LEVELS = (t) => [
+  { value: 'minor', label: t('damage_capture.sev_minor', '🟢 Minor'), description: t('damage_capture.sev_minor_desc', 'Cosmetic only, no functional impact') },
+  { value: 'moderate', label: t('damage_capture.sev_moderate', '🟡 Moderate'), description: t('damage_capture.sev_moderate_desc', 'Noticeable, may need attention') },
+  { value: 'severe', label: t('damage_capture.sev_severe', '🔴 Severe'), description: t('damage_capture.sev_severe_desc', 'Significant damage, repair needed') },
 ];
 
-const DEPTH_LEVELS = [
-  { value: 'surface', label: 'Surface', description: 'Top layer only' },
-  { value: 'shallow', label: 'Shallow', description: 'Slight depth penetration' },
-  { value: 'deep', label: 'Deep', description: 'Significant depth' },
+const DEPTH_LEVELS = (t) => [
+  { value: 'surface', label: t('damage_capture.depth_surface', 'Surface'), description: t('damage_capture.depth_surface_desc', 'Top layer only') },
+  { value: 'shallow', label: t('damage_capture.depth_shallow', 'Shallow'), description: t('damage_capture.depth_shallow_desc', 'Slight depth penetration') },
+  { value: 'deep', label: t('damage_capture.depth_deep', 'Deep'), description: t('damage_capture.depth_deep_desc', 'Significant depth') },
 ];
 
-const URGENCY_LEVELS = [
-  { value: 'low', label: 'Low', description: 'Can be addressed when convenient' },
-  { value: 'medium', label: 'Medium', description: 'Should be addressed soon' },
-  { value: 'high', label: 'High', description: 'Urgent attention required' },
+const URGENCY_LEVELS = (t) => [
+  { value: 'low', label: t('damage_capture.urg_low', 'Low'), description: t('damage_capture.urg_low_desc', 'Can be addressed when convenient') },
+  { value: 'medium', label: t('damage_capture.urg_medium', 'Medium'), description: t('damage_capture.urg_medium_desc', 'Should be addressed soon') },
+  { value: 'high', label: t('damage_capture.urg_high', 'High'), description: t('damage_capture.urg_high_desc', 'Urgent attention required') },
 ];
 
-const ROOMS = [
-  'Living Room', 'Kitchen', 'Bedroom 1', 'Bedroom 2', 'Bedroom 3',
-  'Bathroom 1', 'Bathroom 2', 'Hallway', 'Entrance', 'Balcony',
-  'Corridor', 'Dining Room', 'Study', 'Storage', 'Other'
+const ROOMS = (t) => [
+  t('damage_capture.room_living', 'Living Room'), t('damage_capture.room_kitchen', 'Kitchen'), t('damage_capture.room_bed1', 'Bedroom 1'), t('damage_capture.room_bed2', 'Bedroom 2'), t('damage_capture.room_bed3', 'Bedroom 3'),
+  t('damage_capture.room_bath1', 'Bathroom 1'), t('damage_capture.room_bath2', 'Bathroom 2'), t('damage_capture.room_hallway', 'Hallway'), t('damage_capture.room_entrance', 'Entrance'), t('damage_capture.room_balcony', 'Balcony'),
+  t('damage_capture.room_corridor', 'Corridor'), t('damage_capture.room_dining', 'Dining Room'), t('damage_capture.room_study', 'Study'), t('damage_capture.room_storage', 'Storage'), t('damage_capture.room_other', 'Other')
 ];
 
 /**
@@ -44,6 +45,7 @@ const ROOMS = [
  * Guides users through: capture → AI analysis → review → confirm → save
  */
 const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'landlord' }) => {
+  const { t } = useTranslation();
   const [stage, setStage] = useState('workflow'); // workflow | camera | preview | review | confirm
   const [, setCameraActive] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
@@ -97,7 +99,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
 
   const startCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('📱 Camera is not supported on this device or browser.');
+      setCameraError(t('damage_capture.cam_not_supported', '📱 Camera is not supported on this device or browser.'));
       return;
     }
     setCameraError('');
@@ -124,9 +126,9 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
     } catch (error) {
       console.error('Camera error:', error);
       if (error?.name === 'NotAllowedError') {
-        setCameraError('❌ Camera access was denied. Please allow camera permissions and try again.');
+        setCameraError(t('damage_capture.cam_denied', '❌ Camera access was denied. Please allow camera permissions and try again.'));
       } else {
-        setCameraError('❌ Unable to open camera. Please check your device and try again.');
+        setCameraError(t('damage_capture.cam_error', '❌ Unable to open camera. Please check your device and try again.'));
       }
     } finally {
       setCameraLoading(false);
@@ -171,11 +173,11 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
         setAiResult(analysis);
         autoFillDamageForm(analysis);
       } else {
-        setAnalysisError('AI analysis unavailable. You can complete the report manually.');
+        setAnalysisError(t('damage_capture.ai_unavailable', 'AI analysis unavailable. You can complete the report manually.'));
       }
     } catch (error) {
       console.error('AI analysis failed:', error);
-      setAnalysisError('AI analysis failed. You can still complete the report manually.');
+      setAnalysisError(t('damage_capture.ai_failed', 'AI analysis failed. You can still complete the report manually.'));
     } finally {
       setAnalyzingDamage(false);
     }
@@ -194,7 +196,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
     canvas.toBlob(
       (blob) => {
         if (!blob) {
-          toast.error('❌ Could not capture photo. Please try again.');
+          toast.error(t('damage_capture.capture_failed', '❌ Could not capture photo. Please try again.'));
           return;
         }
 
@@ -217,7 +219,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
 
   const saveDamageReport = useCallback(async () => {
     if (!capturedPhoto || !damageForm.room_location) {
-      toast.error('Missing required information');
+      toast.error(t('damage_capture.missing_info', 'Missing required information'));
       return;
     }
 
@@ -241,49 +243,49 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
       const res = await propertyService.saveDamageReport(propertyId, fd);
 
       if (res.success) {
-        toast.success('✅ Property Maintenance Assessment saved successfully');
+        toast.success(t('damage_capture.saved', '✅ Property Maintenance Assessment saved successfully'));
         cleanup();
         onSaved?.();
         onClose?.();
       } else {
-        toast.error(res.message || 'Failed to save Property Maintenance Assessment');
+        toast.error(res.message || t('damage_capture.save_failed', 'Failed to save Property Maintenance Assessment'));
       }
     } catch (error) {
       console.error('Save error:', error);
-      toast.error(error?.response?.data?.message || 'Failed to save Property Maintenance Assessment');
+      toast.error(error?.response?.data?.message || t('damage_capture.save_failed', 'Failed to save Property Maintenance Assessment'));
     } finally {
       setSaving(false);
     }
   }, [capturedPhoto, damageForm, aiResult, propertyId, cleanup, onSaved, onClose]);
 
   return (
-    <Modal isOpen={true} onClose={onClose} title="📸 Property Maintenance Assessment">
+    <Modal isOpen={true} onClose={onClose} title={t('damage_capture.title', '📸 Property Maintenance Assessment')}>
       <div className="space-y-4">
         {/* WORKFLOW GUIDE */}
         {stage === 'workflow' && (
           <div className="space-y-4">
             <div className="rounded-lg bg-sky-50 p-4">
-              <h3 className="mb-3 font-semibold text-sky-900">How to Report Damage:</h3>
+              <h3 className="mb-3 font-semibold text-sky-900">{t('damage_capture.how_to', 'How to Report Damage:')}</h3>
               <div className="space-y-2 text-sm text-sky-800">
                 <div className="flex items-start gap-3">
                   <span className="rounded-full bg-sky-200 px-2.5 py-0.5 font-bold">1</span>
                   <div>
-                    <strong>📸 Capture</strong>
-                    <p>Take a clear photo of the damage area</p>
+                    <strong>{t('damage_capture.step_capture', '📸 Capture')}</strong>
+                    <p>{t('damage_capture.step_capture_desc', 'Take a clear photo of the damage area')}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="rounded-full bg-sky-200 px-2.5 py-0.5 font-bold">2</span>
                   <div>
-                    <strong>🤖 AI Review</strong>
-                    <p>Our AI analyzes damage type, size, and severity</p>
+                    <strong>{t('damage_capture.step_ai', '🤖 AI Review')}</strong>
+                    <p>{t('damage_capture.step_ai_desc', 'Our AI analyzes damage type, size, and severity')}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="rounded-full bg-sky-200 px-2.5 py-0.5 font-bold">3</span>
                   <div>
-                    <strong>✏️ Edit & Confirm</strong>
-                    <p>Review AI findings or fill in manually, then save</p>
+                    <strong>{t('damage_capture.step_edit', '✏️ Edit & Confirm')}</strong>
+                    <p>{t('damage_capture.step_edit_desc', 'Review AI findings or fill in manually, then save')}</p>
                   </div>
                 </div>
               </div>
@@ -295,7 +297,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
               disabled={cameraLoading}
               className="btn btn-primary w-full"
             >
-              {cameraLoading ? '⏳ Preparing camera...' : '📸 Start Capture'}
+              {cameraLoading ? t('damage_capture.preparing', '⏳ Preparing camera...') : t('damage_capture.start_capture', '📸 Start Capture')}
             </button>
 
             {cameraError && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{cameraError}</div>}
@@ -338,7 +340,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
               </button>
             </div>
 
-            <p className="text-center text-xs text-gray-500">Focus clearly on the damaged area within the frame</p>
+            <p className="text-center text-xs text-gray-500">{t('damage_capture.focus_hint', 'Focus clearly on the damaged area within the frame')}</p>
           </div>
         )}
 
@@ -347,14 +349,14 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
           <div className="space-y-4">
             {capturedPhotoPreview && (
               <div className="overflow-hidden rounded-lg border border-gray-200">
-                <img src={capturedPhotoPreview} alt="Captured damage" className="h-auto w-full" />
+                <img src={capturedPhotoPreview} alt={t('damage_capture.captured_alt', 'Captured damage')} className="h-auto w-full" />
               </div>
             )}
 
             {analyzingDamage && (
               <div className="rounded-lg bg-blue-50 p-4 text-center">
                 <Loader size="small" className="mx-auto mb-2" />
-                <p className="text-sm text-blue-800">🤖 AI is analyzing your damage photo...</p>
+                <p className="text-sm text-blue-800">{t('damage_capture.ai_analyzing', '🤖 AI is analyzing your damage photo...')}</p>
               </div>
             )}
 
@@ -364,30 +366,30 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
 
             {aiResult && !analyzingDamage && (
               <div className="space-y-3 rounded-lg bg-emerald-50 p-4">
-                <h4 className="font-semibold text-emerald-900">✅ AI Analysis Result</h4>
+                <h4 className="font-semibold text-emerald-900">{t('damage_capture.ai_result', '✅ AI Analysis Result')}</h4>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   {aiResult.damage_type && (
                     <div className="rounded bg-white p-2">
-                      <p className="text-xs text-gray-600">Damage Type</p>
+                      <p className="text-xs text-gray-600">{t('damage_capture.damage_type_short', 'Damage Type')}</p>
                       <p className="font-medium text-emerald-700">{aiResult.damage_type}</p>
                     </div>
                   )}
                   {aiResult.severity && (
                     <div className="rounded bg-white p-2">
-                      <p className="text-xs text-gray-600">Severity</p>
+                      <p className="text-xs text-gray-600">{t('damage_capture.severity_short', 'Severity')}</p>
                       <p className="font-medium text-emerald-700">{aiResult.severity}</p>
                     </div>
                   )}
                   {aiResult.depth_level && (
                     <div className="rounded bg-white p-2">
-                      <p className="text-xs text-gray-600">Depth</p>
+                      <p className="text-xs text-gray-600">{t('damage_capture.depth_short', 'Depth')}</p>
                       <p className="font-medium text-emerald-700">{aiResult.depth_level}</p>
                     </div>
                   )}
                   {aiResult.urgency && (
                     <div className="rounded bg-white p-2">
-                      <p className="text-xs text-gray-600">Urgency</p>
+                      <p className="text-xs text-gray-600">{t('damage_capture.urgency_short', 'Urgency')}</p>
                       <p className="font-medium text-emerald-700">{aiResult.urgency}</p>
                     </div>
                   )}
@@ -395,7 +397,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
 
                 {(aiResult.estimated_width_cm || aiResult.estimated_height_cm) && (
                   <div className="rounded bg-white p-2">
-                    <p className="text-xs text-gray-600">Estimated Size</p>
+                    <p className="text-xs text-gray-600">{t('damage_capture.est_size', 'Estimated Size')}</p>
                     <p className="font-medium text-emerald-700">
                       {aiResult.estimated_width_cm || '?'} cm × {aiResult.estimated_height_cm || '?'} cm
                     </p>
@@ -404,7 +406,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
 
                 {aiResult.description && (
                   <div className="rounded bg-white p-2">
-                    <p className="text-xs text-gray-600">Description</p>
+                    <p className="text-xs text-gray-600">{t('damage_capture.description', 'Description')}</p>
                     <p className="text-sm text-emerald-700">{aiResult.description}</p>
                   </div>
                 )}
@@ -446,22 +448,22 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
           <div className="space-y-4">
             {/* Room Location */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Room/Location *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('damage_capture.room_label', 'Room/Location *')}</label>
               <select
                 value={damageForm.room_location}
                 onChange={(e) => setDamageForm((prev) => ({ ...prev, room_location: e.target.value }))}
                 className="input w-full"
               >
-                <option value="">Select location...</option>
-                {ROOMS.map((room) => <option key={room} value={room}>{room}</option>)}
+                <option value="">{t('damage_capture.select_location', 'Select location...')}</option>
+                {ROOMS(t).map((room) => <option key={room} value={room}>{room}</option>)}
               </select>
             </div>
 
             {/* Damage Type */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Damage Type *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('damage_capture.damage_type', 'Damage Type *')}</label>
               <div className="grid grid-cols-2 gap-2">
-                {DAMAGE_TYPES.map(([value, label]) => (
+                {DAMAGE_TYPES(t).map(([value, label]) => (
                   <button
                     key={value}
                     type="button"
@@ -480,9 +482,9 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
 
             {/* Severity */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Severity *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('damage_capture.severity', 'Severity *')}</label>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {SEVERITY_LEVELS.map(({ value, label, description }) => (
+                {SEVERITY_LEVELS(t).map(({ value, label, description }) => (
                   <button
                     key={value}
                     type="button"
@@ -502,9 +504,9 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
 
             {/* Depth */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Depth</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('damage_capture.depth', 'Depth')}</label>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {DEPTH_LEVELS.map(({ value, label, description }) => (
+                {DEPTH_LEVELS(t).map(({ value, label, description }) => (
                   <button
                     key={value}
                     type="button"
@@ -525,7 +527,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
             {/* Dimensions */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Width (cm)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('damage_capture.width', 'Width (cm)')}</label>
                 <input
                   type="number"
                   min="0"
@@ -536,7 +538,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Height (cm)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('damage_capture.height', 'Height (cm)')}</label>
                 <input
                   type="number"
                   min="0"
@@ -550,9 +552,9 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
 
             {/* Urgency */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Urgency</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('damage_capture.urgency', 'Urgency')}</label>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {URGENCY_LEVELS.map(({ value, label, description }) => (
+                {URGENCY_LEVELS(t).map(({ value, label, description }) => (
                   <button
                     key={value}
                     type="button"
@@ -572,12 +574,12 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('damage_capture.notes', 'Additional Notes')}</label>
               <textarea
                 value={damageForm.description}
                 onChange={(e) => setDamageForm((prev) => ({ ...prev, description: e.target.value }))}
                 className="input h-20 resize-none"
-                placeholder="Any other relevant details..."
+                placeholder={t('damage_capture.notes_placeholder', 'Any other relevant details...')}
               />
             </div>
 

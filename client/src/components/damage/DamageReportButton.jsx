@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import DamageReportCapture from '../damage/DamageReportCapture';
 
 /**
@@ -6,6 +7,7 @@ import DamageReportCapture from '../damage/DamageReportCapture';
  * Used in AddProperty, AgentDashboard, PropertyDetail, etc.
  */
 const DamageReportButton = ({ propertyId, onReportSaved, variant = 'primary' }) => {
+  const { t } = useTranslation();
   const [showCapture, setShowCapture] = useState(false);
 
   const handleClose = useCallback(() => {
@@ -24,7 +26,7 @@ const DamageReportButton = ({ propertyId, onReportSaved, variant = 'primary' }) 
         onClick={() => setShowCapture(true)}
         className={`btn btn-${variant} gap-2`}
       >
-        📸 Property Maintenance Assessment
+        📸 {t('damage.button_label', 'Property Maintenance Assessment')}
       </button>
 
       {showCapture && (
