@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FaCheckCircle, FaTimes, FaWallet, FaHistory, FaReceipt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api from '../../services/api';
 
 const TYPE_LABELS = {
   wallet_funding: 'Wallet Funding',

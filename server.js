@@ -104,6 +104,7 @@ const { startSmsDeliveryJobs } = require('./jobs/smsDeliveryJobs');
 const { startSmsMarketingJobs } = require('./jobs/smsMarketingJobs');
 const { startRecruitmentJobs } = require('./jobs/recruitmentJobs');
 const { startPremblyRecoveryJobs } = require('./jobs/premblyRecoveryJobs');
+const { startRegistrationReminderJobs } = require('./jobs/registrationReminderJobs');
 const csrfProtection = require('./config/middleware/csrfProtection');
 const securityAlertMiddleware = require('./config/middleware/securityAlertMiddleware');
 const {
@@ -786,6 +787,7 @@ const startBackgroundServices = () => {
   startSmsMarketingJobs();
   startRecruitmentJobs();
   startPremblyRecoveryJobs();
+  startRegistrationReminderJobs();
   startScheduler();
   scheduleEvidenceIntegrityMonitoring();
   schedulePayoutRetries();

@@ -103,6 +103,7 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showRegistrationFeeModal, setShowRegistrationFeeModal] = useState(!registrationReference);
+  const [resumePayment, setResumePayment] = useState(null);
   const [premblyPending, setPremblyPending] = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
@@ -432,6 +433,21 @@ const Register = () => {
           serverError?.message ||
           t('register.registration_failed')
         );
+
+        // Not completed yet: offer a resume card with a fresh checkout URL
+        // so the registrant can pay again without re-entering their details.
+        if (error.response?.status === 402 && registrationReference) {
+          try {
+            const statusRes = await api.get(
+              `/auth/register/payment/status/${registrationReference}`
+            );
+            if (active && statusRes.data?.success) {
+              setResumePayment(statusRes.data.data);
+            }
+          } catch (statusError) {
+            if (active) setResumePayment(null);
+          }
+        }
       } finally {
         if (active) {
           setLoading(false);
@@ -978,6 +994,73 @@ const inputClass = (field) =>
 
 return (
   <div className="min-h-screen flex dark:bg-gray-900">
+    {resumePayment && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="flex shrink-0 items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+                {t('register.modal_before')}
+              </p>
+              <h2 className="mt-1 text-xl font-bold text-gray-900">
+                Complete Your Registration Payment
+              </h2>
+            </div>
+            <button
+              onClick={() => setResumePayment(null)}
+              className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Close"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <p className="mt-3 text-sm text-gray-600">
+            Your registration details were saved. Resume exactly where you stopped — nothing
+            was charged if the previous attempt failed.
+          </p>
+
+          <div className="mt-4 space-y-2 rounded-xl bg-gray-50 p-4 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">{resumePayment.full_name || 'Account'}</span>
+              <span className="font-medium text-gray-800">{resumePayment.email}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Registration fee</span>
+              <span className="font-semibold text-gray-900">
+                ₦{Number(resumePayment.amount || 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Reference</span>
+              <span className="font-mono text-xs text-gray-700">{resumePayment.reference}</span>
+            </div>
+          </div>
+
+          {resumePayment.authorization_url ? (
+            <a
+              href={resumePayment.authorization_url}
+              className="mt-5 block w-full rounded-xl bg-indigo-600 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Pay Now
+            </a>
+          ) : (
+            <p className="mt-5 text-center text-sm text-amber-600">
+              Payment is temporarily unavailable. Please try again in a few minutes.
+            </p>
+          )}
+
+          <button
+            onClick={() => setResumePayment(null)}
+            className="mt-3 w-full rounded-xl py-2.5 text-center text-sm font-medium text-gray-600 hover:bg-gray-100"
+          >
+            Not now
+          </button>
+        </div>
+      </div>
+    )}
     {showRegistrationFeeModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-4">
         <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white p-6 shadow-2xl">

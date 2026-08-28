@@ -4146,7 +4146,36 @@ async function handleFailedPayment(data, webhookLogger) {
 
     if (paymentResult.rows.length > 0) {
       const paymentId = paymentResult.rows[0].id;
-      await commissionService.clawbackCommissionsForPayment(paymentId, 'payment_failed');
+      await commissionService.clawbackCommissionsForPayment(paymentId, 
+'payment_failed');
+    }
+
+    // Registration payments live in tenant_registration_payments (no `payments`
+    // row exists yet). Mark the pending row failed and email the registrant a
+    // secure resume link so they can retry exactly where they stopped.
+    if (reference && reference.startsWith('REGPAY_')) {
+      const regResult = await db.query(
+        `UPDATE tenant_registration_payments
+         SET payment_status = 'failed',
+             gateway_response = $1
+         WHERE transaction_reference = $2
+           AND payment_status = 'pending'
+         RETURNING id, email, full_name`,
+        [JSON.stringify(data), reference]
+      );
+
+      if (regResult.rows.length > 0) {
+        const row = regResult.rows[0];
+        const { sendCompleteRegistrationEmail } = require('../config/utils/emailService');
+        await sendCompleteRegistrationEmail({
+          email: row.email,
+          fullName: row.full_name,
+          reference,
+          subject: 'Your Registration Payment Failed — Resume on RentalHub NG',
+          message:
+            'We could not complete your registration payment (this may happen during a network/bank interruption). Nothing was charged to your card or account.',
+        });
+      }
     }
 
     webhookLogger.info("Payment failed:", reference);
@@ -4155,7 +4184,6 @@ async function handleFailedPayment(data, webhookLogger) {
     throw error;
   }
 }
-
 
 
 

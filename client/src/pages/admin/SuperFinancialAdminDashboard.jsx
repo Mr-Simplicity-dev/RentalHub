@@ -849,13 +849,13 @@ const SuperFinancialAdminDashboard = () => {
                 <th className="py-2">Account Number</th>
                 <th className="py-2">Status</th>
                 <th className="py-2">Processed</th>
+                <th className="py-2">Failure Reason</th>
               </tr>
             </thead>
             <tbody>
               {withdrawals.length === 0 && (
                 <tr>
-                  <td className="py-3 text-gray-500" colSpan={6}>No withdrawal requests yet</td>
-                </tr>
+                  <td className="py-3 text-gray-500" colSpan={7}>No withdrawal requests yet</td>                </tr>
               )}
               {withdrawals.map((withdrawal) => (
                 <tr className="border-b" key={withdrawal.id}>
@@ -877,6 +877,7 @@ const SuperFinancialAdminDashboard = () => {
                     </span>
                   </td>
                   <td className="py-2 text-gray-600">{withdrawal.processed_at ? dateLabel(withdrawal.processed_at) : 'Pending'}</td>
+                  <td className="py-2 text-xs text-red-600">{withdrawal.payout_failed_reason || '-'}</td>
                 </tr>
               ))}
             </tbody>

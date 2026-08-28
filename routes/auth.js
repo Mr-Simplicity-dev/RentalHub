@@ -122,6 +122,12 @@ router.post(
   authController.completeRegistrationAfterPayment
 );
 
+router.get(
+  '/register/payment/status/:reference',
+  registrationLimiter,
+  authController.getRegistrationPaymentStatus
+);
+
 // Register new user (Landlord or Tenant)
 router.post(
   '/register',

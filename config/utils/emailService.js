@@ -110,6 +110,48 @@ exports.sendPaymentReceiptEmail = async ({
   }
 };
 
+// Send "complete your registration" email (failed payment or reminder)
+exports.sendCompleteRegistrationEmail = async ({
+  email,
+  fullName,
+  reference,
+  subject = 'Complete Your RentalHub NG Registration',
+  message = 'Your registration payment did not complete. Please finish your payment to activate your account.',
+}) => {
+  const resumeUrl = `${FRONTEND_URL}/register?registration_ref=${encodeURIComponent(reference)}`;
+  try {
+    await sendEmail({
+      to: email,
+      subject,
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto;">
+          <div style="text-align:center; padding-bottom:16px; border-bottom:2px solid #0284c7;">
+            <h2 style="margin:0; color:#0f172a;">RentalHub NG</h2>
+            <p style="margin:4px 0 0; color:#64748b;">${esc(subject)}</p>
+          </div>
+          <div style="padding:16px 0; font-size:14px; color:#334155;">
+            <p>Hello ${esc(fullName || email)},</p>
+            <p>${esc(message)}</p>
+            <p style="margin:4px 0;"><strong>Reference:</strong> ${esc(reference)}</p>
+            <p>
+              <a href="${resumeUrl}" style="display:inline-block; background:#0284c7; color:#fff; padding:12px 18px; border-radius:6px; text-decoration:none; margin-top:8px;">
+                Resume Registration &amp; Pay
+              </a>
+            </p>
+            <p style="font-size:12px; color:#94a3b8; margin-top:12px;">
+              Your details have been saved securely. You can resume exactly where you stopped with the link above.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (error) {
+    logger.error('Complete registration email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send welcome email
 exports.sendWelcomeEmail = async (email, fullName, userType) => {
   try {

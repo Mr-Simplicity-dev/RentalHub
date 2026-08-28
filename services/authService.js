@@ -1929,7 +1929,7 @@ exports.initializeRegistrationPayment = async (req, res) => {
     const passwordHash = await bcrypt.hash(plainPassword, salt);
     // Unguessable reference: a timestamp-only reference lets an attacker
     // enumerate pending registrations and complete (hijack) them first.
-    const reference = `REGPAY_${preparedRegistration.user_type.toUpperCase()}_${Date.now()}_${require('crypto').randomBytes(6).toString('hex')}`;
+    const reference = `REGPAY_${preparedRegistration.user_type.toUpperCase()}_${Date.now()}_${require('crypto').randomBytes(16).toString('hex')}`;
 
     // NIN / passport numbers are stored encrypted at rest (same AES-256-GCM
     // used for users.nin). Falls back to plaintext only when the encryption
@@ -2071,6 +2071,97 @@ exports.initializeRegistrationPayment = async (req, res) => {
     });
   }
 };
+
+// Resume: look up a pending registration payment by reference and hand back
+// a fresh checkout URL so the registrant can pay again without re-entering
+// their details. The payload (incl. password hash) already lives server-side.
+exports.getRegistrationPaymentStatus = async (req, res) => {
+  try {
+    const { reference } = req.params;
+
+    const result = await db.query(
+      `SELECT id, user_type, email, phone, full_name, amount, payment_status,
+              registered_user_id
+       FROM tenant_registration_payments
+       WHERE transaction_reference = $1`,
+      [reference]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No pending registration found for this reference'
+      });
+    }
+
+    const row = result.rows[0];
+
+    if (row.registered_user_id) {
+      return res.json({ success: true, data: { status: 'completed' } });
+    }
+
+    let authorizationUrl = null;
+
+    if (PAYSTACK_SECRET_KEY) {
+      const paystackResponse = await axios.post(
+        `${PAYSTACK_BASE_URL}/transaction/initialize`,
+        {
+          email: row.email,
+          amount: Number(row.amount) * 100,
+          reference,
+          callback_url: `${FRONTEND_URL}/register`,
+          metadata: {
+            payment_type: 'registration_fee',
+            user_type: row.user_type,
+            email: row.email,
+            phone: row.phone
+          }
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      authorizationUrl = paystackResponse.data.data.authorization_url;
+
+      // Reset to pending so completion and reminder jobs behave normally
+      // after a failed attempt.
+      await db.query(
+        `UPDATE tenant_registration_payments
+         SET payment_status = 'pending', gateway_response = NULL
+         WHERE transaction_reference = $1 AND registered_user_id IS NULL`,
+        [reference]
+      );
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        status: 'pending',
+        user_type: row.user_type,
+        email: row.email,
+        full_name: row.full_name,
+        amount: row.amount,
+        currency: 'NGN',
+        reference,
+        authorization_url: authorizationUrl
+      }
+    });
+  } catch (error) {
+    req.logger.error('Registration payment status error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load registration payment'
+    });
+  }
+};
+
+
+
+
 
 exports.completeRegistrationAfterPayment = async (req, res) => {
   try {

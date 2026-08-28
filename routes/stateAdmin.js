@@ -360,6 +360,25 @@ router.post('/withdraw',
          RETURNING *`,
         [adminId, amount, bank_name, account_number, account_name]
       );
+
+      // Snapshot recent paid commissions so the payout receipt is itemized.
+      try {
+        const snapshot = await db.query(
+          `SELECT COALESCE(json_agg(json_build_object(
+             'source', source, 'amount', amount, 'commission_rate', commission_rate,
+             'status', status, 'paid_at', paid_at
+           )), '[]'::json) AS snapshot
+           FROM admin_commissions
+           WHERE admin_id = $1 AND status = 'paid' AND paid_at >= CURRENT_DATE - INTERVAL '7 days'`,
+          [adminId]
+        );
+        await db.query(
+          `UPDATE admin_withdrawals SET commissions_snapshot = $2::jsonb WHERE id = $1`,
+          [result.rows[0].id, JSON.stringify(snapshot.rows[0]?.snapshot || [])]
+        );
+      } catch (snapshotError) {
+        req.logger.warn('Commission snapshot failed (non-fatal):', snapshotError.message);
+      }
       
       // Deduct from wallet balance
       await db.query(
@@ -403,7 +422,8 @@ router.get('/withdrawals',
           account_number,
           requested_at,
           processed_at,
-          admin_note
+          admin_note,
+          payout_failed_reason
         FROM admin_withdrawals
         WHERE admin_id = $1
         ORDER BY requested_at DESC

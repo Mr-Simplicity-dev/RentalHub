@@ -1080,6 +1080,9 @@ const FinancialAdminDashboard = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Processed
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Failure Reason
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1112,6 +1115,9 @@ const FinancialAdminDashboard = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {withdrawal.processed_at ? formatDate(withdrawal.processed_at) : 'Pending'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-red-600">
+                            {withdrawal.payout_failed_reason || '-'}
                           </td>
                         </tr>
                       ))}
