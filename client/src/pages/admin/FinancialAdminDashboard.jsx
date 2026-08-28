@@ -458,6 +458,27 @@ const FinancialAdminDashboard = () => {
                 >
                   Request Personal Withdrawal
                 </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await api.get('/payments/commission-statement.pdf', { responseType: 'blob' });
+                      const url = URL.createObjectURL(res.data);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = 'commission-statement.pdf';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(url);
+                    } catch (error) {
+                      toast.error(error.response?.data?.message || 'Failed to download statement');
+                    }
+                  }}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Commission Statement
+                </button>
               </div>
               <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">

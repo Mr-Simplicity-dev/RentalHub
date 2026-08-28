@@ -30,7 +30,6 @@ const AgentWithdrawalService = require('../services/agentWithdrawalService');
 const {
   sendReceiptForPayment,
   sendAdminPayoutReceipt,
-  sendAgentPayoutReceipt,
   sendUserPayoutReceipt,
 } = require('../config/utils/paymentReceipt');
 const {
@@ -3950,16 +3949,7 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
       else if (eventName === 'transfer.failed') status = 'failed';
       else if (eventName === 'transfer.reversed') status = 'reversed';
 
-      const reconciled = await AgentWithdrawalService.reconcilePaystackTransfer(reference, status, data);
-
-      // Email the agent a payout receipt when the transfer succeeds
-      if (eventName === 'transfer.success' && reconciled) {
-        sendAgentPayoutReceipt({
-          agentUserId: reconciled.agent_user_id || reconciled.user_id,
-          amount: reconciled.amount,
-          reference,
-        }).catch(() => {});
-      }
+      await AgentWithdrawalService.reconcilePaystackTransfer(reference, status, data);
       return;
     }
 
@@ -3994,6 +3984,7 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           reference,
         }).catch(() => {});
       } else if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
+        const failureReason = data?.failure_reason || data?.reason || 'Transfer failed';
         if (withdrawal.status !== 'pending' && withdrawal.status !== 'rejected') {
           await db.query(
             `UPDATE wallets
@@ -4015,10 +4006,22 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           [
             eventName === 'transfer.failed' ? 'failed' : 'reversed',
             JSON.stringify(data),
-            data?.failure_reason || data?.reason || 'Transfer failed',
+            failureReason,
             withdrawal.id,
           ]
         );
+
+        // Notify the customer that the payout failed and funds were returned
+        sendUserPayoutReceipt({
+          userId: withdrawal.user_id,
+          amount: withdrawal.amount,
+          bankName: withdrawal.bank_name,
+          accountNumber: withdrawal.account_number,
+          accountName: withdrawal.account_name,
+          reference,
+          status: eventName === 'transfer.failed' ? 'failed' : 'reversed',
+          note: `${failureReason}. The amount has been returned to your wallet.`,
+        }).catch(() => {});
       }
       return;
     }
@@ -4052,8 +4055,10 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           accountNumber: withdrawal.account_number,
           accountName: withdrawal.account_name,
           reference,
+          snapshot: withdrawal.commissions_snapshot || null,
         }).catch(() => {});
       } else if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
+        const failureReason = data?.failure_reason || data?.reason || 'Transfer failed';
         if (withdrawal.status !== 'pending' && withdrawal.status !== 'rejected') {
           await db.query(
             `UPDATE users
@@ -4074,10 +4079,23 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           [
             eventName === 'transfer.failed' ? 'failed' : 'reversed',
             JSON.stringify(data),
-            data?.failure_reason || data?.reason || 'Transfer failed',
+            failureReason,
             withdrawal.id,
           ]
         );
+
+        // Notify the admin that the payout failed and funds were returned
+        sendAdminPayoutReceipt({
+          adminId: withdrawal.admin_id,
+          amount: withdrawal.amount,
+          bankName: withdrawal.bank_name,
+          accountNumber: withdrawal.account_number,
+          accountName: withdrawal.account_name,
+          reference,
+          status: eventName === 'transfer.failed' ? 'failed' : 'reversed',
+          note: `${failureReason}. The amount has been returned to your admin wallet.`,
+          snapshot: withdrawal.commissions_snapshot || null,
+        }).catch(() => {});
       }
     }
   } catch (error) {

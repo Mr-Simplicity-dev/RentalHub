@@ -119,6 +119,7 @@ const sendPayoutReceiptEmail = async ({
   reference,
   date,
   status,
+  note = '',
   itemLines = [],
 }) => {
   try {
@@ -150,6 +151,11 @@ const sendPayoutReceiptEmail = async ({
             <p style="margin:4px 0;"><strong>Bank:</strong> ${esc(bankName || '')} ${esc(accountNumber || '')}</p>
             ${accountName ? `<p style="margin:4px 0;"><strong>Account:</strong> ${esc(accountName)}</p>` : ''}
           </div>
+          ${note ? `
+          <div style="padding:12px 16px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:13px; color:#991b1b;">
+            <strong>Note:</strong> ${esc(note)}
+          </div>
+          <div style="padding-top:12px;"></div>` : ''}
           ${linesHtml ? `
           <table style="width:100%; border-collapse:collapse; font-size:14px; color:#334155;">
             <thead>
@@ -182,20 +188,35 @@ const sendPayoutReceiptEmail = async ({
   }
 };
 
-const sendAdminPayoutReceipt = async ({ adminId, amount, bankName, accountNumber, accountName, reference }) => {
+const sendAdminPayoutReceipt = async ({
+  adminId,
+  amount,
+  bankName,
+  accountNumber,
+  accountName,
+  reference,
+  status = 'processed',
+  note = '',
+  snapshot = null,
+}) => {
   try {
     const user = (await db.query('SELECT email, full_name FROM users WHERE id = $1', [adminId])).rows[0];
     if (!user) return { success: false };
-    // Itemize the commissions covered by this payout (paid around this transfer)
-    const commissions = (
-      await db.query(
-        `SELECT id, source, amount, commission_rate, paid_at
-         FROM admin_commissions
-         WHERE admin_id = $1 AND status = 'paid' AND paid_at >= CURRENT_DATE - INTERVAL '3 days'
-         ORDER BY paid_at DESC`
-      )
-    ).rows;
-    const itemLines = commissions.map((c) => ({
+
+    // Prefer the exact snapshot captured at withdrawal request time.
+    let commissions = snapshot;
+    if (!commissions) {
+      commissions = (
+        await db.query(
+          `SELECT source, amount, commission_rate, paid_at
+           FROM admin_commissions
+           WHERE admin_id = $1 AND status = 'paid' AND paid_at >= CURRENT_DATE - INTERVAL '3 days'
+           ORDER BY paid_at DESC`
+        )
+      ).rows;
+    }
+
+    const itemLines = (commissions || []).map((c) => ({
       label: humanizePaymentType(c.source || 'commission'),
       amount: formatNgn(c.amount),
     }));
@@ -209,7 +230,8 @@ const sendAdminPayoutReceipt = async ({ adminId, amount, bankName, accountNumber
       accountName,
       reference,
       date: new Date().toLocaleString('en-NG'),
-      status: 'processed',
+      status,
+      note,
       itemLines,
     });
   } catch (error) {
@@ -218,7 +240,7 @@ const sendAdminPayoutReceipt = async ({ adminId, amount, bankName, accountNumber
   }
 };
 
-const sendAgentPayoutReceipt = async ({ agentUserId, amount, reference }) => {
+const sendAgentPayoutReceipt = async ({ agentUserId, amount, reference, status = 'processed', note = '' }) => {
   try {
     const user = (await db.query('SELECT email, full_name FROM users WHERE id = $1', [agentUserId])).rows[0];
     if (!user) return { success: false };
@@ -244,7 +266,8 @@ const sendAgentPayoutReceipt = async ({ agentUserId, amount, reference }) => {
       accountName: '',
       reference,
       date: new Date().toLocaleString('en-NG'),
-      status: 'processed',
+      status,
+      note,
       itemLines,
     });
   } catch (error) {
@@ -253,7 +276,16 @@ const sendAgentPayoutReceipt = async ({ agentUserId, amount, reference }) => {
   }
 };
 
-const sendUserPayoutReceipt = async ({ userId, amount, bankName, accountNumber, accountName, reference }) => {
+const sendUserPayoutReceipt = async ({
+  userId,
+  amount,
+  bankName,
+  accountNumber,
+  accountName,
+  reference,
+  status = 'processed',
+  note = '',
+}) => {
   try {
     const user = (await db.query('SELECT email, full_name FROM users WHERE id = $1', [userId])).rows[0];
     if (!user) return { success: false };
@@ -267,7 +299,8 @@ const sendUserPayoutReceipt = async ({ userId, amount, bankName, accountNumber, 
       accountName,
       reference,
       date: new Date().toLocaleString('en-NG'),
-      status: 'processed',
+      status,
+      note,
     });
   } catch (error) {
     console.error('sendUserPayoutReceipt error:', error.message);

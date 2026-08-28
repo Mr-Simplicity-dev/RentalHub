@@ -454,6 +454,19 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
 
     const withdrawalId = withdrawalResult.rows[0].id;
 
+    // Snapshot the commissions covered by this payout so the receipt is
+    // accurate no matter when the transfer completes.
+    const snapshotResult = await db.query(
+      `SELECT COALESCE(json_agg(json_build_object(
+         'source', source, 'amount', amount, 'commission_rate', commission_rate,
+         'status', status, 'paid_at', paid_at
+       )), '[]'::json) AS snapshot
+       FROM admin_commissions
+       WHERE admin_id = $1 AND status = 'paid' AND paid_at >= CURRENT_DATE - INTERVAL '7 days'`,
+      [adminId]
+    );
+    const commissionsSnapshot = snapshotResult.rows[0]?.snapshot || [];
+
     if (!directPayout) {
       await db.query(
         `UPDATE admin_commissions SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
@@ -464,6 +477,11 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
       await db.query(
         `UPDATE users SET admin_wallet_balance = admin_wallet_balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
         [amount, adminId]
+      );
+
+      await db.query(
+        `UPDATE admin_withdrawals SET commissions_snapshot = $2::jsonb WHERE id = $1`,
+        [withdrawalId, JSON.stringify(commissionsSnapshot)]
       );
 
       await db.query(
@@ -505,6 +523,11 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
       await db.query(
         `UPDATE users SET admin_wallet_balance = admin_wallet_balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
         [amount, adminId]
+      );
+
+      await db.query(
+        `UPDATE admin_withdrawals SET commissions_snapshot = $2::jsonb WHERE id = $1`,
+        [withdrawalId, JSON.stringify(commissionsSnapshot)]
       );
 
       await db.query(

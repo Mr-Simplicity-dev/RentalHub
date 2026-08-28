@@ -383,6 +383,33 @@ class AgentWithdrawalService {
       `Paystack status: ${transferStatus}`
     );
 
+    // Email the agent a payout receipt (success) or a failure notice
+    // (failed/reversed with the funds-returned note).
+    try {
+      const { sendAgentPayoutReceipt } = require('../config/utils/paymentReceipt');
+      const statusLabel =
+        transferStatus === 'success'
+          ? 'processed'
+          : transferStatus === 'failed'
+            ? 'failed'
+            : transferStatus === 'reversed'
+              ? 'reversed'
+              : 'processing';
+      const note =
+        transferStatus === 'success'
+          ? ''
+          : `${payload?.failure_reason || payload?.reason || 'Transfer failed'}. The amount has been returned to your earnings.`;
+      sendAgentPayoutReceipt({
+        agentUserId: withdrawal.agent_user_id,
+        amount: withdrawal.amount,
+        reference,
+        status: statusLabel,
+        note,
+      }).catch(() => {});
+    } catch (receiptError) {
+      // Receipt email failures must not break the webhook reconciliation.
+    }
+
     return updated.rows[0] || null;
   }
 
