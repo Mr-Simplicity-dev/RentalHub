@@ -376,6 +376,86 @@ router.get('/wallet/fund/verify/:reference',
 
 // ============ WALLET & WITHDRAWALS ============
 
+// Tenant + Landlord: downloadable PDF receipt (handles combined line items)
+router.get('/receipt-pdf/:paymentId',
+  authenticate,
+  async (req, res) => {
+    try {
+      const PDFDocument = require('pdfkit');
+      const {
+        loadReceiptContext,
+        buildReceiptData,
+      } = require('../config/utils/paymentReceipt');
+
+      const paymentId = Number.parseInt(req.params.paymentId, 10);
+      if (!Number.isInteger(paymentId) || paymentId <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid payment id' });
+      }
+
+      const ctx = await loadReceiptContext(paymentId);
+      if (!ctx) {
+        return res.status(404).json({ success: false, message: 'Payment not found' });
+      }
+      if (Number(ctx.payment.user_id) !== Number(req.user.id)) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+
+      const receipt = buildReceiptData(ctx);
+
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="receipt-${String(paymentId).padStart(6, '0')}.pdf"`
+      );
+      doc.pipe(res);
+
+      doc.fontSize(20).text('RentalHub NG', { align: 'center' });
+      doc.moveDown(0.2);
+      doc.fontSize(11).fillColor('#64748b').text('Official Payment Receipt', { align: 'center' });
+      doc.fontSize(11).fillColor('#0f172a').text(receipt.receiptNumber, { align: 'center' });
+      doc.moveDown();
+
+      doc.fontSize(10).fillColor('#334155');
+      doc.text(`Payer: ${receipt.fullName || receipt.email}`);
+      doc.text(`Date: ${receipt.date}`);
+      doc.text(`Reference: ${receipt.reference}`);
+      doc.text(`Status: ${receipt.status}`);
+      doc.text(`Method: ${receipt.method}`);
+      doc.moveDown();
+
+      const tableTop = doc.y;
+      doc.font('Helvetica-Bold');
+      doc.text('Item', 50, tableTop);
+      doc.text('Amount', 400, tableTop, { width: 150, align: 'right' });
+      doc.moveTo(50, tableTop + 16).lineTo(545, tableTop + 16).strokeColor('#e2e8f0').stroke();
+
+      let y = tableTop + 26;
+      doc.font('Helvetica');
+      receipt.items.forEach((item) => {
+        doc.fillColor('#334155').text(item.label, 50, y, { width: 330 });
+        doc.text(item.amount, 400, y, { width: 150, align: 'right' });
+        y += 22;
+      });
+
+      doc.moveTo(50, y).lineTo(545, y).strokeColor('#e2e8f0').stroke();
+      doc.moveDown();
+      doc.font('Helvetica-Bold');
+      doc.fillColor('#0f172a').text('Total Paid', 50, doc.y);
+      doc.text(receipt.total, 400, doc.y - 14, { width: 150, align: 'right' });
+      doc.moveDown(2);
+      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for using RentalHub NG.', { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      req.logger.error('Receipt PDF error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Failed to generate receipt PDF' });
+      }
+    }
+  }
+);
+
 // Tenant: get wallet balance (approved refunds waiting to be withdrawn)
 router.get('/wallet/balance',
   authenticate,

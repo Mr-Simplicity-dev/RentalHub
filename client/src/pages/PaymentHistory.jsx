@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
-import { FaReceipt, FaPrint } from 'react-icons/fa';
+import { FaReceipt, FaPrint, FaFilePdf } from 'react-icons/fa';
+import { useSearchParams } from 'react-router-dom';
 import Loader from '../components/common/Loader';
 import { paymentService } from '../services/paymentService';
 import BackToDashboard from '../components/common/BackToDashboard';
@@ -52,6 +53,7 @@ const formatPaymentType = (paymentType, tFn) => {
 const PaymentHistory = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [payingPaymentId, setPayingPaymentId] = useState(null);
@@ -99,6 +101,34 @@ const PaymentHistory = () => {
 
   const formatReceiptNumber = (payment) =>
     `RCPT-${String(payment?.id || 0).padStart(6, '0')}`;
+
+  const downloadPdf = async (group) => {
+    const base = group[0];
+    try {
+      const blob = await paymentService.downloadReceiptPdf(base.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `receipt-${String(base.id).padStart(6, '0')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Receipt downloaded');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to download receipt');
+    }
+  };
+
+  // Auto-open a receipt when arriving with ?payment=<id> (e.g. from the wallet)
+  useEffect(() => {
+    const paymentParam = searchParams.get('payment');
+    if (!paymentParam || !paymentGroups.length) return;
+    const id = Number(paymentParam);
+    const group = paymentGroups.find((g) => g.some((p) => Number(p.id) === id));
+    if (group) openReceipt(group);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, paymentGroups.length]);
 
   const loadPayments = useCallback(async () => {
     setLoading(true);
@@ -438,6 +468,12 @@ const PaymentHistory = () => {
                 className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
                 Close
+              </button>
+              <button
+                onClick={() => downloadPdf(selectedReceiptGroup)}
+                className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <FaFilePdf className="mr-1.5" /> Download PDF
               </button>
               <button
                 onClick={() => window.print()}

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FaCheckCircle, FaTimes, FaWallet, FaHistory } from 'react-icons/fa';
+import { FaCheckCircle, FaTimes, FaWallet, FaHistory, FaReceipt } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 const TYPE_LABELS = {
@@ -33,6 +34,7 @@ export default function WalletFundModal({
   const [transactions, setTransactions] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -176,6 +178,15 @@ export default function WalletFundModal({
                             <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[tx.status] || 'bg-gray-100 text-gray-600'}`}>
                               {tx.status}
                             </span>
+                            {tx.payment_id && (
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/payment-history?payment=${tx.payment_id}`)}
+                                className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-teal-600 hover:text-teal-800"
+                              >
+                                <FaReceipt /> View Receipt
+                              </button>
+                            )}
                           </div>
                         </div>
                         {fee > 0 && (

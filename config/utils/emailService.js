@@ -42,6 +42,74 @@ exports.sendVerificationEmail = async (email, verificationToken) => {
   }
 };
 
+// Send payment receipt email
+exports.sendPaymentReceiptEmail = async ({
+  email,
+  fullName,
+  receiptNumber,
+  reference,
+  date,
+  items,
+  total,
+  status,
+  method,
+}) => {
+  try {
+    const rowsHtml = (items || [])
+      .map(
+        (item) => `
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${esc(item.label)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${esc(item.amount)}</td>
+      </tr>`
+      )
+      .join('');
+
+    await sendEmail({
+      to: email,
+      subject: `Payment Receipt ${receiptNumber} - RentalHub NG`,
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto;">
+          <div style="text-align:center; padding-bottom:16px; border-bottom:2px solid #0284c7;">
+            <h2 style="margin:0; color:#0f172a;">RentalHub NG</h2>
+            <p style="margin:4px 0 0; color:#64748b;">Official Payment Receipt</p>
+            <p style="margin:6px 0 0; font-weight:600; color:#0f172a;">${esc(receiptNumber)}</p>
+          </div>
+          <div style="padding:16px 0; font-size:14px; color:#334155;">
+            <p style="margin:4px 0;"><strong>Payer:</strong> ${esc(fullName || email)}</p>
+            <p style="margin:4px 0;"><strong>Date:</strong> ${esc(date)}</p>
+            <p style="margin:4px 0;"><strong>Reference:</strong> ${esc(reference)}</p>
+            <p style="margin:4px 0;"><strong>Status:</strong> ${esc(status)}</p>
+            <p style="margin:4px 0;"><strong>Method:</strong> ${esc(method || 'Paystack')}</p>
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:14px; color:#334155;">
+            <thead>
+              <tr style="background:#f8fafc;">
+                <th style="padding:8px 12px; text-align:left;">Item</th>
+                <th style="padding:8px 12px; text-align:right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot>
+              <tr>
+                <td style="padding:10px 12px; font-weight:700; border-top:2px solid #e2e8f0;">Total Paid</td>
+                <td style="padding:10px 12px; text-align:right; font-weight:700; border-top:2px solid #e2e8f0;">${esc(total)}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <p style="padding-top:16px; font-size:12px; color:#94a3b8; text-align:center;">
+            Thank you for using RentalHub NG. You can view and print this receipt from your Payment History.
+          </p>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (error) {
+    logger.error('Payment receipt email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send welcome email
 exports.sendWelcomeEmail = async (email, fullName, userType) => {
   try {

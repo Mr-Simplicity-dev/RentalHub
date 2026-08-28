@@ -80,6 +80,14 @@ export const paymentService = {
     return response.data;
   },
 
+  // Download a payment receipt as PDF
+  downloadReceiptPdf: async (paymentId) => {
+    const response = await api.get(`/payments/receipt-pdf/${paymentId}`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
   // Get payment details
   getPaymentDetails: async (paymentId) => {
     const response = await api.get(`/payments/${paymentId}`);

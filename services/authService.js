@@ -2272,6 +2272,21 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       }
     });
 
+    // Email the registration receipt (covers base + lawyer/agent add-ons)
+    if (tenantRegistrationPayment?.id) {
+      const basePaymentResult = await db.query(
+        `SELECT id FROM payments
+         WHERE transaction_reference = $1
+         ORDER BY id LIMIT 1`,
+        [reference]
+      );
+      const basePaymentId = basePaymentResult.rows[0]?.id;
+      if (basePaymentId) {
+        const { sendReceiptForPayment } = require('../config/utils/paymentReceipt');
+        sendReceiptForPayment(basePaymentId).catch(() => {});
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: 'Registration completed successfully',

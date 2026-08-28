@@ -27,6 +27,7 @@ const {
 } = require('../services/subscriptionCreditService');
 const commissionService = require('../services/commissionService');
 const AgentWithdrawalService = require('../services/agentWithdrawalService');
+const { sendReceiptForPayment } = require('../config/utils/paymentReceipt');
 const {
   ensureWalletLedgerSchema: ensureSharedWalletLedgerSchema,
   creditWallet,
@@ -3399,6 +3400,9 @@ exports.verifyWalletFunding = async (req, res) => {
       await commissionService.processPaymentCommission(payment.id);
     }
 
+    // Email the receipt for the wallet funding
+    sendReceiptForPayment(payment.id).catch(() => {});
+
       return res.json({
       success: true,
       message: `₦${amountPaid.toLocaleString()} has been added to your wallet successfully!`,
@@ -3919,6 +3923,9 @@ async function handleSuccessfulPayment(data, webhookLogger) {
     ) {
       await commissionService.processPaymentCommission(paymentId);
     }
+
+    // Email the receipt for the completed payment (fires in the background)
+    sendReceiptForPayment(paymentId).catch(() => {});
 
     webhookLogger.info("Webhook payment processed:", reference);
   } catch (error) {
