@@ -2072,6 +2072,79 @@ exports.initializeRegistrationPayment = async (req, res) => {
   }
 };
 
+// Send a phone-OTP to the registration number. The code is required to
+// complete the registration, so a leaked resume link cannot be used alone.
+exports.sendRegistrationPaymentOTP = async (req, res) => {
+  try {
+    await ensureTenantRegistrationPaymentSchema();
+
+    const { reference } = req.params;
+
+    const result = await db.query(
+      `SELECT phone, created_at, registered_user_id, payment_status
+       FROM tenant_registration_payments
+       WHERE transaction_reference = $1
+       LIMIT 1`,
+      [reference]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No pending registration found for this reference'
+      });
+    }
+
+    const row = result.rows[0];
+
+    if (row.registered_user_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'This registration has already been completed'
+      });
+    }
+
+    if (row.payment_status !== 'completed') {
+      const ageMs = Date.now() - new Date(row.created_at).getTime();
+      if (ageMs > 30 * 24 * 60 * 60 * 1000) {
+        return res.status(410).json({
+          success: false,
+          message: 'This registration link has expired. Please start a new registration.'
+        });
+      }
+    }
+
+    const phone = String(row.phone || '').trim();
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'No phone number is attached to this registration. Please start a new registration.'
+      });
+    }
+
+    const otpResult = await sendVerificationCode(phone);
+    if (!otpResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: otpResult.message || 'Could not send the verification code. Please try again shortly.'
+      });
+    }
+
+    await otpSet(`reg_otp:${reference}`, { code: otpResult.code }, 300);
+
+    return res.json({
+      success: true,
+      message: 'A verification code has been sent to your phone.'
+    });
+  } catch (error) {
+    req.logger.error('Registration payment OTP error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send the verification code'
+    });
+  }
+};
+
 // Resume: look up a pending registration payment by reference and hand back
 // a fresh checkout URL so the registrant can pay again without re-entering
 // their details. The payload (incl. password hash) already lives server-side.
@@ -2081,7 +2154,7 @@ exports.getRegistrationPaymentStatus = async (req, res) => {
 
     const result = await db.query(
       `SELECT id, user_type, email, phone, full_name, amount, payment_status,
-              registered_user_id
+              created_at, registered_user_id
        FROM tenant_registration_payments
        WHERE transaction_reference = $1`,
       [reference]
@@ -2098,6 +2171,15 @@ exports.getRegistrationPaymentStatus = async (req, res) => {
 
     if (row.registered_user_id) {
       return res.json({ success: true, data: { status: 'completed' } });
+    }
+
+    // Stale-link expiry: refuse to mint fresh checkout URLs for registrations
+    // that have been pending for over 30 days.
+    if (new Date(row.created_at).getTime() < Date.now() - 30 * 24 * 60 * 60 * 1000) {
+      return res.status(410).json({
+        success: false,
+        message: 'This registration link has expired. Please start a new registration.'
+      });
     }
 
     let authorizationUrl = null;
@@ -2199,6 +2281,56 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
         message: 'This registration payment has already been used'
       });
     }
+
+    // Stale-link expiry: pending/unpaid registration links cannot be completed
+    // or resurrected indefinitely — they die after 30 days.
+    if (
+      tenantRegistrationPayment.payment_status !== 'completed' &&
+      new Date(tenantRegistrationPayment.created_at).getTime() < Date.now() - 30 * 24 * 60 * 60 * 1000
+    ) {
+      return res.status(410).json({
+        success: false,
+        message: 'This registration link has expired. Please start a new registration.'
+      });
+    }
+
+    // Phone-OTP gate: the reference is a bearer secret (it travels in the URL
+    // and email). Requiring the code sent to the registration phone means a
+    // leaked or intercepted link alone can never complete the registration —
+    // the account session is only handed to the person who controls that phone.
+    const otpCode = String(req.body.otp || '').trim();
+    const otpKey = `reg_otp:${reference}`;
+    const storedOTP = await otpGet(otpKey);
+
+    if (!otpCode) {
+      return res.status(428).json({
+        success: false,
+        code: 'OTP_REQUIRED',
+        message: 'Enter the verification code sent to your phone to complete your registration.'
+      });
+    }
+
+    if (!storedOTP || !storedOTP.code) {
+      return res.status(400).json({
+        success: false,
+        code: 'OTP_EXPIRED',
+        message: 'The verification code has expired. Request a new code and try again.'
+      });
+    }
+
+    const storedOTPString = String(storedOTP.code);
+    if (
+      storedOTPString.length !== otpCode.length ||
+      !crypto.timingSafeEqual(Buffer.from(otpCode), Buffer.from(storedOTPString))
+    ) {
+      return res.status(400).json({
+        success: false,
+        code: 'OTP_INVALID',
+        message: 'Invalid verification code.'
+      });
+    }
+
+    await otpDelete(otpKey);
 
     if (tenantRegistrationPayment.payment_status !== 'completed') {
       if (!PAYSTACK_SECRET_KEY) {

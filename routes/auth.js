@@ -128,6 +128,13 @@ router.get(
   authController.getRegistrationPaymentStatus
 );
 
+router.post(
+  '/register/payment/otp/:reference',
+  registrationLimiter,
+  otpSendLimiter,
+  authController.sendRegistrationPaymentOTP
+);
+
 // Register new user (Landlord or Tenant)
 router.post(
   '/register',

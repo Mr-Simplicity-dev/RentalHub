@@ -104,6 +104,10 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showRegistrationFeeModal, setShowRegistrationFeeModal] = useState(!registrationReference);
   const [resumePayment, setResumePayment] = useState(null);
+  const [showOtpStep, setShowOtpStep] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpCompleting, setOtpCompleting] = useState(false);
   const [premblyPending, setPremblyPending] = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
@@ -429,6 +433,18 @@ const Register = () => {
         if (!active) return;
 
         const serverError = error.response?.data;
+
+        // OTP gate: completion requires the code sent to the registration
+        // phone, so a leaked resume link alone can never take the account.
+        if (
+          error.response?.status === 428 &&
+          serverError?.code === 'OTP_REQUIRED' &&
+          registrationReference
+        ) {
+          setShowOtpStep(true);
+          return;
+        }
+
         toast.error(
           serverError?.message ||
           t('register.registration_failed')
@@ -1057,6 +1073,111 @@ return (
             className="mt-3 w-full rounded-xl py-2.5 text-center text-sm font-medium text-gray-600 hover:bg-gray-100"
           >
             Not now
+          </button>
+        </div>
+      </div>
+    )}
+    {showOtpStep && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="flex shrink-0 items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+                {t('register.otp_before')}
+              </p>
+              <h2 className="mt-1 text-xl font-bold text-gray-900">
+                {t('register.otp_title')}
+              </h2>
+            </div>
+            <button
+              onClick={() => setShowOtpStep(false)}
+              className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Close"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <p className="mt-3 text-sm text-gray-600">
+            {t('register.otp_body')}
+          </p>
+
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            value={otpCode}
+            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+            placeholder="••••••"
+            className="mt-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+
+          <button
+            type="button"
+            disabled={otpSending}
+            onClick={async () => {
+              if (!registrationReference) return;
+              setOtpSending(true);
+              try {
+                await api.post(
+                  `/auth/register/payment/otp/${registrationReference}`
+                );
+                toast.success(t('register.otp_sent'));
+              } catch (sendError) {
+                toast.error(sendError?.response?.data?.message || t('register.otp_send_failed'));
+              } finally {
+                setOtpSending(false);
+              }
+            }}
+            className="mt-3 block w-full rounded-xl py-2.5 text-center text-sm font-semibold text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+          >
+            {otpSending
+              ? t('register.otp_sending')
+              : t('register.otp_resend')}
+          </button>
+
+          <button
+            type="button"
+            disabled={otpCompleting || otpCode.length < 6}
+            onClick={async () => {
+              if (!registrationReference || otpCode.length < 6) return;
+              setOtpCompleting(true);
+              try {
+                const response = await api.post(
+                  `/auth/register/payment/complete/${registrationReference}`,
+                  { otp: otpCode }
+                );
+                if (response.data?.success) {
+                  const { token, user } = response.data.data;
+                  setAuthSession(token, user);
+                  api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                  toast.success(t('register.registration_success'));
+                  window.location.assign(
+                    user?.user_type === 'tenant'
+                      ? '/tenant/dashboard'
+                      : '/dashboard'
+                  );
+                }
+              } catch (completeError) {
+                const serverError = completeError.response?.data;
+                if (serverError?.code === 'OTP_EXPIRED') {
+                  setOtpCode('');
+                }
+                toast.error(
+                  serverError?.message ||
+                  t('register.otp_complete_failed')
+                );
+              } finally {
+                setOtpCompleting(false);
+              }
+            }}
+            className="mt-2 block w-full rounded-xl bg-indigo-600 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {otpCompleting
+              ? t('register.otp_completing')
+              : t('register.otp_verify_and_complete')}
           </button>
         </div>
       </div>
