@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FaBed, FaBath, FaMapMarkerAlt, FaHeart, FaRegHeart, FaStar } from 'react-icons/fa';
 import { formatCurrency } from '../../utils/helpers';
 import PropertyShareButton from './PropertyShareButton';
+import { useTranslation } from 'react-i18next';
 
 // const PropertyCard = ({
 //   property,
@@ -125,6 +126,7 @@ const PropertyCard = ({
   showApplyButton = false,
   applyLink,
 }) => {
+  const { t } = useTranslation();
   const detailLink = `/properties/${property.id}`;
   const resolvedApplyLink = applyLink || `${detailLink}?apply=1`;
 
@@ -142,7 +144,7 @@ const PropertyCard = ({
 
         {property.featured && (
           <span className="absolute top-3 left-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-md animate-float">
-            Featured
+            {t('property_card.featured', 'Featured')}
           </span>
         )}
         {showSaveButton && (
@@ -152,7 +154,11 @@ const PropertyCard = ({
               type="button"
               onClick={() => onSave && onSave(property.id)}
               className="bg-white/90 backdrop-blur-sm p-2.5 rounded-full shadow-md hover:bg-white transition-all duration-300 transform hover:scale-110 active:scale-95"
-              aria-label={isSaved ? 'Remove property from saved list' : 'Save property'}
+              aria-label={
+                isSaved
+                  ? t('property_card.remove_from_saved', 'Remove property from saved list')
+                  : t('property_card.save_property', 'Save property')
+              }
             >
               {isSaved ? (
                 <FaHeart className="text-red-500 transition-transform duration-300 hover:scale-110" />
@@ -207,7 +213,12 @@ const PropertyCard = ({
               {formatCurrency(property.rent_amount)}
             </div>
             <div className="text-xs text-gray-400 font-medium">
-              per {property.payment_frequency === 'yearly' ? 'year' : 'month'}
+              {t('property_card.per', 'per {{period}}', {
+                period:
+                  property.payment_frequency === 'yearly'
+                    ? t('property_card.year', 'year')
+                    : t('property_card.month', 'month'),
+              })}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -217,7 +228,7 @@ const PropertyCard = ({
                 data-tour-id="saved-property-apply-workflow"
                 className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5"
               >
-                Apply Now
+                {t('property_card.apply_now', 'Apply Now')}
               </Link>
             )}
             <Link
@@ -228,7 +239,7 @@ const PropertyCard = ({
                   : 'text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 shadow-md hover:shadow-lg'
               }`}
             >
-              View Details
+              {t('property_card.view_details', 'View Details')}
             </Link>
           </div>
         </div>

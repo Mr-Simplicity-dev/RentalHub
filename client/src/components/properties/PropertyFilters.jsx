@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { propertyService } from '../../services/propertyService';
 import { FaSearch } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 const FALLBACK_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa',
@@ -25,6 +26,7 @@ const PROPERTY_TYPES = [
 ];
 
 const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
+  const { t } = useTranslation();
   const [states, setStates] = useState([]);
   const [filters, setFilters] = useState({
     state: '',
@@ -85,7 +87,7 @@ const PropertyFilters = ({ onFilterChange, initialFilters = {} }) => {
 return (
   <div className="card mb-6 w-full max-w-full overflow-hidden">
     <div className="text-center mb-4">
-      <h3 className="text-lg font-semibold">Filter Properties</h3>
+      <h3 className="text-lg font-semibold">{t('property_filters.title', 'Filter Properties')}</h3>
     </div>
 
     <form onSubmit={handleSubmit} className="w-full">
@@ -94,7 +96,7 @@ return (
         {/* State */}
         <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            State
+            {t('property_filters.state', 'State')}
           </label>
           <select
             name="state"
@@ -102,7 +104,7 @@ return (
             onChange={handleChange}
             className="input"
           >
-            <option value="">All States</option>
+            <option value="">{t('property_filters.all_states', 'All States')}</option>
             {states.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -114,7 +116,7 @@ return (
         {/* City */}
         <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            City/Area
+            {t('property_filters.city_area', 'City/Area')}
           </label>
           <input
             type="text"
@@ -122,14 +124,14 @@ return (
             value={filters.city}
             onChange={handleChange}
             className="input"
-            placeholder="Enter city or area"
+            placeholder={t('property_filters.city_placeholder', 'Enter city or area')}
           />
         </div>
 
         {/* Property Type */}
         <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Property Type
+            {t('property_filters.property_type', 'Property Type')}
           </label>
           <select
             name="property_type"
@@ -137,10 +139,10 @@ return (
             onChange={handleChange}
             className="input"
           >
-            <option value="">All Types</option>
+            <option value="">{t('property_filters.all_types', 'All Types')}</option>
             {PROPERTY_TYPES.map((type) => (
               <option key={type.value} value={type.value}>
-                {type.label}
+                {t(`property_filters.type_${type.value}`, type.label)}
               </option>
             ))}
           </select>
@@ -149,7 +151,7 @@ return (
         {/* Bedrooms */}
         <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min. Bedrooms
+            {t('property_filters.min_bedrooms', 'Min. Bedrooms')}
           </label>
           <select
             name="bedrooms"
@@ -157,7 +159,7 @@ return (
             onChange={handleChange}
             className="input"
           >
-            <option value="">Any</option>
+            <option value="">{t('property_filters.any', 'Any')}</option>
             <option value="1">1+</option>
             <option value="2">2+</option>
             <option value="3">3+</option>
@@ -169,7 +171,7 @@ return (
         {/* Min Price */}
         <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min. Price (₦)
+            {t('property_filters.min_price', 'Min. Price (₦)')}
           </label>
           <input
             type="number"
@@ -184,7 +186,7 @@ return (
         {/* Max Price */}
         <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Max. Price (₦)
+            {t('property_filters.max_price', 'Max. Price (₦)')}
           </label>
           <input
             type="number"
@@ -192,14 +194,14 @@ return (
             value={filters.max_price}
             onChange={handleChange}
             className="input"
-            placeholder="No limit"
+            placeholder={t('property_filters.max_price_placeholder', 'No limit')}
           />
         </div>
 
         {/* Bathrooms */}
         <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min. Bathrooms
+            {t('property_filters.min_bathrooms', 'Min. Bathrooms')}
           </label>
           <select
             name="bathrooms"
@@ -207,7 +209,7 @@ return (
             onChange={handleChange}
             className="input"
           >
-            <option value="">Any</option>
+            <option value="">{t('property_filters.any', 'Any')}</option>
             <option value="1">1+</option>
             <option value="2">2+</option>
             <option value="3">3+</option>
@@ -219,7 +221,7 @@ return (
         <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-end">
           <button type="submit" className="btn btn-primary w-full sm:flex-1">
             <FaSearch className="mr-2 shrink-0" />
-            Search
+            {t('property_filters.search', 'Search')}
           </button>
 
           <button
@@ -227,7 +229,7 @@ return (
             onClick={handleReset}
             className="btn btn-secondary w-full sm:w-auto"
           >
-            Reset
+            {t('property_filters.reset', 'Reset')}
           </button>
         </div>
 

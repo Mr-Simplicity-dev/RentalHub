@@ -3,8 +3,10 @@ import { FaTrash, FaCommentDots, FaEdit, FaCheck, FaTimes } from 'react-icons/fa
 import { toast } from 'react-toastify';
 import { useSocket } from '../../hooks/useSocket';
 import api from '../../services/api';
+import { useTranslation } from 'react-i18next';
 
 const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
+  const { t } = useTranslation();
   const { socket } = useSocket();
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,7 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
       const res = await api.get(`/support/tickets/${ticketId}/internal-notes`);
       setNotes(res.data?.data || []);
     } catch {
-      toast.error('Failed to load internal notes');
+      toast.error(t('internal_notes.load_failed', 'Failed to load internal notes'));
     } finally {
       setLoading(false);
     }
@@ -54,7 +56,7 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
       setNotes((prev) => [...prev, res.data.data]);
       setMessage('');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send');
+      toast.error(err.response?.data?.message || t('internal_notes.send_failed', 'Failed to send'));
     } finally {
       setSending(false);
     }
@@ -68,7 +70,7 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
       setEditingId(null);
       setEditText('');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to edit');
+      toast.error(err.response?.data?.message || t('internal_notes.edit_failed', 'Failed to edit'));
     }
   };
 
@@ -81,7 +83,7 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
       setNotes((prev) => prev.filter((n) => n.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
+      toast.error(err.response?.data?.message || t('internal_notes.delete_failed', 'Failed to delete'));
     } finally {
       setDeleting(false);
     }
@@ -91,9 +93,9 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
     <div className="flex flex-col h-full">
       <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-1 py-2 max-h-60">
         {loading ? (
-          <div className="py-4 text-center text-sm text-slate-400">Loading notes...</div>
+          <div className="py-4 text-center text-sm text-slate-400">{t('internal_notes.loading', 'Loading notes...')}</div>
         ) : notes.length === 0 ? (
-          <div className="py-4 text-center text-sm text-slate-400">No internal notes yet.</div>
+          <div className="py-4 text-center text-sm text-slate-400">{t('internal_notes.empty', 'No internal notes yet.')}</div>
         ) : (
           notes.map((note) => (
             <div key={note.id} className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
@@ -132,7 +134,7 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Internal note (admins only)..."
+          placeholder={t('internal_notes.placeholder', 'Internal note (admins only)...')}
           rows={1}
           className="flex-1 resize-none rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
@@ -149,9 +151,9 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-slate-900">Delete Internal Note</h3>
+            <h3 className="text-lg font-semibold text-slate-900">{t('internal_notes.delete_title', 'Delete Internal Note')}</h3>
             <p className="mt-2 text-sm text-slate-600">
-              This removes your internal admin note from the ticket thread.
+              {t('internal_notes.delete_desc', 'This removes your internal admin note from the ticket thread.')}
             </p>
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
               <p className="line-clamp-4 whitespace-pre-wrap text-sm text-amber-900">
@@ -165,7 +167,7 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
                 disabled={deleting}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                Keep Note
+                {t('internal_notes.keep', 'Keep Note')}
               </button>
               <button
                 type="button"
@@ -173,7 +175,7 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
                 disabled={deleting}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {deleting ? 'Deleting...' : 'Delete Note'}
+                {deleting ? t('internal_notes.deleting', 'Deleting...') : t('internal_notes.delete_note', 'Delete Note')}
               </button>
             </div>
           </div>

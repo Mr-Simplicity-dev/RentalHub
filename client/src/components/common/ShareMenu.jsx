@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FaCopy, FaFacebookF, FaShareAlt, FaTelegramPlane, FaWhatsapp } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 
 const copyToClipboard = async (text) => {
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
@@ -23,15 +24,16 @@ const ShareMenu = ({
   text,
   className = '',
   buttonClassName,
-  buttonLabel = 'Share',
+  buttonLabel,
   buttonIcon,
   position = 'right',
   onShare,
-  headerLabel = 'Share',
-  copySuccessMessage = 'Link copied to clipboard',
-  copyErrorMessage = 'Unable to copy link',
-  shareErrorMessage = 'Unable to open share sheet',
+  headerLabel,
+  copySuccessMessage,
+  copyErrorMessage,
+  shareErrorMessage,
 }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState({});
   const buttonRef = useRef(null);
@@ -77,7 +79,7 @@ const ShareMenu = ({
       onShare?.();
     } catch (err) {
       if (err.name !== 'AbortError') {
-        toast.error(shareErrorMessage);
+        toast.error(shareErrorMessage ?? t('share_menu.share_error', 'Unable to open share sheet'));
       }
     }
   };
@@ -85,11 +87,11 @@ const ShareMenu = ({
   const handleCopyLink = async () => {
     try {
       await copyToClipboard(shareUrl);
-      toast.success(copySuccessMessage);
+      toast.success(copySuccessMessage ?? t('share_menu.link_copied', 'Link copied to clipboard'));
       setOpen(false);
       onShare?.();
     } catch {
-      toast.error(copyErrorMessage);
+      toast.error(copyErrorMessage ?? t('share_menu.copy_error', 'Unable to copy link'));
     }
   };
 
@@ -135,7 +137,7 @@ const ShareMenu = ({
         aria-expanded={open}
       >
         {buttonIcon || <FaShareAlt className="text-xs" />}
-        {buttonLabel}
+        {buttonLabel ?? t('share_menu.button', 'Share')}
       </button>
 
       {open && (
@@ -146,7 +148,7 @@ const ShareMenu = ({
             className={`fixed z-[110] w-52 origin-top-right animate-scaleIn rounded-xl border border-gray-100 bg-white py-2 shadow-elevated-lg overflow-y-auto`}
           >
             <div className="px-4 pb-2 mb-1 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-700">{headerLabel}</p>
+              <p className="text-xs font-semibold text-gray-700">{headerLabel ?? t('share_menu.header', 'Share')}</p>
             </div>
 
             {canNativeShare && (
@@ -156,7 +158,7 @@ const ShareMenu = ({
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <FaShareAlt className="text-gray-600" />
-                Share via device
+                {t('share_menu.via_device', 'Share via device')}
               </button>
             )}
 
@@ -166,7 +168,7 @@ const ShareMenu = ({
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <FaCopy className="text-gray-500" />
-              Copy link
+              {t('share_menu.copy_link', 'Copy link')}
             </button>
 
             <div className="my-1 border-t border-gray-100" />

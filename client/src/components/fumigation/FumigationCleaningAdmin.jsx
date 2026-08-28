@@ -23,6 +23,7 @@ import {
 } from 'react-icons/fa';
 import Loader from '../common/Loader';
 import DepartmentSupportEscalations from '../admin/DepartmentSupportEscalations';
+import { useTranslation } from 'react-i18next';
 
 const FUMIGATION_ADMIN_ROLES = [
   'admin',
@@ -37,10 +38,13 @@ const FUMIGATION_ADMIN_ROLES = [
 ];
 
 const FumigationCleaningAdmin = ({
-  title = 'Fumigation & Cleaning Admin',
-  subtitle = 'Manage fumigation and cleaning service bookings',
+  title,
+  subtitle,
   scopeLabel = '',
 }) => {
+  const { t } = useTranslation();
+  const pageTitle = title || t('fumigation_admin.title', 'Fumigation & Cleaning Admin');
+  const pageSubtitle = subtitle || t('fumigation_admin.subtitle', 'Manage fumigation and cleaning service bookings');
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -76,7 +80,7 @@ const FumigationCleaningAdmin = ({
   useEffect(() => {
     const loadAdminData = async () => {
       if (!user || !FUMIGATION_ADMIN_ROLES.includes(user.user_type)) {
-        toast.error('Access denied');
+        toast.error(t('fumigation_admin.access_denied', 'Access denied'));
         navigate('/dashboard');
         return;
       }
@@ -98,7 +102,7 @@ const FumigationCleaningAdmin = ({
         
       } catch (error) {
         console.error('Error loading admin data:', error);
-        toast.error('Failed to load admin data');
+        toast.error(t('fumigation_admin.load_failed', 'Failed to load admin data'));
       } finally {
         setLoading(false);
       }
@@ -212,7 +216,7 @@ const FumigationCleaningAdmin = ({
   };
   
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return t('fumigation_admin.na', 'N/A');
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -222,7 +226,7 @@ const FumigationCleaningAdmin = ({
   };
   
   const formatDateTime = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return t('fumigation_admin.na', 'N/A');
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
       month: 'short',
@@ -250,7 +254,7 @@ const FumigationCleaningAdmin = ({
       console.error('Error loading booking operations:', error);
       setOperations([]);
       setAssignmentDetails(null);
-      toast.error(error.response?.data?.message || 'Failed to load booking operations');
+      toast.error(error.response?.data?.message || t('fumigation_admin.operations_load_failed', 'Failed to load booking operations'));
     } finally {
       setOperationsLoading(false);
     }
@@ -284,7 +288,7 @@ const FumigationCleaningAdmin = ({
     const newStatus = statusDialog.status;
     if (!booking || !newStatus) return;
     if (['completed', 'cancelled', 'rescheduled'].includes(newStatus) && !statusNote.trim()) {
-      toast.error('Add an operational note for this status change');
+      toast.error(t('fumigation_admin.note_required', 'Add an operational note for this status change'));
       return;
     }
 
@@ -299,15 +303,15 @@ const FumigationCleaningAdmin = ({
       });
       
       if (response.data?.success) {
-        toast.success('Booking status updated');
+        toast.success(t('fumigation_admin.status_updated', 'Booking status updated'));
         closeStatusDialog();
         await refreshBookings();
       } else {
-        toast.error(response.data?.message || 'Failed to update status');
+        toast.error(response.data?.message || t('fumigation_admin.status_update_failed', 'Failed to update status'));
       }
     } catch (error) {
       console.error('Error updating booking status:', error);
-      toast.error(error.response?.data?.message || 'Failed to update status');
+      toast.error(error.response?.data?.message || t('fumigation_admin.status_update_failed', 'Failed to update status'));
     } finally {
       setStatusSaving(false);
     }
@@ -315,7 +319,7 @@ const FumigationCleaningAdmin = ({
   
   const handleAssignProviderSubmit = async () => {
     if (!selectedProvider) {
-      toast.error('Please select a provider');
+      toast.error(t('fumigation_admin.select_provider', 'Please select a provider'));
       return;
     }
     
@@ -325,7 +329,7 @@ const FumigationCleaningAdmin = ({
       });
       
       if (response.data?.success) {
-        toast.success('Provider assigned successfully');
+        toast.success(t('fumigation_admin.provider_assigned', 'Provider assigned successfully'));
         setShowAssignProvider(false);
         setSelectedProvider(null);
         
@@ -336,18 +340,18 @@ const FumigationCleaningAdmin = ({
         }
         await loadBookingOperations(selectedBooking.id);
       } else {
-        toast.error(response.data?.message || 'Failed to assign provider');
+        toast.error(response.data?.message || t('fumigation_admin.provider_assign_failed', 'Failed to assign provider'));
       }
     } catch (error) {
       console.error('Error assigning provider:', error);
-      toast.error(error.response?.data?.message || 'Failed to assign provider');
+      toast.error(error.response?.data?.message || t('fumigation_admin.provider_assign_failed', 'Failed to assign provider'));
     }
   };
 
   const submitProviderOperation = async (action) => {
     if (!selectedBooking) return;
     if (['declined', 'completed'].includes(action) && !operationNote.trim()) {
-      toast.error('Add an operational note for this provider action');
+      toast.error(t('fumigation_admin.operation_note_required', 'Add an operational note for this provider action'));
       return;
     }
 
@@ -360,7 +364,7 @@ const FumigationCleaningAdmin = ({
       });
 
       if (response.data?.success) {
-        toast.success('Provider operation updated');
+        toast.success(t('fumigation_admin.operation_updated', 'Provider operation updated'));
         setOperationNote('');
         setOperationProofUrl('');
         const nextBookings = await refreshBookings();
@@ -370,11 +374,11 @@ const FumigationCleaningAdmin = ({
         }
         await loadBookingOperations(selectedBooking.id);
       } else {
-        toast.error(response.data?.message || 'Failed to update provider operation');
+        toast.error(response.data?.message || t('fumigation_admin.operation_update_failed', 'Failed to update provider operation'));
       }
     } catch (error) {
       console.error('Error updating provider operation:', error);
-      toast.error(error.response?.data?.message || 'Failed to update provider operation');
+      toast.error(error.response?.data?.message || t('fumigation_admin.operation_update_failed', 'Failed to update provider operation'));
     } finally {
       setOperationSaving('');
     }
@@ -396,7 +400,18 @@ const FumigationCleaningAdmin = ({
   };
 
   const handleExportData = (format) => {
-    const headers = ['Booking ID', 'Tenant', 'Service', 'Property', 'Booking Date', 'Time Slot', 'Status', 'Payment', 'Amount', 'Provider'];
+    const headers = [
+      t('fumigation_admin.col_booking_id', 'Booking ID'),
+      t('fumigation_admin.col_tenant', 'Tenant'),
+      t('fumigation_admin.col_service', 'Service'),
+      t('fumigation_admin.col_property', 'Property'),
+      t('fumigation_admin.col_booking_date', 'Booking Date'),
+      t('fumigation_admin.col_time_slot', 'Time Slot'),
+      t('fumigation_admin.col_status', 'Status'),
+      t('fumigation_admin.col_payment', 'Payment'),
+      t('fumigation_admin.col_amount', 'Amount'),
+      t('fumigation_admin.col_provider', 'Provider'),
+    ];
     const rows = filteredBookings.map((booking) => [
       `FC-${booking.id?.toString().padStart(6, '0')}`,
       booking.tenant_name,
@@ -425,13 +440,13 @@ const FumigationCleaningAdmin = ({
     }
 
     const printable = window.open('', '_blank');
-    if (!printable) return toast.error('Allow popups to print this report');
+    if (!printable) return toast.error(t('fumigation_admin.allow_popups', 'Allow popups to print this report'));
     printable.document.write(`
       <html>
-        <head><title>Fumigation Bookings Report</title></head>
+        <head><title>${htmlEscape(t('fumigation_admin.report_title', 'Fumigation Bookings Report'))}</title></head>
         <body style="font-family: Arial, sans-serif;">
-          <h1>Fumigation &amp; Cleaning Bookings</h1>
-          <p>Generated ${htmlEscape(new Date().toLocaleString())}</p>
+          <h1>${htmlEscape(t('fumigation_admin.report_heading', 'Fumigation & Cleaning Bookings'))}</h1>
+          <p>${htmlEscape(t('fumigation_admin.report_generated', 'Generated') + ' ' + new Date().toLocaleString())}</p>
           <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse; width: 100%; font-size: 12px;">
             <thead><tr>${headers.map((heading) => `<th>${htmlEscape(heading)}</th>`).join('')}</tr></thead>
             <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${htmlEscape(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
@@ -453,10 +468,10 @@ const FumigationCleaningAdmin = ({
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {title}
+            {pageTitle}
           </h1>
           <p className="text-gray-600">
-            {subtitle}
+            {pageSubtitle}
           </p>
           {scopeLabel && (
             <div className="mt-3 inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
@@ -470,7 +485,7 @@ const FumigationCleaningAdmin = ({
           <div className="fum-admin-providers-section bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Bookings</p>
+                <p className="text-sm text-gray-600">{t('fumigation_admin.total_bookings', 'Total Bookings')}</p>
                 <p className="text-2xl font-bold text-gray-900">{stats?.total_bookings || 0}</p>
               </div>
               <div className="text-blue-600 text-2xl">
@@ -482,7 +497,7 @@ const FumigationCleaningAdmin = ({
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Revenue</p>
+                <p className="text-sm text-gray-600">{t('fumigation_admin.revenue', 'Revenue')}</p>
                 <p className="text-2xl font-bold text-gray-900">
                   ₦{(stats?.total_revenue || 0).toLocaleString()}
                 </p>
@@ -496,7 +511,7 @@ const FumigationCleaningAdmin = ({
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Active Providers</p>
+                <p className="text-sm text-gray-600">{t('fumigation_admin.active_providers', 'Active Providers')}</p>
                 <p className="text-2xl font-bold text-gray-900">{stats?.active_providers || 0}</p>
               </div>
               <div className="text-purple-600 text-2xl">
@@ -508,7 +523,7 @@ const FumigationCleaningAdmin = ({
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Completion Rate</p>
+                <p className="text-sm text-gray-600">{t('fumigation_admin.completion_rate', 'Completion Rate')}</p>
                 <p className="text-2xl font-bold text-gray-900">{stats?.completion_rate || 0}%</p>
               </div>
               <div className="text-orange-600 text-2xl">
@@ -519,7 +534,7 @@ const FumigationCleaningAdmin = ({
         </div>
 
         <div id="support-escalations" className="mb-8">
-          <DepartmentSupportEscalations department="fumigation" title="Fumigation Support Escalations" />
+          <DepartmentSupportEscalations department="fumigation" title={t('fumigation_admin.support_escalations', 'Fumigation Support Escalations')} />
         </div>
         
         {/* Filters and Actions */}
@@ -529,20 +544,20 @@ const FumigationCleaningAdmin = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <FaFilter className="inline mr-2" />
-                Status
+                {t('fumigation_admin.status', 'Status')}
               </label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="input w-full"
               >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="all">{t('fumigation_admin.all_status', 'All Status')}</option>
+                <option value="pending">{t('fumigation_admin.status_pending', 'Pending')}</option>
+                <option value="confirmed">{t('fumigation_admin.status_confirmed', 'Confirmed')}</option>
+                <option value="scheduled">{t('fumigation_admin.status_scheduled', 'Scheduled')}</option>
+                <option value="in_progress">{t('fumigation_admin.status_in_progress', 'In Progress')}</option>
+                <option value="completed">{t('fumigation_admin.status_completed', 'Completed')}</option>
+                <option value="cancelled">{t('fumigation_admin.status_cancelled', 'Cancelled')}</option>
               </select>
             </div>
             
@@ -550,17 +565,17 @@ const FumigationCleaningAdmin = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <FaCalendarAlt className="inline mr-2" />
-                Date Range
+                {t('fumigation_admin.date_range', 'Date Range')}
               </label>
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
                 className="input w-full"
               >
-                <option value="all">All Dates</option>
-                <option value="today">Today</option>
-                <option value="this_week">This Week</option>
-                <option value="this_month">This Month</option>
+                <option value="all">{t('fumigation_admin.all_dates', 'All Dates')}</option>
+                <option value="today">{t('fumigation_admin.today', 'Today')}</option>
+                <option value="this_week">{t('fumigation_admin.this_week', 'This Week')}</option>
+                <option value="this_month">{t('fumigation_admin.this_month', 'This Month')}</option>
               </select>
             </div>
             
@@ -568,17 +583,17 @@ const FumigationCleaningAdmin = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <FaSprayCan className="inline mr-2" />
-                Service Type
+                {t('fumigation_admin.service_type', 'Service Type')}
               </label>
               <select
                 value={serviceFilter}
                 onChange={(e) => setServiceFilter(e.target.value)}
                 className="input w-full"
               >
-                <option value="all">All Services</option>
-                <option value="fumigation">Fumigation</option>
-                <option value="cleaning">Cleaning</option>
-                <option value="deep_cleaning">Deep Cleaning</option>
+                <option value="all">{t('fumigation_admin.all_services', 'All Services')}</option>
+                <option value="fumigation">{t('fumigation_admin.service_fumigation', 'Fumigation')}</option>
+                <option value="cleaning">{t('fumigation_admin.service_cleaning', 'Cleaning')}</option>
+                <option value="deep_cleaning">{t('fumigation_admin.service_deep_cleaning', 'Deep Cleaning')}</option>
               </select>
             </div>
             
@@ -586,18 +601,18 @@ const FumigationCleaningAdmin = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <FaSortAmountDown className="inline mr-2" />
-                Sort By
+                {t('fumigation_admin.sort_by', 'Sort By')}
               </label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="input w-full"
               >
-                <option value="date_desc">Date: Newest First</option>
-                <option value="date_asc">Date: Oldest First</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="status">Status</option>
+                <option value="date_desc">{t('fumigation_admin.sort_date_desc', 'Date: Newest First')}</option>
+                <option value="date_asc">{t('fumigation_admin.sort_date_asc', 'Date: Oldest First')}</option>
+                <option value="price_desc">{t('fumigation_admin.sort_price_desc', 'Price: High to Low')}</option>
+                <option value="price_asc">{t('fumigation_admin.sort_price_asc', 'Price: Low to High')}</option>
+                <option value="status">{t('fumigation_admin.sort_status', 'Status')}</option>
               </select>
             </div>
             
@@ -605,13 +620,13 @@ const FumigationCleaningAdmin = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <FaSearch className="inline mr-2" />
-                Search
+                {t('fumigation_admin.search', 'Search')}
               </label>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search bookings..."
+                placeholder={t('fumigation_admin.search_placeholder', 'Search bookings...')}
                 className="input w-full"
               />
             </div>
@@ -620,7 +635,7 @@ const FumigationCleaningAdmin = ({
           {/* Export Actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-gray-600">
-              Showing {filteredBookings.length} of {bookings.length} bookings
+              {t('fumigation_admin.showing', 'Showing {{shown}} of {{total}} bookings', { shown: filteredBookings.length, total: bookings.length })}
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
@@ -628,14 +643,14 @@ const FumigationCleaningAdmin = ({
                 className="btn btn-outline flex w-full items-center justify-center sm:w-auto"
               >
                 <FaDownload className="mr-2" />
-                Export CSV
+                {t('fumigation_admin.export_csv', 'Export CSV')}
               </button>
               <button
                 onClick={() => handleExportData('PDF')}
                 className="btn btn-outline flex w-full items-center justify-center sm:w-auto"
               >
                 <FaPrint className="mr-2" />
-                Export PDF
+                {t('fumigation_admin.export_pdf', 'Export PDF')}
               </button>
             </div>
           </div>
@@ -648,22 +663,22 @@ const FumigationCleaningAdmin = ({
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Booking Reference
+                    {t('fumigation_admin.col_booking_reference', 'Booking Reference')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Service & Property
+                    {t('fumigation_admin.col_service_property', 'Service & Property')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date & Time
+                    {t('fumigation_admin.col_date_time', 'Date & Time')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    {t('fumigation_admin.col_status', 'Status')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
+                    {t('fumigation_admin.col_amount', 'Amount')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    {t('fumigation_admin.col_actions', 'Actions')}
                   </th>
                 </tr>
               </thead>
@@ -696,7 +711,7 @@ const FumigationCleaningAdmin = ({
                               {booking.property_address}
                             </div>
                             <div className="text-xs text-gray-400">
-                              {booking.property_size_sqm} sqm • {booking.number_of_rooms} rooms
+                              {t('fumigation_admin.property_size', '{{sqm}} sqm • {{rooms}} rooms', { sqm: booking.property_size_sqm, rooms: booking.number_of_rooms })}
                             </div>
                           </div>
                         </div>
@@ -722,7 +737,7 @@ const FumigationCleaningAdmin = ({
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="font-bold">₦{booking.total_price?.toLocaleString()}</div>
                         <div className="text-xs text-gray-500">
-                          {booking.payment_status === 'completed' ? 'Paid' : 'Pending'}
+                          {booking.payment_status === 'completed' ? t('fumigation_admin.paid', 'Paid') : t('fumigation_admin.pending', 'Pending')}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -730,28 +745,28 @@ const FumigationCleaningAdmin = ({
                           <button
                             onClick={() => handleViewBooking(booking)}
                             className="text-blue-600 hover:text-blue-900"
-                            title="View Details"
+                            title={t('fumigation_admin.view_details', 'View Details')}
                           >
                             <FaEye />
                           </button>
                           <button
                             onClick={() => handleAssignProvider(booking)}
                             className="text-green-600 hover:text-green-900"
-                            title="Assign Provider"
+                            title={t('fumigation_admin.assign_provider', 'Assign Provider')}
                           >
                             <FaUserCheck />
                           </button>
                           <button
                             onClick={() => openStatusDialog(booking, 'confirmed')}
                             className="text-purple-600 hover:text-purple-900"
-                            title="Confirm Booking"
+                            title={t('fumigation_admin.confirm_booking', 'Confirm Booking')}
                           >
                             <FaCheckCircle />
                           </button>
                           <button
                             onClick={() => openStatusDialog(booking, 'cancelled')}
                             className="text-red-600 hover:text-red-900"
-                            title="Cancel Booking"
+                            title={t('fumigation_admin.cancel_booking', 'Cancel Booking')}
                           >
                             <FaTimesCircle />
                           </button>
@@ -766,9 +781,9 @@ const FumigationCleaningAdmin = ({
                         <FaSprayCan className="inline-block" />
                         <FaBroom className="inline-block ml-2" />
                       </div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-2">No Bookings Found</h3>
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">{t('fumigation_admin.no_bookings_found', 'No Bookings Found')}</h3>
                       <p className="text-gray-600 mb-4">
-                        {bookings.length === 0 ? 'No bookings yet' : 'Try adjusting your filters'}
+                        {bookings.length === 0 ? t('fumigation_admin.no_bookings_yet', 'No bookings yet') : t('fumigation_admin.try_adjusting_filters', 'Try adjusting your filters')}
                       </p>
                       {bookings.length > 0 && (
                         <button
@@ -780,7 +795,7 @@ const FumigationCleaningAdmin = ({
                           }}
                           className="btn btn-primary"
                         >
-                          Clear All Filters
+                          {t('fumigation_admin.clear_all_filters', 'Clear All Filters')}
                         </button>
                       )}
                     </td>
@@ -796,33 +811,33 @@ const FumigationCleaningAdmin = ({
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
               <div className="border-b border-gray-200 p-6">
-                <h2 className="text-xl font-bold text-gray-900">Update Booking Status</h2>
+                <h2 className="text-xl font-bold text-gray-900">{t('fumigation_admin.update_booking_status', 'Update Booking Status')}</h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  FC-{statusDialog.booking.id.toString().padStart(6, '0')} will be marked as {statusDialog.status.replace('_', ' ')}.
+                  {t('fumigation_admin.will_be_marked', 'FC-{{reference}} will be marked as {{status}}.', { reference: statusDialog.booking.id.toString().padStart(6, '0'), status: statusDialog.status.replace('_', ' ') })}
                 </p>
               </div>
               <div className="space-y-4 p-6">
                 <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
                   <p className="font-semibold text-gray-900">{statusDialog.booking.service_name}</p>
-                  <p>{statusDialog.booking.tenant_name || 'Unknown tenant'} • {formatDate(statusDialog.booking.booking_date)}</p>
+                  <p>{statusDialog.booking.tenant_name || t('fumigation_admin.unknown_tenant', 'Unknown tenant')} • {formatDate(statusDialog.booking.booking_date)}</p>
                 </div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Operational note {['completed', 'cancelled', 'rescheduled'].includes(statusDialog.status) && <span className="text-red-600">*</span>}
+                  {t('fumigation_admin.operational_note', 'Operational note')} {['completed', 'cancelled', 'rescheduled'].includes(statusDialog.status) && <span className="text-red-600">*</span>}
                   <textarea
                     value={statusNote}
                     onChange={(event) => setStatusNote(event.target.value)}
                     rows={4}
                     className="input mt-2 w-full"
-                    placeholder="Add provider update, cancellation reason, completion proof summary, or customer-impact note"
+                    placeholder={t('fumigation_admin.note_placeholder', 'Add provider update, cancellation reason, completion proof summary, or customer-impact note')}
                   />
                 </label>
               </div>
               <div className="flex justify-end gap-3 border-t border-gray-200 p-6">
                 <button type="button" onClick={closeStatusDialog} className="btn btn-outline" disabled={statusSaving}>
-                  Cancel
+                  {t('fumigation_admin.cancel', 'Cancel')}
                 </button>
                 <button type="button" onClick={handleUpdateStatus} className="btn btn-primary" disabled={statusSaving}>
-                  {statusSaving ? 'Updating...' : 'Update Status'}
+                  {statusSaving ? t('fumigation_admin.updating', 'Updating...') : t('fumigation_admin.update_status', 'Update Status')}
                 </button>
               </div>
             </div>
@@ -836,7 +851,7 @@ const FumigationCleaningAdmin = ({
               <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Booking Details</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">{t('fumigation_admin.booking_details', 'Booking Details')}</h2>
                     <p className="text-gray-600">FC-{selectedBooking.id.toString().padStart(6, '0')}</p>
                   </div>
                   <button
@@ -851,7 +866,7 @@ const FumigationCleaningAdmin = ({
                   {/* Left Column */}
                   <div className="space-y-6">
                     <div>
-                      <h3 className="font-bold text-gray-900 mb-3">Service Information</h3>
+                      <h3 className="font-bold text-gray-900 mb-3">{t('fumigation_admin.service_information', 'Service Information')}</h3>
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <div className="flex items-center mb-3">
                           <div className="text-2xl mr-3">
@@ -870,19 +885,19 @@ const FumigationCleaningAdmin = ({
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <span className="text-gray-600">Duration:</span>
-                            <span className="font-semibold ml-1">{selectedBooking.duration_hours} hours</span>
+                            <span className="text-gray-600">{t('fumigation_admin.duration', 'Duration:')}</span>
+                            <span className="font-semibold ml-1">{t('fumigation_admin.duration_value', '{{count}} hours', { count: selectedBooking.duration_hours })}</span>
                           </div>
                           <div>
-                            <span className="text-gray-600">Team Size:</span>
-                            <span className="font-semibold ml-1">{selectedBooking.team_size} people</span>
+                            <span className="text-gray-600">{t('fumigation_admin.team_size', 'Team Size:')}</span>
+                            <span className="font-semibold ml-1">{t('fumigation_admin.people', '{{count}} people', { count: selectedBooking.team_size })}</span>
                           </div>
                         </div>
                       </div>
                     </div>
                     
                     <div>
-                      <h3 className="font-bold text-gray-900 mb-3">Property Details</h3>
+                      <h3 className="font-bold text-gray-900 mb-3">{t('fumigation_admin.property_details', 'Property Details')}</h3>
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <div className="flex items-start mb-3">
                           <FaHome className="text-gray-400 mr-2 mt-0.5" />
@@ -893,17 +908,17 @@ const FumigationCleaningAdmin = ({
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <span className="text-gray-600">Size:</span>
-                            <span className="font-semibold ml-1">{selectedBooking.property_size_sqm} sqm</span>
+                            <span className="text-gray-600">{t('fumigation_admin.size', 'Size:')}</span>
+                            <span className="font-semibold ml-1">{t('fumigation_admin.size_value', '{{count}} sqm', { count: selectedBooking.property_size_sqm })}</span>
                           </div>
                           <div>
-                            <span className="text-gray-600">Rooms:</span>
+                            <span className="text-gray-600">{t('fumigation_admin.rooms', 'Rooms:')}</span>
                             <span className="font-semibold ml-1">{selectedBooking.number_of_rooms}</span>
                           </div>
                           <div>
-                            <span className="text-gray-600">Condition:</span>
+                            <span className="text-gray-600">{t('fumigation_admin.condition', 'Condition:')}</span>
                             <span className="font-semibold ml-1 capitalize">
-                              {selectedBooking.property_condition?.replace('_', ' ') || 'Normal'}
+                              {selectedBooking.property_condition?.replace('_', ' ') || t('fumigation_admin.normal', 'Normal')}
                             </span>
                           </div>
                         </div>
@@ -911,12 +926,12 @@ const FumigationCleaningAdmin = ({
                     </div>
                     
                     <div>
-                      <h3 className="font-bold text-gray-900 mb-3">Tenant Information</h3>
+                      <h3 className="font-bold text-gray-900 mb-3">{t('fumigation_admin.tenant_information', 'Tenant Information')}</h3>
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <h4 className="font-bold text-gray-900 mb-2">{selectedBooking.tenant_name}</h4>
                         <div className="space-y-1 text-sm">
-                          <p className="text-gray-600">Email: {selectedBooking.tenant_email}</p>
-                          <p className="text-gray-600">Phone: {selectedBooking.tenant_phone || 'Not provided'}</p>
+                          <p className="text-gray-600">{t('fumigation_admin.email', 'Email: {{email}}', { email: selectedBooking.tenant_email })}</p>
+                          <p className="text-gray-600">{t('fumigation_admin.phone', 'Phone: {{phone}}', { phone: selectedBooking.tenant_phone || t('fumigation_admin.not_provided', 'Not provided') })}</p>
                         </div>
                       </div>
                     </div>
@@ -925,7 +940,7 @@ const FumigationCleaningAdmin = ({
                   {/* Right Column */}
                   <div className="space-y-6">
                     <div>
-                      <h3 className="font-bold text-gray-900 mb-3">Schedule</h3>
+                      <h3 className="font-bold text-gray-900 mb-3">{t('fumigation_admin.schedule', 'Schedule')}</h3>
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <div className="flex items-center mb-3">
                           <FaCalendarAlt className="text-gray-400 mr-2" />
@@ -941,26 +956,26 @@ const FumigationCleaningAdmin = ({
                           </div>
                         </div>
                         <div className="text-sm text-gray-600">
-                          <p>Created: {formatDateTime(selectedBooking.created_at)}</p>
+                          <p>{t('fumigation_admin.created', 'Created: {{datetime}}', { datetime: formatDateTime(selectedBooking.created_at) })}</p>
                           {selectedBooking.updated_at && (
-                            <p>Last Updated: {formatDateTime(selectedBooking.updated_at)}</p>
+                            <p>{t('fumigation_admin.last_updated', 'Last Updated: {{datetime}}', { datetime: formatDateTime(selectedBooking.updated_at) })}</p>
                           )}
                         </div>
                       </div>
                     </div>
                     
                     <div>
-                      <h3 className="font-bold text-gray-900 mb-3">Status & Payment</h3>
+                      <h3 className="font-bold text-gray-900 mb-3">{t('fumigation_admin.status_and_payment', 'Status & Payment')}</h3>
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <div className="grid grid-cols-2 gap-4 mb-4">
                           <div>
-                            <p className="text-sm text-gray-600">Booking Status</p>
+                            <p className="text-sm text-gray-600">{t('fumigation_admin.booking_status', 'Booking Status')}</p>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${getStatusColor(selectedBooking.booking_status)}`}>
                               {selectedBooking.booking_status.replace('_', ' ')}
                             </span>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-600">Payment Status</p>
+                            <p className="text-sm text-gray-600">{t('fumigation_admin.payment_status', 'Payment Status')}</p>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${getPaymentColor(selectedBooking.payment_status)}`}>
                               {selectedBooking.payment_status}
                             </span>
@@ -969,68 +984,68 @@ const FumigationCleaningAdmin = ({
                         
                         <div className="border-t border-gray-200 pt-4">
                           <div className="flex justify-between items-center mb-2">
-                            <span className="text-gray-600">Total Amount:</span>
+                            <span className="text-gray-600">{t('fumigation_admin.total_amount', 'Total Amount:')}</span>
                             <span className="text-xl font-bold text-gray-900">
                               ₦{selectedBooking.total_price?.toLocaleString()}
                             </span>
                           </div>
                           <div className="text-xs text-gray-500">
                             {selectedBooking.payment_status === 'completed' 
-                              ? `Paid on ${formatDate(selectedBooking.payment_date)}` 
-                              : 'Payment pending'}
+                              ? t('fumigation_admin.paid_on', 'Paid on {{date}}', { date: formatDate(selectedBooking.payment_date) }) 
+                              : t('fumigation_admin.payment_pending', 'Payment pending')}
                           </div>
                         </div>
                       </div>
                     </div>
                     
                     <div>
-                      <h3 className="font-bold text-gray-900 mb-3">Special Instructions</h3>
+                      <h3 className="font-bold text-gray-900 mb-3">{t('fumigation_admin.special_instructions', 'Special Instructions')}</h3>
                       <div className="bg-gray-50 p-4 rounded-lg">
                         {selectedBooking.special_instructions ? (
                           <p className="text-gray-700">{selectedBooking.special_instructions}</p>
                         ) : (
-                          <p className="text-gray-500 italic">No special instructions provided</p>
+                          <p className="text-gray-500 italic">{t('fumigation_admin.no_special_instructions', 'No special instructions provided')}</p>
                         )}
                       </div>
                     </div>
                     
                     {selectedBooking.assigned_provider && (
                       <div>
-                        <h3 className="font-bold text-gray-900 mb-3">Assigned Provider</h3>
+                        <h3 className="font-bold text-gray-900 mb-3">{t('fumigation_admin.assigned_provider', 'Assigned Provider')}</h3>
                         <div className="fum-admin-providers-section bg-green-50 p-4 rounded-lg">
                           <h4 className="font-bold text-green-800 mb-1">
                             {selectedBooking.assigned_provider.company_name || selectedBooking.assigned_provider}
                           </h4>
                           <p className="text-sm text-green-700">
-                            {selectedBooking.assigned_provider.service_specialization || 'Assigned service provider'}
+                            {selectedBooking.assigned_provider.service_specialization || t('fumigation_admin.assigned_service_provider', 'Assigned service provider')}
                           </p>
                           <div className="mt-2 text-sm text-green-600">
-                            <p>Contact: {selectedBooking.assigned_provider.contact_phone || 'Not provided'}</p>
-                            <p>Email: {selectedBooking.assigned_provider.contact_email || 'Not provided'}</p>
-                            <p>Status: {(assignmentDetails?.assignment_status || selectedBooking.assigned_provider.assignment_status || 'assigned').replace('_', ' ')}</p>
+                            <p>{t('fumigation_admin.contact', 'Contact: {{phone}}', { phone: selectedBooking.assigned_provider.contact_phone || t('fumigation_admin.not_provided', 'Not provided') })}</p>
+                            <p>{t('fumigation_admin.email', 'Email: {{email}}', { email: selectedBooking.assigned_provider.contact_email || t('fumigation_admin.not_provided', 'Not provided') })}</p>
+                            <p>{t('fumigation_admin.provider_status', 'Status: {{status}}', { status: (assignmentDetails?.assignment_status || selectedBooking.assigned_provider.assignment_status || 'assigned').replace('_', ' ') })}</p>
                             {(assignmentDetails?.arrival_proof_url || selectedBooking.assigned_provider.arrival_proof_url) && (
                               <p>
-                                Arrival Proof:{' '}
+                                {t('fumigation_admin.arrival_proof', 'Arrival Proof:')}{' '}
                                 <a
                                   href={assignmentDetails?.arrival_proof_url || selectedBooking.assigned_provider.arrival_proof_url}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="font-semibold text-green-800 underline"
                                 >
-                                  Open
+                                  {t('fumigation_admin.open', 'Open')}
                                 </a>
                               </p>
                             )}
                             {(assignmentDetails?.completion_proof_url || selectedBooking.assigned_provider.completion_proof_url) && (
                               <p>
-                                Completion Proof:{' '}
+                                {t('fumigation_admin.completion_proof', 'Completion Proof:')}{' '}
                                 <a
                                   href={assignmentDetails?.completion_proof_url || selectedBooking.assigned_provider.completion_proof_url}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="font-semibold text-green-800 underline"
                                 >
-                                  Open
+                                  {t('fumigation_admin.open', 'Open')}
                                 </a>
                               </p>
                             )}
@@ -1044,8 +1059,8 @@ const FumigationCleaningAdmin = ({
                 <div className="mb-6 border-t border-gray-200 pt-6">
                   <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center">
                     <div>
-                      <h3 className="font-bold text-gray-900">Provider Operations</h3>
-                      <p className="text-sm text-gray-600">Track assignment response, arrival proof, completion proof, and admin notes.</p>
+                      <h3 className="font-bold text-gray-900">{t('fumigation_admin.provider_operations', 'Provider Operations')}</h3>
+                      <p className="text-sm text-gray-600">{t('fumigation_admin.provider_operations_desc', 'Track assignment response, arrival proof, completion proof, and admin notes.')}</p>
                     </div>
                     <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(selectedBooking.booking_status)}`}>
                       {selectedBooking.booking_status.replace('_', ' ')}
@@ -1057,17 +1072,17 @@ const FumigationCleaningAdmin = ({
                       <div className="rounded-lg border border-gray-200 p-4">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                           <label className="block text-sm font-medium text-gray-700 md:col-span-2">
-                            Operation note
+                            {t('fumigation_admin.operation_note', 'Operation note')}
                             <textarea
                               value={operationNote}
                               onChange={(event) => setOperationNote(event.target.value)}
                               rows={3}
                               className="input mt-2 w-full"
-                              placeholder="Provider accepted, arrived with tenant confirmation, treatment completed, decline reason..."
+                              placeholder={t('fumigation_admin.operation_note_placeholder', 'Provider accepted, arrived with tenant confirmation, treatment completed, decline reason...')}
                             />
                           </label>
                           <label className="block text-sm font-medium text-gray-700 md:col-span-2">
-                            Proof URL
+                            {t('fumigation_admin.proof_url', 'Proof URL')}
                             <input
                               type="url"
                               value={operationProofUrl}
@@ -1085,7 +1100,7 @@ const FumigationCleaningAdmin = ({
                             disabled={Boolean(operationSaving)}
                             className="btn btn-outline text-sm"
                           >
-                            {operationSaving === 'accepted' ? 'Saving...' : 'Accepted'}
+                            {operationSaving === 'accepted' ? t('fumigation_admin.saving', 'Saving...') : t('fumigation_admin.accepted', 'Accepted')}
                           </button>
                           <button
                             type="button"
@@ -1093,7 +1108,7 @@ const FumigationCleaningAdmin = ({
                             disabled={Boolean(operationSaving)}
                             className="btn btn-outline text-sm text-red-700"
                           >
-                            {operationSaving === 'declined' ? 'Saving...' : 'Declined'}
+                            {operationSaving === 'declined' ? t('fumigation_admin.saving', 'Saving...') : t('fumigation_admin.declined', 'Declined')}
                           </button>
                           <button
                             type="button"
@@ -1101,7 +1116,7 @@ const FumigationCleaningAdmin = ({
                             disabled={Boolean(operationSaving)}
                             className="btn btn-outline text-sm text-orange-700"
                           >
-                            {operationSaving === 'in_progress' ? 'Saving...' : 'Arrived'}
+                            {operationSaving === 'in_progress' ? t('fumigation_admin.saving', 'Saving...') : t('fumigation_admin.arrived', 'Arrived')}
                           </button>
                           <button
                             type="button"
@@ -1109,15 +1124,15 @@ const FumigationCleaningAdmin = ({
                             disabled={Boolean(operationSaving)}
                             className="btn btn-primary text-sm"
                           >
-                            {operationSaving === 'completed' ? 'Saving...' : 'Completed'}
+                            {operationSaving === 'completed' ? t('fumigation_admin.saving', 'Saving...') : t('fumigation_admin.completed', 'Completed')}
                           </button>
                         </div>
                       </div>
 
                       <div className="rounded-lg border border-gray-200 p-4">
-                        <h4 className="mb-3 font-bold text-gray-900">Operations Timeline</h4>
+                        <h4 className="mb-3 font-bold text-gray-900">{t('fumigation_admin.operations_timeline', 'Operations Timeline')}</h4>
                         {operationsLoading ? (
-                          <p className="text-sm text-gray-500">Loading operations...</p>
+                          <p className="text-sm text-gray-500">{t('fumigation_admin.loading_operations', 'Loading operations...')}</p>
                         ) : operations.length > 0 ? (
                           <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
                             {operations.map((operation) => (
@@ -1129,7 +1144,7 @@ const FumigationCleaningAdmin = ({
                                   <p className="shrink-0 text-xs text-gray-500">{formatDateTime(operation.created_at)}</p>
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                  {operation.actor_name || 'System'}{operation.provider_name ? ` - ${operation.provider_name}` : ''}
+                                  {operation.actor_name || t('fumigation_admin.system', 'System')}{operation.provider_name ? ` - ${operation.provider_name}` : ''}
                                 </p>
                                 {operation.note && <p className="mt-1 text-sm text-gray-700">{operation.note}</p>}
                                 {operation.proof_url && (
@@ -1139,20 +1154,20 @@ const FumigationCleaningAdmin = ({
                                     rel="noreferrer"
                                     className="mt-1 inline-block text-sm font-semibold text-blue-700 underline"
                                   >
-                                    Open proof
+                                    {t('fumigation_admin.open_proof', 'Open proof')}
                                   </a>
                                 )}
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-500">No operation events yet.</p>
+                          <p className="text-sm text-gray-500">{t('fumigation_admin.no_operation_events', 'No operation events yet.')}</p>
                         )}
                       </div>
                     </div>
                   ) : (
                     <div className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-600">
-                      Assign a provider before recording acceptance, arrival, or completion proof.
+                      {t('fumigation_admin.assign_provider_hint', 'Assign a provider before recording acceptance, arrival, or completion proof.')}
                     </div>
                   )}
                 </div>
@@ -1162,7 +1177,7 @@ const FumigationCleaningAdmin = ({
                     onClick={() => setShowBookingDetails(false)}
                     className="btn btn-gray w-full sm:w-auto"
                   >
-                    Close
+                    {t('fumigation_admin.close', 'Close')}
                   </button>
                   {!selectedBooking.assigned_provider && (
                     <button
@@ -1172,7 +1187,7 @@ const FumigationCleaningAdmin = ({
                       }}
                       className="btn btn-primary w-full sm:w-auto"
                     >
-                      Assign Provider
+                      {t('fumigation_admin.assign_provider', 'Assign Provider')}
                     </button>
                   )}
                 </div>
@@ -1188,7 +1203,7 @@ const FumigationCleaningAdmin = ({
               <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Assign Provider</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">{t('fumigation_admin.assign_provider', 'Assign Provider')}</h2>
                     <p className="text-gray-600">
                       FC-{selectedBooking.id.toString().padStart(6, '0')} • {selectedBooking.service_name}
                     </p>
@@ -1205,7 +1220,7 @@ const FumigationCleaningAdmin = ({
                 </div>
                 
                 <div className="mb-6">
-                  <h3 className="font-bold text-gray-900 mb-3">Available Providers</h3>
+                  <h3 className="font-bold text-gray-900 mb-3">{t('fumigation_admin.available_providers', 'Available Providers')}</h3>
                   {providers.length > 0 ? (
                     <div className="fum-admin-providers-section space-y-3 max-h-96 overflow-y-auto">
                       {providers.map((provider) => (
@@ -1224,21 +1239,21 @@ const FumigationCleaningAdmin = ({
                               <p className="text-sm text-gray-600">{provider.service_specialization}</p>
                               <div className="grid grid-cols-2 gap-3 text-sm mt-2">
                                 <div>
-                                  <span className="text-gray-600">Experience:</span>
-                                  <span className="font-semibold ml-1">{provider.years_experience} years</span>
+                                  <span className="text-gray-600">{t('fumigation_admin.experience', 'Experience:')}</span>
+                                  <span className="font-semibold ml-1">{t('fumigation_admin.years', '{{count}} years', { count: provider.years_experience })}</span>
                                 </div>
                                 <div>
-                                  <span className="text-gray-600">Certified:</span>
+                                  <span className="text-gray-600">{t('fumigation_admin.certified', 'Certified:')}</span>
                                   <span className="font-semibold ml-1">
-                                    {provider.is_certified ? 'Yes' : 'No'}
+                                    {provider.is_certified ? t('fumigation_admin.yes', 'Yes') : t('fumigation_admin.no', 'No')}
                                   </span>
                                 </div>
                                 <div>
-                                  <span className="text-gray-600">Rating:</span>
-                                  <span className="font-semibold ml-1">{provider.average_rating || 'N/A'}</span>
+                                  <span className="text-gray-600">{t('fumigation_admin.rating', 'Rating:')}</span>
+                                  <span className="font-semibold ml-1">{provider.average_rating || t('fumigation_admin.na', 'N/A')}</span>
                                 </div>
                                 <div>
-                                  <span className="text-gray-600">Jobs Completed:</span>
+                                  <span className="text-gray-600">{t('fumigation_admin.jobs_completed', 'Jobs Completed:')}</span>
                                   <span className="font-semibold ml-1">{provider.completed_jobs || 0}</span>
                                 </div>
                               </div>
@@ -1252,9 +1267,9 @@ const FumigationCleaningAdmin = ({
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-gray-500">No providers available for this service type</p>
+                      <p className="text-gray-500">{t('fumigation_admin.no_providers', 'No providers available for this service type')}</p>
                       <p className="text-sm text-gray-400 mt-1">
-                        Try assigning a provider manually or contact support
+                        {t('fumigation_admin.no_providers_hint', 'Try assigning a provider manually or contact support')}
                       </p>
                     </div>
                   )}
@@ -1268,14 +1283,14 @@ const FumigationCleaningAdmin = ({
                     }}
                     className="btn btn-gray w-full sm:w-auto"
                   >
-                    Cancel
+                    {t('fumigation_admin.cancel', 'Cancel')}
                   </button>
                   <button
                     onClick={handleAssignProviderSubmit}
                     disabled={!selectedProvider}
                     className="btn btn-primary w-full sm:w-auto"
                   >
-                    Assign Provider
+                    {t('fumigation_admin.assign_provider', 'Assign Provider')}
                   </button>
                 </div>
               </div>
