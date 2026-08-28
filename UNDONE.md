@@ -8,7 +8,7 @@
 
 - [ ] **Verify Resend domain `rentalhub.com.ng` on Resend (DNS records)** — domain status is "failed"; ALL emails from the app (welcome, receipts, payouts, failed-payment + registration reminders) are rejected with 403. Action: add Resend SPF/DKIM/return-path DNS records in Cloudflare for rentalhub.com.ng, then click Verify in the Resend dashboard.
 
-- [ ] **Decide: enable `diaspora_registration_payment` flag** — diaspora accounts are currently FREE (flag OFF). Diaspora pricing is already seeded ($12.85 base, $15 lawyer, $15 agent, FX markup 2%). Flip the flag when you want to charge diaspora registrants.
+- [x] **DONE — `diaspora_registration_payment` enabled (2026-08-28)** — diaspora registrations now charge (base $12.85 + optional add-ons at live FX). Client gating added, server bypass guard added, flag UI labelled in super admin dashboard.
 
 - [ ] **Decide: state-admin withdrawal accounting** — the state-admin request path now snapshots commissions for the receipt but does NOT mark them `paid`. Only the admin-approved path marks commissions paid. Confirm which behavior is correct (mark-paid-on-request vs on-transfer).
 
