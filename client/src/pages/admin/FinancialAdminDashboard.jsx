@@ -370,14 +370,15 @@ const FinancialAdminDashboard = () => {
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Amount</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Bank</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Failure Reason</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {withdrawals.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
-                        No withdrawal requests yet.
-                      </td>
+                        <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
+                          No withdrawal requests yet.
+                        </td>
                     </tr>
                   ) : (
                     withdrawals.map((withdrawal) => (
@@ -389,6 +390,9 @@ const FinancialAdminDashboard = () => {
                           <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold capitalize text-gray-700">
                             {withdrawal.status || 'pending'}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-red-600">
+                          {withdrawal.payout_failed_reason || '-'}
                         </td>
                       </tr>
                     ))
