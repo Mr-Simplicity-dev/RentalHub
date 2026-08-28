@@ -787,6 +787,14 @@ const validateAndPrepareRegistration = async (payload) => {
     throw error;
   }
 
+  // Diaspora registrations must pay when the diaspora payment flag is on —
+  // this free-register path is not an alternative to the payment flow.
+  if (registrationTier === 'diaspora' && flags.diaspora_registration_payment === true) {
+    const error = new Error('Diaspora registration requires a registration payment');
+    error.statusCode = 402;
+    throw error;
+  }
+
   const phoneValidation = validatePhoneForTier(phone, registrationTier);
   if (!phoneValidation.valid) {
     const error = new Error(phoneValidation.message);

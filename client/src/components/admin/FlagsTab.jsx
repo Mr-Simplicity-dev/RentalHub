@@ -44,6 +44,21 @@ const FLAG_META = {
     label: "Passport Requirement",
     description: "Require and allow passport collection for foreign registrations.",
   },
+  diaspora_registration: {
+    label: "Diaspora Registration",
+    description:
+      "Allow foreign (diaspora) registrations with international passport verification and USD pricing.",
+  },
+  diaspora_registration_payment: {
+    label: "Diaspora Registration Payment",
+    description:
+      "Require a USD-quoted registration payment (base $12.85 + optional lawyer/agent add-ons, converted to NGN at the live FX rate) before a diaspora account is created.",
+  },
+  diaspora_require_foreign_card: {
+    label: "Diaspora Foreign Card Required",
+    description:
+      "Reject diaspora registration payments funded by Nigerian-issued cards. When off, a Nigerian-funded card is only a review flag.",
+  },
 };
 
 const REGISTRATION_PARENT_KEY = "allow_registration";
@@ -54,6 +69,9 @@ const REGISTRATION_CHILD_KEYS = [
 const REGISTRATION_OTHER_KEYS = [
   "tenant_registration_payment",
   "landlord_registration_payment",
+  "diaspora_registration",
+  "diaspora_registration_payment",
+  "diaspora_require_foreign_card",
   "nin_number",
   "passport_number",
 ];

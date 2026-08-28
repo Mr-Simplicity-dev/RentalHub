@@ -52,6 +52,7 @@ const initialRegistrationFlags = {
   nin_number: true,
   passport_number: true,
   diaspora_registration: false,
+  diaspora_registration_payment: false,
   diaspora_base_fee_usd: null,
   diaspora_base_fee_ngn_estimate: null,
   tenant_registration_payment: false,
@@ -198,7 +199,8 @@ const Register = () => {
 
     const requiresRegistrationPayment =
     (formData.user_type === 'tenant' && registrationFlags.tenant_registration_payment) ||
-    (formData.user_type === 'landlord' && registrationFlags.landlord_registration_payment);
+    (formData.user_type === 'landlord' && registrationFlags.landlord_registration_payment) ||
+    (formData.is_foreigner && registrationFlags.diaspora_registration_payment);
     const requiresLawyerPayment = formData.use_rentalhub_lawyers;
   const requiresAgentPayment = formData.use_rentalhub_agents;
   const requiresPayment = requiresRegistrationPayment || requiresLawyerPayment || requiresAgentPayment;
@@ -208,7 +210,10 @@ const Register = () => {
   );
   const availableLgas = selectedStateOption?.lgas || [];
     const baseAmount = registrationPricing.amount || (formData.user_type === 'tenant' ? TENANT_REGISTRATION_FEE : LANDLORD_REGISTRATION_FEE);
-    const displayedRegistrationAmount = (requiresRegistrationPayment ? baseAmount : 0) + (requiresLawyerPayment ? LAWYER_ACCESS_FEE : 0) + (requiresAgentPayment ? AGENT_ACCESS_FEE : 0);
+    const diasporaBaseFeeNgn = formData.is_foreigner
+      ? (registrationFlags.diaspora_base_fee_ngn_estimate ?? baseAmount)
+      : baseAmount;
+    const displayedRegistrationAmount = (requiresRegistrationPayment ? (formData.is_foreigner && registrationFlags.diaspora_registration_payment ? diasporaBaseFeeNgn : baseAmount) : 0) + (requiresLawyerPayment ? LAWYER_ACCESS_FEE : 0) + (requiresAgentPayment ? AGENT_ACCESS_FEE : 0);
   const registrationLocationBrowseUrl = formData.state_id
     ? `/properties?state_id=${encodeURIComponent(formData.state_id)}${
         formData.lga_name
@@ -245,6 +250,7 @@ const Register = () => {
           nin_number: data.nin_number !== false,
           passport_number: data.passport_number !== false,
           diaspora_registration: data.diaspora_registration === true,
+          diaspora_registration_payment: data.diaspora_registration_payment === true,
           diaspora_base_fee_usd:
             Number(data.diaspora_base_fee_usd) > 0
               ? Number(data.diaspora_base_fee_usd)
