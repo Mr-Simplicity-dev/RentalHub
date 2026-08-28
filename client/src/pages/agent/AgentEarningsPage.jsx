@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FaDollarSign, FaCheckCircle, FaClock, FaHistory } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import { paymentService } from '../../services/paymentService';
 import { useTranslation } from 'react-i18next';
 import Loader from '../../components/common/Loader';
 
@@ -201,6 +202,26 @@ const AgentEarningsPage = () => {
             <Link to="/agent/withdrawals" className="btn btn-sm btn-primary">
               {t('agent_earnings.request_withdrawal')}
             </Link>
+            <button
+              onClick={async () => {
+                try {
+                  const blob = await paymentService.downloadCommissionStatement();
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'commission-statement.pdf';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                } catch (error) {
+                  toast.error(error.response?.data?.message || 'Failed to download statement');
+                }
+              }}
+              className="btn btn-sm btn-outline"
+            >
+              Download Statement
+            </button>
             <button
               onClick={loadEarningsData}
               className="btn btn-sm btn-outline"

@@ -695,7 +695,29 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
 
           {activeTab === 'commissions' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Commission History</h3>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold">Commission History</h3>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.get('/payments/commission-statement.pdf', { responseType: 'blob' });
+                      const url = URL.createObjectURL(res.data);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = 'commission-statement.pdf';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(url);
+                    } catch (error) {
+                      toast.error(error.response?.data?.message || 'Failed to download statement');
+                    }
+                  }}
+                  className="btn btn-sm btn-outline"
+                >
+                  Download Statement
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead>

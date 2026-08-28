@@ -456,6 +456,214 @@ router.get('/receipt-pdf/:paymentId',
   }
 );
 
+// Tenant + Landlord: downloadable PDF receipt (handles combined line items)
+router.get('/receipt-pdf/:paymentId',
+  authenticate,
+  async (req, res) => {
+    try {
+      const PDFDocument = require('pdfkit');
+      const {
+        loadReceiptContext,
+        buildReceiptData,
+      } = require('../config/utils/paymentReceipt');
+
+      const paymentId = Number.parseInt(req.params.paymentId, 10);
+      if (!Number.isInteger(paymentId) || paymentId <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid payment id' });
+      }
+
+      const ctx = await loadReceiptContext(paymentId);
+      if (!ctx) {
+        return res.status(404).json({ success: false, message: 'Payment not found' });
+      }
+      if (Number(ctx.payment.user_id) !== Number(req.user.id)) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+
+      const receipt = buildReceiptData(ctx);
+
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="receipt-${String(paymentId).padStart(6, '0')}.pdf"`
+      );
+      doc.pipe(res);
+
+      doc.fontSize(20).text('RentalHub NG', { align: 'center' });
+      doc.moveDown(0.2);
+      doc.fontSize(11).fillColor('#64748b').text('Official Payment Receipt', { align: 'center' });
+      doc.fontSize(11).fillColor('#0f172a').text(receipt.receiptNumber, { align: 'center' });
+      doc.moveDown();
+
+      doc.fontSize(10).fillColor('#334155');
+      doc.text(`Payer: ${receipt.fullName || receipt.email}`);
+      doc.text(`Date: ${receipt.date}`);
+      doc.text(`Reference: ${receipt.reference}`);
+      doc.text(`Status: ${receipt.status}`);
+      doc.text(`Method: ${receipt.method}`);
+      doc.moveDown();
+
+      const tableTop = doc.y;
+      doc.font('Helvetica-Bold');
+      doc.text('Item', 50, tableTop);
+      doc.text('Amount', 400, tableTop, { width: 150, align: 'right' });
+      doc.moveTo(50, tableTop + 16).lineTo(545, tableTop + 16).strokeColor('#e2e8f0').stroke();
+
+      let y = tableTop + 26;
+      doc.font('Helvetica');
+      receipt.items.forEach((item) => {
+        doc.fillColor('#334155').text(item.label, 50, y, { width: 330 });
+        doc.text(item.amount, 400, y, { width: 150, align: 'right' });
+        y += 22;
+      });
+
+      doc.moveTo(50, y).lineTo(545, y).strokeColor('#e2e8f0').stroke();
+      doc.moveDown();
+      doc.font('Helvetica-Bold');
+      doc.fillColor('#0f172a').text('Total Paid', 50, doc.y);
+      doc.text(receipt.total, 400, doc.y - 14, { width: 150, align: 'right' });
+      doc.moveDown(2);
+      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for using RentalHub NG.', { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      req.logger.error('Receipt PDF error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Failed to generate receipt PDF' });
+      }
+    }
+  }
+);
+
+// Admin/agent commission earnings statement as PDF
+router.get('/commission-statement.pdf',
+  authenticate,
+  async (req, res) => {
+    try {
+      const PDFDocument = require('pdfkit');
+      const { humanizePaymentType } = require('../config/utils/paymentReceipt');
+
+      const userId = req.user.id;
+      const role = String(req.user.user_type || '').toLowerCase();
+      const isAgent = ['agent', 'landlord_agent'].includes(role);
+      const isAdminEarner = [
+        'super_admin', 'admin', 'lga_admin', 'state_admin',
+        'financial_admin', 'lga_financial_admin', 'state_financial_admin',
+        'super_financial_admin',
+      ].includes(role);
+
+      let items = [];
+      let totals = { earned: 0, pending: 0, paid: 0 };
+
+      if (isAdminEarner) {
+        const result = await db.query(
+          `SELECT source, amount, commission_rate, status, created_at
+           FROM admin_commissions
+           WHERE admin_id = $1
+           ORDER BY created_at DESC
+           LIMIT 500`,
+          [userId]
+        );
+        items = result.rows.map((c) => ({
+          label: humanizePaymentType(c.source || 'commission'),
+          amount: Number(c.amount || 0),
+          status: c.status,
+          date: c.created_at,
+          meta: c.commission_rate != null ? `${(Number(c.commission_rate) * 100).toFixed(1)}%` : '',
+        }));
+      } else if (isAgent) {
+        const result = await db.query(
+          `SELECT source, amount, status, payment_status, created_at
+           FROM agent_commission_ledger
+           WHERE agent_user_id = $1
+           ORDER BY created_at DESC
+           LIMIT 500`,
+          [userId]
+        );
+        items = result.rows.map((c) => ({
+          label: humanizePaymentType(c.source || 'commission'),
+          amount: Number(c.amount || 0),
+          status: c.payment_status === 'paid' ? 'paid' : c.status,
+          date: c.created_at,
+          meta: '',
+        }));
+      }
+
+      if (!isAdminEarner && !isAgent) {
+        return res.status(403).json({ success: false, message: 'No commission statement available for this account' });
+      }
+
+      items.forEach((item) => {
+        if (item.status === 'paid') totals.paid += item.amount;
+        else if (item.status === 'pending' || item.status === 'earned' || item.status === 'verified' || item.status === 'unpaid') totals.pending += item.amount;
+        else totals.earned += item.amount;
+      });
+
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="commission-statement-${userId}.pdf"`);
+      doc.pipe(res);
+
+      doc.fontSize(20).text('RentalHub NG', { align: 'center' });
+      doc.moveDown(0.2);
+      doc.fontSize(11).fillColor('#64748b').text('Commission Earnings Statement', { align: 'center' });
+      doc.fontSize(10).fillColor('#0f172a').text(req.user.full_name || req.user.email, { align: 'center' });
+      doc.moveDown();
+
+      doc.fontSize(10).fillColor('#334155');
+      doc.text(`Generated: ${new Date().toLocaleString('en-NG')}`);
+      doc.text(`Role: ${role}`);
+      doc.moveDown();
+
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a');
+      doc.text(`Total Earned: ₦${totals.earned.toLocaleString()}`);
+      doc.text(`Total Pending: ₦${totals.pending.toLocaleString()}`);
+      doc.text(`Total Paid: ₦${totals.paid.toLocaleString()}`);
+      doc.moveDown();
+
+      const tableTop = doc.y;
+      doc.font('Helvetica-Bold');
+      doc.text('Source', 50, tableTop);
+      doc.text('Rate', 220, tableTop);
+      doc.text('Status', 320, tableTop);
+      doc.text('Date', 400, tableTop, { width: 145, align: 'right' });
+      doc.text('Amount', 430, tableTop, { width: 115, align: 'right' });
+      doc.moveTo(50, tableTop + 16).lineTo(545, tableTop + 16).strokeColor('#e2e8f0').stroke();
+
+      let y = tableTop + 26;
+      doc.font('Helvetica').fontSize(9);
+      items.forEach((item) => {
+        if (y > 720) {
+          doc.addPage();
+          y = 50;
+        }
+        doc.fillColor('#334155').text(item.label, 50, y, { width: 165 });
+        doc.text(item.meta || '', 220, y, { width: 90 });
+        doc.text(String(item.status || ''), 320, y, { width: 70 });
+        doc.text(new Date(item.date).toLocaleDateString('en-NG'), 400, y, { width: 25, align: 'right' });
+        doc.text(`₦${item.amount.toLocaleString()}`, 430, y, { width: 115, align: 'right' });
+        y += 18;
+      });
+
+      doc.moveTo(50, y).lineTo(545, y).strokeColor('#e2e8f0').stroke();
+      doc.moveDown();
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a');
+      doc.text('Statement Total', 50, doc.y);
+      doc.text(`₦${(totals.earned + totals.pending + totals.paid).toLocaleString()}`, 430, doc.y - 14, { width: 115, align: 'right' });
+      doc.moveDown(2);
+      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for using RentalHub NG.', { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      req.logger.error('Commission statement PDF error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Failed to generate commission statement' });
+      }
+    }
+  }
+);
+
 // Tenant: get wallet balance (approved refunds waiting to be withdrawn)
 router.get('/wallet/balance',
   authenticate,

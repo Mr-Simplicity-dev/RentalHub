@@ -27,7 +27,12 @@ const {
 } = require('../services/subscriptionCreditService');
 const commissionService = require('../services/commissionService');
 const AgentWithdrawalService = require('../services/agentWithdrawalService');
-const { sendReceiptForPayment } = require('../config/utils/paymentReceipt');
+const {
+  sendReceiptForPayment,
+  sendAdminPayoutReceipt,
+  sendAgentPayoutReceipt,
+  sendUserPayoutReceipt,
+} = require('../config/utils/paymentReceipt');
 const {
   ensureWalletLedgerSchema: ensureSharedWalletLedgerSchema,
   creditWallet,
@@ -3945,7 +3950,16 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
       else if (eventName === 'transfer.failed') status = 'failed';
       else if (eventName === 'transfer.reversed') status = 'reversed';
 
-      await AgentWithdrawalService.reconcilePaystackTransfer(reference, status, data);
+      const reconciled = await AgentWithdrawalService.reconcilePaystackTransfer(reference, status, data);
+
+      // Email the agent a payout receipt when the transfer succeeds
+      if (eventName === 'transfer.success' && reconciled) {
+        sendAgentPayoutReceipt({
+          agentUserId: reconciled.agent_user_id || reconciled.user_id,
+          amount: reconciled.amount,
+          reference,
+        }).catch(() => {});
+      }
       return;
     }
 
@@ -3969,6 +3983,16 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
            WHERE id = $2`,
           [JSON.stringify(data), withdrawal.id]
         );
+
+        // Email the tenant/landlord a payout receipt
+        sendUserPayoutReceipt({
+          userId: withdrawal.user_id,
+          amount: withdrawal.amount,
+          bankName: withdrawal.bank_name,
+          accountNumber: withdrawal.account_number,
+          accountName: withdrawal.account_name,
+          reference,
+        }).catch(() => {});
       } else if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
         if (withdrawal.status !== 'pending' && withdrawal.status !== 'rejected') {
           await db.query(
@@ -4019,6 +4043,16 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
            WHERE id = $2`,
           [JSON.stringify(data), withdrawal.id]
         );
+
+        // Email the admin a payout receipt with itemized commissions
+        sendAdminPayoutReceipt({
+          adminId: withdrawal.admin_id,
+          amount: withdrawal.amount,
+          bankName: withdrawal.bank_name,
+          accountNumber: withdrawal.account_number,
+          accountName: withdrawal.account_name,
+          reference,
+        }).catch(() => {});
       } else if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
         if (withdrawal.status !== 'pending' && withdrawal.status !== 'rejected') {
           await db.query(

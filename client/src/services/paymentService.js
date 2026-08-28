@@ -88,6 +88,14 @@ export const paymentService = {
     return response.data;
   },
 
+  // Download the user's commission earnings statement as PDF
+  downloadCommissionStatement: async () => {
+    const response = await api.get('/payments/commission-statement.pdf', {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
   // Get payment details
   getPaymentDetails: async (paymentId) => {
     const response = await api.get(`/payments/${paymentId}`);
