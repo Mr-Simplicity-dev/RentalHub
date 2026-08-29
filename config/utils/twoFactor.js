@@ -13,7 +13,7 @@
 
 const { authenticator } = require('otplib');
 const crypto = require('crypto');
-const redis = require('redis').createClient;
+const redis = require('./redis');
 const db = require('../middleware/database');
 const { encryptNIN, decryptNIN } = require('./ninEncryption');
 const { sendVerificationCode } = require('./smsService');
@@ -27,12 +27,12 @@ const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 authenticator.options = { window: 1 };
 
-let redisClient = null;
+let redisClient = redis; // ioredis wrapper (null when unavailable) — falls back to in-memory
 const memoryOtpStore = new Map();
 
 const otpStoreGet = async (key) => {
   try {
-    if (redisClient && redisClient.isReady) {
+    if (redisClient) {
       const value = await redisClient.get(key);
       return value ? JSON.parse(value) : null;
     }
@@ -44,8 +44,8 @@ const otpStoreGet = async (key) => {
 
 const otpStoreSet = async (key, value, ttlSeconds) => {
   try {
-    if (redisClient && redisClient.isReady) {
-      await redisClient.set(key, JSON.stringify(value), { EX: ttlSeconds });
+    if (redisClient) {
+      await redisClient.set(key, JSON.stringify(value), 'EX', ttlSeconds);
       return;
     }
   } catch (error) {
@@ -56,7 +56,7 @@ const otpStoreSet = async (key, value, ttlSeconds) => {
 
 const otpStoreDelete = async (key) => {
   try {
-    if (redisClient && redisClient.isReady) {
+    if (redisClient) {
       await redisClient.del(key);
       return;
     }
