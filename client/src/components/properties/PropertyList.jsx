@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import PropertyCard from './PropertyCard';
 import Loader from '../common/Loader';
 
@@ -10,6 +11,8 @@ const PropertyList = ({
   showApplyButton = false,
   applyLinkBuilder,
 }) => {
+  const { t } = useTranslation();
+
   if (loading) {
     return <Loader />;
   }
@@ -17,8 +20,8 @@ const PropertyList = ({
   if (!properties || properties.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600 text-lg">No properties found</p>
-        <p className="text-gray-500 text-sm mt-2">Try adjusting your search filters</p>
+        <p className="text-gray-600 text-lg">{t('property_list.empty', 'No properties found')}</p>
+        <p className="text-gray-500 text-sm mt-2">{t('property_list.empty_hint', 'Try adjusting your search filters')}</p>
       </div>
     );
   }

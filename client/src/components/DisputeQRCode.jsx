@@ -1,14 +1,16 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { QRCodeCanvas } from "qrcode.react";
 
 export default function DisputeQRCode({ disputeId }) {
+  const { t } = useTranslation();
 
   const verifyUrl = `${window.location.origin}/verify-case?dispute=${disputeId}`;
 
   return (
     <div style={{ textAlign: "center", marginTop: 20 }}>
 
-      <h3>Evidence Verification QR</h3>
+      <h3>{t('dispute_qr.title', 'Evidence Verification QR')}</h3>
 
       <QRCodeCanvas
         value={verifyUrl}
@@ -18,7 +20,7 @@ export default function DisputeQRCode({ disputeId }) {
       />
 
       <p style={{ marginTop: 10 }}>
-        Scan to verify evidence authenticity
+        {t('dispute_qr.scan_hint', 'Scan to verify evidence authenticity')}
       </p>
 
       <small>{verifyUrl}</small>

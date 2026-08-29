@@ -2,23 +2,24 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FaCamera, FaImages, FaRedo, FaTimes, FaTrash } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { propertyService } from '../../services/propertyService';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULT_MAX_PHOTOS = 20;
 
-const getCameraErrorMessage = (error) => {
+const getCameraErrorMessage = (error, t) => {
   if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
-    return 'Camera permission was denied. Allow camera access and try again.';
+    return t('live_property_capture.camera_permission_denied', 'Camera permission was denied. Allow camera access and try again.');
   }
 
   if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
-    return 'No camera was found on this device.';
+    return t('live_property_capture.no_camera_found', 'No camera was found on this device.');
   }
 
   if (error?.name === 'NotReadableError' || error?.name === 'TrackStartError') {
-    return 'Camera is already in use by another app.';
+    return t('live_property_capture.camera_in_use', 'Camera is already in use by another app.');
   }
 
-  return 'Unable to open camera. Use HTTPS or localhost and try again.';
+  return t('live_property_capture.unable_to_open_camera', 'Unable to open camera. Use HTTPS or localhost and try again.');
 };
 
 const buildCameraConstraints = (facingMode) => ({
@@ -38,6 +39,7 @@ const LivePropertyPhotoCapture = ({
   maxPhotos = DEFAULT_MAX_PHOTOS,
   disabled = false,
 }) => {
+  const { t } = useTranslation();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -98,7 +100,7 @@ const LivePropertyPhotoCapture = ({
       if (disabled) return;
 
       if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError('Camera is not supported on this browser.');
+        setCameraError(t('live_property_capture.camera_not_supported', 'Camera is not supported on this browser.'));
         return;
       }
 
@@ -119,7 +121,7 @@ const LivePropertyPhotoCapture = ({
         await attachStream(stream);
       } catch (error) {
         console.error('Property camera failed:', error);
-        setCameraError(getCameraErrorMessage(error));
+        setCameraError(getCameraErrorMessage(error, t));
       } finally {
         setCameraLoading(false);
       }
@@ -136,12 +138,12 @@ const LivePropertyPhotoCapture = ({
     const video = videoRef.current;
 
     if (!video || video.readyState < 2) {
-      toast.error('Camera is not ready yet.');
+      toast.error(t('live_property_capture.camera_not_ready', 'Camera is not ready yet.'));
       return;
     }
 
     if (photos.length >= maxPhotos) {
-      toast.error(`You can capture up to ${maxPhotos} property photos.`);
+      toast.error(t('live_property_capture.max_photos_reached', 'You can capture up to {{maxPhotos}} property photos.', { maxPhotos }));
       return;
     }
 
@@ -161,7 +163,7 @@ const LivePropertyPhotoCapture = ({
     canvas.toBlob(
       async (blob) => {
         if (!blob) {
-          toast.error('Could not capture photo. Please try again.');
+          toast.error(t('live_property_capture.capture_failed', 'Could not capture photo. Please try again.'));
           return;
         }
 
@@ -172,7 +174,7 @@ const LivePropertyPhotoCapture = ({
           const token = session?.data?.token;
 
           if (!session?.success || !token) {
-            toast.error('Could not verify live capture. Please retake the photo.');
+            toast.error(t('live_property_capture.verify_failed_retake', 'Could not verify live capture. Please retake the photo.'));
             return;
           }
 
@@ -188,7 +190,7 @@ const LivePropertyPhotoCapture = ({
           onTokensChange?.(nextTokens);
         } catch (error) {
           console.error('Property capture session failed:', error);
-          toast.error(error?.response?.data?.message || 'Could not verify live capture. Please try again.');
+          toast.error(error?.response?.data?.message || t('live_property_capture.verify_failed_try_again', 'Could not verify live capture. Please try again.'));
         } finally {
           setCaptureLoading(false);
         }
@@ -220,8 +222,8 @@ const LivePropertyPhotoCapture = ({
     <section className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <label className="block text-sm font-semibold text-gray-900">Property Images</label>
-          <p className="mt-1 text-xs text-gray-500">{photos.length}/{maxPhotos} live photos captured</p>
+          <label className="block text-sm font-semibold text-gray-900">{t('live_property_capture.property_images', 'Property Images')}</label>
+          <p className="mt-1 text-xs text-gray-500">{t('live_property_capture.live_photos_captured', '{{count}}/{{max}} live photos captured', { count: photos.length, max: maxPhotos })}</p>
         </div>
 
         <button
@@ -231,7 +233,7 @@ const LivePropertyPhotoCapture = ({
           className="btn btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <FaCamera className="text-sm" />
-          {cameraLoading ? 'Opening camera...' : cameraOpen ? 'Camera ready' : 'Open camera'}
+          {cameraLoading ? t('live_property_capture.opening_camera', 'Opening camera...') : cameraOpen ? t('live_property_capture.camera_ready', 'Camera ready') : t('live_property_capture.open_camera', 'Open camera')}
         </button>
       </div>
 
@@ -261,7 +263,7 @@ const LivePropertyPhotoCapture = ({
               className="btn btn-secondary inline-flex items-center justify-center gap-2 text-sm"
             >
               <FaRedo className="text-xs" />
-              Switch
+              {t('live_property_capture.switch', 'Switch')}
             </button>
             <button
               type="button"
@@ -270,7 +272,7 @@ const LivePropertyPhotoCapture = ({
               className="btn btn-primary inline-flex items-center justify-center gap-2 text-sm disabled:opacity-50"
             >
               <FaCamera className="text-xs" />
-              {captureLoading ? 'Saving...' : 'Capture'}
+              {captureLoading ? t('live_property_capture.saving', 'Saving...') : t('live_property_capture.capture', 'Capture')}
             </button>
             <button
               type="button"
@@ -278,7 +280,7 @@ const LivePropertyPhotoCapture = ({
               className="btn inline-flex items-center justify-center gap-2 text-sm"
             >
               <FaTimes className="text-xs" />
-              Close
+              {t('live_property_capture.close', 'Close')}
             </button>
           </div>
         </div>
@@ -291,14 +293,14 @@ const LivePropertyPhotoCapture = ({
               <div key={preview.key} className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
                 <img
                   src={preview.url}
-                  alt={`Captured property ${index + 1}`}
+                  alt={t('live_property_capture.captured_property_alt', 'Captured property {{number}}', { number: index + 1 })}
                   className="h-full w-full object-cover"
                 />
                 <button
                   type="button"
                   onClick={() => removePhoto(index)}
                   className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white opacity-100 transition hover:bg-red-600 sm:opacity-0 sm:group-hover:opacity-100"
-                  aria-label={`Remove property photo ${index + 1}`}
+                  aria-label={t('live_property_capture.remove_property_photo', 'Remove property photo {{number}}', { number: index + 1 })}
                 >
                   <FaTrash className="text-sm" />
                 </button>
@@ -312,13 +314,13 @@ const LivePropertyPhotoCapture = ({
             className="inline-flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700"
           >
             <FaTrash className="text-xs" />
-            Clear captured photos
+            {t('live_property_capture.clear_captured_photos', 'Clear captured photos')}
           </button>
         </div>
       ) : (
         <div className="flex min-h-32 flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
           <FaImages className="mb-2 text-2xl text-gray-400" />
-          No property photo captured yet.
+          {t('live_property_capture.no_property_photo_captured', 'No property photo captured yet.')}
         </div>
       )}
     </section>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { handleButtonError } from '../../utils/errorHandler';
 
 const Button = ({ 
@@ -14,6 +15,7 @@ const Button = ({
   errorContext = '',
   ...props 
 }) => {
+  const { t } = useTranslation();
   const baseClasses = 'font-medium rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variants = {
@@ -44,7 +46,7 @@ const Button = ({
       return handleButtonError(error, errorContext);
     }
     
-    return 'An error occurred';
+    return t('button.generic_error', 'An error occurred');
   };
 
   const errorText = getErrorText();

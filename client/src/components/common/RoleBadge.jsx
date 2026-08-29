@@ -1,4 +1,5 @@
-import React from 'react';
+﻿import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { getRoleLabel } from '../../config/roleHierarchy';
 
 const DEFAULT_MAP = {
@@ -105,9 +106,10 @@ const DEFAULT_MAP = {
 };
 
 export default function RoleBadge({ role, className = '', compact = false }) {
+  const { t } = useTranslation();
   const key = String(role || '').trim().toLowerCase();
   const config = DEFAULT_MAP[key] || {
-    label: getRoleLabel(key).toUpperCase(),
+    label: t('role_badge.fallback', '{{role}}', { role: getRoleLabel(key).toUpperCase() }),
     className: 'bg-gray-100 text-gray-700 border-gray-200',
   };
 
@@ -120,3 +122,4 @@ export default function RoleBadge({ role, className = '', compact = false }) {
     </span>
   );
 }
+

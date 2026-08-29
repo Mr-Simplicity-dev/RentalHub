@@ -4289,5 +4289,188 @@
     "typing": "{{user}} is typing...",
     "internal_admin_notes": "Internal Admin Notes",
     "reply_placeholder": "Type your reply..."
+  },
+  "map_picker": {
+    "load_error": "Failed to load Google Maps.",
+    "loading": "Loading map…",
+    "hint": "Click on the map to set the property location."
+  },
+  "dispute_qr": {
+    "title": "Evidence Verification QR",
+    "scan_hint": "Scan to verify evidence authenticity"
+  },
+  "dispute_creation": {
+    "title_required": "Dispute title is required",
+    "description_required": "Dispute description is required",
+    "party_required": "Please select who you are disputing against",
+    "created": "Dispute created successfully!",
+    "create_failed": "Failed to create dispute",
+    "title": "Create New Dispute",
+    "property": "Property:",
+    "visibility_note": "This dispute will be visible to authorized lawyers and the other party.",
+    "title_label": "Dispute Title *",
+    "title_placeholder": "e.g., Rent Payment Dispute",
+    "description_label": "Description *",
+    "description_placeholder": "Describe the issue in detail...",
+    "against_label": "Dispute Against *",
+    "select_user": "Select user...",
+    "priority": "Priority",
+    "priority_low": "Low",
+    "priority_normal": "Normal",
+    "priority_high": "High",
+    "priority_urgent": "Urgent",
+    "creating": "Creating...",
+    "create": "Create Dispute",
+    "cancel": "Cancel"
+  },
+  "property_list": {
+    "empty": "No properties found",
+    "empty_hint": "Try adjusting your search filters"
+  },
+  "property_share": {
+    "fallback_title": "Property listing",
+    "text": "Check out this property on RentalHub NG: {{title}}",
+    "header": "Share Listing",
+    "copy_success": "Property link copied",
+    "copy_error": "Unable to copy property link right now",
+    "share_error": "Unable to open the share sheet right now"
+  },
+  "modal": {
+    "close": "Close"
+  },
+  "error_boundary": {
+    "title": "Something went wrong",
+    "body": "An unexpected error occurred. Please try refreshing the page.",
+    "refresh": "Refresh Page"
+  },
+  "back_to_dashboard": {
+    "label": "Back to Dashboard"
+  },
+  "button": {
+    "generic_error": "An error occurred"
+  },
+  "role_badge": {
+    "fallback": "{{role}}"
+  },
+  "booking_cancel": {
+    "title": "Cancel Booking",
+    "message": "Please tell us why you are cancelling this booking.",
+    "reason_required": "Cancellation reason is required.",
+    "reason_label": "Cancellation Reason",
+    "reason_placeholder": "Explain why you need to cancel...",
+    "keep": "Keep Booking",
+    "cancelling": "Cancelling...",
+    "cancel": "Cancel Booking"
+  },
+  "appeal": {
+    "reason_required": "Please provide a reason for your appeal",
+    "submitted": "Appeal submitted. A state admin will review your case.",
+    "submit_failed": "Failed to submit appeal",
+    "title_property": "Appeal Property Rejection",
+    "title_verification": "Appeal Verification Rejection",
+    "desc_property": "If you believe your property was incorrectly rejected, explain why it should be reinstated.",
+    "desc_verification": "If you believe your identity verification was incorrectly rejected, explain why it should be reinstated.",
+    "reason_label": "Reason for Appeal *",
+    "reason_placeholder": "Explain why the decision was incorrect...",
+    "additional_label": "Additional Information (optional)",
+    "additional_placeholder": "Any supporting details or context...",
+    "cancel": "Cancel",
+    "submitting": "Submitting...",
+    "submit": "Submit Appeal"
+  },
+  "live_property_capture": {
+    "camera_permission_denied": "Camera permission was denied. Please allow camera access and try again.",
+    "no_camera_found": "No camera found on this device.",
+    "camera_in_use": "Camera is already in use by another application.",
+    "unable_to_open_camera": "Unable to open the camera. Please try again.",
+    "camera_not_supported": "Camera is not supported on this device or browser.",
+    "camera_not_ready": "Camera is not ready yet. Please wait.",
+    "max_photos_reached": "Maximum of {{maxPhotos}} photos reached. Remove one to capture another.",
+    "capture_failed": "Could not capture the photo. Please try again.",
+    "verify_failed_retake": "Photo verification failed. Please retake the photo.",
+    "verify_failed_try_again": "Photo verification failed. Please try again.",
+    "property_images": "Property Images",
+    "live_photos_captured": "{{count}}/{{max}} live photos captured",
+    "opening_camera": "Opening camera...",
+    "camera_ready": "Camera ready",
+    "open_camera": "Open Camera",
+    "switch": "Switch",
+    "saving": "Saving...",
+    "capture": "Capture",
+    "close": "Close",
+    "captured_property_alt": "Captured property photo {{number}}",
+    "remove_property_photo": "Remove photo {{number}}",
+    "clear_captured_photos": "Clear captured photos",
+    "no_property_photo_captured": "No property photo captured yet"
+  },
+  "live_passport_capture": {
+    "could_not_access_camera": "Could not access the camera. Please allow camera permissions and try again.",
+    "passport_uploaded": "Passport uploaded successfully",
+    "upload_failed": "Upload failed. Please try again.",
+    "title": "Live Passport Capture",
+    "instructions": "Position your passport inside the frame and capture a clear photo.",
+    "starting_camera": "Starting camera...",
+    "open_camera": "Open Camera",
+    "captured_alt": "Captured passport photo",
+    "liveness_passed": "Liveness check passed",
+    "retake": "Retake",
+    "uploading": "Uploading...",
+    "upload_photo": "Upload Photo",
+    "complete_liveness_checks": "Complete the liveness checks to continue",
+    "liveness_passed_capturing": "Liveness passed. Capturing photo...",
+    "close_camera": "Close Camera"
+  },
+  "audio_call": {
+    "requesting_microphone": "Requesting microphone access...",
+    "requesting_camera": "Requesting camera access...",
+    "connecting": "Connecting...",
+    "connected": "Connected",
+    "reconnecting": "Reconnecting...",
+    "failed": "Call failed",
+    "participant": "Participant",
+    "receiver": "Receiver",
+    "caller": "Caller",
+    "virtual_tour": "Virtual tour",
+    "video": "Video",
+    "audio": "Audio",
+    "waiting_for_video": "Waiting for video...",
+    "screen": "Screen",
+    "camera_off": "Camera off",
+    "call_with": "Call with",
+    "preparing_call": "Preparing call...",
+    "property": "Property",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "camera_off_button": "Turn camera off",
+    "camera_on_button": "Turn camera on",
+    "stop_share": "Stop sharing",
+    "share_screen": "Share screen",
+    "end_call": "End Call"
+  },
+  "call_notification": {
+    "call": "Call",
+    "virtual_tour_request": "Virtual tour request",
+    "video_call": "Video call",
+    "audio_call": "Audio call",
+    "incoming": "Incoming",
+    "accepted": "Call accepted",
+    "requesting_virtual_tour": "Requesting a virtual tour...",
+    "calling": "Calling...",
+    "receiver": "Receiver",
+    "requesting_property_tour": "is requesting a property tour",
+    "wants_to_connect": "wants to connect with you",
+    "a_user": "A user",
+    "accepted_notice": "has accepted your call",
+    "waiting_for_receiver": "Waiting for the receiver to answer...",
+    "property": "Property",
+    "accept": "Accept",
+    "reject": "Reject",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "online_status": {
+    "online": "Online",
+    "offline": "Offline",
+    "realtime_offline": "Real-time connection lost"
   }
 }

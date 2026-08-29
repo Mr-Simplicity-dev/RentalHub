@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 
 const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, currentUserId }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState({
@@ -32,17 +34,17 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
     e.preventDefault();
     
     if (!formData.title.trim()) {
-      toast.error('Dispute title is required');
+      toast.error(t('dispute_creation.title_required', 'Dispute title is required'));
       return;
     }
     
     if (!formData.description.trim()) {
-      toast.error('Dispute description is required');
+      toast.error(t('dispute_creation.description_required', 'Dispute description is required'));
       return;
     }
     
     if (!formData.against_user) {
-      toast.error('Please select who you are disputing against');
+      toast.error(t('dispute_creation.party_required', 'Please select who you are disputing against'));
       return;
     }
 
@@ -57,7 +59,7 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
       });
 
       if (res.data.success) {
-        toast.success('Dispute created successfully!');
+        toast.success(t('dispute_creation.created', 'Dispute created successfully!'));
         onClose();
         // Reset form
         setFormData({
@@ -71,7 +73,7 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
         window.location.href = `/dispute/${res.data.data.id}`;
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create dispute');
+      toast.error(err.response?.data?.message || t('dispute_creation.create_failed', 'Failed to create dispute'));
     } finally {
       setLoading(false);
     }
@@ -83,7 +85,7 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Create New Dispute</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t('dispute_creation.title', 'Create New Dispute')}</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
@@ -96,23 +98,23 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
 
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
           <p className="text-sm text-blue-800">
-            <strong>Property:</strong> {propertyTitle}
+            <strong>{t('dispute_creation.property', 'Property:')}</strong> {propertyTitle}
           </p>
           <p className="text-xs text-blue-700 mt-1">
-            This dispute will be visible to authorized lawyers and the other party.
+            {t('dispute_creation.visibility_note', 'This dispute will be visible to authorized lawyers and the other party.')}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Dispute Title *
+              {t('dispute_creation.title_label', 'Dispute Title *')}
             </label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) => setFormData({...formData, title: e.target.value})}
-              placeholder="e.g., Rent Payment Dispute"
+              placeholder={t('dispute_creation.title_placeholder', 'e.g., Rent Payment Dispute')}
               className="input w-full"
               required
             />
@@ -120,12 +122,12 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description *
+              {t('dispute_creation.description_label', 'Description *')}
             </label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
-              placeholder="Describe the issue in detail..."
+              placeholder={t('dispute_creation.description_placeholder', 'Describe the issue in detail...')}
               rows="4"
               className="input w-full"
               required
@@ -134,7 +136,7 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Dispute Against *
+              {t('dispute_creation.against_label', 'Dispute Against *')}
             </label>
             <select
               value={formData.against_user}
@@ -142,7 +144,7 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
               className="input w-full"
               required
             >
-              <option value="">Select user...</option>
+              <option value="">{t('dispute_creation.select_user', 'Select user...')}</option>
               {users
                 .filter(user => user.id !== currentUserId)
                 .map(user => (
@@ -155,17 +157,17 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Priority
+              {t('dispute_creation.priority', 'Priority')}
             </label>
             <select
               value={formData.priority}
               onChange={(e) => setFormData({...formData, priority: e.target.value})}
               className="input w-full"
             >
-              <option value="low">Low</option>
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              <option value="low">{t('dispute_creation.priority_low', 'Low')}</option>
+              <option value="normal">{t('dispute_creation.priority_normal', 'Normal')}</option>
+              <option value="high">{t('dispute_creation.priority_high', 'High')}</option>
+              <option value="urgent">{t('dispute_creation.priority_urgent', 'Urgent')}</option>
             </select>
           </div>
 
@@ -175,14 +177,14 @@ const DisputeCreationModal = ({ isOpen, onClose, propertyId, propertyTitle, curr
               disabled={loading}
               className="btn btn-primary flex-1"
             >
-              {loading ? 'Creating...' : 'Create Dispute'}
+              {loading ? t('dispute_creation.creating', 'Creating...') : t('dispute_creation.create', 'Create Dispute')}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="btn btn-secondary"
             >
-              Cancel
+              {t('dispute_creation.cancel', 'Cancel')}
             </button>
           </div>
         </form>

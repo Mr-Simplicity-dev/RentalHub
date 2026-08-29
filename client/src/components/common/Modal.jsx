@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaTimes } from 'react-icons/fa';
 
 const Modal = ({ isOpen, onClose, title, children, size = 'medium' }) => {
+  const { t } = useTranslation();
   // Close on Escape key
   useEffect(() => {
     const handleEsc = (e) => {
@@ -36,6 +38,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'medium' }) => {
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
             <button
               onClick={onClose}
+              aria-label={t('modal.close', 'Close')}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200"
             >
               <FaTimes className="text-lg" />

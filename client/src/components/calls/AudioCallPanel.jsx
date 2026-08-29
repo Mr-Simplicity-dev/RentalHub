@@ -7,28 +7,7 @@ import {
   FaVideo,
   FaVideoSlash,
 } from 'react-icons/fa';
-
-const statusText = {
-  requesting_microphone: 'Requesting microphone access',
-  requesting_camera: 'Requesting camera and microphone access',
-  connecting: 'Connecting call',
-  connected: 'Call connected',
-  reconnecting: 'Reconnecting call',
-  failed: 'Call connection failed',
-};
-
-const otherPartyName = (call, currentUserId) => {
-  if (!call) return 'Participant';
-  return Number(call.caller?.id) === Number(currentUserId)
-    ? call.receiver?.full_name || 'Receiver'
-    : call.caller?.full_name || 'Caller';
-};
-
-const getCallLabel = (call) => {
-  if (call?.callType === 'virtual_tour') return 'Virtual tour';
-  if (call?.callType === 'video') return 'Video';
-  return 'Audio';
-};
+import { useTranslation } from 'react-i18next';
 
 const AudioCallPanel = ({
   call,
@@ -45,9 +24,32 @@ const AudioCallPanel = ({
   onToggleScreenShare,
   onEnd,
 }) => {
+  const { t } = useTranslation();
   const audioRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localVideoRef = useRef(null);
+
+  const statusText = {
+    requesting_microphone: t('audio_call.requesting_microphone', 'Requesting microphone access'),
+    requesting_camera: t('audio_call.requesting_camera', 'Requesting camera and microphone access'),
+    connecting: t('audio_call.connecting', 'Connecting call'),
+    connected: t('audio_call.connected', 'Call connected'),
+    reconnecting: t('audio_call.reconnecting', 'Reconnecting call'),
+    failed: t('audio_call.failed', 'Call connection failed'),
+  };
+
+  const otherPartyName = (call, currentUserId) => {
+    if (!call) return t('audio_call.participant', 'Participant');
+    return Number(call.caller?.id) === Number(currentUserId)
+      ? call.receiver?.full_name || t('audio_call.receiver', 'Receiver')
+      : call.caller?.full_name || t('audio_call.caller', 'Caller');
+  };
+
+  const getCallLabel = (call) => {
+    if (call?.callType === 'virtual_tour') return t('audio_call.virtual_tour', 'Virtual tour');
+    if (call?.callType === 'video') return t('audio_call.video', 'Video');
+    return t('audio_call.audio', 'Audio');
+  };
 
   const isVideoCall = ['video', 'virtual_tour'].includes(call?.callType);
   const mediaLabel = getCallLabel(call);
@@ -86,7 +88,8 @@ const AudioCallPanel = ({
           />
 
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-white/70">
-            {!remoteStream?.getVideoTracks?.().length && 'Waiting for video'}
+            {!remoteStream?.getVideoTracks?.().length &&
+              t('audio_call.waiting_for_video', 'Waiting for video')}
           </div>
 
           <div className="absolute bottom-2 right-2 h-20 w-28 overflow-hidden rounded-lg border border-white/30 bg-gray-900 shadow-lg sm:bottom-3 sm:right-3 sm:h-28 sm:w-40 sm:rounded-xl">
@@ -99,12 +102,12 @@ const AudioCallPanel = ({
             />
             {screenSharing && (
               <div className="absolute left-1 top-1 rounded bg-black/60 px-2 py-1 text-[10px] font-semibold text-white">
-                Screen
+                {t('audio_call.screen', 'Screen')}
               </div>
             )}
             {!cameraEnabled && !screenSharing && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-xs font-semibold text-white">
-                Camera off
+                {t('audio_call.camera_off', 'Camera off')}
               </div>
             )}
           </div>
@@ -118,15 +121,21 @@ const AudioCallPanel = ({
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-gray-900">
-            {mediaLabel} call with {otherPartyName(call, currentUserId)}
+            {t('audio_call.call_with', '{{label}} call with {{name}}', {
+              label: mediaLabel,
+              name: otherPartyName(call, currentUserId),
+            })}
           </p>
           <p className="mt-1 text-sm text-gray-600">
-            {statusText[status] || `Preparing ${mediaLabel.toLowerCase()} call`}
+            {statusText[status] ||
+              t('audio_call.preparing_call', 'Preparing {{label}} call', {
+                label: mediaLabel.toLowerCase(),
+              })}
           </p>
 
           {call.propertyTitle && (
             <p className="mt-2 truncate rounded-lg bg-gray-50 px-2 py-1 text-xs text-gray-600">
-              Property: {call.propertyTitle}
+              {t('audio_call.property', 'Property: {{title}}', { title: call.propertyTitle })}
             </p>
           )}
 
@@ -145,7 +154,9 @@ const AudioCallPanel = ({
               ) : (
                 <FaMicrophoneSlash className="text-xs" />
               )}
-              {microphoneEnabled ? 'Mute' : 'Unmute'}
+              {microphoneEnabled
+                ? t('audio_call.mute', 'Mute')
+                : t('audio_call.unmute', 'Unmute')}
             </button>
 
             {isVideoCall && (
@@ -163,7 +174,9 @@ const AudioCallPanel = ({
                 ) : (
                   <FaVideoSlash className="text-xs" />
                 )}
-                {cameraEnabled ? 'Camera off' : 'Camera on'}
+                {cameraEnabled
+                  ? t('audio_call.camera_off_button', 'Camera off')
+                  : t('audio_call.camera_on_button', 'Camera on')}
               </button>
             )}
 
@@ -179,7 +192,9 @@ const AudioCallPanel = ({
                 } disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 <FaDesktop className="text-xs" />
-                {screenSharing ? 'Stop share' : 'Share screen'}
+                {screenSharing
+                  ? t('audio_call.stop_share', 'Stop share')
+                  : t('audio_call.share_screen', 'Share screen')}
               </button>
             )}
 
@@ -189,7 +204,7 @@ const AudioCallPanel = ({
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-700 sm:w-auto"
             >
               <FaPhoneSlash className="text-xs" />
-              End call
+              {t('audio_call.end_call', 'End call')}
             </button>
           </div>
         </div>

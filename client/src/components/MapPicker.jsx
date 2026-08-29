@@ -1,4 +1,5 @@
 import React, { useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GoogleMap, Marker, useLoadScript } from '@react-google-maps/api';
 
 const containerStyle = {
@@ -12,6 +13,7 @@ const defaultCenter = {
 };
 
 const MapPicker = ({ value, onChange }) => {
+  const { t } = useTranslation();
   const mapRef = useRef(null);
 
   const { isLoaded, loadError } = useLoadScript({
@@ -32,13 +34,13 @@ const MapPicker = ({ value, onChange }) => {
   if (loadError) {
     return (
       <div className="text-sm text-red-500">
-        Failed to load Google Maps.
+        {t('map_picker.load_error', 'Failed to load Google Maps.')}
       </div>
     );
   }
 
   if (!isLoaded) {
-    return <div className="text-sm text-gray-500">Loading map…</div>;
+    return <div className="text-sm text-gray-500">{t('map_picker.loading', 'Loading map…')}</div>;
   }
 
   return (
@@ -54,7 +56,7 @@ const MapPicker = ({ value, onChange }) => {
       </GoogleMap>
 
       <div className="p-2 text-xs text-gray-600">
-        Click on the map to set the property location.
+        {t('map_picker.hint', 'Click on the map to set the property location.')}
       </div>
     </div>
   );

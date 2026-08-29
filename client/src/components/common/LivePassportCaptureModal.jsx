@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FaTimes, FaCheckCircle, FaRedo } from 'react-icons/fa';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULT_LIVENESS = {
   faceDetected: false, centered: false, blink: false, mouthOpen: false,
@@ -39,7 +40,8 @@ const loadExternalScript = (src) => {
   });
 };
 
-const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport Capture' }) => {
+const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
+  const { t } = useTranslation();
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -189,7 +191,7 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
         }
       } catch {}
     } catch (err) {
-      setCameraError(err.message || 'Could not access camera');
+      setCameraError(err.message || t('live_passport_capture.could_not_access_camera', 'Could not access camera'));
       setCameraLoading(false);
     }
   }, [stopResources, handleFaceResults]);
@@ -219,11 +221,11 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
       formData.append('capture_source', 'live_camera');
       if (liveCaptureToken) formData.append('live_capture_token', liveCaptureToken);
       await api.post('/users/upload-passport', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success('Passport photo uploaded successfully');
+      toast.success(t('live_passport_capture.passport_uploaded', 'Passport photo uploaded successfully'));
       onCapture?.();
       onClose?.();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Upload failed');
+      toast.error(err.response?.data?.message || t('live_passport_capture.upload_failed', 'Upload failed'));
     } finally {
       setUploadingPhoto(false);
     }
@@ -235,31 +237,31 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
     <div className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-zinc-950 p-4 text-white shadow-2xl">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-bold">{title}</h3>
+          <h3 className="text-lg font-bold">{title || t('live_passport_capture.title', 'Live Passport Capture')}</h3>
           <button onClick={onClose} className="rounded-full p-1 text-zinc-400 hover:text-white hover:bg-zinc-800"><FaTimes /></button>
         </div>
 
         {!cameraActive && !captured && (
           <div className="text-center py-8 space-y-4">
-            <p className="text-sm text-zinc-400">Position your face clearly in a well-lit area. Follow the on-screen steps to prove liveness.</p>
+            <p className="text-sm text-zinc-400">{t('live_passport_capture.instructions', 'Position your face clearly in a well-lit area. Follow the on-screen steps to prove liveness.')}</p>
             {cameraError && <p className="text-sm text-red-400">{cameraError}</p>}
             <button onClick={startCamera} disabled={cameraLoading}
               className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 font-semibold text-white hover:bg-green-700 transition disabled:opacity-60">
-              {cameraLoading ? 'Starting camera...' : 'Open Camera'}
+              {cameraLoading ? t('live_passport_capture.starting_camera', 'Starting camera...') : t('live_passport_capture.open_camera', 'Open Camera')}
             </button>
           </div>
         )}
 
         {captured && !cameraActive && (
           <div className="text-center py-4 space-y-4">
-            <img src={capturedImage} alt="Captured" className="mx-auto max-h-60 rounded-lg border-2 border-green-500" />
-            <p className="text-sm text-green-400 font-medium">Liveness checks passed. Tap upload to proceed.</p>
+            <img src={capturedImage} alt={t('live_passport_capture.captured_alt', 'Captured')} className="mx-auto max-h-60 rounded-lg border-2 border-green-500" />
+            <p className="text-sm text-green-400 font-medium">{t('live_passport_capture.liveness_passed', 'Liveness checks passed. Tap upload to proceed.')}</p>
             <div className="flex justify-center gap-3">
               <button onClick={startCamera} disabled={cameraLoading} className="inline-flex items-center gap-1 rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-600 transition">
-                <FaRedo /> Retake
+                <FaRedo /> {t('live_passport_capture.retake', 'Retake')}
               </button>
               <button onClick={handleUpload} disabled={uploadingPhoto} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition disabled:opacity-60">
-                {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                {uploadingPhoto ? t('live_passport_capture.uploading', 'Uploading...') : t('live_passport_capture.upload_photo', 'Upload Photo')}
               </button>
             </div>
           </div>
@@ -283,10 +285,10 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title = 'Live Passport C
                 </div>
               ))}
             </div>
-            {!canCaptureLive && <p className="mt-3 text-center text-sm text-amber-400">Complete all liveness checks. The photo will capture automatically.</p>}
-            {canCaptureLive && !captured && <p className="mt-3 text-center text-sm text-green-400 font-medium">Liveness checks passed. Capturing now...</p>}
+            {!canCaptureLive && <p className="mt-3 text-center text-sm text-amber-400">{t('live_passport_capture.complete_liveness_checks', 'Complete all liveness checks. The photo will capture automatically.')}</p>}
+            {canCaptureLive && !captured && <p className="mt-3 text-center text-sm text-green-400 font-medium">{t('live_passport_capture.liveness_passed_capturing', 'Liveness checks passed. Capturing now...')}</p>}
             {livenessError && <p className="mt-2 text-center text-sm text-red-400">{livenessError}</p>}
-            <button onClick={stopResources} className="mt-3 w-full rounded-lg bg-zinc-800 py-2 text-sm text-zinc-400 hover:bg-zinc-700 transition">Close Camera</button>
+            <button onClick={stopResources} className="mt-3 w-full rounded-lg bg-zinc-800 py-2 text-sm text-zinc-400 hover:bg-zinc-700 transition">{t('live_passport_capture.close_camera', 'Close Camera')}</button>
           </div>
         )}
       </div>
