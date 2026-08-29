@@ -1860,6 +1860,10 @@ exports.requestWithdrawal = async (req, res) => {
   try {
     await ensureRefundSchema();
 
+    // 2FA gate: TOTP (if enrolled) or SMS OTP before a withdrawal is created.
+    const { runWithdrawalFactorCheck } = require('../config/utils/twoFactor');
+    if (!(await runWithdrawalFactorCheck(req, res))) return;
+
     const userId = req.user.id;
     const { amount, bank_name, bank_code, account_number, account_name } = req.body;
 
@@ -2081,6 +2085,10 @@ exports.approveWalletWithdrawal = async (req, res) => {
     if (!WALLET_WITHDRAWAL_ADMIN_ROLES.includes(req.user.user_type)) {
       return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
+
+    // 2FA gate for the approving admin.
+    const { runWithdrawalFactorCheck } = require('../config/utils/twoFactor');
+    if (!(await runWithdrawalFactorCheck(req, res))) return;
 
     const { withdrawalId } = req.params;
 

@@ -3,6 +3,7 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import api from "../../services/api";
 import InputDialog from "../common/InputDialog";
+import TwoFactorStep from "../common/TwoFactorStep";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-NG", {
@@ -81,6 +82,7 @@ export default function CommissionWithdrawalBanner({
     total_earned: 0,
   });
   const [isWithdrawableVisible, setIsWithdrawableVisible] = useState(false);
+  const [withdrawTwoFactor, setWithdrawTwoFactor] = useState(null);
   const [commissionPasswordStatus, setCommissionPasswordStatus] = useState({
     has_commission_password: false,
     loading: true,
@@ -487,16 +489,53 @@ export default function CommissionWithdrawalBanner({
       resetPersonalWithdrawalForm();
       await loadWithdrawableSnapshot();
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || "Failed to submit withdrawal request"
-      );
+      if (error?.response?.status === 428 && error?.response?.data?.code === "OTP_REQUIRED") {
+        setWithdrawTwoFactor({
+          method: error.response.data.method === "totp" ? "totp" : "sms",
+          form: {
+            amount: parseFloat(amount),
+            bank_name: String(bank_name).trim(),
+            bank_code: String(bank_code || "").trim(),
+            account_number: String(account_number).trim(),
+            account_name: String(account_name).trim(),
+          },
+        });
+      } else {
+        toast.error(
+          error.response?.data?.message || "Failed to submit withdrawal request"
+        );
+      }
     } finally {
       setSubmittingPersonalWithdraw(false);
     }
   };
 
+  const verifyWithdrawTwoFactor = async (code) => {
+    const current = withdrawTwoFactor;
+    try {
+      await api.post("/financial-admin/withdraw/request", {
+        ...current.form,
+        ...(current.method === "totp" ? { totp_code: code } : { otp: code }),
+      });
+      toast.success("Withdrawal request submitted successfully");
+      setWithdrawTwoFactor(null);
+      setShowPersonalWithdrawDialog(false);
+      resetPersonalWithdrawalForm();
+      await loadWithdrawableSnapshot();
+    } catch (error) {
+      throw error;
+    }
+  };
+
   return (
     <>
+      {withdrawTwoFactor && (
+        <TwoFactorStep
+          method={withdrawTwoFactor.method}
+          onVerified={verifyWithdrawTwoFactor}
+          onCancel={() => setWithdrawTwoFactor(null)}
+        />
+      )}
       {/* Banner */}
       <div
         className={`rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 ${className}`}

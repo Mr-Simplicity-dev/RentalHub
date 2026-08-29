@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const stateAdminController = require('../controllers/stateAdminController');
 const { authenticate } = require('../config/middleware/auth');
 const { requireStateAdmin } = require('../config/middleware/requireStateAdmin');
+const { requireWithdrawalFactor } = require('../config/utils/twoFactor');
 
 // ====================== AUTHENTICATION ======================
 router.use(authenticate);
@@ -265,6 +266,7 @@ router.post('/withdraw',
     body('account_number').isLength({ min: 10, max: 10 }).withMessage('Account number must be 10 digits'),
     body('account_name').notEmpty().withMessage('Account name is required')
   ],
+  requireWithdrawalFactor,
   async (req, res) => {
     try {
       const errors = validationResult(req);

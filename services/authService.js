@@ -2533,6 +2533,109 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
   }
 };
 
+// =====================================================
+//     2FA (TOTP + SMS fallback) for withdrawals
+// =====================================================
+
+const twoFactor = require('../config/utils/twoFactor');
+
+const respondTwoFactorError = (res, error) => {
+  if (error instanceof twoFactor.TwoFactorError) {
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      code: error.code,
+      message: error.message,
+      method: error.extra?.method || undefined,
+      retry_after: error.extra?.retryAfter || undefined,
+    });
+  }
+  return res.status(500).json({ success: false, message: 'Two-factor check failed' });
+};
+
+exports.getTwoFactorStatus = async (req, res) => {
+  try {
+    const status = await twoFactor.getTotpStatus(req.user.id);
+    return res.json({ success: true, data: status });
+  } catch (error) {
+    req.logger.error('2FA status error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load two-factor status' });
+  }
+};
+
+exports.setupTotp = async (req, res) => {
+  try {
+    const { secret, otpauthUrl } = await twoFactor.createTotpEnrollment({
+      userId: req.user.id,
+      email: req.user.email,
+    });
+    return res.json({
+      success: true,
+      data: { secret, otpauth_url: otpauthUrl },
+    });
+  } catch (error) {
+    req.logger.error('TOTP setup error:', error);
+    return respondTwoFactorError(res, error);
+  }
+};
+
+exports.confirmTotp = async (req, res) => {
+  try {
+    const { recoveryCodes } = await twoFactor.confirmTotpEnrollment({
+      userId: req.user.id,
+      code: req.body.code,
+    });
+    return res.json({
+      success: true,
+      data: { recovery_codes: recoveryCodes },
+    });
+  } catch (error) {
+    req.logger.error('TOTP confirm error:', error);
+    return respondTwoFactorError(res, error);
+  }
+};
+
+exports.disableTotp = async (req, res) => {
+  try {
+    const recoveryCode = String(req.body.recovery_code || '').trim();
+    if (recoveryCode) {
+      await twoFactor.verifyRecoveryCode({ userId: req.user.id, code: recoveryCode });
+    } else {
+      await twoFactor.verifyTotpCode({ userId: req.user.id, code: req.body.code });
+    }
+
+    const db = require('../config/middleware/database');
+    await db.query(
+      `UPDATE users
+       SET totp_enabled = FALSE,
+           totp_secret = NULL,
+           totp_recovery_codes = '[]'::jsonb,
+           totp_failed_attempts = 0,
+           totp_locked_until = NULL,
+           totp_enrolled_at = NULL
+       WHERE id = $1`,
+      [req.user.id]
+    );
+
+    return res.json({ success: true, message: 'Two-factor authentication disabled.' });
+  } catch (error) {
+    req.logger.error('TOTP disable error:', error);
+    return respondTwoFactorError(res, error);
+  }
+};
+
+exports.sendWithdrawalOtp = async (req, res) => {
+  try {
+    await twoFactor.sendSmsWithdrawalOtp({
+      userId: req.user.id,
+      phone: req.user.phone,
+    });
+    return res.json({ success: true, message: 'A verification code has been sent to your phone.' });
+  } catch (error) {
+    req.logger.error('Withdrawal OTP send error:', error);
+    return respondTwoFactorError(res, error);
+  }
+};
+
 // LOGIN
 exports.login = async (req, res) => {
   try {

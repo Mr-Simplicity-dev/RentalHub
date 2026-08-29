@@ -13,6 +13,7 @@ const {
 const { requireSuperAdmin } = require('../config/middleware/requireSuperAdmin');
 const { isStateFinancialAdmin, isSuperAdminOrSuperFinancialAdmin: isSuperOrFinancialRole } = require('../config/utils/roleScopes');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
+const { requireWithdrawalFactor } = require('../config/utils/twoFactor');
 
 /**
  * All admin roles that earn commissions and can request withdrawals.
@@ -300,6 +301,7 @@ router.post('/withdraw/request',
     body('account_number').isLength({ min: 10, max: 10 }).withMessage('Account number must be 10 digits'),
     body('account_name').notEmpty().withMessage('Account name is required')
   ],
+  requireWithdrawalFactor,
   async (req, res) => {
     try {
       const commissionService = require('../services/commissionService');
@@ -512,6 +514,7 @@ router.post('/withdrawals/:withdrawalId/approve',
   [
     body('admin_note').optional()
   ],
+  requireWithdrawalFactor,
   async (req, res) => {
     const db = require('../config/middleware/database');
     try {

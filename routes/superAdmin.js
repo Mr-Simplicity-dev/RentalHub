@@ -10,6 +10,7 @@ const db = require('../config/middleware/database');
 const bcrypt = require('bcryptjs');
 const commissionService = require('../services/commissionService');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
+const { requireWithdrawalFactor } = require('../config/utils/twoFactor');
 const validateRequest = require('../config/middleware/validateRequest');
 const credentialRevalidationCtrl = require('../controllers/credentialRevalidationController');
 
@@ -324,9 +325,15 @@ router.patch('/sfa-permissions/:sfaId', authenticate, requireSuperAdmin, async (
 // ================== SUPER ADMIN DIRECT WITHDRAWAL ==================
 
 // POST /super/withdraw/direct  (super_admin or delegated super_financial_admin with can_direct_withdraw)
-router.post('/withdraw/direct', authenticate, requireSuperAdminOrDelegatedDirectWithdraw, criticalFinanceOpsLimiter, async (req, res) => {
+router.post('/withdraw/direct', authenticate, requireSuperAdminOrDelegatedDirectWithdraw, criticalFinanceOpsLimiter, requireWithdrawalFactor, async (req, res) => {
   try {
     const { amount, bank_name, bank_code, account_number, account_name, password } = req.body;
+
+    // 2FA code fields are consumed by the gate middleware; strip them from
+    // the rest of the flow to avoid confusion.
+    delete req.body.totp_code;
+    delete req.body.otp;
+    delete req.body.recovery_code;
 
     // Validate inputs
     if (!amount || !bank_name || !account_number || !account_name || !password) {

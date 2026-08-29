@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
+import TwoFactorStep from '../../components/common/TwoFactorStep';
 import {
   FaBell,
   FaCalendarDay,
@@ -130,6 +131,7 @@ const SuperSupportAdminDashboard = () => {
     note: '',
   });
   const [withdrawalActionLoadingIds, setWithdrawalActionLoadingIds] = useState([]);
+  const [decisionTwoFactor, setDecisionTwoFactor] = useState(null);
   const [governancePolicies, setGovernancePolicies] = useState(null);
   const [satisfactionStats, setSatisfactionStats] = useState({ avg: 0, count: 0, loaded: false });
 
@@ -186,9 +188,38 @@ const SuperSupportAdminDashboard = () => {
       closeWithdrawalDecision();
       await fetchWithdrawalTickets();
     } catch (error) {
-      toast.error(error.response?.data?.message || `Failed to ${action} withdrawal`);
+      if (error?.response?.status === 428 && error?.response?.data?.code === 'OTP_REQUIRED') {
+        setDecisionTwoFactor({
+          method: error.response.data.method === 'totp' ? 'totp' : 'sms',
+          withdrawal,
+          action,
+          note: String(note || '').trim(),
+        });
+      } else {
+        toast.error(error.response?.data?.message || `Failed to ${action} withdrawal`);
+      }
     } finally {
       setWithdrawalActionLoadingIds((prev) => prev.filter((id) => id !== withdrawal.id));
+    }
+  };
+
+  const verifyDecisionTwoFactor = async (code) => {
+    const current = decisionTwoFactor;
+    try {
+      await api.post(`/financial-admin/withdrawals/${current.withdrawal.id}/${current.action}`, {
+        admin_note: current.note,
+        ...(current.method === 'totp' ? { totp_code: code } : { otp: code }),
+      });
+      toast.success(
+        current.action === 'approve'
+          ? 'Withdrawal approved and payout initiated'
+          : 'Withdrawal rejected and funds returned'
+      );
+      setDecisionTwoFactor(null);
+      closeWithdrawalDecision();
+      await fetchWithdrawalTickets();
+    } catch (error) {
+      throw error;
     }
   };
 
@@ -649,6 +680,13 @@ const SuperSupportAdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-admin-50 via-white to-admin-100/40 p-4 sm:p-6">
+      {decisionTwoFactor && (
+        <TwoFactorStep
+          method={decisionTwoFactor.method}
+          onVerified={verifyDecisionTwoFactor}
+          onCancel={() => setDecisionTwoFactor(null)}
+        />
+      )}
       <div className="mx-auto max-w-7xl">
         <div className="space-y-6">
       <div className="mb-8 text-center">

@@ -5,6 +5,7 @@ import api from '../../services/api';
 import { getAuthUser } from '../../services/authStorage';
 import { useTranslation } from 'react-i18next';
 import Loader from '../../components/common/Loader';
+import TwoFactorStep from '../../components/common/TwoFactorStep';
 
 const AgentWithdrawalPage = () => {
   const { t } = useTranslation();
@@ -15,6 +16,7 @@ const AgentWithdrawalPage = () => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [withdrawTwoFactor, setWithdrawTwoFactor] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     amount: '',
@@ -88,7 +90,42 @@ const AgentWithdrawalPage = () => {
         loadData();
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || t('agent_withdrawal.submit_failed'));
+      if (error.response?.status === 428 && error.response?.data?.code === 'OTP_REQUIRED') {
+        setWithdrawTwoFactor({ method: error.response.data.method === 'totp' ? 'totp' : 'sms' });
+      } else {
+        toast.error(error.response?.data?.message || t('agent_withdrawal.submit_failed'));
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const verifyWithdrawTwoFactor = async (code) => {
+    const body = {
+      landlordId: parseInt(landlordId),
+      amount: parseFloat(formData.amount),
+      withdrawalMethod: formData.withdrawalMethod,
+      bankAccountId: formData.bankAccountId ? parseInt(formData.bankAccountId) : null,
+      requestReason: formData.requestReason,
+      ...(withdrawTwoFactor?.method === 'totp' ? { totp_code: code } : { otp: code }),
+    };
+    setSubmitting(true);
+    try {
+      const response = await api.post(`/withdrawals/agents/${agentId}/withdrawal-requests`, body);
+      if (response.data?.success) {
+        toast.success(t('agent_withdrawal.submitted'));
+        setShowForm(false);
+        setWithdrawTwoFactor(null);
+        setFormData({
+          amount: '',
+          withdrawalMethod: 'bank_transfer',
+          bankAccountId: '',
+          requestReason: '',
+        });
+        loadData();
+      }
+    } catch (error) {
+      throw error;
     } finally {
       setSubmitting(false);
     }
@@ -115,6 +152,13 @@ const AgentWithdrawalPage = () => {
 
   return (
     <div className="space-y-6" data-tour-id="agent-withdrawals-workflow">
+      {withdrawTwoFactor && (
+        <TwoFactorStep
+          method={withdrawTwoFactor.method}
+          onVerified={verifyWithdrawTwoFactor}
+          onCancel={() => setWithdrawTwoFactor(null)}
+        />
+      )}
       {/* Header */}
       <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white shadow-lg">
         <div className="flex items-start justify-between gap-4">

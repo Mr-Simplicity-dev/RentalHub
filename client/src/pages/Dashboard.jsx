@@ -43,6 +43,7 @@ import { useTranslation } from 'react-i18next';
 import ApprovalTimeline from '../components/common/ApprovalTimeline';
 import WalletFundModal from '../components/dashboard/WalletFundModal';
 import WalletWithdrawModal from '../components/dashboard/WalletWithdrawModal';
+import TwoFactorStep from '../components/common/TwoFactorStep';
 import RentSavingsModal from '../components/dashboard/RentSavingsModal';
 import AdSpace from '../components/common/AdSpace';
 
@@ -173,6 +174,7 @@ const Dashboard = () => {
   const [upcomingTransportBookings, setUpcomingTransportBookings] = useState([]);
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [transportLoading, setTransportLoading] = useState(false);
+  const [withdrawTwoFactor, setWithdrawTwoFactor] = useState(null);
 
   // Refund state
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -728,7 +730,35 @@ const Dashboard = () => {
         toast.error(res.data?.message || 'Failed to submit withdrawal');
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit withdrawal');
+      // 2FA gate: show the shared verification step and re-submit with the code.
+      if (err.response?.status === 428 && err.response?.data?.code === 'OTP_REQUIRED') {
+        setWithdrawTwoFactor({ method: err.response.data.method === 'totp' ? 'totp' : 'sms' });
+      } else {
+        toast.error(err.response?.data?.message || 'Failed to submit withdrawal');
+      }
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
+  const verifyWithdrawTwoFactor = async (code) => {
+    const body = {
+      ...withdrawForm,
+      ...(withdrawTwoFactor?.method === 'totp' ? { totp_code: code } : { otp: code }),
+    };
+    setWithdrawLoading(true);
+    try {
+      const res = await api.post('/payments/wallet/withdraw', body);
+      if (res.data?.success) {
+        toast.success('Withdrawal request submitted successfully');
+        setShowWithdrawModal(false);
+        setWithdrawTwoFactor(null);
+        loadDashboardData();
+      } else {
+        toast.error(res.data?.message || 'Failed to submit withdrawal');
+      }
+    } catch (err) {
+      throw err;
     } finally {
       setWithdrawLoading(false);
     }
@@ -2804,6 +2834,14 @@ const Dashboard = () => {
           openFundModal();
         }}
       />
+
+      {withdrawTwoFactor && (
+        <TwoFactorStep
+          method={withdrawTwoFactor.method}
+          onVerified={verifyWithdrawTwoFactor}
+          onCancel={() => setWithdrawTwoFactor(null)}
+        />
+      )}
 
       {showRentSavingsAgreementModal && (
         <div

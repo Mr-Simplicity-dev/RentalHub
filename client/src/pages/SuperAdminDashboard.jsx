@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../services/api";
 import { useAuth } from "../hooks/useAuth";
+import TwoFactorStep from "../components/common/TwoFactorStep";
 
 import UsersTab from "../components/admin/UsersTab";
 import VerificationsTab from "../components/admin/VerificationsTab";
@@ -266,6 +267,7 @@ export default function SuperAdminDashboard() {
     password: "",
   });
   const [submittingPersonalWithdraw, setSubmittingPersonalWithdraw] = useState(false);
+  const [withdrawTwoFactor, setWithdrawTwoFactor] = useState(null);
   const [withdrawAccountNameLoading, setWithdrawAccountNameLoading] = useState(false);
   const [withdrawAccountNameError, setWithdrawAccountNameError] = useState("");
   const [banks, setBanks] = useState([]);
@@ -508,9 +510,40 @@ export default function SuperAdminDashboard() {
       resetPersonalWithdrawalForm();
       await loadWithdrawableSnapshot();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Withdrawal failed');
+      if (error?.response?.status === 428 && error?.response?.data?.code === 'OTP_REQUIRED') {
+        setWithdrawTwoFactor({
+          method: error.response.data.method === 'totp' ? 'totp' : 'sms',
+          form: {
+            amount: parseFloat(amount),
+            bank_name: String(bank_name).trim(),
+            bank_code: String(bank_code || '').trim(),
+            account_number: String(account_number).trim(),
+            account_name: String(account_name).trim(),
+            password: String(password),
+          },
+        });
+      } else {
+        toast.error(error.response?.data?.message || 'Withdrawal failed');
+      }
     } finally {
       setSubmittingPersonalWithdraw(false);
+    }
+  };
+
+  const verifyWithdrawTwoFactor = async (code) => {
+    const current = withdrawTwoFactor;
+    try {
+      await api.post('/super/withdraw/direct', {
+        ...current.form,
+        ...(current.method === 'totp' ? { totp_code: code } : { otp: code }),
+      });
+      toast.success('Withdrawal processed successfully');
+      setWithdrawTwoFactor(null);
+      setShowPersonalWithdrawDialog(false);
+      resetPersonalWithdrawalForm();
+      await loadWithdrawableSnapshot();
+    } catch (error) {
+      throw error;
     }
   };
 
@@ -989,6 +1022,13 @@ export default function SuperAdminDashboard() {
 
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 animate-fadeIn">
+          {withdrawTwoFactor && (
+            <TwoFactorStep
+              method={withdrawTwoFactor.method}
+              onVerified={verifyWithdrawTwoFactor}
+              onCancel={() => setWithdrawTwoFactor(null)}
+            />
+          )}
 
           <LiveModerationQueue
           loadReports={loadReports}

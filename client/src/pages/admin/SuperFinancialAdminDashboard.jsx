@@ -12,6 +12,7 @@ import {
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
+import TwoFactorStep from '../../components/common/TwoFactorStep';
 import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -61,6 +62,8 @@ const SuperFinancialAdminDashboard = () => {
   });
   const [showPersonalWithdrawDialog, setShowPersonalWithdrawDialog] = useState(false);
   const [submittingPersonalWithdraw, setSubmittingPersonalWithdraw] = useState(false);
+  const [withdrawTwoFactor, setWithdrawTwoFactor] = useState(null);
+  const [decisionTwoFactor, setDecisionTwoFactor] = useState(null);
 
   useEffect(() => {
     const role = String(user?.user_type || '').toLowerCase();
@@ -308,9 +311,40 @@ const SuperFinancialAdminDashboard = () => {
       const historyRes = await api.get('/financial-admin/withdrawals/history');
       setWithdrawals(historyRes.data?.data || []);
     } catch (error) {
-      toast.error(error.response?.data?.message || `Failed to ${action} withdrawal`);
+      if (error?.response?.status === 428 && error?.response?.data?.code === 'OTP_REQUIRED') {
+        setDecisionTwoFactor({
+          method: error.response.data.method === 'totp' ? 'totp' : 'sms',
+          withdrawal,
+          action,
+          note: note.trim(),
+        });
+      } else {
+        toast.error(error.response?.data?.message || `Failed to ${action} withdrawal`);
+      }
     } finally {
       setActionLoading(withdrawal.id, false);
+    }
+  };
+
+  const verifyDecisionTwoFactor = async (code) => {
+    const current = decisionTwoFactor;
+    try {
+      await api.post(`/financial-admin/withdrawals/${current.withdrawal.id}/${current.action}`, {
+        admin_note: current.note,
+        ...(current.method === 'totp' ? { totp_code: code } : { otp: code }),
+      });
+      toast.success(
+        current.action === 'approve'
+          ? 'Withdrawal approved and payout initiated'
+          : 'Withdrawal rejected and funds returned'
+      );
+      setDecisionTwoFactor(null);
+      closeWithdrawalDecision();
+      await fetchPendingWithdrawals();
+      const historyRes = await api.get('/financial-admin/withdrawals/history');
+      setWithdrawals(historyRes.data?.data || []);
+    } catch (error) {
+      throw error;
     }
   };
 
@@ -353,7 +387,14 @@ const SuperFinancialAdminDashboard = () => {
       toast.success('Personal commission withdrawal request submitted');
       setShowPersonalWithdrawDialog(false);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to submit withdrawal request');
+      if (error?.response?.status === 428 && error?.response?.data?.code === 'OTP_REQUIRED') {
+        setWithdrawTwoFactor({
+          method: error.response.data.method === 'totp' ? 'totp' : 'sms',
+          inputs: formData,
+        });
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to submit withdrawal request');
+      }
     } finally {
       setSubmittingPersonalWithdraw(false);
     }
@@ -369,6 +410,37 @@ const SuperFinancialAdminDashboard = () => {
 
     return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100/40 p-6">
+      {withdrawTwoFactor && (
+        <TwoFactorStep
+          method={withdrawTwoFactor.method}
+          onVerified={async (code) => {
+            const inputs = withdrawTwoFactor.inputs;
+            try {
+              await api.post('/financial-admin/withdraw/request', {
+                amount: parseFloat(inputs.amount),
+                bank_name: String(inputs.bank_name || '').trim(),
+                bank_code: String(inputs.bank_code || '').trim(),
+                account_number: String(inputs.account_number || '').trim(),
+                account_name: String(inputs.account_name || '').trim(),
+                ...(withdrawTwoFactor.method === 'totp' ? { totp_code: code } : { otp: code }),
+              });
+              toast.success('Personal commission withdrawal request submitted');
+              setWithdrawTwoFactor(null);
+              setShowPersonalWithdrawDialog(false);
+            } catch (error) {
+              throw error;
+            }
+          }}
+          onCancel={() => setWithdrawTwoFactor(null)}
+        />
+      )}
+      {decisionTwoFactor && (
+        <TwoFactorStep
+          method={decisionTwoFactor.method}
+          onVerified={verifyDecisionTwoFactor}
+          onCancel={() => setDecisionTwoFactor(null)}
+        />
+      )}
       <div className="mx-auto max-w-7xl">
         <div className="space-y-6">
       {/* Keep this executive access banner copy and actions intact per product requirement. */}

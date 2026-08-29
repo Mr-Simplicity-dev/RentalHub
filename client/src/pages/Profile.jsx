@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import BackToDashboard from '../components/common/BackToDashboard';
 import AppealModal from '../components/common/AppealModal';
+import { QRCodeSVG } from 'qrcode.react';
 import { useTour } from '../hooks/useTour';
 import {
   getTourDashboardRoute,
@@ -93,6 +94,15 @@ const Profile = () => {
   const [editingProfile, setEditingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [showAppealModal, setShowAppealModal] = useState(false);
+  const [totpEnabled, setTotpEnabled] = useState(false);
+  const [totpLoading, setTotpLoading] = useState(true);
+  const [totpSetup, setTotpSetup] = useState(null);
+  const [totpConfirmCode, setTotpConfirmCode] = useState('');
+  const [totpConfirming, setTotpConfirming] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState(null);
+  const [disableTotpMode, setDisableTotpMode] = useState(false);
+  const [totpDisableCode, setTotpDisableCode] = useState('');
+  const [totpDisabling, setTotpDisabling] = useState(false);
   const [profileForm, setProfileForm] = useState({
     full_name: '',
     phone: '',
@@ -132,6 +142,71 @@ const Profile = () => {
     if (!livenessChecks.movedFarther) checks.push('Move farther from camera');
     return checks;
   }, [livenessChecks]);
+
+  useEffect(() => {
+    const loadTotpStatus = async () => {
+      try {
+        const res = await api.get('/auth/2fa/status');
+        setTotpEnabled(res.data?.data?.totp_enabled === true);
+      } catch {
+        // ignore — status card hides behind defaults
+      } finally {
+        setTotpLoading(false);
+      }
+    };
+    loadTotpStatus();
+  }, []);
+
+  const startTotpSetup = async () => {
+    try {
+      const res = await api.post('/auth/2fa/totp/setup');
+      setTotpSetup(res.data?.data || null);
+      setTotpConfirmCode('');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not start setup');
+    }
+  };
+
+  const confirmTotp = async () => {
+    if (totpConfirmCode.length < 6) return;
+    setTotpConfirming(true);
+    try {
+      const res = await api.post('/auth/2fa/totp/confirm', { code: totpConfirmCode });
+      setRecoveryCodes(res.data?.data?.recovery_codes || []);
+      setTotpSetup(null);
+      setTotpEnabled(true);
+      setTotpConfirmCode('');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not confirm the code');
+    } finally {
+      setTotpConfirming(false);
+    }
+  };
+
+  const cancelTotpSetup = () => {
+    setTotpSetup(null);
+    setTotpConfirmCode('');
+  };
+
+  const disableTotp = async () => {
+    setTotpDisabling(true);
+    try {
+      const body = { code: totpDisableCode.trim() };
+      if (totpDisableCode.trim().length > 6) {
+        delete body.code;
+        body.recovery_code = totpDisableCode.trim();
+      }
+      await api.post('/auth/2fa/totp/disable', body);
+      setTotpEnabled(false);
+      setDisableTotpMode(false);
+      setTotpDisableCode('');
+      toast.success('Two-factor authentication disabled');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not disable two-factor authentication');
+    } finally {
+      setTotpDisabling(false);
+    }
+  };
 
   useEffect(() => {
     const nextFromQuery = searchParams.get('next');
@@ -759,6 +834,194 @@ const Profile = () => {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Two-Factor Security */}
+      <div className="card mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold text-gray-900">
+              {t('profile.totp_title', 'Two-Factor Security')}
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              {t('profile.totp_desc', 'Protect withdrawals with an authenticator app (e.g. Google Authenticator). SMS codes are used automatically until you enable this.')}
+            </p>
+          </div>
+          <span
+            className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+              totpEnabled
+                ? 'bg-green-100 text-green-700'
+                : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {totpEnabled
+              ? t('profile.totp_enabled', 'Enabled')
+              : t('profile.totp_disabled', 'SMS fallback active')}
+          </span>
+        </div>
+
+        {!totpSetup && !recoveryCodes && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={startTotpSetup}
+              disabled={totpLoading}
+            >
+              {totpLoading
+                ? t('profile.totp_loading', 'Loading...')
+                : totpEnabled
+                  ? t('profile.totp_manage', 'Manage Authenticator')
+                  : t('profile.totp_enable', 'Enable Authenticator App')}
+            </button>
+            {totpEnabled && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDisableTotpMode(true)}
+              >
+                {t('profile.totp_disable', 'Disable Two-Factor')}
+              </button>
+            )}
+          </div>
+        )}
+
+        {totpSetup && !recoveryCodes && (
+          <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/50 p-5">
+            <h3 className="font-semibold text-gray-900">
+              {t('profile.totp_setup_title', 'Scan with your authenticator app')}
+            </h3>
+            <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-gray-600">
+              <li>{t('profile.totp_step1', 'Install Google Authenticator (or any TOTP app).')}</li>
+              <li>{t('profile.totp_step2', 'Scan the QR code or enter the secret manually.')}</li>
+              <li>{t('profile.totp_step3', 'Enter the 6-digit code the app shows to finish.')}</li>
+            </ol>
+
+            <div className="mt-4 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+              <div className="rounded-xl bg-white p-3 shadow-sm">
+                {totpSetup.otpauth_url ? (
+                  <QRCodeSVG value={totpSetup.otpauth_url} size={180} level="M" />
+                ) : null}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  {t('profile.totp_manual', 'Manual setup key')}
+                </p>
+                <p className="mt-1 break-all font-mono text-sm text-gray-800">{totpSetup.secret}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={totpConfirmCode}
+                onChange={(e) => setTotpConfirmCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••••"
+                className="input w-full sm:w-40"
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmTotp}
+                disabled={totpConfirming || totpConfirmCode.length < 6}
+              >
+                {totpConfirming
+                  ? t('profile.totp_confirming', 'Confirming...')
+                  : t('profile.totp_confirm', 'Confirm & Enable')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={cancelTotpSetup}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {recoveryCodes && (
+          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-5">
+            <h3 className="font-semibold text-amber-900">
+              {t('profile.recovery_title', 'Save your recovery codes')}
+            </h3>
+            <p className="mt-1 text-sm text-amber-800">
+              {t('profile.recovery_desc', 'Store these somewhere safe. Each code works once — if you lose your phone, they are the only way back into your account.')}
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-1 font-mono text-sm text-gray-800 sm:grid-cols-2">
+              {recoveryCodes.map((code, i) => (
+                <code key={code} className="rounded bg-white/70 px-2 py-1">
+                  {code}
+                </code>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  navigator.clipboard?.writeText(recoveryCodes.join('\n'));
+                  toast.success(t('profile.recovery_copied', 'Recovery codes copied'));
+                }}
+              >
+                {t('profile.recovery_copy', 'Copy Codes')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setRecoveryCodes(null);
+                  setTotpSetup(null);
+                  setTotpEnabled(true);
+                }}
+              >
+                {t('profile.recovery_done', "I've saved them")}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {disableTotpMode && (
+          <div className="mt-5 rounded-xl border border-red-100 bg-red-50 p-5">
+            <h3 className="font-semibold text-red-900">
+              {t('profile.totp_disable_title', 'Disable Two-Factor Authentication')}
+            </h3>
+            <p className="mt-1 text-sm text-red-800">
+              {t('profile.totp_disable_desc', 'Enter a code from your authenticator app, or one of your recovery codes, to confirm.')}
+            </p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text"
+                value={totpDisableCode}
+                onChange={(e) => setTotpDisableCode(e.target.value)}
+                placeholder={t('profile.totp_disable_placeholder', 'Authenticator or recovery code')}
+                className="input w-full"
+              />
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={disableTotp}
+                disabled={totpDisabling || totpDisableCode.trim().length < 6}
+              >
+                {totpDisabling
+                  ? t('profile.totp_disabling', 'Disabling...')
+                  : t('profile.totp_confirm_disable', 'Disable 2FA')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setDisableTotpMode(false);
+                  setTotpDisableCode('');
+                }}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card mb-6" data-tour-id="profile-tour-settings-workflow">

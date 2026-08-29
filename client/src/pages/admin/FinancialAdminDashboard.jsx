@@ -20,6 +20,7 @@ import { toast } from 'react-toastify';
 import Button from '../../components/common/Button';
 import InputDialog from '../../components/common/InputDialog';
 import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
+import TwoFactorStep from '../../components/common/TwoFactorStep';
 import useRetryableAction from '../../hooks/useRetryableAction';
 import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
 
@@ -32,6 +33,7 @@ const FinancialAdminDashboard = () => {
   const [frozenFunds, setFrozenFunds] = useState([]);
   const [stateAdmins, setStateAdmins] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [withdrawTwoFactor, setWithdrawTwoFactor] = useState(null);
   const [profile, setProfile] = useState(null);
   const [withdrawableSnapshot, setWithdrawableSnapshot] = useState({
     withdrawable_amount: 0,
@@ -1249,11 +1251,52 @@ const FinancialAdminDashboard = () => {
           isOpen={showPersonalWithdrawDialog}
           onClose={() => setShowPersonalWithdrawDialog(false)}
           onSubmit={async (formData) => {
-            await personalWithdrawAction.execute(formData);
+            try {
+              await personalWithdrawAction.execute(formData);
+            } catch (err) {
+              if (err?.code === 'OTP_REQUIRED' && err?.status === 428) {
+                setWithdrawTwoFactor({
+                  method: err?.details?.method === 'totp' ? 'totp' : 'sms',
+                  inputs: formData,
+                });
+              } else {
+                toast.error(err?.message || 'Failed to submit withdrawal request');
+              }
+            }
           }}
           isLoading={personalWithdrawAction.isLoading}
           confirmLabel="Submit Withdrawal Request"
                 />
+
+        {withdrawTwoFactor && (
+          <TwoFactorStep
+            method={withdrawTwoFactor.method}
+            onVerified={async (code) => {
+              const body = {
+                amount: parseFloat(withdrawTwoFactor.inputs.amount),
+                bank_name: String(withdrawTwoFactor.inputs.bank_name || '').trim(),
+                bank_code: String(withdrawTwoFactor.inputs.bank_code || '').trim(),
+                account_number: String(withdrawTwoFactor.inputs.account_number || '').trim(),
+                account_name: String(withdrawTwoFactor.inputs.account_name || '').trim(),
+                ...(withdrawTwoFactor.method === 'totp' ? { totp_code: code } : { otp: code }),
+              };
+              try {
+                await api.post('/financial-admin/withdraw/request', body);
+                toast.success('Personal commission withdrawal request submitted');
+                setWithdrawTwoFactor(null);
+                setShowPersonalWithdrawDialog(false);
+                if (profile?.user_type === 'lga_financial_admin') {
+                  await fetchLgaFinanceData();
+                } else {
+                  await fetchDashboardData();
+                }
+              } catch (verifyError) {
+                throw verifyError;
+              }
+            }}
+            onCancel={() => setWithdrawTwoFactor(null)}
+          />
+        )}
         </div>
       </div>
     </div>

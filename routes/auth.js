@@ -4,7 +4,8 @@ const authController = require('../controllers/authController');
 const { uploadPassportLocal, validateFileMagicBytesMiddleware } = require('../config/middleware/upload');
 const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const { checkLoginRateLimit } = require('../config/middleware/loginRateLimiter');
-const { authSensitiveLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter } = require('../config/middleware/securityRateLimiters');
+const { authSensitiveLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter, sensitiveActionLimiter } 
+= require('../config/middleware/securityRateLimiters');
 const { requireTurnstile } = require('../config/middleware/turnstileVerify');
 
 const router = express.Router();
@@ -134,6 +135,13 @@ router.post(
   otpSendLimiter,
   authController.sendRegistrationPaymentOTP
 );
+
+// Two-factor authentication (TOTP + SMS fallback) for withdrawals
+router.get('/2fa/status', authenticate, authController.getTwoFactorStatus);
+router.post('/2fa/totp/setup', authenticate, sensitiveActionLimiter, authController.setupTotp);
+router.post('/2fa/totp/confirm', authenticate, sensitiveActionLimiter, authController.confirmTotp);
+router.post('/2fa/totp/disable', authenticate, sensitiveActionLimiter, authController.disableTotp);
+router.post('/2fa/send-withdrawal-otp', authenticate, otpSendLimiter, authController.sendWithdrawalOtp);
 
 // Register new user (Landlord or Tenant)
 router.post(

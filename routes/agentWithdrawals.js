@@ -5,6 +5,7 @@ const { authenticate } = require('../config/middleware/auth');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const validateRequest = require('../config/middleware/validateRequest');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
+const { requireWithdrawalFactor } = require('../config/utils/twoFactor');
 const {
 	withdrawalCreateValidators,
 	withdrawalQueryValidators,
@@ -26,6 +27,7 @@ router.post(
 	criticalFinanceOpsLimiter,
 	withdrawalCreateValidators,
 	validateRequest,
+	requireWithdrawalFactor,
 	AgentWithdrawalController.createWithdrawalRequest
 );
 
@@ -46,7 +48,7 @@ router.get(
 );
 
 // Approve withdrawal (admin only)
-router.post('/withdrawals/:withdrawalId/approve', [param('withdrawalId').isInt(), body('note').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, AgentWithdrawalController.approveWithdrawal);
+router.post('/withdrawals/:withdrawalId/approve', [param('withdrawalId').isInt(), body('note').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, requireWithdrawalFactor, AgentWithdrawalController.approveWithdrawal);
 
 // Reject withdrawal (admin only)
 router.post('/withdrawals/:withdrawalId/reject', [param('withdrawalId').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, AgentWithdrawalController.rejectWithdrawal);
