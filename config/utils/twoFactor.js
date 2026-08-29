@@ -122,6 +122,10 @@ exports.createTotpEnrollment = async ({ userId, email }) => {
   const secret = authenticator.generateSecret();
   const otpauthUrl = authenticator.keyuri(email, SERVICE_NAME, secret);
 
+  // Encrypted at rest when the encryption key is configured; plaintext
+  // fallback otherwise (same convention as identity data).
+  const storedSecret = encryptNIN(secret) || secret;
+
   await db.query(
     `UPDATE users
      SET totp_secret = $1,
@@ -129,7 +133,7 @@ exports.createTotpEnrollment = async ({ userId, email }) => {
          totp_failed_attempts = 0,
          totp_locked_until = NULL
      WHERE id = $2`,
-    [encryptNIN(secret), userId]
+    [storedSecret, userId]
   );
 
   return { secret, otpauthUrl };
