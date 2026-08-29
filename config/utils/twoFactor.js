@@ -1,7 +1,7 @@
-/**
+﻿/**
  * Two-factor authentication for withdrawals and financial approvals.
  *
- * Design (Option 1 — agreed):
+ * Design (Option 1 â€” agreed):
  *  - TOTP (Google Authenticator / any TOTP app) is the PRIMARY method once
  *    the user enrolls.
  *  - SMS OTP (Termii/Twilio, existing infra) is the fallback for users who
@@ -27,7 +27,7 @@ const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 authenticator.options = { window: 1 };
 
-let redisClient = redis; // ioredis wrapper (null when unavailable) — falls back to in-memory
+let redisClient = redis; // ioredis wrapper (null when unavailable) â€” falls back to in-memory
 const memoryOtpStore = new Map();
 
 const otpStoreGet = async (key) => {
@@ -96,6 +96,16 @@ const resetTotpFailures = async (userId) => {
 const hashRecoveryCode = (code) =>
   crypto.createHash('sha256').update(code).digest('hex');
 
+// Stored TOTP secrets are either an AES-GCM envelope (iv:authTag:data) or
+// plaintext fallback when no encryption key is configured.
+const decryptStoredSecret = (stored) => {
+  if (typeof stored !== 'string' || !stored) return null;
+  if (stored.split(':').length === 3) {
+    return decryptNIN(stored) || stored;
+  }
+  return stored;
+};
+
 const generateRecoveryCode = () => {
   const bytes = crypto.randomBytes(RECOVERY_CODE_COUNT);
   let code = '';
@@ -151,7 +161,7 @@ exports.confirmTotpEnrollment = async ({ userId, code }) => {
     throw new TwoFactorError('TOTP_ALREADY_ENABLED', 'Two-factor authentication is already enabled.');
   }
 
-  const secret = decryptNIN(user.totp_secret);
+  const secret = decryptStoredSecret(user.totp_secret);
   const valid = authenticator.verify({ token: String(code || '').replace(/\s/g, ''), secret });
   if (!valid) {
     throw new TwoFactorError('TOTP_INVALID', 'The code you entered is not valid.');
@@ -198,7 +208,7 @@ exports.verifyTotpCode = async ({ userId, code }) => {
     );
   }
 
-  const secret = decryptNIN(user.totp_secret);
+  const secret = decryptStoredSecret(user.totp_secret);
   const valid = authenticator.verify({ token: String(code || '').replace(/\s/g, ''), secret });
 
   if (valid) {
@@ -380,3 +390,4 @@ exports.runWithdrawalFactorCheck = async (req, res) => {
 };
 
 exports.TwoFactorError = TwoFactorError;
+
