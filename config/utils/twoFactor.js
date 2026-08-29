@@ -107,7 +107,7 @@ const decryptStoredSecret = (stored) => {
 };
 
 const generateRecoveryCode = () => {
-  const bytes = crypto.randomBytes(RECOVERY_CODE_COUNT);
+  const bytes = crypto.randomBytes(16);
   let code = '';
   for (let i = 0; i < 12; i++) {
     code += RECOVERY_ALPHABET[bytes[i] % RECOVERY_ALPHABET.length];
