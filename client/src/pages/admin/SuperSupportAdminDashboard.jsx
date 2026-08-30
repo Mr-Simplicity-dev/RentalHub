@@ -30,6 +30,7 @@ import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequest
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 import SupportGovernancePanel from '../../components/admin/SupportGovernancePanel';
+import SupportVoiceDesk from '../../components/admin/SupportVoiceDesk';
 import TicketConversationModal from '../../components/common/TicketConversationModal';
 
 // Utility functions
@@ -376,7 +377,7 @@ const SuperSupportAdminDashboard = () => {
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'escalations', 'alerts', 'reports', 'activity', 'pool'];
+    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'escalations', 'alerts', 'reports', 'activity', 'pool', 'voice'];
     if (tab && allowedTabs.includes(tab)) {
       setActiveTab(tab);
       return;
@@ -759,6 +760,7 @@ const SuperSupportAdminDashboard = () => {
           { key: 'reports', label: 'Reports' },
           { key: 'activity', label: 'Activity Feed' },
           { key: 'pool', label: 'Admin Pool' },
+          { key: 'voice', label: 'Voice Desk' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -1270,6 +1272,16 @@ const SuperSupportAdminDashboard = () => {
 
         {activeTab === 'escalations' && (
           <SupportTicketWorkspace tickets={dashboardData.supportTickets || []} loading={loading || refreshing} user={user} onOpenTicket={(ticket) => openModal('view-ticket', ticket)} onTicketAction={handleQuickAction} mode="escalations" />
+        )}
+
+        {/* Voice Desk Tab */}
+        {activeTab === 'voice' && (
+          <div className="super-support-voice-desk-section">
+            <SupportVoiceDesk
+              tickets={dashboardData.supportTickets || []}
+              onOpenTickets={() => setActiveTab('tickets')}
+            />
+          </div>
         )}
 
         {/* System Alerts Tab */}

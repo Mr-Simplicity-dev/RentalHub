@@ -136,6 +136,15 @@ const tourEventLimiter = buildLimiter({
   message: 'Too many guided-tour events. Please wait briefly and continue.',
 });
 
+// Twilio Access Tokens are minted per agent availability request. Admin
+// sessions are required, but a stolen admin token could otherwise mint
+// unlimited voice tokens — this ceiling bounds that blast radius.
+const voiceTokenLimiter = buildLimiter({
+  windowMs: Number(process.env.VOICE_TOKEN_WINDOW_MS) || 10 * 60 * 1000,
+  max: Number(process.env.VOICE_TOKEN_MAX) || 30,
+  message: 'Too many voice token requests. Please wait and retry.',
+});
+
 module.exports = {
   authSensitiveLimiter,
   paymentOpsLimiter,
@@ -157,4 +166,5 @@ module.exports = {
   passwordResetLimiter,
   registrationLimiter,
   tourEventLimiter,
+  voiceTokenLimiter,
 };

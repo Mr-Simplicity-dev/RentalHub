@@ -197,7 +197,7 @@ const Privacy = () => {
     },
     {
       name: t('privacy.recipients.comms.title', 'Communications and web services'),
-      detail: t('privacy.recipients.comms.detail', 'Configured email/SMTP or Resend services, Termii or Twilio for SMS, Meta WhatsApp services, Google Maps, Google Analytics and HubSpot chat may process the information required to provide their feature.'),
+      detail: t('privacy.recipients.comms.detail', 'Configured email/SMTP or Resend services, Termii for SMS, Twilio for voice calls, Meta WhatsApp services, Google Maps and Google Analytics may process the information required to provide their feature. Support chat is provided in-house by RentalHub and stored in RentalHub’s own systems.'),
     },
     {
       name: t('privacy.recipients.ai.title', 'AI-assisted damage analysis'),

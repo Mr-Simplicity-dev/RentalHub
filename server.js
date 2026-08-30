@@ -98,6 +98,7 @@ const damageReportRoutes = require('./routes/damageReports');
 const rentSavingsRoutes = require('./routes/rentSavings');
 const adminInspectionRoutes = require('./routes/adminInspections');
 const appealRoutes = require('./routes/appeals');
+const voiceRoutes = require('./routes/voice');
 const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
 const { startRentSavingsJobs } = require('./jobs/rentSavingsJobs');
 const { startSmsDeliveryJobs } = require('./jobs/smsDeliveryJobs');
@@ -511,6 +512,12 @@ app.use(
   })
 );
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Twilio voice webhooks arrive as form-encoded POSTs (parsed above) and do NOT
+// send browser CSRF tokens, so the voice router is mounted here — after the
+// body parsers and before the global CSRF/sanitizer chain.
+app.use('/voice', voiceRoutes);
+
 const hpp = require('hpp');
 app.use(hpp({
   whitelist: [
@@ -673,6 +680,7 @@ app.use('/api/applications', generalOpsLimiter, applicationRoutes);
 app.use('/api/messages', generalOpsLimiter, messageRoutes);
 app.use('/api/users', generalOpsLimiter, userRoutes);
 app.use('/api/admin', adminLimiter, adminRoutes);
+app.use('/api/admin/diaspora', adminLimiter, require('./routes/diasporaAdmin'));
 app.use('/api/admin/seo', adminLimiter, adminSeoRoutes);
 app.use('/api/dashboard', generalOpsLimiter, dashboardRoutes);
 app.use('/api/notifications', generalOpsLimiter, notificationRoutes);

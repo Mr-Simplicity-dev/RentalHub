@@ -67,6 +67,7 @@ const tabs = [
   "pending_approvals",
   "commission_config",
   "appeals",
+  "diaspora",
 ];
 
 const tabLabels = {
@@ -97,6 +98,7 @@ const tabLabels = {
   pending_approvals: "Pending Approvals",
   commission_config: "Commission Config",
   appeals: "Appeals",
+  diaspora: "Diaspora",
 };
 
 const shortcutCategories = [
@@ -1431,6 +1433,10 @@ export default function SuperAdminDashboard() {
 
         {tab === "appeals" && (
           <AppealsTab />
+        )}
+
+        {tab === "diaspora" && (
+          <DiasporaAdminPanel />
         )}
 
       <InputDialog
