@@ -10,6 +10,7 @@ import UsersTab from "../components/admin/UsersTab";
 import VerificationsTab from "../components/admin/VerificationsTab";
 import PropertiesTab from "../components/admin/PropertiesTab";
 import AnalyticsTab from "../components/admin/AnalyticsTab";
+import DiasporaAdminPanel from "../components/admin/DiasporaAdminPanel";
 import ReportsTab from "../components/admin/ReportsTab";
 import LogsTab from "../components/admin/LogsTab";
 import BroadcastTab from "../components/admin/BroadcastTab";
