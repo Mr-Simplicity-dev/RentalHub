@@ -44,6 +44,7 @@ import ApprovalTimeline from '../components/common/ApprovalTimeline';
 import WalletFundModal from '../components/dashboard/WalletFundModal';
 import WalletWithdrawModal from '../components/dashboard/WalletWithdrawModal';
 import TwoFactorStep from '../components/common/TwoFactorStep';
+import DiasporaContextBanner from '../components/common/DiasporaContextBanner';
 import RentSavingsModal from '../components/dashboard/RentSavingsModal';
 import AdSpace from '../components/common/AdSpace';
 
@@ -1358,6 +1359,14 @@ const Dashboard = () => {
           </p>
         </div>
 
+        {user?.diaspora_country && (
+          <DiasporaContextBanner
+            diasporaCountry={user.diaspora_country}
+            billingCountry={user.billing_country}
+            cardBrand={user.card_brand}
+          />
+        )}
+
         <AdSpace placement="dashboard_top" contained={false} className="mb-8" />
 
         {/* Verification Alert */}
@@ -1476,7 +1485,10 @@ const Dashboard = () => {
         )}
 
         {/* Stats Grid */}
-        <section className="dashboard-properties-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <section
+          className="dashboard-properties-section grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+          data-tour-id="stat-grid"
+        >
           {user?.user_type === 'tenant' ? (
             <>
               <StatCard
@@ -1802,7 +1814,7 @@ const Dashboard = () => {
 
         {/* Landlord withdrawal notice */}
         {user?.user_type === 'landlord' && (
-          <div className="bg-green-50 border border-green-200 rounded-lg px-5 py-4 mb-8 flex items-start gap-3">
+          <div className="tour-landlord-withdrawal-notice bg-green-50 border border-green-200 rounded-lg px-5 py-4 mb-8 flex items-start gap-3">
             <FaMoneyBillWave className="text-green-600 text-xl mt-0.5 shrink-0" />
             <div>
               <p className="font-semibold text-green-800 text-sm">Rent Payment Withdrawals</p>
