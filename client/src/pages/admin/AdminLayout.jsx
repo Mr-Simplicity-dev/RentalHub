@@ -510,7 +510,7 @@ const AdminLayout = () => {
         className={`${mobileSidebarOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw]' : 'hidden'} flex-col overflow-y-auto bg-white/95 shadow-xl backdrop-blur lg:sticky lg:top-0 lg:z-0 lg:flex lg:h-screen lg:w-64 lg:max-w-none lg:shadow-lg`}
       >
 
-        <div className="border-b px-5 py-4 sm:px-6 sm:py-5">
+        <div className="border-b px-5 py-4 sm:px-6 sm:py-5" data-tour-id="sidebar-dashboard">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="truncate text-xl font-bold text-gray-900">{roleTheme.panelTitle}</h2>
