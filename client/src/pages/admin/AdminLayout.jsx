@@ -1422,6 +1422,7 @@ const AdminLayout = () => {
             <div className="relative" ref={notifRefMobile}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
+                data-tour-id="header-notifications"
                 className="relative p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
                 aria-label={t('header.notifications')}
               >
