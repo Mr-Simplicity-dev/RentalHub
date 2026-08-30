@@ -53,6 +53,10 @@ exports.sendPaymentReceiptEmail = async ({
   total,
   status,
   method,
+  quoteUsd,
+  fxRate,
+  fxMarkupPct,
+  quoteCurrency,
 }) => {
   try {
     const rowsHtml = (items || [])
@@ -64,6 +68,18 @@ exports.sendPaymentReceiptEmail = async ({
       </tr>`
       )
       .join('');
+
+    const quoteHtml =
+      Number(quoteUsd) > 0
+        ? `
+      <div style="margin-top:12px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:13px;color:#166534;">
+        <p style="margin:0 0 4px;"><strong>Diaspora registration quote</strong></p>
+        <p style="margin:2px 0;">Quote: <strong>$${Number(quoteUsd).toFixed(2)} USD</strong>${quoteCurrency ? ` (${esc(quoteCurrency)})` : ''}</p>
+        ${fxRate ? `<p style="margin:2px 0;">FX rate applied: ₦${Number(fxRate).toLocaleString()} / USD</p>` : ''}
+        ${fxMarkupPct ? `<p style="margin:2px 0;">FX markup: ${Number(fxMarkupPct).toFixed(2)}%</p>` : ''}
+        <p style="margin:2px 0;">Amount charged: ${esc(total)} NGN</p>
+      </div>`
+        : '';
 
     await sendEmail({
       to: email,
@@ -89,14 +105,11 @@ exports.sendPaymentReceiptEmail = async ({
                 <th style="padding:8px 12px; text-align:right;">Amount</th>
               </tr>
             </thead>
-            <tbody>${rowsHtml}</tbody>
-            <tfoot>
-              <tr>
-                <td style="padding:10px 12px; font-weight:700; border-top:2px solid #e2e8f0;">Total Paid</td>
-                <td style="padding:10px 12px; text-align:right; font-weight:700; border-top:2px solid #e2e8f0;">${esc(total)}</td>
-              </tr>
-            </tfoot>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
           </table>
+          ${quoteHtml}
           <p style="padding-top:16px; font-size:12px; color:#94a3b8; text-align:center;">
             Thank you for using RentalHub NG. You can view and print this receipt from your Payment History.
           </p>
