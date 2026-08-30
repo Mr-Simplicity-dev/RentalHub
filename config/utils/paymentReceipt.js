@@ -64,7 +64,7 @@ const getPaymentGroup = async (paymentId) => {
   return { payment, group, ref };
 };
 
-const buildReceiptData = ({ payment, group, user, ref }) => {
+const buildReceiptData = ({ payment, group, user, ref, diasporaQuote }) => {
   const items = group.map((p) => ({
     label: humanizePaymentType(p.payment_type),
     amount: formatNgn(p.amount),
@@ -80,6 +80,11 @@ const buildReceiptData = ({ payment, group, user, ref }) => {
     total: formatNgn(group.reduce((sum, p) => sum + Number(p.amount || 0), 0)),
     status: payment.payment_status,
     method: payment.payment_method || 'Paystack',
+    // Diaspora registration quotes (USD + FX) surfaced on the receipt.
+    quoteUsd: diasporaQuote?.quote_amount_usd ?? null,
+    fxRate: diasporaQuote?.fx_rate ?? null,
+    fxMarkupPct: diasporaQuote?.fx_markup_pct ?? null,
+    quoteCurrency: diasporaQuote?.quote_currency ?? null,
   };
 };
 
@@ -92,7 +97,28 @@ const loadReceiptContext = async (paymentId) => {
   );
   const user = userResult.rows[0] || null;
   if (!user) return null;
-  return { ...ctx, user };
+
+  // Diaspora registration payments carry the USD quote on the pending
+  // registration record; surface it when the receipt is for a registration.
+  let diasporaQuote = null;
+  if (ctx.payment.transaction_reference) {
+    try {
+      const quoteResult = await db.query(
+        `SELECT quote_amount_usd, fx_rate, fx_markup_pct, quote_currency
+         FROM tenant_registration_payments
+         WHERE transaction_reference = $1
+         LIMIT 1`,
+        [ctx.payment.transaction_reference]
+      );
+      if (quoteResult.rows.length && Number(quoteResult.rows[0].quote_amount_usd) > 0) {
+        diasporaQuote = quoteResult.rows[0];
+      }
+    } catch (error) {
+      // non-fatal: receipts still render without the quote block
+    }
+  }
+
+  return { ...ctx, user, diasporaQuote };
 };
 
 const sendReceiptForPayment = async (paymentId) => {
