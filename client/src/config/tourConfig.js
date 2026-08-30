@@ -803,7 +803,7 @@ export const LAWYER_SIDEBAR_STEPS = [
 export const DASHBOARD_ICON_STEPS = [
   {
     id: 'dash_stats',
-    target: '[data-tour-id="stat-unlocked"]',
+    target: '[data-tour-id="stat-grid"]',
     title: 'Dashboard Stats',
     description: 'These cards show key numbers — unlocked details, subscription status, bookings, rent savings, refunds, and grace requests at a glance.',
     placement: 'top',
@@ -814,6 +814,7 @@ export const DASHBOARD_ICON_STEPS = [
     title: 'Invite & Earn',
     description: 'Share your referral link to invite others. Earn rewards when they sign up and complete their first verified activity.',
     placement: 'top',
+    optional: true,
   },
 ];
 
