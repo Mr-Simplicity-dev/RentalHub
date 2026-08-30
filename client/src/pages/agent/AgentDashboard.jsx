@@ -153,7 +153,7 @@ const AgentDashboard = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-tour-id="stat-grid">
               <StatCard icon={<FaHome />} label={t('agent_dashboard.assigned_state')} value={profile?.assigned_state || t('agent_dashboard.not_configured')} dataTourId="stat-assigned-state" />
               <StatCard icon={<FaClipboardList />} label={t('agent_dashboard.landlord')} value={assignment.landlord_name} dataTourId="stat-landlord" />
               <StatCard icon={<FaShieldAlt />} label={t('agent_dashboard.assignment_status')} value={assignment.status || t('agent_dashboard.active')} dataTourId="stat-assignment" />
@@ -300,7 +300,7 @@ const AgentDashboard = () => {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="agent-permissions-section rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-indigo-50 p-2.5 text-indigo-600">
                   <FaShieldAlt className="text-lg" />
@@ -324,7 +324,7 @@ const AgentDashboard = () => {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="agent-task-areas-section rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900">{t('agent_dashboard.task_areas')}</h2>
               <p className="mt-1 text-sm text-gray-500">
                 {t('agent_dashboard.task_areas_desc')}
