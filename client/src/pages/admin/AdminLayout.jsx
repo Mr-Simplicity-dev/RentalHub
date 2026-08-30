@@ -1296,6 +1296,7 @@ const AdminLayout = () => {
           <div className="flex items-center gap-1">
             <Link
               to="/messages"
+              data-tour-id="header-messages"
               className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 shrink-0"
             >
               <FaEnvelope className="text-lg" />
@@ -1309,6 +1310,7 @@ const AdminLayout = () => {
             <div className="relative shrink-0" ref={notifRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
+                data-tour-id="header-notifications"
                 className="relative p-2.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200"
                 aria-label={t('header.notifications')}
               >
@@ -1326,6 +1328,7 @@ const AdminLayout = () => {
             <button
               type="button"
               onClick={() => setProfileMenuOpen((open) => !open)}
+              data-tour-id="header-user-menu"
               className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left shadow-sm transition hover:bg-gray-50"
               aria-expanded={profileMenuOpen}
               aria-haspopup="menu"
@@ -1406,6 +1409,7 @@ const AdminLayout = () => {
           <div className="flex items-center gap-1">
             <Link
               to="/messages"
+              data-tour-id="header-messages"
               className="relative p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 shrink-0"
             >
               <FaEnvelope className="text-base" />
