@@ -216,6 +216,30 @@ const syncSubscribers = async (req, res) => {
       }
     }
 
+    // Sync from survey respondents (public / paper / online) who provided a phone
+    const surveyLeads = await db.query(
+      `SELECT id, respondent_phone, respondent_name
+       FROM survey_responses
+       WHERE respondent_phone IS NOT NULL AND respondent_phone != ''`
+    );
+
+    for (const lead of surveyLeads.rows) {
+      const existing = await db.query(
+        `SELECT id FROM sms_subscribers WHERE phone = $1 AND source = 'survey'`,
+        [lead.respondent_phone]
+      );
+
+      if (existing.rows.length === 0) {
+        await db.query(
+          `INSERT INTO sms_subscribers (phone, full_name, source, source_id, user_type, subscribed)
+           VALUES ($1, $2, 'survey', $3, 'lead', TRUE)
+           ON CONFLICT (phone) DO NOTHING`,
+          [lead.respondent_phone, lead.respondent_name || null, lead.id]
+        );
+        added++;
+      }
+    }
+
     res.json({ success: true, data: { added, updated, total: added + updated } });
   } catch (error) {
     req.logger.error('Sync SMS subscribers error:', error.message);

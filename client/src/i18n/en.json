@@ -4531,7 +4531,20 @@
     "text_placeholder": "Write your answer here...",
     "pick_limit": "Choose up to {{count}}: {{picked}} chosen",
     "screened_out": "Thank you for your time — this survey does not apply to you. Your answer has been recorded.",
-    "security_required": "Please complete the security check to submit."
+    "security_required": "Please complete the security check to submit.",
+    "contact_step": "Step 1 of 2 — your contact details",
+    "contact_intro": "Tell us how to reach you (optional for the survey itself, but very helpful). We only use these details to contact you about RentalHub NG — never for anything else.",
+    "contact_name": "Full name *",
+    "contact_phone": "Phone number *",
+    "contact_location": "Where do you currently live? (state, city) *",
+    "contact_location_ph": "e.g. Gwagwalada, FCT Abuja",
+    "contact_state_origin": "State of origin *",
+    "contact_no_email_note": "No email recorded for this respondent.",
+    "contact_add_email": "Add email instead",
+    "contact_email": "Email address (optional)",
+    "contact_no_email": "This respondent has no email address",
+    "contact_continue": "Continue to the survey",
+    "contact_required": "Please fill in your name, phone, current location and state of origin."
   },
   "public_survey": {
     "title": "RentalHub NG Market Research Survey",

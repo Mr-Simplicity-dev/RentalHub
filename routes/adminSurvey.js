@@ -135,7 +135,10 @@ router.get('/export.csv', async (req, res) => {
     const db = require('../config/middleware/database');
     const rows = await db.query(
       `SELECT sr.respondent_code, sr.source, sr.admin_mode, sr.admin_date,
-              s.state_name AS state, sr.lga_name, sr.created_at, sr.completed_at,
+              s.state_name AS state, sr.lga_name,
+              sr.respondent_name, sr.respondent_phone, sr.respondent_email,
+              sr.respondent_location, sr.respondent_state_of_origin, sr.has_email,
+              sr.created_at, sr.completed_at,
               sr.time_spent_seconds, sr.answers
        FROM survey_responses sr
        LEFT JOIN states s ON s.id = sr.state_id
@@ -154,6 +157,8 @@ router.get('/export.csv', async (req, res) => {
 
     const header = [
       'respondent_code', 'source', 'admin_mode', 'admin_date', 'state', 'lga',
+      'respondent_name', 'respondent_phone', 'respondent_email',
+      'respondent_location', 'respondent_state_of_origin',
       'created_at', 'completed_at', 'time_spent_seconds',
       ...questions.map((q) => q.key),
     ];
@@ -164,7 +169,11 @@ router.get('/export.csv', async (req, res) => {
       lines.push(
         [
           row.respondent_code, row.source, row.admin_mode || '', row.admin_date || '',
-          row.state || '', row.lga_name || '', row.created_at, row.completed_at || '',
+          row.state || '', row.lga_name || '',
+          row.respondent_name || '', row.respondent_phone || '',
+          row.has_email ? (row.respondent_email || '') : 'NO_EMAIL',
+          row.respondent_location || '', row.respondent_state_of_origin || '',
+          row.created_at, row.completed_at || '',
           row.time_spent_seconds || '',
           ...questions.map((q) => {
             const v = answers[q.key];

@@ -253,6 +253,33 @@ const syncSubscribers = async (req, res) => {
       }
     }
 
+    // Sync from survey respondents (public / paper / online) who provided email
+    const surveyLeads = await db.query(
+      `SELECT id, respondent_email, respondent_name
+       FROM survey_responses
+       WHERE has_email = TRUE
+         AND respondent_email IS NOT NULL
+         AND respondent_email != ''`
+    );
+
+    for (const lead of surveyLeads.rows) {
+      const existing = await db.query(
+        `SELECT id FROM email_subscribers WHERE email = $1 AND source = 'survey'`,
+        [lead.respondent_email]
+      );
+
+      if (existing.rows.length === 0) {
+        const token = generateUnsubscribeToken();
+        await db.query(
+          `INSERT INTO email_subscribers (email, full_name, source, source_id, user_type, unsubscribe_token, subscribed)
+           VALUES ($1, $2, 'survey', $3, 'lead', $4, TRUE)
+           ON CONFLICT (email) DO NOTHING`,
+          [lead.respondent_email, lead.respondent_name || null, lead.id, token]
+        );
+        added++;
+      }
+    }
+
     res.json({ success: true, data: { added, updated, total: added + updated } });
   } catch (error) {
     req.logger.error('Sync subscribers error:', error.message);

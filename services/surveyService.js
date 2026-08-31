@@ -309,11 +309,28 @@ exports.getSurveyDefinition = async (req, res) => {
 
 exports.submitPublicSurvey = async (req, res) => {
   try {
-    const { survey_type, answers, consent_flags, state_id, lga_name } = req.body;
+    const { survey_type, answers, consent_flags, state_id, lga_name, contact } = req.body;
 
     const type = String(survey_type || 'tenant').toLowerCase();
     if (!survey.getQuestionnaire(type)) {
       return res.status(400).json({ success: false, message: 'Unknown survey type' });
+    }
+
+    // Contact capture: name + phone required for public/paper respondents;
+    // email optional with an explicit "no email" choice.
+    const contactName = String(contact?.name || '').trim().slice(0, 200);
+    const contactPhone = String(contact?.phone || '').replace(/\s+/g, '').slice(0, 30);
+    const contactEmail = String(contact?.email || '').trim().toLowerCase().slice(0, 255);
+    const noEmail = contact?.no_email === true || !contactEmail;
+    const contactLocation = String(contact?.location || '').trim().slice(0, 255);
+    const contactStateOfOrigin = String(contact?.state_of_origin || '').trim().slice(0, 120);
+
+    if (!contactName || !contactPhone) {
+      return res.status(400).json({
+        success: false,
+        code: 'CONTACT_REQUIRED',
+        message: 'Respondent name and phone number are required',
+      });
     }
 
     const screenedOut = survey
@@ -332,8 +349,11 @@ exports.submitPublicSurvey = async (req, res) => {
     const insert = await db.query(
       `INSERT INTO survey_responses
          (survey_type, survey_version, respondent_code, source,
-          consent_flags, answers, state_id, lga_name, completed_at)
-       VALUES ($1, $2, $3, 'public_link', $4, $5, $6, $7, CURRENT_TIMESTAMP)
+          consent_flags, answers, state_id, lga_name, completed_at,
+          respondent_name, respondent_phone, respondent_email,
+          respondent_location, respondent_state_of_origin, has_email)
+       VALUES ($1, $2, $3, 'public_link', $4, $5, $6, $7, CURRENT_TIMESTAMP,
+               $8, $9, $10, $11, $12, $13)
        RETURNING id, respondent_code`,
       [
         type,
@@ -343,6 +363,12 @@ exports.submitPublicSurvey = async (req, res) => {
         JSON.stringify(answers || {}),
         state_id || null,
         lga_name ? String(lga_name).trim().slice(0, 120) : null,
+        contactName,
+        contactPhone,
+        noEmail ? null : contactEmail,
+        contactLocation || null,
+        contactStateOfOrigin || null,
+        !noEmail,
       ]
     );
 

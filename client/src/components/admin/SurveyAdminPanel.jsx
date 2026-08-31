@@ -456,10 +456,12 @@ const SurveyAdminPanel = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-gray-600">Code</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Respondent</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Phone</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Email</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Lives in</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">State of origin</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-600">Source</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">State</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">User</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">Submitted</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-600">Status</th>
                   <th className="px-3 py-2 text-right font-medium text-gray-600"></th>
                 </tr>
@@ -468,12 +470,17 @@ const SurveyAdminPanel = () => {
                 {(responses?.responses || []).map((r) => (
                   <tr key={r.id}>
                     <td className="px-3 py-2 font-mono text-xs text-gray-700">{r.respondent_code}</td>
-                    <td className="px-3 py-2 text-gray-600">{r.source}{r.admin_mode ? ` (${r.admin_mode})` : ""}</td>
-                    <td className="px-3 py-2 text-gray-600">{r.state_name || "—"}</td>
-                    <td className="px-3 py-2 text-gray-600">{r.user_full_name || "—"}</td>
-                    <td className="px-3 py-2 text-gray-600">
-                      {r.completed_at ? new Date(r.completed_at).toLocaleDateString() : new Date(r.created_at).toLocaleDateString()}
+                    <td className="px-3 py-2 text-gray-700">
+                      <p className="font-medium">{r.respondent_name || r.user_full_name || "—"}</p>
+                      <p className="text-xs text-gray-400">{r.lga_name || r.state_name || ""}</p>
                     </td>
+                    <td className="px-3 py-2 text-gray-600">{r.respondent_phone || "—"}</td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {r.has_email ? (r.respondent_email || "—") : <span className="text-xs font-semibold text-gray-400">NO EMAIL</span>}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">{r.respondent_location || "—"}</td>
+                    <td className="px-3 py-2 text-gray-600">{r.respondent_state_of_origin || "—"}</td>
+                    <td className="px-3 py-2 text-gray-600">{r.source}{r.admin_mode ? ` (${r.admin_mode})` : ""}</td>
                     <td className="px-3 py-2">
                       {r.completed_at ? (
                         <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Completed</span>
@@ -495,7 +502,7 @@ const SurveyAdminPanel = () => {
                 ))}
                 {!responses?.responses?.length && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-gray-400">
+                    <td colSpan={9} className="px-3 py-8 text-center text-sm text-gray-400">
                       No responses yet
                     </td>
                   </tr>
@@ -580,6 +587,7 @@ const SurveyAdminPanel = () => {
                   mode="full"
                   paperMode
                   paperMeta={paperMeta}
+                  collectContacts
                   onComplete={() => {
                     setPaperOpen(false);
                     toast.success("Paper response recorded");

@@ -37,6 +37,7 @@ const PublicSurveyPage = () => {
           surveyType={type}
           mode="full"
           publicMode
+          collectContacts
           onComplete={() => setSubmitted(true)}
         />
       </div>

@@ -16,6 +16,7 @@ export default function SurveyWizard({
   publicMode = false,
   paperMode = false,
   paperMeta = null,
+  collectContacts = false,
   onComplete,
   onExit,
   showExit = false,
@@ -29,6 +30,15 @@ export default function SurveyWizard({
   const [responseId, setResponseId] = useState(null);
   const [answers, setAnswers] = useState({});
   const [consentFlags, setConsentFlags] = useState({});
+  const [contact, setContact] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    no_email: false,
+    location: '',
+    state_of_origin: '',
+  });
+  const [contactDone, setContactDone] = useState(!collectContacts);
   const [sectionIndex, setSectionIndex] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -144,6 +154,7 @@ export default function SurveyWizard({
             answers,
             consent_flags: consentFlags,
             ...(paperMeta || {}),
+            contact,
             mark_complete: true,
           });
           onComplete?.(res.data.data);
@@ -162,6 +173,7 @@ export default function SurveyWizard({
               survey_type: surveyType,
               answers,
               consent_flags: consentFlags,
+              contact,
               turnstile_token: turnstileToken,
             }
           );
@@ -207,6 +219,114 @@ export default function SurveyWizard({
       setQuestionIndex((sections[s - 1]?.questions.length || 1) - 1);
     }
     questionEnteredAt.current = Date.now();
+  };
+
+  const renderContactStep = () => {
+    const canSubmitContact =
+      contact.name.trim().length >= 2 &&
+      contact.phone.replace(/\D/g, '').length >= 10 &&
+      contact.location.trim().length >= 2 &&
+      contact.state_of_origin.trim().length >= 2;
+
+    return (
+      <div className="mt-6 space-y-4">
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+          {t('survey.contact_intro', 'Tell us how to reach you (optional for the survey itself, but very helpful). We only use these details to contact you about RentalHub NG — never for anything else.')}
+        </div>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-gray-700">{t('survey.contact_name', 'Full name *')}</span>
+          <input
+            type="text"
+            value={contact.name}
+            onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-gray-700">{t('survey.contact_phone', 'Phone number *')}</span>
+          <input
+            type="tel"
+            value={contact.phone}
+            onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+            placeholder="0803 000 0000"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-gray-700">
+            {t('survey.contact_location', 'Where do you currently live? (state, city) *')}
+          </span>
+          <input
+            type="text"
+            value={contact.location}
+            onChange={(e) => setContact((c) => ({ ...c, location: e.target.value }))}
+            placeholder={t('survey.contact_location_ph', 'e.g. Gwagwalada, FCT Abuja')}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-gray-700">{t('survey.contact_state_origin', 'State of origin *')}</span>
+          <input
+            type="text"
+            value={contact.state_of_origin}
+            onChange={(e) => setContact((c) => ({ ...c, state_of_origin: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+        </label>
+        {contact.no_email ? (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            {t('survey.contact_no_email_note', 'No email recorded for this respondent.')}
+            <button
+              type="button"
+              onClick={() => setContact((c) => ({ ...c, no_email: false }))}
+              className="ml-2 font-semibold text-indigo-600 hover:text-indigo-800"
+            >
+              {t('survey.contact_add_email', 'Add email instead')}
+            </button>
+          </p>
+        ) : (
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-gray-700">{t('survey.contact_email', 'Email address (optional)')}</span>
+            <input
+              type="email"
+              value={contact.email}
+              onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </label>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="survey-no-email"
+            checked={contact.no_email}
+            onChange={(e) => setContact((c) => ({ ...c, no_email: e.target.checked, email: '' }))}
+            className="h-4 w-4 rounded border-gray-300 text-indigo-600"
+          />
+          <label htmlFor="survey-no-email" className="text-sm text-gray-700">
+            {t('survey.contact_no_email', 'This respondent has no email address')}
+          </label>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (!canSubmitContact) {
+              setError(t('survey.contact_required', 'Please fill in your name, phone, current location and state of origin.'));
+              return;
+            }
+            setError('');
+            setContactDone(true);
+            questionEnteredAt.current = Date.now();
+          }}
+          disabled={!canSubmitContact}
+          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {t('survey.contact_continue', 'Continue to the survey')}
+          <FaArrowRight />
+        </button>
+      </div>
+    );
   };
 
   const renderQuestion = () => {
@@ -361,17 +481,19 @@ export default function SurveyWizard({
         <div>
           <h2 className="text-lg font-bold text-gray-900">{exitLabel}</h2>
           <p className="text-xs text-gray-500">
-            {mode === 'partA'
-              ? t('survey.part_a_sub', 'This first section takes about 2 minutes. The rest can be finished later.')
-              : t('survey.part_b_sub', 'Section {{section}} · Question {{q}} of {{total}}', {
-                  section: currentSection?.section,
-                  q: questionIndex + 1,
-                  total: currentSection?.questions.length,
-                })}
+            {collectContacts && !contactDone
+              ? t('survey.contact_step', 'Step 1 of 2 — your contact details')
+              : mode === 'partA'
+                ? t('survey.part_a_sub', 'This first section takes about 2 minutes. The rest can be finished later.')
+                : t('survey.part_b_sub', 'Section {{section}} · Question {{q}} of {{total}}', {
+                    section: currentSection?.section,
+                    q: questionIndex + 1,
+                    total: currentSection?.questions.length,
+                  })}
           </p>
         </div>
         <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
-          {progress}%
+          {collectContacts && !contactDone ? 0 : progress}%
         </span>
       </div>
 
@@ -379,62 +501,68 @@ export default function SurveyWizard({
       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
         <div
           className="h-full rounded-full bg-indigo-600 transition-all duration-300"
-          style={{ width: `${progress}%` }}
+          style={{ width: `${collectContacts && !contactDone ? 0 : progress}%` }}
         />
       </div>
 
-      {/* Section label */}
-      <div className="mt-6">
-        <p className="text-xs font-bold uppercase tracking-wide text-indigo-600">
-          {t('survey.section', 'Section')} {currentSection?.section}
-        </p>
-        <h3 className="mt-1 text-lg font-semibold leading-snug text-gray-900">
-          {currentQuestion.prompt}
-        </h3>
-      </div>
+      {collectContacts && !contactDone ? (
+        renderContactStep()
+      ) : (
+        <>
+          {/* Section label */}
+          <div className="mt-6">
+            <p className="text-xs font-bold uppercase tracking-wide text-indigo-600">
+              {t('survey.section', 'Section')} {currentSection?.section}
+            </p>
+            <h3 className="mt-1 text-lg font-semibold leading-snug text-gray-900">
+              {currentQuestion.prompt}
+            </h3>
+          </div>
 
-      {renderQuestion()}
+          {renderQuestion()}
 
-      {screenedOut && (
-        <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {t('survey.screened_out', 'Thank you for your time — this survey does not apply to you. Your answer has been recorded.')}
-        </div>
-      )}
-
-      <div className="mt-8 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={handleBack}
-          disabled={sectionIndex === 0 && questionIndex === 0}
-          className="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-        >
-          <FaArrowLeft /> {t('survey.back', 'Back')}
-        </button>
-        <div className="flex flex-col items-end gap-2">
-          {publicMode && (isLastQuestion || screenedOut) && (
-            <TurnstileWidget
-              action="rentalhub_survey"
-              onToken={setTurnstileToken}
-            />
+          {screenedOut && (
+            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {t('survey.screened_out', 'Thank you for your time — this survey does not apply to you. Your answer has been recorded.')}
+            </div>
           )}
-          <div className="flex items-center gap-2">
-            {saving && <span className="text-xs text-gray-400">{t('survey.saving', 'Saving...')}</span>}
+
+          <div className="mt-8 flex items-center justify-between gap-3">
             <button
               type="button"
-              onClick={handleNext}
-              disabled={!canGoNext || submitting || (publicMode && (isLastQuestion || screenedOut) && !turnstileToken)}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+              onClick={handleBack}
+              disabled={sectionIndex === 0 && questionIndex === 0}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
             >
-              {submitting
-                ? t('survey.submitting', 'Submitting...')
-                : isLastQuestion || screenedOut
-                  ? t('survey.finish', 'Finish')
-                  : t('survey.next', 'Next')}
-              <FaArrowRight />
+              <FaArrowLeft /> {t('survey.back', 'Back')}
             </button>
+            <div className="flex flex-col items-end gap-2">
+              {publicMode && (isLastQuestion || screenedOut) && (
+                <TurnstileWidget
+                  action="rentalhub_survey"
+                  onToken={setTurnstileToken}
+                />
+              )}
+              <div className="flex items-center gap-2">
+                {saving && <span className="text-xs text-gray-400">{t('survey.saving', 'Saving...')}</span>}
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={!canGoNext || submitting || (publicMode && (isLastQuestion || screenedOut) && !turnstileToken)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {submitting
+                    ? t('survey.submitting', 'Submitting...')
+                    : isLastQuestion || screenedOut
+                      ? t('survey.finish', 'Finish')
+                      : t('survey.next', 'Next')}
+                  <FaArrowRight />
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
       {showExit && !screenedOut && mode !== 'partA' && (
         <button

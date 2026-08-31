@@ -495,6 +495,8 @@ exports.listResponses = async (req, res) => {
     const result = await db.query(
       `SELECT sr.id, sr.survey_type, sr.survey_version, sr.respondent_code, sr.source,
               sr.admin_mode, sr.admin_date, sr.state_id, sr.lga_name,
+              sr.respondent_name, sr.respondent_phone, sr.respondent_email,
+              sr.respondent_location, sr.respondent_state_of_origin, sr.has_email,
               sr.part_a_completed_at, sr.completed_at, sr.time_spent_seconds,
               sr.created_at,
               s.state_name, u.full_name AS user_full_name, u.email AS user_email
@@ -528,12 +530,20 @@ exports.paperEntry = async (req, res) => {
       state_id,
       state_name,
       lga_name,
+      contact,
     } = req.body;
 
     const type = String(survey_type || 'tenant').toLowerCase();
     if (!survey.getQuestionnaire(type)) {
       return res.status(400).json({ success: false, message: 'Unknown survey type' });
     }
+
+    const contactName = String(contact?.name || '').trim().slice(0, 200);
+    const contactPhone = String(contact?.phone || '').replace(/\s+/g, '').slice(0, 30);
+    const contactEmail = String(contact?.email || '').trim().toLowerCase().slice(0, 255);
+    const noEmail = contact?.no_email === true || !contactEmail;
+    const contactLocation = String(contact?.location || '').trim().slice(0, 255);
+    const contactStateOfOrigin = String(contact?.state_of_origin || '').trim().slice(0, 120);
 
     // Resolve the typed state name to a state id when it matches; otherwise
     // store only the LGA text (paper forms often carry handwritten names).
@@ -550,10 +560,13 @@ exports.paperEntry = async (req, res) => {
       `INSERT INTO survey_responses
          (survey_type, survey_version, respondent_code, source,
           admin_mode, admin_date, state_id, lga_name,
-          consent_flags, answers, part_a_completed_at, completed_at)
+          consent_flags, answers, part_a_completed_at, completed_at,
+          respondent_name, respondent_phone, respondent_email,
+          respondent_location, respondent_state_of_origin, has_email)
        VALUES ($1, $2, $3, 'paper_entry', $4, $5, $6, $7, $8, $9,
                CASE WHEN $10 THEN CURRENT_TIMESTAMP ELSE NULL END,
-               CASE WHEN $10 THEN CURRENT_TIMESTAMP ELSE NULL END)
+               CASE WHEN $10 THEN CURRENT_TIMESTAMP ELSE NULL END,
+               $11, $12, $13, $14, $15, $16)
        RETURNING id, respondent_code`,
       [
         type,
@@ -566,6 +579,12 @@ exports.paperEntry = async (req, res) => {
         JSON.stringify(consent_flags || {}),
         JSON.stringify(answers || {}),
         Boolean(req.body.mark_complete),
+        contactName,
+        contactPhone,
+        noEmail ? null : contactEmail,
+        contactLocation || null,
+        contactStateOfOrigin || null,
+        !noEmail,
       ]
     );
 
