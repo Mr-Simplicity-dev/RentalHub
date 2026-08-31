@@ -38,7 +38,17 @@
 
 - [x] **DONE — Onboarding survey system (2026-08-31, +contacts/sync follow-up)** — tenant (T0–T9) + landlord (L0–L10) questionnaires (107q each); non-skippable Part A (T0+T1 / L0+L1) gate on new-user dashboard before tour; autosave + resume; Part B finished from dashboard reminder; Super Admin → Survey & Analysis tab (frequencies, likert means, NPS, feature priority, fraud signals, open answers, projections machine for revenue/cost/staffing/funding duration); PDF + CSV export; paper entry (admin keys paper responses, R2/R3 fields); public page at /survey (Turnstile). **Contacts follow-up**: public + paper respondents give name/phone/email ("no email" flag)/current location/state of origin — viewable in responses table + CSV; survey contacts sync into Email Marketing ("Sync contacts from users & leads", source='survey') and SMS Marketing ("Sync contacts from users", source='survey'). Existing users (pre-2026-08-31) marked survey_exempt. Migrations 132 + 133. Live unit-tested (gate, analysis pipeline, projections, contacts, email+SMS sync).
 
-- [ ] **Survey follow-ups (next session)** — (1) ha/yo/ig translations for the 214 survey questions (wizard chrome already translated; prompts are English-only today); (2) link to /survey from the public site (Home/Footer) once the user wants lead capture visible.
+- [x] **DONE (2026-08-31) — Agent-assisted mode + resume + account continuation + rent-change restart + notifications** (commits `edc1e3b`, `6aaba6a`; migrations 134 + 135; all 7 live tests passed):
+  - **marketing_agent role**: in users CHECK constraint (migration 135), CREATABLE_ADMIN_ROLES, ALL_USER_TYPES, CreateAdminTab optgroup "Marketing", AdminListTab meta. Created by Super Admin like other admins.
+  - **Marketing agent dashboard** `/marketing-agent/dashboard` (MarketingAgentRoute guard): stats (captured/in-progress/with-email/with-phone), responses-by-LGA chart, my-captured table, "Conduct Survey" → `/survey?agent=1`.
+  - **Agent-assisted public survey**: `/survey?agent=1` (marketing agent logged in) → wizard agent step (LGA + location + admin_mode; name/phone auto from account); attributed via agent_user_id/agent_name/agent_phone/agent_lga/agent_location columns; responses table + CSV show agent fields.
+  - **Public draft resume**: POST /survey/public/draft (generates/returns resume_token, stored in localStorage `rentalhub_survey_resume`), GET /survey/resume?token= returns saved answers; landing shows "Continue where you left off".
+  - **Account continuation**: POST /survey/claim (authenticated, resume_token) links the anonymous draft to the new user — NO re-survey; wizard pre-fills saved answers (resumedDraft state).
+  - **Rent/location change**: wizard shows a situation check screen on continued drafts; "changed/moved" → POST /survey/restart supersedes old row (`superseded_at`) — excluded from ALL analysis/export queries (`loadResponses` adds `superseded_at IS NULL`) — and creates a fresh row.
+  - **Browser notifications**: "Remind me to finish later" (Notification permission) + notification on return when a draft exists; Web Push (true background reminders) NOT built — tracked below.
+- [ ] **[SURVEY-FU-5b] Web Push reminders** (later upgrade) — service worker + VAPID keys for true background notifications to public survey drafters.
+- [ ] **[SURVEY-FU-6] ha/yo/ig translations** of all 214 survey question prompts + option labels + the new survey.agent_*/situation_*/contact_* keys (structure already supports `{en, ha, yo, ig}`; wizard chrome is translated).
+- [ ] **[SURVEY-FU-7] /survey link on public site** — add link to rentalhub.com.ng/survey (Home/Footer) once lead capture is wanted.
 
 ---
 
