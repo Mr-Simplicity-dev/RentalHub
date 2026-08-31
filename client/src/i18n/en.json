@@ -4514,5 +4514,40 @@
     "verifying": "Verifying...",
     "verify": "Verify & Continue",
     "cancel": "Cancel"
+  },
+  "survey": {
+    "title": "RentalHub NG Market Research Survey",
+    "part_a_title": "A few quick questions before you continue",
+    "part_a_sub": "This first section takes about 2 minutes. The rest can be finished later.",
+    "part_b_sub": "Section {{section}} · Question {{q}} of {{total}}",
+    "section": "Section",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish",
+    "saving": "Saving...",
+    "submitting": "Submitting...",
+    "finish_later": "Finish later from my dashboard",
+    "privacy_note": "Anonymous market research. Your personal details are never linked to your answers.",
+    "text_placeholder": "Write your answer here...",
+    "pick_limit": "Choose up to {{count}}: {{picked}} chosen",
+    "screened_out": "Thank you for your time — this survey does not apply to you. Your answer has been recorded.",
+    "security_required": "Please complete the security check to submit."
+  },
+  "public_survey": {
+    "title": "RentalHub NG Market Research Survey",
+    "subtitle": "Help us understand how Nigerians find and pay for rental homes. Your answers are anonymous and used only for research. Estimated time: 15–20 minutes.",
+    "choose": "Who are you?",
+    "tenant": "Tenant / Rent Seeker",
+    "tenant_desc": "Currently renting, looking for a home, or rented within the last 24 months.",
+    "landlord": "Landlord / Property Owner",
+    "landlord_desc": "Own or manage residential rental property in Nigeria.",
+    "privacy": "Anonymous · Voluntary · Your identity is never linked to your answers",
+    "thanks_title": "Thank you!",
+    "thanks_body": "Your answers have been recorded. They will help improve rental services in Nigeria."
+  },
+  "dashboard": {
+    "survey_reminder_title": "Finish your market research survey",
+    "survey_reminder_body": "Your answers help us improve RentalHub NG. It takes about 10 more minutes — you can finish anytime.",
+    "survey_continue": "Continue Survey"
   }
 }

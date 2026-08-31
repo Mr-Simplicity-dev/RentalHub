@@ -263,17 +263,29 @@ test('outbound legs misrouted to /voice/incoming are rejected, not IVR-ed', asyn
 
 // ── IVR menu ─────────────────────────────────────────────────────────────────
 
-test('menu 1 enqueues the caller into the support queue', async () => {
+test('menu 1 sends the caller into their conference room', async () => {
   const res = await post('/voice/menu', {
     Digits: '1', CallSid: 'CA3', To: '+2348012345678',
     From: 'sip:+2348031234567@termii-trunk.example.com',
   });
   assert.equal(res.status, 200);
-  assert.match(res.body, /<Enqueue/);
+  assert.match(res.body, /<Dial/);
+  assert.match(res.body, /<Conference/);
+  assert.match(res.body, /rentalhub_support_CA3/);
   assert.match(res.body, /waitUrl="\/voice\/wait/);
-  assert.match(res.body, /action="\/voice\/enqueue-done/);
-  assert.match(res.body, /friendlyName="support"/);
+  assert.match(res.body, /conference-events/);
   assert.doesNotMatch(res.body, /<Client>/);
+  assert.doesNotMatch(res.body, /<Enqueue/);
+});
+
+test('menu 3 collects a callback number', async () => {
+  const res = await post('/voice/menu', {
+    Digits: '3', CallSid: 'CA3b', To: '+2348012345678', From: '+2348000000000',
+  });
+  assert.equal(res.status, 200);
+  assert.match(res.body, /phone number/);
+  assert.match(res.body, /callback-number/);
+  assert.match(res.body, /finishOnKey="#"/);
 });
 
 test('menu 2 dials the sales backup number', async () => {
@@ -332,11 +344,11 @@ test('dial-fallback with no-answer offers the recovery gather', async () => {
   assert.match(res.body, /Goodbye/);
 });
 
-test('fallback-choice 1 re-enters the support queue', async () => {
+test('fallback-choice 1 re-sends the caller into their conference room', async () => {
   const res = await post('/voice/fallback-choice', { Digits: '1', CallSid: 'CA10', To: '+2348012345678', From: '+2348000000000' });
   assert.equal(res.status, 200);
-  assert.match(res.body, /<Enqueue/);
-  assert.match(res.body, /waitUrl="\/voice\/wait/);
+  assert.match(res.body, /<Conference/);
+  assert.match(res.body, /rentalhub_support_CA10/);
 });
 
 test('fallback-choice 2 routes to sales with the terminal fallback', async () => {
@@ -464,7 +476,7 @@ test('callback-number accepts a valid number and rejects nonsense', async () => 
 
 // ── Queue, hold experience and ad slots ──────────────────────────────────────
 
-test('wait loop plays announcement, callback option and optional music/ad', async () => {
+test('wait loop plays announcement and optional music/ad without DTMF', async () => {
   const originals = {
     music: process.env.VOICE_HOLD_MUSIC_URL,
     ads: process.env.VOICE_ADS_ENABLED,
@@ -482,8 +494,8 @@ test('wait loop plays announcement, callback option and optional music/ad', asyn
     let res = await post('/voice/wait', { CallSid: 'CA30', To: '+2348012345678', From: '+2348000000000' });
     assert.equal(res.status, 200);
     assert.match(res.body, /All agents are currently helping other callers/);
-    assert.match(res.body, /<Gather/);
-    assert.match(res.body, /wait-options/);
+    // Conference waitUrl context: no DTMF gather, only media.
+    assert.doesNotMatch(res.body, /<Gather/);
     assert.doesNotMatch(res.body, /<Play/);
 
     process.env.VOICE_HOLD_MUSIC_URL = 'https://cdn.example.com/hold.mp3';
@@ -503,42 +515,27 @@ test('wait loop plays announcement, callback option and optional music/ad', asyn
   }
 });
 
-test('wait-options routes callback requests and rejects other digits', async () => {
-  let res = await post('/voice/wait-options', {
-    Digits: '1', CallSid: 'CA32', To: '+2348012345678', From: '+2348000000000',
+test('conference-events webhook accepts lifecycle events', async () => {
+  const res = await post('/voice/conference-events', {
+    ConferenceSid: 'CF1234',
+    FriendlyName: 'rentalhub_support_CA40',
+    StatusCallbackEvent: 'conference-start',
+    CallSid: 'CA40',
   });
   assert.equal(res.status, 200);
-  assert.match(res.body, /phone number/);
-  assert.match(res.body, /callback-number/);
-
-  res = await post('/voice/wait-options', {
-    Digits: '9', CallSid: 'CA33', To: '+2348012345678', From: '+2348000000000',
-  });
-  assert.match(res.body, /invalid/);
-  assert.match(res.body, /<Hangup\/>/);
+  const parsed = JSON.parse(res.body);
+  assert.equal(parsed.success, true);
 });
 
-test('enqueue-done ends politely for every outcome', async () => {
-  let res = await post('/voice/enqueue-done', {
-    QueueResult: 'bridged', CallSid: 'CA34', To: '+2348012345678', From: '+2348000000000',
-  });
-  assert.equal(res.status, 200);
-  assert.match(res.body, /<Hangup\/>/);
-
-  res = await post('/voice/enqueue-done', {
-    QueueResult: 'leave', CallSid: 'CA35', To: '+2348012345678', From: '+2348000000000',
-  });
-  assert.match(res.body, /Thank you for calling RentalHub/);
-});
-
-test('outgoing queue: joins the configured queue line and rejects unknown queues', async () => {
+test('outgoing queue: parks the agent in the waiting room and rejects unknown queues', async () => {
   let res = await post('/voice/outgoing', {
     To: 'queue:support', From: 'client:support_agent_1', CallSid: 'CA36',
   });
   assert.equal(res.status, 200);
-  assert.match(res.body, /<Dial answerOnBridge="true"/);
-  assert.match(res.body, /<Queue url="\/voice\/agent-wait/);
-  assert.match(res.body, /support<\/Queue>/);
+  assert.match(res.body, /<Dial timeout="7200"/);
+  assert.match(res.body, /<Conference/);
+  assert.match(res.body, /rentalhub_agents_waiting/);
+  assert.match(res.body, /agent-wait/);
   assert.match(res.body, /statusCallback/);
 
   res = await post('/voice/outgoing', {
@@ -546,7 +543,7 @@ test('outgoing queue: joins the configured queue line and rejects unknown queues
   });
   assert.equal(res.status, 200);
   assert.match(res.body, /not available/);
-  assert.doesNotMatch(res.body, /<Queue/);
+  assert.doesNotMatch(res.body, /<Conference/);
 });
 
 test('agent-wait keeps the agent informed while on the line', async () => {

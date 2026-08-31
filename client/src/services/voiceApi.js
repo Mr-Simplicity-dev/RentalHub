@@ -114,15 +114,36 @@ export const fetchDepartments = async () => {
   return Array.isArray(data?.data) ? data.data : [];
 };
 
-/** Escalate the caller on the given agent leg to a department (cold transfer). */
-export const escalateCall = async (callSid, department) => {
+/**
+ * Warm-transfer consult: the department is called into the caller's room and
+ * held+coached so ONLY the agent hears them (the caller is parked on hold).
+ * Returns { connected } — false when the department hasn't answered yet.
+ */
+export const consultCall = async (callSid, department) => {
   if (!callSid || !department) {
-    const error = new Error('Missing call or department for escalation.');
+    const error = new Error('Missing call or department for consultation.');
+    error.code = 'VOICE_REQUEST_ERROR';
+    throw error;
+  }
+  const data = await authedFetch('/voice/escalate', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'consult', callSid, department }),
+  });
+  return data?.data?.connected === true;
+};
+
+/**
+ * Warm-transfer bridge: unholds the department and the caller (three-way),
+ * after which the agent hangs up on their side.
+ */
+export const transferCall = async (callSid) => {
+  if (!callSid) {
+    const error = new Error('Missing call for transfer.');
     error.code = 'VOICE_REQUEST_ERROR';
     throw error;
   }
   return authedFetch('/voice/escalate', {
     method: 'POST',
-    body: JSON.stringify({ callSid, department }),
+    body: JSON.stringify({ action: 'transfer', callSid }),
   });
 };

@@ -1,41 +1,37 @@
 # Voice System Backlog — Outstanding Work
 
-Status: queue/hold experience, DB-backed audio ads, and department escalation
-are complete. Only deployment (below) and the two integration points remain.
+Status: warm transfers (consult -> transfer on conference rooms) are live.
+Only deployment (below) and the caller-identity limitation remain.
 
 ## Queue / hold / ads / escalation — complete
 
-- [x] **Real call queue** — support callers are `<Enqueue>`d into
-  `VOICE_QUEUE_NAME` (default `support`); agents join the line by dialing
-  `queue:<name>` through the TwiML App (`/voice/outgoing` serves the
-  `<Dial><Queue>` leg); the Voice Desk auto-joins on "Go Available" and
-  re-joins after each call.
-- [x] **Hold experience** — `/voice/wait` loop: busy announcement →
-  5s "press 1 for callback" DTMF window → optional ad slot → optional hold
-  music (`VOICE_HOLD_MUSIC_URL`); `/voice/agent-wait` for the agent side;
-  `/voice/enqueue-done` action closes the caller leg politely.
-- [x] **Ad slots wired to the ad-spaces DB** — ads are created in the Super
-  Admin → Ad Spaces tab (media_type=audio, placement=voice_hold, MP3/WAV/OGG/
-  OPUS upload or URL); the hold loop plays them (deterministic per caller) and
-  counts impressions once per (ad, call) via `voice_ad_impressions`
-  (migration 130). `VOICE_AD_AUDIO_URLS` is only the DB-down fallback.
-- [x] **Department escalation** — `VOICE_ESCALATION_DEPARTMENTS`
-  (`name:E164 | name:client:<identity>`); the desk shows an Escalate control
-  on the queue line; backend verifies the live agent leg (Twilio REST),
-  locates the bridged caller from the 'queued' leg persisted by /voice/wait,
-  cold-transfers the caller via REST TwiML redirect, and audits in
-  `voice_call_escalations` (migration 131).
+- [x] **Conference-room call path** — support calls run inside Twilio
+  conferences: callers park in their own room (hold loop = announcement ->
+  ad -> music via `/voice/wait`); agents are dispatched into rooms (direct
+  join when dialing the queue with a caller waiting, or auto-dispatch via
+  REST participants.create when a caller arrives while the agent is parked in
+  the waiting room); `/voice/conference-events` drives lifecycle +
+  queued->in-progress marking; `/voice/status` + recording attach to the
+  agent dial legs.
+- [x] **Hold experience** — conference waitUrl loop with DB-backed audio ads
+  (ad-spaces DB, placement voice_hold, impression dedupe) and
+  `VOICE_HOLD_MUSIC_URL`. Callback requests moved to the main IVR (press 3)
+  because DTMF is not available in conference hold music.
+- [x] **Warm transfer (consult -> transfer)** — the department is called INTO
+  the caller's room (REST calls.create), held + coached so only the agent
+  hears them while the caller is parked; `transfer` unholds both (three-way)
+  and the agent hangs up. Audited in `voice_call_escalations`. Cold-transfer
+  code removed.
 - [x] Tests: 36 voice tests; full suite 143/143.
 
 ## Integration points (known gaps)
 
-- [ ] **Caller identity for queue-bridged calls** — the browser SDK does not
-  expose caller parameters on the queue leg; the desk shows "Support queue
-  line". Use `voice_call_events` (status webhook + the 'queued' leg) for
-  caller-level reporting and escalation correlation.
-- [ ] **Warm transfers** — escalation is a cold transfer (the caller is
-  redirected to the department and the agent's leg ends). Warm/hold-and-consult
-  transfers need a conference-based call path.
+- [ ] **Caller identity on conference legs** — the browser SDK does not expose
+  caller parameters on conference legs; the desk shows "Support call". Use
+  `voice_call_events` for caller-level reporting.
+- [ ] **Multi-agent dispatch** — dispatch assumes the single
+  `support_agent_1` identity; per-agent identities need a skills/assignment
+  layer.
 
 ## Backend (complete)
 
@@ -50,30 +46,29 @@ are complete. Only deployment (below) and the two integration points remain.
   `voice_call_events` (migration 126), deduplicated by `(call_sid, status)`,
   DB failures non-fatal.
 - [x] **No-answer / busy fallback** — `DialCallStatus` driven recovery IVR:
-  offer retry-the-agent-once or sales (`/voice/dial-fallback` →
-  `/voice/fallback-choice` → bounded `/voice/dial-fallback-final`).
+  offer retry-the-agent-once or sales (`/voice/dial-fallback` ->
+  `/voice/fallback-choice` -> bounded `/voice/dial-fallback-final`).
 - [x] **Rate limiter on `GET /voice/token`** — `voiceTokenLimiter`
   (10 min / 30 tokens, env-tunable) in `config/middleware/securityRateLimiters`.
-- [x] **Committed tests** — `tests/voice.test.js` (34 tests: signature gate,
-  IVR TwiML, queue/wait/ads, fallback flow, outbound, E.164 config, token 401,
-  status tolerance, toll-free, after-hours, callbacks, recording, unit tests).
+- [x] **Committed tests** — `tests/voice.test.js` (36 tests: signature gate,
+  IVR TwiML, conference flow, fallback flow, outbound, E.164 config, token
+  401, status tolerance, toll-free, after-hours, callbacks, recording,
+  escalation parsing, unit tests).
 - [x] **E.164 validation at config load** — all phone-number vars must match
   `^\+[1-9][0-9]{7,14}$`; problems reported by variable NAME only, config
   treated as not-ready (503).
 - [x] **Include `CallSid` in webhook logs** — every log line carries
   `callSid`/`source` correlation metadata.
 
-## Toll-free specifics
+## Toll-free specifics (complete)
 
 - [x] **Dedicated `TOLL_FREE_NUMBER`** — optional E.164 env var; calls to it
-  classify as `toll_free` (badge "Toll-free call · Nigeria · Toll-free"),
-  logged `Incoming toll-free call`, documented (provisioning + Termii parity).
+  classify as `toll_free`, logged `Incoming toll-free call`, documented.
 - [x] **After-hours / holiday handling** — `VOICE_SUPPORT_HOURS_START/END`
   (24h HH:MM), `VOICE_SUPPORT_TIMEZONE` (default Africa/Lagos),
   `VOICE_HOLIDAY_DAYS` (MM-DD). Outside the window: after-hours IVR with
-  press-3 callback; DTMF number → `voice_callback_requests` (migration 127),
-  reviewed via admin `GET /voice/callbacks`. Malformed config degrades to
-  always-available with a logged warning.
+  press-3 callback; DTMF number -> `voice_callback_requests` (migration 127),
+  reviewed via admin `GET /voice/callbacks`.
 - [x] **Call recording** — opt-in `VOICE_RECORD_CALLS=true`; records from
   answer (`record-from-answer`), plays consent before dialing, back-fills
   `voice_call_events.recording_url` via `/voice/recording` (migration 128).
@@ -84,10 +79,12 @@ are complete. Only deployment (below) and the two integration points remain.
   SIP trunk; populate `.env` from `.env.voice.example`.
 - [ ] Confirm nginx proxies `/voice/` to the backend (location block added to
   `deploy/nginx.conf`; verify on the live server).
-- [ ] After the Voice Desk lands: verify end-to-end call (Termii SIP → Twilio
-  → IVR → queue → agent browser Device).
+- [ ] End-to-end call test: Termii SIP -> Twilio -> IVR -> conference room ->
+  agent dispatch -> consult -> transfer.
 
-## Client
+## Client (complete)
 
 - [x] Voice Desk agent console (`voiceApi.js`, `useTwilioVoice.js`, `SupportVoiceDesk.jsx`, dashboard tab)
-- [x] Call-origin awareness (`call_source`/`caller_number`/`call_sid` Client parameters + source badges)
+- [x] Call-origin awareness + toll-free badge (direct client dials)
+- [x] Warm-transfer UI: Consult department -> Transfer now
+- [x] Auto-answer dispatch calls; auto re-join the line after each call

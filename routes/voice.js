@@ -444,7 +444,7 @@ const IVR_GATHER_OPTIONS = {
   timeout: 8,
 };
 
-const MENU_PROMPT = 'For support, press 1. For sales, press 2.';
+const MENU_PROMPT = 'For support, press 1. For sales, press 2. To request a callback, press 3.';
 
 const buildMenuGather = (twiml) => {
   const gather = twiml.gather(IVR_GATHER_OPTIONS);
@@ -490,6 +490,85 @@ const dialNumber = (twiml, number, { action, callerId, req }) => {
     ...(isCallRecordingEnabled() ? DIAL_RECORDING_OPTIONS(req) : {}),
   };
   return twiml.dial(options, number);
+};
+
+// ── Conference helpers (warm-transfer call path) ─────────────────────────────
+// Every support call now runs inside a Twilio <Conference> "room":
+//   - the caller parks in their own room (rentalhub_support_<callerCallSid>)
+//     with the hold loop (announcement → ad → music) as the waitUrl;
+//   - the agent is dispatched into the caller's room (directly when they dial
+//     the queue and a caller is waiting, or via a REST-created participant
+//     call when a caller arrives while the agent is parked);
+//   - escalation becomes a WARM transfer: the department is called into the
+//     SAME room, held+coached so only the agent hears them, then unheld to
+//     bridge the caller, after which the agent leaves.
+//
+// This room model is what makes hold/consult/merge/leave possible at all —
+// a direct queue bridge cannot do it.
+
+const SUPPORT_ROOM_PREFIX = 'rentalhub_support_';
+const AGENTS_WAITING_ROOM = 'rentalhub_agents_waiting';
+
+const getCallerRoomName = (callerCallSid) =>
+  `${SUPPORT_ROOM_PREFIX}${String(callerCallSid || '').slice(0, 64)}`;
+
+const isSupportRoom = (roomName) =>
+  String(roomName || '').startsWith(SUPPORT_ROOM_PREFIX);
+
+const CONFERENCE_EVENTS = ['start', 'end', 'join', 'leave', 'hold', 'kick', 'mute'];
+
+const CONFERENCE_STATUS_CALLBACK = (reqOrSource) => {
+  const source = typeof reqOrSource === 'string'
+    ? reqOrSource
+    : getCallSource(reqOrSource);
+  return {
+    statusCallback: `/voice/conference-events?source=${source}`,
+    statusCallbackMethod: 'POST',
+    statusCallbackEvent: CONFERENCE_EVENTS,
+  };
+};
+
+/** Caller leg: joins their own room and waits (hold loop) for an agent. */
+const dialCallerIntoConference = (twiml, req) => {
+  const roomName = getCallerRoomName(req.body.CallSid);
+  const dial = twiml.dial({
+    timeout: 1800,
+    ...CONFERENCE_STATUS_CALLBACK(req),
+  });
+  dial.conference(
+    {
+      waitUrl: `/voice/wait?source=${getCallSource(req)}`,
+      waitUrlMethod: 'POST',
+      endConferenceOnExit: true,
+      startConferenceOnEnter: true,
+      ...(isCallRecordingEnabled() ? { record: 'record-from-answer' } : {}),
+    },
+    roomName
+  );
+  return roomName;
+};
+
+/**
+ * Agent leg into a room: used for both immediate dispatch (caller waiting)
+ * and the agents' waiting room (no callers yet).
+ */
+const dialAgentIntoConference = (twiml, req, roomName, { waiting = false } = {}) => {
+  const dial = twiml.dial({
+    timeout: 7200,
+    ...DIAL_STATUS_CALLBACK(req),
+    ...(isCallRecordingEnabled() ? DIAL_RECORDING_OPTIONS(req) : {}),
+  });
+  dial.conference(
+    {
+      ...(waiting
+        ? { waitUrl: `/voice/agent-wait?source=${getCallSource(req)}`, waitUrlMethod: 'POST' }
+        : {}),
+      endConferenceOnExit: false,
+      startConferenceOnEnter: true,
+    },
+    roomName
+  );
+  return dial;
 };
 
 // ── POST /voice/incoming ─────────────────────────────────────────────────────
@@ -559,14 +638,15 @@ router.post('/incoming', twilioWebhookGuard, (req, res) => {
 // outbound call. The destination is dialed with the platform number as the
 // caller ID; a failed attempt gets the bounded terminal fallback.
 
-router.post('/outgoing', twilioWebhookGuard, (req, res) => {
+router.post('/outgoing', twilioWebhookGuard, async (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const destination = String(req.body.To || '').trim();
   const config = getQueueConfig();
 
-  // Agent-side queue line: the Voice Desk dials "queue:<name>" to join the
-  // support queue. The agent stays on this leg (hearing /voice/agent-wait)
-  // until a queued caller is bridged to them.
+  // Agent-side queue line: the Voice Desk dials "queue:<name>" to join duty.
+  // If a caller is already waiting in their room, the agent is sent straight
+  // into that room; otherwise the agent parks in the shared waiting room and
+  // is moved into a caller's room by dispatch when one arrives.
   if (destination.toLowerCase().startsWith(QUEUE_PREFIX)) {
     const queueName = destination.slice(QUEUE_PREFIX.length).trim();
     if (queueName !== config.name) {
@@ -577,15 +657,36 @@ router.post('/outgoing', twilioWebhookGuard, (req, res) => {
       return res.send(twiml.toString());
     }
 
-    logger.info('Agent joined the support queue', webhookLogContext(req, { queueName }));
-    twiml.say('Connecting you to the support queue.');
-    const dial = twiml.dial({
-      answerOnBridge: true,
-      timeout: 7200,
-      ...DIAL_STATUS_CALLBACK(req),
-      ...(isCallRecordingEnabled() ? DIAL_RECORDING_OPTIONS(req) : {}),
-    });
-    dial.queue({ url: `/voice/agent-wait?source=${getCallSource(req)}` }, config.name);
+    let waitingCaller = null;
+    try {
+      const result = await db.query(
+        `SELECT call_sid, to_number
+         FROM voice_call_events
+         WHERE status = 'queued'
+           AND created_at >= CURRENT_TIMESTAMP - INTERVAL '30 minutes'
+         ORDER BY created_at DESC
+         LIMIT 1`
+      );
+      waitingCaller = result.rows[0] || null;
+    } catch {
+      waitingCaller = null;
+    }
+
+    if (waitingCaller && isSupportRoom(waitingCaller.to_number)) {
+      logger.info('Agent dispatched directly to waiting caller room', webhookLogContext(req, {
+        roomName: waitingCaller.to_number,
+      }));
+      twiml.say('Connecting you to a waiting caller.');
+      await markCallerStatus(waitingCaller.call_sid, 'in-progress', {
+        agentCallSid: String(req.body.CallSid || '').slice(0, 64) || null,
+        roomName: waitingCaller.to_number,
+      });
+      dialAgentIntoConference(twiml, req, waitingCaller.to_number);
+    } else {
+      logger.info('Agent parked in the waiting room', webhookLogContext(req, { roomName: AGENTS_WAITING_ROOM }));
+      twiml.say('You are on the line. Waiting for incoming calls.');
+      dialAgentIntoConference(twiml, req, AGENTS_WAITING_ROOM, { waiting: true });
+    }
 
     res.type('text/xml');
     return res.send(twiml.toString());
@@ -632,20 +733,22 @@ router.post('/menu', twilioWebhookGuard, (req, res) => {
   if (digits === '1') {
     twiml.say('Connecting you to RentalHub support.');
     sayRecordingConsent(twiml);
-    // Callers are queued (with hold music/announcements served by
-    // /voice/wait) until an agent on the queue line picks them up. The queue
-    // name is also exposed to the agent browser through the queue call.
-    const config = getQueueConfig();
-    twiml.enqueue(
-      {
-        waitUrl: `/voice/wait?source=${getCallSource(req)}`,
-        waitUrlMethod: 'POST',
-        action: `/voice/enqueue-done?source=${getCallSource(req)}`,
-        method: 'POST',
-        friendlyName: config.name,
-      },
-      config.name
-    );
+    // The caller parks in their own conference room; the hold loop plays the
+    // announcement/ad/music until the agent is dispatched into the room.
+    dialCallerIntoConference(twiml, req);
+  } else if (digits === '3') {
+    // Callback request — same DTMF flow as the after-hours branch.
+    twiml.say('Please enter the phone number where we can reach you, then press the hash key.');
+    twiml.gather({
+      action: `/voice/callback-number?source=${getCallSource(req)}`,
+      method: 'POST',
+      numDigits: 14,
+      input: 'dtmf',
+      timeout: 10,
+      finishOnKey: '#',
+    });
+    twiml.say('We did not receive a phone number. Goodbye.');
+    twiml.hangup();
   } else if (digits === '2') {
     twiml.say('Connecting you to our sales team.');
     sayRecordingConsent(twiml);
@@ -703,18 +806,8 @@ router.post('/fallback-choice', twilioWebhookGuard, (req, res) => {
   if (digits === '1') {
     twiml.say('Trying the support line again.');
     sayRecordingConsent(twiml);
-    // Re-enter the queue (the retry path is queue-based, matching /voice/menu).
-    const config = getQueueConfig();
-    twiml.enqueue(
-      {
-        waitUrl: `/voice/wait?source=${getCallSource(req)}`,
-        waitUrlMethod: 'POST',
-        action: `/voice/enqueue-done?source=${getCallSource(req)}`,
-        method: 'POST',
-        friendlyName: config.name,
-      },
-      config.name
-    );
+    // Re-enter the caller's conference room (retry path mirrors /voice/menu).
+    dialCallerIntoConference(twiml, req);
   } else if (digits === '2') {
     twiml.say('Connecting you to our sales team.');
     sayRecordingConsent(twiml);
@@ -751,27 +844,16 @@ router.post('/dial-fallback-final', twilioWebhookGuard, (req, res) => {
 });
 
 // ── POST /voice/wait ─────────────────────────────────────────────────────────
-// Caller-side hold loop, served while a caller is enqueued. Twilio re-fetches
-// this URL after each loop completes, so the sequence below repeats:
-//   1. busy announcement
-//   2. 5-second DTMF window — press 1 to leave a callback request
-//   3. ad slot (opt-in, deterministic per caller)
-//   4. hold music (opt-in)
+// Caller-side hold loop, used as the conference room's waitUrl. Twilio
+// re-fetches it after each loop completes: announcement → ad slot → hold
+// music. (DTMF is NOT available in a conference waitUrl, so callback requests
+// live in the main IVR — press 3 — and the after-hours branch instead.)
 
 router.post('/wait', twilioWebhookGuard, async (req, res) => {
   const config = getQueueConfig();
   const twiml = new twilio.twiml.VoiceResponse();
 
   twiml.say(config.announcement);
-
-  const callbackGather = twiml.gather({
-    action: `/voice/wait-options?source=${getCallSource(req)}`,
-    method: 'POST',
-    numDigits: 1,
-    input: 'dtmf',
-    timeout: 5,
-  });
-  callbackGather.say('Press 1 to leave a callback request instead.');
 
   // Ad slot: DB-backed audio ads (placement "voice_hold") take priority; the
   // config-provided URL list is the fallback when the DB has none or is down.
@@ -804,9 +886,8 @@ router.post('/wait', twilioWebhookGuard, async (req, res) => {
   }
   if (config.holdMusicUrl) twiml.play({}, config.holdMusicUrl);
 
-  // Persist the caller's leg (best-effort) so /voice/escalate can correlate
-  // the bridged caller to the agent's queue leg. The (call_sid, status)
-  // unique key keeps this idempotent across wait-loop re-fetches.
+  // Persist the caller's leg (best-effort) so dispatch and escalation can
+  // correlate the waiting caller. Idempotent via the (call_sid, status) key.
   const callerCallSid = String(req.body.CallSid || '').slice(0, 64);
   if (callerCallSid) {
     try {
@@ -822,11 +903,11 @@ router.post('/wait', twilioWebhookGuard, async (req, res) => {
           String(req.body.ParentCallSid || '').slice(0, 64) || null,
           getCallSource(req),
           sanitizeCallerNumber(req.body.From),
-          config.name,
+          getCallerRoomName(callerCallSid),
         ]
       );
     } catch {
-      // Non-fatal — escalation correlation is best-effort.
+      // Non-fatal — dispatch correlation is best-effort.
     }
   }
 
@@ -834,55 +915,146 @@ router.post('/wait', twilioWebhookGuard, async (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── POST /voice/wait-options ─────────────────────────────────────────────────
-// DTMF captured during the wait loop. "1" leaves the queue to request a
-// callback (number entered via the shared /voice/callback-number flow).
+// ── POST /voice/conference-events ────────────────────────────────────────────
+// Status callbacks from every support conference. Drives:
+//   - caller lifecycle (clear 'queued' when their room ends);
+//   - agent dispatch (move a parked agent into a new caller's room);
+//   - call-state marking (queued → in-progress once the agent joins).
 
-router.post('/wait-options', twilioWebhookGuard, (req, res) => {
-  const digits = String(req.body.Digits || '').trim();
-  const twiml = new twilio.twiml.VoiceResponse();
+const AGENT_IDENTITY = 'support_agent_1';
 
-  if (digits === '1') {
-    twiml.say('Please enter the phone number where we can reach you, then press the hash key.');
-    twiml.gather({
-      action: `/voice/callback-number?source=${getCallSource(req)}`,
-      method: 'POST',
-      numDigits: 14,
-      input: 'dtmf',
-      timeout: 10,
-      finishOnKey: '#',
+const markCallerStatus = async (callerCallSid, status, { agentCallSid = null, roomName = null } = {}) => {
+  if (!callerCallSid) return;
+  try {
+    if (status === 'left') {
+      await db.query(
+        `DELETE FROM voice_call_events
+         WHERE call_sid = $1 AND status IN ('queued', 'in-progress')`,
+        [callerCallSid]
+      );
+      return;
+    }
+    await db.query(
+      `INSERT INTO voice_call_events
+         (call_sid, parent_call_sid, direction, source, status, to_number)
+       VALUES ($1, $2, 'inbound', 'unknown', $3, $4)
+       ON CONFLICT (call_sid, status) DO UPDATE SET
+         parent_call_sid = EXCLUDED.parent_call_sid,
+         to_number = EXCLUDED.to_number`,
+      [callerCallSid, agentCallSid, status, roomName]
+    );
+  } catch {
+    // Best-effort.
+  }
+};
+
+/** True when the agent is currently parked in the shared waiting room. */
+const isAgentParked = async () => {
+  try {
+    const conferences = await getTwilioRestClient().conferences.list({
+      friendlyName: AGENTS_WAITING_ROOM,
+      status: 'in-progress',
     });
-    twiml.say('We did not receive a phone number. Goodbye.');
-    twiml.hangup();
-  } else {
-    twiml.say('That selection is invalid. Goodbye.');
-    twiml.hangup();
+    const conference = conferences[0];
+    if (!conference) return false;
+    const participants = await getTwilioRestClient()
+      .conferences(conference.sid)
+      .participants.list();
+    return participants.some((p) => String(p.callSid || '').startsWith('CA') && p.callSid);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Send the agent into a caller's room. If the agent is parked in the waiting
+ * room, they are first removed from it so their device only ever holds one
+ * call; then a REST-created participant call rings the agent's browser.
+ */
+const dispatchAgentToRoom = async (roomName, callerCallSid) => {
+  const rest = getTwilioRestClient();
+  try {
+    const conferences = await rest.conferences.list({ friendlyName: roomName, status: 'in-progress' });
+    const conference = conferences[0];
+    if (!conference) return false;
+
+    let parkedConference = null;
+    if (await isAgentParked()) {
+      const waiting = await rest.conferences.list({ friendlyName: AGENTS_WAITING_ROOM, status: 'in-progress' });
+      parkedConference = waiting[0] || null;
+      if (parkedConference) {
+        const participants = await rest.conferences(parkedConference.sid).participants.list();
+        const agentParticipant = participants.find(
+          (p) => String(p.callSid || '').startsWith('CA')
+        );
+        if (agentParticipant) {
+          await rest.conferences(parkedConference.sid)
+            .participants(agentParticipant.sid)
+            .remove();
+        }
+      }
+    }
+
+    await rest.conferences(conference.sid).participants.create({
+      to: `client:${AGENT_IDENTITY}`,
+      from: `client:${AGENT_IDENTITY}`,
+    });
+
+    await markCallerStatus(callerCallSid, 'in-progress', { agentCallSid: null, roomName });
+    logger.info('Agent dispatched to caller room', { roomName, callerCallSid });
+    return true;
+  } catch (dispatchError) {
+    logger.warn('Agent dispatch failed', { roomName, message: dispatchError.message });
+    return false;
+  }
+};
+
+router.post('/conference-events', twilioWebhookGuard, async (req, res) => {
+  const event = String(req.body.StatusCallbackEvent || '').trim();
+  const roomName = String(req.body.FriendlyName || '').trim();
+  const participantCallSid = String(req.body.CallSid || '').slice(0, 64);
+
+  // Agent waiting room: nothing to do beyond logging (parking state is read
+  // live from the Twilio API when dispatch is needed).
+  if (roomName === AGENTS_WAITING_ROOM) {
+    logger.info('Voice conference event (agents waiting)', { event, callSid: participantCallSid || undefined });
+    return res.status(200).json({ success: true });
   }
 
-  res.type('text/xml');
-  res.send(twiml.toString());
-});
-
-// ── POST /voice/enqueue-done ─────────────────────────────────────────────────
-// Enqueue action: fires when the caller leaves the queue. "bridged" means an
-// agent took the call; anything else means they left before that.
-
-router.post('/enqueue-done', twilioWebhookGuard, (req, res) => {
-  const queueResult = String(req.body.QueueResult || '').trim();
-  const twiml = new twilio.twiml.VoiceResponse();
-
-  logger.info('Caller left the support queue', webhookLogContext(req, { queueResult }));
-
-  if (queueResult === 'bridged') {
-    twiml.hangup();
-  } else {
-    twiml.say('Thank you for calling RentalHub. Goodbye.');
-    twiml.hangup();
+  if (!isSupportRoom(roomName)) {
+    return res.status(200).json({ success: true });
   }
 
-  res.type('text/xml');
-  res.send(twiml.toString());
+  const callerCallSid = roomName.slice(SUPPORT_ROOM_PREFIX.length);
+
+  logger.info('Voice conference event (support room)', {
+    event,
+    roomName,
+    callerCallSid,
+  });
+
+  if (event === 'conference-start') {
+    // The caller just joined their room and is waiting — try to dispatch the
+    // agent immediately (no-op if the agent is offline; they will join via
+    // the queue line when they dial in).
+    await dispatchAgentToRoom(roomName, callerCallSid);
+  } else if (event === 'participant-join') {
+    // If the joining leg is the agent's (someone other than the caller), the
+    // call is now in progress.
+    if (participantCallSid !== callerCallSid) {
+      await markCallerStatus(callerCallSid, 'in-progress', {
+        agentCallSid: participantCallSid,
+        roomName,
+      });
+    }
+  } else if (event === 'conference-end') {
+    await markCallerStatus(callerCallSid, 'left');
+  }
+
+  res.status(200).json({ success: true });
 });
+
+// ── POST /voice/after-hours ──────────────────────────────────────────────────
 
 // ── POST /voice/agent-wait ───────────────────────────────────────────────────
 // Agent-side hold loop: what the agent hears while connected to the queue
@@ -1106,19 +1278,64 @@ router.get('/departments', voiceTokenLimiter, authenticate, requireAdminOrSuperA
 });
 
 // ── POST /voice/escalate ─────────────────────────────────────────────────────
-// Agent-initiated department escalation (cold transfer).
-//   1. Validates the department mapping.
-//   2. Confirms the agent's queue leg is live (Twilio REST).
-//   3. Locates the bridged caller via the 'queued' leg persisted by
-//      /voice/wait (single queue line ⇒ unambiguous).
-//   4. Redirects the CALLER's leg to a new Dial toward the department target,
-//      which ends the agent's leg and connects the caller to the department.
-//   5. Writes an audit row (voice_call_escalations).
+// Agent-initiated WARM transfer with consultation:
+//   action = 'consult'  → the department target is called INTO the caller's
+//                         conference room, then held + coached so only the
+//                         agent hears them while the caller is parked (hold).
+//                         The agent tells the department the story privately.
+//   action = 'transfer' → the department and caller are unheld (bridged
+//                         three-way); the agent then hangs up on their side.
+//
+// Lookup: the agent's current room is found via the caller's 'in-progress'
+// row (parent_call_sid = agent's conference-leg call SID).
+
+const getActiveCallContext = async (agentCallSid) => {
+  let callerLeg = null;
+  try {
+    const result = await db.query(
+      `SELECT call_sid, source, from_number, to_number, created_at
+       FROM voice_call_events
+       WHERE status = 'in-progress'
+         AND parent_call_sid = $1
+         AND created_at >= CURRENT_TIMESTAMP - INTERVAL '30 minutes'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [String(agentCallSid || '').slice(0, 64)]
+    );
+    callerLeg = result.rows[0] || null;
+  } catch {
+    callerLeg = null;
+  }
+  if (!callerLeg) return null;
+  return {
+    callerCallSid: callerLeg.call_sid,
+    roomName: callerLeg.to_number,
+    source: ['local_termii', 'international_twilio', 'toll_free', 'unknown'].includes(callerLeg.source)
+      ? callerLeg.source
+      : 'unknown',
+  };
+};
+
+const findConferenceForRoom = async (roomName) => {
+  const conferences = await getTwilioRestClient().conferences.list({
+    friendlyName: roomName,
+    status: 'in-progress',
+  });
+  return conferences[0] || null;
+};
+
+const getConferenceParticipantByCallSid = async (conferenceSid, callSid) => {
+  if (!callSid) return null;
+  const participants = await getTwilioRestClient()
+    .conferences(conferenceSid)
+    .participants.list();
+  return participants.find((p) => p.callSid === callSid) || null;
+};
 
 router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
-  const department = findDepartment(req.body?.department);
-  if (!department) {
-    return res.status(400).json({ success: false, message: 'Unknown escalation department.' });
+  const action = String(req.body?.action || '').trim();
+  if (!['consult', 'transfer'].includes(action)) {
+    return res.status(400).json({ success: false, message: 'Escalation action must be "consult" or "transfer".' });
   }
 
   const agentCallSid = String(req.body?.callSid || '').trim();
@@ -1126,100 +1343,158 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
     return res.status(400).json({ success: false, message: 'Missing agent call SID.' });
   }
 
+  // The caller's in-progress row links the agent's leg to the conference room.
+  const context = await getActiveCallContext(agentCallSid);
+  if (!context) {
+    return res.status(404).json({
+      success: false,
+      message: 'No active caller is associated with this agent call.',
+    });
+  }
+
+  let conference;
   try {
-    const agentCall = await getTwilioRestClient().calls(agentCallSid).fetch();
-    if (agentCall.status !== 'in-progress') {
-      return res.status(409).json({
-        success: false,
-        message: 'This call is no longer active and cannot be escalated.',
-      });
-    }
+    conference = await findConferenceForRoom(context.roomName);
   } catch (restError) {
-    logger.warn('Voice escalation: could not verify agent leg', {
-      callSid: agentCallSid,
-      message: restError.message,
-    });
-    return res.status(404).json({
-      success: false,
-      message: 'The agent call could not be found.',
-    });
+    logger.warn('Voice escalation: conference lookup failed', { roomName: context.roomName, message: restError.message });
+    return res.status(502).json({ success: false, message: 'The call conference could not be found.' });
+  }
+  if (!conference) {
+    return res.status(409).json({ success: false, message: 'This call is no longer active.' });
   }
 
-  let callerLeg = null;
+  let callerParticipant = null;
+  let agentParticipant = null;
   try {
-    const result = await db.query(
-      `SELECT call_sid, source, from_number, created_at
-       FROM voice_call_events
-       WHERE status = 'queued'
-         AND created_at >= CURRENT_TIMESTAMP - INTERVAL '30 minutes'
-       ORDER BY created_at DESC
-       LIMIT 1`
-    );
-    callerLeg = result.rows[0] || null;
+    [callerParticipant, agentParticipant] = await Promise.all([
+      getConferenceParticipantByCallSid(conference.sid, context.callerCallSid),
+      getConferenceParticipantByCallSid(conference.sid, agentCallSid),
+    ]);
   } catch {
-    callerLeg = null;
+    callerParticipant = null;
+    agentParticipant = null;
   }
 
-  if (!callerLeg) {
-    return res.status(404).json({
+  if (!callerParticipant || !agentParticipant) {
+    return res.status(409).json({
       success: false,
-      message: 'No caller is currently on this line to escalate.',
+      message: 'The caller or agent is no longer on this call.',
     });
   }
 
-  const source = ['local_termii', 'international_twilio', 'toll_free', 'unknown'].includes(callerLeg.source)
-    ? callerLeg.source
-    : 'unknown';
+  const rest = getTwilioRestClient();
+  const conferenceResource = rest.conferences(conference.sid);
 
-  // Build the redirect TwiML for the caller's leg.
-  const redirectTwiml = new twilio.twiml.VoiceResponse();
-  redirectTwiml.say(`Please hold while we connect you to the ${department.name} department.`);
-  const dialOptions = {
-    answerOnBridge: true,
-    timeout: 25,
-    ...DIAL_STATUS_CALLBACK(source),
-  };
-  const target = department.target;
-  if (target.toLowerCase().startsWith('client:')) {
-    const dial = redirectTwiml.dial(dialOptions);
-    const clientElement = dial.client(target.slice('client:'.length));
-    clientElement.parameter({ name: 'call_source', value: source });
-  } else {
-    redirectTwiml.dial(dialOptions, target);
+  if (action === 'consult') {
+    const department = findDepartment(req.body?.department);
+    if (!department) {
+      return res.status(400).json({ success: false, message: 'Unknown escalation department.' });
+    }
+
+    // Park the caller (hold music from the conference waitUrl) so the
+    // consultation is private.
+    try {
+      await conferenceResource.participants(callerParticipant.sid).update({ hold: true });
+    } catch (holdError) {
+      logger.warn('Voice consult: could not hold caller', { message: holdError.message });
+    }
+
+    // Call the department INTO the same room.
+    const consultTwiml = new twilio.twiml.VoiceResponse();
+    const consultDial = consultTwiml.dial({ timeout: 30, ...DIAL_STATUS_CALLBACK(context.source) });
+    consultDial.conference(
+      { startConferenceOnEnter: true, endConferenceOnExit: false },
+      context.roomName
+    );
+    const departmentIsClient = department.target.startsWith('client:');
+    const consultCall = await rest.calls.create({
+      to: departmentIsClient ? `client:${department.target.slice('client:'.length)}` : department.target,
+      from: departmentIsClient
+        ? `client:${AGENT_IDENTITY}`
+        : (process.env.OUTBOUND_CALLER_ID || process.env.NIGERIA_NUMBER || '').trim(),
+      twiml: consultTwiml.toString(),
+    });
+
+    // Wait (briefly) for the department to answer and join, then coach them
+    // to the agent only.
+    let departmentParticipant = null;
+    for (let attempt = 0; attempt < 6 && !departmentParticipant; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      try {
+        const participants = await conferenceResource.participants.list();
+        departmentParticipant = participants.find(
+          (p) => p.callSid === consultCall.sid
+        ) || null;
+      } catch {
+        break;
+      }
+    }
+    if (departmentParticipant) {
+      try {
+        await conferenceResource.participants(departmentParticipant.sid).update({
+          coach: agentParticipant.sid,
+          hold: true,
+        });
+      } catch (coachError) {
+        logger.warn('Voice consult: could not coach department participant', { message: coachError.message });
+      }
+    }
+
+    logger.info('Call consultation started', {
+      callerCallSid: context.callerCallSid,
+      agentCallSid,
+      department: department.name,
+      departmentJoined: Boolean(departmentParticipant),
+    });
+
+    try {
+      await db.query(
+        `INSERT INTO voice_call_escalations (call_sid, agent_call_sid, department, escalated_by)
+         VALUES ($1, $2, $3, $4)`,
+        [context.callerCallSid, agentCallSid, department.name, req.user?.id || null]
+      );
+    } catch {
+      // Audit write is best-effort.
+    }
+
+    return res.json({
+      success: true,
+      data: { connected: Boolean(departmentParticipant) },
+    });
+  }
+
+  // action === 'transfer': bridge the department with the caller (unhold
+  // both, drop the coaching) — the agent then leaves on their side.
+  const participants = await conferenceResource.participants.list();
+  const departmentParticipant = participants.find(
+    (p) => p.callSid !== agentCallSid && p.callSid !== context.callerCallSid && p.callSid
+  );
+  if (!departmentParticipant) {
+    return res.status(409).json({
+      success: false,
+      message: 'The department is not on the call yet. Start a consultation first.',
+    });
   }
 
   try {
-    await getTwilioRestClient()
-      .calls(callerLeg.call_sid)
-      .update({ twiml: redirectTwiml.toString() });
-  } catch (updateError) {
-    logger.warn('Voice escalation: caller leg redirect failed', {
-      callerCallSid: callerLeg.call_sid,
-      department: department.name,
-      message: updateError.message,
+    await conferenceResource.participants(departmentParticipant.sid).update({
+      coach: null,
+      hold: false,
     });
+    await conferenceResource.participants(callerParticipant.sid).update({ hold: false });
+  } catch (bridgeError) {
+    logger.warn('Voice transfer: bridging participants failed', { message: bridgeError.message });
     return res.status(502).json({
       success: false,
       message: 'The call could not be transferred right now. Please try again.',
     });
   }
 
-  logger.info('Call escalated to department', {
-    callerCallSid: callerLeg.call_sid,
+  logger.info('Call transferred to department (warm)', {
+    callerCallSid: context.callerCallSid,
     agentCallSid,
-    department: department.name,
-    source,
+    department: departmentParticipant ? 'department participant' : 'unknown',
   });
-
-  try {
-    await db.query(
-      `INSERT INTO voice_call_escalations (call_sid, agent_call_sid, department, escalated_by)
-       VALUES ($1, $2, $3, $4)`,
-      [callerLeg.call_sid, agentCallSid, department.name, req.user?.id || null]
-    );
-  } catch {
-    // Audit write is best-effort — the transfer already succeeded.
-  }
 
   return res.json({ success: true });
 });

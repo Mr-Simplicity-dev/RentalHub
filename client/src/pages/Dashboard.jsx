@@ -45,6 +45,7 @@ import WalletFundModal from '../components/dashboard/WalletFundModal';
 import WalletWithdrawModal from '../components/dashboard/WalletWithdrawModal';
 import TwoFactorStep from '../components/common/TwoFactorStep';
 import DiasporaContextBanner from '../components/common/DiasporaContextBanner';
+import SurveyWizard from '../components/survey/SurveyWizard';
 import RentSavingsModal from '../components/dashboard/RentSavingsModal';
 import AdSpace from '../components/common/AdSpace';
 
@@ -166,6 +167,22 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
+  useEffect(() => {
+    const loadSurveyStatus = async () => {
+      try {
+        const res = await api.get('/survey/my-status');
+        const status = res.data.data;
+        setSurveyStatus(status);
+        if (status.required && !status.part_a_done && !status.exempt) {
+          setSurveyGate(true);
+        }
+      } catch {
+        // survey gate unavailable — don't block the dashboard
+      }
+    };
+    loadSurveyStatus();
+  }, []);
+
   const [stats, setStats] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -176,6 +193,9 @@ const Dashboard = () => {
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [transportLoading, setTransportLoading] = useState(false);
   const [withdrawTwoFactor, setWithdrawTwoFactor] = useState(null);
+  const [surveyStatus, setSurveyStatus] = useState(null);
+  const [surveyGate, setSurveyGate] = useState(false);
+  const [surveyModalOpen, setSurveyModalOpen] = useState(false);
 
   // Refund state
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -1348,6 +1368,34 @@ const Dashboard = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
+      {surveyGate && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-white">
+          <SurveyWizard
+            surveyType={surveyStatus?.survey_type || 'tenant'}
+            mode="partA"
+            onComplete={() => {
+              setSurveyGate(false);
+              window.location.reload();
+            }}
+          />
+        </div>
+      )}
+
+      {surveyModalOpen && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-white">
+          <SurveyWizard
+            surveyType={surveyStatus?.survey_type || 'tenant'}
+            mode="full"
+            onComplete={() => {
+              setSurveyModalOpen(false);
+              window.location.reload();
+            }}
+            onExit={() => setSurveyModalOpen(false)}
+            showExit
+          />
+        </div>
+      )}
+
       <div className="container mx-auto px-4">
         {/* Welcome Section */}
         <div className="mb-8 text-center">
@@ -1365,6 +1413,26 @@ const Dashboard = () => {
             billingCountry={user.billing_country}
             cardBrand={user.card_brand}
           />
+        )}
+
+        {surveyStatus?.required && surveyStatus.part_a_done && !surveyStatus.completed && (
+          <div className="mb-6 flex flex-col items-start justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-sm font-semibold text-indigo-900">
+                {t('dashboard.survey_reminder_title', 'Finish your market research survey')}
+              </p>
+              <p className="text-xs text-indigo-700">
+                {t('dashboard.survey_reminder_body', 'Your answers help us improve RentalHub NG. It takes about 10 more minutes — you can finish anytime.')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSurveyModalOpen(true)}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              {t('dashboard.survey_continue', 'Continue Survey')}
+            </button>
+          </div>
         )}
 
         <AdSpace placement="dashboard_top" contained={false} className="mb-8" />

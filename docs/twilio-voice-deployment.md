@@ -78,28 +78,20 @@ the same SIP destination your other Nigeria numbers use.
 
 ### Support queue & hold experience
 
-Callers who press **1** are placed in a real Twilio `<Queue>` and hear a
-repeating hold loop served by `/voice/wait`:
+Support calls now run inside Twilio **conference rooms** (the warm-transfer
+call path): the caller parks in their own room with a repeating hold loop
+served by `/voice/wait`:
 
 1. busy announcement (`VOICE_QUEUE_ANNOUNCEMENT`)
-2. a 5-second DTMF window — press **1** to leave a callback request
-3. an optional audio ad slot (`VOICE_ADS_ENABLED=true` +
-   `VOICE_AD_AUDIO_URLS`, comma-separated HTTPS audio URLs; one ad is picked
-   deterministically per caller)
-4. optional hold music (`VOICE_HOLD_MUSIC_URL`)
+2. an optional audio ad slot (DB-backed — see below)
+3. optional hold music (`VOICE_HOLD_MUSIC_URL`)
 
-Agents join the line from the Voice Desk: after "Go Available" the desk
-registers the Device and automatically dials `queue:support` through the
-TwiML App (served by `/voice/outgoing` as a `<Dial><Queue>` leg). Queued
-callers are bridged automatically; the desk re-joins the line after each
-call while the agent stays available. The queue name is configurable via
-`VOICE_QUEUE_NAME`.
-
-> The agent-side queue call and the platform's ad-spaces engine are the two
-> known integration points for the next iteration: caller identity for
-> queue-bridged calls is not exposed to the browser SDK (use
-> `voice_call_events` for that), and audio ad slots are config-driven until
-> they are wired to the ad engine.
+DTMF is not available inside a conference hold loop, so the **callback
+request option moved to the main IVR (press 3)** and the after-hours branch.
+Agents join duty from the Voice Desk ("Go Available" → dials `queue:support`
+through the TwiML App): they are dispatched straight into a waiting caller's
+room, or parked in the shared waiting room and auto-dispatched when a caller
+arrives. The desk re-joins the line automatically after each call.
 
 ### Ad slots on hold (DB-backed)
 
@@ -113,7 +105,7 @@ deterministically per caller and an impression is counted **once per
 `VOICE_AD_AUDIO_URLS` remains only as a fallback when the DB has no audio ads
 or is unreachable.
 
-### Department escalation (agent-initiated)
+### Department escalation — warm transfer (consult → transfer)
 
 Configure `VOICE_ESCALATION_DEPARTMENTS` as comma-separated
 `name:target` pairs where the target is an **E.164 number** or a **Twilio
@@ -123,12 +115,23 @@ Client identity** (`client:legal_1`):
 VOICE_ESCALATION_DEPARTMENTS=finance:+2348012345678,legal:client:legal_1
 ```
 
-While on a call, the agent picks a department in the Voice Desk and clicks
-**Escalate call**. The backend verifies the agent's leg is live, locates the
-bridged caller, and cold-transfers the caller to the department target via the
-Twilio REST API. Each escalation is audited in `voice_call_escalations`
-(migration 131). The agent's leg ends and the desk re-joins the queue line
-automatically.
+Support calls now run inside **conference rooms**, which is what makes warm
+transfers possible:
+
+1. The caller parks in their own room (hold loop = `/voice/wait`).
+2. The agent is dispatched into the room — directly when they dial the queue
+   and a caller is waiting, or via an automatic dispatch call when a caller
+   arrives while the agent is parked in the waiting room.
+3. **Consult**: the agent picks a department and presses *Consult department*.
+   The department is called into the same room, held + coached so **only the
+   agent hears them**, while the caller is parked on hold. The agent tells the
+   department the story privately.
+4. **Transfer now**: the department and caller are unheld (three-way bridge)
+   and the agent hangs up — the caller stays with the department.
+
+Escalations are audited in `voice_call_escalations` (migration 131). Caller
+identity is not exposed to the browser SDK on conference legs — caller-level
+reporting comes from `voice_call_events`.
 
 ### After-hours & holidays (optional)
 

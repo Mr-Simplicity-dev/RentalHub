@@ -1,0 +1,455 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import api from '../../services/api';
+import TurnstileWidget from '../common/TurnstileWidget';
+import { FaArrowLeft, FaArrowRight, FaCheckCircle, FaShieldAlt } from 'react-icons/fa';
+
+/**
+ * Onboarding market-research survey wizard.
+ * mode: 'partA' (gate: only Part A sections, non-skippable overlay)
+ *       'full'  (the whole survey, used standalone or after the gate)
+ * surveyType: 'tenant' | 'landlord'
+ */
+export default function SurveyWizard({
+  surveyType = 'tenant',
+  mode = 'partA',
+  publicMode = false,
+  paperMode = false,
+  paperMeta = null,
+  onComplete,
+  onExit,
+  showExit = false,
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = ['en', 'ha', 'yo', 'ig'].includes(i18n.language) ? i18n.language : 'en';
+
+  const [definition, setDefinition] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [responseId, setResponseId] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [consentFlags, setConsentFlags] = useState({});
+  const [sectionIndex, setSectionIndex] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [screenedOut, setScreenedOut] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+  const [startedAt] = useState(Date.now());
+
+  const anonymousMode = publicMode || paperMode;
+  const questionEnteredAt = useRef(Date.now());
+
+  const sections = useMemo(() => {
+    if (!definition) return [];
+    const bySection = {};
+    for (const q of definition.questions) {
+      if (mode === 'partA' && q.part !== 'A') continue;
+      (bySection[q.section] = bySection[q.section] || []).push(q);
+    }
+    return Object.keys(bySection)
+      .filter((s) => definition.sections.includes(s))
+      .map((s) => ({ section: s, questions: bySection[s] }));
+  }, [definition, mode]);
+
+  const currentSection = sections[sectionIndex] || null;
+  const currentQuestion = currentSection?.questions[questionIndex] || null;
+
+  const loadDefinition = useCallback(async () => {
+    try {
+      setLoading(true);
+      const defRes = await api.get(`/survey/definition?type=${surveyType}&lang=${lang}`);
+      setDefinition(defRes.data.data);
+
+      if (anonymousMode) return;
+
+      const statusRes = await api.get('/survey/my-status');
+      const status = statusRes.data.data;
+      if (status.response_id) {
+        setResponseId(status.response_id);
+      } else {
+        const startRes = await api.post('/survey/start');
+        setResponseId(startRes.data.data.response.id);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not load the survey');
+    } finally {
+      setLoading(false);
+    }
+  }, [surveyType, lang, anonymousMode]);
+
+  useEffect(() => {
+    loadDefinition();
+  }, [loadDefinition]);
+
+  const autosave = useCallback(async () => {
+    if (anonymousMode || !responseId || Object.keys(answers).length === 0) return;
+    setSaving(true);
+    try {
+      await api.post('/survey/save', { response_id: responseId, answers, consent_flags: consentFlags });
+    } catch {
+      // silent autosave — the server keeps previous answers
+    } finally {
+      setSaving(false);
+    }
+  }, [responseId, answers, consentFlags, anonymousMode]);
+
+  // Debounced autosave as the user answers
+  useEffect(() => {
+    if (anonymousMode || !responseId) return;
+    const timer = setTimeout(() => autosave(), 800);
+    return () => clearTimeout(timer);
+  }, [answers, consentFlags, responseId, autosave, anonymousMode]);
+
+  const setAnswer = (value) => {
+    if (!currentQuestion) return;
+    setAnswers((prev) => ({ ...prev, [currentQuestion.key]: value }));
+    if (currentQuestion.analysis === 'consent' && currentQuestion.endsOn && value === currentQuestion.endsOn) {
+      setScreenedOut(true);
+    }
+  };
+
+  const totalQuestions = sections.reduce((n, s) => n + s.questions.length, 0);
+  const answeredCount = sections.reduce(
+    (n, s) => n + s.questions.filter((q) => {
+      const v = answers[q.key];
+      return v !== undefined && v !== null && v !== '';
+    }).length,
+    0
+  );
+  const progress = totalQuestions ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+
+  const canGoNext = (() => {
+    if (!currentQuestion) return false;
+    const elapsed = Date.now() - questionEnteredAt.current;
+    if (elapsed < (currentQuestion.minSeconds || 3) * 1000) return false;
+    const v = answers[currentQuestion.key];
+    if (!currentQuestion.required) return true;
+    if (v === undefined || v === null || v === '') return false;
+    if (currentQuestion.type === 'multi' && currentQuestion.maxPicks && Array.isArray(v) && v.length > currentQuestion.maxPicks) return false;
+    return true;
+  })();
+
+  const isLastQuestion =
+    sectionIndex === sections.length - 1 && questionIndex === currentSection?.questions.length - 1;
+
+  const handleNext = async () => {
+    if (!canGoNext) return;
+    if (screenedOut || isLastQuestion) {
+      setSubmitting(true);
+      try {
+        if (paperMode) {
+          const res = await api.post('/admin/survey/paper-entry', {
+            survey_type: surveyType,
+            answers,
+            consent_flags: consentFlags,
+            ...(paperMeta || {}),
+            mark_complete: true,
+          });
+          onComplete?.(res.data.data);
+          return;
+        }
+
+        if (publicMode) {
+          if (!turnstileToken) {
+            setError(t('survey.security_required', 'Please complete the security check to submit.'));
+            setSubmitting(false);
+            return;
+          }
+          const res = await api.post(
+            '/survey/public/submit',
+            {
+              survey_type: surveyType,
+              answers,
+              consent_flags: consentFlags,
+              turnstile_token: turnstileToken,
+            }
+          );
+          onComplete?.(res.data.data);
+          return;
+        }
+
+        await autosave();
+        if (screenedOut || mode === 'partA') {
+          await api.post('/survey/complete-part-a', { response_id: responseId });
+          if (mode === 'partA') {
+            onComplete?.({ partA: true, screenedOut });
+            return;
+          }
+        }
+        await api.post('/survey/complete', {
+          response_id: responseId,
+          time_spent_seconds: Math.round((Date.now() - startedAt) / 1000),
+        });
+        onComplete?.({ partA: false, screenedOut });
+      } catch (err) {
+        setError(err.response?.data?.message || 'Could not submit the survey');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (questionIndex < currentSection.questions.length - 1) {
+      setQuestionIndex((i) => i + 1);
+    } else {
+      setSectionIndex((s) => s + 1);
+      setQuestionIndex(0);
+    }
+    questionEnteredAt.current = Date.now();
+  };
+
+  const handleBack = () => {
+    if (questionIndex > 0) {
+      setQuestionIndex((i) => i - 1);
+    } else if (sectionIndex > 0) {
+      setSectionIndex((s) => s - 1);
+      setQuestionIndex((sections[s - 1]?.questions.length || 1) - 1);
+    }
+    questionEnteredAt.current = Date.now();
+  };
+
+  const renderQuestion = () => {
+    if (!currentQuestion) return null;
+    const q = currentQuestion;
+    const value = answers[q.key];
+    const labels = q.labels || {};
+
+    if (q.type === 'likert') {
+      return (
+        <div className="mt-6 grid grid-cols-5 gap-2">
+          {(q.options || ['1', '2', '3', '4', '5'].map((x) => [x, x])).map((opt) => {
+            const v = typeof opt === 'string' ? opt : opt.v;
+            const label = typeof opt === 'string' ? labels[opt] || opt : opt.label;
+            const selected = Number(value) === Number(v);
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setAnswer(Number(v))}
+                className={`rounded-xl border-2 p-3 text-center transition ${
+                  selected
+                    ? 'border-indigo-600 bg-indigo-50'
+                    : 'border-gray-200 bg-white hover:border-indigo-300'
+                }`}
+              >
+                <span className="block text-xl font-bold text-gray-900">{v}</span>
+                <span className="mt-1 block text-[11px] leading-tight text-gray-500">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (q.type === 'single' || q.type === 'consent') {
+      return (
+        <div className="mt-6 space-y-2">
+          {q.options.map((opt) => {
+            const selected = value === opt.v;
+            return (
+              <button
+                key={opt.v}
+                type="button"
+                onClick={() => setAnswer(opt.v)}
+                className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition ${
+                  selected
+                    ? 'border-indigo-600 bg-indigo-50'
+                    : 'border-gray-200 bg-white hover:border-indigo-300'
+                }`}
+              >
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                    selected ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'
+                  }`}
+                >
+                  {selected && <FaCheckCircle className="h-3 w-3 text-white" />}
+                </span>
+                <span className="text-sm text-gray-800">{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (q.type === 'multi' || q.type === 'rank') {
+      const picks = Array.isArray(value) ? value : [];
+      const maxPicks = q.maxPicks || q.options.length;
+      return (
+        <div className="mt-6 space-y-2">
+          {q.options.map((opt) => {
+            const selected = picks.includes(opt.v);
+            const atLimit = !selected && picks.length >= maxPicks;
+            return (
+              <button
+                key={opt.v}
+                type="button"
+                disabled={atLimit}
+                onClick={() => {
+                  const next = selected
+                    ? picks.filter((p) => p !== opt.v)
+                    : [...picks, opt.v];
+                  setAnswer(next);
+                }}
+                className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition disabled:opacity-40 ${
+                  selected
+                    ? 'border-indigo-600 bg-indigo-50'
+                    : 'border-gray-200 bg-white hover:border-indigo-300'
+                }`}
+              >
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
+                    selected ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'
+                  }`}
+                >
+                  {selected && <FaCheckCircle className="h-3 w-3 text-white" />}
+                </span>
+                <span className="text-sm text-gray-800">{opt.label}</span>
+              </button>
+            );
+          })}
+          {q.maxPicks && (
+            <p className="text-xs text-gray-500">
+              {t('survey.pick_limit', 'Choose up to {{count}}: {{picked}} chosen', {
+                count: q.maxPicks,
+                picked: picks.length,
+              })}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // text
+    return (
+      <textarea
+        value={typeof value === 'string' ? value : ''}
+        onChange={(e) => setAnswer(e.target.value)}
+        rows={4}
+        className="mt-6 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+        placeholder={t('survey.text_placeholder', 'Write your answer here...')}
+      />
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-indigo-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl bg-red-50 px-4 py-6 text-center text-sm text-red-700">
+        {error}
+      </div>
+    );
+  }
+
+  if (!currentQuestion) return null;
+
+  const exitLabel = mode === 'partA'
+    ? t('survey.part_a_title', 'A few quick questions before you continue')
+    : t('survey.title', 'RentalHub NG Market Research Survey');
+
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">{exitLabel}</h2>
+          <p className="text-xs text-gray-500">
+            {mode === 'partA'
+              ? t('survey.part_a_sub', 'This first section takes about 2 minutes. The rest can be finished later.')
+              : t('survey.part_b_sub', 'Section {{section}} · Question {{q}} of {{total}}', {
+                  section: currentSection?.section,
+                  q: questionIndex + 1,
+                  total: currentSection?.questions.length,
+                })}
+          </p>
+        </div>
+        <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+          {progress}%
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+        <div
+          className="h-full rounded-full bg-indigo-600 transition-all duration-300"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      {/* Section label */}
+      <div className="mt-6">
+        <p className="text-xs font-bold uppercase tracking-wide text-indigo-600">
+          {t('survey.section', 'Section')} {currentSection?.section}
+        </p>
+        <h3 className="mt-1 text-lg font-semibold leading-snug text-gray-900">
+          {currentQuestion.prompt}
+        </h3>
+      </div>
+
+      {renderQuestion()}
+
+      {screenedOut && (
+        <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {t('survey.screened_out', 'Thank you for your time — this survey does not apply to you. Your answer has been recorded.')}
+        </div>
+      )}
+
+      <div className="mt-8 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={handleBack}
+          disabled={sectionIndex === 0 && questionIndex === 0}
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+        >
+          <FaArrowLeft /> {t('survey.back', 'Back')}
+        </button>
+        <div className="flex flex-col items-end gap-2">
+          {publicMode && (isLastQuestion || screenedOut) && (
+            <TurnstileWidget
+              action="rentalhub_survey"
+              onToken={setTurnstileToken}
+            />
+          )}
+          <div className="flex items-center gap-2">
+            {saving && <span className="text-xs text-gray-400">{t('survey.saving', 'Saving...')}</span>}
+            <button
+              type="button"
+              onClick={handleNext}
+              disabled={!canGoNext || submitting || (publicMode && (isLastQuestion || screenedOut) && !turnstileToken)}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {submitting
+                ? t('survey.submitting', 'Submitting...')
+                : isLastQuestion || screenedOut
+                  ? t('survey.finish', 'Finish')
+                  : t('survey.next', 'Next')}
+              <FaArrowRight />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showExit && !screenedOut && mode !== 'partA' && (
+        <button
+          type="button"
+          onClick={onExit}
+          className="mt-4 block w-full text-center text-sm font-medium text-gray-400 hover:text-gray-600"
+        >
+          {t('survey.finish_later', 'Finish later from my dashboard')}
+        </button>
+      )}
+
+      <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-gray-400">
+        <FaShieldAlt className="text-gray-400" />
+        {t('survey.privacy_note', 'Anonymous market research. Your personal details are never linked to your answers.')}
+      </p>
+    </div>
+  );
+}

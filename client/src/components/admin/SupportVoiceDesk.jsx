@@ -27,7 +27,7 @@ import {
   FaCheckCircle,
 } from 'react-icons/fa';
 import useTwilioVoice from '../../hooks/useTwilioVoice';
-import { escalateCall, fetchDepartments } from '../../services/voiceApi';
+import { consultCall, fetchDepartments, transferCall } from '../../services/voiceApi';
 
 // ── Local in-memory recent-calls adapter ────────────────────────────────────
 // TODO(voice): replace with backend call events once the /voice/status
@@ -149,12 +149,12 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
   const [now, setNow] = useState(() => Date.now());
   const [announcement, setAnnouncement] = useState('');
 
-  // Department escalation state.
+  // Department escalation state (warm transfer: consult → transfer).
   const [departments, setDepartments] = useState([]);
   const [escalateDept, setEscalateDept] = useState('');
   const [escalating, setEscalating] = useState(false);
   const [escalateError, setEscalateError] = useState('');
-  const [escalatedTo, setEscalatedTo] = useState('');
+  const [consultState, setConsultState] = useState('idle'); // idle | ringing | connected
 
   // Timers for the ringing / active-call clocks.
   const [ringingStartedAt, setRingingStartedAt] = useState(null);
@@ -201,11 +201,11 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     }
   }, [incomingCall, status]);
 
-  // ── Department escalation ──────────────────────────────────────────────────
-  // Load the department list only while the agent is on the queue line; reset
-  // all escalation state whenever the active call changes.
+  // ── Department escalation (warm transfer) ──────────────────────────────────
+  // Load the department list only while the agent is on a call; reset all
+  // escalation state whenever the active call changes.
   useEffect(() => {
-    if (!activeCall || !isQueueLine(activeCall)) return undefined;
+    if (!activeCall || isQueueLine(activeCall)) return undefined;
     let mounted = true;
     fetchDepartments()
       .then((list) => { if (mounted) setDepartments(list); })
@@ -214,25 +214,43 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
   }, [activeCall]);
 
   useEffect(() => {
-    setEscalatedTo('');
+    setConsultState('idle');
     setEscalateError('');
     setEscalateDept('');
   }, [activeCall]);
 
-  const handleEscalate = useCallback(async () => {
-    if (!escalateDept || !activeCall) return;
+  const getActiveCallSid = useCallback(() => {
+    if (!activeCall) return null;
+    return activeCall.parameters?.CallSid || activeCall.customParameters?.call_sid || null;
+  }, [activeCall]);
+
+  const handleConsult = useCallback(async () => {
+    if (!escalateDept) return;
     setEscalating(true);
     setEscalateError('');
     try {
-      const callSid = activeCall.parameters?.CallSid || activeCall.customParameters?.call_sid;
-      await escalateCall(callSid, escalateDept);
-      setEscalatedTo(escalateDept);
+      const connected = await consultCall(getActiveCallSid(), escalateDept);
+      setConsultState(connected ? 'connected' : 'ringing');
     } catch (err) {
-      setEscalateError(err.message || 'Could not escalate the call.');
+      setEscalateError(err.message || 'Could not start the consultation.');
+      setConsultState('idle');
     } finally {
       setEscalating(false);
     }
-  }, [activeCall, escalateDept]);
+  }, [escalateDept, getActiveCallSid]);
+
+  const handleTransfer = useCallback(async () => {
+    setEscalating(true);
+    setEscalateError('');
+    try {
+      await transferCall(getActiveCallSid());
+      setConsultState('idle');
+    } catch (err) {
+      setEscalateError(err.message || 'Could not transfer the call.');
+    } finally {
+      setEscalating(false);
+    }
+  }, [getActiveCallSid]);
 
   // ── Recent-calls adapter (in-memory only, see TODO above) ────────────────
   useEffect(() => {
@@ -503,14 +521,13 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <p className="text-lg font-bold text-slate-900">
-                    {isQueueLine(activeCall) ? 'Support queue line' : formatCaller(activeCall)}
+                    {isQueueLine(activeCall) ? 'Support queue line' : 'Support call'}
                   </p>
-                  {!isQueueLine(activeCall) && <CallOriginBadge call={activeCall} />}
                 </div>
                 <p className="text-xs text-slate-500">
                   {isQueueLine(activeCall)
-                    ? `Waiting for a queued caller — ${formatElapsed(callStartedAt)} on the line`
-                    : `${formatElapsed(callStartedAt)} elapsed`}
+                    ? `Waiting for a queued caller to be dispatched — ${formatElapsed(callStartedAt)} on the line`
+                    : `${formatElapsed(callStartedAt)} elapsed · caller number not available on conference legs`}
                 </p>
               </div>
             </div>
@@ -535,17 +552,17 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
               </button>
             </div>
           </div>
-          {isQueueLine(activeCall) && (
+          {!isQueueLine(activeCall) && (
             <div className="mt-4 border-t border-slate-100 pt-3">
               <div className="flex flex-wrap items-center gap-2">
                 <label htmlFor="voice-escalate-department" className="text-xs font-semibold text-slate-600">
-                  Escalate to department:
+                  Consult department:
                 </label>
                 <select
                   id="voice-escalate-department"
                   value={escalateDept}
                   onChange={(e) => setEscalateDept(e.target.value)}
-                  disabled={escalating || escalatedTo || departments.length === 0}
+                  disabled={escalating || consultState !== 'idle' || departments.length === 0}
                   className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
                 >
                   <option value="">{departments.length === 0 ? 'No departments configured' : 'Select department…'}</option>
@@ -553,25 +570,33 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
                     <option key={department} value={department}>{department}</option>
                   ))}
                 </select>
-                <button
-                  onClick={handleEscalate}
-                  disabled={!escalateDept || escalating || Boolean(escalatedTo)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2"
-                >
-                  {escalating ? <FaSpinner className="animate-spin" size={14} /> : <FaHeadset size={14} />}
-                  Escalate call
-                </button>
+                {consultState === 'idle' ? (
+                  <button
+                    onClick={handleConsult}
+                    disabled={!escalateDept || escalating}
+                    className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2"
+                  >
+                    {escalating ? <FaSpinner className="animate-spin" size={14} /> : <FaHeadset size={14} />}
+                    Consult department
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleTransfer}
+                    disabled={escalating || consultState !== 'connected'}
+                    className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2"
+                  >
+                    {escalating ? <FaSpinner className="animate-spin" size={14} /> : <FaPhoneAlt size={14} />}
+                    Transfer now
+                  </button>
+                )}
               </div>
               <p className="mt-1 text-[11px] text-slate-400">
-                Transfers the caller to the selected department. You will be disconnected from this call.
+                {consultState === 'idle' && 'The caller is put on hold while you speak with the department privately.'}
+                {consultState === 'ringing' && 'The department is ringing. Transfer is enabled once they answer.'}
+                {consultState === 'connected' && 'The caller is on hold. Tell the department the story, then press Transfer now.'}
               </p>
               {escalateError && (
                 <p className="mt-1 text-xs text-red-600" role="alert">{escalateError}</p>
-              )}
-              {escalatedTo && (
-                <p className="mt-1 text-xs font-medium text-green-700">
-                  Call transferred to the {escalatedTo} department.
-                </p>
               )}
             </div>
           )}

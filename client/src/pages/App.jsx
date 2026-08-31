@@ -79,6 +79,7 @@ const AdminCompliance = React.lazy(() => import('./admin/AdminCompliance'));
 const SeoDashboard = React.lazy(() => import('./SeoDashboard'));
 const AppLanding = React.lazy(() => import('./AppLanding'));
 const QrCodePage = React.lazy(() => import('./QrCodePage'));
+const PublicSurveyPage = React.lazy(() => import('./PublicSurvey'));
 const SupportGovernancePanel = React.lazy(() => import('../components/admin/SupportGovernancePanel'));
 const LawyerDashboard = React.lazy(() => import('./lawyer/LawyerDashboard'));
 const LawyerLayout = React.lazy(() => import('./lawyer/LawyerLayout'));
@@ -702,6 +703,7 @@ function App() {
               <Route path="/mobile-app" element={<MobileAppPage />} />
               <Route path="/download" element={<React.Suspense fallback={<div />}><AppLanding /></React.Suspense>} />
               <Route path="/qr-code" element={<React.Suspense fallback={<div />}><QrCodePage /></React.Suspense>} />
+              <Route path="/survey" element={<React.Suspense fallback={<div />}><PublicSurveyPage /></React.Suspense>} />
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
               <Route path="/transportation/book" element={<TransportationBooking />} />

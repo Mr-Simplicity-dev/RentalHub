@@ -681,6 +681,8 @@ app.use('/api/messages', generalOpsLimiter, messageRoutes);
 app.use('/api/users', generalOpsLimiter, userRoutes);
 app.use('/api/admin', adminLimiter, adminRoutes);
 app.use('/api/admin/diaspora', adminLimiter, require('./routes/diasporaAdmin'));
+app.use('/api/survey', generalOpsLimiter, require('./routes/survey'));
+app.use('/api/admin/survey', adminLimiter, require('./routes/adminSurvey'));
 app.use('/api/admin/seo', adminLimiter, adminSeoRoutes);
 app.use('/api/dashboard', generalOpsLimiter, dashboardRoutes);
 app.use('/api/notifications', generalOpsLimiter, notificationRoutes);

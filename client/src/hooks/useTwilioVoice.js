@@ -127,7 +127,18 @@ const useTwilioVoice = () => {
   }, []);
 
   // Dial the queue through the TwiML App. The backend serves the agent-side
-  // Dequeue TwiML (a <Dial><Queue> leg) when To starts with "queue:".
+  // dispatch TwiML (a <Dial><Conference> leg) when To starts with "queue:".
+  const scheduleQueueReconnect = useCallback(() => {
+    if (reconnectTimerRef.current) return;
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      // Re-join the line only when still available and not mid-call.
+      if (deviceRef.current && statusRef.current === 'ready' && !activeCallRef.current) {
+        connectToQueue();
+      }
+    }, 2000);
+  }, [connectToQueue]);
+
   const connectToQueue = useCallback(() => {
     const device = deviceRef.current;
     if (!device || queueCallRef.current) return;
@@ -140,14 +151,7 @@ const useTwilioVoice = () => {
         if (queueCallRef.current === queueCall) {
           queueCallRef.current = null;
           setInQueue(false);
-          // While the agent stays available, put them back on the line so the
-          // next queued caller can be bridged.
-          if (deviceRef.current && statusRef.current === 'ready' && !reconnectTimerRef.current) {
-            reconnectTimerRef.current = setTimeout(() => {
-              reconnectTimerRef.current = null;
-              if (deviceRef.current && statusRef.current === 'ready') connectToQueue();
-            }, 2000);
-          }
+          scheduleQueueReconnect();
         }
       };
       queueCall.once('disconnect', clearQueueCall);
@@ -156,7 +160,7 @@ const useTwilioVoice = () => {
     } catch (queueError) {
       setError('Could not join the support queue. Try again.');
     }
-  }, []);
+  }, [scheduleQueueReconnect]);
 
   const goAvailable = useCallback(async () => {
     setError(null);
@@ -199,6 +203,37 @@ const useTwilioVoice = () => {
       });
 
       device.on('incoming', (call) => {
+        // With the conference dispatch model, the ONLY incoming calls are
+        // backend-created dispatch legs (REST participants.create) that send
+        // the agent into a waiting caller's room. Auto-accept them so the
+        // agent is connected without needing to click anything.
+        const acceptDispatch = () => {
+          incomingRef.current = null;
+          setIncomingCall(null);
+          activeCallRef.current = call;
+          setActiveCall(call);
+          setMuted(false);
+          call.once('disconnect', () => {
+            if (activeCallRef.current === call) {
+              activeCallRef.current = null;
+              setActiveCall(null);
+              setMuted(false);
+              scheduleQueueReconnect();
+            }
+          });
+          try {
+            call.accept();
+          } catch {
+            // Call already ended.
+          }
+        };
+        if (deviceRef.current && statusRef.current !== 'offline') {
+          acceptDispatch();
+          return;
+        }
+
+        // Fallback ringing flow (kept for safety if a direct client dial ever
+        // returns to the IVR design).
         incomingRef.current = call;
         setIncomingCall(call);
 

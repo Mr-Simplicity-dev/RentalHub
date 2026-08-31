@@ -11,6 +11,7 @@ import VerificationsTab from "../components/admin/VerificationsTab";
 import PropertiesTab from "../components/admin/PropertiesTab";
 import AnalyticsTab from "../components/admin/AnalyticsTab";
 import DiasporaAdminPanel from "../components/admin/DiasporaAdminPanel";
+import SurveyAdminPanel from "../components/admin/SurveyAdminPanel";
 import ReportsTab from "../components/admin/ReportsTab";
 import LogsTab from "../components/admin/LogsTab";
 import BroadcastTab from "../components/admin/BroadcastTab";
@@ -69,6 +70,7 @@ const tabs = [
   "commission_config",
   "appeals",
   "diaspora",
+  "survey",
 ];
 
 const tabLabels = {
@@ -100,6 +102,7 @@ const tabLabels = {
   commission_config: "Commission Config",
   appeals: "Appeals",
   diaspora: "Diaspora",
+  survey: "Survey & Analysis",
 };
 
 const shortcutCategories = [
@@ -1438,6 +1441,10 @@ export default function SuperAdminDashboard() {
 
         {tab === "diaspora" && (
           <DiasporaAdminPanel />
+        )}
+
+        {tab === "survey" && (
+          <SurveyAdminPanel />
         )}
 
       <InputDialog
