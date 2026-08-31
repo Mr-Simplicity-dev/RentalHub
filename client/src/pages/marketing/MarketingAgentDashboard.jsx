@@ -37,7 +37,7 @@ const MarketingAgentDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-5xl px-4">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="marketing-agent-header-section mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {t('marketing_agent.title', 'Marketing Agent Dashboard')}
@@ -53,7 +53,7 @@ const MarketingAgentDashboard = () => {
             <button
               type="button"
               onClick={() => navigate('/survey?agent=1')}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="marketing-agent-conduct-button inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
             >
               <FaPlus /> {t('marketing_agent.conduct', 'Conduct Survey')}
             </button>
@@ -66,7 +66,7 @@ const MarketingAgentDashboard = () => {
           <div className="py-16 text-center text-sm text-gray-400">Loading…</div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="marketing-agent-stats-section grid grid-cols-2 gap-4 sm:grid-cols-4" data-tour-id="stat-grid">
               <div className="rounded-xl border border-soft bg-white p-4 shadow-sm">
                 <p className="flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500">
                   <FaClipboardCheck className="text-emerald-500" /> {t('marketing_agent.captured', 'Captured')}
@@ -94,7 +94,7 @@ const MarketingAgentDashboard = () => {
             </div>
 
             {data?.by_lga?.length > 0 && (
-              <div className="mt-6 rounded-xl border border-soft bg-white p-4 shadow-sm">
+              <div className="marketing-agent-lga-chart mt-6 rounded-xl border border-soft bg-white p-4 shadow-sm">
                 <p className="mb-3 text-sm font-semibold text-gray-700">
                   {t('marketing_agent.by_lga', 'Responses by LGA')}
                 </p>
@@ -109,7 +109,7 @@ const MarketingAgentDashboard = () => {
               </div>
             )}
 
-            <div className="mt-6 overflow-x-auto rounded-xl border border-soft bg-white shadow-sm">
+            <div className="marketing-agent-responses-table mt-6 overflow-x-auto rounded-xl border border-soft bg-white shadow-sm">
               <p className="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-700">
                 {t('marketing_agent.my_responses', 'My captured respondents')}
               </p>

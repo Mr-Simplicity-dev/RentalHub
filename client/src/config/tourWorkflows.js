@@ -327,6 +327,7 @@ export const getWorkflowToursByUserRole = (userRole, t) => {
     tenant: [WORKFLOW_TOURS.TENANT_RENTAL, WORKFLOW_TOURS.SERVICE_BOOKINGS, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
     landlord: [WORKFLOW_TOURS.LANDLORD_LISTING, WORKFLOW_TOURS.SERVICE_BOOKINGS, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
     agent: [WORKFLOW_TOURS.AGENT_OPERATIONS, WORKFLOW_TOURS.SERVICE_BOOKINGS, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
+    marketing_agent: [WORKFLOW_TOURS.ACCOUNT_SETTINGS],
     lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
     state_lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
     super_lawyer: [WORKFLOW_TOURS.LAWYER_CASEWORK, WORKFLOW_TOURS.ACCOUNT_SETTINGS],
@@ -335,6 +336,7 @@ export const getWorkflowToursByUserRole = (userRole, t) => {
   const adminWorkflowMeta = {
     admin: ['platform_admin_operations', 'Run the platform review queue', 'Move through users, properties, applications, verifications, and administration tools.'],
     lga_admin: ['lga_admin_operations', 'Run local platform operations', 'Review users, properties, applications, and verification work inside your assigned scope.'],
+    zonal_admin: ['zonal_admin_operations', 'Run zonal platform operations', 'Review users, properties, applications, and verification work inside your assigned zone.'],
     state_admin: ['state_admin_operations', 'Run state operations', 'Follow state oversight, finance, withdrawals, and administration tools in one guided path.'],
     state_financial_admin: ['state_financial_operations', 'Run state financial operations', 'Review state coverage, balances, commissions, withdrawals, and operational tools.'],
     financial_admin: ['financial_admin_operations', 'Manage the financial workflow', 'Move from transactions to state performance, frozen funds, withdrawals, escalations, and audit records.'],

@@ -1017,7 +1017,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_support_9',
       target: '.super-support-voice-desk-section',
-      route: '/admin/super-support-dashboard?tab=voice-desk',
+      route: '/admin/super-support-dashboard?tab=voice',
       title: 'Voice Desk',
       description: 'Manage voice-support operations and call escalations for your support team.',
       placement: 'top',
@@ -1079,6 +1079,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_7',
       target: '.super-admin-users-section',
+      route: '/super-admin?tab=users',
       title: 'Users Workspace',
       description: 'Review and manage platform users, verifications, and account records from this tab.',
       placement: 'top',
@@ -1087,6 +1088,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_8',
       target: '.super-admin-analytics-section',
+      route: '/super-admin?tab=analytics',
       title: 'Analytics',
       description: 'Open platform analytics, SEO dashboards, reports, and tour analytics from here.',
       placement: 'top',
@@ -1095,6 +1097,7 @@ export const TOUR_STEPS = {
     {
       id: 'super_9',
       target: '.super-admin-support-section',
+      route: '/super-admin?tab=reports',
       title: 'Reports & Broadcasts',
       description: 'Access reports, logs, broadcasts, ad spaces, email and SMS marketing, and service ratings.',
       placement: 'top',
@@ -1103,8 +1106,54 @@ export const TOUR_STEPS = {
     {
       id: 'super_10',
       target: '.super-admin-admins-section',
+      route: '/super-admin?tab=recruitment',
       title: 'Recruitment & Admins',
       description: 'Manage recruitment, pricing, flags, platform lawyers and agents, and admin monitoring.',
+      placement: 'top',
+      highlight: true,
+    },
+  ],
+
+  // Marketing Agent Dashboard
+  MARKETING_AGENT_DASHBOARD: [
+    {
+      id: 'marketing_1',
+      target: '.marketing-agent-header-section',
+      title: 'Marketing Console',
+      description: 'Your survey capture console — conduct new surveys and track every respondent you capture from here.',
+      placement: 'bottom',
+      highlight: true,
+    },
+    {
+      id: 'marketing_2',
+      target: '.marketing-agent-stats-section',
+      title: 'Capture Stats',
+      description: 'Track captured respondents, in-progress drafts, and how many provided an email or phone number.',
+      placement: 'top',
+      highlight: true,
+    },
+    {
+      id: 'marketing_3',
+      target: '.marketing-agent-conduct-button',
+      title: 'Conduct Survey',
+      description: 'Start a new survey session and capture a respondent directly from the public survey link.',
+      placement: 'left',
+      highlight: true,
+    },
+    {
+      id: 'marketing_4',
+      target: '.marketing-agent-lga-chart',
+      title: 'Responses by LGA',
+      description: 'Review how many respondents you have captured per local government area.',
+      placement: 'top',
+      highlight: true,
+      optional: true,
+    },
+    {
+      id: 'marketing_5',
+      target: '.marketing-agent-responses-table',
+      title: 'My Captured Respondents',
+      description: 'Review every respondent record — code, type, contact, LGA, and completion status.',
       placement: 'top',
       highlight: true,
     },
@@ -1175,9 +1224,9 @@ export const DASHBOARD_ICON_STEPS = [
 
 const mergeSharedSteps = (baseSteps, userRole) => {
   let steps = [...baseSteps];
-  const isAdmin = ['admin', 'lga_admin', 'state_admin', 'financial_admin', 'lga_financial_admin', 'super_financial_admin', 'transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin', 'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin', 'recruitment_admin', 'state_financial_admin', 'lga_support_admin', 'state_support_admin', 'super_support_admin', 'super_admin'].includes(userRole);
+  const isAdmin = ['admin', 'lga_admin', 'state_admin', 'financial_admin', 'lga_financial_admin', 'super_financial_admin', 'transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin', 'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin', 'recruitment_admin', 'state_financial_admin', 'lga_support_admin', 'state_support_admin', 'super_support_admin', 'super_admin', 'zonal_admin'].includes(userRole);
   const isLawyer = ['lawyer', 'state_lawyer', 'super_lawyer'].includes(userRole);
-  const isDashboard = ['tenant', 'user', 'landlord', 'agent'].includes(userRole);
+  const isDashboard = ['tenant', 'user', 'landlord', 'agent', 'marketing_agent'].includes(userRole);
 
   if (isDashboard) {
     steps = [...DASHBOARD_ICON_STEPS, ...steps];
@@ -1255,11 +1304,13 @@ export const getTourStepsByUserRole = (userRole, t, context = {}) => {
     landlord: TOUR_STEPS.LANDLORD_DASHBOARD,
     tenant: TOUR_STEPS.TENANT_DASHBOARD,
     agent: TOUR_STEPS.AGENT_DASHBOARD,
+    marketing_agent: TOUR_STEPS.MARKETING_AGENT_DASHBOARD,
     lawyer: TOUR_STEPS.LAWYER_DASHBOARD,
     state_lawyer: TOUR_STEPS.LAWYER_DASHBOARD,
     super_lawyer: TOUR_STEPS.LAWYER_DASHBOARD,
     admin: TOUR_STEPS.ADMIN_DASHBOARD,
     lga_admin: TOUR_STEPS.ADMIN_DASHBOARD,
+    zonal_admin: TOUR_STEPS.ADMIN_DASHBOARD,
     financial_admin: TOUR_STEPS.FINANCIAL_ADMIN_DASHBOARD,
     lga_financial_admin: TOUR_STEPS.LGA_FINANCIAL_ADMIN_DASHBOARD,
     super_financial_admin: TOUR_STEPS.SUPER_FINANCIAL_ADMIN_DASHBOARD,
@@ -1299,11 +1350,13 @@ export const getTourDashboardType = (userRole) => {
     landlord: 'landlord_dashboard',
     tenant: 'tenant_dashboard',
     agent: 'agent_dashboard',
+    marketing_agent: 'marketing_agent_dashboard',
     lawyer: 'lawyer_dashboard',
     state_lawyer: 'state_lawyer_dashboard',
     super_lawyer: 'super_lawyer_dashboard',
     admin: 'admin_dashboard',
     lga_admin: 'lga_admin_dashboard',
+    zonal_admin: 'zonal_admin_dashboard',
     state_admin: 'state_admin_dashboard',
     state_financial_admin: 'state_financial_admin_dashboard',
     financial_admin: 'financial_admin_dashboard',
@@ -1336,11 +1389,13 @@ export const getTourDashboardRoute = (userRole) => {
     tenant: '/tenant/dashboard',
     landlord: '/dashboard',
     agent: '/agent/dashboard',
+    marketing_agent: '/marketing-agent/dashboard',
     lawyer: '/lawyer',
     state_lawyer: '/lawyer/state',
     super_lawyer: '/lawyer/super',
     admin: '/admin',
     lga_admin: '/admin',
+    zonal_admin: '/admin',
     state_admin: '/admin',
     state_financial_admin: '/admin',
     financial_admin: '/admin/financial-dashboard',
