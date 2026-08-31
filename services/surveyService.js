@@ -3,6 +3,7 @@
  */
 
 const crypto = require('crypto');
+const axios = require('axios');
 const db = require('../config/middleware/database');
 const survey = require('../config/survey');
 
@@ -11,6 +12,213 @@ const generateRespondentCode = () =>
 
 const generateResumeToken = () =>
   crypto.randomBytes(24).toString('base64url');
+
+// ── Location / VPN gate ────────────────────────────────────────────────────
+// The survey only runs inside the configured area and blocks VPN/proxy IPs.
+
+const EARTH_RADIUS_KM = 6371;
+const haversineKm = (lat1, lng1, lat2, lng2) => {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const getIpGeolocation = async (ip) => {
+  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('10.') || ip.startsWith('192.168.')) {
+    return null;
+  }
+  const providers = [
+    `https://ipapi.co/${encodeURIComponent(ip)}/json/`,
+    `https://ipwho.is/${encodeURIComponent(ip)}`,
+  ];
+  for (const url of providers) {
+    try {
+      const response = await axios.get(url, { timeout: 4000 });
+      const data = response.data;
+      if (data && (data.country_code || data.country)) {
+        return {
+          country_code: String(data.country_code || data.country).toUpperCase(),
+          proxy: Boolean(data.proxy),
+          hosting: Boolean(data.hosting || data.security?.is_hosting),
+          vpn: Boolean(data.vpn || data.security?.is_vpn || data.security?.is_proxy),
+        };
+      }
+    } catch {
+      // try next provider
+    }
+  }
+  return null;
+};
+
+const getClientIp = (req) =>
+  String(req.headers['x-forwarded-for'] || req.ip || '')
+    .split(',')[0]
+    .trim();
+
+const getSurveyLocationConfig = async () => {
+  const [scopeRow, locationsRow] = await Promise.all([
+    db.query(`SELECT value FROM app_settings WHERE key = 'survey_allowed_scope'`),
+    db.query(`SELECT value FROM app_settings WHERE key = 'survey_allowed_locations'`),
+  ]);
+  let scope = scopeRow.rows[0]?.value || 'nigeria';
+  let locations = [];
+  try {
+    locations = JSON.parse(locationsRow.rows[0]?.value || '[]');
+  } catch {
+    locations = [];
+  }
+  if (!Array.isArray(locations)) locations = [];
+  return { scope, locations };
+};
+
+exports.getSurveyLocationConfigForAdmin = async () => getSurveyLocationConfig();
+
+// Public: gate status for the client (enabled + allowed areas only).
+exports.getSurveyLocationConfig = async (req, res) => {
+  try {
+    const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
+    const map = await flags();
+    const gateEnabled = map.survey_location_gate === true;
+    const config = await getSurveyLocationConfig();
+
+    return res.json({
+      success: true,
+      data: {
+        gate_enabled: gateEnabled,
+        scope: gateEnabled ? config.scope : null,
+        allowed_locations: gateEnabled
+          ? config.locations.map((l) => ({
+              label: l.label || `${l.lat},${l.lng}`,
+              lat: Number(l.lat),
+              lng: Number(l.lng),
+              radius_km: Number(l.radius_km) || 30,
+            }))
+          : [],
+      },
+    });
+  } catch (error) {
+    req.logger.error('Survey location config error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load survey location config' });
+  }
+};
+
+// Public: verify the device is inside the allowed area and not on a VPN.
+exports.checkSurveyLocation = async (req, res) => {
+  try {
+    const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
+    const map = await flags();
+    if (map.survey_location_gate !== true) {
+      return res.json({ success: true, data: { allowed: true, reason: null } });
+    }
+
+    const config = await getSurveyLocationConfig();
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.json({
+        success: true,
+        data: { allowed: false, reason: 'location_required' },
+      });
+    }
+
+    // 1) Location match against the allowed scope.
+    let locationOk = false;
+    if (config.scope === 'locations') {
+      locationOk = config.locations.some(
+        (l) =>
+          haversineKm(lat, lng, Number(l.lat), Number(l.lng)) <= (Number(l.radius_km) || 30)
+      );
+    } else {
+      // nigeria scope: the country check is done via the IP below; device
+      // coords must at least be a plausible latitude/longitude.
+      locationOk = lat >= 3 && lat <= 15 && lng >= 2 && lng <= 15;
+    }
+
+    if (!locationOk) {
+      return res.json({
+        success: true,
+        data: { allowed: false, reason: 'not_in_area' },
+      });
+    }
+
+    // 2) IP-based country + VPN check.
+    const ip = getClientIp(req);
+    const ipGeo = await getIpGeolocation(ip);
+
+    if (ipGeo) {
+      if (ipGeo.proxy || ipGeo.hosting || ipGeo.vpn) {
+        return res.json({
+          success: true,
+          data: { allowed: false, reason: 'vpn_detected', ip_country: ipGeo.country_code },
+        });
+      }
+      if (config.scope === 'nigeria' && ipGeo.country_code && ipGeo.country_code !== 'NG') {
+        return res.json({
+          success: true,
+          data: { allowed: false, reason: 'outside_nigeria', ip_country: ipGeo.country_code },
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: { allowed: true, reason: null, ip_country: ipGeo?.country_code || null },
+    });
+  } catch (error) {
+    req.logger.error('Survey location check error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to check survey location' });
+  }
+};
+
+// Server-side enforcement used at draft/submit time.
+const enforceLocationGate = async (req, body) => {
+  const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
+  const map = await flags();
+  if (map.survey_location_gate !== true) return { allowed: true };
+
+  const config = await getSurveyLocationConfig();
+  const lat = Number(body.lat);
+  const lng = Number(body.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { allowed: false, reason: 'location_required' };
+  }
+
+  let locationOk = false;
+  if (config.scope === 'locations') {
+    locationOk = config.locations.some(
+      (l) => haversineKm(lat, lng, Number(l.lat), Number(l.lng)) <= (Number(l.radius_km) || 30)
+    );
+  } else {
+    locationOk = lat >= 3 && lat <= 15 && lng >= 2 && lng <= 15;
+  }
+  if (!locationOk) return { allowed: false, reason: 'not_in_area' };
+
+  const ip = getClientIp(req);
+  const ipGeo = await getIpGeolocation(ip);
+  if (ipGeo) {
+    if (ipGeo.proxy || ipGeo.hosting || ipGeo.vpn) {
+      return { allowed: false, reason: 'vpn_detected' };
+    }
+    if (config.scope === 'nigeria' && ipGeo.country_code && ipGeo.country_code !== 'NG') {
+      return { allowed: false, reason: 'outside_nigeria' };
+    }
+  }
+
+  return { allowed: true };
+};
+
+const LOCATION_REASONS = {
+  location_required: 'We could not confirm your location. Please enable location access and try again.',
+  not_in_area: 'The survey is only available in the allowed survey area right now.',
+  vpn_detected: 'VPN connections are not allowed for this survey. Please turn off your VPN and try again.',
+  outside_nigeria: 'This survey is only available to respondents in Nigeria.',
+};
 
 const ensureSchema = async () => {
   await db.query(`
@@ -138,6 +346,16 @@ exports.savePublicDraft = async (req, res) => {
     const type = String(survey_type || 'tenant').toLowerCase();
     if (!survey.getQuestionnaire(type)) {
       return res.status(400).json({ success: false, message: 'Unknown survey type' });
+    }
+
+    // Location/VPN gate — enforced on every draft save.
+    const gate = await enforceLocationGate(req, req.body || {});
+    if (!gate.allowed) {
+      return res.status(403).json({
+        success: false,
+        code: 'LOCATION_BLOCKED',
+        message: LOCATION_REASONS[gate.reason] || 'Survey unavailable at this location',
+      });
     }
 
     const token = String(resume_token || '').slice(0, 64) || generateResumeToken();
@@ -576,6 +794,16 @@ exports.submitPublicSurvey = async (req, res) => {
         success: false,
         code: 'CONTACT_REQUIRED',
         message: 'Respondent name and phone number are required',
+      });
+    }
+
+    // Location/VPN gate — enforced on final submission too.
+    const gate = await enforceLocationGate(req, req.body || {});
+    if (!gate.allowed) {
+      return res.status(403).json({
+        success: false,
+        code: 'LOCATION_BLOCKED',
+        message: LOCATION_REASONS[gate.reason] || 'Survey unavailable at this location',
       });
     }
 

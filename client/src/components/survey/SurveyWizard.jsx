@@ -19,6 +19,7 @@ export default function SurveyWizard({
   collectContacts = false,
   agentMode = false,
   prefillContact = null,
+  locationCoords = null,
   onComplete,
   onExit,
   showExit = false,
@@ -180,6 +181,8 @@ export default function SurveyWizard({
           consent_flags: consentFlags,
           resume_token: token,
           agent: agentMode ? { ...agentSession } : undefined,
+          lat: locationCoords?.lat,
+          lng: locationCoords?.lng,
         });
         const returnedToken = res.data?.data?.resume_token;
         if (returnedToken && returnedToken !== token) {
@@ -190,7 +193,7 @@ export default function SurveyWizard({
       }
     }, 1200);
     return () => clearTimeout(timer);
-  }, [answers, consentFlags, surveyType, agentMode, agentSession, publicMode, paperMode]);
+  }, [answers, consentFlags, surveyType, agentMode, agentSession, publicMode, paperMode, locationCoords]);
 
   const setAnswer = (value) => {
     if (!currentQuestion) return;
@@ -259,6 +262,8 @@ export default function SurveyWizard({
               resume_token: localStorage.getItem(RESUME_KEY) || '',
               time_spent_seconds: Math.round((Date.now() - startedAt) / 1000),
               turnstile_token: turnstileToken,
+              lat: locationCoords?.lat,
+              lng: locationCoords?.lng,
             }
           );
           localStorage.removeItem(RESUME_KEY);

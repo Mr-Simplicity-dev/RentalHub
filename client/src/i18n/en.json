@@ -4607,11 +4607,29 @@
     "remind_requesting": "Asking your browser...",
     "remind_yes": "Yes, remind me",
     "remind_no": "No, I'll finish now",
-    "remind_close": "Close"
+    "remind_close": "Close",
+    "loc_required": "We could not confirm your location. Please enable location access and try again.",
+    "loc_area": "The survey is only available in the allowed survey area right now.",
+    "loc_vpn": "VPN connections are not allowed for this survey. Please turn off your VPN and try again.",
+    "loc_country": "This survey is only available to respondents in Nigeria.",
+    "loc_generic": "The survey is not available at your current location.",
+    "loc_blocked_title": "Survey not available here"
   },
   "dashboard": {
     "survey_reminder_title": "Finish your market research survey",
     "survey_reminder_body": "Your answers help us improve RentalHub NG. It takes about 10 more minutes — you can finish anytime.",
     "survey_continue": "Continue Survey"
+  },
+  "nigeria_page": {
+    "load_failed": "Could not load Nigerian property data. Please try again.",
+    "loading": "Loading Nigerian property data…",
+    "unavailable": "Nigerian property data is currently unavailable.",
+    "title": "Properties Across Nigeria",
+    "subtitle": "Browse rental supply by state, LGA and high-intent areas, powered by verified RentalHub NG listings.",
+    "all_states": "All States",
+    "lgas_count": "{{count}} LGAs",
+    "high_intent": "High-Intent Areas",
+    "high_intent_desc": "Locations where renters are actively searching right now.",
+    "verified_listing": "{{count}} verified listings"
   }
 }

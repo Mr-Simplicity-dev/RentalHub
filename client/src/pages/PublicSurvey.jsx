@@ -51,11 +51,77 @@ const PublicSurveyPage = () => {
   const [notifState, setNotifState] = useState('default');
   const [hasDraft, setHasDraft] = useState(false);
   const [prefillContact, setPrefillContact] = useState(null);
+  const [locationState, setLocationState] = useState('checking'); // checking | ok | blocked
+  const [locationBlockReason, setLocationBlockReason] = useState('');
+  const [locationCoords, setLocationCoords] = useState(null);
   const googleButtonRef = useRef(null);
   const googleReady = useRef(false);
 
   const isMarketingAgent = user?.user_type === 'marketing_agent';
   const agentMode = isMarketingAgent && searchParams.get('agent') === '1';
+
+  // Location/VPN gate: verify the device is inside the allowed area BEFORE
+  // the reminder popup and any survey activity.
+  useEffect(() => {
+    let active = true;
+
+    const runLocationGate = async () => {
+      try {
+        const configRes = await api.get('/survey/location-config');
+        const config = configRes.data?.data || {};
+        if (!config.gate_enabled) {
+          if (active) setLocationState('ok');
+          return;
+        }
+
+        const coords = await new Promise((resolve) => {
+          if (!navigator.geolocation) return resolve(null);
+          navigator.geolocation.getCurrentPosition(
+            (pos) =>
+              resolve({
+                lat: Number(pos.coords.latitude),
+                lng: Number(pos.coords.longitude),
+              }),
+            () => resolve(null),
+            { timeout: 8000, maximumAge: 60000 }
+          );
+        });
+
+        if (!coords) {
+          if (active) {
+            setLocationBlockReason('location_required');
+            setLocationState('blocked');
+          }
+          return;
+        }
+
+        const checkRes = await api.get(
+          `/survey/location-check?lat=${coords.lat}&lng=${coords.lng}`
+        );
+        const result = checkRes.data?.data || {};
+        if (!result.allowed) {
+          if (active) {
+            setLocationBlockReason(result.reason || 'not_in_area');
+            setLocationState('blocked');
+          }
+          return;
+        }
+
+        if (active) {
+          setLocationCoords(coords);
+          localStorage.setItem('rentalhub_survey_coords', JSON.stringify(coords));
+          setLocationState('ok');
+        }
+      } catch {
+        if (active) setLocationState('ok');
+      }
+    };
+
+    runLocationGate();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     document.title = 'RentalHub NG Survey';
@@ -238,11 +304,45 @@ const PublicSurveyPage = () => {
           collectContacts
           agentMode={agentMode}
           prefillContact={prefillContact}
+          locationCoords={locationCoords}
           onComplete={() => {
             localStorage.removeItem(TYPE_KEY);
             setSubmitted(true);
           }}
         />
+      </div>
+    );
+  }
+
+  const LOCATION_MESSAGES = {
+    location_required: t('public_survey.loc_required', 'We could not confirm your location. Please enable location access and try again.'),
+    not_in_area: t('public_survey.loc_area', 'The survey is only available in the allowed survey area right now.'),
+    vpn_detected: t('public_survey.loc_vpn', 'VPN connections are not allowed for this survey. Please turn off your VPN and try again.'),
+    outside_nigeria: t('public_survey.loc_country', 'This survey is only available to respondents in Nigeria.'),
+  };
+
+  if (locationState === 'checking') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-indigo-600" />
+      </div>
+    );
+  }
+
+  if (locationState === 'blocked') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-600 text-2xl">
+            ⛔
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">
+            {t('public_survey.loc_blocked_title', 'Survey not available here')}
+          </h1>
+          <p className="mt-2 text-sm text-gray-600">
+            {LOCATION_MESSAGES[locationBlockReason] || t('public_survey.loc_generic', 'The survey is not available at your current location.')}
+          </p>
+        </div>
       </div>
     );
   }

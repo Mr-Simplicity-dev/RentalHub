@@ -8,6 +8,7 @@ const Footer = () => {
   const { t } = useTranslation();
   const [mobileContactLinksEnabled, setMobileContactLinksEnabled] = useState(false);
   const [careerLinkVisible, setCareerLinkVisible] = useState(false);
+  const [surveyLinkVisible, setSurveyLinkVisible] = useState(false);
 
   useEffect(() => {
     const detectMobilePhone = () => {
@@ -42,6 +43,14 @@ const Footer = () => {
       })
       .catch(() => {
         if (active) setCareerLinkVisible(false);
+      });
+
+    api.get('/survey/public-flags')
+      .then((res) => {
+        if (active) setSurveyLinkVisible(Boolean(res.data?.data?.survey_public_enabled));
+      })
+      .catch(() => {
+        if (active) setSurveyLinkVisible(false);
       });
 
     return () => {
@@ -86,6 +95,7 @@ const Footer = () => {
               <li><FooterLink to="/about" label={t('footer.about_us')} /></li>
               <li><FooterLink to="/how-it-works" label={t('footer.how')} /></li>
               <li><FooterLink to="/faq" label={t('footer.faq')} /></li>
+              {surveyLinkVisible && <li><FooterLink to="/survey" label={t('footer.survey', 'Market Survey')} /></li>}
               {careerLinkVisible && <li><FooterLink to="/careers" label="Career" /></li>}
             </ul>
           </div>

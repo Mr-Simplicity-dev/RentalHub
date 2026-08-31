@@ -89,6 +89,16 @@ const DEFAULT_FEATURE_FLAGS = [
     enabled: true,
     description: 'Allow tenants and landlords to earn N1,000 subscription credit for successful referral registrations.',
   },
+  {
+    key: 'survey_public_enabled',
+    enabled: false,
+    description: 'Show the public market-research survey link (rentalhub.com.ng/survey) on the site footer.',
+  },
+  {
+    key: 'survey_location_gate',
+    enabled: false,
+    description: 'Require respondents to be physically inside the allowed survey area (real-time device location, no VPNs) before they can take the survey.',
+  },
 ];
 
 let featureFlagsReady = false;

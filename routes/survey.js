@@ -15,11 +15,32 @@ const {
   claimSurveyDraft,
   restartSurvey,
 } = require('../services/surveyService');
+const surveyController = require('../services/surveyService');
 const { getMarketingAgentOverview } = require('../services/surveyAnalysisService');
 const pushService = require('../services/pushService');
 
+// Public: site-wide feature flags relevant to visitors (footer link etc.)
+router.get('/public-flags', async (req, res) => {
+  try {
+    const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
+    const flags = await getFeatureFlagsMap();
+    return res.json({
+      success: true,
+      data: {
+        survey_public_enabled: flags.survey_public_enabled === true,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to load flags' });
+  }
+});
+
 // Public: VAPID public key for Web Push subscriptions
 router.get('/push/public-key', pushService.getPublicKey);
+
+// Public: location gate status + check
+router.get('/location-config', surveyController.getSurveyLocationConfig);
+router.get('/location-check', surveyController.checkSurveyLocation);
 
 // Public: push subscription (optionalAuthenticate so agents/logged-in users are linked)
 router.post('/push/subscribe', optionalAuthenticate, pushService.subscribe);

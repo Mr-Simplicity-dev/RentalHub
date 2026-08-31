@@ -8,6 +8,8 @@ const {
   paperEntry,
   deleteResponse,
   computeAnalysis,
+  saveLocationConfig,
+  getLocationConfigForAdmin,
 } = require('../services/surveyAnalysisService');
 const pushService = require('../services/pushService');
 const { requireDiasporaAdmin } = require('../services/diasporaAdminService');
@@ -29,6 +31,10 @@ router.delete('/responses/:responseId', deleteResponse);
 router.post('/reminders/send', async (req, res) => {
   await pushService.sendSurveyReminders(req, res);
 });
+
+// Location gate admin controls
+router.get('/location-config', getLocationConfigForAdmin);
+router.post('/location-config', saveLocationConfig);
 
 // PDF + CSV export
 router.get('/export.pdf', async (req, res) => {

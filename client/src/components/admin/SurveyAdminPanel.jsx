@@ -20,6 +20,10 @@ const SurveyAdminPanel = () => {
   const [projAvg, setProjAvg] = useState(500000);
   const [projBudget, setProjBudget] = useState(5000000);
   const [paperOpen, setPaperOpen] = useState(false);
+  const [locConfig, setLocConfig] = useState(null);
+  const [locScope, setLocScope] = useState("nigeria");
+  const [locList, setLocList] = useState([]);
+  const [locSaving, setLocSaving] = useState(false);
   const [paperMeta, setPaperMeta] = useState({
     admin_mode: "face_to_face",
     admin_date: new Date().toISOString().slice(0, 10),
@@ -62,11 +66,38 @@ const SurveyAdminPanel = () => {
     }
   }, [type, projUsers, projAvg, projBudget]);
 
+  const loadLocationConfig = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/survey/location-config");
+      setLocConfig(res.data.data);
+      setLocScope(res.data.data.scope || "nigeria");
+      setLocList(res.data.data.locations || []);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
-    if (tab === "analysis" || tab === "overview") loadAnalysis();
     if (tab === "responses") loadResponses();
     if (tab === "projections") loadProjections();
-  }, [tab, type, loadAnalysis, loadResponses, loadProjections]);
+    loadLocationConfig();
+  }, [tab, type, loadAnalysis, loadResponses, loadProjections, loadLocationConfig]);
+
+  const saveLocationConfig = async () => {
+    setLocSaving(true);
+    try {
+      const res = await api.post("/admin/survey/location-config", {
+        scope: locScope,
+        locations: locList,
+      });
+      toast.success(res.data?.message || "Location rules saved");
+      setLocConfig(res.data.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save location rules");
+    } finally {
+      setLocSaving(false);
+    }
+  };
 
   const exportPdf = () => {
     window.open(`/api/admin/survey/export.pdf?type=${type}`, "_blank");
@@ -112,6 +143,7 @@ const SurveyAdminPanel = () => {
     ["analysis", "Full Analysis"],
     ["projections", "Projections"],
     ["responses", "Responses & Paper Entry"],
+    ["location", "Location Rules"],
   ];
 
   return (
@@ -627,6 +659,116 @@ const SurveyAdminPanel = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+      {/* ── Location rules ──────────────────────────────────────────────── */}
+      {tab === "location" && (
+        <div className="space-y-6">
+          <div className="rounded-xl border border-soft bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-700">Survey Location & VPN Gate</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Gate status:{" "}
+              <span className={`font-semibold ${locConfig?.gate_enabled ? "text-green-600" : "text-amber-600"}`}>
+                {locConfig?.gate_enabled ? "ENABLED" : "DISABLED"}
+              </span>{" "}
+              — toggle it from Super Admin → Flags (the "Survey Location Gate" flag). When enabled,
+              respondents must be physically in the allowed area (real-time device location) and VPN/proxy
+              connections are blocked.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-soft p-4">
+            <p className="mb-2 text-sm font-semibold text-gray-700">Allowed scope</p>
+            <select
+              value={locScope}
+              onChange={(e) => setLocScope(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="nigeria">Anywhere in Nigeria</option>
+              <option value="locations">Only the listed locations below</option>
+            </select>
+          </div>
+
+          {locScope === "locations" && (
+            <div className="rounded-xl border border-soft p-4">
+              <p className="mb-2 text-sm font-semibold text-gray-700">Allowed locations</p>
+              {locList.map((loc, i) => (
+                <div key={i} className="mb-2 grid grid-cols-1 gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2 sm:grid-cols-4">
+                  <input
+                    value={loc.label || ""}
+                    onChange={(e) => {
+                      const next = [...locList];
+                      next[i] = { ...next[i], label: e.target.value };
+                      setLocList(next);
+                    }}
+                    placeholder="Label (e.g. FCT Gwagwalada)"
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm sm:col-span-2"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    value={loc.lat}
+                    onChange={(e) => {
+                      const next = [...locList];
+                      next[i] = { ...next[i], lat: Number(e.target.value) };
+                      setLocList(next);
+                    }}
+                    placeholder="Latitude"
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    value={loc.lng}
+                    onChange={(e) => {
+                      const next = [...locList];
+                      next[i] = { ...next[i], lng: Number(e.target.value) };
+                      setLocList(next);
+                    }}
+                    placeholder="Longitude"
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={loc.radius_km}
+                    onChange={(e) => {
+                      const next = [...locList];
+                      next[i] = { ...next[i], radius_km: Number(e.target.value) };
+                      setLocList(next);
+                    }}
+                    placeholder="Radius km"
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLocList(locList.filter((_, j) => j !== i))}
+                    className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setLocList([...locList, { label: "", lat: 0, lng: 0, radius_km: 30 }])}
+                className="mt-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                + Add location
+              </button>
+              <p className="mt-2 text-xs text-gray-400">
+                Tip: find any place's latitude/longitude on Google Maps (right-click the spot).
+              </p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={locSaving}
+            onClick={saveLocationConfig}
+            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {locSaving ? "Saving…" : "Save Location Rules"}
+          </button>
         </div>
       )}
     </div>

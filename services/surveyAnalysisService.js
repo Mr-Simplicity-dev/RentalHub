@@ -619,7 +619,70 @@ exports.deleteResponse = async (req, res) => {
 };
 
 // ── Marketing agent dashboard ──────────────────────────────────────────────
-// Each marketing agent sees the surveys they captured + their stats.
+
+// ── Survey location gate config (admin) ────────────────────────────────────
+exports.saveLocationConfig = async (req, res) => {
+  try {
+    const { scope, locations } = req.body;
+
+    const validScope = String(scope || 'nigeria') === 'locations' ? 'locations' : 'nigeria';
+    let cleanLocations = [];
+    if (Array.isArray(locations)) {
+      cleanLocations = locations
+        .filter(
+          (l) =>
+            l &&
+            Number.isFinite(Number(l.lat)) &&
+            Number.isFinite(Number(l.lng)) &&
+            Number.isFinite(Number(l.radius_km))
+        )
+        .slice(0, 50)
+        .map((l) => ({
+          label: String(l.label || '').trim().slice(0, 120) || `${l.lat},${l.lng}`,
+          lat: Number(l.lat),
+          lng: Number(l.lng),
+          radius_km: Number(l.radius_km),
+        }));
+    }
+
+    await db.query(
+      `INSERT INTO app_settings (key, value, description)
+       VALUES ('survey_allowed_scope', $1, 'survey location gate scope'),
+              ('survey_allowed_locations', $2, 'allowed survey locations')
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [validScope, JSON.stringify(cleanLocations)]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Survey location rules saved',
+      data: { scope: validScope, locations: cleanLocations },
+    });
+  } catch (error) {
+    req.logger.error('Survey location config save error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to save location rules' });
+  }
+};
+
+exports.getLocationConfigForAdmin = async (req, res) => {
+  try {
+    const svc = require('./surveyService');
+    const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
+    const map = await flags();
+    const config = await svc.getSurveyLocationConfigForAdmin();
+    return res.json({
+      success: true,
+      data: {
+        gate_enabled: map.survey_location_gate === true,
+        scope: config.scope,
+        locations: config.locations,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Survey location config load error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load location rules' });
+  }
+};
 
 exports.getMarketingAgentOverview = async (req, res) => {
   try {

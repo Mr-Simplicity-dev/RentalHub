@@ -59,6 +59,16 @@ const FLAG_META = {
     description:
       "Reject diaspora registration payments funded by Nigerian-issued cards. When off, a Nigerian-funded card is only a review flag.",
   },
+  survey_public_enabled: {
+    label: "Public Survey Link",
+    description:
+      "Show the market-research survey link (rentalhub.com.ng/survey) in the site footer.",
+  },
+  survey_location_gate: {
+    label: "Survey Location Gate",
+    description:
+      "Require respondents to be physically inside the allowed survey area (real-time device location) and block VPN/proxy connections before they can take the survey.",
+  },
 };
 
 const REGISTRATION_PARENT_KEY = "allow_registration";
