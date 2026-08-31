@@ -36,6 +36,6 @@
 
 - [x] **DONE — Voice system WIP handled (2026-08-31)** — committed + deployed the user's voice work: routes/voice.js, tests/voice.test.js, SupportVoiceDesk.jsx, voiceApi.js, docs, migrations 130 (audio ads) + 131 (call escalations), adService audio support. twilio module restored on VPS. Voice routes live at /voice.
 
-## Inbox
+- [x] **DONE — Onboarding survey system (2026-08-31, +contacts/sync follow-up)** — tenant (T0–T9) + landlord (L0–L10) questionnaires (107q each); non-skippable Part A (T0+T1 / L0+L1) gate on new-user dashboard before tour; autosave + resume; Part B finished from dashboard reminder; Super Admin → Survey & Analysis tab (frequencies, likert means, NPS, feature priority, fraud signals, open answers, projections machine for revenue/cost/staffing/funding duration); PDF + CSV export; paper entry (admin keys paper responses, R2/R3 fields); public page at /survey (Turnstile). **Contacts follow-up**: public + paper respondents give name/phone/email ("no email" flag)/current location/state of origin — viewable in responses table + CSV; survey contacts sync into Email Marketing ("Sync contacts from users & leads", source='survey') and SMS Marketing ("Sync contacts from users", source='survey'). Existing users (pre-2026-08-31) marked survey_exempt. Migrations 132 + 133. Live unit-tested (gate, analysis pipeline, projections, contacts, email+SMS sync).
 
-- (empty)
+- [ ] **Survey follow-ups (next session)** — (1) ha/yo/ig translations for the 214 survey questions (wizard chrome already translated; prompts are English-only today); (2) link to /survey from the public site (Home/Footer) once the user wants lead capture visible.
