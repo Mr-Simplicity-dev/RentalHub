@@ -239,6 +239,9 @@ const CreateAdminTab = () => {
           <optgroup label="Recruitment">
             <option value="recruitment_admin">Recruitment Admin</option>
           </optgroup>
+          <optgroup label="Marketing">
+            <option value="marketing_agent">Marketing Agent</option>
+          </optgroup>
           <optgroup label="Finance">
             <option value="lga_financial_admin">LGA Financial Admin</option>
             <option value="state_financial_admin">State Financial Admin</option>

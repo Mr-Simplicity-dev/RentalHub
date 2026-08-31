@@ -20,6 +20,7 @@ const ROLE_GROUPS = {
   lgaTransportation: ['transportation_admin', 'lga_transportation_admin'],
   stateTransportation: ['state_transportation_admin'],
   superTransportation: ['super_transportation_admin'],
+  marketing: ['marketing_agent'],
 };
 
 const all = (...groups) => groups.flat();
@@ -69,13 +70,14 @@ const GENERAL_ADMIN_LABELS = Object.freeze({
   lga_admin: 'LGA Admin', state_admin: 'State Admin', zonal_admin: 'Zonal Admin', super_admin: 'Super Admin',
 });
 const SPECIALIST_ADMIN_ROLES = ADMIN_ROLES.filter((role) => !GENERAL_ADMIN_ROLES.includes(role));
-const CREATABLE_ADMIN_ROLES = unique(['lga_admin', 'state_admin', 'zonal_admin', ...SPECIALIST_ADMIN_ROLES]);
+const CREATABLE_ADMIN_ROLES = unique(['lga_admin', 'state_admin', 'zonal_admin', 'marketing_agent', ...SPECIALIST_ADMIN_ROLES]);
 const ALL_ADMIN_ROLES = unique([...GENERAL_ADMIN_ROLES, ...SPECIALIST_ADMIN_ROLES]);
 
 const ALL_USER_TYPES = unique([
   'tenant',
   'landlord',
   'agent',
+  'marketing_agent',
   ...ADMIN_ROLES,
 ]);
 

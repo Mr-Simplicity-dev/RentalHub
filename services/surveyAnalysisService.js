@@ -23,6 +23,7 @@ const loadResponses = async ({ type, from, to, source, completedOnly = true }) =
   if (completedOnly) {
     clauses.push('completed_at IS NOT NULL');
   }
+  clauses.push('superseded_at IS NULL');
   if (from) {
     params.push(from);
     clauses.push(`completed_at >= $${params.length}`);
@@ -497,13 +498,15 @@ exports.listResponses = async (req, res) => {
               sr.admin_mode, sr.admin_date, sr.state_id, sr.lga_name,
               sr.respondent_name, sr.respondent_phone, sr.respondent_email,
               sr.respondent_location, sr.respondent_state_of_origin, sr.has_email,
+              sr.agent_user_id, sr.agent_name, sr.agent_phone,
+              sr.agent_lga, sr.agent_location,
               sr.part_a_completed_at, sr.completed_at, sr.time_spent_seconds,
               sr.created_at,
               s.state_name, u.full_name AS user_full_name, u.email AS user_email
        FROM survey_responses sr
        LEFT JOIN states s ON s.id = sr.state_id
        LEFT JOIN users u ON u.id = sr.user_id
-       WHERE ${where}
+       WHERE ${where} AND sr.superseded_at IS NULL
        ORDER BY sr.created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, (page - 1) * limit]
@@ -612,6 +615,57 @@ exports.deleteResponse = async (req, res) => {
   } catch (error) {
     req.logger.error('Survey response delete error:', error);
     return res.status(500).json({ success: false, message: 'Failed to delete response' });
+  }
+};
+
+// ── Marketing agent dashboard ──────────────────────────────────────────────
+// Each marketing agent sees the surveys they captured + their stats.
+
+exports.getMarketingAgentOverview = async (req, res) => {
+  try {
+    const agentId = req.user.id;
+
+    const statsResult = await db.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE completed_at IS NOT NULL) AS captured,
+         COUNT(*) FILTER (WHERE completed_at IS NULL AND superseded_at IS NULL) AS in_progress,
+         COUNT(*) FILTER (WHERE has_email = TRUE AND respondent_email IS NOT NULL) AS with_email,
+         COUNT(*) FILTER (WHERE respondent_phone IS NOT NULL) AS with_phone
+       FROM survey_responses
+       WHERE agent_user_id = $1 AND superseded_at IS NULL`,
+      [agentId]
+    );
+
+    const recent = await db.query(
+      `SELECT id, respondent_code, survey_type, respondent_name, respondent_phone,
+              respondent_email, respondent_location, respondent_state_of_origin,
+              agent_lga, agent_location, admin_mode, created_at, completed_at
+       FROM survey_responses
+       WHERE agent_user_id = $1 AND superseded_at IS NULL
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [agentId]
+    );
+
+    const byLga = await db.query(
+      `SELECT COALESCE(agent_lga, 'Unknown') AS lga, COUNT(*) AS count
+       FROM survey_responses
+       WHERE agent_user_id = $1 AND completed_at IS NOT NULL AND superseded_at IS NULL
+       GROUP BY agent_lga ORDER BY count DESC`,
+      [agentId]
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        stats: statsResult.rows[0] || { captured: 0, in_progress: 0, with_email: 0, with_phone: 0 },
+        by_lga: byLga.rows,
+        responses: recent.rows,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Marketing agent overview error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load agent overview' });
   }
 };
 

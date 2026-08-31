@@ -153,6 +153,12 @@ const ROLE_META = {
     duty: 'Owns platform configuration, roles, pricing, flags, oversight, and final escalation.',
     reportsTo: 'Platform Owner',
   },
+  marketing_agent: {
+    label: 'Marketing Agent',
+    department: 'Marketing',
+    duty: 'Conducts market-research surveys (public page / paper) and captures respondent leads for email/SMS marketing.',
+    reportsTo: 'Super Admin',
+  },
 };
 
 const getRoleMeta = (role) => {

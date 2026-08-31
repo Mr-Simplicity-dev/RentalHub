@@ -461,6 +461,8 @@ const SurveyAdminPanel = () => {
                   <th className="px-3 py-2 text-left font-medium text-gray-600">Email</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-600">Lives in</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-600">State of origin</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Agent</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Agent LGA</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-600">Source</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-600">Status</th>
                   <th className="px-3 py-2 text-right font-medium text-gray-600"></th>
@@ -480,6 +482,17 @@ const SurveyAdminPanel = () => {
                     </td>
                     <td className="px-3 py-2 text-gray-600">{r.respondent_location || "—"}</td>
                     <td className="px-3 py-2 text-gray-600">{r.respondent_state_of_origin || "—"}</td>
+                    <td className="px-3 py-2 text-gray-700">
+                      {r.agent_name ? (
+                        <span>
+                          {r.agent_name}
+                          {r.agent_phone ? <span className="block text-xs text-gray-400">{r.agent_phone}</span> : null}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">{r.agent_lga || "—"}</td>
                     <td className="px-3 py-2 text-gray-600">{r.source}{r.admin_mode ? ` (${r.admin_mode})` : ""}</td>
                     <td className="px-3 py-2">
                       {r.completed_at ? (
@@ -502,7 +515,7 @@ const SurveyAdminPanel = () => {
                 ))}
                 {!responses?.responses?.length && (
                   <tr>
-                    <td colSpan={9} className="px-3 py-8 text-center text-sm text-gray-400">
+                    <td colSpan={11} className="px-3 py-8 text-center text-sm text-gray-400">
                       No responses yet
                     </td>
                   </tr>

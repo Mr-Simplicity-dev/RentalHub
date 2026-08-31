@@ -138,11 +138,12 @@ router.get('/export.csv', async (req, res) => {
               s.state_name AS state, sr.lga_name,
               sr.respondent_name, sr.respondent_phone, sr.respondent_email,
               sr.respondent_location, sr.respondent_state_of_origin, sr.has_email,
+              sr.agent_name, sr.agent_phone, sr.agent_lga, sr.agent_location,
               sr.created_at, sr.completed_at,
               sr.time_spent_seconds, sr.answers
        FROM survey_responses sr
        LEFT JOIN states s ON s.id = sr.state_id
-       WHERE sr.survey_type = $1 AND sr.completed_at IS NOT NULL
+       WHERE sr.survey_type = $1 AND sr.completed_at IS NOT NULL AND sr.superseded_at IS NULL
        ORDER BY sr.created_at DESC`,
       [type]
     );
@@ -159,6 +160,7 @@ router.get('/export.csv', async (req, res) => {
       'respondent_code', 'source', 'admin_mode', 'admin_date', 'state', 'lga',
       'respondent_name', 'respondent_phone', 'respondent_email',
       'respondent_location', 'respondent_state_of_origin',
+      'agent_name', 'agent_phone', 'agent_lga', 'agent_location',
       'created_at', 'completed_at', 'time_spent_seconds',
       ...questions.map((q) => q.key),
     ];
@@ -173,6 +175,7 @@ router.get('/export.csv', async (req, res) => {
           row.respondent_name || '', row.respondent_phone || '',
           row.has_email ? (row.respondent_email || '') : 'NO_EMAIL',
           row.respondent_location || '', row.respondent_state_of_origin || '',
+          row.agent_name || '', row.agent_phone || '', row.agent_lga || '', row.agent_location || '',
           row.created_at, row.completed_at || '',
           row.time_spent_seconds || '',
           ...questions.map((q) => {

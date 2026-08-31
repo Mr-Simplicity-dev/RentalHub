@@ -86,6 +86,7 @@ const LawyerLayout = React.lazy(() => import('./lawyer/LawyerLayout'));
 const StateLawyerDashboard = React.lazy(() => import('./lawyer/StateLawyerDashboard'));
 const SuperLawyerDashboard = React.lazy(() => import('./lawyer/SuperLawyerDashboard'));
 const AgentDashboard = React.lazy(() => import('./agent/AgentDashboard'));
+const MarketingAgentDashboard = React.lazy(() => import('./marketing/MarketingAgentDashboard'));
 const VerifyCase = React.lazy(() => import('./VerifyCase'));
 const DisputeDetails = React.lazy(() => import('./DisputeDetails'));
 const MyDisputes = React.lazy(() => import('./MyDisputes'));
@@ -350,6 +351,19 @@ const AgentRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.user_type !== 'agent') return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
+const MarketingAgentRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'marketing_agent') return <Navigate to="/dashboard" />;
 
   return children;
 };
@@ -788,6 +802,7 @@ function App() {
                 <Route index element={<SuperLawyerDashboard />} />
               </Route>
               <Route path="/agent/dashboard" element={<AgentRoute><AgentDashboard /></AgentRoute>} />
+              <Route path="/marketing-agent/dashboard" element={<MarketingAgentRoute><MarketingAgentDashboard /></MarketingAgentRoute>} />
               <Route path="/agent/earnings" element={<AgentRoute><AgentEarningsPage /></AgentRoute>} />
                             <Route path="/agent/withdrawals" element={<AgentRoute><AgentWithdrawalPage /></AgentRoute>} />
               <Route path="/verify" element={<VerifyCase />} />

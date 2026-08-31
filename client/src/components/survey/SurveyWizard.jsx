@@ -17,6 +17,7 @@ export default function SurveyWizard({
   paperMode = false,
   paperMeta = null,
   collectContacts = false,
+  agentMode = false,
   onComplete,
   onExit,
   showExit = false,
@@ -39,6 +40,14 @@ export default function SurveyWizard({
     state_of_origin: '',
   });
   const [contactDone, setContactDone] = useState(!collectContacts);
+  const [agentSession, setAgentSession] = useState({
+    lga: '',
+    location: '',
+    admin_mode: 'face_to_face',
+  });
+  const [agentSessionDone, setAgentSessionDone] = useState(!agentMode);
+  const [resumedDraft, setResumedDraft] = useState(false);
+  const [situation, setSituation] = useState(null); // null | 'same' | 'changed'
   const [sectionIndex, setSectionIndex] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -49,6 +58,7 @@ export default function SurveyWizard({
 
   const anonymousMode = publicMode || paperMode;
   const questionEnteredAt = useRef(Date.now());
+  const RESUME_KEY = 'rentalhub_survey_resume';
 
   const sections = useMemo(() => {
     if (!definition) return [];
@@ -71,22 +81,74 @@ export default function SurveyWizard({
       const defRes = await api.get(`/survey/definition?type=${surveyType}&lang=${lang}`);
       setDefinition(defRes.data.data);
 
-      if (anonymousMode) return;
+      if (paperMode) return;
 
-      const statusRes = await api.get('/survey/my-status');
-      const status = statusRes.data.data;
-      if (status.response_id) {
-        setResponseId(status.response_id);
-      } else {
-        const startRes = await api.post('/survey/start');
-        setResponseId(startRes.data.data.response.id);
+      if (publicMode) {
+        // Resume an anonymous draft from this device, if one exists.
+        const token = localStorage.getItem(RESUME_KEY);
+        if (token) {
+          try {
+            const resumeRes = await api.get(`/survey/resume?token=${encodeURIComponent(token)}`);
+            if (resumeRes.data?.success) {
+              const draft = resumeRes.data.data;
+              if (draft.completed) {
+                onComplete?.(draft);
+                return;
+              }
+              setAnswers(draft.answers || {});
+              setConsentFlags(draft.consent_flags || {});
+              setResumedDraft(true);
+            }
+          } catch {
+            // stale token — start fresh
+            localStorage.removeItem(RESUME_KEY);
+          }
+        }
+        return;
+      }
+
+      // Authenticated: claim an anonymous draft if we have a resume token.
+      const localToken = localStorage.getItem(RESUME_KEY);
+      if (localToken) {
+        try {
+          const claimRes = await api.post('/survey/claim', { resume_token: localToken });
+          if (claimRes.data?.success) {
+            const claimed = claimRes.data.data;
+            setResponseId(claimed.response_id);
+            setAnswers(claimed.answers || {});
+            setConsentFlags(claimed.consent_flags || {});
+            if (claimed.completed) {
+              onComplete?.({ partA: true, claimed: true });
+              return;
+            }
+            setResumedDraft(true);
+            localStorage.removeItem(RESUME_KEY);
+            return;
+          }
+        } catch {
+          localStorage.removeItem(RESUME_KEY);
+        }
+      }
+
+      const startRes = await api.post('/survey/start');
+      const row = startRes.data.data.response;
+      setResponseId(row.id);
+      const saved = row.answers || {};
+      if (row.completed_at) {
+        onComplete?.({ partA: Boolean(row.part_a_completed_at), already_completed: true });
+        return;
+      }
+      if (Object.keys(saved).length > 0) {
+        setAnswers(saved);
+        setConsentFlags(row.consent_flags || {});
+        setResumedDraft(true);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Could not load the survey');
     } finally {
       setLoading(false);
     }
-  }, [surveyType, lang, anonymousMode]);
+  }, [surveyType, lang, publicMode, paperMode, onComplete]);
 
   useEffect(() => {
     loadDefinition();
@@ -106,10 +168,28 @@ export default function SurveyWizard({
 
   // Debounced autosave as the user answers
   useEffect(() => {
-    if (anonymousMode || !responseId) return;
-    const timer = setTimeout(() => autosave(), 800);
+    if (publicMode === false || paperMode) return;
+    if (Object.keys(answers).length === 0) return;
+    const timer = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem(RESUME_KEY) || '';
+        const res = await api.post('/survey/public/draft', {
+          survey_type: surveyType,
+          answers,
+          consent_flags: consentFlags,
+          resume_token: token,
+          agent: agentMode ? { ...agentSession } : undefined,
+        });
+        const returnedToken = res.data?.data?.resume_token;
+        if (returnedToken && returnedToken !== token) {
+          localStorage.setItem(RESUME_KEY, returnedToken);
+        }
+      } catch {
+        // silent draft save
+      }
+    }, 1200);
     return () => clearTimeout(timer);
-  }, [answers, consentFlags, responseId, autosave, anonymousMode]);
+  }, [answers, consentFlags, surveyType, agentMode, agentSession, publicMode, paperMode]);
 
   const setAnswer = (value) => {
     if (!currentQuestion) return;
@@ -174,9 +254,13 @@ export default function SurveyWizard({
               answers,
               consent_flags: consentFlags,
               contact,
+              agent: agentMode ? { ...agentSession } : undefined,
+              resume_token: localStorage.getItem(RESUME_KEY) || '',
+              time_spent_seconds: Math.round((Date.now() - startedAt) / 1000),
               turnstile_token: turnstileToken,
             }
           );
+          localStorage.removeItem(RESUME_KEY);
           onComplete?.(res.data.data);
           return;
         }
@@ -219,6 +303,144 @@ export default function SurveyWizard({
       setQuestionIndex((sections[s - 1]?.questions.length || 1) - 1);
     }
     questionEnteredAt.current = Date.now();
+  };
+
+  const handleRestart = async () => {
+    try {
+      setSubmitting(true);
+      await api.post('/survey/restart', { response_id: responseId });
+      setAnswers({});
+      setConsentFlags({});
+      setResumedDraft(false);
+      setSituation(null);
+      setSectionIndex(0);
+      setQuestionIndex(0);
+      const startRes = await api.post('/survey/start');
+      setResponseId(startRes.data.data.response.id);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not restart the survey');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const renderSituationCheck = () => (
+    <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
+      <h3 className="font-semibold text-amber-900">
+        {t('survey.situation_title', 'Welcome back! Before you continue...')}
+      </h3>
+      <p className="mt-1 text-sm text-amber-800">
+        {t('survey.situation_desc', 'You started this survey earlier. Your answers are saved — please confirm nothing important changed.')}
+      </p>
+      <div className="mt-4 space-y-2">
+        <p className="text-sm font-medium text-gray-800">
+          {t('survey.situation_rent', 'Is your rent situation the same as when you started this survey?')}
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setSituation('same')}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            {t('survey.situation_same', 'Yes, same')}
+          </button>
+          <button
+            type="button"
+            onClick={handleRestart}
+            disabled={submitting}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            {t('survey.situation_changed', "No, it changed — start fresh")}
+          </button>
+        </div>
+        <p className="mt-3 text-sm font-medium text-gray-800">
+          {t('survey.situation_location', 'Have you moved to a different state or LGA since you started?')}
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setSituation('same')}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            {t('survey.situation_no', 'No, same place')}
+          </button>
+          <button
+            type="button"
+            onClick={handleRestart}
+            disabled={submitting}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            {t('survey.situation_moved', 'Yes, I moved — start fresh')}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-amber-700">
+          {t('survey.situation_note', 'If you start fresh, your old answers are permanently discarded and never used in analysis.')}
+        </p>
+      </div>
+    </div>
+  );
+
+  const renderAgentStep = () => {
+    const canContinue = agentSession.lga.trim().length >= 2;
+    return (
+      <div className="mt-6 space-y-4">
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {t('survey.agent_intro', 'You are conducting this survey as a RentalHub marketing agent. Your name and phone are recorded from your account — just tell us where this interview is happening.')}
+        </div>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-gray-700">
+            {t('survey.agent_lga', 'LGA where the survey is carried out *')}
+          </span>
+          <input
+            type="text"
+            value={agentSession.lga}
+            onChange={(e) => setAgentSession((a) => ({ ...a, lga: e.target.value }))}
+            placeholder="e.g. Gwagwalada"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-gray-700">{t('survey.agent_location', 'Location / area')}</span>
+          <input
+            type="text"
+            value={agentSession.location}
+            onChange={(e) => setAgentSession((a) => ({ ...a, location: e.target.value }))}
+            placeholder={t('survey.agent_location_ph', 'e.g. Phase 1, Gwagwalada market area')}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-gray-700">{t('survey.agent_mode_label', 'How is this survey being administered?')}</span>
+          <select
+            value={agentSession.admin_mode}
+            onChange={(e) => setAgentSession((a) => ({ ...a, admin_mode: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="face_to_face">{t('survey.mode_face', 'Face-to-face')}</option>
+            <option value="telephone">{t('survey.mode_phone', 'Telephone')}</option>
+            <option value="online">{t('survey.mode_online', 'Online self-completion')}</option>
+            <option value="other">{t('survey.mode_other', 'Other')}</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            if (!canContinue) {
+              setError(t('survey.agent_lga_required', 'Please enter the LGA where the survey is carried out.'));
+              return;
+            }
+            setError('');
+            setAgentSessionDone(true);
+            questionEnteredAt.current = Date.now();
+          }}
+          disabled={!canContinue}
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {t('survey.agent_continue', 'Continue to the respondent')}
+          <FaArrowRight />
+        </button>
+      </div>
+    );
   };
 
   const renderContactStep = () => {
@@ -481,19 +703,21 @@ export default function SurveyWizard({
         <div>
           <h2 className="text-lg font-bold text-gray-900">{exitLabel}</h2>
           <p className="text-xs text-gray-500">
-            {collectContacts && !contactDone
-              ? t('survey.contact_step', 'Step 1 of 2 — your contact details')
-              : mode === 'partA'
-                ? t('survey.part_a_sub', 'This first section takes about 2 minutes. The rest can be finished later.')
-                : t('survey.part_b_sub', 'Section {{section}} · Question {{q}} of {{total}}', {
-                    section: currentSection?.section,
-                    q: questionIndex + 1,
-                    total: currentSection?.questions.length,
-                  })}
+            {agentMode && !agentSessionDone
+              ? t('survey.agent_step', 'Step 1 of 3 — your interview details')
+              : collectContacts && !contactDone
+                ? t('survey.contact_step', 'Step 1 of 2 — your contact details')
+                : mode === 'partA'
+                  ? t('survey.part_a_sub', 'This first section takes about 2 minutes. The rest can be finished later.')
+                  : t('survey.part_b_sub', 'Section {{section}} · Question {{q}} of {{total}}', {
+                      section: currentSection?.section,
+                      q: questionIndex + 1,
+                      total: currentSection?.questions.length,
+                    })}
           </p>
         </div>
         <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
-          {collectContacts && !contactDone ? 0 : progress}%
+          {agentMode && !agentSessionDone ? 0 : collectContacts && !contactDone ? 0 : progress}%
         </span>
       </div>
 
@@ -501,12 +725,25 @@ export default function SurveyWizard({
       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
         <div
           className="h-full rounded-full bg-indigo-600 transition-all duration-300"
-          style={{ width: `${collectContacts && !contactDone ? 0 : progress}%` }}
+          style={{ width: `${agentMode && !agentSessionDone ? 0 : collectContacts && !contactDone ? 0 : progress}%` }}
         />
       </div>
 
-      {collectContacts && !contactDone ? (
+      {agentMode && !agentSessionDone ? (
+        renderAgentStep()
+      ) : collectContacts && !contactDone ? (
         renderContactStep()
+      ) : resumedDraft && situation === null && !publicMode && !paperMode ? (
+        <>
+          {renderSituationCheck()}
+          <button
+            type="button"
+            onClick={() => setSituation('same')}
+            className="mt-6 w-full rounded-xl bg-indigo-600 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            {t('survey.continue_existing', 'Continue with my saved answers')}
+          </button>
+        </>
       ) : (
         <>
           {/* Section label */}

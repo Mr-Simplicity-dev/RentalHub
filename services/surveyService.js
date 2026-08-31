@@ -9,12 +9,25 @@ const survey = require('../config/survey');
 const generateRespondentCode = () =>
   `RH${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
+const generateResumeToken = () =>
+  crypto.randomBytes(24).toString('base64url');
+
 const ensureSchema = async () => {
   await db.query(`
     ALTER TABLE users
       ADD COLUMN IF NOT EXISTS survey_part_a_completed_at TIMESTAMP,
       ADD COLUMN IF NOT EXISTS survey_completed_at TIMESTAMP,
       ADD COLUMN IF NOT EXISTS survey_exempt BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+  await db.query(`
+    ALTER TABLE survey_responses
+      ADD COLUMN IF NOT EXISTS agent_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS agent_name VARCHAR(200),
+      ADD COLUMN IF NOT EXISTS agent_phone VARCHAR(30),
+      ADD COLUMN IF NOT EXISTS agent_lga VARCHAR(120),
+      ADD COLUMN IF NOT EXISTS agent_location VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS resume_token VARCHAR(64)
   `);
 };
 
@@ -75,7 +88,9 @@ exports.startSurvey = async (req, res) => {
     const surveyType = user.user_type === 'landlord' ? 'landlord' : 'tenant';
 
     const existing = await db.query(
-      `SELECT * FROM survey_responses WHERE user_id = $1 ORDER BY id DESC LIMIT 1`,
+      `SELECT * FROM survey_responses
+       WHERE user_id = $1 AND superseded_at IS NULL
+       ORDER BY id DESC LIMIT 1`,
       [req.user.id]
     );
     if (existing.rows.length && existing.rows[0].completed_at) {
@@ -112,6 +127,229 @@ exports.startSurvey = async (req, res) => {
   } catch (error) {
     req.logger.error('Survey start error:', error);
     return res.status(500).json({ success: false, message: 'Failed to start survey' });
+  }
+};
+
+// Public draft: save progress anonymously with a resume token (no login).
+exports.savePublicDraft = async (req, res) => {
+  try {
+    const { survey_type, answers, consent_flags, resume_token, contact, agent } = req.body;
+
+    const type = String(survey_type || 'tenant').toLowerCase();
+    if (!survey.getQuestionnaire(type)) {
+      return res.status(400).json({ success: false, message: 'Unknown survey type' });
+    }
+
+    const token = String(resume_token || '').slice(0, 64) || generateResumeToken();
+
+    const agentUser = req.user?.user_type === 'marketing_agent' ? req.user : null;
+    const agentName = String(agent?.name || agentUser?.full_name || '').trim().slice(0, 200);
+    const agentPhone = String(agent?.phone || agentUser?.phone || '').replace(/\s+/g, '').slice(0, 30);
+    const agentLga = String(agent?.lga || '').trim().slice(0, 120);
+    const agentLocation = String(agent?.location || '').trim().slice(0, 255);
+
+    const existing = await db.query(
+      `SELECT id FROM survey_responses WHERE resume_token = $1 AND completed_at IS NULL`,
+      [token]
+    );
+
+    if (existing.rows.length) {
+      await db.query(
+        `UPDATE survey_responses
+         SET answers = answers || $2::jsonb,
+             consent_flags = consent_flags || $3::jsonb,
+             agent_user_id = COALESCE(agent_user_id, $4),
+             agent_name = COALESCE(NULLIF($5, ''), agent_name),
+             agent_phone = COALESCE(NULLIF($6, ''), agent_phone),
+             agent_lga = COALESCE(NULLIF($7, ''), agent_lga),
+             agent_location = COALESCE(NULLIF($8, ''), agent_location),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [
+          existing.rows[0].id,
+          JSON.stringify(answers || {}),
+          JSON.stringify(consent_flags || {}),
+          agentUser ? agentUser.id : null,
+          agentName,
+          agentPhone,
+          agentLga,
+          agentLocation,
+        ]
+      );
+      return res.json({ success: true, data: { resume_token: token, draft: true } });
+    }
+
+    await db.query(
+      `INSERT INTO survey_responses
+         (survey_type, survey_version, respondent_code, source,
+          resume_token, consent_flags, answers,
+          agent_user_id, agent_name, agent_phone, agent_lga, agent_location)
+       VALUES ($1, $2, $3, 'public_link', $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        type,
+        survey.SURVEY_VERSION,
+        generateRespondentCode(),
+        token,
+        JSON.stringify(consent_flags || {}),
+        JSON.stringify(answers || {}),
+        agentUser ? agentUser.id : null,
+        agentName,
+        agentPhone,
+        agentLga,
+        agentLocation,
+      ]
+    );
+
+    return res.status(201).json({ success: true, data: { resume_token: token, draft: true } });
+  } catch (error) {
+    req.logger.error('Public survey draft error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to save survey draft' });
+  }
+};
+
+// Resume an anonymous draft by token.
+exports.resumeSurvey = async (req, res) => {
+  try {
+    const token = String(req.query.token || req.body?.token || '').trim();
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'resume token is required' });
+    }
+
+    const result = await db.query(
+      `SELECT id, survey_type, survey_version, respondent_code, source,
+              answers, consent_flags, completed_at, superseded_at
+       FROM survey_responses
+       WHERE resume_token = $1
+       LIMIT 1`,
+      [token]
+    );
+
+    if (result.rows.length === 0 || result.rows[0].superseded_at) {
+      return res.status(404).json({ success: false, message: 'Draft not found or expired' });
+    }
+
+    const row = result.rows[0];
+    return res.json({
+      success: true,
+      data: {
+        response_id: row.id,
+        survey_type: row.survey_type,
+        answers: row.answers || {},
+        consent_flags: row.consent_flags || {},
+        completed: Boolean(row.completed_at),
+      },
+    });
+  } catch (error) {
+    req.logger.error('Survey resume error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to resume survey' });
+  }
+};
+
+// Link an anonymous draft to the logged-in user (no re-survey on registration).
+exports.claimSurveyDraft = async (req, res) => {
+  try {
+    const token = String(req.body?.resume_token || '').trim();
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'resume_token is required' });
+    }
+
+    const result = await db.query(
+      `UPDATE survey_responses
+       SET user_id = $1,
+           source = CASE WHEN source = 'public_link' THEN 'online' ELSE source END
+       WHERE resume_token = $2
+         AND user_id IS NULL
+         AND superseded_at IS NULL
+       RETURNING id, survey_type, part_a_completed_at, completed_at, answers, consent_flags`,
+      [req.user.id, token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Draft not found or already claimed' });
+    }
+
+    const row = result.rows[0];
+    if (row.completed_at) {
+      await db.query(
+        `UPDATE users
+         SET survey_part_a_completed_at = COALESCE(survey_part_a_completed_at, CURRENT_TIMESTAMP),
+             survey_completed_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [req.user.id]
+      );
+    } else if (row.part_a_completed_at) {
+      await db.query(
+        `UPDATE users SET survey_part_a_completed_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [req.user.id]
+      );
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        response_id: row.id,
+        survey_type: row.survey_type,
+        answers: row.answers || {},
+        consent_flags: row.consent_flags || {},
+        completed: Boolean(row.completed_at),
+      },
+    });
+  } catch (error) {
+    req.logger.error('Survey claim error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to claim survey' });
+  }
+};
+
+// Restart a survey: supersede the old record (never analysed again) and start fresh.
+exports.restartSurvey = async (req, res) => {
+  try {
+    const { response_id } = req.body;
+
+    const ownership = await db.query(
+      `SELECT * FROM survey_responses WHERE id = $1 AND user_id = $2`,
+      [response_id, req.user.id]
+    );
+    if (ownership.rows.length === 0) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    await db.query(
+      `UPDATE survey_responses SET superseded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [response_id]
+    );
+    await db.query(
+      `UPDATE users SET survey_part_a_completed_at = NULL, survey_completed_at = NULL WHERE id = $1`,
+      [req.user.id]
+    );
+
+    const userResult = await db.query(
+      `SELECT user_type, preferred_state_id, preferred_lga_name FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+    const user = userResult.rows[0];
+    const surveyType = user.user_type === 'landlord' ? 'landlord' : 'tenant';
+
+    const insert = await db.query(
+      `INSERT INTO survey_responses
+         (survey_type, survey_version, user_id, respondent_code, source,
+          state_id, lga_name)
+       VALUES ($1, $2, $3, $4, 'online', $5, $6)
+       RETURNING *`,
+      [
+        surveyType,
+        survey.SURVEY_VERSION,
+        req.user.id,
+        generateRespondentCode(),
+        user.preferred_state_id || null,
+        user.preferred_lga_name || null,
+      ]
+    );
+
+    return res.json({ success: true, data: { response: insert.rows[0] } });
+  } catch (error) {
+    req.logger.error('Survey restart error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to restart survey' });
   }
 };
 
@@ -309,12 +547,20 @@ exports.getSurveyDefinition = async (req, res) => {
 
 exports.submitPublicSurvey = async (req, res) => {
   try {
-    const { survey_type, answers, consent_flags, state_id, lga_name, contact } = req.body;
+    const { survey_type, answers, consent_flags, state_id, lga_name, contact, resume_token, agent } = req.body;
 
     const type = String(survey_type || 'tenant').toLowerCase();
     if (!survey.getQuestionnaire(type)) {
       return res.status(400).json({ success: false, message: 'Unknown survey type' });
     }
+
+    // Agent attribution (marketing agents conduct surveys via the public page)
+    const agentUser = req.user?.user_type === 'marketing_agent' ? req.user : null;
+    const agentName = String(agent?.name || agentUser?.full_name || '').trim().slice(0, 200);
+    const agentPhone = String(agent?.phone || agentUser?.phone || '').replace(/\s+/g, '').slice(0, 30);
+    const agentLga = String(agent?.lga || '').trim().slice(0, 120);
+    const agentLocation = String(agent?.location || '').trim().slice(0, 255);
+    const agentMode = String(agent?.admin_mode || (agentUser ? 'face_to_face' : '') || '').trim().slice(0, 20) || null;
 
     // Contact capture: name + phone required for public/paper respondents;
     // email optional with an explicit "no email" choice.
@@ -346,14 +592,72 @@ exports.submitPublicSurvey = async (req, res) => {
       });
     }
 
+    // Resume-token submission completes the existing draft instead of duplicating.
+    const token = String(resume_token || '').trim();
+    if (token) {
+      const draft = await db.query(
+        `SELECT id FROM survey_responses WHERE resume_token = $1 AND completed_at IS NULL`,
+        [token]
+      );
+      if (draft.rows.length) {
+        await db.query(
+          `UPDATE survey_responses
+           SET consent_flags = consent_flags || $2::jsonb,
+               answers = answers || $3::jsonb,
+               completed_at = CURRENT_TIMESTAMP,
+               part_a_completed_at = COALESCE(part_a_completed_at, CURRENT_TIMESTAMP),
+               time_spent_seconds = $4,
+               respondent_name = COALESCE(NULLIF($5, ''), respondent_name),
+               respondent_phone = COALESCE(NULLIF($6, ''), respondent_phone),
+               respondent_email = COALESCE($7, respondent_email),
+               has_email = COALESCE($8, has_email),
+               respondent_location = COALESCE(NULLIF($9, ''), respondent_location),
+               respondent_state_of_origin = COALESCE(NULLIF($10, ''), respondent_state_of_origin),
+               agent_user_id = COALESCE(agent_user_id, $11),
+               agent_name = COALESCE(NULLIF($12, ''), agent_name),
+               agent_phone = COALESCE(NULLIF($13, ''), agent_phone),
+               agent_lga = COALESCE(NULLIF($14, ''), agent_lga),
+               agent_location = COALESCE(NULLIF($15, ''), agent_location),
+               admin_mode = COALESCE(NULLIF($16, ''), admin_mode),
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $1
+           RETURNING id, respondent_code`,
+          [
+            draft.rows[0].id,
+            JSON.stringify(consent_flags || {}),
+            JSON.stringify(answers || {}),
+            Math.max(0, Number(req.body.time_spent_seconds) || 0),
+            contactName,
+            contactPhone,
+            noEmail ? null : contactEmail,
+            !noEmail,
+            contactLocation || null,
+            contactStateOfOrigin || null,
+            agentUser ? agentUser.id : null,
+            agentName,
+            agentPhone,
+            agentLga,
+            agentLocation,
+            agentMode,
+          ]
+        );
+        return res.status(200).json({
+          success: true,
+          message: 'Survey submitted. Thank you for your time!',
+          data: { respondent_code: draft.rows[0].respondent_code },
+        });
+      }
+    }
+
     const insert = await db.query(
       `INSERT INTO survey_responses
          (survey_type, survey_version, respondent_code, source,
           consent_flags, answers, state_id, lga_name, completed_at,
           respondent_name, respondent_phone, respondent_email,
-          respondent_location, respondent_state_of_origin, has_email)
+          respondent_location, respondent_state_of_origin, has_email,
+          agent_user_id, agent_name, agent_phone, agent_lga, agent_location, admin_mode)
        VALUES ($1, $2, $3, 'public_link', $4, $5, $6, $7, CURRENT_TIMESTAMP,
-               $8, $9, $10, $11, $12, $13)
+               $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        RETURNING id, respondent_code`,
       [
         type,
@@ -369,6 +673,12 @@ exports.submitPublicSurvey = async (req, res) => {
         contactLocation || null,
         contactStateOfOrigin || null,
         !noEmail,
+        agentUser ? agentUser.id : null,
+        agentName || null,
+        agentPhone || null,
+        agentLga || null,
+        agentLocation || null,
+        agentMode,
       ]
     );
 
