@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { FaChartPie, FaFilePdf, FaFileCsv, FaPlus, FaTrash } from "react-icons/fa";
+import { FaChartPie, FaFilePdf, FaFileCsv, FaPlus, FaTrash, FaBell } from "react-icons/fa";
 import { toast } from "react-toastify";
 import api from "../../services/api";
 import SurveyWizard from "../survey/SurveyWizard";
@@ -75,6 +75,16 @@ const SurveyAdminPanel = () => {
     window.open(`/api/admin/survey/export.csv?type=${type}`, "_blank");
   };
 
+  const sendPushReminders = async () => {
+    if (!window.confirm("Send a push reminder to everyone with an unfinished survey?")) return;
+    try {
+      const res = await api.post("/admin/survey/reminders/send");
+      toast.success(res.data?.message || "Push reminders sent");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to send push reminders");
+    }
+  };
+
   const deleteResponse = async (id) => {
     if (!window.confirm("Delete this survey response?")) return;
     try {
@@ -137,6 +147,13 @@ const SurveyAdminPanel = () => {
             className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
           >
             <FaFileCsv /> CSV
+          </button>
+          <button
+            type="button"
+            onClick={sendPushReminders}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            <FaBell /> Push Reminders
           </button>
         </div>
       </div>

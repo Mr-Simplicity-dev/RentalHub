@@ -4601,7 +4601,13 @@
     "notif_on": "Reminders on",
     "notif_denied": "Notifications blocked in browser",
     "notif_unsupported": "Notifications not supported",
-    "notif_cta": "Remind me to finish later"
+    "notif_cta": "Remind me to finish later",
+    "remind_title": "Remind you to finish later?",
+    "remind_sub": "The survey takes 15–20 minutes. If you get busy, we can send a reminder so you never lose your answers.",
+    "remind_requesting": "Asking your browser...",
+    "remind_yes": "Yes, remind me",
+    "remind_no": "No, I'll finish now",
+    "remind_close": "Close"
   },
   "dashboard": {
     "survey_reminder_title": "Finish your market research survey",

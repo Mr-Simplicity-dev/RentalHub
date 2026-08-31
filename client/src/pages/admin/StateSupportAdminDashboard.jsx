@@ -329,7 +329,9 @@ const StateSupportAdminDashboard = () => {
       )}
 
       {activeTab === 'tenancy' && (
-      <TenancyWorkflowPanel title="State Support Tenancy Grace and Refund Enablement" />
+      <div className="state-support-tenancy-section">
+        <TenancyWorkflowPanel title="State Support Tenancy Grace and Refund Enablement" />
+      </div>
       )}
 
       {activeTab === 'queue' && (
@@ -441,11 +443,15 @@ const StateSupportAdminDashboard = () => {
 
       {/* Support Tickets Section */}
       {activeTab === 'tickets' && (
-        <SupportTicketWorkspace tickets={tickets} loading={ticketsLoading} user={user} onOpenTicket={openTicket} onTicketAction={handleTicketAction} mode="tickets" />
+        <div className="state-support-tickets-section">
+          <SupportTicketWorkspace tickets={tickets} loading={ticketsLoading} user={user} onOpenTicket={openTicket} onTicketAction={handleTicketAction} mode="tickets" />
+        </div>
       )}
 
       {activeTab === 'escalations' && (
-        <SupportTicketWorkspace tickets={tickets} loading={ticketsLoading} user={user} onOpenTicket={openTicket} onTicketAction={handleTicketAction} mode="escalations" />
+        <div className="state-support-escalations-section">
+          <SupportTicketWorkspace tickets={tickets} loading={ticketsLoading} user={user} onOpenTicket={openTicket} onTicketAction={handleTicketAction} mode="escalations" />
+        </div>
       )}
 
       {selectedTicket && (

@@ -16,6 +16,14 @@ const {
   restartSurvey,
 } = require('../services/surveyService');
 const { getMarketingAgentOverview } = require('../services/surveyAnalysisService');
+const pushService = require('../services/pushService');
+
+// Public: VAPID public key for Web Push subscriptions
+router.get('/push/public-key', pushService.getPublicKey);
+
+// Public: push subscription (optionalAuthenticate so agents/logged-in users are linked)
+router.post('/push/subscribe', optionalAuthenticate, pushService.subscribe);
+router.post('/push/unsubscribe', pushService.unsubscribe);
 
 // Public: question definitions (used by wizard + public page)
 router.get('/definition', getSurveyDefinition);

@@ -9,6 +9,7 @@ const {
   deleteResponse,
   computeAnalysis,
 } = require('../services/surveyAnalysisService');
+const pushService = require('../services/pushService');
 const { requireDiasporaAdmin } = require('../services/diasporaAdminService');
 
 // The survey admin panel is restricted to the same financial/super roles.
@@ -23,6 +24,11 @@ router.get('/projections', getProjections);
 router.get('/responses', listResponses);
 router.post('/paper-entry', paperEntry);
 router.delete('/responses/:responseId', deleteResponse);
+
+// Push reminder admin controls
+router.post('/reminders/send', async (req, res) => {
+  await pushService.sendSurveyReminders(req, res);
+});
 
 // PDF + CSV export
 router.get('/export.pdf', async (req, res) => {

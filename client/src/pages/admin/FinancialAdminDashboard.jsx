@@ -423,7 +423,7 @@ const FinancialAdminDashboard = () => {
       <div className="mx-auto max-w-7xl">
         <div className="space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="fin-admin-header-section bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Financial Admin Dashboard</h1>
@@ -752,7 +752,9 @@ const FinancialAdminDashboard = () => {
             )}
 
             {activeTab === 'support-escalations' && (
-              <DepartmentSupportEscalations department="finance" title="Finance Support Escalations" />
+              <div className="fin-admin-escalations-section">
+                <DepartmentSupportEscalations department="finance" title="Finance Support Escalations" />
+              </div>
             )}
 
             {activeTab === 'transactions' && (
@@ -1134,7 +1136,7 @@ const FinancialAdminDashboard = () => {
             )}
 
             {activeTab === 'audit-trail' && (
-              <div className="space-y-4">
+              <div className="fin-admin-audit-section space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">Transaction Audit Trail</h3>
                   <div className="flex flex-col gap-2 sm:flex-row">

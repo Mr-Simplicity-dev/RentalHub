@@ -1,18 +1,45 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { FaBell, FaCheckCircle } from 'react-icons/fa';
+import { FaBell, FaCheckCircle, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
+import api from '../services/api';
 import SurveyWizard from '../components/survey/SurveyWizard';
 
 const RESUME_KEY = 'rentalhub_survey_resume';
 const TYPE_KEY = 'rentalhub_survey_type';
+const REMIND_KEY = 'rentalhub_survey_remind';
+const GOOGLE_KEY = 'rentalhub_survey_google';
+
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+
+const urlBase64ToUint8Array = (base64) => {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+  const base64Url = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64Url);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
+  return output;
+};
+
+const decodeGoogleCredential = (credential) => {
+  try {
+    const base64 = credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(window.atob(base64));
+    return {
+      email: payload.email || '',
+      name: payload.name || payload.given_name || '',
+    };
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Public survey page: rentalhub.com.ng/survey
- * - Anonymous respondents (online self-completion)
- * - Marketing agents conducting surveys (logged-in, /survey?agent=1)
- * - Draft resume via localStorage resume token + browser notifications.
+ * - Blocking "Remind me to finish later" popup (attended before type choice)
+ * - Google sign-in prefill (name editable) when available on the phone
+ * - Marketing agent mode (?agent=1), draft resume, Web Push reminders
  */
 const PublicSurveyPage = () => {
   const { t } = useTranslation();
@@ -20,25 +47,151 @@ const PublicSurveyPage = () => {
   const [searchParams] = useSearchParams();
   const [type, setType] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  const [showReminder, setShowReminder] = useState(false);
   const [notifState, setNotifState] = useState('default');
   const [hasDraft, setHasDraft] = useState(false);
+  const [prefillContact, setPrefillContact] = useState(null);
+  const googleButtonRef = useRef(null);
+  const googleReady = useRef(false);
 
   const isMarketingAgent = user?.user_type === 'marketing_agent';
   const agentMode = isMarketingAgent && searchParams.get('agent') === '1';
 
   useEffect(() => {
     document.title = 'RentalHub NG Survey';
+
     const savedType = localStorage.getItem(TYPE_KEY);
-    if (savedType && localStorage.getItem(RESUME_KEY)) {
+    const hasResume = Boolean(localStorage.getItem(RESUME_KEY));
+    if (hasResume) {
       setHasDraft(true);
+      if (savedType && savedType !== type) setType(savedType);
+      return;
     }
-    if (savedType && savedType !== type) {
-      setType(savedType);
+
+    // Reminder popup: must be attended before choosing tenant/landlord.
+    if (!localStorage.getItem(REMIND_KEY)) {
+      setShowReminder(true);
+    }
+
+    const savedGoogle = localStorage.getItem(GOOGLE_KEY);
+    if (savedGoogle) {
+      try {
+        setPrefillContact(JSON.parse(savedGoogle));
+      } catch {
+        // ignore malformed
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Notify once when the user returns with an unfinished draft.
+  const registerServiceWorker = useCallback(async () => {
+    if (!('serviceWorker' in navigator)) return null;
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      return reg;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    registerServiceWorker();
+  }, [registerServiceWorker]);
+
+  // Google Identity Services: render "Sign in with Google" button once.
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || googleReady.current) return;
+    if (typeof window.google?.accounts !== 'undefined') {
+      renderGoogleButton();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = renderGoogleButton;
+    document.body.appendChild(script);
+
+    function renderGoogleButton() {
+      if (googleReady.current) return;
+      googleReady.current = true;
+      try {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => {
+            const profile = decodeGoogleCredential(response.credential);
+            if (profile && profile.email) {
+              setPrefillContact({ name: profile.name || '', email: profile.email });
+              localStorage.setItem(GOOGLE_KEY, JSON.stringify(profile));
+            }
+          },
+          auto_select: false,
+        });
+        if (googleButtonRef.current) {
+          window.google.accounts.id.renderButton(googleButtonRef.current, {
+            theme: 'outline',
+            size: 'large',
+            shape: 'pill',
+            text: 'continue_with',
+          });
+        }
+      } catch {
+        // GIS failed to initialise — Google sign-in just won't show.
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Push subscription (only after the user opts in via the reminder popup).
+  const enablePushReminders = async () => {
+    setNotifState('requesting');
+    if (typeof Notification === 'undefined') {
+      setNotifState('unsupported');
+      localStorage.setItem(REMIND_KEY, 'yes');
+      setShowReminder(false);
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    setNotifState(permission);
+
+    if (permission === 'granted') {
+      const reg = await registerServiceWorker();
+      if (reg) {
+        try {
+          const keyRes = await api.get('/survey/push/public-key');
+          const publicKey = keyRes.data?.data?.public_key;
+          const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+          });
+          await api.post('/survey/push/subscribe', {
+            endpoint: sub.endpoint,
+            keys: sub.toJSON().keys,
+            resume_token: localStorage.getItem(RESUME_KEY) || '',
+          });
+        } catch {
+          // push failed — fall back to in-page notification only
+        }
+      }
+      try {
+        new Notification(t('public_survey.notif_ok', 'Reminders on!'), {
+          body: t('public_survey.notif_ok_body', "We'll remind you to finish your survey."),
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    localStorage.setItem(REMIND_KEY, permission === 'granted' ? 'yes' : 'no');
+    setShowReminder(false);
+  };
+
+  const skipReminder = () => {
+    localStorage.setItem(REMIND_KEY, 'no');
+    setShowReminder(false);
+  };
+
+  // In-page nudge when returning with a draft (Web Push covers closed tabs).
   useEffect(() => {
     if (hasDraft && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       try {
@@ -51,24 +204,6 @@ const PublicSurveyPage = () => {
       }
     }
   }, [hasDraft, t]);
-
-  const enableNotifications = async () => {
-    if (typeof Notification === 'undefined') {
-      setNotifState('unsupported');
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    setNotifState(permission);
-    if (permission === 'granted') {
-      try {
-        new Notification(t('public_survey.notif_ok', 'Reminders on!'), {
-          body: t('public_survey.notif_ok_body', "We'll remind you to finish your survey."),
-        });
-      } catch {
-        // ignore
-      }
-    }
-  };
 
   const pickType = (nextType) => {
     localStorage.setItem(TYPE_KEY, nextType);
@@ -102,6 +237,7 @@ const PublicSurveyPage = () => {
           publicMode
           collectContacts
           agentMode={agentMode}
+          prefillContact={prefillContact}
           onComplete={() => {
             localStorage.removeItem(TYPE_KEY);
             setSubmitted(true);
@@ -113,6 +249,63 @@ const PublicSurveyPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
+      {/* Blocking reminder popup — attended before choosing tenant/landlord */}
+      {showReminder && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+                  <FaBell className="text-xl" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    {t('public_survey.remind_title', 'Remind you to finish later?')}
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    {t('public_survey.remind_sub', 'The survey takes 15–20 minutes. If you get busy, we can send a reminder so you never lose your answers.')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={skipReminder}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label={t('public_survey.remind_close', 'Close')}
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-2">
+              <button
+                type="button"
+                onClick={enablePushReminders}
+                disabled={notifState === 'requesting'}
+                className="block w-full rounded-xl bg-indigo-600 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {notifState === 'requesting'
+                  ? t('public_survey.remind_requesting', 'Asking your browser...')
+                  : t('public_survey.remind_yes', 'Yes, remind me')}
+              </button>
+              <button
+                type="button"
+                onClick={skipReminder}
+                className="block w-full rounded-xl border border-gray-300 py-3 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                {t('public_survey.remind_no', "No, I'll finish now")}
+              </button>
+            </div>
+
+            {notifState === 'denied' && (
+              <p className="mt-3 text-center text-xs text-red-600">
+                {t('public_survey.notif_denied', 'Notifications blocked in browser — you can still finish now or continue later from this page.')}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto w-full max-w-xl px-4">
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-bold text-gray-900">
@@ -143,6 +336,13 @@ const PublicSurveyPage = () => {
               ? t('public_survey.agent_choose', 'Conducting as an agent — who is the respondent?')
               : t('public_survey.choose', 'Who are you?')}
           </p>
+
+          {!agentMode && GOOGLE_CLIENT_ID && !hasDraft && (
+            <div className="mt-4 flex justify-center">
+              <div ref={googleButtonRef} />
+            </div>
+          )}
+
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
@@ -165,23 +365,6 @@ const PublicSurveyPage = () => {
               </p>
             </button>
           </div>
-
-          {!hasDraft && (
-            <button
-              type="button"
-              onClick={enableNotifications}
-              className="mt-6 inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-            >
-              <FaBell className="text-gray-400" />
-              {notifState === 'granted'
-                ? t('public_survey.notif_on', 'Reminders on')
-                : notifState === 'denied'
-                  ? t('public_survey.notif_denied', 'Notifications blocked in browser')
-                  : notifState === 'unsupported'
-                    ? t('public_survey.notif_unsupported', 'Notifications not supported')
-                    : t('public_survey.notif_cta', 'Remind me to finish later')}
-            </button>
-          )}
 
           <p className="mt-6 text-xs text-gray-400">
             {t('public_survey.privacy', 'Anonymous · Voluntary · Your identity is never linked to your answers')}

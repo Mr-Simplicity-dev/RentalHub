@@ -694,7 +694,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
           )}
 
           {activeTab === 'commissions' && (
-            <div className="space-y-4">
+            <div className="state-admin-commissions-section space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-lg font-semibold">Commission History</h3>
                 <button
@@ -776,7 +776,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
           )}
 
           {activeTab === 'transactions' && (
-            <div className="space-y-4">
+            <div className="state-admin-transactions-section space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">All Transactions</h3>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -868,7 +868,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
           )}
 
           {activeTab === 'users' && (
-            <div className="space-y-4">
+            <div className="state-admin-users-section space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">Managed Users</h3>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -941,7 +941,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
           )}
 
           {activeTab === 'withdrawals' && (
-            <div className="space-y-4">
+            <div className="state-admin-withdrawals-section space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold">Withdrawal History</h3>
                 <button
@@ -1036,7 +1036,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
           )}
 
           {activeTab === 'oversight' && (
-            <div className="space-y-6">
+            <div className="state-admin-oversight-section space-y-6">
               <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>

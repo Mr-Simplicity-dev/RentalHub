@@ -18,6 +18,7 @@ export default function SurveyWizard({
   paperMeta = null,
   collectContacts = false,
   agentMode = false,
+  prefillContact = null,
   onComplete,
   onExit,
   showExit = false,
@@ -32,9 +33,9 @@ export default function SurveyWizard({
   const [answers, setAnswers] = useState({});
   const [consentFlags, setConsentFlags] = useState({});
   const [contact, setContact] = useState({
-    name: '',
+    name: prefillContact?.name || '',
     phone: '',
-    email: '',
+    email: prefillContact?.email || '',
     no_email: false,
     location: '',
     state_of_origin: '',

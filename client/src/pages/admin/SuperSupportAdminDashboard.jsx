@@ -1286,7 +1286,7 @@ const SuperSupportAdminDashboard = () => {
 
         {/* System Alerts Tab */}
         {activeTab === 'alerts' && (
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="super-support-alerts-section rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900">System Alerts</h3>
               <div className="flex items-center gap-2">
@@ -1372,7 +1372,7 @@ const SuperSupportAdminDashboard = () => {
 
         {/* Reports Tab */}
         {activeTab === 'reports' && (
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="super-support-reports-section rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Reports & Analytics</h3>
               <div className="flex items-center gap-2">

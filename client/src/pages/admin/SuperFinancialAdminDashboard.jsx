@@ -516,7 +516,7 @@ const SuperFinancialAdminDashboard = () => {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="super-financial-kpi-section grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <article className="rounded-xl bg-white p-5 shadow">
           <p className="text-xs uppercase tracking-wide text-gray-500">Today Transactions</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{totals.todayCount}</p>
@@ -543,7 +543,7 @@ const SuperFinancialAdminDashboard = () => {
         </article>
       </section>
 
-      <section className="rounded-xl border border-blue-100 bg-blue-50 p-5">
+      <section className="super-financial-health-section rounded-xl border border-blue-100 bg-blue-50 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Commission Health</p>
