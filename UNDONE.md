@@ -18,7 +18,7 @@
 
 - [x] **DONE — Withdrawal 2FA (2026-08-29)** — TOTP (Google Authenticator) primary + SMS OTP fallback; recovery codes (10, single-use, hashed); 5-attempt lockout (15 min); enrollment UI in Profile; gate on ALL withdrawal requests (wallet, admin/state commission, agent, super-admin direct) AND admin approvals (financial-admin approve, agent approve, wallet approve). Migration 125. Unit-tested live (9/9). Note: consider setting NIN_ENCRYPTION_KEY on VPS so TOTP secrets are encrypted at rest (currently plaintext fallback, same as NIN).
 
-- [ ] **Diaspora registration Phases 3–5 (kept for later from two weeks ago)** — Phases 1–2 done (client diaspora detection + payment gating/quote + diaspora flags). Phases 3–5 not started.
+- [x] **DONE — Diaspora Phases 3–5 (2026-08-31)** — Phase 3: Super Admin → Diaspora tab (review queue: country, target state, card country/brand, Nigerian-funded review flags + dismiss with notes; migration 126). Phase 4: USD quote + FX rate + markup on registration receipts (email + PDF). Phase 5: diaspora dashboard banner + diaspora_country/billing_country/card_brand in /auth/me. Note: 0 diaspora users in DB yet — queue fills as diaspora registrations happen. Note: user's WIP voice system (routes/voice.js + migrations 130/131 + adService changes) is uncommitted/unapplied locally and NOT deployed — twilio dep already in package.json; VPS restored.
 
 - [ ] **Translate new keys into other languages** — pages newly converted to i18n (AppLanding, QrCodePage, Terms, Privacy + OTP strings) have English defaults; ha/yo/ig/ru/fr/ar/zh currently fall back to English for them.
 
