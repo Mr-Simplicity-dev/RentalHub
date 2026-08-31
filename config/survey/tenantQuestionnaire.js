@@ -44,6 +44,7 @@ const q = (key, section, part, type, prompt, options, extra = {}) => ({
   type,
   prompt: { en: prompt },
   options: options ? options.map(([v, label]) => ({ v, en: label })) : null,
+  required: extra.required !== false,
   ...extra,
 });
 
