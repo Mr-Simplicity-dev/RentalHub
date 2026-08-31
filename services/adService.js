@@ -12,6 +12,7 @@ const AD_PLACEMENTS = [
   { value: 'dashboard_inline', label: 'Dashboard inline banner' },
   { value: 'properties_top', label: 'Properties top banner' },
   { value: 'properties_inline', label: 'Properties inline banner' },
+  { value: 'voice_hold', label: 'Voice hold ad (audio)' },
 ];
 
 const AD_PLACEMENT_VALUES = new Set(AD_PLACEMENTS.map((placement) => placement.value));
@@ -37,6 +38,16 @@ const AD_VIDEO_MIME_EXTENSIONS = {
   'video/x-msvideo': '.avi',
 };
 const AD_VIDEO_ALLOWED_EXTENSIONS = new Set(['.mp4', '.webm', '.ogv', '.mov', '.avi']);
+const AD_AUDIO_MAX_SIZE_BYTES = 15 * 1024 * 1024;
+const AD_AUDIO_MIME_EXTENSIONS = {
+  'audio/mpeg': '.mp3',
+  'audio/mp3': '.mp3',
+  'audio/wav': '.wav',
+  'audio/x-wav': '.wav',
+  'audio/ogg': '.ogg',
+  'audio/opus': '.opus',
+};
+const AD_AUDIO_ALLOWED_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.opus']);
 
 if (!fs.existsSync(AD_IMAGE_UPLOAD_DIR)) {
   fs.mkdirSync(AD_IMAGE_UPLOAD_DIR, { recursive: true });
@@ -101,6 +112,35 @@ const adVideoUpload = multer({
   },
 }).single('video');
 
+const adAudioStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, AD_IMAGE_UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const originalExtension = path.extname(file.originalname || '').toLowerCase();
+    const extension = AD_AUDIO_ALLOWED_EXTENSIONS.has(originalExtension)
+      ? originalExtension
+      : AD_AUDIO_MIME_EXTENSIONS[file.mimetype] || '.mp3';
+    cb(null, `ad_audio_${Date.now()}_${crypto.randomBytes(8).toString('hex')}${extension}`);
+  },
+});
+
+const adAudioUpload = multer({
+  storage: adAudioStorage,
+  limits: { fileSize: AD_AUDIO_MAX_SIZE_BYTES },
+  fileFilter: (req, file, cb) => {
+    const isAllowedAudio = Boolean(AD_AUDIO_MIME_EXTENSIONS[file.mimetype]);
+    const extension = path.extname(file.originalname || '').toLowerCase();
+    const hasAllowedExtension = !extension || AD_AUDIO_ALLOWED_EXTENSIONS.has(extension);
+
+    if (!isAllowedAudio || !hasAllowedExtension) {
+      return cb(new Error('Upload an MP3, WAV, OGG, or OPUS audio file'));
+    }
+
+    return cb(null, true);
+  },
+}).single('audio');
+
 let adSpacesSchemaReady = false;
 
 const ensureAdSpacesSchema = async () => {
@@ -147,11 +187,14 @@ const ensureAdSpacesSchema = async () => {
       ADD COLUMN IF NOT EXISTS video_duration INTEGER;
 
     ALTER TABLE ad_spaces
+      ADD COLUMN IF NOT EXISTS audio_url VARCHAR(1000);
+
+    ALTER TABLE ad_spaces
       DROP CONSTRAINT IF EXISTS chk_ad_spaces_media_type;
 
     ALTER TABLE ad_spaces
       ADD CONSTRAINT chk_ad_spaces_media_type
-      CHECK (media_type IN ('image', 'video'));
+      CHECK (media_type IN ('image', 'video', 'audio'));
 
     ALTER TABLE ad_spaces
       DROP CONSTRAINT IF EXISTS chk_ad_spaces_placement;
@@ -313,8 +356,8 @@ const normalizeAdPayload = (payload) => {
   }
 
   const mediaType = String(payload.media_type || 'image').toLowerCase();
-  if (!['image', 'video'].includes(mediaType)) {
-    throwValidation('Media type must be "image" or "video"');
+  if (!['image', 'video', 'audio'].includes(mediaType)) {
+    throwValidation('Media type must be "image", "video" or "audio"');
   }
 
   return {
@@ -327,6 +370,7 @@ const normalizeAdPayload = (payload) => {
     video_url: normalizeOptionalUrl(payload.video_url, 'Video URL'),
     video_thumbnail: normalizeOptionalUrl(payload.video_thumbnail, 'Video thumbnail URL'),
     video_duration: payload.video_duration ? Math.max(1, Math.min(300, Number(payload.video_duration) || 30)) : null,
+    audio_url: normalizeOptionalUrl(payload.audio_url, 'Audio URL'),
     target_url: normalizeOptionalUrl(payload.target_url, 'Target URL'),
     cta_label: normalizeText(payload.cta_label, 'CTA label', 80),
     background_color: normalizeColor(payload.background_color, '#ffffff'),
@@ -382,7 +426,7 @@ const listPublicAds = async (req, res) => {
 
     const { rows } = await db.query(
       `SELECT id, placement, title, description, sponsor_name, media_type,
-              image_url, video_url, video_thumbnail, video_duration,
+              image_url, video_url, video_thumbnail, video_duration, audio_url,
               target_url, cta_label, background_color, text_color, sharing_enabled
        FROM ad_spaces
        WHERE ${where.join(' AND ')}
@@ -478,12 +522,12 @@ const createAd = async (req, res) => {
     const { rows } = await db.query(
       `INSERT INTO ad_spaces (
          placement, title, description, sponsor_name, media_type,
-         image_url, video_url, video_thumbnail, video_duration,
+         image_url, video_url, video_thumbnail, video_duration, audio_url,
          target_url, cta_label, background_color, text_color,
          sharing_enabled, is_active, sort_order,
          starts_at, ends_at, created_by, updated_by
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $19)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $20)
        RETURNING *`,
       [
         ad.placement,
@@ -495,6 +539,7 @@ const createAd = async (req, res) => {
         ad.video_url,
         ad.video_thumbnail,
         ad.video_duration,
+        ad.audio_url,
         ad.target_url,
         ad.cta_label,
         ad.background_color,
@@ -554,16 +599,17 @@ const updateAd = async (req, res) => {
            video_url = $8,
            video_thumbnail = $9,
            video_duration = $10,
-           target_url = $11,
-           cta_label = $12,
-           background_color = $13,
-           text_color = $14,
-           sharing_enabled = $15,
-           is_active = $16,
-           sort_order = $17,
-           starts_at = $18,
-           ends_at = $19,
-           updated_by = $20,
+           audio_url = $11,
+           target_url = $12,
+           cta_label = $13,
+           background_color = $14,
+           text_color = $15,
+           sharing_enabled = $16,
+           is_active = $17,
+           sort_order = $18,
+           starts_at = $19,
+           ends_at = $20,
+           updated_by = $21,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
        RETURNING *`,
@@ -578,6 +624,7 @@ const updateAd = async (req, res) => {
         ad.video_url,
         ad.video_thumbnail,
         ad.video_duration,
+        ad.audio_url,
         ad.target_url,
         ad.cta_label,
         ad.background_color,
@@ -743,6 +790,102 @@ const uploadAdVideo = async (req, res) => {
   }
 };
 
+const uploadAdAudioFile = (req, res, next) => {
+  adAudioUpload(req, res, (error) => {
+    if (!error) {
+      return next();
+    }
+
+    const message =
+      error.code === 'LIMIT_FILE_SIZE'
+        ? 'Ad audio must be 15MB or smaller'
+        : error.message || 'Failed to upload ad audio';
+
+    return res.status(400).json({
+      success: false,
+      message,
+    });
+  });
+};
+
+const uploadAdAudio = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No audio uploaded',
+      });
+    }
+
+    const url = `/uploads/ad-spaces/${req.file.filename}`;
+
+    return res.json({
+      success: true,
+      data: { url },
+    });
+  } catch (error) {
+    return handleControllerError(res, error, 'Failed to upload ad audio');
+  }
+};
+
+// ── Voice hold ads (DB-backed, used by routes/voice.js) ─────────────────────
+
+/**
+ * Active audio ads for the voice hold placement. Respects the global
+ * ads_enabled feature flag; returns [] when ads are disabled or the DB is
+ * unreachable so the voice wait loop can fall back to config-provided URLs.
+ */
+const listAudioAdsForVoice = async () => {
+  try {
+    await ensureAdSpacesSchema();
+
+    const flags = await getFeatureFlagsMap();
+    if (flags.ads_enabled === false) return [];
+
+    const { rows } = await db.query(
+      `SELECT id, title, sponsor_name, audio_url, target_url
+       FROM ad_spaces
+       WHERE is_active = TRUE
+         AND media_type = 'audio'
+         AND placement = 'voice_hold'
+         AND audio_url IS NOT NULL
+         AND audio_url <> ''
+         AND (starts_at IS NULL OR starts_at <= CURRENT_TIMESTAMP)
+         AND (ends_at IS NULL OR ends_at >= CURRENT_TIMESTAMP)
+       ORDER BY sort_order ASC, created_at DESC`
+    );
+    return rows;
+  } catch (error) {
+    return [];
+  }
+};
+
+/**
+ * Count one impression per (ad, call) at most. The waitUrl is re-fetched for
+ * every hold-loop iteration, so the UNIQUE(ad_id, call_sid) constraint is what
+ * keeps impressions honest. Best-effort — never throws.
+ */
+const recordVoiceAdImpression = async (adId, callSid) => {
+  const normalizedCallSid = String(callSid || '').slice(0, 64);
+  if (!Number.isInteger(Number(adId)) || !normalizedCallSid) return;
+  try {
+    const result = await db.query(
+      `INSERT INTO voice_ad_impressions (ad_id, call_sid)
+       VALUES ($1, $2)
+       ON CONFLICT (ad_id, call_sid) DO NOTHING`,
+      [Number(adId), normalizedCallSid]
+    );
+    if (result.rowCount > 0) {
+      await db.query(
+        `UPDATE ad_spaces SET impression_count = impression_count + 1 WHERE id = $1`,
+        [Number(adId)]
+      );
+    }
+  } catch (error) {
+    // Best-effort impression tracking must never break the hold loop.
+  }
+};
+
 const serveAdFile = async (req, res) => {
   try {
     const { filename } = req.params;
@@ -782,5 +925,9 @@ module.exports = {
   uploadAdImage,
   uploadAdVideoFile,
   uploadAdVideo,
+  uploadAdAudioFile,
+  uploadAdAudio,
+  listAudioAdsForVoice,
+  recordVoiceAdImpression,
   serveAdFile,
 };
