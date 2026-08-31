@@ -32,6 +32,10 @@
 
 - [ ] **Review the 12 abandoned registrations** in `tenant_registration_payments` (pending, >12h old) — they will get reminder emails once Resend is verified; check they are legitimate.
 
+- [x] **DONE — Key translations (2026-08-31)** — all new sections (wallet_fund, wallet_withdraw, damage, damage_card, damage_capture, property_card, property_filters, fumigation_*, common dialogs, calls, map_picker, dispute_*, property_list/share, modal, error_boundary, back_to_dashboard, button, role_badge, booking_cancel, appeal, live_*_capture, audio/call/online_status, two_factor + profile.totp_* + register.otp_*) translated into ha/yo/ig/ru/fr/ar/zh (~850 keys per language). All 8 JSON files validated.
+
+- [x] **DONE — Voice system WIP handled (2026-08-31)** — committed + deployed the user's voice work: routes/voice.js, tests/voice.test.js, SupportVoiceDesk.jsx, voiceApi.js, docs, migrations 130 (audio ads) + 131 (call escalations), adService audio support. twilio module restored on VPS. Voice routes live at /voice.
+
 ## Inbox
 
 - (empty)
