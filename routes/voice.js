@@ -45,6 +45,7 @@ const {
   requireAdminOrSuperAdmin,
 } = require('../config/middleware/auth');
 const { voiceTokenLimiter } = require('../config/middleware/securityRateLimiters');
+const adService = require('../services/adService');
 
 const router = express.Router();
 
@@ -212,19 +213,69 @@ const getQueueConfig = () => ({
 
 const QUEUE_PREFIX = 'queue:';
 
+// ── Escalation configuration ─────────────────────────────────────────────────
+// Format: "department:target,department:target" where target is an E.164
+// number or a Twilio Client identity ("client:identity"). Example:
+//   VOICE_ESCALATION_DEPARTMENTS=finance:+2348012345678,legal:client_legal_1
+
+const DEPARTMENT_NAME_PATTERN = /^[a-z][a-z0-9_-]{1,31}$/i;
+const CLIENT_IDENTITY_PATTERN = /^client:[a-zA-Z0-9_-]{1,63}$/;
+
+const getEscalationDepartments = () => {
+  const raw = String(process.env.VOICE_ESCALATION_DEPARTMENTS || '').trim();
+  if (!raw) return [];
+  const departments = [];
+  for (const entry of raw.split(',')) {
+    const [name, ...rest] = entry.trim().split(':');
+    const target = rest.join(':').trim();
+    if (!DEPARTMENT_NAME_PATTERN.test(name || '') || !target) continue;
+    const validTarget =
+      E164_PATTERN.test(target) || CLIENT_IDENTITY_PATTERN.test(target.toLowerCase());
+    if (!validTarget) continue;
+    departments.push({ name, target });
+  }
+  return departments;
+};
+
+const findDepartment = (name) =>
+  getEscalationDepartments().find(
+    (department) => department.name.toLowerCase() === String(name || '').toLowerCase()
+  );
+
+// Lazy Twilio REST client — only created when an escalation is requested.
+let twilioRestClient = null;
+const getTwilioRestClient = () => {
+  if (!twilioRestClient) {
+    twilioRestClient = new twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+  }
+  return twilioRestClient;
+};
+
 /**
  * Pick an ad deterministically for a given call (same caller hears the same ad
- * across wait-loop iterations). Returns null when ads are disabled or no audio
- * ad URLs are configured.
+ * across wait-loop iterations). Returns null when no candidates exist.
  */
-const pickAdUrl = (adUrls, callSid) => {
-  if (!adUrls.length) return null;
+const pickAd = (candidates, callSid) => {
+  if (!candidates.length) return null;
   let hash = 0;
   const input = String(callSid || '');
   for (let i = 0; i < input.length; i += 1) {
     hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
   }
-  return adUrls[hash % adUrls.length];
+  return candidates[hash % candidates.length];
+};
+
+/** Resolve site-relative URLs to the public base Twilio can reach. */
+const absoluteUrl = (url) => {
+  const value = String(url || '').trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  const base = (process.env.TWILIO_WEBHOOK_BASE_URL || '').trim().replace(/\/+$/, '');
+  if (!base) return null;
+  return `${base}${value.startsWith('/') ? value : `/${value}`}`;
 };
 
 /**
@@ -351,20 +402,31 @@ const attachClientCallContext = (clientElement, req) => {
 // Dial status callbacks fire for every leg transition (initiated/ringing/
 // answered/completed). The 'completed' event carries DialCallStatus, which is
 // how we detect no-answer/busy/failed/cancel for the fallback flow.
-const DIAL_STATUS_CALLBACK = (req) => ({
-  statusCallback: `/voice/status?source=${getCallSource(req)}`,
-  statusCallbackMethod: 'POST',
-  statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-});
+// Accepts either a request (derives the source) or a source string directly.
+const DIAL_STATUS_CALLBACK = (reqOrSource) => {
+  const source = typeof reqOrSource === 'string'
+    ? reqOrSource
+    : getCallSource(reqOrSource);
+  return {
+    statusCallback: `/voice/status?source=${source}`,
+    statusCallbackMethod: 'POST',
+    statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+  };
+};
 
 // QA/compliance recording (opt-in via VOICE_RECORD_CALLS=true). Recording is
 // enabled from answer onwards; the recording URL is delivered to
 // /voice/recording and back-filled onto the matching status row.
-const DIAL_RECORDING_OPTIONS = (req) => ({
-  record: 'record-from-answer',
-  recordingStatusCallback: `/voice/recording?source=${getCallSource(req)}`,
-  recordingStatusCallbackMethod: 'POST',
-});
+const DIAL_RECORDING_OPTIONS = (reqOrSource) => {
+  const source = typeof reqOrSource === 'string'
+    ? reqOrSource
+    : getCallSource(reqOrSource);
+  return {
+    record: 'record-from-answer',
+    recordingStatusCallback: `/voice/recording?source=${source}`,
+    recordingStatusCallbackMethod: 'POST',
+  };
+};
 
 const sayRecordingConsent = (twiml) => {
   if (isCallRecordingEnabled()) {
@@ -696,7 +758,7 @@ router.post('/dial-fallback-final', twilioWebhookGuard, (req, res) => {
 //   3. ad slot (opt-in, deterministic per caller)
 //   4. hold music (opt-in)
 
-router.post('/wait', twilioWebhookGuard, (req, res) => {
+router.post('/wait', twilioWebhookGuard, async (req, res) => {
   const config = getQueueConfig();
   const twiml = new twilio.twiml.VoiceResponse();
 
@@ -711,12 +773,62 @@ router.post('/wait', twilioWebhookGuard, (req, res) => {
   });
   callbackGather.say('Press 1 to leave a callback request instead.');
 
-  // Ad slot: deterministic per caller so the same ad repeats on each loop.
+  // Ad slot: DB-backed audio ads (placement "voice_hold") take priority; the
+  // config-provided URL list is the fallback when the DB has none or is down.
+  // One ad is picked deterministically per caller; impressions are recorded
+  // once per (ad, call) via the voice_ad_impressions dedupe table.
   if (config.adsEnabled) {
-    const adUrl = pickAdUrl(config.adUrls, req.body.CallSid);
-    if (adUrl) twiml.play({}, adUrl);
+    let adUrl = null;
+    let adId = null;
+    try {
+      const dbAds = await adService.listAudioAdsForVoice();
+      const picked = pickAd(dbAds, req.body.CallSid);
+      if (picked) {
+        adUrl = absoluteUrl(picked.audio_url);
+        adId = picked.id;
+      }
+    } catch {
+      // DB unreachable — fall through to the config-provided list.
+    }
+    if (!adUrl) {
+      const configUrls = config.adUrls.filter((url) => /^https:\/\//i.test(url));
+      const picked = pickAd(configUrls, req.body.CallSid);
+      if (picked) adUrl = picked;
+    }
+    if (adUrl) {
+      twiml.play({}, adUrl);
+      if (adId) {
+        adService.recordVoiceAdImpression(adId, req.body.CallSid);
+      }
+    }
   }
   if (config.holdMusicUrl) twiml.play({}, config.holdMusicUrl);
+
+  // Persist the caller's leg (best-effort) so /voice/escalate can correlate
+  // the bridged caller to the agent's queue leg. The (call_sid, status)
+  // unique key keeps this idempotent across wait-loop re-fetches.
+  const callerCallSid = String(req.body.CallSid || '').slice(0, 64);
+  if (callerCallSid) {
+    try {
+      await db.query(
+        `INSERT INTO voice_call_events
+           (call_sid, parent_call_sid, direction, source, status, from_number, to_number)
+         VALUES ($1, $2, 'inbound', $3, 'queued', $4, $5)
+         ON CONFLICT (call_sid, status) DO UPDATE SET
+           from_number = EXCLUDED.from_number,
+           source = EXCLUDED.source`,
+        [
+          callerCallSid,
+          String(req.body.ParentCallSid || '').slice(0, 64) || null,
+          getCallSource(req),
+          sanitizeCallerNumber(req.body.From),
+          config.name,
+        ]
+      );
+    } catch {
+      // Non-fatal — escalation correlation is best-effort.
+    }
+  }
 
   res.type('text/xml');
   res.send(twiml.toString());
@@ -981,6 +1093,137 @@ router.post('/status', twilioWebhookGuard, async (req, res) => {
   res.status(200).json({ success: true });
 });
 
+// ── GET /voice/departments ───────────────────────────────────────────────────
+// Admin-only list of escalation departments configured via
+// VOICE_ESCALATION_DEPARTMENTS. Targets are deliberately NOT exposed — the
+// desk only needs names; the backend resolves targets at escalate time.
+
+router.get('/departments', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, (req, res) => {
+  res.json({
+    success: true,
+    data: getEscalationDepartments().map((department) => department.name),
+  });
+});
+
+// ── POST /voice/escalate ─────────────────────────────────────────────────────
+// Agent-initiated department escalation (cold transfer).
+//   1. Validates the department mapping.
+//   2. Confirms the agent's queue leg is live (Twilio REST).
+//   3. Locates the bridged caller via the 'queued' leg persisted by
+//      /voice/wait (single queue line ⇒ unambiguous).
+//   4. Redirects the CALLER's leg to a new Dial toward the department target,
+//      which ends the agent's leg and connects the caller to the department.
+//   5. Writes an audit row (voice_call_escalations).
+
+router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+  const department = findDepartment(req.body?.department);
+  if (!department) {
+    return res.status(400).json({ success: false, message: 'Unknown escalation department.' });
+  }
+
+  const agentCallSid = String(req.body?.callSid || '').trim();
+  if (!agentCallSid) {
+    return res.status(400).json({ success: false, message: 'Missing agent call SID.' });
+  }
+
+  try {
+    const agentCall = await getTwilioRestClient().calls(agentCallSid).fetch();
+    if (agentCall.status !== 'in-progress') {
+      return res.status(409).json({
+        success: false,
+        message: 'This call is no longer active and cannot be escalated.',
+      });
+    }
+  } catch (restError) {
+    logger.warn('Voice escalation: could not verify agent leg', {
+      callSid: agentCallSid,
+      message: restError.message,
+    });
+    return res.status(404).json({
+      success: false,
+      message: 'The agent call could not be found.',
+    });
+  }
+
+  let callerLeg = null;
+  try {
+    const result = await db.query(
+      `SELECT call_sid, source, from_number, created_at
+       FROM voice_call_events
+       WHERE status = 'queued'
+         AND created_at >= CURRENT_TIMESTAMP - INTERVAL '30 minutes'
+       ORDER BY created_at DESC
+       LIMIT 1`
+    );
+    callerLeg = result.rows[0] || null;
+  } catch {
+    callerLeg = null;
+  }
+
+  if (!callerLeg) {
+    return res.status(404).json({
+      success: false,
+      message: 'No caller is currently on this line to escalate.',
+    });
+  }
+
+  const source = ['local_termii', 'international_twilio', 'toll_free', 'unknown'].includes(callerLeg.source)
+    ? callerLeg.source
+    : 'unknown';
+
+  // Build the redirect TwiML for the caller's leg.
+  const redirectTwiml = new twilio.twiml.VoiceResponse();
+  redirectTwiml.say(`Please hold while we connect you to the ${department.name} department.`);
+  const dialOptions = {
+    answerOnBridge: true,
+    timeout: 25,
+    ...DIAL_STATUS_CALLBACK(source),
+  };
+  const target = department.target;
+  if (target.toLowerCase().startsWith('client:')) {
+    const dial = redirectTwiml.dial(dialOptions);
+    const clientElement = dial.client(target.slice('client:'.length));
+    clientElement.parameter({ name: 'call_source', value: source });
+  } else {
+    redirectTwiml.dial(dialOptions, target);
+  }
+
+  try {
+    await getTwilioRestClient()
+      .calls(callerLeg.call_sid)
+      .update({ twiml: redirectTwiml.toString() });
+  } catch (updateError) {
+    logger.warn('Voice escalation: caller leg redirect failed', {
+      callerCallSid: callerLeg.call_sid,
+      department: department.name,
+      message: updateError.message,
+    });
+    return res.status(502).json({
+      success: false,
+      message: 'The call could not be transferred right now. Please try again.',
+    });
+  }
+
+  logger.info('Call escalated to department', {
+    callerCallSid: callerLeg.call_sid,
+    agentCallSid,
+    department: department.name,
+    source,
+  });
+
+  try {
+    await db.query(
+      `INSERT INTO voice_call_escalations (call_sid, agent_call_sid, department, escalated_by)
+       VALUES ($1, $2, $3, $4)`,
+      [callerLeg.call_sid, agentCallSid, department.name, req.user?.id || null]
+    );
+  } catch {
+    // Audit write is best-effort — the transfer already succeeded.
+  }
+
+  return res.json({ success: true });
+});
+
 // ── GET /voice/token ─────────────────────────────────────────────────────────
 // Issues a short-lived Twilio Access Token (TTL 3600s) for the shared agent
 // identity "support_agent_1". The browser Voice SDK uses it to register a
@@ -1032,6 +1275,9 @@ module.exports._voiceScopeForTest = {
   getVoiceConfigStatus,
   isSupportHoursActive,
   normalizeCallbackNumber,
+  getEscalationDepartments,
+  findDepartment,
+  pickAd,
   E164_PATTERN,
   VOICE_STATUSES,
 };

@@ -1,9 +1,9 @@
 # Voice System Backlog — Outstanding Work
 
-Status: items 1–10 plus the queue/hold/ad-slot experience are complete. Only
-deployment (11–13) and the two documented integration points below remain.
+Status: queue/hold experience, DB-backed audio ads, and department escalation
+are complete. Only deployment (below) and the two integration points remain.
 
-## Queue / hold / ads — just landed
+## Queue / hold / ads / escalation — complete
 
 - [x] **Real call queue** — support callers are `<Enqueue>`d into
   `VOICE_QUEUE_NAME` (default `support`); agents join the line by dialing
@@ -14,19 +14,28 @@ deployment (11–13) and the two documented integration points below remain.
   5s "press 1 for callback" DTMF window → optional ad slot → optional hold
   music (`VOICE_HOLD_MUSIC_URL`); `/voice/agent-wait` for the agent side;
   `/voice/enqueue-done` action closes the caller leg politely.
-- [x] **Ad slots on hold** — `VOICE_ADS_ENABLED=true` + `VOICE_AD_AUDIO_URLS`
-  (HTTPS audio); one ad per loop, picked deterministically per caller.
-- [x] Tests: 34 voice tests; full suite 141/141.
+- [x] **Ad slots wired to the ad-spaces DB** — ads are created in the Super
+  Admin → Ad Spaces tab (media_type=audio, placement=voice_hold, MP3/WAV/OGG/
+  OPUS upload or URL); the hold loop plays them (deterministic per caller) and
+  counts impressions once per (ad, call) via `voice_ad_impressions`
+  (migration 130). `VOICE_AD_AUDIO_URLS` is only the DB-down fallback.
+- [x] **Department escalation** — `VOICE_ESCALATION_DEPARTMENTS`
+  (`name:E164 | name:client:<identity>`); the desk shows an Escalate control
+  on the queue line; backend verifies the live agent leg (Twilio REST),
+  locates the bridged caller from the 'queued' leg persisted by /voice/wait,
+  cold-transfers the caller via REST TwiML redirect, and audits in
+  `voice_call_escalations` (migration 131).
+- [x] Tests: 36 voice tests; full suite 143/143.
 
 ## Integration points (known gaps)
 
-- [ ] **Audio ads via the platform ad-spaces engine** — the current ad slot is
-  config-driven (`VOICE_AD_AUDIO_URLS`); wire it to the ads DB (audio asset
-  type + impression/click attribution) with a TODO marker in `/voice/wait`.
 - [ ] **Caller identity for queue-bridged calls** — the browser SDK does not
   expose caller parameters on the queue leg; the desk shows "Support queue
-  line". Use `voice_call_events` (status webhook) for caller-level reporting,
-  or persist queue-join time to correlate.
+  line". Use `voice_call_events` (status webhook + the 'queued' leg) for
+  caller-level reporting and escalation correlation.
+- [ ] **Warm transfers** — escalation is a cold transfer (the caller is
+  redirected to the department and the agent's leg ends). Warm/hold-and-consult
+  transfers need a conference-based call path.
 
 ## Backend (complete)
 

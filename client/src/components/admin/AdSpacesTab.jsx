@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
-import { FaEdit, FaExternalLinkAlt, FaFilm, FaImage, FaPlus, FaShareAlt, FaTrash, FaUpload } from 'react-icons/fa';
+import { FaEdit, FaExternalLinkAlt, FaFilm, FaHeadset, FaImage, FaMusic, FaPlus, FaShareAlt, FaTrash, FaUpload } from 'react-icons/fa';
 import api from '../../services/api';
 
 const fallbackPlacements = [
@@ -10,6 +10,7 @@ const fallbackPlacements = [
   { value: 'dashboard_inline', label: 'Dashboard inline banner' },
   { value: 'properties_top', label: 'Properties top banner' },
   { value: 'properties_inline', label: 'Properties inline banner' },
+  { value: 'voice_hold', label: 'Voice hold ad (audio)' },
 ];
 
 const emptyForm = {
@@ -22,6 +23,7 @@ const emptyForm = {
   video_url: '',
   video_thumbnail: '',
   video_duration: '30',
+  audio_url: '',
   target_url: '',
   cta_label: 'Learn more',
   background_color: '#ffffff',
@@ -199,6 +201,40 @@ const AdSpacesTab = () => {
     }
   };
 
+  const handleAudioUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/')) {
+      toast.error('Select an audio file');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('audio', file);
+
+    try {
+      setUploading(true);
+      const response = await api.post('/super/ad-spaces/audio', formData);
+      const url = response.data?.data?.url;
+
+      if (!url) {
+        toast.error('Upload completed but no audio URL was returned');
+        return;
+      }
+
+      setForm((prev) => ({ ...prev, audio_url: url }));
+      toast.success('Ad audio uploaded');
+    } catch (error) {
+      console.error('Ad audio upload failed:', error.response || error);
+      toast.error(getUploadErrorMessage(error));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const buildPayload = () => ({
     placement: form.placement,
     title: form.title,
@@ -209,6 +245,7 @@ const AdSpacesTab = () => {
     video_url: form.video_url,
     video_thumbnail: form.video_thumbnail,
     video_duration: form.media_type === 'video' ? Number(form.video_duration || 30) : null,
+    audio_url: form.media_type === 'audio' ? form.audio_url : null,
     target_url: form.target_url,
     cta_label: form.cta_label,
     background_color: form.background_color,
@@ -268,6 +305,7 @@ const AdSpacesTab = () => {
       video_url: ad.video_url || '',
       video_thumbnail: ad.video_thumbnail || '',
       video_duration: String(ad.video_duration || 30),
+      audio_url: ad.audio_url || '',
       target_url: ad.target_url || '',
       cta_label: ad.cta_label || '',
       background_color: ad.background_color || '#ffffff',
@@ -505,6 +543,18 @@ const AdSpacesTab = () => {
                   <FaFilm className="text-base" />
                   Video
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, media_type: 'audio' }))}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                    form.media_type === 'audio'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <FaMusic className="text-base" />
+                  Audio
+                </button>
               </div>
             </label>
 
@@ -536,7 +586,7 @@ const AdSpacesTab = () => {
                   Paste an https URL or upload JPG, PNG, WEBP, or GIF up to 5MB.
                 </p>
               </div>
-            ) : (
+            ) : form.media_type === 'video' ? (
               <>
                 <div className="text-sm font-medium text-gray-700">
                   <label htmlFor="ad-video-url">Video URL or Upload</label>
@@ -589,6 +639,45 @@ const AdSpacesTab = () => {
                     className="input mt-1"
                   />
                 </label>
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-medium text-gray-700">
+                  <label htmlFor="ad-audio-url">Audio URL or Upload</label>
+                  <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      id="ad-audio-url"
+                      name="audio_url"
+                      value={form.audio_url}
+                      onChange={handleChange}
+                      className="input min-w-0 flex-1"
+                      placeholder="https://... or /uploads/ad-spaces/audio.mp3"
+                    />
+                    <label className="btn btn-secondary shrink-0 cursor-pointer gap-2">
+                      <FaUpload className="text-xs" />
+                      {uploading ? 'Uploading...' : 'Upload'}
+                      <input
+                        type="file"
+                        accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,audio/opus"
+                        onChange={handleAudioUpload}
+                        disabled={uploading || loading}
+                        className="sr-only"
+                      />
+                    </label>
+                  </div>
+                  <p className="mt-1 text-xs font-normal text-gray-500">
+                    Paste an https URL or upload MP3, WAV, OGG, or OPUS up to 15MB.
+                    Audio ads play in the voice hold loop (placement: Voice hold ad).
+                  </p>
+                </div>
+                {form.audio_url && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-gray-700">Preview</p>
+                    <audio controls className="mt-1 w-full" src={form.audio_url} preload="none">
+                      Your browser does not support audio playback.
+                    </audio>
+                  </div>
+                )}
               </>
             )}
 
@@ -781,7 +870,7 @@ const AdSpacesTab = () => {
                       {ad.is_active ? 'Active' : 'Paused'}
                     </span>
                     <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-                      {ad.media_type === 'video' ? 'Video' : 'Image'}
+                      {ad.media_type === 'video' ? 'Video' : ad.media_type === 'audio' ? 'Audio' : 'Image'}
                     </span>
                   </div>
                 </div>
@@ -802,6 +891,14 @@ const AdSpacesTab = () => {
                     <span>Duration: {ad.video_duration || 'N/A'}s</span>
                   )}
                 </div>
+
+                {ad.media_type === 'audio' && ad.audio_url && (
+                  <div className="mt-3">
+                    <audio controls className="w-full" src={ad.audio_url} preload="none">
+                      Your browser does not support audio playback.
+                    </audio>
+                  </div>
+                )}
 
                 {Array.isArray(ad.operations) && ad.operations.length > 0 && (
                   <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-3">

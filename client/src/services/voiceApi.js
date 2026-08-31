@@ -67,3 +67,62 @@ export const fetchVoiceToken = async () => {
 
   return data.token;
 };
+
+const authedFetch = async (path, options = {}) => {
+  const token = getAuthToken();
+  const headers = {
+    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+
+  let response;
+  try {
+    response = await fetch(path, {
+      credentials: 'include',
+      ...options,
+      headers,
+    });
+  } catch (networkError) {
+    const error = new Error('Could not reach the voice service. Check your connection.');
+    error.code = 'VOICE_NETWORK_ERROR';
+    throw error;
+  }
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    // Non-JSON body — fall through to the status check below.
+  }
+
+  if (!response.ok) {
+    const error = new Error(data?.message || 'The voice service request failed.');
+    error.status = response.status;
+    error.code = response.status === 401 || response.status === 403
+      ? 'VOICE_AUTH_ERROR'
+      : 'VOICE_REQUEST_ERROR';
+    throw error;
+  }
+
+  return data;
+};
+
+/** Admin-only list of escalation department names (targets stay on the backend). */
+export const fetchDepartments = async () => {
+  const data = await authedFetch('/voice/departments');
+  return Array.isArray(data?.data) ? data.data : [];
+};
+
+/** Escalate the caller on the given agent leg to a department (cold transfer). */
+export const escalateCall = async (callSid, department) => {
+  if (!callSid || !department) {
+    const error = new Error('Missing call or department for escalation.');
+    error.code = 'VOICE_REQUEST_ERROR';
+    throw error;
+  }
+  return authedFetch('/voice/escalate', {
+    method: 'POST',
+    body: JSON.stringify({ callSid, department }),
+  });
+};

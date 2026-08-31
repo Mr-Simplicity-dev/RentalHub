@@ -101,6 +101,35 @@ call while the agent stays available. The queue name is configurable via
 > `voice_call_events` for that), and audio ad slots are config-driven until
 > they are wired to the ad engine.
 
+### Ad slots on hold (DB-backed)
+
+With `VOICE_ADS_ENABLED=true`, the hold loop plays audio ads straight from
+your **ad-spaces database**: create an ad in the Super Admin → Ad Spaces tab
+with media type **Audio** and placement **Voice hold ad (audio)** (upload
+MP3/WAV/OGG/OPUS up to 15MB or paste an https URL). Ads respect the
+`ads_enabled` feature flag and their start/end schedules; one ad is picked
+deterministically per caller and an impression is counted **once per
+(ad, call)** via the `voice_ad_impressions` dedupe table (migration 130).
+`VOICE_AD_AUDIO_URLS` remains only as a fallback when the DB has no audio ads
+or is unreachable.
+
+### Department escalation (agent-initiated)
+
+Configure `VOICE_ESCALATION_DEPARTMENTS` as comma-separated
+`name:target` pairs where the target is an **E.164 number** or a **Twilio
+Client identity** (`client:legal_1`):
+
+```bash
+VOICE_ESCALATION_DEPARTMENTS=finance:+2348012345678,legal:client:legal_1
+```
+
+While on a call, the agent picks a department in the Voice Desk and clicks
+**Escalate call**. The backend verifies the agent's leg is live, locates the
+bridged caller, and cold-transfers the caller to the department target via the
+Twilio REST API. Each escalation is audited in `voice_call_escalations`
+(migration 131). The agent's leg ends and the desk re-joins the queue line
+automatically.
+
 ### After-hours & holidays (optional)
 
 Set `VOICE_SUPPORT_HOURS_START` / `VOICE_SUPPORT_HOURS_END` (24h `HH:MM`) and

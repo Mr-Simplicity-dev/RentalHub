@@ -209,6 +209,28 @@ test('callback numbers are normalized to E.164-ish form', () => {
   assert.equal(normalizeCallbackNumber(undefined), null);
 });
 
+test('escalation departments parse only valid name:target pairs', () => {
+  const { getEscalationDepartments, findDepartment } = _voiceScopeForTest;
+  const original = process.env.VOICE_ESCALATION_DEPARTMENTS;
+  try {
+    delete process.env.VOICE_ESCALATION_DEPARTMENTS;
+    assert.deepEqual(getEscalationDepartments(), []);
+
+    process.env.VOICE_ESCALATION_DEPARTMENTS =
+      'finance:+2348012345678,legal:client:legal_1,broken,empty:,,bad_target:12345';
+    const departments = getEscalationDepartments();
+    assert.deepEqual(departments, [
+      { name: 'finance', target: '+2348012345678' },
+      { name: 'legal', target: 'client:legal_1' },
+    ]);
+    assert.deepEqual(findDepartment('FINANCE'), { name: 'finance', target: '+2348012345678' });
+    assert.equal(findDepartment('sales'), undefined);
+  } finally {
+    if (original === undefined) delete process.env.VOICE_ESCALATION_DEPARTMENTS;
+    else process.env.VOICE_ESCALATION_DEPARTMENTS = original;
+  }
+});
+
 // ── Webhook signature gate ───────────────────────────────────────────────────
 
 test('incoming webhook requires a valid Twilio signature', async () => {
@@ -369,6 +391,14 @@ test('token endpoint rejects unauthenticated requests', async () => {
 
 test('callbacks endpoint rejects unauthenticated requests', async () => {
   const res = await get('/voice/callbacks');
+  assert.equal(res.status, 401);
+});
+
+test('departments and escalate endpoints reject unauthenticated requests', async () => {
+  let res = await get('/voice/departments');
+  assert.equal(res.status, 401);
+
+  res = await post('/voice/escalate', { callSid: 'CA1', department: 'finance' });
   assert.equal(res.status, 401);
 });
 

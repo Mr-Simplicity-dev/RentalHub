@@ -4497,5 +4497,22 @@
     "online": "Online",
     "offline": "Offline",
     "realtime_offline": "Real-time connection lost"
+  },
+  "two_factor": {
+    "title": "Security Check",
+    "totp_hint": "Two-factor authentication is required for this action.",
+    "sms_hint": "Two-factor authentication is required for this action.",
+    "totp_body": "Enter the 6-digit code from your authenticator app (e.g. Google Authenticator).",
+    "sms_body": "We sent a verification code to your phone. Enter it below to continue.",
+    "code_required": "Enter the 6-digit verification code.",
+    "verify_failed": "Verification failed. Please try again.",
+    "close": "Close",
+    "sms_sent": "Verification code sent to your phone.",
+    "sms_send_failed": "Could not send the code. Please try again.",
+    "sending": "Sending code...",
+    "resend": "Resend code",
+    "verifying": "Verifying...",
+    "verify": "Verify & Continue",
+    "cancel": "Cancel"
   }
 }
