@@ -64,10 +64,10 @@ const getSurveyLocationConfig = async () => {
     db.query(`SELECT value FROM app_settings WHERE key = 'survey_allowed_scope'`),
     db.query(`SELECT value FROM app_settings WHERE key = 'survey_allowed_locations'`),
   ]);
-  let scope = scopeRow.rows[0]?.value || 'nigeria';
+  let scope = scopeRow.rows[0]?.value?.value || 'nigeria';
   let locations = [];
   try {
-    locations = JSON.parse(locationsRow.rows[0]?.value || '[]');
+    locations = JSON.parse(locationsRow.rows[0]?.value?.value || '[]');
   } catch {
     locations = [];
   }

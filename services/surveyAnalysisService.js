@@ -646,11 +646,14 @@ exports.saveLocationConfig = async (req, res) => {
     }
 
     await db.query(
-      `INSERT INTO app_settings (key, value, description)
-       VALUES ('survey_allowed_scope', $1, 'survey location gate scope'),
-              ('survey_allowed_locations', $2, 'allowed survey locations')
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-      [validScope, JSON.stringify(cleanLocations)]
+      `INSERT INTO app_settings (key, value)
+       VALUES ('survey_allowed_scope', $1),
+              ('survey_allowed_locations', $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+      [
+        JSON.stringify({ value: validScope }),
+        JSON.stringify({ value: JSON.stringify(cleanLocations) }),
+      ]
     );
 
     return res.json({
