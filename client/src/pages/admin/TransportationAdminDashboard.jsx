@@ -740,6 +740,7 @@ const TransportationAdminDashboard = () => {
 
       {activeTab === 'alerts' ? (
         <SectionCard
+          className="trans-admin-alerts-section"
           title="Alert management"
           description="Resolve failed payments, cancellations, and critical logistics issues before they affect the tenant move experience."
         >
@@ -781,7 +782,7 @@ const TransportationAdminDashboard = () => {
       ) : null}
 
       {activeTab === 'analytics' ? (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="trans-admin-analytics-section grid gap-6 xl:grid-cols-2">
           <SectionCard
             title="Revenue trend"
             description="Completed transportation revenue over the selected analysis window."

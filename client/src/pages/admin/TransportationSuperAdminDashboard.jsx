@@ -509,6 +509,7 @@ export default function TransportationSuperAdminDashboard() {
 
       {activeTab === 'metrics' ? (
         <SectionCard
+          className="super-trans-metrics-section"
           title="Performance metrics"
           description="Stored transportation performance metrics that can later feed automated reporting and scheduled monitoring."
         >

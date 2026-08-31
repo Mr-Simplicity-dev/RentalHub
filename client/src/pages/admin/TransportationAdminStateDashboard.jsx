@@ -323,6 +323,7 @@ export default function TransportationAdminStateDashboard() {
 
       {activeTab === 'alerts' ? (
         <SectionCard
+          className="state-trans-alerts-section"
           title="Jurisdiction alerts"
           description="Resolve operational or payment issues affecting transportation requests in your state."
         >
@@ -396,7 +397,7 @@ export default function TransportationAdminStateDashboard() {
       ) : null}
 
       {activeTab === 'analytics' ? (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="state-trans-analytics-section grid gap-6 xl:grid-cols-2">
           <SectionCard
             title="Revenue trend"
             description="Completed transportation revenue inside your state scope."

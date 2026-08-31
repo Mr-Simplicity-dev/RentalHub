@@ -11,7 +11,7 @@
  */
 
 const webpush = require('web-push');
-const db = require('../middleware/database');
+const db = require('../config/middleware/database');
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;

@@ -219,15 +219,19 @@ export default function RecruitmentAdminDashboard() {
           )}
 
           {activeTab === 'roles' && (
-            <RecruitmentRolesTab roles={roles} cycles={cycles} onRefresh={loadCore} />
+            <div className="recruitment-admin-roles-section">
+              <RecruitmentRolesTab roles={roles} cycles={cycles} onRefresh={loadCore} />
+            </div>
           )}
 
           {activeTab === 'locations' && (
-            <RecruitmentLocationsTab
-              locations={locations}
-              states={states}
-              onRefresh={loadCore}
-            />
+            <div className="recruitment-admin-locations-section">
+              <RecruitmentLocationsTab
+                locations={locations}
+                states={states}
+                onRefresh={loadCore}
+              />
+            </div>
           )}
 
           {activeTab === 'applicants' && (
@@ -240,11 +244,13 @@ export default function RecruitmentAdminDashboard() {
           )}
 
           {activeTab === 'interviews' && (
-            <RecruitmentInterviewTab
-              cycles={cycles}
-              roles={roles}
-              onRefreshCore={loadCore}
-            />
+            <div className="recruitment-admin-interviews-section">
+              <RecruitmentInterviewTab
+                cycles={cycles}
+                roles={roles}
+                onRefreshCore={loadCore}
+              />
+            </div>
           )}
         </div>
       </div>
