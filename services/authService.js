@@ -4485,7 +4485,8 @@ exports.getCurrentUser = async (req, res) => {
               u.is_active, u.account_suspended_reason,
               COALESCE(u.approval_status, 'approved') AS approval_status,
               COALESCE(u.is_recruitment_admin, FALSE) AS is_recruitment_admin,
-              u.chamber_name, u.chamber_phone
+              u.chamber_name, u.chamber_phone,
+              u.diaspora_country, u.billing_country, u.card_brand
        FROM users u
        LEFT JOIN states s ON s.id = u.preferred_state_id
        WHERE u.id = $1`,

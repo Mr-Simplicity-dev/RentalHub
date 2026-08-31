@@ -1,16 +1,41 @@
 # Voice System Backlog — Outstanding Work
 
-Status: items 1–10 are complete (1–7 from the previous round; 8–10 — toll-free
-classification, after-hours/holiday handling with DTMF callbacks, and
-opt-in call recording — just landed). Only deployment remains.
+Status: items 1–10 plus the queue/hold/ad-slot experience are complete. Only
+deployment (11–13) and the two documented integration points below remain.
 
-## Backend gaps
+## Queue / hold / ads — just landed
+
+- [x] **Real call queue** — support callers are `<Enqueue>`d into
+  `VOICE_QUEUE_NAME` (default `support`); agents join the line by dialing
+  `queue:<name>` through the TwiML App (`/voice/outgoing` serves the
+  `<Dial><Queue>` leg); the Voice Desk auto-joins on "Go Available" and
+  re-joins after each call.
+- [x] **Hold experience** — `/voice/wait` loop: busy announcement →
+  5s "press 1 for callback" DTMF window → optional ad slot → optional hold
+  music (`VOICE_HOLD_MUSIC_URL`); `/voice/agent-wait` for the agent side;
+  `/voice/enqueue-done` action closes the caller leg politely.
+- [x] **Ad slots on hold** — `VOICE_ADS_ENABLED=true` + `VOICE_AD_AUDIO_URLS`
+  (HTTPS audio); one ad per loop, picked deterministically per caller.
+- [x] Tests: 34 voice tests; full suite 141/141.
+
+## Integration points (known gaps)
+
+- [ ] **Audio ads via the platform ad-spaces engine** — the current ad slot is
+  config-driven (`VOICE_AD_AUDIO_URLS`); wire it to the ads DB (audio asset
+  type + impression/click attribution) with a TODO marker in `/voice/wait`.
+- [ ] **Caller identity for queue-bridged calls** — the browser SDK does not
+  expose caller parameters on the queue leg; the desk shows "Support queue
+  line". Use `voice_call_events` (status webhook) for caller-level reporting,
+  or persist queue-join time to correlate.
+
+## Backend (complete)
 
 - [x] **Outbound-call handler** — `POST /voice/outgoing` TwiML endpoint
   (validates E.164 destination, sets `callerId` from `OUTBOUND_CALLER_ID` /
-  `NIGERIA_NUMBER`, terminal fallback on failure). TwiML App Voice URL must be
-  configured to `/voice/outgoing`; misrouted `client:` legs hitting
-  `/voice/incoming` are rejected with `<Reject/>`.
+  `NIGERIA_NUMBER`, terminal fallback on failure; `queue:<name>` joins the
+  support queue line). TwiML App Voice URL must be configured to
+  `/voice/outgoing`; misrouted `client:` legs hitting `/voice/incoming` are
+  rejected with `<Reject/>`.
 - [x] **`POST /voice/status` call-status webhook** — Dial status callbacks
   (initiated/ringing/answered/completed + DialCallStatus) persisted to
   `voice_call_events` (migration 126), deduplicated by `(call_sid, status)`,
@@ -20,9 +45,9 @@ opt-in call recording — just landed). Only deployment remains.
   `/voice/fallback-choice` → bounded `/voice/dial-fallback-final`).
 - [x] **Rate limiter on `GET /voice/token`** — `voiceTokenLimiter`
   (10 min / 30 tokens, env-tunable) in `config/middleware/securityRateLimiters`.
-- [x] **Committed tests** — `tests/voice.test.js` (29 tests: signature gate,
-  IVR TwiML, fallback flow, outbound, E.164 config, token 401, status
-  tolerance, toll-free, after-hours, callbacks, recording, unit tests).
+- [x] **Committed tests** — `tests/voice.test.js` (34 tests: signature gate,
+  IVR TwiML, queue/wait/ads, fallback flow, outbound, E.164 config, token 401,
+  status tolerance, toll-free, after-hours, callbacks, recording, unit tests).
 - [x] **E.164 validation at config load** — all phone-number vars must match
   `^\+[1-9][0-9]{7,14}$`; problems reported by variable NAME only, config
   treated as not-ready (503).
@@ -44,14 +69,14 @@ opt-in call recording — just landed). Only deployment remains.
   answer (`record-from-answer`), plays consent before dialing, back-fills
   `voice_call_events.recording_url` via `/voice/recording` (migration 128).
 
-## Deployment
+## Deployment (manual — you)
 
 - [ ] Provision Twilio account, Standard API Key, TwiML App, numbers, Termii
   SIP trunk; populate `.env` from `.env.voice.example`.
 - [ ] Confirm nginx proxies `/voice/` to the backend (location block added to
   `deploy/nginx.conf`; verify on the live server).
 - [ ] After the Voice Desk lands: verify end-to-end call (Termii SIP → Twilio
-  → IVR → agent browser Device).
+  → IVR → queue → agent browser Device).
 
 ## Client
 
