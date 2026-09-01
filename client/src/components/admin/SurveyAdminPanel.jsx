@@ -179,7 +179,7 @@ const SurveyAdminPanel = () => {
             <FaChartPie className="text-indigo-600" /> Survey & Analysis
           </h3>
           <p className="text-sm text-gray-500">
-            Onboarding market research: tenant & landlord questionnaires, analysis and projections.
+            Onboarding Surveyresearch: tenant & landlord questionnaires, analysis and projections.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -803,14 +803,14 @@ const SurveyAdminPanel = () => {
             <p className="text-sm font-semibold text-gray-700">Foreign-Card Local-Rate Pricing</p>
             <p className="mt-1 text-xs text-gray-500">
               A local (₦) registration paid with a card issued outside Nigeria is charged at the
-              black-market rate plus a $5 conversion/processing fee, as a second payment before the
+              black-Surveyrate plus a $5 conversion/processing fee, as a second payment before the
               account activates. The local-rate IP/VPN block is controlled from Super Admin → Flags
               ("Local Rate IP Check").
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block font-medium text-gray-700">Black-market USD rate (₦ per $1)</span>
+              <span className="mb-1 block font-medium text-gray-700">Black-SurveyUSD rate (₦ per $1)</span>
               <input
                 type="number"
                 min="0"

@@ -3,10 +3,30 @@ const {
   getLocationPageData,
   getNigeriaDirectoryPage,
 } = require('../config/utils/seoPageService');
+const {
+  isSearchCrawler,
+  renderLocationHtml,
+  renderDirectoryHtml,
+  renderAreaHtml,
+} = require('../config/utils/seoHtmlRenderer');
+
+const renderForCrawler = (req, data, renderFn, res) => {
+  if (!isSearchCrawler(req.headers['user-agent'])) {
+    return false;
+  }
+  const html = renderFn(data);
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(html);
+  return true;
+};
 
 exports.getNigeriaDirectory = async (req, res) => {
   try {
     const data = await getNigeriaDirectoryPage();
+    if (renderForCrawler(req, data, (d) => renderDirectoryHtml(d), res)) {
+      return;
+    }
     return res.json({
       success: true,
       ...data,
@@ -32,6 +52,10 @@ exports.getLocationPage = async (req, res) => {
         success: false,
         message: 'Location page not found',
       });
+    }
+
+    if (renderForCrawler(req, data, (d) => renderLocationHtml(d), res)) {
+      return;
     }
 
     return res.json({
@@ -60,6 +84,10 @@ exports.getAreaPage = async (req, res) => {
         success: false,
         message: 'Area page not found',
       });
+    }
+
+    if (renderForCrawler(req, data, (d) => renderAreaHtml(d), res)) {
+      return;
     }
 
     return res.json({

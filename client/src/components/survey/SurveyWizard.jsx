@@ -411,7 +411,7 @@ export default function SurveyWizard({
             type="text"
             value={agentSession.location}
             onChange={(e) => setAgentSession((a) => ({ ...a, location: e.target.value }))}
-            placeholder={t('survey.agent_location_ph', 'e.g. Phase 1, Gwagwalada market area')}
+            placeholder={t('survey.agent_location_ph', 'e.g. Phase 1, Gwagwalada Surveyarea')}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
         </label>
@@ -701,7 +701,7 @@ export default function SurveyWizard({
 
   const exitLabel = mode === 'partA'
     ? t('survey.part_a_title', 'A few quick questions before you continue')
-    : t('survey.title', 'RentalHub NG Market Research Survey');
+    : t('survey.title', 'RentalHub NG SurveyResearch Survey');
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6">
@@ -819,7 +819,7 @@ export default function SurveyWizard({
 
       <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-gray-400">
         <FaShieldAlt className="text-gray-400" />
-        {t('survey.privacy_note', 'Anonymous market research. Your personal details are never linked to your answers.')}
+        {t('survey.privacy_note', 'Anonymous Surveyresearch. Your personal details are never linked to your answers.')}
       </p>
     </div>
   );

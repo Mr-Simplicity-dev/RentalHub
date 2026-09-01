@@ -106,6 +106,27 @@ exports.getSurveyLocationConfig = async (req, res) => {
   }
 };
 
+// ── IP verdict: BLOCK only when every available provider agrees ────────────
+// Nigerian mobile/ISP IPs are frequently mis-flagged by single geo providers,
+// so a lone "foreign" or "proxy" reading is treated as a false positive.
+const ipIsForeignOrVpn = (verdicts) => {
+  if (verdicts.length === 0) return false;
+  const anyClean = verdicts.some(
+    (v) =>
+      (!v.country_code || v.country_code === 'NG') &&
+      !v.proxy &&
+      !v.hosting &&
+      !v.vpn
+  );
+  if (anyClean) return false;
+
+  const allForeign = verdicts.every(
+    (v) => v.country_code && v.country_code !== 'NG'
+  );
+  const allVpn = verdicts.every((v) => v.proxy || v.hosting || v.vpn);
+  return allForeign || allVpn;
+};
+
 // Public: verify the device is inside the allowed area and not on a VPN.
 exports.checkSurveyLocation = async (req, res) => {
   try {
@@ -118,56 +139,52 @@ exports.checkSurveyLocation = async (req, res) => {
     const config = await getSurveyLocationConfig();
     const lat = Number(req.query.lat);
     const lng = Number(req.query.lng);
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return res.json({
-        success: true,
-        data: { allowed: false, reason: 'location_required' },
-      });
-    }
-
-    // 1) Location match against the allowed scope.
-    let locationOk = false;
-    if (config.scope === 'locations') {
-      locationOk = config.locations.some(
-        (l) =>
-          haversineKm(lat, lng, Number(l.lat), Number(l.lng)) <= (Number(l.radius_km) || 30)
-      );
-    } else {
-      // nigeria scope: the country check is done via the IP below; device
-      // coords must at least be a plausible latitude/longitude.
-      locationOk = lat >= 3 && lat <= 15 && lng >= 2 && lng <= 15;
-    }
-
-    if (!locationOk) {
-      return res.json({
-        success: true,
-        data: { allowed: false, reason: 'not_in_area' },
-      });
-    }
-
-    // 2) IP-based country + VPN check.
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
     const ip = getClientIp(req);
-    const ipGeo = await getIpGeolocation(ip);
+    const { getIpVerdicts } = require('../config/utils/ipGeo');
+    const verdicts = await getIpVerdicts(ip);
 
-    if (ipGeo) {
-      if (ipGeo.proxy || ipGeo.hosting || ipGeo.vpn) {
-        return res.json({
-          success: true,
-          data: { allowed: false, reason: 'vpn_detected', ip_country: ipGeo.country_code },
-        });
+    // 1) Device location (when available).
+    if (hasCoords) {
+      let locationOk = false;
+      if (config.scope === 'locations') {
+        locationOk = config.locations.some(
+          (l) =>
+            haversineKm(lat, lng, Number(l.lat), Number(l.lng)) <= (Number(l.radius_km) || 30)
+        );
+      } else {
+        locationOk = lat >= 3 && lat <= 15 && lng >= 2 && lng <= 15;
       }
-      if (config.scope === 'nigeria' && ipGeo.country_code && ipGeo.country_code !== 'NG') {
-        return res.json({
-          success: true,
-          data: { allowed: false, reason: 'outside_nigeria', ip_country: ipGeo.country_code },
-        });
+
+      if (!locationOk) {
+        return res.json({ success: true, data: { allowed: false, reason: 'not_in_area' } });
       }
+    } else if (config.scope === 'locations') {
+      // Specific-location scope requires working device GPS.
+      return res.json({ success: true, data: { allowed: false, reason: 'location_required' } });
+    }
+
+    // 2) IP consensus: only block when all providers agree it's foreign/VPN.
+    if (ipIsForeignOrVpn(verdicts)) {
+      const blocked = verdicts.some((v) => v.proxy || v.hosting || v.vpn);
+      return res.json({
+        success: true,
+        data: {
+          allowed: false,
+          reason: blocked ? 'vpn_detected' : 'outside_nigeria',
+          ip_country: verdicts[0]?.country_code || null,
+        },
+      });
     }
 
     return res.json({
       success: true,
-      data: { allowed: true, reason: null, ip_country: ipGeo?.country_code || null },
+      data: {
+        allowed: true,
+        reason: null,
+        ip_country: verdicts[0]?.country_code || null,
+        verdicts: verdicts.map((v) => v.country_code),
+      },
     });
   } catch (error) {
     req.logger.error('Survey location check error:', error);
@@ -184,30 +201,29 @@ const enforceLocationGate = async (req, body) => {
   const config = await getSurveyLocationConfig();
   const lat = Number(body.lat);
   const lng = Number(body.lng);
+  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+  const ip = getClientIp(req);
+  const { getIpVerdicts } = require('../config/utils/ipGeo');
+  const verdicts = await getIpVerdicts(ip);
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+  if (hasCoords) {
+    let locationOk = false;
+    if (config.scope === 'locations') {
+      locationOk = config.locations.some(
+        (l) => haversineKm(lat, lng, Number(l.lat), Number(l.lng)) <= (Number(l.radius_km) || 30)
+      );
+    } else {
+      locationOk = lat >= 3 && lat <= 15 && lng >= 2 && lng <= 15;
+    }
+    if (!locationOk) return { allowed: false, reason: 'not_in_area' };
+  } else if (config.scope === 'locations') {
     return { allowed: false, reason: 'location_required' };
   }
 
-  let locationOk = false;
-  if (config.scope === 'locations') {
-    locationOk = config.locations.some(
-      (l) => haversineKm(lat, lng, Number(l.lat), Number(l.lng)) <= (Number(l.radius_km) || 30)
-    );
-  } else {
-    locationOk = lat >= 3 && lat <= 15 && lng >= 2 && lng <= 15;
-  }
-  if (!locationOk) return { allowed: false, reason: 'not_in_area' };
-
-  const ip = getClientIp(req);
-  const ipGeo = await getIpGeolocation(ip);
-  if (ipGeo) {
-    if (ipGeo.proxy || ipGeo.hosting || ipGeo.vpn) {
-      return { allowed: false, reason: 'vpn_detected' };
-    }
-    if (config.scope === 'nigeria' && ipGeo.country_code && ipGeo.country_code !== 'NG') {
-      return { allowed: false, reason: 'outside_nigeria' };
-    }
+  // IP consensus: block only when ALL providers agree foreign/VPN.
+  if (ipIsForeignOrVpn(verdicts)) {
+    const blocked = verdicts.some((v) => v.proxy || v.hosting || v.vpn);
+    return { allowed: false, reason: blocked ? 'vpn_detected' : 'outside_nigeria' };
   }
 
   return { allowed: true };

@@ -98,7 +98,7 @@ const buildSeoBlocks = ({ seed, locationLabel, propertyLabel, stats }) => {
   ];
 
   const marketAngles = [
-    `The market in ${locationLabel} attracts renters who want a balance of affordability, access, and verified listings.`,
+    `The Surveyin ${locationLabel} attracts renters who want a balance of affordability, access, and verified listings.`,
     `Rental demand in ${locationLabel} usually follows road access, neighbourhood reputation, and the type of homes entering the market.`,
     `If you want cheap rent in ${locationLabel}, timing, property type, and exact street still matter more than state-wide averages.`,
   ];

@@ -1324,7 +1324,7 @@
     "mistake_2_desc": "Missing details about utilities, parking, or house rules leads to fewer applications.",
     "mistake_2_fix": "Fill out all property fields completely.",
     "mistake_3_title": "Overpricing",
-    "mistake_3_desc": "Setting rent above market rate results in longer vacancies.",
+    "mistake_3_desc": "Setting rent above Surveyrate results in longer vacancies.",
     "mistake_3_fix": "Research comparable listings in your area and price competitively.",
     "mistake_4_title": "Slow Response Times",
     "mistake_4_desc": "Delayed responses frustrate tenants and make you appear unprofessional.",
@@ -1702,7 +1702,7 @@
     "cheap_rent_in": "cheap rent in ",
     "overview": "Area overview",
     "rankings": "How this page ranks",
-    "market_notes": "Rental market notes",
+    "market_notes": "Rental Surveynotes",
     "nearby": "Nearby area pages",
     "count_listings": "listings",
     "back_to_state": "Back to state SEO page",
@@ -1726,7 +1726,7 @@
     "target_query": "Target Query",
     "cheap_rent_in": "cheap rent in ",
     "ranking_strategy": "Ranking Strategy",
-    "market_overview": "Rental Market Overview",
+    "market_overview": "Rental SurveyOverview",
     "renter_tips": "What Renters Should Know",
     "nearby": "Nearby Rental Intent Pages",
     "count_listings": "listings",
@@ -3388,7 +3388,7 @@
     "adjustment_before": "Additional payment required",
     "adjustment_title": "Foreign card detected",
     "adjustment_body": "Your payment card is issued outside Nigeria. To complete your local-rate registration, an additional",
-    "adjustment_body_2": "(black-market conversion + $5 processing fee) is required before your account is activated.",
+    "adjustment_body_2": "(black-Surveyconversion + $5 processing fee) is required before your account is activated.",
     "adjustment_pay": "Pay the difference now",
     "adjustment_failed": "Could not start the difference payment. Please try again.",
     "prembly_verify_complete": "Identity verification completed successfully.",
@@ -4525,7 +4525,7 @@
     "cancel": "Cancel"
   },
   "survey": {
-    "title": "RentalHub NG Market Research Survey",
+    "title": "RentalHub NG SurveyResearch Survey",
     "part_a_title": "A few quick questions before you continue",
     "part_a_sub": "This first section takes about 2 minutes. The rest can be finished later.",
     "part_b_sub": "Section {{section}} · Question {{q}} of {{total}}",
@@ -4536,7 +4536,7 @@
     "saving": "Saving...",
     "submitting": "Submitting...",
     "finish_later": "Finish later from my dashboard",
-    "privacy_note": "Anonymous market research. Your personal details are never linked to your answers.",
+    "privacy_note": "Anonymous Surveyresearch. Your personal details are never linked to your answers.",
     "text_placeholder": "Write your answer here...",
     "pick_limit": "Choose up to {{count}}: {{picked}} chosen",
     "screened_out": "Thank you for your time — this survey does not apply to you. Your answer has been recorded.",
@@ -4558,7 +4558,7 @@
     "agent_intro": "You are conducting this survey as a RentalHub marketing agent. Your name and phone are recorded from your account — just tell us where this interview is happening.",
     "agent_lga": "LGA where the survey is carried out *",
     "agent_location": "Location / area",
-    "agent_location_ph": "e.g. Phase 1, Gwagwalada market area",
+    "agent_location_ph": "e.g. Phase 1, Gwagwalada Surveyarea",
     "agent_mode_label": "How is this survey being administered?",
     "mode_face": "Face-to-face",
     "mode_phone": "Telephone",
@@ -4590,7 +4590,7 @@
     "no_responses": "No surveys captured yet. Click \"Conduct Survey\" to start."
   },
   "public_survey": {
-    "title": "RentalHub NG Market Research Survey",
+    "title": "RentalHub NG SurveyResearch Survey",
     "subtitle": "Help us understand how Nigerians find and pay for rental homes. Your answers are anonymous and used only for research. Estimated time: 15–20 minutes.",
     "choose": "Who are you?",
     "agent_choose": "Conducting as an agent — who is the respondent?",
@@ -4622,10 +4622,11 @@
     "loc_vpn": "VPN connections are not allowed for this survey. Please turn off your VPN and try again.",
     "loc_country": "This survey is only available to respondents in Nigeria.",
     "loc_generic": "The survey is not available at your current location.",
-    "loc_blocked_title": "Survey not available here"
+    "loc_blocked_title": "Survey not available here",
+    "google_hint": "Start with Google — we fill in your name and email (you can still edit them)."
   },
   "dashboard": {
-    "survey_reminder_title": "Finish your market research survey",
+    "survey_reminder_title": "Finish your Surveyresearch survey",
     "survey_reminder_body": "Your answers help us improve RentalHub NG. It takes about 10 more minutes — you can finish anytime.",
     "survey_continue": "Continue Survey"
   },

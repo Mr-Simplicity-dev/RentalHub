@@ -1419,7 +1419,7 @@ const Dashboard = () => {
           <div className="mb-6 flex flex-col items-start justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 sm:flex-row sm:items-center">
             <div>
               <p className="text-sm font-semibold text-indigo-900">
-                {t('dashboard.survey_reminder_title', 'Finish your market research survey')}
+                {t('dashboard.survey_reminder_title', 'Finish your Surveyresearch survey')}
               </p>
               <p className="text-xs text-indigo-700">
                 {t('dashboard.survey_reminder_body', 'Your answers help us improve RentalHub NG. It takes about 10 more minutes — you can finish anytime.')}

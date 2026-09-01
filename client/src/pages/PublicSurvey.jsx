@@ -87,16 +87,12 @@ const PublicSurveyPage = () => {
           );
         });
 
-        if (!coords) {
-          if (active) {
-            setLocationBlockReason('location_required');
-            setLocationState('blocked');
-          }
-          return;
-        }
-
+        // No GPS? Still ask the server — with the Nigeria scope a clean
+        // Nigerian IP is enough (GPS-denied phones should not be blocked).
         const checkRes = await api.get(
-          `/survey/location-check?lat=${coords.lat}&lng=${coords.lng}`
+          coords
+            ? `/survey/location-check?lat=${coords.lat}&lng=${coords.lng}`
+            : `/survey/location-check`
         );
         const result = checkRes.data?.data || {};
         if (!result.allowed) {
@@ -108,8 +104,10 @@ const PublicSurveyPage = () => {
         }
 
         if (active) {
-          setLocationCoords(coords);
-          localStorage.setItem('rentalhub_survey_coords', JSON.stringify(coords));
+          if (coords) {
+            setLocationCoords(coords);
+            localStorage.setItem('rentalhub_survey_coords', JSON.stringify(coords));
+          }
           setLocationState('ok');
         }
       } catch {
@@ -408,8 +406,18 @@ const PublicSurveyPage = () => {
 
       <div className="mx-auto w-full max-w-xl px-4">
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+          {/* Google sign-in is the FIRST thing on the page */}
+          {!agentMode && GOOGLE_CLIENT_ID && (
+            <div className="mb-6 flex flex-col items-center gap-2">
+              <div ref={googleButtonRef} />
+              <p className="text-xs text-gray-400">
+                {t('public_survey.google_hint', 'Start with Google — we fill in your name and email (you can still edit them).')}
+              </p>
+            </div>
+          )}
+
           <h1 className="text-2xl font-bold text-gray-900">
-            {t('public_survey.title', 'RentalHub NG Market Research Survey')}
+            {t('public_survey.title', 'RentalHub NG SurveyResearch Survey')}
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             {t('public_survey.subtitle', 'Help us understand how Nigerians find and pay for rental homes. Your answers are anonymous and used only for research. Estimated time: 15–20 minutes.')}
@@ -436,12 +444,6 @@ const PublicSurveyPage = () => {
               ? t('public_survey.agent_choose', 'Conducting as an agent — who is the respondent?')
               : t('public_survey.choose', 'Who are you?')}
           </p>
-
-          {!agentMode && GOOGLE_CLIENT_ID && !hasDraft && (
-            <div className="mt-4 flex justify-center">
-              <div ref={googleButtonRef} />
-            </div>
-          )}
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button

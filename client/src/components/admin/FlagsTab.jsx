@@ -72,7 +72,7 @@ const FLAG_META = {
   local_rate_ip_check: {
     label: "Local Rate IP Check",
     description:
-      "Block the local (₦) registration rate for payments from foreign IPs or VPN/proxy connections — they must register as diaspora (USD) instead. Foreign cards on the local rate pay a black-market conversion + $5 fee.",
+      "Block the local (₦) registration rate for payments from foreign IPs or VPN/proxy connections — they must register as diaspora (USD) instead. Foreign cards on the local rate pay a black-Surveyconversion + $5 fee.",
   },
 };
 

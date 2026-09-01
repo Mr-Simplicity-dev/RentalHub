@@ -235,7 +235,7 @@ export default function LocationPage() {
                 <p className="mt-3 leading-7 text-gray-700">{data.content?.overview}</p>
               </div>
               <div>
-                <h3 className="text-xl font-semibold text-gray-900">{t('location_page.renter_know')}</h3>
+                <h3 className="text-xl font-semibold text-gray-900">{t('location_page.renter_tips')}</h3>
                 <p className="mt-3 leading-7 text-gray-700">{data.content?.marketSummary}</p>
               </div>
             </section>
@@ -243,7 +243,7 @@ export default function LocationPage() {
             <section className="space-y-6 rounded-3xl bg-white p-8 shadow-sm">
               <div>
                 <h2 className="text-2xl font-semibold text-gray-900">
-                  {t('location_page.nearby_intent_pages')}
+                  {t('location_page.nearby')}
                 </h2>
                 <div className="mt-4 grid gap-3">
                   {(data.links?.areas || []).map((item) => (
@@ -276,7 +276,7 @@ export default function LocationPage() {
           {data.links?.lgas?.length > 0 && (
             <section className="mt-8 rounded-3xl bg-white p-8 shadow-sm">
               <h2 className="text-2xl font-semibold text-gray-900">
-                {t('location_page.all_lgas', { state: data.location.state })}
+                {t('location_page.all_lgas_in', { state: data.location.state })}
               </h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {data.links.lgas.map((item) => (
@@ -285,7 +285,7 @@ export default function LocationPage() {
                     to={item.url}
                     className="rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 transition hover:border-primary-300 hover:text-primary-700"
                   >
-                    {t('location_page.houses_for_rent', { name: item.name })}
+                    {t('location_page.houses_for_rent_in', { name: item.name })}
                   </Link>
                 ))}
               </div>
