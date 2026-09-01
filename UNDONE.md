@@ -61,6 +61,11 @@
   - **Foreign-card local registrants pay black-market + $5**: at completion, if billing_country ≠ NG on the local tier → adjustment = (localFee/officialRate)×blackRate + feeUsd×blackRate − localFee (official rate from `getUsdToNgnRate`; black rate + fee from app_settings `black_market_usd_rate`=1600, `foreign_card_conversion_fee_usd`=5 — editable in Survey Admin → FX Rules). 402 `FOREIGN_CARD_ADJUSTMENT` → client "Pay the difference now" → `POST /auth/register/payment/foreign-card/:reference` (Paystack init, reference `${base}_FOREIGN_CARD`, payments row payment_type registration_foreign_card_adjustment) → webhook marks `foreign_card_adjustment_paid_at` → completion proceeds (OTP gate still applies). Columns added: tenant_registration_payments.ip_country, ip_flagged, foreign_card_adjustment_ngn, foreign_card_adjustment_paid_at. Example: local ₦3,000 → foreign total ₦11,200 (adj ₦8,200).
   - Honest limits (documented): Nigerian SIM + Nigerian-funded card can still bypass; IP check fail-open when geo provider unreachable; the diaspora user pays with a foreign card on the DIASPORA tier unaffected.
 
+- [x] **DONE (2026-08-31) — Survey gate false-positive fix + Google button placement** (`d884c6d`):
+  - Location/VPN check now uses IP **consensus** (`getIpVerdicts` queries ipapi.co AND ipwho.is; BLOCK only when ALL providers agree it's foreign or VPN — single-provider flags fail open, fixing Nigerian mobile/ISP false positives). Gwagwalada coords verified allowed live.
+  - **GPS denied is no longer a block** for the Nigeria scope: no coords → server checks IP only (clean Nigerian IP = allowed). Phones without location permission pass.
+  - "Sign in with Google" button is now the **FIRST thing** on the /survey landing (above title/cards), with a hint line; hidden in agent mode.
+
 ---
 
 ## SURVEY SYSTEM — MASTER RECORD (self-contained; read this if memory is wiped)
