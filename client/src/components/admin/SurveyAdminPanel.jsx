@@ -24,6 +24,8 @@ const SurveyAdminPanel = () => {
   const [locScope, setLocScope] = useState("nigeria");
   const [locList, setLocList] = useState([]);
   const [locSaving, setLocSaving] = useState(false);
+  const [fxConfig, setFxConfig] = useState({ black_market_usd_rate: 1600, foreign_card_conversion_fee_usd: 5 });
+  const [fxSaving, setFxSaving] = useState(false);
   const [paperMeta, setPaperMeta] = useState({
     admin_mode: "face_to_face",
     admin_date: new Date().toISOString().slice(0, 10),
@@ -77,11 +79,33 @@ const SurveyAdminPanel = () => {
     }
   }, []);
 
+  const loadFxConfig = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/survey/fx-config");
+      setFxConfig(res.data.data);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     if (tab === "responses") loadResponses();
     if (tab === "projections") loadProjections();
     loadLocationConfig();
-  }, [tab, type, loadAnalysis, loadResponses, loadProjections, loadLocationConfig]);
+    loadFxConfig();
+  }, [tab, type, loadAnalysis, loadResponses, loadProjections, loadLocationConfig, loadFxConfig]);
+
+  const saveFxConfig = async () => {
+    setFxSaving(true);
+    try {
+      await api.post("/admin/survey/fx-config", fxConfig);
+      toast.success("FX rules saved");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save FX rules");
+    } finally {
+      setFxSaving(false);
+    }
+  };
 
   const saveLocationConfig = async () => {
     setLocSaving(true);
@@ -144,6 +168,7 @@ const SurveyAdminPanel = () => {
     ["projections", "Projections"],
     ["responses", "Responses & Paper Entry"],
     ["location", "Location Rules"],
+    ["fx", "FX Rules"],
   ];
 
   return (
@@ -768,6 +793,51 @@ const SurveyAdminPanel = () => {
             className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {locSaving ? "Saving…" : "Save Location Rules"}
+          </button>
+        </div>
+      )}
+      {/* ── FX rules ─────────────────────────────────────────────────────── */}
+      {tab === "fx" && (
+        <div className="space-y-6">
+          <div className="rounded-xl border border-soft bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-700">Foreign-Card Local-Rate Pricing</p>
+            <p className="mt-1 text-xs text-gray-500">
+              A local (₦) registration paid with a card issued outside Nigeria is charged at the
+              black-market rate plus a $5 conversion/processing fee, as a second payment before the
+              account activates. The local-rate IP/VPN block is controlled from Super Admin → Flags
+              ("Local Rate IP Check").
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="text-sm">
+              <span className="mb-1 block font-medium text-gray-700">Black-market USD rate (₦ per $1)</span>
+              <input
+                type="number"
+                min="0"
+                value={fxConfig.black_market_usd_rate}
+                onChange={(e) => setFxConfig((f) => ({ ...f, black_market_usd_rate: Number(e.target.value) || 0 }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block font-medium text-gray-700">Conversion/processing fee (USD)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={fxConfig.foreign_card_conversion_fee_usd}
+                onChange={(e) => setFxConfig((f) => ({ ...f, foreign_card_conversion_fee_usd: Number(e.target.value) || 0 }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            disabled={fxSaving}
+            onClick={saveFxConfig}
+            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {fxSaving ? "Saving…" : "Save FX Rules"}
           </button>
         </div>
       )}

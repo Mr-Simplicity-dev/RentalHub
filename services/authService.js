@@ -1866,6 +1866,34 @@ exports.initializeRegistrationPayment = async (req, res) => {
 
     const isDiasporaQuote = preparedRegistration.registrationTier === 'diaspora';
 
+    // ── Local-rate IP/VPN gate ─────────────────────────────────────────────
+    // The cheap local (₦) rate is only for payers physically in Nigeria.
+    // Foreign IPs / VPNs / proxies are hard-blocked from this rate so
+    // diaspora Nigerians cannot use a VPN + Nigerian line to pay in naira.
+    let ipCountry = null;
+    let ipFlagged = false;
+    if (!isDiasporaQuote && flags.local_rate_ip_check === true) {
+      const { getClientIp, getIpGeolocation } = require('../config/utils/ipGeo');
+      const ip = getClientIp(req);
+      const geo = await getIpGeolocation(ip);
+      ipCountry = geo?.country_code || null;
+      const isForeignOrVpn = geo && (
+        geo.proxy || geo.hosting || geo.vpn ||
+        (geo.country_code && geo.country_code !== 'NG')
+      );
+      if (isForeignOrVpn) {
+        const error = new Error(
+          'This registration rate is only available to payers in Nigeria. If you are outside Nigeria, please register as a diaspora account (USD pricing), or contact support@rentalhub.com.ng.'
+        );
+        error.statusCode = 403;
+        error.code = 'LOCAL_RATE_FOREIGN_IP';
+        throw error;
+      }
+      if (ipCountry) {
+        ipFlagged = ipCountry !== 'NG';
+      }
+    }
+
     // ── Diaspora: convert the USD quote to the NGN charge (Paystack settles
     //    in naira). The USD quote, FX rate and markup are stored for audit.
     let quoteUsd = null;
@@ -1989,9 +2017,11 @@ exports.initializeRegistrationPayment = async (req, res) => {
          fx_rate,
          fx_markup_pct,
          amount_ngn,
-         passport_issuing_country
+         passport_issuing_country,
+         ip_country,
+         ip_flagged
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [
         preparedRegistrationWithLocation.user_type,
         preparedRegistrationWithLocation.email,
@@ -2009,6 +2039,8 @@ exports.initializeRegistrationPayment = async (req, res) => {
         fxMarkupPct,
         baseAmountNgn,
         preparedRegistrationWithLocation.passportIssuingCountry || null,
+        ipCountry,
+        ipFlagged,
       ]
     );
 
@@ -2442,6 +2474,43 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       }
     }
 
+    // ── Foreign-card local registrants: black-market premium + $5 fee ──────
+    // A local (₦) rate paid with a card issued outside Nigeria is priced at
+    // the black-market conversion rate plus a fixed $5 processing fee. The
+    // difference is charged as a second payment before the account activates.
+    const storedBillingCountry = String(billingCountry || '').toUpperCase();
+    if (storedTier === 'local' && storedBillingCountry && storedBillingCountry !== 'NG') {
+      const localFee = Number(tenantRegistrationPayment.amount || 0);
+      const officialRate = Number(await getUsdToNgnRate()) || 1500;
+      const blackMarketRate = await getBlackMarketRate();
+      const conversionFeeUsd = await getForeignCardConversionFeeUsd();
+
+      const foreignTotal =
+        Math.round((localFee / officialRate) * blackMarketRate) +
+        Math.round(conversionFeeUsd * blackMarketRate);
+      const adjustment = Math.max(0, foreignTotal - localFee);
+
+      if (adjustment > 0) {
+        await db.query(
+          `UPDATE tenant_registration_payments
+           SET foreign_card_adjustment_ngn = $1
+           WHERE transaction_reference = $2`,
+          [adjustment, reference]
+        );
+
+        if (!tenantRegistrationPayment.foreign_card_adjustment_paid_at) {
+          return res.status(402).json({
+            success: false,
+            code: 'FOREIGN_CARD_ADJUSTMENT',
+            message:
+              `Your card is issued outside Nigeria (${storedBillingCountry}). An additional ₦${adjustment.toLocaleString()} ` +
+              `(black-market conversion + $${conversionFeeUsd} processing fee) is required before your account is activated.`,
+            data: { amount: adjustment, reference },
+          });
+        }
+      }
+    }
+
     const verificationMeta = tenantRegistrationPayment.verification_meta || null;
     const kycResult = storedPayload.kycResult || null;
     // Identity numbers were encrypted at rest during initialization; decrypt
@@ -2635,6 +2704,114 @@ exports.sendWithdrawalOtp = async (req, res) => {
     return respondTwoFactorError(res, error);
   }
 };
+
+// Black-market FX + foreign-card conversion fee (admin editable in app_settings)
+const getBlackMarketRate = async () => {
+  try {
+    const result = await db.query(
+      `SELECT value FROM app_settings WHERE key = 'black_market_usd_rate'`
+    );
+    const configured = Number(result.rows[0]?.value?.value);
+    return Number.isFinite(configured) && configured > 0 ? configured : 1600;
+  } catch {
+    return 1600;
+  }
+};
+
+const getForeignCardConversionFeeUsd = async () => {
+  try {
+    const result = await db.query(
+      `SELECT value FROM app_settings WHERE key = 'foreign_card_conversion_fee_usd'`
+    );
+    const configured = Number(result.rows[0]?.value?.value);
+    return Number.isFinite(configured) && configured > 0 ? configured : 5;
+  } catch {
+    return 5;
+  }
+};
+
+// Pay the foreign-card adjustment: a second Paystack checkout for the
+// difference between the local rate and the black-market-priced total.
+exports.payForeignCardAdjustment = async (req, res) => {
+  try {
+    const { reference } = req.params;
+
+    const result = await db.query(
+      `SELECT * FROM tenant_registration_payments WHERE transaction_reference = $1 LIMIT 1`,
+      [reference]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Registration payment not found' });
+    }
+
+    const row = result.rows[0];
+    const adjustment = Number(row.foreign_card_adjustment_ngn || 0);
+    if (adjustment <= 0) {
+      return res.status(400).json({ success: false, message: 'No foreign-card adjustment is due for this registration' });
+    }
+    if (row.foreign_card_adjustment_paid_at) {
+      return res.json({
+        success: true,
+        message: 'Foreign-card adjustment already paid',
+        data: { already_paid: true, reference },
+      });
+    }
+    if (row.registered_user_id) {
+      return res.status(400).json({ success: false, message: 'This registration is already completed' });
+    }
+
+    const adjustmentReference = `${reference}_FOREIGN_CARD`;
+
+    await db.query(
+      `INSERT INTO payments (user_id, payment_type, amount, transaction_reference, payment_status)
+       VALUES ($1, 'registration_foreign_card_adjustment', $2, $3, 'pending')
+       ON CONFLICT (transaction_reference) DO NOTHING`,
+      [row.user_id, adjustment, adjustmentReference]
+    );
+
+    const userResult = await db.query(`SELECT email FROM users WHERE id = $1`, [row.user_id]);
+    const userEmail = userResult.rows[0]?.email || row.email;
+
+    const paystackResponse = await axios.post(
+      `${PAYSTACK_BASE_URL}/transaction/initialize`,
+      {
+        email: userEmail,
+        amount: adjustment * 100,
+        reference: adjustmentReference,
+        callback_url: `${FRONTEND_URL}/register`,
+        metadata: {
+          payment_type: 'registration_foreign_card_adjustment',
+          user_id: row.user_id,
+          base_reference: reference,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        amount: adjustment,
+        reference: adjustmentReference,
+        authorization_url: paystackResponse.data.data.authorization_url,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Foreign card adjustment error:', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to start the foreign-card adjustment payment',
+    });
+  }
+};
+
+exports.getBlackMarketRate = getBlackMarketRate;
+exports.getForeignCardConversionFeeUsd = getForeignCardConversionFeeUsd;
 
 // LOGIN
 exports.login = async (req, res) => {

@@ -70,7 +70,8 @@ export const authService = {
   clearLocalSession: () => {
     clearAuthSession();
     delete api.defaults.headers.common['Authorization'];
-    localStorage.removeItem('rememberedEmail');
+    // Note: rememberedEmail is intentionally NOT cleared here so that
+    // "Remember Me" persists across logout and expired sessions.
   },
 
   // Logout (NO redirect here)

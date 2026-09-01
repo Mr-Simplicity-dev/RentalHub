@@ -123,6 +123,12 @@ router.post(
   authController.completeRegistrationAfterPayment
 );
 
+router.post(
+  '/register/payment/foreign-card/:reference',
+  registrationLimiter,
+  authController.payForeignCardAdjustment
+);
+
 router.get(
   '/register/payment/status/:reference',
   registrationLimiter,

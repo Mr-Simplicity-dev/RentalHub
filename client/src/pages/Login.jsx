@@ -100,11 +100,10 @@ const Login = () => {
         // Persist or clear remembered email
         if (rememberMe) {
           localStorage.setItem(REMEMBERED_EMAIL_KEY, email);
+          setLoginEmailSuggestions(saveLoginEmailSuggestion(email));
         } else {
           localStorage.removeItem(REMEMBERED_EMAIL_KEY);
         }
-
-        setLoginEmailSuggestions(saveLoginEmailSuggestion(email));
 
         const user = response.data?.user || {};
         const role = user.user_type;

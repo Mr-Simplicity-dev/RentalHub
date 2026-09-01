@@ -618,6 +618,61 @@ exports.deleteResponse = async (req, res) => {
   }
 };
 
+// ── Foreign-card FX rules (admin) ───────────────────────────────────────────
+exports.getFxConfigForAdmin = async (req, res) => {
+  try {
+    const rows = await db.query(
+      `SELECT key, value FROM app_settings
+       WHERE key IN ('black_market_usd_rate', 'foreign_card_conversion_fee_usd')`
+    );
+    const read = (key, fallback) => {
+      const row = rows.rows.find((r) => r.key === key);
+      const value = Number(row?.value?.value);
+      return Number.isFinite(value) && value > 0 ? value : fallback;
+    };
+    return res.json({
+      success: true,
+      data: {
+        black_market_usd_rate: read('black_market_usd_rate', 1600),
+        foreign_card_conversion_fee_usd: read('foreign_card_conversion_fee_usd', 5),
+      },
+    });
+  } catch (error) {
+    req.logger.error('FX config load error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load FX config' });
+  }
+};
+
+exports.saveFxConfig = async (req, res) => {
+  try {
+    const blackMarketRate = Number(req.body.black_market_usd_rate);
+    const conversionFeeUsd = Number(req.body.foreign_card_conversion_fee_usd);
+
+    if (!Number.isFinite(blackMarketRate) || blackMarketRate <= 0) {
+      return res.status(400).json({ success: false, message: 'A valid black-market rate is required' });
+    }
+    if (!Number.isFinite(conversionFeeUsd) || conversionFeeUsd < 0) {
+      return res.status(400).json({ success: false, message: 'A valid conversion fee is required' });
+    }
+
+    await db.query(
+      `INSERT INTO app_settings (key, value)
+       VALUES ('black_market_usd_rate', $1),
+              ('foreign_card_conversion_fee_usd', $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+      [
+        JSON.stringify({ value: blackMarketRate }),
+        JSON.stringify({ value: conversionFeeUsd }),
+      ]
+    );
+
+    return res.json({ success: true, message: 'FX rules saved' });
+  } catch (error) {
+    req.logger.error('FX config save error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to save FX rules' });
+  }
+};
+
 // ── Marketing agent dashboard ──────────────────────────────────────────────
 
 // ── Survey location gate config (admin) ────────────────────────────────────

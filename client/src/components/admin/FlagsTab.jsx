@@ -69,6 +69,11 @@ const FLAG_META = {
     description:
       "Require respondents to be physically inside the allowed survey area (real-time device location) and block VPN/proxy connections before they can take the survey.",
   },
+  local_rate_ip_check: {
+    label: "Local Rate IP Check",
+    description:
+      "Block the local (₦) registration rate for payments from foreign IPs or VPN/proxy connections — they must register as diaspora (USD) instead. Foreign cards on the local rate pay a black-market conversion + $5 fee.",
+  },
 };
 
 const REGISTRATION_PARENT_KEY = "allow_registration";

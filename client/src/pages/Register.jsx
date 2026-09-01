@@ -105,6 +105,8 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showRegistrationFeeModal, setShowRegistrationFeeModal] = useState(!registrationReference);
   const [resumePayment, setResumePayment] = useState(null);
+  const [foreignIpBlocked, setForeignIpBlocked] = useState('');
+  const [foreignCardAdjustment, setForeignCardAdjustment] = useState(null);
   const [showOtpStep, setShowOtpStep] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [otpSending, setOtpSending] = useState(false);
@@ -439,6 +441,17 @@ const Register = () => {
         if (!active) return;
 
         const serverError = error.response?.data;
+
+        // Foreign-card adjustment: a local-rate registration paid with a card
+        // issued outside Nigeria needs a second payment (black-market FX + $5).
+        if (
+          error.response?.status === 402 &&
+          serverError?.code === 'FOREIGN_CARD_ADJUSTMENT' &&
+          registrationReference
+        ) {
+          setForeignCardAdjustment(serverError.data || { reference: registrationReference });
+          return;
+        }
 
         // OTP gate: completion requires the code sent to the registration
         // phone, so a leaked resume link alone can never take the account.
@@ -799,6 +812,11 @@ toast.error(
       return;
     }
 
+    if (serverError?.code === 'LOCAL_RATE_FOREIGN_IP') {
+      setForeignIpBlocked(serverError.message || t('register.foreign_ip_blocked'));
+      return;
+    }
+
     toast.error(
       firstError?.msg ||
       serverError?.message ||
@@ -1083,8 +1101,108 @@ return (
         </div>
       </div>
     )}
-    {showOtpStep && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-4">
+    {foreignIpBlocked && (
+      <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-600 text-2xl">⛔</div>
+            <h2 className="text-lg font-bold text-gray-900">
+              {t('register.foreign_ip_title', 'Local rate not available in your location')}
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">{foreignIpBlocked}</p>
+          </div>
+          <div className="mt-5 space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                setFormData((prev) => ({ ...prev, is_foreigner: true }));
+                setForeignIpBlocked('');
+                setShowRegistrationFeeModal(true);
+              }}
+              className="block w-full rounded-xl bg-indigo-600 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              {t('register.foreign_ip_diaspora', 'Continue as a diaspora account (USD)')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setForeignIpBlocked('')}
+              className="block w-full rounded-xl border border-gray-300 py-3 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {foreignCardAdjustment && (
+      <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-amber-600">
+                {t('register.adjustment_before')}
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-gray-900">
+                {t('register.adjustment_title', 'Foreign card detected')}
+              </h2>
+            </div>
+            <button
+              onClick={() => setForeignCardAdjustment(null)}
+              className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Close"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <p className="mt-3 text-sm text-gray-600">
+            {t('register.adjustment_body', 'Your payment card is issued outside Nigeria. To complete your local-rate registration, an additional')}{' '}
+            <strong>₦{Number(foreignCardAdjustment.amount || 0).toLocaleString()}</strong>{' '}
+            {t('register.adjustment_body_2', '(black-market conversion + $5 processing fee) is required before your account is activated.')}
+          </p>
+
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                setLoading(true);
+                const res = await api.post(
+                  `/auth/register/payment/foreign-card/${registrationReference}`
+                );
+                if (res.data?.data?.already_paid) {
+                  setForeignCardAdjustment(null);
+                  window.location.reload();
+                  return;
+                }
+                if (res.data?.data?.authorization_url) {
+                  window.location.href = res.data.data.authorization_url;
+                }
+              } catch (payError) {
+                toast.error(payError?.response?.data?.message || t('register.adjustment_failed'));
+              } finally {
+                setLoading(false);
+              }
+            }}
+            className="mt-5 block w-full rounded-xl bg-amber-600 py-3 text-center text-sm font-semibold text-white hover:bg-amber-700"
+          >
+            {t('register.adjustment_pay', 'Pay the difference now')}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setForeignCardAdjustment(null)}
+            className="mt-2 block w-full py-2 text-center text-sm font-medium text-gray-500 hover:text-gray-700"
+          >
+            {t('common.cancel')}
+          </button>
+        </div>
+      </div>
+    )}
+
+    {showOtpStep && (      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
           <div className="flex shrink-0 items-start justify-between gap-4">
             <div>

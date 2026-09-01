@@ -99,6 +99,11 @@ const DEFAULT_FEATURE_FLAGS = [
     enabled: false,
     description: 'Require respondents to be physically inside the allowed survey area (real-time device location, no VPNs) before they can take the survey.',
   },
+  {
+    key: 'local_rate_ip_check',
+    enabled: true,
+    description: 'Block the local (₦) registration rate for payments coming from foreign IPs or VPN/proxy connections — they must register as diaspora (USD) instead.',
+  },
 ];
 
 let featureFlagsReady = false;

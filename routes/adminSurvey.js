@@ -10,6 +10,8 @@ const {
   computeAnalysis,
   saveLocationConfig,
   getLocationConfigForAdmin,
+  getFxConfigForAdmin,
+  saveFxConfig,
 } = require('../services/surveyAnalysisService');
 const pushService = require('../services/pushService');
 const { requireDiasporaAdmin } = require('../services/diasporaAdminService');
@@ -35,6 +37,10 @@ router.post('/reminders/send', async (req, res) => {
 // Location gate admin controls
 router.get('/location-config', getLocationConfigForAdmin);
 router.post('/location-config', saveLocationConfig);
+
+// Foreign-card FX rules
+router.get('/fx-config', getFxConfigForAdmin);
+router.post('/fx-config', saveFxConfig);
 
 // PDF + CSV export
 router.get('/export.pdf', async (req, res) => {

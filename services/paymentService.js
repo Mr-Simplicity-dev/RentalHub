@@ -3811,6 +3811,19 @@ async function handleSuccessfulPayment(data, webhookLogger) {
     const completedPayment = updateResult.rows[0] || null;
     const paymentId = completedPayment?.id || null;
 
+    // Foreign-card adjustment for local-rate registrations: mark the pending
+    // registration as having paid the black-market conversion + $5 fee.
+    if (reference.endsWith('_FOREIGN_CARD')) {
+      const baseReference = reference.slice(0, -'_FOREIGN_CARD'.length);
+      await db.query(
+        `UPDATE tenant_registration_payments
+         SET foreign_card_adjustment_paid_at = CURRENT_TIMESTAMP
+         WHERE transaction_reference = $1`,
+        [baseReference]
+      );
+    }
+
+
     if (metadata.payment_type === "tenant_subscription") {
       const expiry = new Date();
       expiry.setDate(expiry.getDate() + (metadata.duration_days || 30));

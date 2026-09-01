@@ -95,7 +95,7 @@ const Footer = () => {
               <li><FooterLink to="/about" label={t('footer.about_us')} /></li>
               <li><FooterLink to="/how-it-works" label={t('footer.how')} /></li>
               <li><FooterLink to="/faq" label={t('footer.faq')} /></li>
-              {surveyLinkVisible && <li><FooterLink to="/survey" label={t('footer.survey', 'Market Survey')} /></li>}
+              {surveyLinkVisible && <li><FooterLink to="/survey" label={t('footer.survey', 'Survey')} /></li>}
               {careerLinkVisible && <li><FooterLink to="/careers" label="Career" /></li>}
             </ul>
           </div>
