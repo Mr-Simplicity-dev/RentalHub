@@ -97,7 +97,7 @@ const tabLabels = {
   registration_access: "Registration Access",
   flags: "Flags",
   fraud: "Fraud",
-  admin: "Admin",
+  admin: "Admin Accounts",
   admin_monitor: "Admin Monitor",
   pending_approvals: "Pending Approvals",
   commission_config: "Commission Config",
@@ -155,7 +155,7 @@ const shortcutCategories = [
       { name: "reports", label: "Reports", detail: "Generate and download platform reports" },
       { name: "logs", label: "Logs", detail: "System activity and audit logs" },
       { name: "recruitment", label: "Recruitment", detail: "Career module, cycles, applicants, and interviews" },
-      { name: "admin", label: "Admin Management", detail: "View and manage admin accounts" },
+      { name: "admin", label: "Admin Accounts", detail: "View and manage admin accounts" },
       { name: "admin_monitor", label: "Admin Monitor", detail: "Monitor admin activity and performance" },
       { name: "pending_approvals", label: "Pending Approvals", detail: "Review pending admin account approvals" },
       { name: "commission_config", label: "Commission Config", detail: "Manage commission rates and fee distribution" },
@@ -789,6 +789,19 @@ export default function SuperAdminDashboard() {
         });
       }
     }
+    // Route-based destinations that live outside this tab dashboard (SEO,
+    // tour analytics, department oversights, support/voice boards...). The
+    // search must reach everything a super admin can open.
+    const routeDestinations = [
+      { name: "route:seo", label: "SEO Dashboard", detail: "SEO settings and Google indexing", keywords: ["seo", "google", "sitemap", "indexing"], path: "/super-admin/seo" },
+      { name: "route:tour-analytics", label: "Tour Analytics", detail: "Guided-tour adoption analytics", keywords: ["tour", "onboarding", "walkthrough"], path: "/super-admin/tour-analytics" },
+      { name: "route:transportation", label: "Transportation Oversight", detail: "Transportation bookings and admins", keywords: ["transport", "vehicle", "driver", "ride"], path: "/super-admin/transportation" },
+      { name: "route:fumigation", label: "Fumigation Oversight", detail: "Fumigation and cleaning services", keywords: ["fumigation", "cleaning", "pest"], path: "/super-admin/fumigation-cleaning" },
+      { name: "route:support-governance", label: "Support Governance", detail: "Support policy and configuration", keywords: ["support", "policy", "sla"], path: "/super-admin/support-governance?tab=overview" },
+      { name: "route:voice-desk", label: "Voice Desk", detail: "Live support call agent console", keywords: ["voice", "call", "twilio", "agent", "desk", "consult"], path: "/admin/super-support-dashboard?tab=voice" },
+      { name: "route:voice-ops", label: "Voice Ops", detail: "Call log, recordings and callback requests", keywords: ["voice", "call", "recording", "callback", "duty", "agents"], path: "/admin/super-support-dashboard?tab=voice_ops" },
+    ];
+    items.push(...routeDestinations);
     return items;
   }, []);
 
@@ -804,13 +817,18 @@ export default function SuperAdminDashboard() {
           .toLowerCase()
           .includes(q)
       )
-      .slice(0, 8);
+      .slice(0, 10);
   }, [navQuery, navCatalog]);
 
   const pickNav = (name) => {
+    const item = navCatalog.find((entry) => entry.name === name);
     setNavQuery("");
     setNavOpen(false);
-    loadTab(name);
+    if (item?.path) {
+      navigate(item.path);
+    } else {
+      loadTab(name);
+    }
   };
 
   const loadTab = useCallback((name) => {

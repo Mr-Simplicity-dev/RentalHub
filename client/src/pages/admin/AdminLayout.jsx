@@ -757,7 +757,7 @@ const AdminLayout = () => {
 
                 <NavLink to="/super-admin?tab=admin" className={() => superAdminNavItem('admin')}>
                   <FaUsers className="mr-3" />
-                  Admin
+                  Admin Accounts
                   {badgePill(liveBadges.pendingAdminApprovals, 'amber')}
                 </NavLink>
 
