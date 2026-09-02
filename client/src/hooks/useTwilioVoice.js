@@ -162,12 +162,12 @@ const useTwilioVoice = () => {
     }
   }, [scheduleQueueReconnect]);
 
-  const goAvailable = useCallback(async () => {
+  const goAvailable = useCallback(async (line = '') => {
     setError(null);
     setStatus('connecting');
 
     try {
-      const token = await fetchVoiceToken();
+      const token = await fetchVoiceToken(line);
 
       const device = new Device(token, {
         logLevel: 0,

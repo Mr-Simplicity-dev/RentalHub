@@ -434,6 +434,34 @@ test('departments, call-log and escalate endpoints reject unauthenticated reques
 
   res = await get('/voice/summary');
   assert.equal(res.status, 401);
+
+  res = await get('/voice/agent-lines');
+  assert.equal(res.status, 401);
+
+  res = await get('/voice/call-context?callSid=CA1');
+  assert.equal(res.status, 401);
+
+  res = await get('/voice/token?line=anything');
+  assert.equal(res.status, 401);
+});
+
+test('agent identities parse from VOICE_AGENT_IDENTITIES', () => {
+  const { getAgentIdentities, isValidAgentLine } = _voiceScopeForTest;
+  const original = process.env.VOICE_AGENT_IDENTITIES;
+  try {
+    delete process.env.VOICE_AGENT_IDENTITIES;
+    assert.deepEqual(getAgentIdentities(), ['support_agent_1']);
+    assert.equal(isValidAgentLine('support_agent_1'), true);
+    assert.equal(isValidAgentLine('support_agent_2'), false);
+
+    process.env.VOICE_AGENT_IDENTITIES = 'support_agent_1,support_agent_2, bad!name';
+    assert.deepEqual(getAgentIdentities(), ['support_agent_1', 'support_agent_2']);
+    assert.equal(isValidAgentLine('support_agent_2'), true);
+    assert.equal(isValidAgentLine('nope'), false);
+  } finally {
+    if (original === undefined) delete process.env.VOICE_AGENT_IDENTITIES;
+    else process.env.VOICE_AGENT_IDENTITIES = original;
+  }
 });
 
 // ── After-hours branch ───────────────────────────────────────────────────────

@@ -15,12 +15,16 @@
 
 import { getAuthToken } from './authStorage';
 
-export const fetchVoiceToken = async () => {
+export const fetchVoiceToken = async (line = '') => {
   const token = getAuthToken();
+
+  const url = line
+    ? `/voice/token?line=${encodeURIComponent(line)}`
+    : '/voice/token';
 
   let response;
   try {
-    response = await fetch('/voice/token', {
+    response = await fetch(url, {
       method: 'GET',
       credentials: 'include',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -132,6 +136,35 @@ export const fetchVoiceSummary = async () => {
   return (
     data?.data || { callsToday: 0, openEscalations: 0, callbackRequests: 0 }
   );
+};
+
+/** Admin-only list of agent identities the desk may register as. */
+export const fetchAgentLines = async () => {
+  const data = await authedFetch('/voice/agent-lines');
+  return Array.isArray(data?.data) ? data.data : [];
+};
+
+/**
+ * Resolve the caller behind the agent's current call (conference legs do not
+ * expose caller info to the SDK). Returns null when no caller is active.
+ */
+export const fetchCallContext = async (agentCallSid) => {
+  if (!agentCallSid) return null;
+  try {
+    const data = await authedFetch(`/voice/call-context?callSid=${encodeURIComponent(agentCallSid)}`);
+    return data?.data || null;
+  } catch {
+    return null;
+  }
+};
+
+/** End a ringing/consulting department leg and reconnect agent + caller. */
+export const cancelConsult = async (callSid) => {
+  if (!callSid) return;
+  return authedFetch('/voice/escalate', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'cancel-consult', callSid }),
+  });
 };
 
 /**

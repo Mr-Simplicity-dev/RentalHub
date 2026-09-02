@@ -1354,6 +1354,44 @@ router.get('/departments', voiceTokenLimiter, authenticate, requireAdminOrSuperA
   });
 });
 
+// ── GET /voice/agent-lines ───────────────────────────────────────────────────
+// Admin-only list of agent identities the desk may register as
+// (VOICE_AGENT_IDENTITIES). The desk picks one line before going available.
+
+router.get('/agent-lines', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, (req, res) => {
+  res.json({ success: true, data: getAgentIdentities() });
+});
+
+// ── GET /voice/call-context ──────────────────────────────────────────────────
+// Admin-only: resolve the caller (number + source) behind the agent's current
+// call. Conference legs do not expose caller info to the browser SDK, so the
+// desk fetches it here from the 'in-progress'/'queued' rows keyed by the
+// agent's call SID.
+
+router.get('/call-context', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+  const agentCallSid = String(req.query.callSid || '').trim();
+  if (!agentCallSid) {
+    return res.status(400).json({ success: false, message: 'Missing agent call SID.' });
+  }
+
+  const context = await getActiveCallContext(agentCallSid);
+  if (!context) {
+    return res.status(404).json({
+      success: false,
+      message: 'No active caller is associated with this agent call.',
+    });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      callerNumber: context.callerNumber,
+      source: context.source,
+      roomName: context.roomName,
+    },
+  });
+});
+
 // ── POST /voice/escalate ─────────────────────────────────────────────────────
 // Agent-initiated WARM transfer with consultation:
 //   action = 'consult'  → the department target is called INTO the caller's
@@ -1431,8 +1469,11 @@ const getConferenceParticipantByCallSid = async (conferenceSid, callSid) => {
 
 router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
   const action = String(req.body?.action || '').trim();
-  if (!['consult', 'transfer'].includes(action)) {
-    return res.status(400).json({ success: false, message: 'Escalation action must be "consult" or "transfer".' });
+  if (!['consult', 'transfer', 'cancel-consult'].includes(action)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Escalation action must be "consult", "transfer" or "cancel-consult".',
+    });
   }
 
   const agentCallSid = String(req.body?.callSid || '').trim();
@@ -1481,6 +1522,33 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
 
   const rest = getTwilioRestClient();
   const conferenceResource = rest.conferences(conference.sid);
+
+  if (action === 'cancel-consult') {
+    // End a ringing/consulting department leg and un-park the caller so the
+    // agent and caller are simply reconnected.
+    try {
+      const participants = await conferenceResource.participants.list();
+      const departmentParticipant = participants.find(
+        (p) => p.callSid !== agentCallSid && p.callSid !== context.callerCallSid && p.callSid
+      );
+      if (departmentParticipant) {
+        await conferenceResource.participants(departmentParticipant.sid).remove();
+      }
+    } catch (cancelError) {
+      logger.warn('Voice cancel-consult: removing department leg failed', { message: cancelError.message });
+    }
+    try {
+      await conferenceResource.participants(callerParticipant.sid).update({ hold: false });
+    } catch (unholdError) {
+      logger.warn('Voice cancel-consult: un-holding caller failed', { message: unholdError.message });
+    }
+
+    logger.info('Consultation cancelled', {
+      callerCallSid: context.callerCallSid,
+      agentCallSid,
+    });
+    return res.json({ success: true });
+  }
 
   if (action === 'consult') {
     const department = findDepartment(req.body?.department);
@@ -1665,11 +1733,11 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
 });
 
 // ── GET /voice/token ─────────────────────────────────────────────────────────
-// Issues a short-lived Twilio Access Token (TTL 3600s) for the shared agent
-// identity "support_agent_1". The browser Voice SDK uses it to register a
-// Device that can receive calls dialed as <Client>support_agent_1</Client>.
-// Only admins/super-admins may mint tokens; only one browser should normally
-// hold the identity registered at a time.
+// Issues a short-lived Twilio Access Token (TTL 3600s) for the chosen agent
+// identity. `?line=<identity>` selects the agent line (validated against
+// VOICE_AGENT_IDENTITIES; defaults to the first). The browser Voice SDK uses
+// it to register a Device. Only admins/super-admins may mint tokens; only one
+// browser should normally hold a given identity registered at a time.
 
 router.get('/token', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, (req, res) => {
   const status = getVoiceConfigStatus();
@@ -1681,12 +1749,21 @@ router.get('/token', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, 
     });
   }
 
+  const requestedLine = String(req.query.line || req.query.agent || '').trim();
+  if (requestedLine && !isValidAgentLine(requestedLine)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Unknown agent line. Check VOICE_AGENT_IDENTITIES.',
+    });
+  }
+  const identity = requestedLine || AGENT_IDENTITY;
+
   try {
     const accessToken = new twilio.jwt.AccessToken(
       process.env.TWILIO_ACCOUNT_SID,
       process.env.TWILIO_API_KEY,
       process.env.TWILIO_API_SECRET,
-      { ttl: 3600, identity: 'support_agent_1' }
+      { ttl: 3600, identity }
     );
 
     const voiceGrant = new twilio.jwt.AccessToken.VoiceGrant({
@@ -1718,6 +1795,8 @@ module.exports._voiceScopeForTest = {
   getEscalationDepartments,
   findDepartment,
   pickAd,
+  getAgentIdentities,
+  isValidAgentLine,
   E164_PATTERN,
   VOICE_STATUSES,
 };

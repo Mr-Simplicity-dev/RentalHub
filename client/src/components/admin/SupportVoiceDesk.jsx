@@ -27,14 +27,18 @@ import {
   FaCheckCircle,
 } from 'react-icons/fa';
 import useTwilioVoice from '../../hooks/useTwilioVoice';
-import { consultCall, fetchDepartments, transferCall } from '../../services/voiceApi';
+import {
+  cancelConsult,
+  consultCall,
+  fetchAgentLines,
+  fetchCallContext,
+  fetchCallLog,
+  fetchDepartments,
+  transferCall,
+} from '../../services/voiceApi';
 import { getOriginMeta } from './voiceMeta';
 
-// â”€â”€ Local in-memory recent-calls adapter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// TODO(voice): replace with backend call events once the /voice/status
-// call-status webhook exists (see docs/voice-system-backlog.md). This list
-// intentionally lives in memory only and is reset on page reload.
-const recentCalls = [];
+
 
 // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -130,16 +134,19 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
   const [escalateError, setEscalateError] = useState('');
   const [escalateNote, setEscalateNote] = useState('');
   const [consultState, setConsultState] = useState('idle'); // idle | ringing | connected
+  // Agent line selection (multi-agent) + caller identity + persisted call log.
+  const [agentLines, setAgentLines] = useState([]);
+  const [agentLine, setAgentLine] = useState('');
+  const [callerContext, setCallerContext] = useState(null);
+  const [callHistory, setCallHistory] = useState([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   // Timers for the ringing / active-call clocks.
   const [ringingStartedAt, setRingingStartedAt] = useState(null);
   const [callStartedAt, setCallStartedAt] = useState(null);
 
   const answerButtonRef = useRef(null);
-  const lastDeclineAtRef = useRef(0);
   const lastAnnouncedStatusRef = useRef(status);
-  const prevIncomingRef = useRef(null);
-  const prevActiveRef = useRef(null);
 
   // Tick once per second while a call is ringing or active.
   useEffect(() => {
@@ -227,58 +234,61 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
       setEscalating(false);
     }
   }, [getActiveCallSid, escalateNote]);
-
-  // â”€â”€ Recent-calls adapter (in-memory only, see TODO above) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  useEffect(() => {
-    const prevIncoming = prevIncomingRef.current;
-    prevIncomingRef.current = incomingCall;
-    // Caller never answered and the call was not explicitly declined â†’ missed.
-    if (
-      prevIncoming &&
-      !incomingCall &&
-      !activeCall &&
-      Date.now() - lastDeclineAtRef.current > 1000
-    ) {
-      recentCalls.unshift({
-        id: prevIncoming.parameters?.CallSid || prevIncoming.customParameters?.call_sid || `missed-${Date.now()}`,
-        number: formatCaller(prevIncoming),
-        source: getOriginMeta(prevIncoming?.customParameters?.call_source || prevIncoming?.parameters?.call_source).label,
-        outcome: 'Missed',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      });
+  const handleCancelConsult = useCallback(async () => {
+    setEscalating(true);
+    setEscalateError('');
+    try {
+      await cancelConsult(getActiveCallSid());
+      setConsultState('idle');
+      setEscalateDept('');
+    } catch (err) {
+      setEscalateError(err.message || 'Could not cancel the consultation.');
+    } finally {
+      setEscalating(false);
     }
-  }, [incomingCall, activeCall]);
+  }, [getActiveCallSid]);
 
+  // Agent lines (multi-agent): the desk registers as the chosen identity.
   useEffect(() => {
-    const prevActive = prevActiveRef.current;
-    prevActiveRef.current = activeCall;
-    if (prevActive && !activeCall) {
-      const duration = callStartedAt
-        ? Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000))
-        : 0;
-      const mm = String(Math.floor(duration / 60)).padStart(2, '0');
-      const ss = String(duration % 60).padStart(2, '0');
-      recentCalls.unshift({
-        id: prevActive.parameters?.CallSid || prevActive.customParameters?.call_sid || `ended-${Date.now()}`,
-        number: formatCaller(prevActive),
-        source: getOriginMeta(prevActive?.customParameters?.call_source || prevActive?.parameters?.call_source).label,
-        outcome: `Ended (${mm}:${ss})`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      });
+    let mounted = true;
+    fetchAgentLines()
+      .then((lines) => {
+        if (!mounted) return;
+        setAgentLines(lines);
+        setAgentLine((prev) => prev || lines[0] || '');
+      })
+      .catch(() => { /* keep single-agent default */ });
+    return () => { mounted = false; };
+  }, []);
+
+  // Persisted recent calls (call log) shown in the desk card.
+  useEffect(() => {
+    let mounted = true;
+    fetchCallLog()
+      .then((list) => { if (mounted) setCallHistory(Array.isArray(list) ? list : []); })
+      .catch(() => { /* log unavailable in the desk */ })
+      .finally(() => { if (mounted) setHistoryLoaded(true); });
+    return () => { mounted = false; };
+  }, []);
+
+  // Caller identity on the active call: conference legs do not expose the
+  // caller to the SDK, so the desk resolves it from the backend once a
+  // non-queue call becomes active.
+  useEffect(() => {
+    if (!activeCall || isQueueLine(activeCall)) {
+      setCallerContext(null);
+      return undefined;
     }
-  }, [activeCall, callStartedAt]);
+    let mounted = true;
+    const agentCallSid = activeCall.parameters?.CallSid || activeCall.customParameters?.call_sid;
+    fetchCallContext(agentCallSid).then((context) => { if (mounted) setCallerContext(context); });
+    return () => { mounted = false; };
+  }, [activeCall]);
 
   const handleDecline = useCallback(() => {
-    lastDeclineAtRef.current = Date.now();
-    recentCalls.unshift({
-      id: incomingCall?.parameters?.CallSid || incomingCall?.customParameters?.call_sid || `declined-${Date.now()}`,
-      number: formatCaller(incomingCall),
-      source: getOriginMeta(incomingCall?.customParameters?.call_source || incomingCall?.parameters?.call_source).label,
-      outcome: 'Declined',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    });
     declineCall();
-  }, [declineCall, incomingCall]);
+  }, [declineCall]);
+
 
   // â”€â”€ Current support queue summary (from data already loaded in the dashboard) â”€â”€
   const queueSummary = useMemo(() => {
@@ -330,7 +340,19 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
               <span className="inline-block h-2 w-2 rounded-full bg-current motion-reduce:animate-none" aria-hidden="true" />
               {statusMeta.label}
             </span>
-            {available ? (
+            {!available && agentLines.length > 1 && (
+                <select
+                  value={agentLine}
+                  onChange={(e) => setAgentLine(e.target.value)}
+                  aria-label="Agent line"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                >
+                  {agentLines.map((line) => (
+                    <option key={line} value={line}>{line}</option>
+                  ))}
+                </select>
+              )}
+              {available ? (
               <button
                 onClick={goUnavailable}
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -339,7 +361,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
               </button>
             ) : (
               <button
-                onClick={goAvailable}
+                onClick={() => goAvailable(agentLine)}
                 disabled={busy}
                 className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
               >
@@ -363,7 +385,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
               available as <span className="font-mono text-xs">support_agent_1</span>.
             </p>
             <button
-              onClick={goAvailable}
+              onClick={() => goAvailable(agentLine)}
               className="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
             >
               <FaPhoneAlt size={14} /> Go Available
@@ -432,7 +454,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
             </div>
           </div>
           <button
-            onClick={goAvailable}
+            onClick={() => goAvailable(agentLine)}
             className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
           >
             Try again
@@ -497,13 +519,20 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <p className="text-lg font-bold text-slate-900">
-                    {isQueueLine(activeCall) ? 'Support queue line' : 'Support call'}
+                    {isQueueLine(activeCall)
+                      ? 'Support queue line'
+                      : callerContext?.callerNumber || 'Support call'}
                   </p>
+                  {!isQueueLine(activeCall) && callerContext?.source && (
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${getOriginMeta(callerContext.source).tone}`}>
+                      {getOriginMeta(callerContext.source).label}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500">
                   {isQueueLine(activeCall)
-                    ? `Waiting for a queued caller to be dispatched â€” ${formatElapsed(callStartedAt)} on the line`
-                    : `${formatElapsed(callStartedAt)} elapsed Â· caller number not available on conference legs`}
+                    ? 'Waiting for a queued caller to be dispatched: ' + formatElapsed(callStartedAt) + ' on the line'
+                    : formatElapsed(callStartedAt) + ' elapsed'}
                 </p>
               </div>
             </div>
@@ -556,14 +585,23 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
                     Consult department
                   </button>
                 ) : (
-                  <button
-                    onClick={handleTransfer}
-                    disabled={escalating || consultState !== 'connected'}
-                    className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2"
-                  >
-                    {escalating ? <FaSpinner className="animate-spin" size={14} /> : <FaPhoneAlt size={14} />}
-                    Transfer now
-                  </button>
+                  <>
+                    <button
+                      onClick={handleTransfer}
+                      disabled={escalating || consultState !== 'connected'}
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2"
+                    >
+                      {escalating ? <FaSpinner className="animate-spin" size={14} /> : <FaPhoneAlt size={14} />}
+                      Transfer now
+                    </button>
+                    <button
+                      onClick={handleCancelConsult}
+                      disabled={escalating}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
+                    >
+                      Cancel consultation
+                    </button>
+                  </>
                 )}
               </div>
               <p className="mt-1 text-[11px] text-slate-400">
@@ -636,24 +674,33 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
           <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <FaHeadset className="text-indigo-600" size={15} /> Recent calls
           </h3>
-          {recentCalls.length === 0 ? (
+          {!historyLoaded ? (
+            <p className="mt-3 text-sm text-slate-500">Loading recent calls...</p>
+          ) : callHistory.length === 0 ? (
             <p className="mt-3 text-sm text-slate-500">
-              No calls yet this session. Calls here are kept in memory only.
+              No calls recorded yet. Full history lives in the Voice Ops tab.
             </p>
           ) : (
             <ul className="mt-3 divide-y divide-slate-100">
-              {recentCalls.slice(0, 6).map((call) => (
-                <li key={call.id} className="flex items-center justify-between gap-2 py-2 text-sm">
-                  <span className="truncate text-slate-800">
-                    {call.number}
-                    {call.source && <span className="ml-2 text-[11px] text-slate-400">{call.source}</span>}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <span className="text-xs text-slate-500">{call.outcome}</span>
-                    <span className="text-xs text-slate-400">{call.time}</span>
-                  </span>
-                </li>
-              ))}
+              {callHistory.slice(0, 6).map((call) => {
+                  const origin = getOriginMeta(call.source);
+                  const shown = call.from_number || call.to_number || 'Unknown';
+                  const when = call.created_at
+                    ? new Date(call.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : '';
+                  return (
+                    <li key={call.call_sid + '-' + call.status} className="flex items-center justify-between gap-2 py-2 text-sm">
+                      <span className="truncate text-slate-800">
+                        {shown}
+                        {call.source && <span className={'ml-2 text-[11px] text-slate-400'}>{origin.label}</span>}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="text-xs text-slate-500">{(call.status || '').replace(/-/g, ' ')}</span>
+                        <span className="text-xs text-slate-400">{when}</span>
+                      </span>
+                    </li>
+                  );
+                })}
             </ul>
           )}
         </div>

@@ -1,7 +1,36 @@
 # Voice System Backlog — Outstanding Work
 
-Status: warm transfers (consult -> transfer on conference rooms) are live.
-Only deployment (below) and the caller-identity limitation remain.
+Status: warm transfers + Voice Ops + department-ticket bridge + super-admin
+access + known-limitation fixes are done. What remains is deployment and the
+two documented integration points below.
+
+## Deployment (to do — you)
+
+- [ ] **Add Twilio env vars to the server `.env`** (`/var/www/rentalhub/.env`):
+      TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_API_KEY, TWILIO_API_SECRET,
+      TWILIO_TWIML_APP_SID, NIGERIA_NUMBER, INTL_NUMBER, SALES_BACKUP_NUMBER,
+      TWILIO_WEBHOOK_BASE_URL=https://rentalhub.com.ng, plus optional
+      TOLL_FREE_NUMBER, VOICE_QUEUE_NAME, VOICE_ADS_ENABLED,
+      VOICE_ESCALATION_DEPARTMENTS (platform dept names only), VOICE_HOLD_MUSIC_URL,
+      VOICE_SUPPORT_HOURS_*, VOICE_RECORD_CALLS, VOICE_AGENT_IDENTITIES.
+      Then `pm2 restart rentalhub`.
+- [ ] **Provision Twilio**: Standard API Key + Secret; TwiML App (Voice URL =
+      https://rentalhub.com.ng/voice/outgoing); buy/point numbers (webhook =
+      /voice/incoming); configure the Termii SIP trunk.
+- [ ] **Verify live end-to-end**: Termii -> Twilio -> IVR -> conference room ->
+      agent dispatch -> consult -> transfer -> department ticket.
+- [ ] Redeploy latest code when ready: `git pull`, `npm run migrate`,
+      `cd client && npm run build`, `pm2 restart rentalhub`.
+
+## Integration points (known gaps)
+
+- [ ] **Multi-agent hardening** — dispatch now moves the longest-parked agent
+      and the desk supports per-line tokens; still missing ring-all/skills
+      routing and agent idle/status dashboards.
+- [ ] **Consult edge cases** — department no-answer keeps "Transfer now"
+      disabled until they join (Cancel consultation is provided); no automatic
+      retry loop.
+
 
 ## Queue / hold / ads / escalation — complete
 
