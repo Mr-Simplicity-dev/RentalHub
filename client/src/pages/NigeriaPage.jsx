@@ -14,7 +14,9 @@ export default function NigeriaPage() {
 
     const loadPage = async () => {
       try {
-        const response = await fetch('/nigeria');
+        const response = await fetch('/nigeria', {
+          headers: { Accept: 'application/json' },
+        });
         const payload = await response.json();
 
         if (!response.ok) {
