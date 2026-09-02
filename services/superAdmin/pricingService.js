@@ -49,6 +49,9 @@ const ensureFeatureFlagOperationSchema = async () => {
   `);
 };
 
+const getAdminOperationActorName = (user = {}) =>
+  user.full_name || user.name || user.email || `Admin #${user.id || 'unknown'}`;
+
 const createFeatureFlagOperation = async ({
   flagKey,
   actor,
@@ -57,8 +60,7 @@ const createFeatureFlagOperation = async ({
   previousEnabled,
   newEnabled,
   metadata = {},
-}) => {
-  await db.query(
+}) => {  await db.query(
     `INSERT INTO feature_flag_operations (
        flag_key, actor_id, actor_name, event_type, note, previous_enabled, new_enabled, metadata
      )
