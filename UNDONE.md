@@ -71,7 +71,11 @@
   - **Device matching**: client GPS → Google Maps reverse geocode (browser key) → state (admin_area_level_1) + LGA (admin_area_level_2, locality fallback) → `/survey/location-check?state&lga` → server matches names (normalized, lenient containment; FCT alias aware). Draft/submit carry state_name/lga_name; enforcement 403 LOCATION_BLOCKED.
   - **Rules verified live**: Gwagwalada (enabled) allowed; Kuje (not enabled) → `lga_not_allowed` — "The survey is not available yet for you in this local government area."; missing LGA → location_required; VPN/foreign IP consensus still blocks regardless of LGA.
   - **Google-first landing**: the page renders immediately with "Sign in with Google" as the first element; the location check runs in the background (tenant/landlord cards disabled with "Confirming your local government area…"); blocked users get the not-available screen; the reminder popup appears only after location passes.
-  - NOTE: exact-LGA gating requires working device GPS + Google reverse geocoding (browser Maps key REACT_APP_GOOGLE_MAPS_KEY already set). Google's LGA naming must match our dropdown names — containment matching handles most variants (e.g., "Federal Capital Territory" vs "FCT"). If a real device LGA fails to match, verify the Google-resolved name via the server's device_state/device_lga echo in the response.
+- [x] **DONE (2026-08-31) — Nigerian LGAs corrected to the official 774** (`3fda3d0`, verified live):
+  - `data/nigeriaLocations.js` (single source for the web app: locationDirectory/location-options, registration LGA validation, survey location dropdowns): was 771 → added **Onuimo (Imo)**, **Yewa North + Yewa South (Ogun)** (both verified against Wikipedia), fixed **Niger "Moya" → "Munya"** (official name). Now 774.
+  - `RentalHubMobile/src/screens/shared/ContactWidgetScreen.js` had its OWN LGA map: 766 with cross-state errors (e.g., Nasarawa LGAs "Akwanga/Awe/Obi" wrongly inside Benue). Regenerated from the canonical dataset via the new maintenance script `scripts/regenMobileLgas.js` (kept for future re-syncs). Mobile now 774.
+  - Whole-project sweep for other LGA-list copies found none (data/, client/src, migrations, config, services, routes, scripts, tests, docs, misc folders all clean).
+  - Deployment note: web server reads the dataset at startup — a pm2 restart picks it up (done). The mobile change ships with the next mobile build.
 
 ---
 
