@@ -4539,7 +4539,9 @@
     "situation_no": "Rárá, ibi kan náà ni",
     "situation_moved": "Bẹ́ẹ̀ ni, mo kó lọ — bẹ̀rẹ̀ tuntun",
     "situation_note": "Bí o bá bẹ̀rẹ̀ tuntun, a ó pa àwọn ìdáhùn àtijọ́ rẹ run títí láé kò sì ní lò wọ́n nínú ìtúpalẹ̀ rara.",
-    "continue_existing": "Tẹ̀ síwájú pẹ̀lú àwọn ìdáhùn mi tí a fipamọ́"
+    "continue_existing": "Tẹ̀ síwájú pẹ̀lú àwọn ìdáhùn mi tí a fipamọ́",
+    "contact_no_email_agent": "Ẹni tó ń dáhùn yìí kò ní àdírẹ́sì imeeli",
+    "contact_no_email_public": "Èmi kò ní àdírẹ́sì imeeli"
   },
   "marketing_agent": {
     "title": "Dáshíbọ́ọ̀dù Aṣojú Òwò",
@@ -4570,6 +4572,15 @@
     "remind_requesting": "Ń béèrè lọ́wọ́ àwùjọ àwárí rẹ...",
     "remind_yes": "Bẹ́ẹ̀ ni, rán ìránlétí sí mi",
     "remind_no": "Rárá, màá parí rẹ̀ báyìí",
-    "remind_close": "Pa á"
+    "remind_close": "Pa á",
+    "gate_title": "Wọlé sí ìwádìí pẹ̀lú imeeli rẹ",
+    "gate_sub": "Sọ fún wa níbi tí a ó ti rán ọ̀nà àbáwọlé ìwádìí àti àbájáde rẹ sí — pápá náà kò ṣe dandan nínú ìwádìí.",
+    "gate_close": "Pa",
+    "gate_email_label": "Àdírẹ́sì imeeli",
+    "gate_email_ph": "ìwọ@àpẹẹrẹ.com",
+    "gate_email_invalid": "Jọ̀wọ́ tẹ àdírẹ́sì imeeli tó wúlò sí.",
+    "gate_start": "Bẹ̀rẹ̀ ìwádìí",
+    "gate_skip": "Tẹ̀ síwájú láìsí imeeli",
+    "gate_google_hint": "Ò ó fẹ́ Google? Lo bọ́tìnì wọlé lókè yìí, wọ́n ó kún imeeli rẹ fúnra rẹ."
   }
 }

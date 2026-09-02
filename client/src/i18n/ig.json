@@ -4539,7 +4539,9 @@
     "situation_no": "Mba, otu ebe",
     "situation_moved": "Ee, akwagara m — malite ọhụrụ",
     "situation_note": "Ọ bụrụ na ịmalite ọhụrụ, a ga-ekpochapụ azịza ochie gị kpamkpam ma ejighi ya mee ihe na nyocha.",
-    "continue_existing": "Gaa n'ihu na azịza m echekwara"
+    "continue_existing": "Gaa n'ihu na azịza m echekwara",
+    "contact_no_email_agent": "Onye a zara ajụjụ enweghị adreesị email",
+    "contact_no_email_public": "Enweghị m adreesị email"
   },
   "marketing_agent": {
     "title": "Dashbọọdụ Onye Nnọchiteanya Ahịa",
@@ -4570,6 +4572,15 @@
     "remind_requesting": "Na-ajụ ihe nchọgharị gị...",
     "remind_yes": "Ee, chetaara m",
     "remind_no": "Mba, aga m emecha ya ugbu a",
-    "remind_close": "Mechie"
+    "remind_close": "Mechie",
+    "gate_title": "Nweta ohere ịbanye na nyocha site na email gị",
+    "gate_sub": "Gwa anyị ebe anyị ga-ezitere gị ohere nyocha na nsonaazụ — ubi ahụ adịghị mkpa n'ime nyocha.",
+    "gate_close": "Mechie",
+    "gate_email_label": "Adreesị email",
+    "gate_email_ph": "gi@iheatu.com",
+    "gate_email_invalid": "Biko tinye adreesị email ziri ezi.",
+    "gate_start": "Malite nyocha",
+    "gate_skip": "Gaa n'ihu na-enweghị email",
+    "gate_google_hint": "Ị chọrọ Google? Jiri bọtịnụ nbanye dị n'elu ma a ga-ejuputa email gị na akpaka."
   }
 }

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { FaBell, FaCheckCircle, FaTimes } from 'react-icons/fa';
+import { FaBell, FaCheckCircle, FaEnvelope, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import SurveyWizard from '../components/survey/SurveyWizard';
@@ -10,6 +10,8 @@ const RESUME_KEY = 'rentalhub_survey_resume';
 const TYPE_KEY = 'rentalhub_survey_type';
 const REMIND_KEY = 'rentalhub_survey_remind';
 const GOOGLE_KEY = 'rentalhub_survey_google';
+const EMAIL_KEY = 'rentalhub_survey_email';
+const EMAIL_GATE_KEY = 'rentalhub_survey_email_gate';
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 const GOOGLE_MAPS_KEY = process.env.REACT_APP_GOOGLE_MAPS_KEY || '';
@@ -100,6 +102,8 @@ const PublicSurveyPage = () => {
   const [type, setType] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
+  const [showEmailGate, setShowEmailGate] = useState(false);
+  const [gateEmail, setGateEmail] = useState('');
   const [notifState, setNotifState] = useState('default');
   const [hasDraft, setHasDraft] = useState(false);
   const [prefillContact, setPrefillContact] = useState(null);
@@ -253,7 +257,10 @@ const PublicSurveyPage = () => {
             const profile = decodeGoogleCredential(response.credential);
             if (profile && profile.email) {
               setPrefillContact({ name: profile.name || '', email: profile.email });
+              setGateEmail(profile.email);
               localStorage.setItem(GOOGLE_KEY, JSON.stringify(profile));
+              localStorage.setItem(EMAIL_KEY, profile.email);
+              setShowEmailGate(false);
             }
           },
           auto_select: false,
@@ -322,6 +329,35 @@ const PublicSurveyPage = () => {
     setShowReminder(false);
   };
 
+  // Email access gate: a public respondent is asked for an email before
+  // starting so their contact step is pre-filled (Google also fills this).
+  useEffect(() => {
+    if (locationState !== 'ok' || showReminder || hasDraft || agentMode) return;
+    if (localStorage.getItem(EMAIL_GATE_KEY)) return;
+    const savedEmail = localStorage.getItem(EMAIL_KEY) || '';
+    setGateEmail(savedEmail);
+    setShowEmailGate(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationState, showReminder, hasDraft, agentMode]);
+
+  const acceptEmailGate = () => {
+    const normalizedEmail = String(gateEmail || '').trim();
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return;
+    }
+    if (normalizedEmail) localStorage.setItem(EMAIL_KEY, normalizedEmail);
+    localStorage.setItem(EMAIL_GATE_KEY, '1');
+    if (normalizedEmail) {
+      setPrefillContact((prev) => ({ name: prev?.name || '', email: normalizedEmail }));
+    }
+    setShowEmailGate(false);
+  };
+
+  const skipEmailGate = () => {
+    localStorage.setItem(EMAIL_GATE_KEY, '1');
+    setShowEmailGate(false);
+  };
+
   // In-page nudge when returning with a draft (Web Push covers closed tabs).
   useEffect(() => {
     if (hasDraft && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -338,6 +374,13 @@ const PublicSurveyPage = () => {
 
   const pickType = (nextType) => {
     localStorage.setItem(TYPE_KEY, nextType);
+    // Carry the email provided at the access gate (or by Google) into the
+    // wizard so the optional contact email field arrives pre-filled.
+    const storedEmail = localStorage.getItem(EMAIL_KEY) || '';
+    if (storedEmail && (!prefillContact?.email || prefillContact.email === storedEmail)) {
+      setPrefillContact((prev) => ({ name: prev?.name || '', email: storedEmail }));
+    }
+    setShowEmailGate(false);
     setType(nextType);
   };
 
@@ -457,6 +500,86 @@ const PublicSurveyPage = () => {
             {notifState === 'denied' && (
               <p className="mt-3 text-center text-xs text-red-600">
                 {t('public_survey.notif_denied', 'Notifications blocked in browser — you can still finish now or continue later from this page.')}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Email access gate — collect an email before starting the survey so
+          the optional contact field is pre-filled (Google fills this too) */}
+      {locationState === 'ok' && showEmailGate && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <FaEnvelope className="text-xl" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    {t('public_survey.gate_title', 'Access the survey with your email')}
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    {t('public_survey.gate_sub', 'Tell us where to send your survey access and results — the field is optional in the survey itself.')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={skipEmailGate}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label={t('public_survey.gate_close', 'Close')}
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <label htmlFor="survey-gate-email" className="mb-1 block text-sm font-medium text-gray-700">
+                {t('public_survey.gate_email_label', 'Email address')}
+              </label>
+              <input
+                id="survey-gate-email"
+                type="email"
+                value={gateEmail}
+                onChange={(e) => setGateEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    acceptEmailGate();
+                  }
+                }}
+                placeholder={t('public_survey.gate_email_ph', 'you@example.com')}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+              />
+              {gateEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gateEmail.trim()) && (
+                <p className="mt-1 text-xs text-red-600">
+                  {t('public_survey.gate_email_invalid', 'Please enter a valid email address.')}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-5 space-y-2">
+              <button
+                type="button"
+                onClick={acceptEmailGate}
+                className="block w-full rounded-xl bg-emerald-600 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                {t('public_survey.gate_start', 'Start the survey')}
+              </button>
+              <button
+                type="button"
+                onClick={skipEmailGate}
+                className="block w-full rounded-xl border border-gray-300 py-3 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                {t('public_survey.gate_skip', 'Continue without email')}
+              </button>
+            </div>
+
+            {GOOGLE_CLIENT_ID && (
+              <p className="mt-3 text-center text-xs text-gray-400">
+                {t('public_survey.gate_google_hint', 'Prefer Google? Use the sign-in button above and your email will be filled in automatically.')}
               </p>
             )}
           </div>

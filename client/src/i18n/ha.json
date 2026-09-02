@@ -4539,7 +4539,9 @@
     "situation_no": "A'a, wuri ɗaya ne",
     "situation_moved": "E, na ƙaura — fara sabo",
     "situation_note": "Idan ka fara sabo, za a share tsoffin amsoshinka har abada kuma ba za a taɓa amfani da su a cikin bincike ba.",
-    "continue_existing": "Ci gaba da amsoshina da aka ajiye"
+    "continue_existing": "Ci gaba da amsoshina da aka ajiye",
+    "contact_no_email_agent": "Wannan mai amsa ba shi da adireshin imel",
+    "contact_no_email_public": "Ba ni da adireshin imel"
   },
   "marketing_agent": {
     "title": "Allon Aikin Wakilin Tallan",
@@ -4570,6 +4572,15 @@
     "remind_requesting": "Ana tambayar mai bincikenka...",
     "remind_yes": "E, tunatar da ni",
     "remind_no": "A'a, zan kammala yanzu",
-    "remind_close": "Rufewa"
+    "remind_close": "Rufewa",
+    "gate_title": "Shiga binciken da imel ɗinka",
+    "gate_sub": "Faɗa mana inda za mu aiko maka damar shiga binciken da sakamako — filin ba dole ba ne a cikin binciken.",
+    "gate_close": "Rufe",
+    "gate_email_label": "Adireshin imel",
+    "gate_email_ph": "kai@misali.com",
+    "gate_email_invalid": "Da fatan za a shigar da ingantaccen adireshin imel.",
+    "gate_start": "Fara binciken",
+    "gate_skip": "Ci gaba ba tare da imel ba",
+    "gate_google_hint": "Kuna son Google? Yi amfani da maɓallin shiga a sama kuma za a cika imel ɗinka ta atomatik."
   }
 }

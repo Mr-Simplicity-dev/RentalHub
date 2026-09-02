@@ -921,7 +921,38 @@ router.post('/wait', twilioWebhookGuard, async (req, res) => {
 //   - agent dispatch (move a parked agent into a new caller's room);
 //   - call-state marking (queued → in-progress once the agent joins).
 
-const AGENT_IDENTITY = 'support_agent_1';
+// ── Agent identities (multi-agent) ───────────────────────────────────────────
+// Agents are identified by Twilio Client identities. Configure the allowed
+// lines via VOICE_AGENT_IDENTITIES (comma-separated); the first entry is the
+// default identity used by legacy paths and when only one agent exists.
+
+const getAgentIdentities = () => {
+  const parsed = String(process.env.VOICE_AGENT_IDENTITIES || 'support_agent_1')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => /^[a-zA-Z0-9_-]{1,63}$/.test(value));
+  return parsed.length ? parsed : ['support_agent_1'];
+};
+
+const isValidAgentLine = (line) =>
+  getAgentIdentities().includes(String(line || '').trim());
+
+const AGENT_IDENTITY = getAgentIdentities()[0];
+
+/** Resolve the client identity behind a call (its To is "client:<identity>"). */
+const resolveClientIdentityFromCall = async (callSid) => {
+  try {
+    const call = await getTwilioRestClient().calls(callSid).fetch();
+    const to = String(call.to || '');
+    if (to.toLowerCase().startsWith('client:')) {
+      const identity = to.slice('client:'.length);
+      return /^[a-zA-Z0-9_-]{1,63}$/.test(identity) ? identity : null;
+    }
+  } catch {
+    // Call not found / no longer live.
+  }
+  return null;
+};
 
 const markCallerStatus = async (callerCallSid, status, { agentCallSid = null, roomName = null } = {}) => {
   if (!callerCallSid) return;
@@ -948,60 +979,47 @@ const markCallerStatus = async (callerCallSid, status, { agentCallSid = null, ro
   }
 };
 
-/** True when the agent is currently parked in the shared waiting room. */
-const isAgentParked = async () => {
-  try {
-    const conferences = await getTwilioRestClient().conferences.list({
-      friendlyName: AGENTS_WAITING_ROOM,
-      status: 'in-progress',
-    });
-    const conference = conferences[0];
-    if (!conference) return false;
-    const participants = await getTwilioRestClient()
-      .conferences(conference.sid)
-      .participants.list();
-    return participants.some((p) => String(p.callSid || '').startsWith('CA') && p.callSid);
-  } catch {
-    return false;
-  }
-};
-
 /**
- * Send the agent into a caller's room. If the agent is parked in the waiting
- * room, they are first removed from it so their device only ever holds one
- * call; then a REST-created participant call rings the agent's browser.
+ * Send an agent into a caller's room (multi-agent aware):
+ *   1. If agents are parked in the shared waiting room, move the LONGEST-
+ *      waiting parked agent into the caller's room (REST rings their browser).
+ *   2. Otherwise no-one is on duty — the caller keeps waiting (the next agent
+ *      to dial the queue line joins them directly).
  */
 const dispatchAgentToRoom = async (roomName, callerCallSid) => {
   const rest = getTwilioRestClient();
   try {
-    const conferences = await rest.conferences.list({ friendlyName: roomName, status: 'in-progress' });
-    const conference = conferences[0];
+    const conference = (await rest.conferences.list({ friendlyName: roomName, status: 'in-progress' }))[0];
     if (!conference) return false;
 
-    let parkedConference = null;
-    if (await isAgentParked()) {
-      const waiting = await rest.conferences.list({ friendlyName: AGENTS_WAITING_ROOM, status: 'in-progress' });
-      parkedConference = waiting[0] || null;
-      if (parkedConference) {
-        const participants = await rest.conferences(parkedConference.sid).participants.list();
-        const agentParticipant = participants.find(
-          (p) => String(p.callSid || '').startsWith('CA')
-        );
-        if (agentParticipant) {
-          await rest.conferences(parkedConference.sid)
-            .participants(agentParticipant.sid)
-            .remove();
+    let targetIdentity = null;
+    try {
+      const waiting = (await rest.conferences.list({ friendlyName: AGENTS_WAITING_ROOM, status: 'in-progress' }))[0];
+      if (waiting) {
+        const participants = await rest.conferences(waiting.sid).participants.list();
+        const parked = participants
+          .filter((p) => String(p.callSid || '').startsWith('CA'))
+          .sort((a, b) => new Date(a.dateCreated || 0) - new Date(b.dateCreated || 0));
+        for (const participant of parked) {
+          const identity = await resolveClientIdentityFromCall(participant.callSid);
+          if (!identity) continue;
+          targetIdentity = identity;
+          await rest.conferences(waiting.sid).participants(participant.sid).remove();
+          break;
         }
       }
+    } catch {
+      // Fall back to the default identity below.
     }
 
+    const identity = targetIdentity || AGENT_IDENTITY;
     await rest.conferences(conference.sid).participants.create({
-      to: `client:${AGENT_IDENTITY}`,
-      from: `client:${AGENT_IDENTITY}`,
+      to: `client:${identity}`,
+      from: `client:${identity}`,
     });
 
     await markCallerStatus(callerCallSid, 'in-progress', { agentCallSid: null, roomName });
-    logger.info('Agent dispatched to caller room', { roomName, callerCallSid });
+    logger.info('Agent dispatched to caller room', { roomName, callerCallSid, identity });
     return true;
   } catch (dispatchError) {
     logger.warn('Agent dispatch failed', { roomName, message: dispatchError.message });

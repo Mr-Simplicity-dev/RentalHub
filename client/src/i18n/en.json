@@ -4554,6 +4554,8 @@
     "contact_add_email": "Add email instead",
     "contact_email": "Email address (optional)",
     "contact_no_email": "This respondent has no email address",
+    "contact_no_email_agent": "This respondent has no email address",
+    "contact_no_email_public": "I do not have an email address",
     "contact_continue": "Continue to the survey",
     "contact_required": "Please fill in your name, phone, current location and state of origin.",
     "agent_step": "Step 1 of 3 — your interview details",
@@ -4627,7 +4629,16 @@
     "loc_generic": "The survey is not available at your current location.",
     "loc_blocked_title": "Survey not available here",
     "loc_checking": "Confirming your local government area…",
-    "google_hint": "Start with Google — we fill in your name and email (you can still edit them)."
+    "google_hint": "Start with Google — we fill in your name and email (you can still edit them).",
+    "gate_title": "Access the survey with your email",
+    "gate_sub": "Tell us where to send your survey access and results — the field is optional in the survey itself.",
+    "gate_close": "Close",
+    "gate_email_label": "Email address",
+    "gate_email_ph": "you@example.com",
+    "gate_email_invalid": "Please enter a valid email address.",
+    "gate_start": "Start the survey",
+    "gate_skip": "Continue without email",
+    "gate_google_hint": "Prefer Google? Use the sign-in button above and your email will be filled in automatically."
   },
   "dashboard": {
     "survey_reminder_title": "Finish your Surveyresearch survey",
