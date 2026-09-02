@@ -1583,7 +1583,7 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
     // Wait (briefly) for the department to answer and join, then coach them
     // to the agent only.
     let departmentParticipant = null;
-    for (let attempt = 0; attempt < 6 && !departmentParticipant; attempt += 1) {
+    for (let attempt = 0; attempt < 15 && !departmentParticipant; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       try {
         const participants = await conferenceResource.participants.list();
@@ -1730,6 +1730,70 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
   }
 
   return res.json({ success: true });
+});
+
+// ── GET /voice/consult-status ────────────────────────────────────────────────
+// Admin-only: has the consulted department actually joined the caller's room?
+// The Voice Desk polls this while a consult is "ringing" so it can enable
+// "Transfer now" the moment the department answers (even after the initial
+// consult request has returned).
+
+router.get('/consult-status', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+  const agentCallSid = String(req.query.callSid || '').trim();
+  if (!agentCallSid) {
+    return res.status(400).json({ success: false, message: 'Missing agent call SID.' });
+  }
+  const context = await getActiveCallContext(agentCallSid);
+  if (!context) {
+    return res.json({ success: true, data: { connected: false } });
+  }
+  let connected = false;
+  try {
+    const conference = await findConferenceForRoom(context.roomName);
+    if (conference) {
+      const participants = await getTwilioRestClient().conferences(conference.sid).participants.list();
+      connected = participants.some(
+        (p) => p.callSid && p.callSid !== agentCallSid && p.callSid !== context.callerCallSid
+      );
+    }
+  } catch {
+    connected = false;
+  }
+  return res.json({ success: true, data: { connected } });
+});
+
+// ── GET /voice/duty-status ───────────────────────────────────────────────────
+// Admin-only: per-agent on-duty indicator. An agent is:
+//   offline — not in any conference,
+//   on_duty — parked in the shared waiting room,
+//   on_call — inside a caller's support room.
+// Used by the Voice Ops panel to show who is covering the line.
+
+router.get('/duty-status', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+  const lines = getAgentIdentities();
+  const states = Object.fromEntries(lines.map((identity) => [identity, 'offline']));
+  try {
+    const rest = getTwilioRestClient();
+    const conferences = await rest.conferences.list({ status: 'in-progress' });
+    for (const conference of conferences) {
+      const participants = await rest.conferences(conference.sid).participants.list();
+      for (const participant of participants) {
+        const identity = await resolveClientIdentityFromCall(participant.callSid);
+        if (!identity || !(identity in states)) continue;
+        if (isSupportRoom(conference.friendlyName)) {
+          states[identity] = 'on_call';
+        } else if (conference.friendlyName === AGENTS_WAITING_ROOM && states[identity] !== 'on_call') {
+          states[identity] = 'on_duty';
+        }
+      }
+    }
+  } catch {
+    // Best-effort — treat everyone as offline on API failure.
+  }
+  res.json({
+    success: true,
+    data: lines.map((identity) => ({ identity, state: states[identity] })),
+  });
 });
 
 // ── GET /voice/token ─────────────────────────────────────────────────────────

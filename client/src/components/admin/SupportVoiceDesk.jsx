@@ -25,6 +25,7 @@ import {
   FaClipboardList,
   FaPowerOff,
   FaCheckCircle,
+  FaSyncAlt,
 } from 'react-icons/fa';
 import useTwilioVoice from '../../hooks/useTwilioVoice';
 import {
@@ -33,6 +34,7 @@ import {
   fetchAgentLines,
   fetchCallContext,
   fetchCallLog,
+  fetchConsultStatus,
   fetchDepartments,
   transferCall,
 } from '../../services/voiceApi';
@@ -247,6 +249,39 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
       setEscalating(false);
     }
   }, [getActiveCallSid]);
+
+  // Poll while a consult is ringing: flip to "connected" the moment the
+  // department answers, so "Transfer now" becomes available automatically.
+  useEffect(() => {
+    if (consultState !== 'ringing') return undefined;
+    let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      const connected = await fetchConsultStatus(getActiveCallSid());
+      if (!stopped && connected) setConsultState('connected');
+    };
+    const poll = setInterval(tick, 4000);
+    tick();
+    return () => { stopped = true; clearInterval(poll); };
+  }, [consultState, getActiveCallSid]);
+
+  // Retry: cancel the current ringing consult, then immediately re-dial the
+  // same department.
+  const handleRetryConsult = useCallback(async () => {
+    setEscalating(true);
+    setEscalateError('');
+    const department = escalateDept;
+    try {
+      await cancelConsult(getActiveCallSid());
+      const connected = await consultCall(getActiveCallSid(), department);
+      setConsultState(connected ? 'connected' : 'ringing');
+    } catch (err) {
+      setEscalateError(err.message || 'Could not retry the consultation.');
+      setConsultState('idle');
+    } finally {
+      setEscalating(false);
+    }
+  }, [escalateDept, getActiveCallSid]);
 
   // Agent lines (multi-agent): the desk registers as the chosen identity.
   useEffect(() => {
@@ -601,12 +636,22 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
                     >
                       Cancel consultation
                     </button>
+                    {consultState === 'ringing' && (
+                      <button
+                        onClick={handleRetryConsult}
+                        disabled={escalating}
+                        className="inline-flex items-center gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
+                      >
+                        {escalating ? <FaSpinner className="animate-spin" size={14} /> : <FaSyncAlt size={14} />}
+                        Retry department
+                      </button>
+                    )}
                   </>
                 )}
               </div>
               <p className="mt-1 text-[11px] text-slate-400">
                 {consultState === 'idle' && 'The caller is put on hold while you speak with the department privately.'}
-                {consultState === 'ringing' && 'The department is ringing. Transfer is enabled once they answer.'}
+                {consultState === 'ringing' && 'The department is ringing. You will be able to Transfer now automatically once they answer.'}
                 {consultState === 'connected' && 'The caller is on hold. Tell the department the story, then press Transfer now.'}
               </p>
               {consultState === 'connected' && (

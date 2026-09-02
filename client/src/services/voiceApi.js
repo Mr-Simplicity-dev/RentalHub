@@ -167,6 +167,23 @@ export const cancelConsult = async (callSid) => {
   });
 };
 
+/** Has the consulted department joined the room yet? (poll while ringing) */
+export const fetchConsultStatus = async (callSid) => {
+  if (!callSid) return false;
+  try {
+    const data = await authedFetch(`/voice/consult-status?callSid=${encodeURIComponent(callSid)}`);
+    return data?.data?.connected === true;
+  } catch {
+    return false;
+  }
+};
+
+/** Per-agent duty status: offline | on_duty | on_call. */
+export const fetchDutyStatus = async () => {
+  const data = await authedFetch('/voice/duty-status');
+  return Array.isArray(data?.data) ? data.data : [];
+};
+
 /**
  * Warm-transfer consult: the department is called into the caller's room and
  * held+coached so ONLY the agent hears them (the caller is parked on hold).

@@ -443,6 +443,12 @@ test('departments, call-log and escalate endpoints reject unauthenticated reques
 
   res = await get('/voice/token?line=anything');
   assert.equal(res.status, 401);
+
+  res = await get('/voice/duty-status');
+  assert.equal(res.status, 401);
+
+  res = await get('/voice/consult-status?callSid=CA1');
+  assert.equal(res.status, 401);
 });
 
 test('agent identities parse from VOICE_AGENT_IDENTITIES', () => {

@@ -12,7 +12,7 @@ import {
   FaExclamationTriangle,
   FaPhoneVolume,
 } from 'react-icons/fa';
-import { fetchCallLog, fetchCallbackRequests } from '../../services/voiceApi';
+import { fetchCallLog, fetchCallbackRequests, fetchDutyStatus } from '../../services/voiceApi';
 import { getOriginMeta } from './voiceMeta';
 
 const STATUS_TONES = {
@@ -85,6 +85,26 @@ const VoiceOperationsPanel = () => {
     }
   }, []);
 
+  // Agents on duty
+  const [duty, setDuty] = useState([]);
+  const loadDuty = useCallback(async () => {
+    try {
+      setDuty(await fetchDutyStatus());
+    } catch {
+      setDuty([]);
+    }
+  }, []);
+  useEffect(() => {
+    loadDuty();
+  }, [loadDuty]);
+
+  const DUTY_TONES = {
+    offline: 'bg-slate-100 text-slate-600',
+    on_duty: 'bg-green-100 text-green-700',
+    on_call: 'bg-blue-100 text-blue-700',
+  };
+  const DUTY_LABEL = { offline: 'Offline', on_duty: 'On duty', on_call: 'On a call' };
+
   useEffect(() => {
     load();
   }, [load]);
@@ -126,6 +146,28 @@ const VoiceOperationsPanel = () => {
         </div>
       ) : (
         <>
+          {/* ── Agents on duty ── */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <FaHeadset className="text-indigo-600" size={15} />
+              Agents on duty
+            </h3>
+            {duty.length === 0 ? (
+              <p className="mt-3 text-sm text-slate-500">No agent lines configured.</p>
+            ) : (
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {duty.map((agent) => (
+                  <li key={agent.identity} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm">
+                    <span className="font-mono text-xs text-slate-700">{agent.identity}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${DUTY_TONES[agent.state] || DUTY_TONES.offline}`}>
+                      {DUTY_LABEL[agent.state] || agent.state}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* ── Call log ── */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
