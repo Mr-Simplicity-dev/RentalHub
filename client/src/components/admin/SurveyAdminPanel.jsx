@@ -151,6 +151,35 @@ const SurveyAdminPanel = () => {
     window.open(`/api/admin/survey/export.csv?type=${type}`, "_blank");
   };
 
+  const [locGateBusy, setLocGateBusy] = useState(false);
+
+  const toggleLocationGate = async () => {
+    const targetEnabled = !(locConfig?.gate_enabled === true);
+    const reason = window.prompt(
+      targetEnabled
+        ? "Turn the Survey Location Gate ON? Give a reason for the audit log:"
+        : "Turn the Survey Location Gate OFF (survey available everywhere)? Give a reason:"
+    );
+    if (reason === null) return;
+    if (!String(reason || "").trim()) {
+      toast.error("A reason is required to change the gate");
+      return;
+    }
+    setLocGateBusy(true);
+    try {
+      await api.patch("/super/flags/survey_location_gate", {
+        enabled: targetEnabled,
+        reason: String(reason).trim(),
+      });
+      toast.success(`Survey Location Gate ${targetEnabled ? "enabled" : "disabled"}`);
+      await loadLocationConfig();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update the gate");
+    } finally {
+      setLocGateBusy(false);
+    }
+  };
+
   const sendPushReminders = async () => {
     if (!window.confirm("Send a push reminder to everyone with an unfinished survey?")) return;
     try {
@@ -711,17 +740,30 @@ const SurveyAdminPanel = () => {
       {tab === "location" && (
         <div className="space-y-6">
           <div className="rounded-xl border border-soft bg-gray-50 p-4">
-            <p className="text-sm font-semibold text-gray-700">Survey Location & VPN Gate</p>
-            <p className="mt-1 text-xs text-gray-500">
-              Gate status:{" "}
-              <span className={`font-semibold ${locConfig?.gate_enabled ? "text-green-600" : "text-amber-600"}`}>
-                {locConfig?.gate_enabled ? "ENABLED" : "DISABLED"}
-              </span>{" "}
-              — toggle it from Super Admin → Flags (the "Survey Location Gate" flag). When enabled,
-              only respondents whose device location resolves to an ENABLED state + LGA below can take
-              the survey. Anyone else sees "not available in this local government". VPN/proxy
-              connections are blocked (consensus across two IP providers).
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Survey Location & VPN Gate</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Status:{" "}
+                  <span className={`font-semibold ${locConfig?.gate_enabled ? "text-green-600" : "text-amber-600"}`}>
+                    {locConfig?.gate_enabled ? "ENABLED" : "DISABLED"}
+                  </span>{" "}
+                  — when enabled, only respondents whose device location resolves to an ENABLED state + LGA below
+                  can take the survey. Anyone else sees "not available in this local government". VPN/proxy
+                  connections are blocked (consensus across two IP providers).
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={locGateBusy || !locConfig}
+                onClick={toggleLocationGate}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+                  locConfig?.gate_enabled ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
+              >
+                {locGateBusy ? "Saving…" : locConfig?.gate_enabled ? "Turn Gate OFF" : "Turn Gate ON"}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-xl border border-soft p-4">

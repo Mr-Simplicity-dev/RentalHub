@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { FaEye, FaEyeSlash, FaStar } from "react-icons/fa";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { FaEye, FaEyeSlash, FaSearch, FaStar } from "react-icons/fa";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../services/api";
@@ -159,6 +159,16 @@ const shortcutCategories = [
       { name: "admin_monitor", label: "Admin Monitor", detail: "Monitor admin activity and performance" },
       { name: "pending_approvals", label: "Pending Approvals", detail: "Review pending admin account approvals" },
       { name: "commission_config", label: "Commission Config", detail: "Manage commission rates and fee distribution" },
+    ],
+  },
+  {
+    key: "research",
+    label: "Research & Governance",
+    color: "violet",
+    items: [
+      { name: "survey", label: "Survey & Analysis", detail: "Onboarding questionnaires, analysis and location rules" },
+      { name: "diaspora", label: "Diaspora", detail: "Review diaspora registrations and FX pricing" },
+      { name: "appeals", label: "Appeals", detail: "Review and resolve platform appeals" },
     ],
   },
 ];
@@ -726,9 +736,85 @@ export default function SuperAdminDashboard() {
   setBroadcasts(res.data.broadcasts || []);
 }, []);
 
+  // Quick-navigation search: catalog of every tab (labels + keywords).
+  const navCatalog = useMemo(() => {
+    const aliases = {
+      survey: ["market research", "questionnaire", "tenant survey", "landlord survey", "location rules"],
+      diaspora: ["fx", "usd", "foreign", "registration"],
+      appeals: ["disputes", "review"],
+      commission_config: ["commission", "fee", "rates"],
+      pending_approvals: ["pending", "admin approval"],
+      users: ["accounts", "bans"],
+      verifications: ["identity", "nin"],
+      properties: ["listings"],
+      property_requests: ["listing request"],
+      fraud: ["reports"],
+      recruitment: ["jobs", "careers", "interviews"],
+      flags: ["feature flags", "toggles"],
+      registration_access: ["state", "lga", "signup"],
+      ad_spaces: ["ads", "audio ad"],
+      platform_ratings: ["ratings", "reviews"],
+      email_marketing: ["email"],
+      sms_marketing: ["sms"],
+      platform_lawyers: ["lawyer"],
+      platform_agents: ["agents"],
+      admin: ["staff", "accounts"],
+      admin_monitor: ["activity", "performance"],
+      logs: ["audit"],
+      analytics: ["usage", "insights"],
+      reports: ["export"],
+      broadcast: ["notifications"],
+      lawyer_invites: ["invites"],
+      lawyer_activity: ["lawyer"],
+    };
+    const items = [];
+    for (const cat of shortcutCategories) {
+      for (const item of cat.items) {
+        items.push({
+          name: item.name,
+          label: item.label,
+          detail: item.detail,
+          keywords: [...(aliases[item.name] || []), cat.label],
+        });
+      }
+    }
+    // Guarantee every registered tab is searchable even if missing from the grid.
+    for (const name of tabs) {
+      if (!items.some((item) => item.name === name)) {
+        items.push({
+          name,
+          label: tabLabels[name] || name.replace(/_/g, " "),
+          detail: "",
+          keywords: aliases[name] || [],
+        });
+      }
+    }
+    return items;
+  }, []);
+
+  const [navQuery, setNavQuery] = useState("");
+  const [navOpen, setNavOpen] = useState(false);
+  const navResults = useMemo(() => {
+    const q = navQuery.trim().toLowerCase();
+    if (!q) return [];
+    return navCatalog
+      .filter((item) =>
+        [item.label, item.detail, item.name, ...item.keywords]
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      )
+      .slice(0, 8);
+  }, [navQuery, navCatalog]);
+
+  const pickNav = (name) => {
+    setNavQuery("");
+    setNavOpen(false);
+    loadTab(name);
+  };
+
   const loadTab = useCallback((name) => {
   if (!tabs.includes(name)) return;
-
   skipUrlSyncRef.current = true;
   setTab(name);
   setSearchParams({ tab: name }, { replace: true });
@@ -1142,6 +1228,65 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
         </section>
+
+        {/* Quick-navigation search */}
+        <div className="relative mb-6">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <FaSearch className="text-slate-400" size={16} aria-hidden="true" />
+            <input
+              type="search"
+              value={navQuery}
+              onChange={(e) => {
+                setNavQuery(e.target.value);
+                setNavOpen(true);
+              }}
+              onFocus={() => setNavOpen(true)}
+              onBlur={() => setTimeout(() => setNavOpen(false), 150)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && navResults.length) {
+                  e.preventDefault();
+                  pickNav(navResults[0].name);
+                } else if (e.key === "Escape") {
+                  setNavOpen(false);
+                }
+              }}
+              placeholder="Search sections... (e.g. survey, diaspora, users, ads)"
+              aria-label="Search admin sections"
+              className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+            />
+            {navQuery && (
+              <button
+                type="button"
+                onClick={() => { setNavQuery(""); setNavOpen(false); }}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-600"
+                aria-label="Clear search"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {navOpen && navQuery.trim() && (
+            <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+              {navResults.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-slate-500">No sections match "{navQuery.trim()}".</p>
+              ) : (
+                navResults.map((item) => (
+                  <button
+                    key={item.name}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickNav(item.name)}
+                    className="flex w-full flex-col items-start gap-0.5 px-4 py-2.5 text-left hover:bg-indigo-50"
+                  >
+                    <span className="text-sm font-semibold text-slate-800">{item.label}</span>
+                    {item.detail && <span className="text-xs text-slate-500">{item.detail}</span>}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
         {tab === "overview" && (
           <section className="super-admin-platform-section mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <VoiceSupportOverview />
@@ -1166,6 +1311,7 @@ export default function SuperAdminDashboard() {
                 emerald: { dot: 'bg-emerald-500', border: 'border-emerald-300', bg: 'bg-emerald-50', text: 'text-emerald-700', activeBorder: 'border-emerald-500', activeBg: 'bg-emerald-50', activeText: 'text-emerald-900', hover: 'hover:border-emerald-300 hover:bg-emerald-50' },
                 rose: { dot: 'bg-rose-500', border: 'border-rose-300', bg: 'bg-rose-50', text: 'text-rose-700', activeBorder: 'border-rose-500', activeBg: 'bg-rose-50', activeText: 'text-rose-900', hover: 'hover:border-rose-300 hover:bg-rose-50' },
                 amber: { dot: 'bg-amber-500', border: 'border-amber-300', bg: 'bg-amber-50', text: 'text-amber-700', activeBorder: 'border-amber-500', activeBg: 'bg-amber-50', activeText: 'text-amber-900', hover: 'hover:border-amber-300 hover:bg-amber-50' },
+                violet: { dot: 'bg-violet-500', border: 'border-violet-300', bg: 'bg-violet-50', text: 'text-violet-700', activeBorder: 'border-violet-500', activeBg: 'bg-violet-50', activeText: 'text-violet-900', hover: 'hover:border-violet-300 hover:bg-violet-50' },
               };
               const c = colorMap[cat.color] || colorMap.indigo;
               const sectionClass = TOUR_SECTION_CLASSES[cat.key]

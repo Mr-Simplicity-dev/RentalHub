@@ -775,6 +775,33 @@ const AdminLayout = () => {
                   <FaUserShield className="mr-3" />
                   Admin Monitor
                 </NavLink>
+
+                <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Research &amp; Governance</p>
+
+                <NavLink to="/super-admin?tab=survey" className={() => superAdminNavItem('survey')}>
+                  <FaChartLine className="mr-3" />
+                  Survey &amp; Analysis
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=diaspora" className={() => superAdminNavItem('diaspora')}>
+                  <FaGlobe className="mr-3" />
+                  Diaspora
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=appeals" className={() => superAdminNavItem('appeals')}>
+                  <FaExclamationTriangle className="mr-3" />
+                  Appeals
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=commission_config" className={() => superAdminNavItem('commission_config')}>
+                  <FaMoneyBill className="mr-3" />
+                  Commission Config
+                </NavLink>
+
+                <NavLink to="/super-admin?tab=pending_approvals" className={() => superAdminNavItem('pending_approvals')}>
+                  <FaCheckCircle className="mr-3" />
+                  Pending Approvals
+                </NavLink>
               </div>
             </div>
           )}
