@@ -231,6 +231,22 @@ test('escalation departments parse only valid name:target pairs', () => {
   }
 });
 
+test('voice departments map into the platform ticket-escalation loop', () => {
+  const supportRoutes = require('../routes/support');
+  const { getVoiceTicketDepartment } = supportRoutes._supportScopeForTest;
+
+  assert.equal(getVoiceTicketDepartment('finance'), 'finance');
+  assert.equal(getVoiceTicketDepartment('legal'), 'legal');
+  assert.equal(getVoiceTicketDepartment('technical'), 'technical');
+  assert.equal(getVoiceTicketDepartment('transportation'), 'transportation');
+  assert.equal(getVoiceTicketDepartment('fumigation'), 'fumigation');
+  // Support/unknown departments never raise a ticket (no escalation loop).
+  assert.equal(getVoiceTicketDepartment('support'), null);
+  assert.equal(getVoiceTicketDepartment('made_up'), null);
+
+  assert.equal(typeof supportRoutes.createVoiceEscalatedTicket, 'function');
+});
+
 // ── Webhook signature gate ───────────────────────────────────────────────────
 
 test('incoming webhook requires a valid Twilio signature', async () => {
@@ -406,11 +422,17 @@ test('callbacks endpoint rejects unauthenticated requests', async () => {
   assert.equal(res.status, 401);
 });
 
-test('departments and escalate endpoints reject unauthenticated requests', async () => {
+test('departments, call-log and escalate endpoints reject unauthenticated requests', async () => {
   let res = await get('/voice/departments');
   assert.equal(res.status, 401);
 
   res = await post('/voice/escalate', { callSid: 'CA1', department: 'finance' });
+  assert.equal(res.status, 401);
+
+  res = await get('/voice/call-log');
+  assert.equal(res.status, 401);
+
+  res = await get('/voice/summary');
   assert.equal(res.status, 401);
 });
 

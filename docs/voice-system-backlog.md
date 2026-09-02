@@ -22,7 +22,20 @@ Only deployment (below) and the caller-identity limitation remain.
   hears them while the caller is parked; `transfer` unholds both (three-way)
   and the agent hangs up. Audited in `voice_call_escalations`. Cold-transfer
   code removed.
-- [x] Tests: 36 voice tests; full suite 143/143.
+- [x] **Complaint -> department -> super-admin loop** — every completed
+  transfer raises a support ticket already escalated to the department
+  (`routes/support.js` `createVoiceEscalatedTicket`; migration 140 links
+  `voice_call_escalations.ticket_id`): caller number/source, call SID,
+  recording URL and the agent's problem note ride along; department admin
+  roles get notified and act in their dashboards; the Super Support dashboard
+  lists every escalation for supervision/rectification. Voice department
+  names must be platform departments (finance/legal/technical/transportation/
+  fumigation).
+- [x] **Voice Operations panel (super admin)** — new "Voice Ops" tab
+  (`VoiceOperationsPanel.jsx`): call log (per-leg history with inline audio
+  player for recordings via `GET /voice/call-log`) and callback requests with
+  tap-to-call links. Shared source-badge labels live in `voiceMeta.js`.
+- [x] Tests: 37 voice tests; full suite 153/153.
 
 ## Integration points (known gaps)
 

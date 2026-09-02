@@ -1166,6 +1166,65 @@ router.get('/callbacks', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
   }
 });
 
+// ── GET /voice/summary ───────────────────────────────────────────────────────
+// Lightweight counters for the super-admin overview widget. Each metric is
+// fetched independently so a missing table never fails the whole summary.
+
+router.get('/summary', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+  const safeCount = async (sql, params) => {
+    try {
+      const result = await db.query(sql, params);
+      return Number(result.rows[0]?.count || 0);
+    } catch {
+      return 0;
+    }
+  };
+
+  const data = {
+    callsToday: await safeCount(
+      `SELECT COUNT(DISTINCT call_sid) AS count
+       FROM voice_call_events
+       WHERE created_at >= CURRENT_DATE`
+    ),
+    openEscalations: await safeCount(
+      `SELECT COUNT(*) AS count
+       FROM support_tickets
+       WHERE escalation_status IN ('escalated', 'acknowledged', 'action_required')`
+    ),
+    callbackRequests: await safeCount(
+      `SELECT COUNT(*) AS count FROM voice_callback_requests`
+    ),
+  };
+
+  res.json({ success: true, data });
+});
+// ── GET /voice/call-log ──────────────────────────────────────────────────────
+// Admin-only call history for the Voice Operations panel. One row per call leg
+// (the LATEST recorded state), newest first, with duration and the recording
+// URL when available.
+
+router.get('/call-log', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT call_sid, direction, source, status,
+              from_number, to_number, duration_sec, recording_url, created_at
+       FROM (
+         SELECT DISTINCT ON (call_sid)
+                call_sid, direction, source, status,
+                from_number, to_number, duration_sec, recording_url, created_at
+         FROM voice_call_events
+         ORDER BY call_sid, created_at DESC
+       ) latest
+       ORDER BY created_at DESC
+       LIMIT 100`
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    logger.error('Voice call log failed:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to load the call log.' });
+  }
+});
+
 // ── POST /voice/recording ────────────────────────────────────────────────────
 // Recording status callbacks (VOICE_RECORD_CALLS=true). Back-fills the
 // recording URL onto the matching status row; never fails the webhook.
@@ -1307,9 +1366,29 @@ const getActiveCallContext = async (agentCallSid) => {
     callerLeg = null;
   }
   if (!callerLeg) return null;
+
+  // The in-progress row does not carry the caller number (it is stored on the
+  // 'queued' row, which survives until the room ends).
+  let fromNumber = callerLeg.from_number || null;
+  if (!fromNumber) {
+    try {
+      const queued = await db.query(
+        `SELECT from_number
+         FROM voice_call_events
+         WHERE call_sid = $1 AND status = 'queued'
+         LIMIT 1`,
+        [callerLeg.call_sid]
+      );
+      fromNumber = queued.rows[0]?.from_number || null;
+    } catch {
+      fromNumber = null;
+    }
+  }
+
   return {
     callerCallSid: callerLeg.call_sid,
     roomName: callerLeg.to_number,
+    callerNumber: fromNumber,
     source: ['local_termii', 'international_twilio', 'toll_free', 'unknown'].includes(callerLeg.source)
       ? callerLeg.source
       : 'unknown',
@@ -1495,6 +1574,74 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
     agentCallSid,
     department: departmentParticipant ? 'department participant' : 'unknown',
   });
+
+  // Raise the complaint through the platform's department-escalation loop:
+  // a ticket lands with the department's admin roles and on the Super Support
+  // dashboard (with the call recording attached) for rectification.
+  // Best-effort — never fails the transfer.
+  try {
+    const supportRoutes = require('./support');
+
+    let ticketDepartment = null;
+    try {
+      const escalationRow = await db.query(
+        `SELECT department
+         FROM voice_call_escalations
+         WHERE call_sid = $1 AND agent_call_sid = $2
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [context.callerCallSid, agentCallSid]
+      );
+      ticketDepartment = escalationRow.rows[0]?.department || null;
+    } catch {
+      ticketDepartment = null;
+    }
+
+    let recordingUrl = null;
+    try {
+      const recordingRow = await db.query(
+        `SELECT recording_url
+         FROM voice_call_events
+         WHERE call_sid = $1 AND recording_url IS NOT NULL
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [context.callerCallSid]
+      );
+      recordingUrl = recordingRow.rows[0]?.recording_url || null;
+    } catch {
+      recordingUrl = null;
+    }
+
+    const ticket = ticketDepartment
+      ? await supportRoutes.createVoiceEscalatedTicket({
+          department: ticketDepartment,
+          callerNumber: context.callerNumber || '',
+          source: context.source,
+          note: String(req.body?.note || ''),
+          callSid: context.callerCallSid,
+          recordingUrl: recordingUrl || '',
+          actor: req.user,
+        })
+      : null;
+
+    if (ticket?.id) {
+      try {
+        await db.query(
+          `UPDATE voice_call_escalations
+           SET ticket_id = $1
+           WHERE call_sid = $2 AND agent_call_sid = $3
+             AND ticket_id IS NULL`,
+          [ticket.id, context.callerCallSid, agentCallSid]
+        );
+      } catch {
+        // Link update is best-effort.
+      }
+    }
+  } catch (ticketError) {
+    logger.warn('Voice transfer ticket creation failed (non-fatal):', ticketError.message, {
+      callerCallSid: context.callerCallSid,
+    });
+  }
 
   return res.json({ success: true });
 });

@@ -40,6 +40,7 @@ import RecruitmentAdminTab from "../components/admin/RecruitmentAdminTab";
 import AdminMonitorTab from "../components/admin/AdminMonitorTab";
 import CommissionConfigTab from "../components/admin/CommissionConfigTab";
 import AppealsTab from "../components/admin/AppealsTab";
+import VoiceSupportOverview from "../components/admin/VoiceSupportOverview";
 
 const tabs = [
   "overview",
@@ -1141,9 +1142,9 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
         </section>
-
         {tab === "overview" && (
           <section className="super-admin-platform-section mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <VoiceSupportOverview />
           <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">

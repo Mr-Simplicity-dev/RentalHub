@@ -888,8 +888,112 @@ const notifyDepartmentEscalation = async (ticket, department, note = '') => {
       emitToUser(user.id, 'ticket:department_escalated', { ticketId: ticket.id, ticket, department });
     }
   } catch (err) {
-    req.logger.error('Department escalation notification error:', err);
+    logger.error('Department escalation notification error:', err);
   }
+};
+
+// ── Voice warm-transfer → support-ticket bridge ──────────────────────────────
+// routes/voice.js calls this after a successful warm transfer so the caller's
+// complaint follows the platform's normal department-escalation loop: the
+// department's admin roles act on the ticket, and the Super Support dashboard
+// surfaces every escalation for supervision and rectification. The call SID
+// and recording URL ride along on the ticket for audit.
+
+const VOICE_DEPARTMENT_CATEGORIES = {
+  finance: 'payment',
+  legal: 'legal',
+  technical: 'technical',
+  transportation: 'transportation',
+  fumigation: 'fumigation_cleaning',
+};
+
+/**
+ * Map a voice escalation department name to a platform operations department
+ * that participates in the ticket escalation loop. Returns null for unknown
+ * or support-only names (those never get a ticket).
+ */
+const getVoiceTicketDepartment = (department) => {
+  const normalized = normalizeDepartment(department);
+  return VOICE_DEPARTMENT_CATEGORIES[normalized] ? normalized : null;
+};
+
+const createVoiceEscalatedTicket = async ({
+  department,
+  callerNumber = '',
+  source = 'unknown',
+  note = '',
+  callSid = '',
+  recordingUrl = '',
+  actor = null,
+}) => {
+  const targetDepartment = getVoiceTicketDepartment(department);
+  if (!targetDepartment) {
+    logger.warn('Voice ticket skipped: department has no ticket mapping', { department });
+    return null;
+  }
+
+  await ensureSupportSchema();
+
+  const category = VOICE_DEPARTMENT_CATEGORIES[targetDepartment];
+  const trimmedNote = String(note || '').trim();
+  const description = [
+    `Caller number: ${callerNumber || 'Private number'}`,
+    `Call source: ${source || 'unknown'}`,
+    ...(callSid ? [`Call SID: ${callSid}`] : []),
+    ...(recordingUrl ? [`Call recording: ${recordingUrl}`] : []),
+    ...(trimmedNote ? ['', `Agent note: ${trimmedNote.slice(0, 2000)}`] : []),
+  ].join('\n');
+
+  const result = await db.query(
+    `INSERT INTO support_tickets
+       (subject, description, priority, status, category,
+        escalation_department, escalation_status, escalation_note,
+        sla_due_at, escalated_at, last_escalated_at)
+     VALUES ($1, $2, 'high', 'in_progress', $3, $4, 'escalated', $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+     RETURNING *`,
+    [
+      `[Voice → ${targetDepartment.replace(/_/g, ' ')}] Escalated support call`,
+      description,
+      category,
+      targetDepartment,
+      trimmedNote.slice(0, 1000) || null,
+      resolveSlaDueAt(category, 'high'),
+    ]
+  );
+
+  const ticket = result.rows[0];
+
+  await addTicketTimeline(
+    ticket.id,
+    actor,
+    'department_escalated',
+    `Voice call escalated to ${targetDepartment.replace(/_/g, ' ')}`,
+    { department: targetDepartment, source: 'voice', callSid: callSid || null }
+  );
+
+  try {
+    await notifyDepartmentEscalation(
+      ticket,
+      targetDepartment,
+      trimmedNote || 'Voice warm transfer from the support desk'
+    );
+  } catch (notifyError) {
+    logger.warn('Voice ticket department notification failed (non-fatal):', notifyError.message);
+  }
+
+  try {
+    emitTicketToAdmins('ticket:created', { ticket: toClientSupportTicket(ticket) });
+  } catch {
+    // Non-fatal — dashboards refresh through their own queries.
+  }
+
+  logger.info('Voice escalation ticket created', {
+    ticketId: ticket.id,
+    department: targetDepartment,
+    callSid: callSid || null,
+  });
+
+  return ticket;
 };
 
 const sendSupportAlertEmails = async (recipientIds, subject, message, path = '/admin/super-support-dashboard?tab=escalations') => {
@@ -3638,6 +3742,9 @@ router.get('/admin/dashboard', authenticate, requireSupportAdmin, async (req, re
   }
 });
 
+router.createVoiceEscalatedTicket = createVoiceEscalatedTicket;
+router.getVoiceTicketDepartment = getVoiceTicketDepartment;
+
 router._supportScopeForTest = {
   canSupportAdminAccessTicket,
   normalizeSupportCategory,
@@ -3654,6 +3761,7 @@ router._supportScopeForTest = {
   runSupportSlaMonitor,
   toClientSupportTicket,
   getGuestAccessTokenFromRequest,
+  getVoiceTicketDepartment,
 };
 
 module.exports = router;

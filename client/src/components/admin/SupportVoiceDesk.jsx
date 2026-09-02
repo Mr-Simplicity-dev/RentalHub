@@ -1,5 +1,5 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// SupportVoiceDesk — internal Twilio browser calling workspace for the Super
+﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SupportVoiceDesk â€” internal Twilio browser calling workspace for the Super
 // Support Admin dashboard. Complements the ticket workspace; tickets remain
 // the source of truth for support work.
 //
@@ -10,7 +10,7 @@
 //   - An aria-live region announces incoming calls and connection changes.
 //   - Keyboard: Enter answers, Escape declines, on the incoming-call card.
 //   - prefers-reduced-motion is respected via motion-reduce utilities.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -28,14 +28,15 @@ import {
 } from 'react-icons/fa';
 import useTwilioVoice from '../../hooks/useTwilioVoice';
 import { consultCall, fetchDepartments, transferCall } from '../../services/voiceApi';
+import { getOriginMeta } from './voiceMeta';
 
-// ── Local in-memory recent-calls adapter ────────────────────────────────────
+// â”€â”€ Local in-memory recent-calls adapter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // TODO(voice): replace with backend call events once the /voice/status
 // call-status webhook exists (see docs/voice-system-backlog.md). This list
 // intentionally lives in memory only and is reset on page reload.
 const recentCalls = [];
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const STATUS_META = {
   offline: { label: 'Offline', tone: 'border-slate-200 bg-slate-50 text-slate-700' },
@@ -45,41 +46,14 @@ const STATUS_META = {
   error: { label: 'Error', tone: 'border-red-200 bg-red-50 text-red-700' },
 };
 
-// ── Call-origin badges ───────────────────────────────────────────────────────
+// â”€â”€ Call-origin badges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The backend passes a sanitized `call_source` (and `caller_number`) as Twilio
-// Client custom parameters. These labels are informational only — they never
-// reveal raw SIP addresses, trunk details or account identifiers. Neutral
-// hierarchy: Local = blue, International = violet, Unknown = gray.
-const ORIGIN_META = {
-  local_termii: {
-    label: 'Local call',
-    detail: 'Nigeria · Termii SIP',
-    tone: 'border-blue-200 bg-blue-50 text-blue-700',
-  },
-  toll_free: {
-    label: 'Toll-free call',
-    detail: 'Nigeria · Toll-free',
-    tone: 'border-cyan-200 bg-cyan-50 text-cyan-700',
-  },
-  international_twilio: {
-    label: 'International call',
-    detail: 'International · Twilio',
-    tone: 'border-violet-200 bg-violet-50 text-violet-700',
-  },
-  unknown: {
-    label: 'Inbound call',
-    detail: 'Route unavailable',
-    tone: 'border-slate-200 bg-slate-100 text-slate-600',
-  },
-};
-
-const getCallOrigin = (call) => {
-  const source = call?.customParameters?.call_source || call?.parameters?.call_source || 'unknown';
-  return ORIGIN_META[source] || ORIGIN_META.unknown;
-};
-
+// Client custom parameters. Labels live in ./voiceMeta (shared with the Voice
+// Operations panel).
 const CallOriginBadge = ({ call }) => {
-  const origin = getCallOrigin(call);
+  const origin = getOriginMeta(
+    call?.customParameters?.call_source || call?.parameters?.call_source || 'unknown'
+  );
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${origin.tone}`}
@@ -107,7 +81,7 @@ const formatCaller = (call) => {
   }
 
   // Defense-in-depth: if anything untrusted sneaks through, surface only an
-  // E.164-ish digit string — never SIP URIs or email-like identities.
+  // E.164-ish digit string â€” never SIP URIs or email-like identities.
   const digits = String(from).match(/\+?[0-9]{7,15}/);
   return digits ? digits[0] : 'Private number';
 };
@@ -123,7 +97,7 @@ const formatElapsed = (startedAt) => {
 // The agent's queue line is an outbound call to "queue:<name>". It reads as
 // the active call while the agent is on duty; when a caller is bridged, the
 // same leg carries the conversation (caller params are not exposed to the SDK
-// for queue-bridged legs — see docs/voice-system-backlog.md).
+// for queue-bridged legs â€” see docs/voice-system-backlog.md).
 const isQueueLine = (call) =>
   String(call?.parameters?.To || call?.customParameters?.To || '')
     .toLowerCase()
@@ -149,11 +123,12 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
   const [now, setNow] = useState(() => Date.now());
   const [announcement, setAnnouncement] = useState('');
 
-  // Department escalation state (warm transfer: consult → transfer).
+  // Department escalation state (warm transfer: consult â†’ transfer).
   const [departments, setDepartments] = useState([]);
   const [escalateDept, setEscalateDept] = useState('');
   const [escalating, setEscalating] = useState(false);
   const [escalateError, setEscalateError] = useState('');
+  const [escalateNote, setEscalateNote] = useState('');
   const [consultState, setConsultState] = useState('idle'); // idle | ringing | connected
 
   // Timers for the ringing / active-call clocks.
@@ -201,7 +176,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     }
   }, [incomingCall, status]);
 
-  // ── Department escalation (warm transfer) ──────────────────────────────────
+  // â”€â”€ Department escalation (warm transfer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Load the department list only while the agent is on a call; reset all
   // escalation state whenever the active call changes.
   useEffect(() => {
@@ -209,7 +184,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     let mounted = true;
     fetchDepartments()
       .then((list) => { if (mounted) setDepartments(list); })
-      .catch(() => { /* unavailable → the escalate control stays disabled */ });
+      .catch(() => { /* unavailable â†’ the escalate control stays disabled */ });
     return () => { mounted = false; };
   }, [activeCall]);
 
@@ -217,6 +192,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     setConsultState('idle');
     setEscalateError('');
     setEscalateDept('');
+    setEscalateNote('');
   }, [activeCall]);
 
   const getActiveCallSid = useCallback(() => {
@@ -243,20 +219,20 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     setEscalating(true);
     setEscalateError('');
     try {
-      await transferCall(getActiveCallSid());
+      await transferCall(getActiveCallSid(), escalateNote);
       setConsultState('idle');
     } catch (err) {
       setEscalateError(err.message || 'Could not transfer the call.');
     } finally {
       setEscalating(false);
     }
-  }, [getActiveCallSid]);
+  }, [getActiveCallSid, escalateNote]);
 
-  // ── Recent-calls adapter (in-memory only, see TODO above) ────────────────
+  // â”€â”€ Recent-calls adapter (in-memory only, see TODO above) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const prevIncoming = prevIncomingRef.current;
     prevIncomingRef.current = incomingCall;
-    // Caller never answered and the call was not explicitly declined → missed.
+    // Caller never answered and the call was not explicitly declined â†’ missed.
     if (
       prevIncoming &&
       !incomingCall &&
@@ -266,7 +242,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
       recentCalls.unshift({
         id: prevIncoming.parameters?.CallSid || prevIncoming.customParameters?.call_sid || `missed-${Date.now()}`,
         number: formatCaller(prevIncoming),
-        source: getCallOrigin(prevIncoming).label,
+        source: getOriginMeta(prevIncoming?.customParameters?.call_source || prevIncoming?.parameters?.call_source).label,
         outcome: 'Missed',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
@@ -285,7 +261,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
       recentCalls.unshift({
         id: prevActive.parameters?.CallSid || prevActive.customParameters?.call_sid || `ended-${Date.now()}`,
         number: formatCaller(prevActive),
-        source: getCallOrigin(prevActive).label,
+        source: getOriginMeta(prevActive?.customParameters?.call_source || prevActive?.parameters?.call_source).label,
         outcome: `Ended (${mm}:${ss})`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
@@ -297,14 +273,14 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     recentCalls.unshift({
       id: incomingCall?.parameters?.CallSid || incomingCall?.customParameters?.call_sid || `declined-${Date.now()}`,
       number: formatCaller(incomingCall),
-      source: getCallOrigin(incomingCall).label,
+      source: getOriginMeta(incomingCall?.customParameters?.call_source || incomingCall?.parameters?.call_source).label,
       outcome: 'Declined',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
     declineCall();
   }, [declineCall, incomingCall]);
 
-  // ── Current support queue summary (from data already loaded in the dashboard) ──
+  // â”€â”€ Current support queue summary (from data already loaded in the dashboard) â”€â”€
   const queueSummary = useMemo(() => {
     const open = tickets.filter(
       (t) => t.status !== 'resolved' && t.status !== 'closed'
@@ -320,7 +296,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
   const busy = status === 'connecting' || status === 'reconnecting';
   const available = status === 'ready';
 
-  // ── Keyboard: Enter answers / Escape declines on the incoming card ───────
+  // â”€â”€ Keyboard: Enter answers / Escape declines on the incoming card â”€â”€â”€â”€â”€â”€â”€
   const handleIncomingKeyDown = (e) => {
     if (e.target !== e.currentTarget) return;
     if (e.key === 'Enter') {
@@ -337,7 +313,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
       {/* Visually hidden live region for screen readers */}
       <div aria-live="polite" className="sr-only">{announcement}</div>
 
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -375,7 +351,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
         </div>
       </div>
 
-      {/* ── Initial state: explain before any permission is requested ── */}
+      {/* â”€â”€ Initial state: explain before any permission is requested â”€â”€ */}
       {status === 'offline' && !error && (
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mx-auto max-w-xl text-center">
@@ -396,7 +372,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
         </div>
       )}
 
-      {/* ── Ready state ── */}
+      {/* â”€â”€ Ready state â”€â”€ */}
       {available && !incomingCall && !activeCall && (
         <div className={`rounded-xl border p-6 shadow-sm ${inQueue ? 'border-green-200 bg-green-50' : 'border-indigo-200 bg-indigo-50'}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -408,7 +384,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
               )}
               <div>
                 <p className="text-sm font-semibold text-slate-900">
-                  {inQueue ? 'On the line — waiting for callers' : 'Ready — not connected to the queue'}
+                  {inQueue ? 'On the line â€” waiting for callers' : 'Ready â€” not connected to the queue'}
                 </p>
                 <p className="text-xs text-slate-600">
                   {inQueue
@@ -429,19 +405,19 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
         </div>
       )}
 
-      {/* ── Connecting / Reconnecting state ── */}
+      {/* â”€â”€ Connecting / Reconnecting state â”€â”€ */}
       {busy && !error && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <FaSpinner className="animate-spin text-amber-600" size={18} aria-hidden="true" />
             <p className="text-sm font-medium text-amber-800">
-              {status === 'connecting' ? 'Connecting to the voice service…' : 'Reconnecting to the voice service…'}
+              {status === 'connecting' ? 'Connecting to the voice serviceâ€¦' : 'Reconnecting to the voice serviceâ€¦'}
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Error state with recovery guidance ── */}
+      {/* â”€â”€ Error state with recovery guidance â”€â”€ */}
       {status === 'error' && error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 shadow-sm" role="alert">
           <div className="flex items-start gap-3">
@@ -464,7 +440,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
         </div>
       )}
 
-      {/* ── Incoming call card ── */}
+      {/* â”€â”€ Incoming call card â”€â”€ */}
       {incomingCall && !activeCall && (
         <div
           className="rounded-xl border-2 border-indigo-300 bg-white p-6 shadow-md"
@@ -507,7 +483,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
         </div>
       )}
 
-      {/* ── Active call card (queue line or bridged call) ── */}
+      {/* â”€â”€ Active call card (queue line or bridged call) â”€â”€ */}
       {activeCall && (
         <div className="rounded-xl border border-indigo-200 bg-white p-6 shadow-md">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -526,8 +502,8 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
                 </div>
                 <p className="text-xs text-slate-500">
                   {isQueueLine(activeCall)
-                    ? `Waiting for a queued caller to be dispatched — ${formatElapsed(callStartedAt)} on the line`
-                    : `${formatElapsed(callStartedAt)} elapsed · caller number not available on conference legs`}
+                    ? `Waiting for a queued caller to be dispatched â€” ${formatElapsed(callStartedAt)} on the line`
+                    : `${formatElapsed(callStartedAt)} elapsed Â· caller number not available on conference legs`}
                 </p>
               </div>
             </div>
@@ -565,7 +541,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
                   disabled={escalating || consultState !== 'idle' || departments.length === 0}
                   className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
                 >
-                  <option value="">{departments.length === 0 ? 'No departments configured' : 'Select department…'}</option>
+                  <option value="">{departments.length === 0 ? 'No departments configured' : 'Select departmentâ€¦'}</option>
                   {departments.map((department) => (
                     <option key={department} value={department}>{department}</option>
                   ))}
@@ -595,6 +571,23 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
                 {consultState === 'ringing' && 'The department is ringing. Transfer is enabled once they answer.'}
                 {consultState === 'connected' && 'The caller is on hold. Tell the department the story, then press Transfer now.'}
               </p>
+              {consultState === 'connected' && (
+                <div className="mt-2">
+                  <label htmlFor="voice-escalate-note" className="text-xs font-medium text-slate-600">
+                    Problem note (optional â€” appears on the ticket for the department and super admin)
+                  </label>
+                  <textarea
+                    id="voice-escalate-note"
+                    value={escalateNote}
+                    onChange={(e) => setEscalateNote(e.target.value)}
+                    rows={2}
+                    maxLength={2000}
+                    disabled={escalating}
+                    className="mt-1 w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 disabled:opacity-60"
+                    placeholder="e.g. Caller says a rent payment went to the wrong accountâ€¦"
+                  />
+                </div>
+              )}
               {escalateError && (
                 <p className="mt-1 text-xs text-red-600" role="alert">{escalateError}</p>
               )}
@@ -606,7 +599,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
         </div>
       )}
 
-      {/* ── Queue summary + switch to ticket workspace ── */}
+      {/* â”€â”€ Queue summary + switch to ticket workspace â”€â”€ */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
@@ -638,7 +631,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
           </div>
         </div>
 
-        {/* ── Recent calls (in-memory, see TODO) ── */}
+        {/* â”€â”€ Recent calls (in-memory, see TODO) â”€â”€ */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <FaHeadset className="text-indigo-600" size={15} /> Recent calls
@@ -670,3 +663,4 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
 };
 
 export default SupportVoiceDesk;
+

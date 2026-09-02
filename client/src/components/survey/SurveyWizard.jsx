@@ -306,7 +306,7 @@ export default function SurveyWizard({
       setQuestionIndex((i) => i - 1);
     } else if (sectionIndex > 0) {
       setSectionIndex((s) => s - 1);
-      setQuestionIndex((sections[s - 1]?.questions.length || 1) - 1);
+      setQuestionIndex((sections[sectionIndex - 1]?.questions.length || 1) - 1);
     }
     questionEnteredAt.current = Date.now();
   };
@@ -532,7 +532,9 @@ export default function SurveyWizard({
             className="h-4 w-4 rounded border-gray-300 text-indigo-600"
           />
           <label htmlFor="survey-no-email" className="text-sm text-gray-700">
-            {t('survey.contact_no_email', 'This respondent has no email address')}
+            {agentMode
+              ? t('survey.contact_no_email_agent', 'This respondent has no email address')
+              : t('survey.contact_no_email_public', 'I do not have an email address')}
           </label>
         </div>
 

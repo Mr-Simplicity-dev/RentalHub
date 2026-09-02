@@ -109,7 +109,10 @@ or is unreachable.
 
 Configure `VOICE_ESCALATION_DEPARTMENTS` as comma-separated
 `name:target` pairs where the target is an **E.164 number** or a **Twilio
-Client identity** (`client:legal_1`):
+Client identity** (`client:legal_1`). **Use the platform's department names**
+(`finance`, `legal`, `technical`, `transportation`, `fumigation`) so a
+transfer automatically raises a support ticket into that department's
+escalation tray:
 
 ```bash
 VOICE_ESCALATION_DEPARTMENTS=finance:+2348012345678,legal:client:legal_1
@@ -129,9 +132,33 @@ transfers possible:
 4. **Transfer now**: the department and caller are unheld (three-way bridge)
    and the agent hangs up — the caller stays with the department.
 
-Escalations are audited in `voice_call_escalations` (migration 131). Caller
-identity is not exposed to the browser SDK on conference legs — caller-level
-reporting comes from `voice_call_events`.
+### Complaint → department → super admin loop
+
+Every completed **Transfer now** raises a support ticket automatically
+(`createVoiceEscalatedTicket` in `routes/support.js`, migration 140 links it
+to `voice_call_escalations.ticket_id`):
+
+- The ticket is created **already escalated** to the department (high
+  priority, in-progress, SLA due) with the caller number, call source, call
+  SID and **recording URL** embedded, plus the agent's optional problem note.
+- The department's admin roles (finance → `financial_admin` family, legal →
+  lawyer family, etc.) receive the notification and act on it in their
+  dashboards.
+- The **Super Support Admin dashboard** lists every department escalation, so
+  the super admin can supervise and rectify; clicking through shows the ticket
+  with the recording link.
+
+### Voice Operations panel (super admin)
+
+The Super Support dashboard has a **Voice Ops** tab
+(`VoiceOperationsPanel.jsx`, backed by `GET /voice/call-log` and
+`GET /voice/callbacks`):
+
+- **Call log** — one row per call leg, newest first: time, source badge,
+  direction, from/to numbers, status, duration, and an inline audio player for
+  recordings (`voice_call_events.recording_url`).
+- **Callback requests** — after-hours/menu callback numbers with tap-to-call
+  links (`voice_callback_requests`).
 
 ### After-hours & holidays (optional)
 

@@ -114,6 +114,26 @@ export const fetchDepartments = async () => {
   return Array.isArray(data?.data) ? data.data : [];
 };
 
+/** Admin-only call history: one row per leg, latest state, newest first. */
+export const fetchCallLog = async () => {
+  const data = await authedFetch('/voice/call-log');
+  return Array.isArray(data?.data) ? data.data : [];
+};
+
+/** Admin-only list of after-hours callback requests. */
+export const fetchCallbackRequests = async () => {
+  const data = await authedFetch('/voice/callbacks');
+  return Array.isArray(data?.data) ? data.data : [];
+};
+
+/** Admin-only summary counters for the super-admin overview widget. */
+export const fetchVoiceSummary = async () => {
+  const data = await authedFetch('/voice/summary');
+  return (
+    data?.data || { callsToday: 0, openEscalations: 0, callbackRequests: 0 }
+  );
+};
+
 /**
  * Warm-transfer consult: the department is called into the caller's room and
  * held+coached so ONLY the agent hears them (the caller is parked on hold).
@@ -134,9 +154,10 @@ export const consultCall = async (callSid, department) => {
 
 /**
  * Warm-transfer bridge: unholds the department and the caller (three-way),
- * after which the agent hangs up on their side.
+ * after which the agent hangs up on their side. `note` becomes the ticket
+ * text that rides the complaint into the department's escalation tray.
  */
-export const transferCall = async (callSid) => {
+export const transferCall = async (callSid, note = '') => {
   if (!callSid) {
     const error = new Error('Missing call for transfer.');
     error.code = 'VOICE_REQUEST_ERROR';
@@ -144,6 +165,6 @@ export const transferCall = async (callSid) => {
   }
   return authedFetch('/voice/escalate', {
     method: 'POST',
-    body: JSON.stringify({ action: 'transfer', callSid }),
+    body: JSON.stringify({ action: 'transfer', callSid, note: String(note || '').slice(0, 2000) }),
   });
 };

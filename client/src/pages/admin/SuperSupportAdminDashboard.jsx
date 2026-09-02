@@ -31,6 +31,7 @@ import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 import SupportGovernancePanel from '../../components/admin/SupportGovernancePanel';
 import SupportVoiceDesk from '../../components/admin/SupportVoiceDesk';
+import VoiceOperationsPanel from '../../components/admin/VoiceOperationsPanel';
 import TicketConversationModal from '../../components/common/TicketConversationModal';
 
 // Utility functions
@@ -377,7 +378,7 @@ const SuperSupportAdminDashboard = () => {
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'escalations', 'alerts', 'reports', 'activity', 'pool', 'voice'];
+    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'escalations', 'alerts', 'reports', 'activity', 'pool', 'voice', 'voice_ops'];
     if (tab && allowedTabs.includes(tab)) {
       setActiveTab(tab);
       return;
@@ -761,6 +762,7 @@ const SuperSupportAdminDashboard = () => {
           { key: 'activity', label: 'Activity Feed' },
           { key: 'pool', label: 'Admin Pool' },
           { key: 'voice', label: 'Voice Desk' },
+          { key: 'voice_ops', label: 'Voice Ops' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -1281,6 +1283,13 @@ const SuperSupportAdminDashboard = () => {
               tickets={dashboardData.supportTickets || []}
               onOpenTickets={() => setActiveTab('tickets')}
             />
+          </div>
+        )}
+
+        {/* Voice Operations Tab */}
+        {activeTab === 'voice_ops' && (
+          <div className="super-support-voice-ops-section">
+            <VoiceOperationsPanel />
           </div>
         )}
 

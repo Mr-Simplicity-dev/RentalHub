@@ -659,6 +659,18 @@ const AdminLayout = () => {
                   Support Governance
                 </NavLink>
 
+                <NavLink
+                  to="/admin/super-support-dashboard?tab=voice"
+                  className={() =>
+                    location.pathname.startsWith('/admin/super-support-dashboard')
+                      ? roleTheme.activeNav
+                      : roleTheme.hoverNav
+                  }
+                >
+                  <FaPhone className="mr-3" />
+                  Support &amp; Voice
+                </NavLink>
+
                 <p className="px-4 pt-3 text-[10px] font-bold uppercase tracking-wide text-gray-400">Intelligence</p>
 
                 <NavLink to="/super-admin?tab=analytics" className={() => superAdminNavItem('analytics')}>
