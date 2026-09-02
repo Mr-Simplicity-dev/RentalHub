@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Onboarding survey service: response lifecycle + gate status.
  */
 
@@ -13,58 +13,54 @@ const generateRespondentCode = () =>
 const generateResumeToken = () =>
   crypto.randomBytes(24).toString('base64url');
 
-// ── Location / VPN gate ────────────────────────────────────────────────────
+// â”€â”€ Location / VPN gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The survey only runs inside the configured area and blocks VPN/proxy IPs.
 
-const EARTH_RADIUS_KM = 6371;
-const haversineKm = (lat1, lng1, lat2, lng2) => {
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
 
-const getIpGeolocation = async (ip) => {
-  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('10.') || ip.startsWith('192.168.')) {
-    return null;
-  }
-  const providers = [
-    `https://ipapi.co/${encodeURIComponent(ip)}/json/`,
-    `https://ipwho.is/${encodeURIComponent(ip)}`,
-  ];
-  for (const url of providers) {
-    try {
-      const response = await axios.get(url, { timeout: 4000 });
-      const data = response.data;
-      if (data && (data.country_code || data.country)) {
-        return {
-          country_code: String(data.country_code || data.country).toUpperCase(),
-          proxy: Boolean(data.proxy),
-          hosting: Boolean(data.hosting || data.security?.is_hosting),
-          vpn: Boolean(data.vpn || data.security?.is_vpn || data.security?.is_proxy),
-        };
-      }
-    } catch {
-      // try next provider
-    }
-  }
-  return null;
-};
+// ── Location / VPN gate ────────────────────────────────────────────────────
+// The survey only runs in the state + LGA combinations enabled by the super
+// admin (GPS-derived, name-matched). VPN/proxy IPs are blocked — even for a
+// Nigerian IP, a device outside the enabled LGA is refused.
 
-const getClientIp = (req) =>
-  String(req.headers['x-forwarded-for'] || req.ip || '')
-    .split(',')[0]
+const normalizeName = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/\./g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 
+const stateMatches = (a, b) => {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (!na || !nb) return false;
+  return (
+    na === nb ||
+    na.includes(nb) ||
+    nb.includes(na) ||
+    /fct|federal/.test(na + ' ' + nb)
+  );
+};
+
+const lgaMatches = (a, b) => {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  return Boolean(na) && Boolean(nb) && (na === nb || na.includes(nb) || nb.includes(na));
+};
+
+const isAllowedSurveyLocation = (config, deviceState, deviceLga) => {
+  if (!deviceLga) return false;
+  return config.locations.some(
+    (l) => stateMatches(l.state_name, deviceState) && lgaMatches(l.lga_name, deviceLga)
+  );
+};
+
+// app_settings stores {"value": "..."} inside JSONB.
 const getSurveyLocationConfig = async () => {
   const [scopeRow, locationsRow] = await Promise.all([
     db.query(`SELECT value FROM app_settings WHERE key = 'survey_allowed_scope'`),
     db.query(`SELECT value FROM app_settings WHERE key = 'survey_allowed_locations'`),
   ]);
-  let scope = scopeRow.rows[0]?.value?.value || 'nigeria';
+  const scope = scopeRow.rows[0]?.value?.value || 'lga_list';
   let locations = [];
   try {
     locations = JSON.parse(locationsRow.rows[0]?.value?.value || '[]');
@@ -77,7 +73,7 @@ const getSurveyLocationConfig = async () => {
 
 exports.getSurveyLocationConfigForAdmin = async () => getSurveyLocationConfig();
 
-// Public: gate status for the client (enabled + allowed areas only).
+// Public: gate status for the client (enabled + allowed state/LGA list).
 exports.getSurveyLocationConfig = async (req, res) => {
   try {
     const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
@@ -92,10 +88,8 @@ exports.getSurveyLocationConfig = async (req, res) => {
         scope: gateEnabled ? config.scope : null,
         allowed_locations: gateEnabled
           ? config.locations.map((l) => ({
-              label: l.label || `${l.lat},${l.lng}`,
-              lat: Number(l.lat),
-              lng: Number(l.lng),
-              radius_km: Number(l.radius_km) || 30,
+              state_name: String(l.state_name || '').trim(),
+              lga_name: String(l.lga_name || '').trim(),
             }))
           : [],
       },
@@ -127,7 +121,13 @@ const ipIsForeignOrVpn = (verdicts) => {
   return allForeign || allVpn;
 };
 
-// Public: verify the device is inside the allowed area and not on a VPN.
+const getIpVerdictsFor = async (req) => {
+  const { getClientIp, getIpVerdicts } = require('../config/utils/ipGeo');
+  const ip = getClientIp(req);
+  return getIpVerdicts(ip);
+};
+
+// Public: verify the device is inside an ENABLED state + LGA and not on a VPN.
 exports.checkSurveyLocation = async (req, res) => {
   try {
     const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
@@ -137,42 +137,40 @@ exports.checkSurveyLocation = async (req, res) => {
     }
 
     const config = await getSurveyLocationConfig();
-    const lat = Number(req.query.lat);
-    const lng = Number(req.query.lng);
-    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
-    const ip = getClientIp(req);
-    const { getIpVerdicts } = require('../config/utils/ipGeo');
-    const verdicts = await getIpVerdicts(ip);
+    const deviceState = String(req.query.state || req.query.state_name || '').trim();
+    const deviceLga = String(req.query.lga || req.query.lga_name || '').trim();
 
-    // 1) Device location (when available).
-    if (hasCoords) {
-      let locationOk = false;
-      if (config.scope === 'locations') {
-        locationOk = config.locations.some(
-          (l) =>
-            haversineKm(lat, lng, Number(l.lat), Number(l.lng)) <= (Number(l.radius_km) || 30)
-        );
-      } else {
-        locationOk = lat >= 3 && lat <= 15 && lng >= 2 && lng <= 15;
-      }
-
-      if (!locationOk) {
-        return res.json({ success: true, data: { allowed: false, reason: 'not_in_area' } });
-      }
-    } else if (config.scope === 'locations') {
-      // Specific-location scope requires working device GPS.
-      return res.json({ success: true, data: { allowed: false, reason: 'location_required' } });
+    if (!deviceLga) {
+      return res.json({
+        success: true,
+        data: { allowed: false, reason: 'location_required' },
+      });
     }
 
-    // 2) IP consensus: only block when all providers agree it's foreign/VPN.
+    const verdicts = await getIpVerdictsFor(req);
+
+    // 1) VPN / foreign-IP consensus — blocks even legit-LGA devices on VPNs.
     if (ipIsForeignOrVpn(verdicts)) {
-      const blocked = verdicts.some((v) => v.proxy || v.hosting || v.vpn);
+      const vpnFlagged = verdicts.some((v) => v.proxy || v.hosting || v.vpn);
       return res.json({
         success: true,
         data: {
           allowed: false,
-          reason: blocked ? 'vpn_detected' : 'outside_nigeria',
+          reason: vpnFlagged ? 'vpn_detected' : 'outside_nigeria',
           ip_country: verdicts[0]?.country_code || null,
+        },
+      });
+    }
+
+    // 2) Exact state + LGA match against the enabled list.
+    if (!isAllowedSurveyLocation(config, deviceState, deviceLga)) {
+      return res.json({
+        success: true,
+        data: {
+          allowed: false,
+          reason: 'lga_not_allowed',
+          device_state: deviceState,
+          device_lga: deviceLga,
         },
       });
     }
@@ -183,7 +181,8 @@ exports.checkSurveyLocation = async (req, res) => {
         allowed: true,
         reason: null,
         ip_country: verdicts[0]?.country_code || null,
-        verdicts: verdicts.map((v) => v.country_code),
+        device_state: deviceState,
+        device_lga: deviceLga,
       },
     });
   } catch (error) {
@@ -199,31 +198,19 @@ const enforceLocationGate = async (req, body) => {
   if (map.survey_location_gate !== true) return { allowed: true };
 
   const config = await getSurveyLocationConfig();
-  const lat = Number(body.lat);
-  const lng = Number(body.lng);
-  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
-  const ip = getClientIp(req);
-  const { getIpVerdicts } = require('../config/utils/ipGeo');
-  const verdicts = await getIpVerdicts(ip);
+  const deviceState = String(body.state_name || body.state || '').trim();
+  const deviceLga = String(body.lga_name || body.lga || '').trim();
 
-  if (hasCoords) {
-    let locationOk = false;
-    if (config.scope === 'locations') {
-      locationOk = config.locations.some(
-        (l) => haversineKm(lat, lng, Number(l.lat), Number(l.lng)) <= (Number(l.radius_km) || 30)
-      );
-    } else {
-      locationOk = lat >= 3 && lat <= 15 && lng >= 2 && lng <= 15;
-    }
-    if (!locationOk) return { allowed: false, reason: 'not_in_area' };
-  } else if (config.scope === 'locations') {
-    return { allowed: false, reason: 'location_required' };
+  if (!deviceLga) return { allowed: false, reason: 'location_required' };
+
+  const verdicts = await getIpVerdictsFor(req);
+  if (ipIsForeignOrVpn(verdicts)) {
+    const vpnFlagged = verdicts.some((v) => v.proxy || v.hosting || v.vpn);
+    return { allowed: false, reason: vpnFlagged ? 'vpn_detected' : 'outside_nigeria' };
   }
 
-  // IP consensus: block only when ALL providers agree foreign/VPN.
-  if (ipIsForeignOrVpn(verdicts)) {
-    const blocked = verdicts.some((v) => v.proxy || v.hosting || v.vpn);
-    return { allowed: false, reason: blocked ? 'vpn_detected' : 'outside_nigeria' };
+  if (!isAllowedSurveyLocation(config, deviceState, deviceLga)) {
+    return { allowed: false, reason: 'lga_not_allowed' };
   }
 
   return { allowed: true };
@@ -231,7 +218,7 @@ const enforceLocationGate = async (req, body) => {
 
 const LOCATION_REASONS = {
   location_required: 'We could not confirm your location. Please enable location access and try again.',
-  not_in_area: 'The survey is only available in the allowed survey area right now.',
+  lga_not_allowed: 'The survey is not available yet for you in this local government area.',
   vpn_detected: 'VPN connections are not allowed for this survey. Please turn off your VPN and try again.',
   outside_nigeria: 'This survey is only available to respondents in Nigeria.',
 };
@@ -364,7 +351,7 @@ exports.savePublicDraft = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Unknown survey type' });
     }
 
-    // Location/VPN gate — enforced on every draft save.
+    // Location/VPN gate â€” enforced on every draft save.
     const gate = await enforceLocationGate(req, req.body || {});
     if (!gate.allowed) {
       return res.status(403).json({
@@ -813,7 +800,7 @@ exports.submitPublicSurvey = async (req, res) => {
       });
     }
 
-    // Location/VPN gate — enforced on final submission too.
+    // Location/VPN gate â€” enforced on final submission too.
     const gate = await enforceLocationGate(req, req.body || {});
     if (!gate.allowed) {
       return res.status(403).json({

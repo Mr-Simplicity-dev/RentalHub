@@ -296,7 +296,7 @@ export default function LocationPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-gray-900">
-                  {t('location_page.verified_properties', { location: locationLabel })}
+                  {t('location_page.verified_properties_in', { location: locationLabel })}
                 </h2>
                 <p className="mt-2 text-sm text-gray-600">
                   {t('location_page.seo_note')}
@@ -306,7 +306,7 @@ export default function LocationPage() {
                 to="/properties"
                 className="rounded-full border border-primary-200 px-4 py-2 text-sm font-medium text-primary-700"
               >
-                {t('location_page.browse_properties')}
+                {t('location_page.browse_all')}
               </Link>
             </div>
 

@@ -21,9 +21,12 @@ const SurveyAdminPanel = () => {
   const [projBudget, setProjBudget] = useState(5000000);
   const [paperOpen, setPaperOpen] = useState(false);
   const [locConfig, setLocConfig] = useState(null);
-  const [locScope, setLocScope] = useState("nigeria");
+  const [locScope, setLocScope] = useState("lga_list");
   const [locList, setLocList] = useState([]);
   const [locSaving, setLocSaving] = useState(false);
+  const [locOptions, setLocOptions] = useState([]);
+  const [locNewState, setLocNewState] = useState("");
+  const [locNewLga, setLocNewLga] = useState("");
   const [fxConfig, setFxConfig] = useState({ black_market_usd_rate: 1600, foreign_card_conversion_fee_usd: 5 });
   const [fxSaving, setFxSaving] = useState(false);
   const [paperMeta, setPaperMeta] = useState({
@@ -70,14 +73,32 @@ const SurveyAdminPanel = () => {
 
   const loadLocationConfig = useCallback(async () => {
     try {
-      const res = await api.get("/admin/survey/location-config");
-      setLocConfig(res.data.data);
-      setLocScope(res.data.data.scope || "nigeria");
-      setLocList(res.data.data.locations || []);
+      const [configRes, optionsRes] = await Promise.all([
+        api.get("/admin/survey/location-config"),
+        api.get("/property-utils/location-options"),
+      ]);
+      setLocConfig(configRes.data.data);
+      setLocScope(configRes.data.data.scope || "lga_list");
+      setLocList(configRes.data.data.locations || []);
+      setLocOptions(optionsRes.data.data || []);
     } catch {
       // ignore
     }
   }, []);
+
+  const addLocationRule = () => {
+    if (!locNewState || !locNewLga) {
+      toast.error("Select a state and an LGA first");
+      return;
+    }
+    const stateName = locOptions.find((s) => String(s.id) === String(locNewState))?.state_name || locNewState;
+    if (locList.some((l) => l.lga_name === locNewLga && l.state_name === stateName)) {
+      toast.error("That state/LGA is already enabled");
+      return;
+    }
+    setLocList([...locList, { state_name: stateName, lga_name: locNewLga }]);
+    setLocNewLga("");
+  };
 
   const loadFxConfig = useCallback(async () => {
     try {
@@ -697,94 +718,77 @@ const SurveyAdminPanel = () => {
                 {locConfig?.gate_enabled ? "ENABLED" : "DISABLED"}
               </span>{" "}
               — toggle it from Super Admin → Flags (the "Survey Location Gate" flag). When enabled,
-              respondents must be physically in the allowed area (real-time device location) and VPN/proxy
-              connections are blocked.
+              only respondents whose device location resolves to an ENABLED state + LGA below can take
+              the survey. Anyone else sees "not available in this local government". VPN/proxy
+              connections are blocked (consensus across two IP providers).
             </p>
           </div>
 
           <div className="rounded-xl border border-soft p-4">
-            <p className="mb-2 text-sm font-semibold text-gray-700">Allowed scope</p>
-            <select
-              value={locScope}
-              onChange={(e) => setLocScope(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="nigeria">Anywhere in Nigeria</option>
-              <option value="locations">Only the listed locations below</option>
-            </select>
-          </div>
+            <p className="mb-2 text-sm font-semibold text-gray-700">Enabled states & LGAs</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <select
+                value={locNewState}
+                onChange={(e) => {
+                  setLocNewState(e.target.value);
+                  setLocNewLga("");
+                }}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="">Select state…</option>
+                {locOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.state_name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={locNewLga}
+                onChange={(e) => setLocNewLga(e.target.value)}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                disabled={!locNewState}
+              >
+                <option value="">Select LGA…</option>
+                {(locOptions.find((s) => String(s.id) === String(locNewState))?.lgas || []).map((lga) => (
+                  <option key={lga} value={lga}>
+                    {lga}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={addLocationRule}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                Enable
+              </button>
+            </div>
 
-          {locScope === "locations" && (
-            <div className="rounded-xl border border-soft p-4">
-              <p className="mb-2 text-sm font-semibold text-gray-700">Allowed locations</p>
+            <div className="mt-4 space-y-2">
+              {locList.length === 0 && (
+                <p className="rounded-lg bg-gray-50 px-3 py-4 text-center text-sm text-gray-400">
+                  No locations enabled yet — the survey will be unavailable everywhere while the gate is on.
+                </p>
+              )}
               {locList.map((loc, i) => (
-                <div key={i} className="mb-2 grid grid-cols-1 gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2 sm:grid-cols-4">
-                  <input
-                    value={loc.label || ""}
-                    onChange={(e) => {
-                      const next = [...locList];
-                      next[i] = { ...next[i], label: e.target.value };
-                      setLocList(next);
-                    }}
-                    placeholder="Label (e.g. FCT Gwagwalada)"
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm sm:col-span-2"
-                  />
-                  <input
-                    type="number"
-                    step="any"
-                    value={loc.lat}
-                    onChange={(e) => {
-                      const next = [...locList];
-                      next[i] = { ...next[i], lat: Number(e.target.value) };
-                      setLocList(next);
-                    }}
-                    placeholder="Latitude"
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    step="any"
-                    value={loc.lng}
-                    onChange={(e) => {
-                      const next = [...locList];
-                      next[i] = { ...next[i], lng: Number(e.target.value) };
-                      setLocList(next);
-                    }}
-                    placeholder="Longitude"
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    value={loc.radius_km}
-                    onChange={(e) => {
-                      const next = [...locList];
-                      next[i] = { ...next[i], radius_km: Number(e.target.value) };
-                      setLocList(next);
-                    }}
-                    placeholder="Radius km"
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
+                <div
+                  key={`${loc.state_name}-${loc.lga_name}`}
+                  className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm"
+                >
+                  <span className="text-gray-700">
+                    <strong>{loc.lga_name}</strong> — {loc.state_name}
+                  </span>
                   <button
                     type="button"
                     onClick={() => setLocList(locList.filter((_, j) => j !== i))}
-                    className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                    className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
                   >
                     Remove
                   </button>
                 </div>
               ))}
-              <button
-                type="button"
-                onClick={() => setLocList([...locList, { label: "", lat: 0, lng: 0, radius_km: 30 }])}
-                className="mt-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                + Add location
-              </button>
-              <p className="mt-2 text-xs text-gray-400">
-                Tip: find any place's latitude/longitude on Google Maps (right-click the spot).
-              </p>
             </div>
-          )}
+          </div>
 
           <button
             type="button"

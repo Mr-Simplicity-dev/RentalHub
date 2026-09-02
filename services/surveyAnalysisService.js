@@ -678,25 +678,21 @@ exports.saveFxConfig = async (req, res) => {
 // ── Survey location gate config (admin) ────────────────────────────────────
 exports.saveLocationConfig = async (req, res) => {
   try {
-    const { scope, locations } = req.body;
+    const { locations } = req.body;
 
-    const validScope = String(scope || 'nigeria') === 'locations' ? 'locations' : 'nigeria';
     let cleanLocations = [];
     if (Array.isArray(locations)) {
       cleanLocations = locations
         .filter(
           (l) =>
             l &&
-            Number.isFinite(Number(l.lat)) &&
-            Number.isFinite(Number(l.lng)) &&
-            Number.isFinite(Number(l.radius_km))
+            String(l.state_name || '').trim().length >= 2 &&
+            String(l.lga_name || '').trim().length >= 2
         )
-        .slice(0, 50)
+        .slice(0, 100)
         .map((l) => ({
-          label: String(l.label || '').trim().slice(0, 120) || `${l.lat},${l.lng}`,
-          lat: Number(l.lat),
-          lng: Number(l.lng),
-          radius_km: Number(l.radius_km),
+          state_name: String(l.state_name).trim().slice(0, 120),
+          lga_name: String(l.lga_name).trim().slice(0, 120),
         }));
     }
 
@@ -706,7 +702,7 @@ exports.saveLocationConfig = async (req, res) => {
               ('survey_allowed_locations', $2)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
       [
-        JSON.stringify({ value: validScope }),
+        JSON.stringify({ value: 'lga_list' }),
         JSON.stringify({ value: JSON.stringify(cleanLocations) }),
       ]
     );
@@ -714,7 +710,7 @@ exports.saveLocationConfig = async (req, res) => {
     return res.json({
       success: true,
       message: 'Survey location rules saved',
-      data: { scope: validScope, locations: cleanLocations },
+      data: { scope: 'lga_list', locations: cleanLocations },
     });
   } catch (error) {
     req.logger.error('Survey location config save error:', error);

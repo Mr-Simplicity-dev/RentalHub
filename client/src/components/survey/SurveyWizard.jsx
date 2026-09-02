@@ -19,7 +19,7 @@ export default function SurveyWizard({
   collectContacts = false,
   agentMode = false,
   prefillContact = null,
-  locationCoords = null,
+  locationInfo = null, // { state, lga } resolved from device GPS
   onComplete,
   onExit,
   showExit = false,
@@ -181,8 +181,8 @@ export default function SurveyWizard({
           consent_flags: consentFlags,
           resume_token: token,
           agent: agentMode ? { ...agentSession } : undefined,
-          lat: locationCoords?.lat,
-          lng: locationCoords?.lng,
+          state_name: locationInfo?.state || '',
+          lga_name: locationInfo?.lga || '',
         });
         const returnedToken = res.data?.data?.resume_token;
         if (returnedToken && returnedToken !== token) {
@@ -193,7 +193,7 @@ export default function SurveyWizard({
       }
     }, 1200);
     return () => clearTimeout(timer);
-  }, [answers, consentFlags, surveyType, agentMode, agentSession, publicMode, paperMode, locationCoords]);
+  }, [answers, consentFlags, surveyType, agentMode, agentSession, publicMode, paperMode, locationInfo]);
 
   const setAnswer = (value) => {
     if (!currentQuestion) return;
@@ -262,8 +262,8 @@ export default function SurveyWizard({
               resume_token: localStorage.getItem(RESUME_KEY) || '',
               time_spent_seconds: Math.round((Date.now() - startedAt) / 1000),
               turnstile_token: turnstileToken,
-              lat: locationCoords?.lat,
-              lng: locationCoords?.lng,
+              state_name: locationInfo?.state || '',
+              lga_name: locationInfo?.lga || '',
             }
           );
           localStorage.removeItem(RESUME_KEY);
@@ -701,7 +701,7 @@ export default function SurveyWizard({
 
   const exitLabel = mode === 'partA'
     ? t('survey.part_a_title', 'A few quick questions before you continue')
-    : t('survey.title', 'RentalHub NG SurveyResearch Survey');
+    : t('survey.title', 'RentalHub NG Research Survey');
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6">

@@ -12,6 +12,7 @@ const REMIND_KEY = 'rentalhub_survey_remind';
 const GOOGLE_KEY = 'rentalhub_survey_google';
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+const GOOGLE_MAPS_KEY = process.env.REACT_APP_GOOGLE_MAPS_KEY || '';
 
 const urlBase64ToUint8Array = (base64) => {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
@@ -35,6 +36,57 @@ const decodeGoogleCredential = (credential) => {
   }
 };
 
+// Resolve GPS coordinates to { state, lga } names via the Google Maps
+// Geocoder (admin enables surveys by state + LGA, so names are required).
+const geocodeToStateAndLga = (lat, lng) =>
+  new Promise((resolve) => {
+    const loadMaps = () =>
+      new Promise((res) => {
+        if (window.google?.maps?.Geocoder) return res(true);
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&loading=async`;
+        script.async = true;
+        script.onload = () => res(true);
+        script.onerror = () => res(false);
+        document.body.appendChild(script);
+        setTimeout(() => res(Boolean(window.google?.maps?.Geocoder)), 8000);
+      });
+
+    loadMaps().then((ok) => {
+      if (!ok) return resolve(null);
+      try {
+        new window.google.maps.Geocoder().geocode(
+          { location: { lat, lng } },
+          (results) => {
+            if (!results || !results.length) return resolve(null);
+            let state = '';
+            let lga = '';
+            for (const component of results[0].address_components || []) {
+              const types = component.types || [];
+              if (types.includes('administrative_area_level_1')) {
+                state = component.long_name || '';
+              }
+              if (types.includes('administrative_area_level_2')) {
+                lga = component.long_name || '';
+              }
+            }
+            // Fallback for places where the LGA surfaces as the locality.
+            if (!lga) {
+              for (const component of results[0].address_components || []) {
+                if ((component.types || []).includes('locality')) {
+                  lga = component.long_name || '';
+                }
+              }
+            }
+            resolve({ state, lga });
+          }
+        );
+      } catch {
+        resolve(null);
+      }
+    });
+  });
+
 /**
  * Public survey page: rentalhub.com.ng/survey
  * - Blocking "Remind me to finish later" popup (attended before type choice)
@@ -53,15 +105,15 @@ const PublicSurveyPage = () => {
   const [prefillContact, setPrefillContact] = useState(null);
   const [locationState, setLocationState] = useState('checking'); // checking | ok | blocked
   const [locationBlockReason, setLocationBlockReason] = useState('');
-  const [locationCoords, setLocationCoords] = useState(null);
+  const [locationInfo, setLocationInfo] = useState(null); // { state, lga }
   const googleButtonRef = useRef(null);
   const googleReady = useRef(false);
 
   const isMarketingAgent = user?.user_type === 'marketing_agent';
   const agentMode = isMarketingAgent && searchParams.get('agent') === '1';
 
-  // Location/VPN gate: verify the device is inside the allowed area BEFORE
-  // the reminder popup and any survey activity.
+  // Location gate: resolve GPS -> state+LGA names (enabled per state/LGA),
+  // then ask the server. VPNs are blocked server-side (consensus).
   useEffect(() => {
     let active = true;
 
@@ -69,7 +121,7 @@ const PublicSurveyPage = () => {
       try {
         const configRes = await api.get('/survey/location-config');
         const config = configRes.data?.data || {};
-        if (!config.gate_enabled) {
+        if (!config.gate_enabled || config.scope !== 'lga_list') {
           if (active) setLocationState('ok');
           return;
         }
@@ -87,27 +139,42 @@ const PublicSurveyPage = () => {
           );
         });
 
-        // No GPS? Still ask the server — with the Nigeria scope a clean
-        // Nigerian IP is enough (GPS-denied phones should not be blocked).
+        if (!coords) {
+          if (active) {
+            setLocationBlockReason('location_required');
+            setLocationState('blocked');
+          }
+          return;
+        }
+
+        const place = await geocodeToStateAndLga(coords.lat, coords.lng);
+        const resolved = {
+          state: place?.state || '',
+          lga: place?.lga || '',
+        };
+        if (!resolved.lga) {
+          if (active) {
+            setLocationBlockReason('location_required');
+            setLocationState('blocked');
+          }
+          return;
+        }
+
         const checkRes = await api.get(
-          coords
-            ? `/survey/location-check?lat=${coords.lat}&lng=${coords.lng}`
-            : `/survey/location-check`
+          `/survey/location-check?state=${encodeURIComponent(resolved.state)}&lga=${encodeURIComponent(resolved.lga)}`
         );
         const result = checkRes.data?.data || {};
         if (!result.allowed) {
           if (active) {
-            setLocationBlockReason(result.reason || 'not_in_area');
+            setLocationBlockReason(result.reason || 'lga_not_allowed');
             setLocationState('blocked');
           }
           return;
         }
 
         if (active) {
-          if (coords) {
-            setLocationCoords(coords);
-            localStorage.setItem('rentalhub_survey_coords', JSON.stringify(coords));
-          }
+          setLocationInfo(resolved);
+          localStorage.setItem('rentalhub_survey_location', JSON.stringify(resolved));
           setLocationState('ok');
         }
       } catch {
@@ -302,7 +369,7 @@ const PublicSurveyPage = () => {
           collectContacts
           agentMode={agentMode}
           prefillContact={prefillContact}
-          locationCoords={locationCoords}
+          locationInfo={locationInfo}
           onComplete={() => {
             localStorage.removeItem(TYPE_KEY);
             setSubmitted(true);
@@ -314,18 +381,10 @@ const PublicSurveyPage = () => {
 
   const LOCATION_MESSAGES = {
     location_required: t('public_survey.loc_required', 'We could not confirm your location. Please enable location access and try again.'),
-    not_in_area: t('public_survey.loc_area', 'The survey is only available in the allowed survey area right now.'),
+    lga_not_allowed: t('public_survey.loc_lga', 'The survey is not available yet for you in this local government area.'),
     vpn_detected: t('public_survey.loc_vpn', 'VPN connections are not allowed for this survey. Please turn off your VPN and try again.'),
     outside_nigeria: t('public_survey.loc_country', 'This survey is only available to respondents in Nigeria.'),
   };
-
-  if (locationState === 'checking') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-indigo-600" />
-      </div>
-    );
-  }
 
   if (locationState === 'blocked') {
     return (
@@ -347,8 +406,8 @@ const PublicSurveyPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
-      {/* Blocking reminder popup — attended before choosing tenant/landlord */}
-      {showReminder && (
+      {/* Blocking reminder popup — appears after location passes, before choosing */}
+      {locationState === 'ok' && showReminder && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
@@ -417,7 +476,7 @@ const PublicSurveyPage = () => {
           )}
 
           <h1 className="text-2xl font-bold text-gray-900">
-            {t('public_survey.title', 'RentalHub NG SurveyResearch Survey')}
+            {t('public_survey.title', 'RentalHub NG Research Survey')}
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             {t('public_survey.subtitle', 'Help us understand how Nigerians find and pay for rental homes. Your answers are anonymous and used only for research. Estimated time: 15–20 minutes.')}
@@ -445,11 +504,19 @@ const PublicSurveyPage = () => {
               : t('public_survey.choose', 'Who are you?')}
           </p>
 
+          {locationState === 'checking' && (
+            <p className="mt-2 flex items-center justify-center gap-2 text-xs text-gray-400">
+              <span className="h-3 w-3 animate-spin rounded-full border-b-2 border-indigo-600" />
+              {t('public_survey.loc_checking', 'Confirming your local government area…')}
+            </p>
+          )}
+
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => pickType('tenant')}
-              className="rounded-xl border-2 border-gray-200 bg-white p-5 text-left transition hover:border-indigo-500"
+              disabled={locationState === 'checking'}
+              className="rounded-xl border-2 border-gray-200 bg-white p-5 text-left transition hover:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <p className="font-bold text-gray-900">{t('public_survey.tenant', 'Tenant / Rent Seeker')}</p>
               <p className="mt-1 text-xs text-gray-500">
@@ -459,7 +526,8 @@ const PublicSurveyPage = () => {
             <button
               type="button"
               onClick={() => pickType('landlord')}
-              className="rounded-xl border-2 border-gray-200 bg-white p-5 text-left transition hover:border-indigo-500"
+              disabled={locationState === 'checking'}
+              className="rounded-xl border-2 border-gray-200 bg-white p-5 text-left transition hover:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <p className="font-bold text-gray-900">{t('public_survey.landlord', 'Landlord / Property Owner')}</p>
               <p className="mt-1 text-xs text-gray-500">
