@@ -698,6 +698,7 @@ app.use('/api/sms-marketing', generalOpsLimiter, smsMarketingRoutes);
 app.use('/api/platform-ratings', generalOpsLimiter, platformRatingRoutes);
 app.use('/api/recruitment', generalOpsLimiter, recruitmentRoutes);
 app.use('/api/referrals', generalOpsLimiter, referralRoutes);
+app.use('/api/rent-stats', generalOpsLimiter, require('./routes/rentStats'));
 
 app.use('/api/disputes', generalOpsLimiter, disputesRoutes);
 app.use('/api/disputes', generalOpsLimiter, disputeRoutes);
