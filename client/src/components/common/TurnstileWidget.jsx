@@ -45,7 +45,10 @@ const TurnstileWidget = forwardRef(({ action, onToken, onExpire, onError }, ref)
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: SITE_KEY,
           action,
-          appearance: 'interaction-only',
+          // Render the widget immediately so users always see the checkbox
+          // before submitting. "interaction-only" hides it until Cloudflare
+          // detects an interaction, which left many users unable to log in.
+          appearance: 'always',
           execution: 'render',
           theme: 'auto',
           retry: 'auto',

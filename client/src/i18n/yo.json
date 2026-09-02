@@ -1735,7 +1735,9 @@
     "all_lgas_in": "Gbogbo àwọn LGA ní {{state}}",
     "houses_for_rent_in": "Àwọn ilé yíyá ní {{name}}",
     "verified_properties_in": "Àwọn Ohun-Inì Tí A Fọwọ́ Sí Ní {{location}}",
-    "seo_note": "Àwọn ojú-ewé SEO orísun ohun-inì máa ń dára jùlọ nígbà tí wọ́n bá sopọ̀ ìtọ́sọ́nà ibi pẹ̀lú àwọn ohun-inì tó wà lọ́wọ́ tí a fọwọ́ sí.",
+
+    "houses_for_rent_in_state": "Àwọn ilé yíyá ní {{state}}",
+    "lgas_subtitle": "Ṣàwárí àwọn ìjọba ìbílẹ̀ ní {{state}} láti rí ilé tó sún mọ́ ọ.",    "seo_note": "Àwọn ojú-ewé SEO orísun ohun-inì máa ń dára jùlọ nígbà tí wọ́n bá sopọ̀ ìtọ́sọ́nà ibi pẹ̀lú àwọn ohun-inì tó wà lọ́wọ́ tí a fọwọ́ sí.",
     "browse_all": "Wo gbogbo àwọn ohun-inì",
     "no_properties": "Kò sí àwọn ohun-inì tí a fọwọ́ sí tó wà lọ́wọ́ lórí ojú-ewé ibi yìí.",
     "faq": "Ìbéèrè Àwọn Tó Wọ́pọ̀",

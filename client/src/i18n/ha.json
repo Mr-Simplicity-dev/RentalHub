@@ -1735,7 +1735,9 @@
     "all_lgas_in": "Duk LGAs a {{state}}",
     "houses_for_rent_in": "Gidaje don haya a {{name}}",
     "verified_properties_in": "Gidajen Da Aka Tabbatar a {{location}}",
-    "seo_note": "Shafukan SEO na gidaje suna aiki mafi kyau lokacin da suka haɗa jagorar wuri da cikakken jeri na gidaje masu aiki.",
+
+    "houses_for_rent_in_state": "Gidaje don haya a {{state}}",
+    "lgas_subtitle": "Bincika kananan hukumomi a {{state}} don samun gidaje kusa da ku.",    "seo_note": "Shafukan SEO na gidaje suna aiki mafi kyau lokacin da suka haɗa jagorar wuri da cikakken jeri na gidaje masu aiki.",
     "browse_all": "Bincika duk gidaje",
     "no_properties": "Babu gidajen da aka tabbatar a wannan shafin wuri tukuna.",
     "faq": "Tambayoyi",

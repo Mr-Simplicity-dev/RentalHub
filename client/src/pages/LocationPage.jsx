@@ -276,8 +276,11 @@ export default function LocationPage() {
           {data.links?.lgas?.length > 0 && (
             <section className="mt-8 rounded-3xl bg-white p-8 shadow-sm">
               <h2 className="text-2xl font-semibold text-gray-900">
-                {t('location_page.all_lgas_in', { state: data.location.state })}
+                {t('location_page.houses_for_rent_in_state', { state: data.location.state })}
               </h2>
+              <p className="mt-2 text-sm text-gray-500">
+                {t('location_page.lgas_subtitle', 'Browse local government areas in {{state}} to find homes near you.')}
+              </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {data.links.lgas.map((item) => (
                   <Link
@@ -285,7 +288,7 @@ export default function LocationPage() {
                     to={item.url}
                     className="rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 transition hover:border-primary-300 hover:text-primary-700"
                   >
-                    {t('location_page.houses_for_rent_in', { name: item.name })}
+                    {item.name}
                   </Link>
                 ))}
               </div>

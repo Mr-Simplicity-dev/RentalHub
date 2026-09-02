@@ -1735,7 +1735,9 @@
     "all_lgas_in": "LGA niile na {{state}}",
     "houses_for_rent_in": "Ụlọ maka mgbazinye na {{name}}",
     "verified_properties_in": "Ụlọ Enyocharala Na {{location}}",
-    "seo_note": "Ibe SEO ụlọ na-arụ ọrụ kacha mma mgbe ha jikọtara ntuziaka ọnọdụ na ndepụta dị ndụ enyocharala.",
+
+    "houses_for_rent_in_state": "Ụlọ maka mgbazinye na {{state}}",
+    "lgas_subtitle": "Chọgharịa mpaghara ọchịchị ime obodo na {{state}} iji chọta ụlọ dị nso gị.",    "seo_note": "Ibe SEO ụlọ na-arụ ọrụ kacha mma mgbe ha jikọtara ntuziaka ọnọdụ na ndepụta dị ndụ enyocharala.",
     "browse_all": "Chọgharịa ụlọ niile",
     "no_properties": "Enweghị ụlọ enyocharala dị na ibe ọnọdụ a.",
     "faq": "Ajụjụ",

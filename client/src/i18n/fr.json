@@ -1725,7 +1725,9 @@
     "all_lgas_in": "All LGAs in {{state}}",
     "houses_for_rent_in": "Houses for rent in {{name}}",
     "verified_properties_in": "Verified Properties in {{location}}",
-    "seo_note": "Property-based SEO pages work best when they connect a location guide to live verified inventory.",
+
+    "houses_for_rent_in_state": "Maisons à louer au {{state}}",
+    "lgas_subtitle": "Parcourez les zones de gouvernement local au {{state}} pour trouver un logement près de chez vous.",    "seo_note": "Property-based SEO pages work best when they connect a location guide to live verified inventory.",
     "browse_all": "Browse all properties",
     "no_properties": "No verified properties are live on this location page yet.",
     "faq": "FAQ",
