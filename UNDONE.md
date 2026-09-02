@@ -66,6 +66,13 @@
   - **GPS denied is no longer a block** for the Nigeria scope: no coords → server checks IP only (clean Nigerian IP = allowed). Phones without location permission pass.
   - "Sign in with Google" button is now the **FIRST thing** on the /survey landing (above title/cards), with a hint line; hidden in agent mode.
 
+- [x] **DONE (2026-08-31) — State+LGA enabled-list gate + Google-first landing** (`539e51e`, migration 139, verified live):
+  - **Model replaced**: the survey gate is now an explicit **enabled state+LGA list** (like registration access rules) instead of lat/lng circles or "whole Nigeria". Stored in app_settings `survey_allowed_locations` as `[{state_name, lga_name}]` (seeded: FCT → Gwagwalada). Config endpoint + admin UI (Survey tab → Location Rules) now use **state/LGA dropdowns** from `/property-utils/location-options` (37 states + their LGAs) with Enable/Remove/Save.
+  - **Device matching**: client GPS → Google Maps reverse geocode (browser key) → state (admin_area_level_1) + LGA (admin_area_level_2, locality fallback) → `/survey/location-check?state&lga` → server matches names (normalized, lenient containment; FCT alias aware). Draft/submit carry state_name/lga_name; enforcement 403 LOCATION_BLOCKED.
+  - **Rules verified live**: Gwagwalada (enabled) allowed; Kuje (not enabled) → `lga_not_allowed` — "The survey is not available yet for you in this local government area."; missing LGA → location_required; VPN/foreign IP consensus still blocks regardless of LGA.
+  - **Google-first landing**: the page renders immediately with "Sign in with Google" as the first element; the location check runs in the background (tenant/landlord cards disabled with "Confirming your local government area…"); blocked users get the not-available screen; the reminder popup appears only after location passes.
+  - NOTE: exact-LGA gating requires working device GPS + Google reverse geocoding (browser Maps key REACT_APP_GOOGLE_MAPS_KEY already set). Google's LGA naming must match our dropdown names — containment matching handles most variants (e.g., "Federal Capital Territory" vs "FCT"). If a real device LGA fails to match, verify the Google-resolved name via the server's device_state/device_lga echo in the response.
+
 ---
 
 ## SURVEY SYSTEM — MASTER RECORD (self-contained; read this if memory is wiped)
