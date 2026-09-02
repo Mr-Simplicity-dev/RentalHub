@@ -26,7 +26,7 @@
 
 - [ ] **tagthemall-server crash-looping** (~1000+ restarts; separate service, likely Mongo issue) — investigate and stabilise.
 
-- [ ] **Stray nginx config `/etc/nginx/sites-enabled/rentalhub.bak- ` (trailing space)** — causes duplicate/conflicting server_name warnings; remove it.
+- [x] **DONE — Stray nginx configs removed (2026-09-02)** — `/etc/nginx/sites-enabled/rentalhub.bak- ` (trailing space) and `rentalhub.bak-fix` removed; conflicting server_name warnings gone from `nginx -t`; both backed up to `/root/nginx-backups` on the VPS.
 
 - [ ] **Local dev environment broken** — wrong Atlas Mongo credentials + no local Postgres; must be fixed before any local development/testing.
 
