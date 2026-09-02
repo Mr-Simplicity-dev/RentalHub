@@ -88,7 +88,20 @@ const TurnstileWidget = forwardRef(({ action, onToken, onExpire, onError }, ref)
 
   if (!SITE_KEY) return null;
 
-  return <div ref={containerRef} />;
+  // Turnstile renders a fixed ~300px iframe. On narrow/mobile modals it would
+  // overflow the card, so the widget is centered when there is room and
+  // horizontally scrollable when the viewport is tighter than the widget.
+  return (
+    <div
+      className="cf-turnstile-scroll"
+      style={{ width: '100%', overflowX: 'auto', overflowY: 'visible', minHeight: 65 }}
+    >
+      <div
+        ref={containerRef}
+        style={{ margin: '0 auto', width: 'max-content', minWidth: 300, maxWidth: '100%' }}
+      />
+    </div>
+  );
 });
 
 TurnstileWidget.displayName = 'TurnstileWidget';
