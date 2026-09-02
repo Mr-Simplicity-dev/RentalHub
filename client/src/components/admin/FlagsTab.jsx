@@ -142,7 +142,14 @@ const FlagsTab = ({ flags, toggleFlag }) => {
     );
 
     return mergedFlags
-      .filter((flag) => !registrationKeys.has(flag.key))
+      .filter(
+        (flag) =>
+          !registrationKeys.has(flag.key) &&
+          // The Survey Location Gate is controlled from Survey -> Location
+          // Rules (audited toggle). Keeping a second switch here caused
+          // confusion, so it is hidden from the generic flags list.
+          flag.key !== "survey_location_gate"
+      )
       .sort((a, b) => {
         const aWeight = weight.has(a.key) ? weight.get(a.key) : Number.MAX_SAFE_INTEGER;
         const bWeight = weight.has(b.key) ? weight.get(b.key) : Number.MAX_SAFE_INTEGER;
