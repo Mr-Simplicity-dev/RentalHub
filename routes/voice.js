@@ -1640,10 +1640,10 @@ const getConferenceParticipantByCallSid = async (conferenceSid, callSid) => {
 
 router.post('/escalate', voiceTokenLimiter, authenticate, requireVoiceAgent, async (req, res) => {
   const action = String(req.body?.action || '').trim();
-  if (!['consult', 'transfer', 'cancel-consult', 'relate'].includes(action)) {
+  if (!['consult', 'transfer', 'cancel-consult', 'relate', 'consult-up', 'transfer-up'].includes(action)) {
     return res.status(400).json({
       success: false,
-      message: 'Escalation action must be "consult", "transfer", "cancel-consult" or "relate".',
+      message: 'Escalation action must be "consult", "transfer", "cancel-consult", "relate", "consult-up" or "transfer-up".',
     });
   }
 
@@ -1760,6 +1760,113 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireVoiceAgent, asy
     logger.info('Consultation cancelled', {
       callerCallSid: context.callerCallSid,
       agentCallSid,
+    });
+    return res.json({ success: true });
+  }
+
+  // Phase 4: geographic hand-off UP the ladder (LGA -> state -> super support).
+  // The target tier is derived from the acting agent's scope (never client
+  // supplied). There is NO complaint slip — only a warm transfer and an audit
+  // row marked TIER_UP. After a successful transfer-up the lower agent leaves;
+  // the higher tier is then the de-facto owner (ownership enforcement applies
+  // on any further actions).
+  if (action === 'consult-up' || action === 'transfer-up') {
+    const scope = resolveAgentScopeForUser(req.user);
+    const targetTier = scope.level === 'lga' ? 'state' : scope.level === 'state' ? 'super' : null;
+    if (!targetTier) {
+      return res.status(400).json({ success: false, message: 'Super support hands off via "relate", not consult-up.' });
+    }
+    const pools = getTierIdentityPools();
+    const pool = targetTier === 'state' ? pools.state : pools.super;
+    if (!pool || !pool.length) {
+      return res.status(409).json({ success: false, message: `No ${targetTier}-tier agent is staffed for a hand-off yet.` });
+    }
+    const tierIdentity = pool[0];
+    const tierMarker = `TIER_UP:${targetTier.toUpperCase()}`;
+
+    if (action === 'consult-up') {
+      try {
+        await conferenceResource.participants(callerParticipant.sid).update({ hold: true });
+      } catch (holdError) {
+        logger.warn('Voice consult-up: could not hold caller', { message: holdError.message });
+      }
+
+      const consultTwiml = new twilio.twiml.VoiceResponse();
+      const consultDial = consultTwiml.dial({ timeout: 30, ...DIAL_STATUS_CALLBACK(context.source) });
+      consultDial.conference({ startConferenceOnEnter: true, endConferenceOnExit: false }, context.roomName);
+      let tierCall;
+      try {
+        tierCall = await rest.calls.create({
+          to: `client:${tierIdentity}`,
+          from: `client:${AGENT_IDENTITY}`,
+          twiml: consultTwiml.toString(),
+        });
+      } catch (dialError) {
+        return res.status(502).json({ success: false, message: 'Could not ring the next support tier.' });
+      }
+
+      let tierParticipant = null;
+      for (let attempt = 0; attempt < 15 && !tierParticipant; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+          const participants = await conferenceResource.participants.list();
+          tierParticipant = participants.find((p) => p.callSid === tierCall.sid) || null;
+        } catch {
+          break;
+        }
+      }
+      if (tierParticipant) {
+        try {
+          await conferenceResource.participants(tierParticipant.sid).update({
+            coach: agentParticipant.sid,
+            hold: true,
+          });
+        } catch (coachError) {
+          logger.warn('Voice consult-up: could not coach tier participant', { message: coachError.message });
+        }
+      }
+
+      logger.info('Tier hand-off consultation started', {
+        callerCallSid: context.callerCallSid,
+        agentCallSid,
+        targetTier,
+        joined: Boolean(tierParticipant),
+      });
+      try {
+        await db.query(
+          `INSERT INTO voice_call_escalations (call_sid, agent_call_sid, department, escalated_by)
+           VALUES ($1, $2, $3, $4)`,
+          [context.callerCallSid, agentCallSid, tierMarker, req.user?.id || null]
+        );
+      } catch {
+        // Audit write is best-effort.
+      }
+      return res.json({ success: true, data: { connected: Boolean(tierParticipant) } });
+    }
+
+    // transfer-up: bridge the higher tier with the caller; the lower agent
+    // leaves on their side. No complaint slip is raised.
+    const participants = await conferenceResource.participants.list();
+    const tierParticipant = participants.find(
+      (p) => p.callSid !== agentCallSid && p.callSid !== context.callerCallSid && p.callSid
+    );
+    if (!tierParticipant) {
+      return res.status(409).json({
+        success: false,
+        message: 'The next-tier agent is not on the call yet. Start a hand-off consultation first.',
+      });
+    }
+    try {
+      await conferenceResource.participants(tierParticipant.sid).update({ coach: null, hold: false });
+      await conferenceResource.participants(callerParticipant.sid).update({ hold: false });
+    } catch (bridgeError) {
+      logger.warn('Voice transfer-up: bridging failed', { message: bridgeError.message });
+      return res.status(502).json({ success: false, message: 'The hand-off could not be completed right now.' });
+    }
+    logger.info('Call handed UP to next tier (warm)', {
+      callerCallSid: context.callerCallSid,
+      agentCallSid,
+      targetTier,
     });
     return res.json({ success: true });
   }
