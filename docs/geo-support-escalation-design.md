@@ -169,6 +169,24 @@ Super admin (review only, not on the line)
 - "Relate to super admin": flagged `voice_superadmin` ticket surfaced in the
   super admin dashboard/history.
 
+> STATUS (Phase 4): backend-core IMPLEMENTED (commits 68a8d74, da1b878,
+> b9f9d45; migration 144).
+> - Ownership: voiceRouting.canAgentHandleJurisdiction (FCT/federal-alias aware,
+>   LGA/state/super rules, unknown jurisdiction = super-only) + enforcement on
+>   /voice/escalate (403 outside your support area) when geo flag is ON; unit
+>   tested. resolveAgentScopeForUser shared with /voice/desk-scope.
+> - Relate-to-Super-Admin: migration 144 voice_relate_requests; /voice/escalate
+>   action 'relate' (super support/super admin only); GET /voice/relates and
+>   PATCH /voice/relates/:id/handle (super-tier only); VoiceSupportOverview
+>   'Relates for you (n)' panel with Mark handled. DB-verified live.
+> - consult-up / transfer-up: /voice/escalate actions (LGA/state only) derive
+>   the next tier from the acting agent's scope, mirror the department warm
+>   transfer, log TIER_UP:<TIER> in voice_call_escalations, raise NO complaint
+>   slip; lower agent leaves on transfer-up; super support must use 'relate'.
+> HONEST gaps: consult-up/transfer-up Twilio legs are NOT runtime-tested (no
+> live env) and the LGA/state desk 'Hand up' button UI is deferred until the
+> Twilio smoke. Migration 143 fix (queued status) is a prerequisite in prod.
+
 ### Phase 5 — functional-department gating & ladder polish
 - Department warm-transfer UI offered only at super support.
 - Callback scoping, SLA/after-hours per jurisdiction if required.
