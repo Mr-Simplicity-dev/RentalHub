@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const db = require('../config/middleware/database');
 const survey = require('../config/survey');
+const surveyBoundary = require('./surveyBoundary');
 
 const generateRespondentCode = () =>
   `RH${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
@@ -53,6 +54,16 @@ const isAllowedSurveyLocation = (config, deviceState, deviceLga) => {
     (l) => stateMatches(l.state_name, deviceState) && lgaMatches(l.lga_name, deviceLga)
   );
 };
+
+// Boundary (polygon) matching: names come from the GADM-derived boundary file
+// and may omit spaces ("AbaNorth", "FederalCapitalTerritory"), so compare with
+// an aggressive key that is case/space/punctuation-insensitive.
+const isAllowedSurveyBoundaryLocation = (config, deviceState, deviceLga) =>
+  config.locations.some(
+    (l) =>
+      surveyBoundary.stateKeyMatches(l.state_name, deviceState) &&
+      surveyBoundary.lgaKeyMatches(l.lga_name, deviceLga)
+  );
 
 // app_settings stores {"value": "..."} inside JSONB.
 const getSurveyLocationConfig = async () => {
@@ -123,6 +134,7 @@ exports.getSurveyLocationConfig = async (req, res) => {
       data: {
         gate_enabled: gateEnabled,
         scope: gateEnabled ? config.scope : null,
+        boundary_available: surveyBoundary.boundariesReady(),
         allowed_locations: gateEnabled
           ? config.locations.map((l) => ({
               state_name: String(l.state_name || '').trim(),
@@ -228,13 +240,83 @@ exports.checkSurveyLocation = async (req, res) => {
   }
 };
 
+// Public: verify GPS coordinates against the official LGA boundary polygons.
+// Preferred over the name-based GET /location-check once geo/nigeria_lgas.json
+// is present (boundary_available). VPN/foreign-IP consensus still applies.
+exports.verifySurveyLocation = async (req, res) => {
+  try {
+    const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
+    const map = await flags();
+    // Gate OFF = the public survey is closed (marketing agents never reach here).
+    if (map.survey_location_gate !== true) {
+      return res.json({
+        success: true,
+        data: { allowed: false, reason: 'survey_closed', boundary_available: true },
+      });
+    }
+
+    const lat = Number(req.body?.lat);
+    const lng = Number(req.body?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({ success: false, message: 'Valid latitude and longitude are required.' });
+    }
+
+    const verdicts = await getIpVerdictsFor(req);
+    if (ipIsForeignOrVpn(verdicts)) {
+      const vpnFlagged = verdicts.some((v) => v.proxy || v.hosting || v.vpn);
+      return res.json({
+        success: true,
+        data: {
+          allowed: false,
+          reason: vpnFlagged ? 'vpn_detected' : 'outside_nigeria',
+          ip_country: verdicts[0]?.country_code || null,
+          boundary_available: true,
+        },
+      });
+    }
+
+    if (!surveyBoundary.boundariesReady()) {
+      // Boundaries not deployed yet — client falls back to the name-based check.
+      return res.json({
+        success: true,
+        data: { allowed: false, boundary_available: false },
+      });
+    }
+
+    const hit = surveyBoundary.resolve(lat, lng);
+    if (!hit) {
+      return res.json({
+        success: true,
+        data: { allowed: false, reason: 'outside_nigeria', boundary_available: true },
+      });
+    }
+
+    const config = await getSurveyLocationConfig();
+    const allowed = isAllowedSurveyBoundaryLocation(config, hit.state, hit.lga);
+
+    return res.json({
+      success: true,
+      data: {
+        allowed,
+        reason: allowed ? null : config.locations.length ? 'boundary_out' : 'lga_not_allowed',
+        boundary_available: true,
+        state_name: hit.state,
+        lga_name: hit.lga,
+        device_state: hit.state,
+        device_lga: hit.lga,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Survey location verify error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to verify survey location' });
+  }
+};
+
 // Server-side enforcement used at draft/submit time.
 const isAgentEntry = (req, body) =>
   req.user?.user_type === 'marketing_agent' ||
   Boolean(String(body?.agent?.name || '').trim()) ||
-  Boolean(String(body?.agent_name || '').trim());
-
-const enforceLocationGate = async (req, body) => {
+  Boolean(String(body?.agent_name || '').trim());const enforceLocationGate = async (req, body) => {
   const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
   const map = await flags();
   // Gate OFF = the PUBLIC survey is closed; marketing-agent (field/paper)
@@ -268,6 +350,8 @@ const enforceLocationGate = async (req, body) => {
 const LOCATION_REASONS = {
   location_required: 'We could not confirm your location. Please enable location access and try again.',
   lga_not_allowed: 'The survey is not available yet for you in this local government area.',
+  boundary_out:
+    'Your device is outside the enabled survey boundary. Eligibility is checked against official local-government lines — if you are right on the boundary, normal GPS error can place you just outside. Retry from a clearer spot, or contact the survey team if you believe you qualify.',
   vpn_detected: 'VPN connections are not allowed for this survey. Please turn off your VPN and try again.',
   outside_nigeria: 'This survey is only available to respondents in Nigeria.',
   survey_closed: 'This survey is closed at the moment. Please check back later.',

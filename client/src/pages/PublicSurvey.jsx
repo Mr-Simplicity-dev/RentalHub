@@ -170,34 +170,66 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
           return;
         }
 
-        const place = await geocodeToStateAndLga(coords.lat, coords.lng);
-        const resolved = {
-          state: place?.state || '',
-          lga: place?.lga || '',
-        };
-        if (!resolved.lga) {
-          if (active) {
-            setLocationBlockReason('location_required');
-            setLocationState('blocked');
+        const namesFor = (res) => ({
+          state: String(res.state_name || res.device_state || '').trim(),
+          lga: String(res.lga_name || res.device_lga || '').trim(),
+        });
+
+        let result;
+        let names;
+        if (config.boundary_available) {
+          // Preferred: the server tests the raw GPS fix against official LGA
+          // boundary polygons (covers the whole area council, e.g. anyone in
+          // Zuba/Dobi inside the Gwagwalada polygon).
+          const verifyRes = await api.post('/survey/location-verify', {
+            lat: coords.lat,
+            lng: coords.lng,
+          });
+          result = verifyRes.data?.data || {};
+          names = namesFor(result);
+          // Server claims boundary support but the file is absent — fall back
+          // to the Google name-based check.
+          if (result.boundary_available === false) {
+            const place = await geocodeToStateAndLga(coords.lat, coords.lng);
+            names = { state: place?.state || '', lga: place?.lga || '' };
+            const checkRes = await api.get(
+              `/survey/location-check?state=${encodeURIComponent(names.state)}&lga=${encodeURIComponent(names.lga)}`
+            );
+            result = checkRes.data?.data || {};
           }
-          return;
+        } else {
+          const place = await geocodeToStateAndLga(coords.lat, coords.lng);
+          names = { state: place?.state || '', lga: place?.lga || '' };
+          if (!names.lga) {
+            if (active) {
+              setLocationBlockReason('location_required');
+              setLocationState('blocked');
+            }
+            return;
+          }
+          const checkRes = await api.get(
+            `/survey/location-check?state=${encodeURIComponent(names.state)}&lga=${encodeURIComponent(names.lga)}`
+          );
+          result = checkRes.data?.data || {};
         }
 
-        const checkRes = await api.get(
-          `/survey/location-check?state=${encodeURIComponent(resolved.state)}&lga=${encodeURIComponent(resolved.lga)}`
-        );
-        const result = checkRes.data?.data || {};
         if (!result.allowed) {
           if (active) {
-            setLocationBlockReason(result.reason || 'lga_not_allowed');
-            setLocationState('blocked');
+            if (result.reason === 'survey_closed') {
+              setLocationBlockReason('survey_closed');
+              setLocationState('closed');
+            } else {
+              setLocationBlockReason(result.reason || 'lga_not_allowed');
+              setLocationState('blocked');
+            }
           }
           return;
         }
 
+        const location = { state: names.state, lga: names.lga };
         if (active) {
-          setLocationInfo(resolved);
-          localStorage.setItem('rentalhub_survey_location', JSON.stringify(resolved));
+          setLocationInfo(location);
+          localStorage.setItem('rentalhub_survey_location', JSON.stringify(location));
           setLocationState('ok');
         }
       } catch {
@@ -530,6 +562,10 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
   const LOCATION_MESSAGES = {
     location_required: t('public_survey.loc_required', 'We could not confirm your location. Please enable location access and try again.'),
     lga_not_allowed: t('public_survey.loc_lga', 'The survey is not available yet for you in this local government area.'),
+    boundary_out: t(
+      'public_survey.loc_boundary',
+      'Your device is outside the enabled survey boundary. Eligibility is checked against official local-government lines — if you are right on the boundary, normal GPS error can place you just outside. Retry from a clearer spot, or contact the survey team if you believe you qualify.'
+    ),
     vpn_detected: t('public_survey.loc_vpn', 'VPN connections are not allowed for this survey. Please turn off your VPN and try again.'),
     outside_nigeria: t('public_survey.loc_country', 'This survey is only available to respondents in Nigeria.'),
     survey_closed: t('public_survey.closed_body', 'This survey is not currently open. Please check back later.'),
@@ -810,6 +846,15 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
               </p>
             </button>
           </div>
+
+          {!agentMode && locationState === 'ok' && (
+            <p className="mt-5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              {t(
+                'public_survey.boundary_note',
+                'Location note: eligibility is verified with GPS against official local-government boundaries. If you are near an area boundary, normal phone GPS error can put you just outside and lock you out — step away from the line and retry.'
+              )}
+            </p>
+          )}
 
           <p className="mt-6 text-xs text-gray-400">
             {t('public_survey.privacy', 'Anonymous · Voluntary · Your identity is never linked to your answers')}

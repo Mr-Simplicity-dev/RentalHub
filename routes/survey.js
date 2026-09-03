@@ -67,6 +67,7 @@ router.get('/push/public-key', pushService.getPublicKey);
 // Public: location gate status + check
 router.get('/location-config', surveyController.getSurveyLocationConfig);
 router.get('/location-check', surveyController.checkSurveyLocation);
+router.post('/location-verify', publicWriteLimiter, surveyController.verifySurveyLocation);
 
 // Public: push subscription (optionalAuthenticate so agents/logged-in users are linked)
 router.post('/push/subscribe', optionalAuthenticate, pushService.subscribe);
