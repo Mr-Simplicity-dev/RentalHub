@@ -87,21 +87,24 @@ const normalizeAnswers = (type, answers) => {
   return cleaned;
 };
 
-// A respondent who recently completed the same survey with the same phone
-// number (paper/agent re-entry included) is probably a double entry.
-const findRecentCompletedRespondent = async (type, phone, days = 30) => {
-  if (!phone) return null;
+// A respondent who recently completed the same survey with the same name,
+// phone AND state-of-origin (even from a different Google account) is a
+// duplicate entry.
+const findRecentCompletedRespondent = async (type, phone, name, stateOfOrigin, days = 30) => {
+  if (!phone || !name) return null;
   const result = await db.query(
     `SELECT id, respondent_code
      FROM survey_responses
      WHERE survey_type = $1
        AND respondent_phone = $2
+       AND LOWER(COALESCE(respondent_name, '')) = LOWER(COALESCE($3, ''))
+       AND respondent_state_of_origin IS NOT DISTINCT FROM NULLIF($4, '')
        AND completed_at IS NOT NULL
        AND superseded_at IS NULL
-       AND completed_at >= CURRENT_TIMESTAMP - ($3::int * INTERVAL '1 day')
+       AND completed_at >= CURRENT_TIMESTAMP - ($5::int * INTERVAL '1 day')
      ORDER BY completed_at DESC
      LIMIT 1`,
-    [type, phone, days]
+    [type, phone, name, stateOfOrigin || null, days]
   );
   return result.rows[0] || null;
 };
@@ -853,15 +856,25 @@ exports.submitPublicSurvey = async (req, res) => {
     const contactName = String(contact?.name || '').trim().slice(0, 200);
     const contactPhone = String(contact?.phone || '').replace(/\s+/g, '').slice(0, 30);
     const contactEmail = String(contact?.email || '').trim().toLowerCase().slice(0, 255);
-    const noEmail = contact?.no_email === true || !contactEmail;
     const contactLocation = String(contact?.location || '').trim().slice(0, 255);
     const contactStateOfOrigin = String(contact?.state_of_origin || '').trim().slice(0, 120);
+    // Email is mandatory for the general public; marketing agents (who do the
+    // survey face-to-face / on paper) may leave it off.
+    const emailOptionalForAgent = Boolean(agentUser) || agentMode === 'face_to_face';
+    const hasEmail = Boolean(contactEmail);
 
     if (!contactName || !contactPhone) {
       return res.status(400).json({
         success: false,
         code: 'CONTACT_REQUIRED',
         message: 'Respondent name and phone number are required',
+      });
+    }
+    if (!emailOptionalForAgent && !hasEmail) {
+      return res.status(400).json({
+        success: false,
+        code: 'EMAIL_REQUIRED',
+        message: 'An email address is required to take this survey',
       });
     }
 
@@ -896,7 +909,7 @@ exports.submitPublicSurvey = async (req, res) => {
     // #7 Double-entry guard: the same phone recently completed this survey
     // (paper/agent re-entry included) unless the operator explicitly forces it.
     if (!forceDuplicate) {
-      const recent = await findRecentCompletedRespondent(type, contactPhone);
+      const recent = await findRecentCompletedRespondent(type, contactPhone, contactName, contactStateOfOrigin);
       if (recent) {
         return res.status(409).json({
           success: false,
@@ -958,8 +971,8 @@ exports.submitPublicSurvey = async (req, res) => {
             Math.max(0, Number(req.body.time_spent_seconds) || 0),
             contactName,
             contactPhone,
-            noEmail ? null : contactEmail,
-            !noEmail,
+            contactEmail || null,
+            hasEmail,
             contactLocation || null,
             contactStateOfOrigin || null,
             agentUser ? agentUser.id : null,
@@ -1000,10 +1013,10 @@ exports.submitPublicSurvey = async (req, res) => {
         lga_name ? String(lga_name).trim().slice(0, 120) : null,
         contactName,
         contactPhone,
-        noEmail ? null : contactEmail,
+        contactEmail || null,
         contactLocation || null,
         contactStateOfOrigin || null,
-        !noEmail,
+        hasEmail,
         agentUser ? agentUser.id : null,
         agentName || null,
         agentPhone || null,
@@ -1024,3 +1037,4 @@ exports.submitPublicSurvey = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to submit survey' });
   }
 };
+

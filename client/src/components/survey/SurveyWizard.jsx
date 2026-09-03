@@ -480,6 +480,7 @@ export default function SurveyWizard({
     const canSubmitContact =
       contact.name.trim().length >= 2 &&
       contact.phone.replace(/\D/g, '').length >= 10 &&
+      (!agentMode ? /.+@.+\..+/.test(contact.email.trim()) : true) &&
       contact.location.trim().length >= 2 &&
       contact.state_of_origin.trim().length >= 2;
 
@@ -541,29 +542,32 @@ export default function SurveyWizard({
           </p>
         ) : (
           <label className="block text-sm">
-            <span className="mb-1 block font-medium text-gray-700">{t('survey.contact_email', 'Email address (optional)')}</span>
+            <span className="mb-1 block font-medium text-gray-700">
+              {t('survey.contact_email', 'Email address')}
+              {agentMode ? ' (optional)' : ' *'}
+            </span>
             <input
               type="email"
               value={contact.email}
-              onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+              onChange={(e) => setContact((c) => ({ ...c, email: e.target.value, no_email: false }))}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </label>
         )}
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="survey-no-email"
-            checked={contact.no_email}
-            onChange={(e) => setContact((c) => ({ ...c, no_email: e.target.checked, email: '' }))}
-            className="h-4 w-4 rounded border-gray-300 text-indigo-600"
-          />
-          <label htmlFor="survey-no-email" className="text-sm text-gray-700">
-            {agentMode
-              ? t('survey.contact_no_email_agent', 'This respondent has no email address')
-              : t('survey.contact_no_email_public', 'I do not have an email address')}
-          </label>
-        </div>
+        {agentMode && (
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="survey-no-email"
+              checked={contact.no_email}
+              onChange={(e) => setContact((c) => ({ ...c, no_email: e.target.checked, email: '' }))}
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600"
+            />
+            <label htmlFor="survey-no-email" className="text-sm text-gray-700">
+              {t('survey.contact_no_email_agent', 'This respondent has no email address')}
+            </label>
+          </div>
+        )}
 
         <button
           type="button"
@@ -734,6 +738,16 @@ export default function SurveyWizard({
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6">
+      {resumedDraft && publicMode && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="text-sm font-semibold text-emerald-800">
+            {t('survey.welcome_back', 'Welcome back — continue where you left off.')}
+          </p>
+          <p className="mt-0.5 text-xs text-emerald-700">
+            {t('survey.welcome_back_sub', 'Your earlier answers have been saved on this device.')}
+          </p>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-gray-900">{exitLabel}</h2>

@@ -114,6 +114,7 @@ const PublicSurveyPage = () => {
 const [doorPassed, setDoorPassed] = useState(false);
 const [doorBusy, setDoorBusy] = useState(false);
 const [doorError, setDoorError] = useState('');
+const gateTurnstileRef = useRef(null);
 const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
   const googleButtonRef = useRef(null);
   const googleReady = useRef(false);
@@ -334,15 +335,11 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
     setShowReminder(false);
   };
 
-  // Email access gate: a public respondent is asked for an email before
-  // starting so their contact step is pre-filled (Google also fills this).
+  // The email is now collected on the entry card (see below) — no separate
+  // auto-popup, so a visitor is never asked twice.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (locationState !== 'ok' || showReminder || hasDraft || agentMode) return;
-    if (localStorage.getItem(EMAIL_GATE_KEY)) return;
-    const savedEmail = localStorage.getItem(EMAIL_KEY) || '';
-    setGateEmail(savedEmail);
-    setShowEmailGate(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return;
   }, [locationState, showReminder, hasDraft, agentMode]);
 
   const acceptEmailGate = () => {
@@ -378,11 +375,23 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
 
   const verifyDoor = async (token) => {
     if (!token || doorBusy) return;
+    const email = String(gateEmail || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setDoorError(t('public_survey.gate_email_required', 'An email address is required to continue.'));
+      gateTurnstileRef.current?.reset();
+      return;
+    }
     setDoorBusy(true);
     setDoorError('');
     try {
       const res = await api.post('/survey/public/gate', { turnstile_token: token });
       if (res.data?.success) {
+        // Persist the captured identity so the survey's contact step is prefilled.
+        localStorage.setItem(EMAIL_KEY, email);
+        setPrefillContact((prev) => ({
+          name: String(prev?.name || '').trim() ? prev.name : email.split('@')[0],
+          email,
+        }));
         setDoorPassed(true);
       } else {
         setDoorError(res.data?.message || t('public_survey.door_failed', 'Security check failed. Please try again.'));
@@ -503,30 +512,67 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
 
   // Door guard: one Turnstile challenge before the survey can begin.
   if (locationState === 'ok' && !type && !agentMode && !doorPassed) {
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(gateEmail || '').trim());
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-8">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
             <FaShieldAlt className="text-2xl" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">
-            {t('public_survey.door_title', 'One quick check before you start')}
+          <h1 className="text-center text-xl font-bold text-gray-900">
+            {t('public_survey.gate_title2', 'Let’s start with your email')}
           </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            {t('public_survey.door_body', 'Tick the box to prove you are a real person. This keeps automated bots from filling the survey, so your answers stay truthful.')}
+          <p className="mt-2 text-center text-sm text-gray-600">
+            {t('public_survey.gate_body2', 'Your email is required and lets us send you the results. Use your Google account and we’ll fill it in for you.')}
           </p>
+
+          {GOOGLE_CLIENT_ID && (
+            <div className="mt-5 flex justify-center">
+              <div ref={googleButtonRef} />
+            </div>
+          )}
+
+          <div className="mt-5 space-y-4">
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-gray-700">{t('public_survey.gate_name', 'Full name')}</span>
+              <input
+                type="text"
+                value={prefillContact?.name || ''}
+                onChange={(e) => setPrefillContact((p) => ({ ...(p || {}), name: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                placeholder={t('public_survey.gate_name_ph', 'Your name')}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-gray-700">{t('public_survey.gate_email_label', 'Email address')} *</span>
+              <input
+                type="email"
+                value={gateEmail || ''}
+                onChange={(e) => { setGateEmail(e.target.value.trim()); setDoorError(''); }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                placeholder="you@example.com"
+              />
+            </label>
+          </div>
+
           <div className="mt-5 flex justify-center">
             <TurnstileWidget
+              ref={gateTurnstileRef}
               action="rentalhub_survey_entry"
               onToken={verifyDoor}
               onExpire={() => setDoorError(t('public_survey.door_expired', 'The security check expired. Please tick the box again.'))}
             />
           </div>
           {doorBusy && (
-            <p className="mt-3 text-sm text-gray-500">{t('public_survey.door_checking', 'Checking...')}</p>
+            <p className="mt-3 text-center text-sm text-gray-500">{t('public_survey.door_checking', 'Checking...')}</p>
           )}
           {doorError && (
-            <p className="mt-3 text-sm text-red-600" role="alert">{doorError}</p>
+            <p className="mt-3 text-center text-sm text-red-600" role="alert">{doorError}</p>
+          )}
+          {emailValid && doorPassed && (
+            <p className="mt-3 text-center text-sm text-emerald-600">
+              {t('public_survey.gate_ok', 'You’re all set — choose your account type to begin.')}
+            </p>
           )}
         </div>
       </div>
@@ -654,36 +700,13 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
               >
                 {t('public_survey.gate_start', 'Start the survey')}
               </button>
-              <button
-                type="button"
-                onClick={skipEmailGate}
-                className="block w-full rounded-xl border border-gray-300 py-3 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                {t('public_survey.gate_skip', 'Continue without email')}
-              </button>
             </div>
-
-            {GOOGLE_CLIENT_ID && (
-              <p className="mt-3 text-center text-xs text-gray-400">
-                {t('public_survey.gate_google_hint', 'Prefer Google? Use the sign-in button above and your email will be filled in automatically.')}
-              </p>
-            )}
           </div>
         </div>
       )}
 
       <div className="mx-auto w-full max-w-xl px-4">
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-          {/* Google sign-in is the FIRST thing on the page */}
-          {!agentMode && GOOGLE_CLIENT_ID && (
-            <div className="mb-6 flex flex-col items-center gap-2">
-              <div ref={googleButtonRef} />
-              <p className="text-xs text-gray-400">
-                {t('public_survey.google_hint', 'Start with Google — we fill in your name and email (you can still edit them).')}
-              </p>
-            </div>
-          )}
-
           <h1 className="text-2xl font-bold text-gray-900">
             {t('public_survey.title', 'RentalHub NG Research Survey')}
           </h1>

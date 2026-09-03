@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import TwoFactorStep from '../../components/common/TwoFactorStep';
 import {
@@ -30,9 +30,15 @@ import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequest
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 import SupportGovernancePanel from '../../components/admin/SupportGovernancePanel';
-import SupportVoiceDesk from '../../components/admin/SupportVoiceDesk';
-import VoiceOperationsPanel from '../../components/admin/VoiceOperationsPanel';
 import TicketConversationModal from '../../components/common/TicketConversationModal';
+
+// Lazy-loaded on purpose: SupportVoiceDesk pulls in the Twilio Voice SDK via
+// useTwilioVoice. Evaluating that at chunk-load time caused a TDZ crash
+// ("Cannot access ... before initialization") on first navigation; loading it
+// only when the Voice tab is opened keeps the heavy dependency out of the
+// chunk's top-level evaluation.
+const SupportVoiceDesk = lazy(() => import('../../components/admin/SupportVoiceDesk'));
+const VoiceOperationsPanel = lazy(() => import('../../components/admin/VoiceOperationsPanel'));
 
 // Utility functions
 const badgeClass = (status) => {
@@ -1279,17 +1285,21 @@ const SuperSupportAdminDashboard = () => {
         {/* Voice Desk Tab */}
         {activeTab === 'voice' && (
           <div className="super-support-voice-desk-section">
-            <SupportVoiceDesk
-              tickets={dashboardData.supportTickets || []}
-              onOpenTickets={() => setActiveTab('tickets')}
-            />
+            <Suspense fallback={<div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading Voice Desk...</div>}>
+              <SupportVoiceDesk
+                tickets={dashboardData.supportTickets || []}
+                onOpenTickets={() => setActiveTab('tickets')}
+              />
+            </Suspense>
           </div>
         )}
 
         {/* Voice Operations Tab */}
         {activeTab === 'voice_ops' && (
           <div className="super-support-voice-ops-section">
-            <VoiceOperationsPanel />
+            <Suspense fallback={<div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading Voice Operations...</div>}>
+              <VoiceOperationsPanel />
+            </Suspense>
           </div>
         )}
 
