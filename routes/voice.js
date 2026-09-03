@@ -46,6 +46,11 @@ const {
 } = require('../config/middleware/auth');
 const { voiceTokenLimiter } = require('../config/middleware/securityRateLimiters');
 const adService = require('../services/adService');
+const {
+  isVoiceReadRole,
+  resolveVoiceReadScope,
+  buildScopeClause,
+} = require('../services/voiceJurisdiction');
 
 const router = express.Router();
 
@@ -1167,15 +1172,34 @@ router.post('/callback-number', twilioWebhookGuard, async (req, res) => {
 });
 
 // ── GET /voice/callbacks ─────────────────────────────────────────────────────
-// Admin-only review of after-hours callback requests.
+// Review of after-hours callback requests, scoped to the reader's tier
+// (super/state/LGA — docs/geo-support-escalation-design.md Phase 1).
 
-router.get('/callbacks', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+// Voice record readers: super/state/LGA tiers. Attaches req.voiceScope.
+const requireVoiceRead = (req, res, next) => {
   try {
+    if (!req.user || !isVoiceReadRole(req.user.user_type)) {
+      return res.status(403).json({ success: false, message: 'Your role cannot view voice records.' });
+    }
+    req.voiceScope = resolveVoiceReadScope(req.user);
+    next();
+  } catch (error) {
+    return res.status(error.statusCode || 403).json({ success: false, message: error.message });
+  }
+};
+
+router.get('/callbacks', voiceTokenLimiter, authenticate, requireVoiceRead, async (req, res) => {
+  try {
+    const scopeClause = buildScopeClause(req.voiceScope, '');
+    const where = scopeClause.clause ? `WHERE TRUE ${scopeClause.clause}` : '';
     const result = await db.query(
-      `SELECT id, call_sid, phone_number, source, created_at
+      `SELECT id, call_sid, phone_number, source,
+              jurisdiction_state, jurisdiction_lga, jurisdiction_source, created_at
        FROM voice_callback_requests
+       ${where}
        ORDER BY created_at DESC
-       LIMIT 50`
+       LIMIT 50`,
+      scopeClause.params
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
@@ -1221,20 +1245,26 @@ router.get('/summary', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin
 // (the LATEST recorded state), newest first, with duration and the recording
 // URL when available.
 
-router.get('/call-log', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+router.get('/call-log', voiceTokenLimiter, authenticate, requireVoiceRead, async (req, res) => {
   try {
+    const scopeClause = buildScopeClause(req.voiceScope, 'latest');
+    const where = scopeClause.clause ? `WHERE TRUE ${scopeClause.clause}` : '';
     const result = await db.query(
       `SELECT call_sid, direction, source, status,
-              from_number, to_number, duration_sec, recording_url, created_at
+              from_number, to_number, duration_sec, recording_url,
+              jurisdiction_state, jurisdiction_lga, jurisdiction_source, created_at
        FROM (
          SELECT DISTINCT ON (call_sid)
                 call_sid, direction, source, status,
-                from_number, to_number, duration_sec, recording_url, created_at
+                from_number, to_number, duration_sec, recording_url,
+                jurisdiction_state, jurisdiction_lga, jurisdiction_source, created_at
          FROM voice_call_events
          ORDER BY call_sid, created_at DESC
        ) latest
+       ${where}
        ORDER BY created_at DESC
-       LIMIT 100`
+       LIMIT 100`,
+      scopeClause.params
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
