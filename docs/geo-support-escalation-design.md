@@ -123,6 +123,17 @@ Super admin (review only, not on the line)
 - Scope `/voice/call-log` + `/voice/callbacks` reads by role+jurisdiction
   (LGA admin sees their LGA, state admin their state, super support all).
 
+> STATUS (Phase 0/1): IMPLEMENTED and DB-verified (commits 8009a51..b09d543,
+> migrations 142 + 143). Schema adds jurisdiction_* to events + callbacks;
+> reads are tier-scoped via services/voiceJurisdiction.js; capture resolves a
+> known caller's home area from users.phone -> preferred_lga_name +
+> preferred_state_id on /voice/wait and /voice/callback-number, and propagates
+> onto later status rows so call-log rows keep their area. Remaining (honest):
+> no live Twilio end-to-end run (env not configured) — webhook SQL paths were
+> validated by direct DB simulation; unknown callers stay `unknown` (super-only);
+> Rule B "home LGA" is currently the user's preferred LGA, NOT yet the LGA of
+> the property they may be calling about (open question §8.1).
+
 ### Phase 2 — rooms by jurisdiction + roll-up routing (behind a flag)
 - Name rooms/queue-lines by jurisdiction; dispatch by ownership.
 - When the owning tier is not staffed, roll up deterministically.
