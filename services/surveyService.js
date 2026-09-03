@@ -229,10 +229,22 @@ exports.checkSurveyLocation = async (req, res) => {
 };
 
 // Server-side enforcement used at draft/submit time.
+const isAgentEntry = (req, body) =>
+  req.user?.user_type === 'marketing_agent' ||
+  Boolean(String(body?.agent?.name || '').trim()) ||
+  Boolean(String(body?.agent_name || '').trim());
+
 const enforceLocationGate = async (req, body) => {
   const flags = require('../config/middleware/featureFlags').getFeatureFlagsMap;
   const map = await flags();
-  if (map.survey_location_gate !== true) return { allowed: true };
+  // Gate OFF = the PUBLIC survey is closed; marketing-agent (field/paper)
+  // entries remain allowed since they capture responses on behalf of the
+  // platform outside the self-serve link.
+  if (map.survey_location_gate !== true) {
+    return isAgentEntry(req, body)
+      ? { allowed: true }
+      : { allowed: false, reason: 'survey_closed' };
+  }
 
   const config = await getSurveyLocationConfig();
   const deviceState = String(body.state_name || body.state || '').trim();
@@ -258,6 +270,7 @@ const LOCATION_REASONS = {
   lga_not_allowed: 'The survey is not available yet for you in this local government area.',
   vpn_detected: 'VPN connections are not allowed for this survey. Please turn off your VPN and try again.',
   outside_nigeria: 'This survey is only available to respondents in Nigeria.',
+  survey_closed: 'This survey is closed at the moment. Please check back later.',
 };
 
 const ensureSchema = async () => {

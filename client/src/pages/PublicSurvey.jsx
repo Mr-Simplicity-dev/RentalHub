@@ -121,6 +121,8 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
 
   const isMarketingAgent = user?.user_type === 'marketing_agent';
   const agentMode = isMarketingAgent && searchParams.get('agent') === '1';
+  const agentModeRef = useRef(agentMode);
+  agentModeRef.current = agentMode;
 
   // Location gate: resolve GPS -> state+LGA names (enabled per state/LGA),
   // then ask the server. VPNs are blocked server-side (consensus).
@@ -134,7 +136,16 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
         const config = configRes.data?.data || {};
         gateOn = Boolean(config.gate_enabled) && config.scope === 'lga_list';
         if (!gateOn) {
-          if (active) setLocationState('ok');
+          if (active) {
+            if (agentModeRef.current) {
+              setLocationState('ok');
+            } else {
+              // Gate OFF = the public self-serve survey is closed. Marketing
+              // agents (field/paper entry) are exempt.
+              setLocationBlockReason('survey_closed');
+              setLocationState('closed');
+            }
+          }
           return;
         }
 
@@ -190,16 +201,15 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
           setLocationState('ok');
         }
       } catch {
-        // Fail closed only when the gate is known to be enabled: if its
-        // eligibility checks error out (geocoder/IP provider down, request
-        // blocked), do NOT let the respondent through, or they would bypass
-        // the location gate. With the gate off, transient errors stay open.
+        // If the availability check itself fails we cannot confirm the survey
+        // is open, so the public sees it as closed (never fail open). Marketing
+        // agents keep their field/paper entry path.
         if (active) {
-          if (gateOn) {
-            setLocationBlockReason('location_required');
-            setLocationState('blocked');
-          } else {
+          if (agentModeRef.current) {
             setLocationState('ok');
+          } else {
+            setLocationBlockReason('survey_closed');
+            setLocationState('closed');
           }
         }
       }
@@ -478,6 +488,25 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
     );
   }
 
+  // The public self-serve survey is closed when the location gate is OFF.
+  if (locationState === 'closed') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-200 text-slate-600 text-2xl">
+            🔒
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">
+            {t('public_survey.closed_title', 'Survey closed')}
+          </h1>
+          <p className="mt-2 text-sm text-gray-600">
+            {t('public_survey.closed_body', 'This survey is not currently open. Please check back later.')}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (type) {
     return (
       <div className="min-h-screen bg-gray-50 py-10">
@@ -503,6 +532,7 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
     lga_not_allowed: t('public_survey.loc_lga', 'The survey is not available yet for you in this local government area.'),
     vpn_detected: t('public_survey.loc_vpn', 'VPN connections are not allowed for this survey. Please turn off your VPN and try again.'),
     outside_nigeria: t('public_survey.loc_country', 'This survey is only available to respondents in Nigeria.'),
+    survey_closed: t('public_survey.closed_body', 'This survey is not currently open. Please check back later.'),
   };
 
   if (locationState === 'blocked') {

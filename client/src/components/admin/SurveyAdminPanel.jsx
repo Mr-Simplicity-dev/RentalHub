@@ -157,8 +157,8 @@ const SurveyAdminPanel = () => {
     const targetEnabled = !(locConfig?.gate_enabled === true);
     const reason = window.prompt(
       targetEnabled
-        ? "Turn the Survey Location Gate ON? Give a reason for the audit log:"
-        : "Turn the Survey Location Gate OFF (survey available everywhere)? Give a reason:"
+        ? "Open the public survey? It will be location-gated to the enabled states/LGAs below. Give a reason for the audit log:"
+        : "Close the public survey to everyone (rentalhub.com.ng/survey shows 'Survey closed')? Give a reason:"
     );
     if (reason === null) return;
     if (!String(reason || "").trim()) {
@@ -742,15 +742,17 @@ const SurveyAdminPanel = () => {
           <div className="rounded-xl border border-soft bg-gray-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-gray-700">Survey Location & VPN Gate</p>
+                <p className="text-sm font-semibold text-gray-700">Public Survey Switch & Location/VPN Gate</p>
                 <p className="mt-1 text-xs text-gray-500">
                   Status:{" "}
-                  <span className={`font-semibold ${locConfig?.gate_enabled ? "text-green-600" : "text-amber-600"}`}>
-                    {locConfig?.gate_enabled ? "ENABLED" : "DISABLED"}
+                  <span className={`font-semibold ${locConfig?.gate_enabled ? "text-green-600" : "text-red-600"}`}>
+                    {locConfig?.gate_enabled ? "OPEN (location-gated)" : "CLOSED"}
                   </span>{" "}
-                  — when enabled, only respondents whose device location resolves to an ENABLED state + LGA below
-                  can take the survey. Anyone else sees "not available in this local government". VPN/proxy
-                  connections are blocked (consensus across two IP providers).
+                  — when ON, the public survey at rentalhub.com.ng/survey is open but only to respondents whose
+                  device location resolves to an ENABLED state + LGA below; anyone else sees "not available in this
+                  local government", and VPN/proxy connections are blocked (consensus across two IP providers).
+                  When OFF, the public survey is closed and shows "Survey closed" (marketing-agent field entry is
+                  still allowed).
                 </p>
               </div>
               <button
@@ -761,7 +763,7 @@ const SurveyAdminPanel = () => {
                   locConfig?.gate_enabled ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
                 }`}
               >
-                {locGateBusy ? "Saving…" : locConfig?.gate_enabled ? "Turn Gate OFF" : "Turn Gate ON"}
+                {locGateBusy ? "Saving…" : locConfig?.gate_enabled ? "Close Survey (Gate OFF)" : "Open Survey (Gate ON)"}
               </button>
             </div>
           </div>
