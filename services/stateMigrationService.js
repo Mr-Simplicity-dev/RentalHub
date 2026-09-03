@@ -3,7 +3,8 @@ const { statesMatch } = require('../config/utils/stateScope');
 
 const STATE_SUPPORT_ROLE = 'state_support_admin';
 const SUPER_SUPPORT_ROLE = 'super_support_admin';
-const SUPPORT_REVIEW_ROLES = [STATE_SUPPORT_ROLE, SUPER_SUPPORT_ROLE];
+const TOP_SUPPORT_ROLE = 'super_admin';
+const SUPPORT_REVIEW_ROLES = [STATE_SUPPORT_ROLE, SUPER_SUPPORT_ROLE, TOP_SUPPORT_ROLE];
 const MIGRATION_USER_TYPES = ['agent', 'lawyer'];
 const STAGE_VALUES = ['outgoing', 'incoming', 'all'];
 
@@ -139,7 +140,7 @@ const ensureStateMigrationSchema = async () => {
 const normalizeStateInput = (value) => String(value || '').trim();
 
 const isStateSupport = (role) => role === STATE_SUPPORT_ROLE;
-const isSuperSupport = (role) => role === SUPER_SUPPORT_ROLE;
+const isSuperSupport = (role) => role === SUPER_SUPPORT_ROLE || role === TOP_SUPPORT_ROLE;
 
 const getReviewerProfile = async (userId) => {
   const result = await db.query(
