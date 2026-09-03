@@ -1,11 +1,11 @@
-// ─────────────────────────────────────────────────────────────────────────────
+﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Twilio dual-carrier voice support system.
 //
 // Carriers:
-//   - Nigeria  → inbound calls arrive via Termii SIP forwarding onto a Twilio
+//   - Nigeria  â†’ inbound calls arrive via Termii SIP forwarding onto a Twilio
 //                number / SIP trunk (matched by NIGERIA_NUMBER / the SIP trunk
 //                suffix configured through NIGERIA_SIP_TRUNK_MATCH).
-//   - International → inbound calls arrive on INTL_NUMBER.
+//   - International â†’ inbound calls arrive on INTL_NUMBER.
 //
 // Endpoints:
 //   POST /voice/incoming        IVR entry point (number webhook)
@@ -34,7 +34,7 @@
 // This router is mounted in server.js AFTER express.urlencoded (Twilio posts
 // form-encoded webhooks) and BEFORE the global CSRF middleware (Twilio cannot
 // send browser CSRF tokens).
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const express = require('express');
 const twilio = require('twilio');
@@ -62,7 +62,7 @@ const {
 
 const router = express.Router();
 
-// ── Configuration ────────────────────────────────────────────────────────────
+// â”€â”€ Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Variables the voice system needs before it can safely serve any request.
 // (TWILIO_WEBHOOK_BASE_URL is intentionally NOT in this list: in development
@@ -79,7 +79,7 @@ const REQUIRED_VOICE_ENV_VARS = [
   'SALES_BACKUP_NUMBER',
 ];
 
-// E.164: a "+" followed by 8–15 digits (country code + national number).
+// E.164: a "+" followed by 8â€“15 digits (country code + national number).
 const E164_PATTERN = /^\+[1-9][0-9]{7,14}$/;
 
 // Phone-number variables that must hold valid E.164 values. OUTBOUND_CALLER_ID
@@ -122,9 +122,9 @@ const getVoiceConfigStatus = () => {
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// ── Optional operational settings ────────────────────────────────────────────
+// â”€â”€ Optional operational settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // After-hours windows and recording are opt-in. When misconfigured, the
-// affected feature degrades gracefully (hours → always available; recording →
+// affected feature degrades gracefully (hours â†’ always available; recording â†’
 // off) with a logged warning rather than breaking inbound calls.
 
 const HOURS_TIME_PATTERN = /^([01]?\d|2[0-3]):([0-5]\d)$/;
@@ -167,12 +167,12 @@ const isSupportHoursActive = (now = new Date()) => {
   if (config.malformed) {
     if (!hoursMisconfigWarned) {
       hoursMisconfigWarned = true;
-      logger.warn('Voice support hours misconfigured — treated as always available:', config.reason);
+      logger.warn('Voice support hours misconfigured â€” treated as always available:', config.reason);
     }
     return true;
   }
 
-  // Build "MM-DD" in the configured timezone (locale-safe — never rely on the
+  // Build "MM-DD" in the configured timezone (locale-safe â€” never rely on the
   // locale's date separator) and compare against the holiday list.
   const dateParts = new Intl.DateTimeFormat('en-GB', {
     timeZone: config.timeZone,
@@ -205,12 +205,12 @@ const isCallRecordingEnabled = () => {
   return value === 'true' || value === '1';
 };
 
-// ── Queue / hold / ad-slot configuration ─────────────────────────────────────
+// â”€â”€ Queue / hold / ad-slot configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The support line routes callers through a real Twilio <Queue>: the caller is
-// <Enqueue>d and hears a wait loop (announcement → optional ad slot → optional
+// <Enqueue>d and hears a wait loop (announcement â†’ optional ad slot â†’ optional
 // hold music) until an agent dequeues them. Agents join the line by dialing
 // "queue:<name>" through the TwiML App (the Voice Desk does this
-// automatically). Ad slots are config-driven for now — wired to the platform's
+// automatically). Ad slots are config-driven for now â€” wired to the platform's
 // ad-spaces engine later (see docs/voice-system-backlog.md).
 
 const getQueueConfig = () => ({
@@ -226,7 +226,7 @@ const getQueueConfig = () => ({
 
 const QUEUE_PREFIX = 'queue:';
 
-// ── Escalation configuration ─────────────────────────────────────────────────
+// â”€â”€ Escalation configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Format: "department:target,department:target" where target is an E.164
 // number or a Twilio Client identity ("client:identity"). Example:
 //   VOICE_ESCALATION_DEPARTMENTS=finance:+2348012345678,legal:client_legal_1
@@ -255,7 +255,7 @@ const findDepartment = (name) =>
     (department) => department.name.toLowerCase() === String(name || '').toLowerCase()
   );
 
-// Lazy Twilio REST client — only created when an escalation is requested.
+// Lazy Twilio REST client â€” only created when an escalation is requested.
 let twilioRestClient = null;
 const getTwilioRestClient = () => {
   if (!twilioRestClient) {
@@ -314,7 +314,7 @@ const requireVoiceConfig = (req, res, next) => {
  *
  * Twilio computes its signature over the full public URL plus the POST body,
  * so the URL used here must match the public HTTPS URL Twilio called. In
- * production that URL is built from TWILIO_WEBHOOK_BASE_URL only — the
+ * production that URL is built from TWILIO_WEBHOOK_BASE_URL only â€” the
  * request's Host header is attacker-controlled and never trusted.
  */
 const validateTwilioSignature = (req) => {
@@ -345,7 +345,7 @@ const twilioWebhookGuard = [requireVoiceConfig, (req, res, next) => {
   next();
 }];
 
-// ── Call context helpers ─────────────────────────────────────────────────────
+// â”€â”€ Call context helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // `source` is threaded through webhook URLs as a query parameter so every leg
 // (Dial status callbacks, Dial action webhooks) keeps the ORIGINAL call's
 // origin even though `To` changes per leg.
@@ -357,7 +357,7 @@ const classifyCallSource = (to) => {
   const intlNumber = process.env.INTL_NUMBER || '';
   const tollFreeNumber = process.env.TOLL_FREE_NUMBER || '';
 
-  // includes('') is always true — guard against empty match strings so an
+  // includes('') is always true â€” guard against empty match strings so an
   // unset variable can never misclassify every call.
   if (
     (nigeriaNumber && value.includes(nigeriaNumber)) ||
@@ -380,8 +380,8 @@ const getCallSource = (req) => {
 
 /**
  * Extract a display-safe E.164-ish caller number.
- * SIP trunks may report From as "sip:+2348…@trunk.example" or even as an
- * email-like identity — never forward raw SIP URIs or usernames to agents.
+ * SIP trunks may report From as "sip:+2348â€¦@trunk.example" or even as an
+ * email-like identity â€” never forward raw SIP URIs or usernames to agents.
  */
 const sanitizeCallerNumber = (rawFrom) => {
   if (!rawFrom) return null;
@@ -447,7 +447,7 @@ const sayRecordingConsent = (twiml) => {
   }
 };
 
-// ── IVR helpers ──────────────────────────────────────────────────────────────
+// â”€â”€ IVR helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const IVR_GATHER_OPTIONS = {
   action: '/voice/menu',
@@ -505,10 +505,10 @@ const dialNumber = (twiml, number, { action, callerId, req }) => {
   return twiml.dial(options, number);
 };
 
-// ── Conference helpers (warm-transfer call path) ─────────────────────────────
+// â”€â”€ Conference helpers (warm-transfer call path) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Every support call now runs inside a Twilio <Conference> "room":
 //   - the caller parks in their own room (rentalhub_support_<callerCallSid>)
-//     with the hold loop (announcement → ad → music) as the waitUrl;
+//     with the hold loop (announcement â†’ ad â†’ music) as the waitUrl;
 //   - the agent is dispatched into the caller's room (directly when they dial
 //     the queue and a caller is waiting, or via a REST-created participant
 //     call when a caller arrives while the agent is parked);
@@ -516,7 +516,7 @@ const dialNumber = (twiml, number, { action, callerId, req }) => {
 //     SAME room, held+coached so only the agent hears them, then unheld to
 //     bridge the caller, after which the agent leaves.
 //
-// This room model is what makes hold/consult/merge/leave possible at all —
+// This room model is what makes hold/consult/merge/leave possible at all â€”
 // a direct queue bridge cannot do it.
 
 const SUPPORT_ROOM_PREFIX = 'rentalhub_support_';
@@ -584,7 +584,7 @@ const dialAgentIntoConference = (twiml, req, roomName, { waiting = false } = {})
   return dial;
 };
 
-// ── POST /voice/incoming ─────────────────────────────────────────────────────
+// â”€â”€ POST /voice/incoming â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Entry point for every inbound call (Nigeria via Termii SIP, or
 // international). Plays the greeting, collects a single DTMF digit and hands
 // control to /voice/menu. If the caller never presses a digit, the Gather
@@ -593,18 +593,18 @@ const dialAgentIntoConference = (twiml, req, roomName, { waiting = false } = {})
 router.post('/incoming', twilioWebhookGuard, (req, res) => {
   const callSource = getCallSource(req);
 
-  // Outbound legs initiated from the agent browser carry From=client:…
+  // Outbound legs initiated from the agent browser carry From=client:â€¦
   // (the TwiML App Voice URL is /voice/outgoing). If such a leg is
   // mis-routed here, never play the inbound IVR to the dialed party.
   if (String(req.body.From || '').toLowerCase().startsWith('client:')) {
-    logger.warn('Voice webhook: outbound leg hit /voice/incoming — check the TwiML App Voice URL', webhookLogContext(req));
+    logger.warn('Voice webhook: outbound leg hit /voice/incoming â€” check the TwiML App Voice URL', webhookLogContext(req));
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.reject();
     res.type('text/xml');
     return res.send(twiml.toString());
   }
 
-  // Operational logs — keep these exact strings; the frontend derives its
+  // Operational logs â€” keep these exact strings; the frontend derives its
   // badge from the `call_source` Client parameter, not from logs.
   if (callSource === 'local_termii') {
     logger.info('Incoming call from Nigeria via Termii', webhookLogContext(req));
@@ -646,7 +646,7 @@ router.post('/incoming', twilioWebhookGuard, (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── POST /voice/outgoing ─────────────────────────────────────────────────────
+// â”€â”€ POST /voice/outgoing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // TwiML App Voice URL: invoked when an agent browser Device places an
 // outbound call. The destination is dialed with the platform number as the
 // caller ID; a failed attempt gets the bounded terminal fallback.
@@ -743,13 +743,13 @@ router.post('/outgoing', twilioWebhookGuard, async (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── POST /voice/menu ─────────────────────────────────────────────────────────
+// â”€â”€ POST /voice/menu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // DTMF routing:
-//   1 → connect to the Voice JS SDK agent registered as "support_agent_1"
+//   1 â†’ connect to the Voice JS SDK agent registered as "support_agent_1"
 //       (answerOnBridge makes the caller hear the agent only after the
 //        browser Device accepts the call).
-//   2 → dial the sales backup number (E.164).
-//   anything else → say invalid, re-present the menu once, then goodbye.
+//   2 â†’ dial the sales backup number (E.164).
+//   anything else â†’ say invalid, re-present the menu once, then goodbye.
 // Both Dial legs report status to /voice/status and hand failures to
 // /voice/dial-fallback.
 
@@ -764,7 +764,7 @@ router.post('/menu', twilioWebhookGuard, (req, res) => {
     // announcement/ad/music until the agent is dispatched into the room.
     dialCallerIntoConference(twiml, req);
   } else if (digits === '3') {
-    // Callback request — same DTMF flow as the after-hours branch.
+    // Callback request â€” same DTMF flow as the after-hours branch.
     twiml.say('Please enter the phone number where we can reach you, then press the hash key.');
     twiml.gather({
       action: `/voice/callback-number?source=${getCallSource(req)}`,
@@ -795,7 +795,7 @@ router.post('/menu', twilioWebhookGuard, (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── POST /voice/dial-fallback ────────────────────────────────────────────────
+// â”€â”€ POST /voice/dial-fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Action webhook fired when a Dial completes. `completed` means the call was
 // actually answered; every other DialCallStatus (no-answer, busy, failed,
 // cancel, timeout) triggers the recovery IVR once.
@@ -820,11 +820,11 @@ router.post('/dial-fallback', twilioWebhookGuard, (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── POST /voice/fallback-choice ──────────────────────────────────────────────
+// â”€â”€ POST /voice/fallback-choice â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Recovery choice after a failed Dial:
-//   1 → retry the browser agent once (bounded: terminal fallback on failure)
-//   2 → connect to sales
-//   anything else → goodbye
+//   1 â†’ retry the browser agent once (bounded: terminal fallback on failure)
+//   2 â†’ connect to sales
+//   anything else â†’ goodbye
 
 router.post('/fallback-choice', twilioWebhookGuard, (req, res) => {
   const digits = String(req.body.Digits || '').trim();
@@ -851,7 +851,7 @@ router.post('/fallback-choice', twilioWebhookGuard, (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── POST /voice/dial-fallback-final ──────────────────────────────────────────
+// â”€â”€ POST /voice/dial-fallback-final â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Terminal recovery step: no further retries are offered, so the call can
 // never loop.
 
@@ -870,11 +870,11 @@ router.post('/dial-fallback-final', twilioWebhookGuard, (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── POST /voice/wait ─────────────────────────────────────────────────────────
+// â”€â”€ POST /voice/wait â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Caller-side hold loop, used as the conference room's waitUrl. Twilio
-// re-fetches it after each loop completes: announcement → ad slot → hold
+// re-fetches it after each loop completes: announcement â†’ ad slot â†’ hold
 // music. (DTMF is NOT available in a conference waitUrl, so callback requests
-// live in the main IVR — press 3 — and the after-hours branch instead.)
+// live in the main IVR â€” press 3 â€” and the after-hours branch instead.)
 
 router.post('/wait', twilioWebhookGuard, async (req, res) => {
   const config = getQueueConfig();
@@ -897,7 +897,7 @@ router.post('/wait', twilioWebhookGuard, async (req, res) => {
         adId = picked.id;
       }
     } catch {
-      // DB unreachable — fall through to the config-provided list.
+      // DB unreachable â€” fall through to the config-provided list.
     }
     if (!adUrl) {
       const configUrls = config.adUrls.filter((url) => /^https:\/\//i.test(url));
@@ -944,7 +944,7 @@ router.post('/wait', twilioWebhookGuard, async (req, res) => {
         ]
       );
     } catch {
-      // Non-fatal — dispatch correlation is best-effort.
+      // Non-fatal â€” dispatch correlation is best-effort.
     }
   }
 
@@ -952,13 +952,13 @@ router.post('/wait', twilioWebhookGuard, async (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── POST /voice/conference-events ────────────────────────────────────────────
+// â”€â”€ POST /voice/conference-events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Status callbacks from every support conference. Drives:
 //   - caller lifecycle (clear 'queued' when their room ends);
 //   - agent dispatch (move a parked agent into a new caller's room);
-//   - call-state marking (queued → in-progress once the agent joins).
+//   - call-state marking (queued â†’ in-progress once the agent joins).
 
-// ── Agent identities (multi-agent) ───────────────────────────────────────────
+// â”€â”€ Agent identities (multi-agent) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Agents are identified by Twilio Client identities. Configure the allowed
 // lines via VOICE_AGENT_IDENTITIES (comma-separated); the first entry is the
 // default identity used by legacy paths and when only one agent exists.
@@ -1076,7 +1076,7 @@ const markCallerStatus = async (callerCallSid, status, { agentCallSid = null, ro
  * Send an agent into a caller's room (multi-agent aware):
  *   1. If agents are parked in the shared waiting room, move the LONGEST-
  *      waiting parked agent into the caller's room (REST rings their browser).
- *   2. Otherwise no-one is on duty — the caller keeps waiting (the next agent
+ *   2. Otherwise no-one is on duty â€” the caller keeps waiting (the next agent
  *      to dial the queue line joins them directly).
  */
 const dispatchAgentToRoom = async (roomName, callerCallSid) => {
@@ -1170,7 +1170,7 @@ router.post('/conference-events', twilioWebhookGuard, async (req, res) => {
   });
 
   if (event === 'conference-start') {
-    // The caller just joined their room and is waiting — try to dispatch the
+    // The caller just joined their room and is waiting â€” try to dispatch the
     // agent immediately (no-op if the agent is offline; they will join via
     // the queue line when they dial in).
     await dispatchAgentToRoom(roomName, callerCallSid);
@@ -1190,9 +1190,9 @@ router.post('/conference-events', twilioWebhookGuard, async (req, res) => {
   res.status(200).json({ success: true });
 });
 
-// ── POST /voice/after-hours ──────────────────────────────────────────────────
+// â”€â”€ POST /voice/after-hours â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ── POST /voice/agent-wait ───────────────────────────────────────────────────
+// â”€â”€ POST /voice/agent-wait â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Agent-side hold loop: what the agent hears while connected to the queue
 // line and waiting for a caller to be bridged.
 
@@ -1207,7 +1207,7 @@ router.post('/agent-wait', twilioWebhookGuard, (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── POST /voice/after-hours ──────────────────────────────────────────────────
+// â”€â”€ POST /voice/after-hours â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // DTMF entry of the after-hours branch: only "3" (request a callback) is
 // meaningful; anything else ends the call.
 
@@ -1239,7 +1239,7 @@ router.post('/after-hours', twilioWebhookGuard, (req, res) => {
 
 /**
  * Normalize a DTMF-entered callback number to E.164-ish form.
- * Nigerian callers typically dial "0803…" (local) or "234803…" (intl format).
+ * Nigerian callers typically dial "0803â€¦" (local) or "234803â€¦" (intl format).
  */
 const normalizeCallbackNumber = (digits) => {
   const cleaned = String(digits || '').replace(/\D/g, '');
@@ -1249,7 +1249,7 @@ const normalizeCallbackNumber = (digits) => {
   return `+${cleaned}`;
 };
 
-// ── POST /voice/callback-number ──────────────────────────────────────────────
+// â”€â”€ POST /voice/callback-number â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Persists the DTMF-entered callback number (after-hours flow). Persistence is
 // best-effort: a DB outage must not fail the call.
 
@@ -1293,9 +1293,9 @@ router.post('/callback-number', twilioWebhookGuard, async (req, res) => {
   res.send(twiml.toString());
 });
 
-// ── GET /voice/callbacks ─────────────────────────────────────────────────────
+// â”€â”€ GET /voice/callbacks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Review of after-hours callback requests, scoped to the reader's tier
-// (super/state/LGA — docs/geo-support-escalation-design.md Phase 1).
+// (super/state/LGA â€” docs/geo-support-escalation-design.md Phase 1).
 
 // Voice record readers: super/state/LGA tiers. Attaches req.voiceScope.
 const requireVoiceRead = (req, res, next) => {
@@ -1308,6 +1308,16 @@ const requireVoiceRead = (req, res, next) => {
   } catch (error) {
     return res.status(error.statusCode || 403).json({ success: false, message: error.message });
   }
+};
+
+// Agent console access (Phase 3): the support tiers (super/state/LGA) plus the
+// general area admins may staff the line and use the desk. Same role set as
+// voice records. Ownership/enforcement of actions is Phase 4's job.
+const requireVoiceAgent = (req, res, next) => {
+  if (!req.user || !isVoiceReadRole(req.user.user_type)) {
+    return res.status(403).json({ success: false, message: 'Your role cannot use the voice console.' });
+  }
+  next();
 };
 
 router.get('/callbacks', voiceTokenLimiter, authenticate, requireVoiceRead, async (req, res) => {
@@ -1330,7 +1340,7 @@ router.get('/callbacks', voiceTokenLimiter, authenticate, requireVoiceRead, asyn
   }
 });
 
-// ── GET /voice/summary ───────────────────────────────────────────────────────
+// â”€â”€ GET /voice/summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Lightweight counters for the super-admin overview widget. Each metric is
 // fetched independently so a missing table never fails the whole summary.
 
@@ -1362,7 +1372,7 @@ router.get('/summary', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin
 
   res.json({ success: true, data });
 });
-// ── GET /voice/call-log ──────────────────────────────────────────────────────
+// â”€â”€ GET /voice/call-log â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Admin-only call history for the Voice Operations panel. One row per call leg
 // (the LATEST recorded state), newest first, with duration and the recording
 // URL when available.
@@ -1395,7 +1405,7 @@ router.get('/call-log', voiceTokenLimiter, authenticate, requireVoiceRead, async
   }
 });
 
-// ── POST /voice/recording ────────────────────────────────────────────────────
+// â”€â”€ POST /voice/recording â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Recording status callbacks (VOICE_RECORD_CALLS=true). Back-fills the
 // recording URL onto the matching status row; never fails the webhook.
 
@@ -1502,33 +1512,33 @@ router.post('/status', twilioWebhookGuard, async (req, res) => {
   res.status(200).json({ success: true });
 });
 
-// ── GET /voice/departments ───────────────────────────────────────────────────
+// â”€â”€ GET /voice/departments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Admin-only list of escalation departments configured via
-// VOICE_ESCALATION_DEPARTMENTS. Targets are deliberately NOT exposed — the
+// VOICE_ESCALATION_DEPARTMENTS. Targets are deliberately NOT exposed â€” the
 // desk only needs names; the backend resolves targets at escalate time.
 
-router.get('/departments', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, (req, res) => {
+router.get('/departments', voiceTokenLimiter, authenticate, requireVoiceAgent, (req, res) => {
   res.json({
     success: true,
     data: getEscalationDepartments().map((department) => department.name),
   });
 });
 
-// ── GET /voice/agent-lines ───────────────────────────────────────────────────
+// â”€â”€ GET /voice/agent-lines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Admin-only list of agent identities the desk may register as
 // (VOICE_AGENT_IDENTITIES). The desk picks one line before going available.
 
-router.get('/agent-lines', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, (req, res) => {
+router.get('/agent-lines', voiceTokenLimiter, authenticate, requireVoiceAgent, (req, res) => {
   res.json({ success: true, data: getAgentIdentities() });
 });
 
-// ── GET /voice/call-context ──────────────────────────────────────────────────
+// â”€â”€ GET /voice/call-context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Admin-only: resolve the caller (number + source) behind the agent's current
 // call. Conference legs do not expose caller info to the browser SDK, so the
 // desk fetches it here from the 'in-progress'/'queued' rows keyed by the
 // agent's call SID.
 
-router.get('/call-context', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+router.get('/call-context', voiceTokenLimiter, authenticate, requireVoiceAgent, async (req, res) => {
   const agentCallSid = String(req.query.callSid || '').trim();
   if (!agentCallSid) {
     return res.status(400).json({ success: false, message: 'Missing agent call SID.' });
@@ -1552,13 +1562,13 @@ router.get('/call-context', voiceTokenLimiter, authenticate, requireAdminOrSuper
   });
 });
 
-// ── POST /voice/escalate ─────────────────────────────────────────────────────
+// â”€â”€ POST /voice/escalate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Agent-initiated WARM transfer with consultation:
-//   action = 'consult'  → the department target is called INTO the caller's
+//   action = 'consult'  â†’ the department target is called INTO the caller's
 //                         conference room, then held + coached so only the
 //                         agent hears them while the caller is parked (hold).
 //                         The agent tells the department the story privately.
-//   action = 'transfer' → the department and caller are unheld (bridged
+//   action = 'transfer' â†’ the department and caller are unheld (bridged
 //                         three-way); the agent then hangs up on their side.
 //
 // Lookup: the agent's current room is found via the caller's 'in-progress'
@@ -1627,7 +1637,7 @@ const getConferenceParticipantByCallSid = async (conferenceSid, callSid) => {
   return participants.find((p) => p.callSid === callSid) || null;
 };
 
-router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+router.post('/escalate', voiceTokenLimiter, authenticate, requireVoiceAgent, async (req, res) => {
   const action = String(req.body?.action || '').trim();
   if (!['consult', 'transfer', 'cancel-consult'].includes(action)) {
     return res.status(400).json({
@@ -1789,7 +1799,7 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
   }
 
   // action === 'transfer': bridge the department with the caller (unhold
-  // both, drop the coaching) — the agent then leaves on their side.
+  // both, drop the coaching) â€” the agent then leaves on their side.
   const participants = await conferenceResource.participants.list();
   const departmentParticipant = participants.find(
     (p) => p.callSid !== agentCallSid && p.callSid !== context.callerCallSid && p.callSid
@@ -1824,7 +1834,7 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
   // Raise the complaint through the platform's department-escalation loop:
   // a ticket lands with the department's admin roles and on the Super Support
   // dashboard (with the call recording attached) for rectification.
-  // Best-effort — never fails the transfer.
+  // Best-effort â€” never fails the transfer.
   try {
     const supportRoutes = require('./support');
 
@@ -1892,13 +1902,13 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireAdminOrSuperAdm
   return res.json({ success: true });
 });
 
-// ── GET /voice/consult-status ────────────────────────────────────────────────
+// â”€â”€ GET /voice/consult-status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Admin-only: has the consulted department actually joined the caller's room?
 // The Voice Desk polls this while a consult is "ringing" so it can enable
 // "Transfer now" the moment the department answers (even after the initial
 // consult request has returned).
 
-router.get('/consult-status', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+router.get('/consult-status', voiceTokenLimiter, authenticate, requireVoiceAgent, async (req, res) => {
   const agentCallSid = String(req.query.callSid || '').trim();
   if (!agentCallSid) {
     return res.status(400).json({ success: false, message: 'Missing agent call SID.' });
@@ -1922,14 +1932,14 @@ router.get('/consult-status', voiceTokenLimiter, authenticate, requireAdminOrSup
   return res.json({ success: true, data: { connected } });
 });
 
-// ── GET /voice/duty-status ───────────────────────────────────────────────────
+// â”€â”€ GET /voice/duty-status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Admin-only: per-agent on-duty indicator. An agent is:
-//   offline — not in any conference,
-//   on_duty — parked in the shared waiting room,
-//   on_call — inside a caller's support room.
+//   offline â€” not in any conference,
+//   on_duty â€” parked in the shared waiting room,
+//   on_call â€” inside a caller's support room.
 // Used by the Voice Ops panel to show who is covering the line.
 
-router.get('/duty-status', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, async (req, res) => {
+router.get('/duty-status', voiceTokenLimiter, authenticate, requireVoiceAgent, async (req, res) => {
   const lines = getAgentIdentities();
   const states = Object.fromEntries(lines.map((identity) => [identity, 'offline']));
   try {
@@ -1948,7 +1958,7 @@ router.get('/duty-status', voiceTokenLimiter, authenticate, requireAdminOrSuperA
       }
     }
   } catch {
-    // Best-effort — treat everyone as offline on API failure.
+    // Best-effort â€” treat everyone as offline on API failure.
   }
   res.json({
     success: true,
@@ -1956,14 +1966,50 @@ router.get('/duty-status', voiceTokenLimiter, authenticate, requireAdminOrSuperA
   });
 });
 
-// ── GET /voice/token ─────────────────────────────────────────────────────────
+// â”€â”€ GET /voice/token â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Issues a short-lived Twilio Access Token (TTL 3600s) for the chosen agent
 // identity. `?line=<identity>` selects the agent line (validated against
 // VOICE_AGENT_IDENTITIES; defaults to the first). The browser Voice SDK uses
 // it to register a Device. Only admins/super-admins may mint tokens; only one
 // browser should normally hold a given identity registered at a time.
 
-router.get('/token', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, (req, res) => {
+// ── GET /voice/desk-scope ────────────────────────────────────────────────────
+// Phase 3: tells the logged-in agent's Voice Desk which queue line to staff.
+// Geo OFF => everyone staffs the legacy national line. Geo ON => state/LGA
+// support staff their assigned tier line (falls back to super when their area
+// is unassigned).
+
+router.get('/desk-scope', voiceTokenLimiter, authenticate, requireVoiceAgent, async (req, res) => {
+  try {
+    const role = req.user.user_type;
+    const geoOn = await isVoiceGeoRoutingEnabled();
+    let scope = { level: 'super', state: null, lga: null };
+    if (geoOn) {
+      const state = String(req.user.assigned_state || '').trim();
+      const lga = String(req.user.assigned_lga || req.user.assigned_city || '').trim();
+      if (role === 'state_support_admin' || role === 'state_admin') {
+        if (state) scope = { level: 'state', state, lga: null };
+      } else if (role === 'lga_support_admin' || role === 'lga_admin') {
+        if (state && lga) scope = { level: 'lga', state, lga };
+      }
+    }
+    const queue =
+      scope.level === 'lga'
+        ? `queue:lga:${scope.state}:${scope.lga}`
+        : scope.level === 'state'
+          ? `queue:state:${scope.state}`
+          : `queue:${getQueueConfig().name}`;
+    const waitingRoom = waitingRoomForScope(scope, AGENTS_WAITING_ROOM);
+    return res.json({ success: true, data: { geo_enabled: geoOn, scope, queue, waiting_room: waitingRoom } });
+  } catch (error) {
+    logger.error('Voice desk-scope failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to resolve your voice desk scope.' });
+  }
+});
+
+// ── GET /voice/token ─────────────────────────────────────────────────────────
+
+router.get('/token', voiceTokenLimiter, authenticate, requireVoiceAgent, (req, res) => {
   const status = getVoiceConfigStatus();
   if (!status.ready) {
     logger.error('Voice token request blocked: incomplete Twilio configuration');
@@ -2009,7 +2055,7 @@ router.get('/token', voiceTokenLimiter, authenticate, requireAdminOrSuperAdmin, 
 
 module.exports = router;
 
-// Test-only exports — same convention as routes/support.js (_supportScopeForTest).
+// Test-only exports â€” same convention as routes/support.js (_supportScopeForTest).
 module.exports._voiceScopeForTest = {
   classifyCallSource,
   sanitizeCallerNumber,
@@ -2024,3 +2070,10 @@ module.exports._voiceScopeForTest = {
   E164_PATTERN,
   VOICE_STATUSES,
 };
+
+
+
+
+
+
+
