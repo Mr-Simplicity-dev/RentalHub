@@ -34,7 +34,7 @@ const authenticate = async (req, res, next) => {
 
     const result = await db.query(
       `SELECT id, email, user_type, identity_verified, subscription_active,
-              assigned_state, assigned_city, assigned_zone, is_recruitment_admin,
+              assigned_state, assigned_city, assigned_lga, assigned_zone, is_recruitment_admin,
               preferred_state_id, preferred_lga_name,
               deleted_at, is_active,
               account_suspended_reason,
@@ -105,7 +105,7 @@ const optionalAuthenticate = async (req, res, next) => {
 
     const result = await db.query(
       `SELECT id, email, user_type, identity_verified, subscription_active,
-              assigned_state, assigned_city, assigned_zone, is_recruitment_admin,
+              assigned_state, assigned_city, assigned_lga, assigned_zone, is_recruitment_admin,
               preferred_state_id, preferred_lga_name,
               deleted_at, is_active,
               account_suspended_reason,
