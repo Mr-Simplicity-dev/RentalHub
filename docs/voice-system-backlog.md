@@ -162,6 +162,20 @@ Two escalation axes, both terminating at the platform super admin:
 - Functional/department: issue handled by the matching department's super admin
   -> super admin.
 
+## ROUTING BASIS (owner decision, Sept 2026) — Rule B with A-fallback
+
+- **Known user (phone/ANI matched to an account, or caller identified):** route
+  by the user's HOME / PROPERTY LGA (their profile address, or the LGA of the
+  property they are calling about). So a Gwagwalada resident who works in Wuse
+  and calls is served by Gwagwalada support, because the issue is about their
+  home/property area. Do NOT use call-time GPS for known users.
+- **Unknown caller (no account match):** fall back to WHERE-THEY-ARE-AT-CALL-
+  TIME (Rule A) — IVR state/LGA capture and/or ANI/device location — so a
+  walk-in caller from Wuse is served by the Wuse/AMAC (FCT) team.
+- Consequence for the build: routing needs a per-user "home LGA" source
+  (profile address / property listing LGA). Call-time location remains only the
+  identity fallback, not the primary key.
+
 ## Truth in the code TODAY (do not re-litigate these as new bugs)
 
 - The toll-free line is ONE national queue staffed ONLY by super-support agents
