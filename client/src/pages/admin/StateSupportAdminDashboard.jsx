@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaArrowDown, FaArrowUp, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -13,6 +13,9 @@ import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequest
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 import TicketConversationModal from '../../components/common/TicketConversationModal';
+
+// Lazy: the desk pulls in the Twilio SDK — keep it out of the dashboard chunk.
+const SupportVoiceDesk = lazy(() => import('../../components/admin/SupportVoiceDesk'));
 
 const badgeClass = (status) => {
   if (status === 'approved') return 'bg-green-100 text-green-700';
@@ -50,7 +53,7 @@ const StateSupportAdminDashboard = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const activeTab = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab') || 'overview';
-    return ['overview', 'queue', 'property_requests', 'tenancy', 'tickets', 'escalations'].includes(tab) ? tab : 'overview';
+    return ['overview', 'queue', 'property_requests', 'tenancy', 'tickets', 'escalations', 'voice'].includes(tab) ? tab : 'overview';
   }, [location.search]);
 
   const workspaceTabs = [
@@ -60,6 +63,7 @@ const StateSupportAdminDashboard = () => {
     { key: 'tenancy', label: 'Tenancy Actions', to: '/admin/state-support-dashboard?tab=tenancy' },
     { key: 'tickets', label: 'Support Tickets', to: '/admin/state-support-dashboard?tab=tickets' },
     { key: 'escalations', label: 'Escalations', to: '/admin/state-support-dashboard?tab=escalations' },
+    { key: 'voice', label: 'Voice Desk', to: '/admin/state-support-dashboard?tab=voice' },
   ];
 
   const loadTickets = useCallback(async () => {
@@ -452,6 +456,15 @@ const StateSupportAdminDashboard = () => {
         <div className="state-support-escalations-section">
           <SupportTicketWorkspace tickets={tickets} loading={ticketsLoading} user={user} onOpenTicket={openTicket} onTicketAction={handleTicketAction} mode="escalations" />
         </div>
+      )}
+
+      {/* Voice Desk Section (Phase 3) — scoped to this state's line */}
+      {activeTab === 'voice' && (
+        <section className="mt-4">
+          <Suspense fallback={<p className="px-4 py-8 text-sm text-gray-500">Loading voice desk…</p>}>
+            <SupportVoiceDesk tickets={tickets} onOpenTickets={() => { setSelectedTicket(null); }} />
+          </Suspense>
+        </section>
       )}
 
       {selectedTicket && (

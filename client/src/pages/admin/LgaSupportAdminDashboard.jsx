@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaSyncAlt } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -10,6 +10,9 @@ import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 import TicketConversationModal from '../../components/common/TicketConversationModal';
 
+// Lazy: the desk pulls in the Twilio SDK — keep it out of the dashboard chunk.
+const SupportVoiceDesk = lazy(() => import('../../components/admin/SupportVoiceDesk'));
+
 const LgaSupportAdminDashboard = () => {
   const { user } = useAuth();
   const { socket } = useSocket();
@@ -19,7 +22,7 @@ const LgaSupportAdminDashboard = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const activeTab = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab') || 'overview';
-    return ['overview', 'property_requests', 'tenancy', 'tickets', 'escalations'].includes(tab) ? tab : 'overview';
+    return ['overview', 'property_requests', 'tenancy', 'tickets', 'escalations', 'voice'].includes(tab) ? tab : 'overview';
   }, [location.search]);
 
   const workspaceTabs = [
@@ -28,6 +31,7 @@ const LgaSupportAdminDashboard = () => {
     { key: 'tenancy', label: 'Tenancy Actions', to: '/admin/lga-support-dashboard?tab=tenancy' },
     { key: 'tickets', label: 'Support Tickets', to: '/admin/lga-support-dashboard?tab=tickets' },
     { key: 'escalations', label: 'Escalations', to: '/admin/lga-support-dashboard?tab=escalations' },
+    { key: 'voice', label: 'Voice Desk', to: '/admin/lga-support-dashboard?tab=voice' },
   ];
 
   // Socket listener for real-time ticket list updates
@@ -188,6 +192,15 @@ const LgaSupportAdminDashboard = () => {
 
         {activeTab === 'escalations' && (
         <SupportTicketWorkspace tickets={data.tickets} loading={loading} user={user} onOpenTicket={openTicket} onTicketAction={handleQuickAction} mode="escalations" />
+        )}
+
+        {/* Voice Desk Section (Phase 3) — scoped to this LGA's line */}
+        {activeTab === 'voice' && (
+        <section className="lga-support-voice-section">
+          <Suspense fallback={<p className="px-4 py-8 text-sm text-gray-500">Loading voice desk…</p>}>
+            <SupportVoiceDesk tickets={data.tickets} onOpenTickets={openTicket} />
+          </Suspense>
+        </section>
         )}
       </div>
 
