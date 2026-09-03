@@ -104,6 +104,11 @@ const DEFAULT_FEATURE_FLAGS = [
     enabled: true,
     description: 'Block the local (₦) registration rate for payments coming from foreign IPs or VPN/proxy connections — they must register as diaspora (USD) instead.',
   },
+  {
+    key: 'voice_geo_routing',
+    enabled: false,
+    description: 'Route toll-free support calls by the caller\'s jurisdiction (LGA -> state -> super support). OFF keeps the single national super-support queue.',
+  },
 ];
 
 let featureFlagsReady = false;
