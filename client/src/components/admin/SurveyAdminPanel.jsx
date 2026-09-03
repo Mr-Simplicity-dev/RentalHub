@@ -971,17 +971,33 @@ const SurveyAdminPanel = () => {
                       <strong>{loc.lga_name}</strong> — {loc.state_name}
                       {!isOn && <span className="ml-2 text-xs font-medium text-amber-600">disabled</span>}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => toggleStagedLoc(loc.state_name, loc.lga_name)}
-                      className={`rounded-lg px-3 py-1 text-xs font-medium ${
-                        isOn
-                          ? "border border-amber-300 text-amber-700 hover:bg-amber-50"
-                          : "border border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                      }`}
-                    >
-                      {isOn ? "Disable" : "Enable"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleStagedLoc(loc.state_name, loc.lga_name)}
+                        className={`rounded-lg px-3 py-1 text-xs font-medium ${
+                          isOn
+                            ? "border border-amber-300 text-amber-700 hover:bg-amber-50"
+                            : "border border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        {isOn ? "Disable" : "Enable"}
+                      </button>
+                      <button
+                        type="button"
+                        title="Remove this LGA from the list entirely"
+                        onClick={() =>
+                          setLocList(
+                            locList.filter(
+                              (l) => !(l.state_name === loc.state_name && l.lga_name === loc.lga_name)
+                            )
+                          )
+                        }
+                        className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 );
               })}
