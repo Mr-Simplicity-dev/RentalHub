@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Device } from '@twilio/voice-sdk';
 import { useAuth } from './useAuth';
-import { fetchVoiceToken } from '../services/voiceApi';
+import { fetchVoiceToken, fetchDeskScope } from '../services/voiceApi';
 
 const AGENT_IDENTITY = 'support_agent_1';
 const TOKEN_REFRESH_LEAD_MS = 60 * 1000; // refresh ~1 min before expiry
@@ -63,6 +63,8 @@ const useTwilioVoice = () => {
 
   const [inQueue, setInQueue] = useState(false);
   const queueNameRef = useRef(process.env.REACT_APP_VOICE_QUEUE_NAME || 'support');
+  const [deskScopeLevel, setDeskScopeLevel] = useState('super');
+  const [geoEnabled, setGeoEnabled] = useState(false);
 
   const isQueueCall = (call) =>
     String(call?.parameters?.To || call?.customParameters?.To || '').toLowerCase().startsWith('queue:');
@@ -72,6 +74,26 @@ const useTwilioVoice = () => {
     activeCallRef.current = activeCall;
   };
   useEffect(syncRefs, [incomingCall, activeCall]);
+
+  // Phase 3: dial the queue line the backend scopes for this agent (geo ON:
+  // LGA/state agents staff their own tier line). Falls back to the env default
+  // when the desk-scope endpoint is unavailable.
+  useEffect(() => {
+    let mounted = true;
+    fetchDeskScope()
+      .then((scope) => {
+        if (!mounted || !scope) return;
+        if (scope.queue) {
+          queueNameRef.current = String(scope.queue).replace(/^queue:/, '');
+        }
+        setDeskScopeLevel(scope.scope?.level || 'super');
+        setGeoEnabled(scope.geo_enabled === true);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const teardown = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -389,6 +411,8 @@ const useTwilioVoice = () => {
     endCall,
     toggleMute,
     identity: AGENT_IDENTITY,
+    deskScopeLevel,
+    geoEnabled,
   };
 };
 

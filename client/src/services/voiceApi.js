@@ -145,6 +145,20 @@ export const fetchAgentLines = async () => {
 };
 
 /**
+ * Phase 3: the logged-in agent's desk scope. Returns which queue line to staff
+ * and whether geo routing is active; null when unavailable (callers keep the
+ * env-based default queue).
+ */
+export const fetchDeskScope = async () => {
+  try {
+    const data = await authedFetch('/voice/desk-scope');
+    return data?.data || null;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Resolve the caller behind the agent's current call (conference legs do not
  * expose caller info to the SDK). Returns null when no caller is active.
  */

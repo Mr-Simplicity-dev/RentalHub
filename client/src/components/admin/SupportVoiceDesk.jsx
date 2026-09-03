@@ -124,7 +124,14 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     declineCall,
     endCall,
     toggleMute,
+    deskScopeLevel,
+    geoEnabled,
   } = useTwilioVoice();
+
+  // Phase 3: only the super tier may pick an identity line or escalate to a
+  // department (the ladder's functional axis tops out at super support). LGA/
+  // state desks are console-only for their assigned tier line.
+  const isSuperScope = deskScopeLevel === 'super';
 
   const [now, setNow] = useState(() => Date.now());
   const [announcement, setAnnouncement] = useState('');
@@ -189,13 +196,13 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
   // Load the department list only while the agent is on a call; reset all
   // escalation state whenever the active call changes.
   useEffect(() => {
-    if (!activeCall || isQueueLine(activeCall)) return undefined;
+    if (!activeCall || isQueueLine(activeCall) || !isSuperScope) return undefined;
     let mounted = true;
     fetchDepartments()
       .then((list) => { if (mounted) setDepartments(list); })
-      .catch(() => { /* unavailable â†’ the escalate control stays disabled */ });
+      .catch(() => { /* unavailable â†' the escalate control stays disabled */ });
     return () => { mounted = false; };
-  }, [activeCall]);
+  }, [activeCall, isSuperScope]);
 
   useEffect(() => {
     setConsultState('idle');
@@ -283,9 +290,14 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     }
   }, [escalateDept, getActiveCallSid]);
 
-  // Agent lines (multi-agent): the desk registers as the chosen identity.
+  // Agent lines (multi-agent): only the super tier may pick an identity line.
   useEffect(() => {
     let mounted = true;
+    if (!isSuperScope) {
+      setAgentLines([]);
+      setAgentLine('');
+      return () => { mounted = false; };
+    }
     fetchAgentLines()
       .then((lines) => {
         if (!mounted) return;
@@ -294,7 +306,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
       })
       .catch(() => { /* keep single-agent default */ });
     return () => { mounted = false; };
-  }, []);
+  }, [isSuperScope]);
 
   // Persisted recent calls (call log) shown in the desk card.
   useEffect(() => {
