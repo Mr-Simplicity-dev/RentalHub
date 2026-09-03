@@ -11,6 +11,7 @@ const {
   waitingRoomForScope,
   waitingRoomsForCaller,
   pickQueuedCallerForAgent,
+  canAgentHandleJurisdiction,
 } = require('../services/voiceRouting');
 
 test('voice routing: geo flag gate', () => {
@@ -152,4 +153,29 @@ test('voice routing: direct-join picks the owning caller', () => {
   // An LGA with no matching caller -> park (null).
   assert.strictEqual(pickQueuedCallerForAgent(callers, parseQueueScope('queue:lga:Lagos:Eti-Osa'), true), null);
   assert.strictEqual(pickQueuedCallerForAgent([], superScope, true), null);
+});
+
+test('voice routing: ownership (may agent act on this caller)', () => {
+  const jurGwag = { state: 'FCT', lga: 'Gwagwalada' };
+  const jurKuje = { state: 'FCT', lga: 'Kuje' };
+  const jurOtherState = { state: 'Lagos', lga: 'Eti-Osa' };
+
+  // super acts anywhere, including unknown jurisdiction.
+  assert.strictEqual(canAgentHandleJurisdiction({ level: 'super' }, jurGwag), true);
+  assert.strictEqual(canAgentHandleJurisdiction({ level: 'super' }, null), true);
+
+  // state scoped to FCT.
+  const stateScope = { level: 'state', state: 'Federal Capital Territory', lga: null };
+  assert.strictEqual(canAgentHandleJurisdiction(stateScope, jurGwag), true);
+  assert.strictEqual(canAgentHandleJurisdiction(stateScope, jurKuje), true);
+  assert.strictEqual(canAgentHandleJurisdiction(stateScope, jurOtherState), false);
+  assert.strictEqual(canAgentHandleJurisdiction(stateScope, null), false);
+
+  // lga scoped to FCT/Gwagwalada.
+  const lgaScope = { level: 'lga', state: 'FCT', lga: 'Gwagwalada' };
+  assert.strictEqual(canAgentHandleJurisdiction(lgaScope, jurGwag), true);
+  assert.strictEqual(canAgentHandleJurisdiction(lgaScope, jurKuje), false);
+  assert.strictEqual(canAgentHandleJurisdiction(lgaScope, jurOtherState), false);
+  assert.strictEqual(canAgentHandleJurisdiction(lgaScope, null), false);
+  assert.strictEqual(canAgentHandleJurisdiction({ level: 'agent' }, jurGwag), false);
 });

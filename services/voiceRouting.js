@@ -80,6 +80,43 @@ const dispatchIdentityOrder = (jurisdiction, identitiesByTier = {}) => {
 
 const normalizeKey = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
+// Ownership rule (Phase 4): may an agent scope act on a call whose caller is
+// in `callJurisdiction`? super acts anywhere; state only inside its state;
+// LGA only inside its LGA. Calls with no captured jurisdiction may only be
+// handled by super (lower tiers never pick them up).
+const canAgentHandleJurisdiction = (agentScope, callJurisdiction) => {
+  const level = agentScope && agentScope.level;
+  if (level === 'super') return true;
+  if (level !== 'state' && level !== 'lga') return false;
+
+  const state = String(callJurisdiction?.state || '').trim();
+  const lga = String(callJurisdiction?.lga || '').trim();
+  if (!state) return false;
+
+  const scopeStateKey = normalizeKey(agentScope.state);
+  const callStateKey = normalizeKey(state);
+  const stateOk =
+    Boolean(scopeStateKey) &&
+    Boolean(callStateKey) &&
+    (scopeStateKey === callStateKey ||
+      scopeStateKey.includes(callStateKey) ||
+      callStateKey.includes(scopeStateKey) ||
+      scopeStateKey === 'fct' ||
+      callStateKey === 'fct');
+  if (level === 'state') return stateOk;
+
+  const callLgaKey = normalizeKey(lga);
+  const scopeLgaKey = normalizeKey(agentScope.lga);
+  return (
+    stateOk &&
+    Boolean(callLgaKey) &&
+    Boolean(scopeLgaKey) &&
+    (callLgaKey === scopeLgaKey ||
+      callLgaKey.includes(scopeLgaKey) ||
+      scopeLgaKey.includes(callLgaKey))
+  );
+};
+
 // Parses a dialed queue line back into a tier scope. Accepts both the legacy
 // single name (config.name, e.g. "support") and the geo forms:
 //   queue:super, queue:state:<state>, queue:lga:<state>:<lga>
@@ -168,4 +205,5 @@ module.exports = {
   waitingRoomForScope,
   waitingRoomsForCaller,
   pickQueuedCallerForAgent,
+  canAgentHandleJurisdiction,
 };

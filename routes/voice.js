@@ -58,6 +58,7 @@ const {
   waitingRoomForScope,
   waitingRoomsForCaller,
   pickQueuedCallerForAgent,
+  canAgentHandleJurisdiction,
 } = require('../services/voiceRouting');
 
 const router = express.Router();
@@ -1660,6 +1661,15 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireVoiceAgent, asy
     });
   }
 
+  // Phase 4 ownership enforcement: lower tiers may only escalate callers
+  // inside their own tier/area.
+  if (!(await agentMayActOnCall(req, context.callerCallSid))) {
+    return res.status(403).json({
+      success: false,
+      message: 'This call is outside your support area.',
+    });
+  }
+
   let conference;
   try {
     conference = await findConferenceForRoom(context.roomName);
@@ -1979,20 +1989,36 @@ router.get('/duty-status', voiceTokenLimiter, authenticate, requireVoiceAgent, a
 // support staff their assigned tier line (falls back to super when their area
 // is unassigned).
 
+// Agent scope from the logged-in user (Phase 4 ownership). Mirror of the LGA/
+// state tiers; general admins and support tiers map onto super/state/lga.
+const resolveAgentScopeForUser = (user) => {
+  const role = user && user.user_type;
+  const state = String(user?.assigned_state || '').trim();
+  const lga = String(user?.assigned_lga || user?.assigned_city || '').trim();
+  if (role === 'state_support_admin' || role === 'state_admin') {
+    if (state) return { level: 'state', state, lga: null };
+  } else if (role === 'lga_support_admin' || role === 'lga_admin') {
+    if (state && lga) return { level: 'lga', state, lga };
+  }
+  return { level: 'super', state: null, lga: null };
+};
+
+// Ownership enforcement: with geo routing ON a lower-tier agent may only act
+// on callers inside their own tier/area. Geo OFF keeps today's single-queue
+// behaviour (everyone staffs super).
+const agentMayActOnCall = async (req, callerCallSid) => {
+  const geoOn = await isVoiceGeoRoutingEnabled();
+  if (!geoOn) return true;
+  const scope = resolveAgentScopeForUser(req.user);
+  if (scope.level === 'super') return true;
+  const jurisdiction = await existingJurisdictionFor(callerCallSid);
+  return canAgentHandleJurisdiction(scope, jurisdiction);
+};
+
 router.get('/desk-scope', voiceTokenLimiter, authenticate, requireVoiceAgent, async (req, res) => {
   try {
-    const role = req.user.user_type;
     const geoOn = await isVoiceGeoRoutingEnabled();
-    let scope = { level: 'super', state: null, lga: null };
-    if (geoOn) {
-      const state = String(req.user.assigned_state || '').trim();
-      const lga = String(req.user.assigned_lga || req.user.assigned_city || '').trim();
-      if (role === 'state_support_admin' || role === 'state_admin') {
-        if (state) scope = { level: 'state', state, lga: null };
-      } else if (role === 'lga_support_admin' || role === 'lga_admin') {
-        if (state && lga) scope = { level: 'lga', state, lga };
-      }
-    }
+    const scope = geoOn ? resolveAgentScopeForUser(req.user) : { level: 'super', state: null, lga: null };
     const queue =
       scope.level === 'lga'
         ? `queue:lga:${scope.state}:${scope.lga}`
