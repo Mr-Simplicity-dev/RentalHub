@@ -73,6 +73,40 @@ const getSurveyLocationConfig = async () => {
 
 exports.getSurveyLocationConfigForAdmin = async () => getSurveyLocationConfig();
 
+// Drop any answer key that is not part of the CURRENT questionnaire. This
+// keeps analysis lists safe when the questionnaire is edited between deploys
+// and stops junk keys from bots reaching the analysis tables.
+const normalizeAnswers = (type, answers) => {
+  const questionnaire = survey.getQuestionnaire(type);
+  if (!questionnaire) return {};
+  const known = new Set(questionnaire.questions.map((question) => question.key));
+  const cleaned = {};
+  for (const [key, value] of Object.entries(answers || {})) {
+    if (known.has(key)) cleaned[key] = value;
+  }
+  return cleaned;
+};
+
+// A respondent who recently completed the same survey with the same phone
+// number (paper/agent re-entry included) is probably a double entry.
+const findRecentCompletedRespondent = async (type, phone, days = 30) => {
+  if (!phone) return null;
+  const result = await db.query(
+    `SELECT id, respondent_code
+     FROM survey_responses
+     WHERE survey_type = $1
+       AND respondent_phone = $2
+       AND completed_at IS NOT NULL
+       AND superseded_at IS NULL
+       AND completed_at >= CURRENT_TIMESTAMP - ($3::int * INTERVAL '1 day')
+     ORDER BY completed_at DESC
+     LIMIT 1`,
+    [type, phone, days]
+  );
+  return result.rows[0] || null;
+};
+
+
 // Public: gate status for the client (enabled + allowed state/LGA list).
 exports.getSurveyLocationConfig = async (req, res) => {
   try {
@@ -350,7 +384,7 @@ exports.savePublicDraft = async (req, res) => {
     if (!survey.getQuestionnaire(type)) {
       return res.status(400).json({ success: false, message: 'Unknown survey type' });
     }
-
+    const safeAnswers = normalizeAnswers(type, answers);
     // Location/VPN gate â€” enforced on every draft save.
     const gate = await enforceLocationGate(req, req.body || {});
     if (!gate.allowed) {
@@ -388,7 +422,7 @@ exports.savePublicDraft = async (req, res) => {
          WHERE id = $1`,
         [
           existing.rows[0].id,
-          JSON.stringify(answers || {}),
+          JSON.stringify(safeAnswers),
           JSON.stringify(consent_flags || {}),
           agentUser ? agentUser.id : null,
           agentName,
@@ -412,7 +446,7 @@ exports.savePublicDraft = async (req, res) => {
         generateRespondentCode(),
         token,
         JSON.stringify(consent_flags || {}),
-        JSON.stringify(answers || {}),
+        JSON.stringify(safeAnswers),
         agentUser ? agentUser.id : null,
         agentName,
         agentPhone,
@@ -435,6 +469,33 @@ exports.resumeSurvey = async (req, res) => {
 
     if (!token) {
       return res.status(400).json({ success: false, message: 'resume token is required' });
+    }
+
+    // #6 The gate also applies when resuming: VPN/foreign IPs are blocked and,
+    // when the device reports its state + LGA, it must still be enabled.
+    const flagMap = await require('../config/middleware/featureFlags').getFeatureFlagsMap();
+    if (flagMap.survey_location_gate === true) {
+      const verdicts = await getIpVerdictsFor(req);
+      if (ipIsForeignOrVpn(verdicts)) {
+        const vpnFlagged = verdicts.some((v) => v.proxy || v.hosting || v.vpn);
+        return res.status(403).json({
+          success: false,
+          code: 'LOCATION_BLOCKED',
+          message: vpnFlagged ? LOCATION_REASONS.vpn_detected : LOCATION_REASONS.outside_nigeria,
+        });
+      }
+      const qState = String(req.query.state || req.query.state_name || '').trim();
+      const qLga = String(req.query.lga || req.query.lga_name || '').trim();
+      if (qLga) {
+        const config = await getSurveyLocationConfig();
+        if (!isAllowedSurveyLocation(config, qState, qLga)) {
+          return res.status(403).json({
+            success: false,
+            code: 'LOCATION_BLOCKED',
+            message: LOCATION_REASONS.lga_not_allowed,
+          });
+        }
+      }
     }
 
     const result = await db.query(
@@ -775,6 +836,10 @@ exports.submitPublicSurvey = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Unknown survey type' });
     }
 
+    const safeAnswers = normalizeAnswers(type, answers);
+    const clientRequestId = String(req.body?.client_request_id || '').slice(0, 64) || null;
+    const forceDuplicate = req.body?.force === true;
+
     // Agent attribution (marketing agents conduct surveys via the public page)
     const agentUser = req.user?.user_type === 'marketing_agent' ? req.user : null;
     const agentName = String(agent?.name || agentUser?.full_name || '').trim().slice(0, 200);
@@ -808,6 +873,38 @@ exports.submitPublicSurvey = async (req, res) => {
         code: 'LOCATION_BLOCKED',
         message: LOCATION_REASONS[gate.reason] || 'Survey unavailable at this location',
       });
+    }
+
+    // Idempotency: a re-sent submission (same client_request_id) must not
+    // create a second completed row.
+    if (clientRequestId) {
+      const sent = await db.query(
+        `SELECT id, respondent_code FROM survey_responses
+         WHERE client_request_id = $1 AND superseded_at IS NULL
+         LIMIT 1`,
+        [clientRequestId]
+      );
+      if (sent.rows.length) {
+        return res.status(200).json({
+          success: true,
+          message: 'Survey already submitted.',
+          data: { respondent_code: sent.rows[0].respondent_code },
+        });
+      }
+    }
+
+    // #7 Double-entry guard: the same phone recently completed this survey
+    // (paper/agent re-entry included) unless the operator explicitly forces it.
+    if (!forceDuplicate) {
+      const recent = await findRecentCompletedRespondent(type, contactPhone);
+      if (recent) {
+        return res.status(409).json({
+          success: false,
+          code: 'DUPLICATE_RESPONDENT',
+          message: 'A survey from this number was already recorded recently.',
+          data: { respondent_code: recent.respondent_code, id: recent.id },
+        });
+      }
     }
 
     const screenedOut = survey
@@ -849,14 +946,15 @@ exports.submitPublicSurvey = async (req, res) => {
                agent_phone = COALESCE(NULLIF($13, ''), agent_phone),
                agent_lga = COALESCE(NULLIF($14, ''), agent_lga),
                agent_location = COALESCE(NULLIF($15, ''), agent_location),
-               admin_mode = COALESCE(NULLIF($16, ''), admin_mode),
-               updated_at = CURRENT_TIMESTAMP
+           admin_mode = COALESCE(NULLIF($16, ''), admin_mode),
+           client_request_id = COALESCE(client_request_id, $17),
+           updated_at = CURRENT_TIMESTAMP
            WHERE id = $1
            RETURNING id, respondent_code`,
           [
             draft.rows[0].id,
             JSON.stringify(consent_flags || {}),
-            JSON.stringify(answers || {}),
+            JSON.stringify(safeAnswers),
             Math.max(0, Number(req.body.time_spent_seconds) || 0),
             contactName,
             contactPhone,
@@ -870,6 +968,7 @@ exports.submitPublicSurvey = async (req, res) => {
             agentLga,
             agentLocation,
             agentMode,
+            clientRequestId,
           ]
         );
         return res.status(200).json({
@@ -886,16 +985,17 @@ exports.submitPublicSurvey = async (req, res) => {
           consent_flags, answers, state_id, lga_name, completed_at,
           respondent_name, respondent_phone, respondent_email,
           respondent_location, respondent_state_of_origin, has_email,
-          agent_user_id, agent_name, agent_phone, agent_lga, agent_location, admin_mode)
+          agent_user_id, agent_name, agent_phone, agent_lga, agent_location, admin_mode,
+          client_request_id)
        VALUES ($1, $2, $3, 'public_link', $4, $5, $6, $7, CURRENT_TIMESTAMP,
-               $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+               $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
        RETURNING id, respondent_code`,
       [
         type,
         survey.SURVEY_VERSION,
         generateRespondentCode(),
         JSON.stringify(consent_flags || {}),
-        JSON.stringify(answers || {}),
+        JSON.stringify(safeAnswers),
         state_id || null,
         lga_name ? String(lga_name).trim().slice(0, 120) : null,
         contactName,
@@ -910,6 +1010,7 @@ exports.submitPublicSurvey = async (req, res) => {
         agentLga || null,
         agentLocation || null,
         agentMode,
+        clientRequestId,
       ]
     );
 

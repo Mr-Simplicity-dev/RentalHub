@@ -56,6 +56,14 @@ export default function SurveyWizard({
   const [submitting, setSubmitting] = useState(false);
   const [screenedOut, setScreenedOut] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState(null);
+  // Stable per-mount idempotency key: re-sending the same submission can
+  // never create two completed rows.
+  const [submitNonce] = useState(() =>
+    `srv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  );
+  const [dupConfirm, setDupConfirm] = useState(null); // { message, code }
+  const [forceSubmit, setForceSubmit] = useState(false);
+  const turnstileRef = useRef(null);
   const [startedAt] = useState(Date.now());
 
   const anonymousMode = publicMode || paperMode;
@@ -90,7 +98,12 @@ export default function SurveyWizard({
         const token = localStorage.getItem(RESUME_KEY);
         if (token) {
           try {
-            const resumeRes = await api.get(`/survey/resume?token=${encodeURIComponent(token)}`);
+            const resumeParams = new URLSearchParams({ token });
+            // Pass device location so the resume gate can still enforce the
+            // enabled state + LGA when it is turned on.
+            if (locationInfo?.state) resumeParams.set('state', locationInfo.state);
+            if (locationInfo?.lga) resumeParams.set('lga', locationInfo.lga);
+            const resumeRes = await api.get(`/survey/resume?${resumeParams.toString()}`);
             if (resumeRes.data?.success) {
               const draft = resumeRes.data.data;
               if (draft.completed) {
@@ -251,21 +264,35 @@ export default function SurveyWizard({
             setSubmitting(false);
             return;
           }
-          const res = await api.post(
-            '/survey/public/submit',
-            {
-              survey_type: surveyType,
-              answers,
-              consent_flags: consentFlags,
-              contact,
-              agent: agentMode ? { ...agentSession } : undefined,
-              resume_token: localStorage.getItem(RESUME_KEY) || '',
-              time_spent_seconds: Math.round((Date.now() - startedAt) / 1000),
-              turnstile_token: turnstileToken,
-              state_name: locationInfo?.state || '',
-              lga_name: locationInfo?.lga || '',
+          let res;
+          try {
+            res = await api.post(
+              '/survey/public/submit',
+              {
+                survey_type: surveyType,
+                answers,
+                consent_flags: consentFlags,
+                contact,
+                agent: agentMode ? { ...agentSession } : undefined,
+                resume_token: localStorage.getItem(RESUME_KEY) || '',
+                time_spent_seconds: Math.round((Date.now() - startedAt) / 1000),
+                turnstile_token: turnstileToken,
+                client_request_id: submitNonce,
+                force: forceSubmit || undefined,
+                state_name: locationInfo?.state || '',
+                lga_name: locationInfo?.lga || '',
+              }
+            );
+          } catch (err) {
+            if (err.response?.data?.code === 'DUPLICATE_RESPONDENT') {
+              setDupConfirm({
+                message: err.response.data.message || '',
+                code: err.response.data?.data?.respondent_code || '',
+              });
+              return;
             }
-          );
+            throw err;
+          }
           localStorage.removeItem(RESUME_KEY);
           onComplete?.(res.data.data);
           return;
@@ -782,10 +809,50 @@ export default function SurveyWizard({
               <FaArrowLeft /> {t('survey.back', 'Back')}
             </button>
             <div className="flex flex-col items-end gap-2">
+              {dupConfirm && (
+                <div className="w-full max-w-xs rounded-xl border border-amber-300 bg-amber-50 p-3 text-right">
+                  <p className="text-xs font-medium text-amber-800">
+                    {dupConfirm.message || t('survey.dup_title', 'This number was already recorded recently.')}
+                  </p>
+                  {dupConfirm.code && (
+                    <p className="mt-0.5 font-mono text-[11px] text-amber-700">
+                      {t('survey.dup_code', 'Reference')}: {dupConfirm.code}
+                    </p>
+                  )}
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDupConfirm(null);
+                        setForceSubmit(true);
+                        setTurnstileToken(null);
+                        turnstileRef.current?.reset();
+                      }}
+                      className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+                    >
+                      {t('survey.dup_anyway', 'Record anyway')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setDupConfirm(null); setForceSubmit(false); }}
+                      className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                    >
+                      {t('survey.dup_cancel', 'Cancel')}
+                    </button>
+                  </div>
+                  {forceSubmit && (
+                    <p className="mt-2 text-[11px] text-amber-700">
+                      {t('survey.dup_retick', 'Tick the security box again, then press Finish to record anyway.')}
+                    </p>
+                  )}
+                </div>
+              )}
               {publicMode && (isLastQuestion || screenedOut) && (
                 <TurnstileWidget
+                  ref={turnstileRef}
                   action="rentalhub_survey"
                   onToken={setTurnstileToken}
+                  onExpire={() => setTurnstileToken(null)}
                 />
               )}
               <div className="flex items-center gap-2">

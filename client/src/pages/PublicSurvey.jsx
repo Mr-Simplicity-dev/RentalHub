@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { FaBell, FaCheckCircle, FaEnvelope, FaTimes } from 'react-icons/fa';
+import { FaBell, FaCheckCircle, FaEnvelope, FaShieldAlt, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import SurveyWizard from '../components/survey/SurveyWizard';
+import TurnstileWidget from '../components/common/TurnstileWidget';
 
 const RESUME_KEY = 'rentalhub_survey_resume';
 const TYPE_KEY = 'rentalhub_survey_type';
@@ -110,6 +111,10 @@ const PublicSurveyPage = () => {
   const [locationState, setLocationState] = useState('checking'); // checking | ok | blocked
   const [locationBlockReason, setLocationBlockReason] = useState('');
   const [locationInfo, setLocationInfo] = useState(null); // { state, lga }
+const [doorPassed, setDoorPassed] = useState(false);
+const [doorBusy, setDoorBusy] = useState(false);
+const [doorError, setDoorError] = useState('');
+const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
   const googleButtonRef = useRef(null);
   const googleReady = useRef(false);
 
@@ -358,6 +363,37 @@ const PublicSurveyPage = () => {
     setShowEmailGate(false);
   };
 
+  // "Door guard": verify the Turnstile challenge before the survey starts so
+  // automated bots are stopped at the entrance (server verifies the token via
+  // POST /survey/public/gate with action rentalhub_survey_entry).
+  // #4 Respect the "Public Survey" on/off flag (agents may still capture).
+  useEffect(() => {
+    let mounted = true;
+    api
+      .get('/survey/public-flags')
+      .then((res) => { if (mounted) setSurveyEnabled(res.data?.data?.survey_public_enabled === true); })
+      .catch(() => { if (mounted) setSurveyEnabled(true); });
+    return () => { mounted = false; };
+  }, []);
+
+  const verifyDoor = async (token) => {
+    if (!token || doorBusy) return;
+    setDoorBusy(true);
+    setDoorError('');
+    try {
+      const res = await api.post('/survey/public/gate', { turnstile_token: token });
+      if (res.data?.success) {
+        setDoorPassed(true);
+      } else {
+        setDoorError(res.data?.message || t('public_survey.door_failed', 'Security check failed. Please try again.'));
+      }
+    } catch (err) {
+      setDoorError(err.response?.data?.message || t('public_survey.door_failed', 'Security check failed. Please try again.'));
+    } finally {
+      setDoorBusy(false);
+    }
+  };
+
   // In-page nudge when returning with a draft (Web Push covers closed tabs).
   useEffect(() => {
     if (hasDraft && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -396,6 +432,24 @@ const PublicSurveyPage = () => {
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             {t('public_survey.thanks_body', 'Your answers have been recorded. They will help improve rental services in Nigeria.')}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (surveyEnabled === false && !agentMode) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500 text-2xl">
+            <FaShieldAlt className="text-xl" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">
+            {t('public_survey.disabled_title', 'This survey is currently closed')}
+          </h1>
+          <p className="mt-2 text-sm text-gray-600">
+            {t('public_survey.disabled_body', 'The survey is not accepting responses right now. Please check back later.')}
           </p>
         </div>
       </div>
@@ -442,6 +496,38 @@ const PublicSurveyPage = () => {
           <p className="mt-2 text-sm text-gray-600">
             {LOCATION_MESSAGES[locationBlockReason] || t('public_survey.loc_generic', 'The survey is not available at your current location.')}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Door guard: one Turnstile challenge before the survey can begin.
+  if (locationState === 'ok' && !type && !agentMode && !doorPassed) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+            <FaShieldAlt className="text-2xl" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">
+            {t('public_survey.door_title', 'One quick check before you start')}
+          </h1>
+          <p className="mt-2 text-sm text-gray-600">
+            {t('public_survey.door_body', 'Tick the box to prove you are a real person. This keeps automated bots from filling the survey, so your answers stay truthful.')}
+          </p>
+          <div className="mt-5 flex justify-center">
+            <TurnstileWidget
+              action="rentalhub_survey_entry"
+              onToken={verifyDoor}
+              onExpire={() => setDoorError(t('public_survey.door_expired', 'The security check expired. Please tick the box again.'))}
+            />
+          </div>
+          {doorBusy && (
+            <p className="mt-3 text-sm text-gray-500">{t('public_survey.door_checking', 'Checking...')}</p>
+          )}
+          {doorError && (
+            <p className="mt-3 text-sm text-red-600" role="alert">{doorError}</p>
+          )}
         </div>
       </div>
     );
