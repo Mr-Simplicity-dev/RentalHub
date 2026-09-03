@@ -51,6 +51,7 @@ const {
   resolveVoiceReadScope,
   buildScopeClause,
 } = require('../services/voiceJurisdiction');
+const { resolveCallerArea } = require('../services/callerArea');
 
 const router = express.Router();
 
@@ -896,19 +897,29 @@ router.post('/wait', twilioWebhookGuard, async (req, res) => {
   const callerCallSid = String(req.body.CallSid || '').slice(0, 64);
   if (callerCallSid) {
     try {
+      const callerNumber = sanitizeCallerNumber(req.body.From);
+      // Phase 1 jurisdiction capture: Rule B home area for known callers.
+      const area = callerNumber ? await resolveCallerArea(callerNumber) : null;
       await db.query(
         `INSERT INTO voice_call_events
-           (call_sid, parent_call_sid, direction, source, status, from_number, to_number)
-         VALUES ($1, $2, 'inbound', $3, 'queued', $4, $5)
+           (call_sid, parent_call_sid, direction, source, status, from_number, to_number,
+            jurisdiction_state, jurisdiction_lga, jurisdiction_source)
+         VALUES ($1, $2, 'inbound', $3, 'queued', $4, $5, $6, $7, $8)
          ON CONFLICT (call_sid, status) DO UPDATE SET
            from_number = EXCLUDED.from_number,
-           source = EXCLUDED.source`,
+           source = EXCLUDED.source,
+           jurisdiction_state = COALESCE(EXCLUDED.jurisdiction_state, voice_call_events.jurisdiction_state),
+           jurisdiction_lga = COALESCE(EXCLUDED.jurisdiction_lga, voice_call_events.jurisdiction_lga),
+           jurisdiction_source = COALESCE(EXCLUDED.jurisdiction_source, voice_call_events.jurisdiction_source)`,
         [
           callerCallSid,
           String(req.body.ParentCallSid || '').slice(0, 64) || null,
           getCallSource(req),
-          sanitizeCallerNumber(req.body.From),
+          callerNumber,
           getCallerRoomName(callerCallSid),
+          area ? area.state : null,
+          area ? area.lga : null,
+          area ? area.source : 'unknown',
         ]
       );
     } catch {
@@ -972,11 +983,24 @@ const markCallerStatus = async (callerCallSid, status, { agentCallSid = null, ro
     }
     await db.query(
       `INSERT INTO voice_call_events
-         (call_sid, parent_call_sid, direction, source, status, to_number)
-       VALUES ($1, $2, 'inbound', 'unknown', $3, $4)
+         (call_sid, parent_call_sid, direction, source, status, to_number,
+          jurisdiction_state, jurisdiction_lga, jurisdiction_source)
+       VALUES ($1, $2, 'inbound', 'unknown', $3, $4,
+         (SELECT e.jurisdiction_state FROM voice_call_events e
+           WHERE e.call_sid = $1 AND e.jurisdiction_state IS NOT NULL
+           ORDER BY e.created_at ASC LIMIT 1),
+         (SELECT e.jurisdiction_lga FROM voice_call_events e
+           WHERE e.call_sid = $1 AND e.jurisdiction_lga IS NOT NULL
+           ORDER BY e.created_at ASC LIMIT 1),
+         (SELECT e.jurisdiction_source FROM voice_call_events e
+           WHERE e.call_sid = $1 AND e.jurisdiction_source IS NOT NULL
+           ORDER BY e.created_at ASC LIMIT 1))
        ON CONFLICT (call_sid, status) DO UPDATE SET
          parent_call_sid = EXCLUDED.parent_call_sid,
-         to_number = EXCLUDED.to_number`,
+         to_number = EXCLUDED.to_number,
+         jurisdiction_state = COALESCE(EXCLUDED.jurisdiction_state, voice_call_events.jurisdiction_state),
+         jurisdiction_lga = COALESCE(EXCLUDED.jurisdiction_lga, voice_call_events.jurisdiction_lga),
+         jurisdiction_source = COALESCE(EXCLUDED.jurisdiction_source, voice_call_events.jurisdiction_source)`,
       [callerCallSid, agentCallSid, status, roomName]
     );
   } catch {
@@ -1156,10 +1180,19 @@ router.post('/callback-number', twilioWebhookGuard, async (req, res) => {
   logger.info('Voice callback requested', webhookLogContext(req, { phoneNumber }));
 
   try {
+    const area = await resolveCallerArea(phoneNumber);
     await db.query(
-      `INSERT INTO voice_callback_requests (call_sid, phone_number, source)
-       VALUES ($1, $2, $3)`,
-      [callSid || null, phoneNumber, getCallSource(req)]
+      `INSERT INTO voice_callback_requests
+         (call_sid, phone_number, source, jurisdiction_state, jurisdiction_lga, jurisdiction_source)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        callSid || null,
+        phoneNumber,
+        getCallSource(req),
+        area ? area.state : null,
+        area ? area.lga : null,
+        area ? area.source : 'unknown',
+      ]
     );
   } catch (error) {
     logger.warn('Voice callback persistence failed:', error.message, { callSid });
@@ -1345,14 +1378,27 @@ router.post('/status', twilioWebhookGuard, async (req, res) => {
   try {
     await db.query(
       `INSERT INTO voice_call_events
-         (call_sid, parent_call_sid, direction, source, status, from_number, to_number, duration_sec)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (call_sid, parent_call_sid, direction, source, status, from_number, to_number, duration_sec,
+          jurisdiction_state, jurisdiction_lga, jurisdiction_source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+         (SELECT e.jurisdiction_state FROM voice_call_events e
+           WHERE e.call_sid = $1 AND e.jurisdiction_state IS NOT NULL
+           ORDER BY e.created_at ASC LIMIT 1),
+         (SELECT e.jurisdiction_lga FROM voice_call_events e
+           WHERE e.call_sid = $1 AND e.jurisdiction_lga IS NOT NULL
+           ORDER BY e.created_at ASC LIMIT 1),
+         (SELECT e.jurisdiction_source FROM voice_call_events e
+           WHERE e.call_sid = $1 AND e.jurisdiction_source IS NOT NULL
+           ORDER BY e.created_at ASC LIMIT 1))
        ON CONFLICT (call_sid, status) DO UPDATE SET
          parent_call_sid = EXCLUDED.parent_call_sid,
          duration_sec = EXCLUDED.duration_sec,
          from_number = EXCLUDED.from_number,
          to_number = EXCLUDED.to_number,
-         source = EXCLUDED.source`,
+         source = EXCLUDED.source,
+         jurisdiction_state = COALESCE(EXCLUDED.jurisdiction_state, voice_call_events.jurisdiction_state),
+         jurisdiction_lga = COALESCE(EXCLUDED.jurisdiction_lga, voice_call_events.jurisdiction_lga),
+         jurisdiction_source = COALESCE(EXCLUDED.jurisdiction_source, voice_call_events.jurisdiction_source)`,
       [
         payload.callSid,
         payload.parentCallSid,
