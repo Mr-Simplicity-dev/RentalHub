@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaChartPie, FaFilePdf, FaFileCsv, FaPlus, FaTrash, FaBell } from "react-icons/fa";
 import { toast } from "react-toastify";
 import api from "../../services/api";
@@ -29,6 +29,45 @@ const SurveyAdminPanel = () => {
   const [locNewLga, setLocNewLga] = useState("");
   const [fxConfig, setFxConfig] = useState({ black_market_usd_rate: 1600, foreign_card_conversion_fee_usd: 5 });
   const [fxSaving, setFxSaving] = useState(false);
+
+  const PAGE_SIZE = 25;
+  const [locPage, setLocPage] = useState(1);
+  const [locQuery, setLocQuery] = useState("");
+
+  const allLocations = useMemo(() => {
+    const flat = [];
+    for (const s of locOptions) {
+      const st = String(s.state_name || "").trim();
+      for (const lga of Array.isArray(s.lgas) ? s.lgas : []) {
+        flat.push({ state_name: st, lga_name: String(lga).trim() });
+      }
+    }
+    return flat;
+  }, [locOptions]);
+
+  const filteredAll = useMemo(() => {
+    const q = String(locQuery || "").toLowerCase().trim();
+    if (!q) return [];
+    return allLocations
+      .filter(
+        (l) =>
+          (l.state_name + " " + l.lga_name).toLowerCase().includes(q) ||
+          l.lga_name.toLowerCase().includes(q) ||
+          l.state_name.toLowerCase().includes(q)
+      )
+      .slice(0, 8);
+  }, [allLocations, locQuery]);
+
+  const isAllEnabled =
+    Array.isArray(locConfig?.locations) &&
+    locConfig.locations.length === allLocations.length &&
+    allLocations.length > 0;
+
+  const totalPages = Math.max(1, Math.ceil(locList.length / PAGE_SIZE));
+  const pagedLocations = locList.slice((locPage - 1) * PAGE_SIZE, locPage * PAGE_SIZE);
+  useEffect(() => {
+    if (locPage > totalPages) setLocPage(totalPages);
+  }, [locPage, totalPages]);
   const [paperMeta, setPaperMeta] = useState({
     admin_mode: "face_to_face",
     admin_date: new Date().toISOString().slice(0, 10),
@@ -190,11 +229,38 @@ const SurveyAdminPanel = () => {
       toast.success(res.data?.message || "Enabled all LGAs");
       setLocConfig({ ...(locConfig || {}), ...res.data.data });
       setLocList(res.data.data?.locations || []);
+      setLocPage(1);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to enable all LGAs");
     } finally {
       setLocSaving(false);
     }
+  };
+
+  const disableAllLocations = async () => {
+    if (!window.confirm("Remove ALL enabled LGAs? While the gate is ON the survey becomes unavailable everywhere until you re-enable some.")) {
+      return;
+    }
+    setLocSaving(true);
+    try {
+      const res = await api.post("/admin/survey/location-config", {
+        scope: locScope,
+        locations: [],
+      });
+      toast.success(res.data?.message || "Removed all LGAs");
+      setLocList([]);
+      setLocPage(1);
+      setLocConfig({ ...(locConfig || {}), scope: res.data.data?.scope || "lga_list", locations: [] });
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to remove all LGAs");
+    } finally {
+      setLocSaving(false);
+    }
+  };
+
+  const toggleAllLocations = () => {
+    if (isAllEnabled) disableAllLocations();
+    else enableAllLocations();
   };
 
   const sendPushReminders = async () => {
@@ -787,6 +853,41 @@ const SurveyAdminPanel = () => {
 
           <div className="rounded-xl border border-soft p-4">
             <p className="mb-2 text-sm font-semibold text-gray-700">Enabled states & LGAs</p>
+            <div className="mb-3">
+              <input
+                type="text"
+                value={locQuery}
+                onChange={(e) => setLocQuery(e.target.value)}
+                placeholder="Search any of the 774 LGAs to enable (e.g. Zuba, Gwagwalada, Eti-Osa)…"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              />
+              {String(locQuery || "").trim().length >= 2 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {filteredAll.length === 0 ? (
+                    <p className="text-xs text-gray-400">No matching LGA found.</p>
+                  ) : (
+                    filteredAll.map((m) => {
+                      const already = locList.some(
+                        (l) => l.state_name === m.state_name && l.lga_name === m.lga_name
+                      );
+                      return already ? null : (
+                        <button
+                          key={`${m.state_name}-${m.lga_name}`}
+                          type="button"
+                          onClick={() => {
+                            setLocList([...locList, m]);
+                            setLocQuery("");
+                          }}
+                          className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                        >
+                          + {m.lga_name} ({m.state_name})
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <select
                 value={locNewState}
@@ -831,7 +932,12 @@ const SurveyAdminPanel = () => {
                   No locations enabled yet — the survey will be unavailable everywhere while the gate is on.
                 </p>
               )}
-              {locList.map((loc, i) => (
+              {locList.length > 0 && (
+                <p className="text-xs text-gray-400">
+                  {locList.length.toLocaleString()} enabled · page {Math.min(locPage, totalPages)} of {totalPages.toLocaleString()}
+                </p>
+              )}
+              {pagedLocations.map((loc) => (
                 <div
                   key={`${loc.state_name}-${loc.lga_name}`}
                   className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm"
@@ -841,7 +947,13 @@ const SurveyAdminPanel = () => {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setLocList(locList.filter((_, j) => j !== i))}
+                    onClick={() =>
+                      setLocList(
+                        locList.filter(
+                          (l) => !(l.state_name === loc.state_name && l.lga_name === loc.lga_name)
+                        )
+                      )
+                    }
                     className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
                   >
                     Remove
@@ -849,6 +961,30 @@ const SurveyAdminPanel = () => {
                 </div>
               ))}
             </div>
+
+            {totalPages > 1 && (
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  disabled={locPage <= 1}
+                  onClick={() => setLocPage((p) => Math.max(1, p - 1))}
+                  className="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  ‹ Prev
+                </button>
+                <span className="text-xs text-gray-500">
+                  {Math.min(locPage, totalPages)} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={locPage >= totalPages}
+                  onClick={() => setLocPage((p) => Math.min(totalPages, p + 1))}
+                  className="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Next ›
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -862,11 +998,17 @@ const SurveyAdminPanel = () => {
             </button>
             <button
               type="button"
-              disabled={locSaving}
-              onClick={enableAllLocations}
-              className="rounded-lg border border-indigo-300 bg-white px-5 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+              disabled={locSaving || !locConfig}
+              onClick={toggleAllLocations}
+              className={`rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${
+                isAllEnabled ? "bg-red-600 hover:bg-red-700" : "border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50"
+              }`}
             >
-              Enable all 774 LGAs (whole Nigeria)
+              {locSaving
+                ? "Saving…"
+                : isAllEnabled
+                  ? "Disable all 774 LGAs (clear)"
+                  : "Enable all 774 LGAs (whole Nigeria)"}
             </button>
           </div>
         </div>

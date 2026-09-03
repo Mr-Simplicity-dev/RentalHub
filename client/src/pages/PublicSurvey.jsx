@@ -253,6 +253,58 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
     };
   }, []);
 
+  // In-tab boundary watcher: a respondent blocked because they were outside
+  // (or GPS couldn't confirm) keeps the tab open; watch their position and
+  // auto-admit the moment the server reports they are inside an enabled LGA.
+  // Web Push cannot geofence in the background, so this only helps while the
+  // survey tab is open — the "remind me later" push brings them back.
+  useEffect(() => {
+    if (
+      locationState !== 'blocked' ||
+      !['boundary_out', 'location_required'].includes(locationBlockReason) ||
+      agentModeRef.current ||
+      !('geolocation' in navigator)
+    ) {
+      return undefined;
+    }
+
+    let stopped = false;
+    let watchId = null;
+    const admitIfInside = async (pos) => {
+      if (stopped) return;
+      const lat = Number(pos?.coords?.latitude);
+      const lng = Number(pos?.coords?.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      try {
+        const verifyRes = await api.post('/survey/location-verify', { lat, lng });
+        const v = verifyRes.data?.data || {};
+        if (v.allowed) {
+          const location = { state: v.state_name || '', lga: v.lga_name || '' };
+          if (stopped) return;
+          setLocationInfo(location);
+          localStorage.setItem('rentalhub_survey_location', JSON.stringify(location));
+          setLocationBlockReason('');
+          setLocationState('ok');
+          stopped = true;
+          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        }
+      } catch {
+        // keep watching — transient errors should not block auto-admission
+      }
+    };
+
+    watchId = navigator.geolocation.watchPosition(
+      admitIfInside,
+      () => {},
+      { enableHighAccuracy: false, maximumAge: 30000, timeout: 20000 }
+    );
+
+    return () => {
+      stopped = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [locationState, locationBlockReason]);
+
   useEffect(() => {
     document.title = 'RentalHub NG Survey';
 
@@ -584,6 +636,14 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
           <p className="mt-2 text-sm text-gray-600">
             {LOCATION_MESSAGES[locationBlockReason] || t('public_survey.loc_generic', 'The survey is not available at your current location.')}
           </p>
+          {locationBlockReason === 'boundary_out' && !agentMode && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              {t(
+                'public_survey.watching',
+                'Keep this page open — we are watching your location and will let you in automatically once you are inside the survey area.'
+              )}
+            </p>
+          )}
         </div>
       </div>
     );

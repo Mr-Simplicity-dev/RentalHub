@@ -689,7 +689,6 @@ exports.saveLocationConfig = async (req, res) => {
             String(l.state_name || '').trim().length >= 2 &&
             String(l.lga_name || '').trim().length >= 2
         )
-        .slice(0, 100)
         .map((l) => ({
           state_name: String(l.state_name).trim().slice(0, 120),
           lga_name: String(l.lga_name).trim().slice(0, 120),
