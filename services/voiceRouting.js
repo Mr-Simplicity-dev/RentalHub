@@ -53,4 +53,36 @@ const queueLineFor = (target) => {
   return 'queue:super';
 };
 
-module.exports = { TARGET, isGeoEnabled, rollUp, chooseRoutingTarget, queueLineFor };
+// Ordered dispatch identities for a caller, honouring the geo ladder
+// (LGA -> state -> super) and rolling up when an owning tier has nobody on
+// duty. `identitiesByTier` = { lga: [], state: [], super: [] }. Returns the
+// owning tier's pool, or the first lower-tier pool that is staffed, or [].
+const dispatchIdentityOrder = (jurisdiction, identitiesByTier = {}) => {
+  const lga = (identitiesByTier.lga || []).filter(Boolean);
+  const state = (identitiesByTier.state || []).filter(Boolean);
+  const sup = (identitiesByTier.super || []).filter(Boolean);
+
+  const hasJurisdiction =
+    Boolean(String(jurisdiction?.state || '').trim()) &&
+    Boolean(String(jurisdiction?.lga || '').trim());
+
+  const target = chooseRoutingTarget(hasJurisdiction ? jurisdiction : null, {
+    lga: lga.length > 0,
+    state: state.length > 0,
+    super: sup.length > 0,
+  });
+
+  if (target.tier === TARGET.LGA && lga.length) return lga;
+  if (target.tier === TARGET.STATE && state.length) return state;
+  if (target.tier === TARGET.SUPER && sup.length) return sup;
+  return [];
+};
+
+module.exports = {
+  TARGET,
+  isGeoEnabled,
+  rollUp,
+  chooseRoutingTarget,
+  queueLineFor,
+  dispatchIdentityOrder,
+};

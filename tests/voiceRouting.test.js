@@ -6,6 +6,7 @@ const {
   rollUp,
   chooseRoutingTarget,
   queueLineFor,
+  dispatchIdentityOrder,
 } = require('../services/voiceRouting');
 
 test('voice routing: geo flag gate', () => {
@@ -58,4 +59,27 @@ test('voice routing: queue line naming', () => {
   assert.strictEqual(queueLineFor({ tier: TARGET.STATE, state: 'FCT' }), 'queue:state:FCT');
   assert.strictEqual(queueLineFor({ tier: TARGET.SUPER }), 'queue:super');
   assert.strictEqual(queueLineFor(null), null);
+});
+
+test('voice routing: dispatch identity order rolls up the geo ladder', () => {
+  const jur = { state: 'FCT', lga: 'Gwagwalada' };
+  const superOnly = { lga: [], state: [], super: ['support_agent_1'] };
+  const all = { lga: ['lga_fct_gwagwalada'], state: ['state_fct'], super: ['support_agent_1'] };
+  const lgaState = { lga: ['lga_fct_gwagwalada'], state: ['state_fct'], super: [] };
+
+  assert.deepStrictEqual(dispatchIdentityOrder(jur, all), ['lga_fct_gwagwalada']);
+  // LGA empty -> rolls to state.
+  assert.deepStrictEqual(
+    dispatchIdentityOrder(jur, { lga: [], state: ['state_fct'], super: ['support_agent_1'] }),
+    ['state_fct']
+  );
+  // Only super staffed -> everything rolls to super (today's behaviour).
+  assert.deepStrictEqual(dispatchIdentityOrder(jur, superOnly), ['support_agent_1']);
+  // Nobody staffed anywhere.
+  assert.deepStrictEqual(dispatchIdentityOrder(jur, { lga: [], state: [], super: [] }), []);
+  // Unknown jurisdiction -> super (never geo-locks an unidentified caller).
+  assert.deepStrictEqual(dispatchIdentityOrder(null, all), ['support_agent_1']);
+  assert.deepStrictEqual(dispatchIdentityOrder({ state: '', lga: '' }, all), ['support_agent_1']);
+  // LGA + state staffed but no super: LGA first, rolls to state.
+  assert.deepStrictEqual(dispatchIdentityOrder(jur, lgaState), ['lga_fct_gwagwalada']);
 });

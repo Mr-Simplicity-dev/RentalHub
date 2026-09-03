@@ -52,6 +52,7 @@ const {
   buildScopeClause,
 } = require('../services/voiceJurisdiction');
 const { resolveCallerArea } = require('../services/callerArea');
+const { dispatchIdentityOrder } = require('../services/voiceRouting');
 
 const router = express.Router();
 
@@ -955,6 +956,32 @@ const isValidAgentLine = (line) =>
 
 const AGENT_IDENTITY = getAgentIdentities()[0];
 
+// Phase 2 geo routing: identities are grouped per tier. Super = the existing
+// national line. LGA/state pools read optional env lists (VOICE_LGA_IDENTITIES,
+// VOICE_STATE_IDENTITIES, comma-separated) that the Phase 3 desks will staff;
+// empty pools just mean that tier rolls up to the next one.
+const parseTierIdentities = (envValue) =>
+  String(envValue || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => /^[a-zA-Z0-9_-]{1,63}$/.test(value));
+
+const getTierIdentityPools = () => ({
+  lga: parseTierIdentities(process.env.VOICE_LGA_IDENTITIES),
+  state: parseTierIdentities(process.env.VOICE_STATE_IDENTITIES),
+  super: getAgentIdentities(),
+});
+
+const isVoiceGeoRoutingEnabled = async () => {
+  try {
+    const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
+    const flags = await getFeatureFlagsMap();
+    return flags.voice_geo_routing === true;
+  } catch {
+    return false;
+  }
+};
+
 /** Resolve the client identity behind a call (its To is "client:<identity>"). */
 const resolveClientIdentityFromCall = async (callSid) => {
   try {
@@ -1059,13 +1086,25 @@ const dispatchAgentToRoom = async (roomName, callerCallSid) => {
     }
 
     const identity = targetIdentity || AGENT_IDENTITY;
+    let ringIdentity = identity;
+    try {
+      // Phase 2: when geo routing is on, ring the owning tier's pool first and
+      // roll up (LGA -> state -> super). Flag OFF keeps today's behaviour.
+      if (await isVoiceGeoRoutingEnabled()) {
+        const jurisdiction = await existingJurisdictionFor(callerCallSid);
+        const order = dispatchIdentityOrder(jurisdiction, getTierIdentityPools());
+        if (order.length) ringIdentity = order[0];
+      }
+    } catch {
+      // Fall back to the default identity below.
+    }
     await rest.conferences(conference.sid).participants.create({
-      to: `client:${identity}`,
-      from: `client:${identity}`,
+      to: `client:${ringIdentity}`,
+      from: `client:${ringIdentity}`,
     });
 
     await markCallerStatus(callerCallSid, 'in-progress', { agentCallSid: null, roomName });
-    logger.info('Agent dispatched to caller room', { roomName, callerCallSid, identity });
+    logger.info('Agent dispatched to caller room', { roomName, callerCallSid, identity: ringIdentity });
     return true;
   } catch (dispatchError) {
     logger.warn('Agent dispatch failed', { roomName, message: dispatchError.message });
