@@ -128,10 +128,12 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
     let active = true;
 
     const runLocationGate = async () => {
+      let gateOn = false;
       try {
         const configRes = await api.get('/survey/location-config');
         const config = configRes.data?.data || {};
-        if (!config.gate_enabled || config.scope !== 'lga_list') {
+        gateOn = Boolean(config.gate_enabled) && config.scope === 'lga_list';
+        if (!gateOn) {
           if (active) setLocationState('ok');
           return;
         }
@@ -188,7 +190,18 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
           setLocationState('ok');
         }
       } catch {
-        if (active) setLocationState('ok');
+        // Fail closed only when the gate is known to be enabled: if its
+        // eligibility checks error out (geocoder/IP provider down, request
+        // blocked), do NOT let the respondent through, or they would bypass
+        // the location gate. With the gate off, transient errors stay open.
+        if (active) {
+          if (gateOn) {
+            setLocationBlockReason('location_required');
+            setLocationState('blocked');
+          } else {
+            setLocationState('ok');
+          }
+        }
       }
     };
 
