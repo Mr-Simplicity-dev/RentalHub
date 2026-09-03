@@ -970,6 +970,23 @@ const resolveClientIdentityFromCall = async (callSid) => {
   return null;
 };
 
+const existingJurisdictionFor = async (callSid) => {
+  if (!callSid) return null;
+  try {
+    const result = await db.query(
+      `SELECT jurisdiction_state AS state, jurisdiction_lga AS lga, jurisdiction_source AS source
+       FROM voice_call_events
+       WHERE call_sid = $1 AND jurisdiction_state IS NOT NULL
+       ORDER BY created_at ASC
+       LIMIT 1`,
+      [callSid]
+    );
+    return result.rows[0] || null;
+  } catch {
+    return null;
+  }
+};
+
 const markCallerStatus = async (callerCallSid, status, { agentCallSid = null, roomName = null } = {}) => {
   if (!callerCallSid) return;
   try {
@@ -981,27 +998,27 @@ const markCallerStatus = async (callerCallSid, status, { agentCallSid = null, ro
       );
       return;
     }
+    const jurisdiction = await existingJurisdictionFor(callerCallSid);
     await db.query(
       `INSERT INTO voice_call_events
          (call_sid, parent_call_sid, direction, source, status, to_number,
           jurisdiction_state, jurisdiction_lga, jurisdiction_source)
-       VALUES ($1, $2, 'inbound', 'unknown', $3, $4,
-         (SELECT e.jurisdiction_state FROM voice_call_events e
-           WHERE e.call_sid = $1 AND e.jurisdiction_state IS NOT NULL
-           ORDER BY e.created_at ASC LIMIT 1),
-         (SELECT e.jurisdiction_lga FROM voice_call_events e
-           WHERE e.call_sid = $1 AND e.jurisdiction_lga IS NOT NULL
-           ORDER BY e.created_at ASC LIMIT 1),
-         (SELECT e.jurisdiction_source FROM voice_call_events e
-           WHERE e.call_sid = $1 AND e.jurisdiction_source IS NOT NULL
-           ORDER BY e.created_at ASC LIMIT 1))
+       VALUES ($1, $2, 'inbound', 'unknown', $3, $4, $5, $6, $7)
        ON CONFLICT (call_sid, status) DO UPDATE SET
          parent_call_sid = EXCLUDED.parent_call_sid,
          to_number = EXCLUDED.to_number,
          jurisdiction_state = COALESCE(EXCLUDED.jurisdiction_state, voice_call_events.jurisdiction_state),
          jurisdiction_lga = COALESCE(EXCLUDED.jurisdiction_lga, voice_call_events.jurisdiction_lga),
          jurisdiction_source = COALESCE(EXCLUDED.jurisdiction_source, voice_call_events.jurisdiction_source)`,
-      [callerCallSid, agentCallSid, status, roomName]
+      [
+        callerCallSid,
+        agentCallSid,
+        status,
+        roomName,
+        jurisdiction ? jurisdiction.state : null,
+        jurisdiction ? jurisdiction.lga : null,
+        jurisdiction ? jurisdiction.source : null,
+      ]
     );
   } catch {
     // Best-effort.
@@ -1376,20 +1393,12 @@ router.post('/status', twilioWebhookGuard, async (req, res) => {
   logger.info('Voice call status', { callSid: payload.callSid, status, source: payload.source, direction });
 
   try {
+    const jurisdiction = await existingJurisdictionFor(payload.callSid);
     await db.query(
       `INSERT INTO voice_call_events
          (call_sid, parent_call_sid, direction, source, status, from_number, to_number, duration_sec,
           jurisdiction_state, jurisdiction_lga, jurisdiction_source)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-         (SELECT e.jurisdiction_state FROM voice_call_events e
-           WHERE e.call_sid = $1 AND e.jurisdiction_state IS NOT NULL
-           ORDER BY e.created_at ASC LIMIT 1),
-         (SELECT e.jurisdiction_lga FROM voice_call_events e
-           WHERE e.call_sid = $1 AND e.jurisdiction_lga IS NOT NULL
-           ORDER BY e.created_at ASC LIMIT 1),
-         (SELECT e.jurisdiction_source FROM voice_call_events e
-           WHERE e.call_sid = $1 AND e.jurisdiction_source IS NOT NULL
-           ORDER BY e.created_at ASC LIMIT 1))
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (call_sid, status) DO UPDATE SET
          parent_call_sid = EXCLUDED.parent_call_sid,
          duration_sec = EXCLUDED.duration_sec,
@@ -1408,6 +1417,9 @@ router.post('/status', twilioWebhookGuard, async (req, res) => {
         payload.fromNumber,
         payload.toNumber,
         payload.durationSec,
+        jurisdiction ? jurisdiction.state : null,
+        jurisdiction ? jurisdiction.lga : null,
+        jurisdiction ? jurisdiction.source : null,
       ]
     );
   } catch (error) {
