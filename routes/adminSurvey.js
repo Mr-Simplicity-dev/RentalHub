@@ -11,6 +11,7 @@ const {
   saveLocationConfig,
   getLocationConfigForAdmin,
   enableAllLocationConfig,
+  disableAllLocationConfig,
   getFxConfigForAdmin,
   saveFxConfig,
 } = require('../services/surveyAnalysisService');
@@ -39,6 +40,7 @@ router.post('/reminders/send', async (req, res) => {
 router.get('/location-config', getLocationConfigForAdmin);
 router.post('/location-config', saveLocationConfig);
 router.post('/location-config/enable-all', enableAllLocationConfig);
+router.post('/location-config/disable-all', disableAllLocationConfig);
 
 // Foreign-card FX rules
 router.get('/fx-config', getFxConfigForAdmin);

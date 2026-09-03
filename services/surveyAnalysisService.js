@@ -692,6 +692,7 @@ exports.saveLocationConfig = async (req, res) => {
         .map((l) => ({
           state_name: String(l.state_name).trim().slice(0, 120),
           lga_name: String(l.lga_name).trim().slice(0, 120),
+          enabled: l.enabled !== false,
         }));
     }
 
@@ -749,7 +750,7 @@ exports.enableAllLocationConfig = async (req, res) => {
       if (!stateName) continue;
       for (const lga of Array.isArray(st.lgas) ? st.lgas : []) {
         const lgaName = String(lga || '').trim();
-        if (lgaName.length >= 2) locations.push({ state_name: stateName, lga_name: lgaName });
+        if (lgaName.length >= 2) locations.push({ state_name: stateName, lga_name: lgaName, enabled: true });
       }
     }
 
@@ -772,6 +773,47 @@ exports.enableAllLocationConfig = async (req, res) => {
   } catch (error) {
     req.logger.error('Survey enable-all locations error:', error);
     return res.status(500).json({ success: false, message: 'Failed to enable all LGAs' });
+  }
+};
+
+// Turns every stored LGA off (enabled:false) WITHOUT removing them, so the
+// coverage list survives and can be switched back on later.
+exports.disableAllLocationConfig = async (req, res) => {
+  try {
+    const row = await db.query(`SELECT value FROM app_settings WHERE key = 'survey_allowed_locations'`);
+    let locations = [];
+    try {
+      locations = JSON.parse(row.rows[0]?.value?.value || '[]');
+    } catch {
+      locations = [];
+    }
+    if (!Array.isArray(locations)) locations = [];
+
+    locations = locations.map((l) => ({
+      state_name: String(l.state_name || '').trim().slice(0, 120),
+      lga_name: String(l.lga_name || '').trim().slice(0, 120),
+      enabled: false,
+    }));
+
+    await db.query(
+      `INSERT INTO app_settings (key, value)
+       VALUES ('survey_allowed_scope', $1),
+              ('survey_allowed_locations', $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+      [
+        JSON.stringify({ value: 'lga_list' }),
+        JSON.stringify({ value: JSON.stringify(locations) }),
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: 'All enabled LGAs are now disabled (the list was kept)',
+      data: { scope: 'lga_list', locations },
+    });
+  } catch (error) {
+    req.logger.error('Survey disable-all locations error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to disable all LGAs' });
   }
 };
 

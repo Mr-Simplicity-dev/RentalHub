@@ -9,6 +9,13 @@ import {
 
 const PIE_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
 
+const withEnabled = (arr) =>
+  (Array.isArray(arr) ? arr : []).map((l) => ({
+    state_name: String(l.state_name || "").trim(),
+    lga_name: String(l.lga_name || "").trim(),
+    enabled: l.enabled !== false,
+  }));
+
 const SurveyAdminPanel = () => {
   const [tab, setTab] = useState("overview");
   const [type, setType] = useState("tenant");
@@ -58,10 +65,13 @@ const SurveyAdminPanel = () => {
       .slice(0, 8);
   }, [allLocations, locQuery]);
 
-  const isAllEnabled =
-    Array.isArray(locConfig?.locations) &&
-    locConfig.locations.length === allLocations.length &&
-    allLocations.length > 0;
+  const savedLocations = Array.isArray(locConfig?.locations) ? locConfig.locations : [];
+  const activeSavedCount = savedLocations.filter((l) => l.enabled !== false).length;
+  const fullAllActive =
+    allLocations.length > 0 &&
+    savedLocations.length >= allLocations.length &&
+    activeSavedCount === allLocations.length;
+  const isAllEnabled = fullAllActive;
 
   const totalPages = Math.max(1, Math.ceil(locList.length / PAGE_SIZE));
   const pagedLocations = locList.slice((locPage - 1) * PAGE_SIZE, locPage * PAGE_SIZE);
@@ -116,9 +126,10 @@ const SurveyAdminPanel = () => {
         api.get("/admin/survey/location-config"),
         api.get("/property-utils/location-options"),
       ]);
-      setLocConfig(configRes.data.data);
-      setLocScope(configRes.data.data.scope || "lga_list");
-      setLocList(configRes.data.data.locations || []);
+      const config = configRes.data.data;
+      setLocConfig({ ...config, locations: withEnabled(config.locations) });
+      setLocScope(config.scope || "lga_list");
+      setLocList(withEnabled(config.locations));
       setLocOptions(optionsRes.data.data || []);
     } catch {
       // ignore
@@ -135,7 +146,7 @@ const SurveyAdminPanel = () => {
       toast.error("That state/LGA is already enabled");
       return;
     }
-    setLocList([...locList, { state_name: stateName, lga_name: locNewLga }]);
+    setLocList([...locList, { state_name: stateName, lga_name: locNewLga, enabled: true }]);
     setLocNewLga("");
   };
 
@@ -220,15 +231,16 @@ const SurveyAdminPanel = () => {
   };
 
   const enableAllLocations = async () => {
-    if (!window.confirm("Enable the survey for ALL 774 Nigerian LGAs? VPN/foreign-IP blocking and the OFF=closed switch still apply.")) {
+    if (!window.confirm("Enable ALL 774 Nigerian LGAs for the survey? VPN/foreign-IP blocking and the OFF=closed switch still apply.")) {
       return;
     }
     setLocSaving(true);
     try {
       const res = await api.post("/admin/survey/location-config/enable-all");
       toast.success(res.data?.message || "Enabled all LGAs");
-      setLocConfig({ ...(locConfig || {}), ...res.data.data });
-      setLocList(res.data.data?.locations || []);
+      const data = res.data.data || {};
+      setLocConfig({ ...(locConfig || {}), scope: data.scope, locations: withEnabled(data.locations) });
+      setLocList(withEnabled(data.locations));
       setLocPage(1);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to enable all LGAs");
@@ -238,24 +250,32 @@ const SurveyAdminPanel = () => {
   };
 
   const disableAllLocations = async () => {
-    if (!window.confirm("Remove ALL enabled LGAs? While the gate is ON the survey becomes unavailable everywhere until you re-enable some.")) {
+    if (!window.confirm("Turn the survey OFF everywhere for now? The list of all LGAs is KEPT so you can switch areas back on later.")) {
       return;
     }
     setLocSaving(true);
     try {
-      const res = await api.post("/admin/survey/location-config", {
-        scope: locScope,
-        locations: [],
-      });
-      toast.success(res.data?.message || "Removed all LGAs");
-      setLocList([]);
+      const res = await api.post("/admin/survey/location-config/disable-all");
+      toast.success(res.data?.message || "All LGAs disabled");
+      const data = res.data.data || {};
+      setLocConfig({ ...(locConfig || {}), scope: data.scope, locations: withEnabled(data.locations) });
+      setLocList(withEnabled(data.locations));
       setLocPage(1);
-      setLocConfig({ ...(locConfig || {}), scope: res.data.data?.scope || "lga_list", locations: [] });
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to remove all LGAs");
+      toast.error(err.response?.data?.message || "Failed to disable all LGAs");
     } finally {
       setLocSaving(false);
     }
+  };
+
+  const toggleStagedLoc = (stateName, lgaName) => {
+    setLocList(
+      locList.map((l) =>
+        l.state_name === stateName && l.lga_name === lgaName
+          ? { ...l, enabled: !(l.enabled !== false) }
+          : l
+      )
+    );
   };
 
   const toggleAllLocations = () => {
@@ -875,7 +895,7 @@ const SurveyAdminPanel = () => {
                           key={`${m.state_name}-${m.lga_name}`}
                           type="button"
                           onClick={() => {
-                            setLocList([...locList, m]);
+                            setLocList([...locList, { ...m, enabled: true }]);
                             setLocQuery("");
                           }}
                           className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
@@ -934,32 +954,37 @@ const SurveyAdminPanel = () => {
               )}
               {locList.length > 0 && (
                 <p className="text-xs text-gray-400">
-                  {locList.length.toLocaleString()} enabled · page {Math.min(locPage, totalPages)} of {totalPages.toLocaleString()}
+                  {locList.filter((l) => l.enabled !== false).length.toLocaleString()} enabled of{" "}
+                  {locList.length.toLocaleString()} listed · page {Math.min(locPage, totalPages)} of {totalPages.toLocaleString()}
                 </p>
               )}
-              {pagedLocations.map((loc) => (
-                <div
-                  key={`${loc.state_name}-${loc.lga_name}`}
-                  className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm"
-                >
-                  <span className="text-gray-700">
-                    <strong>{loc.lga_name}</strong> — {loc.state_name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setLocList(
-                        locList.filter(
-                          (l) => !(l.state_name === loc.state_name && l.lga_name === loc.lga_name)
-                        )
-                      )
-                    }
-                    className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+              {pagedLocations.map((loc) => {
+                const isOn = loc.enabled !== false;
+                return (
+                  <div
+                    key={`${loc.state_name}-${loc.lga_name}`}
+                    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${
+                      isOn ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-100 opacity-70"
+                    }`}
                   >
-                    Remove
-                  </button>
-                </div>
-              ))}
+                    <span className={isOn ? "text-gray-700" : "text-gray-500 line-through"}>
+                      <strong>{loc.lga_name}</strong> — {loc.state_name}
+                      {!isOn && <span className="ml-2 text-xs font-medium text-amber-600">disabled</span>}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleStagedLoc(loc.state_name, loc.lga_name)}
+                      className={`rounded-lg px-3 py-1 text-xs font-medium ${
+                        isOn
+                          ? "border border-amber-300 text-amber-700 hover:bg-amber-50"
+                          : "border border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                      }`}
+                    >
+                      {isOn ? "Disable" : "Enable"}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
 
             {totalPages > 1 && (
@@ -1007,7 +1032,7 @@ const SurveyAdminPanel = () => {
               {locSaving
                 ? "Saving…"
                 : isAllEnabled
-                  ? "Disable all 774 LGAs (clear)"
+                  ? "Disable all LGAs (coverage off — list kept)"
                   : "Enable all 774 LGAs (whole Nigeria)"}
             </button>
           </div>

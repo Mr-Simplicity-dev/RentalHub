@@ -51,7 +51,7 @@ const lgaMatches = (a, b) => {
 const isAllowedSurveyLocation = (config, deviceState, deviceLga) => {
   if (!deviceLga) return false;
   return config.locations.some(
-    (l) => stateMatches(l.state_name, deviceState) && lgaMatches(l.lga_name, deviceLga)
+    (l) => l.enabled !== false && stateMatches(l.state_name, deviceState) && lgaMatches(l.lga_name, deviceLga)
   );
 };
 
@@ -61,6 +61,7 @@ const isAllowedSurveyLocation = (config, deviceState, deviceLga) => {
 const isAllowedSurveyBoundaryLocation = (config, deviceState, deviceLga) =>
   config.locations.some(
     (l) =>
+      l.enabled !== false &&
       surveyBoundary.stateKeyMatches(l.state_name, deviceState) &&
       surveyBoundary.lgaKeyMatches(l.lga_name, deviceLga)
   );
