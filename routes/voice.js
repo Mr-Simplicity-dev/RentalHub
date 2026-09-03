@@ -52,7 +52,13 @@ const {
   buildScopeClause,
 } = require('../services/voiceJurisdiction');
 const { resolveCallerArea } = require('../services/callerArea');
-const { dispatchIdentityOrder } = require('../services/voiceRouting');
+const {
+  dispatchIdentityOrder,
+  parseQueueScope,
+  waitingRoomForScope,
+  waitingRoomsForCaller,
+  pickQueuedCallerForAgent,
+} = require('../services/voiceRouting');
 
 const router = express.Router();
 
@@ -651,12 +657,22 @@ router.post('/outgoing', twilioWebhookGuard, async (req, res) => {
   const config = getQueueConfig();
 
   // Agent-side queue line: the Voice Desk dials "queue:<name>" to join duty.
-  // If a caller is already waiting in their room, the agent is sent straight
-  // into that room; otherwise the agent parks in the shared waiting room and
-  // is moved into a caller's room by dispatch when one arrives.
+  // When geo routing is OFF only the single national queue (config.name) is
+  // accepted (today's behaviour). When ON the tier lines are also accepted:
+  //   queue:super / queue:state:<state> / queue:lga:<state>:<lga>.
+  // If a caller who belongs to that line is waiting, the agent joins their
+  // room directly; otherwise the agent parks in that line's waiting room and
+  // dispatch pulls them into an owned caller's room when one arrives.
   if (destination.toLowerCase().startsWith(QUEUE_PREFIX)) {
     const queueName = destination.slice(QUEUE_PREFIX.length).trim();
-    if (queueName !== config.name) {
+    const geoOn = await isVoiceGeoRoutingEnabled();
+    const legacy = queueName === config.name;
+    const scope = legacy
+      ? { tier: 'super', state: null, lga: null }
+      : geoOn
+        ? parseQueueScope(destination)
+        : null;
+    if (!scope) {
       logger.warn('Outgoing voice call rejected: unknown queue name', webhookLogContext(req, { queueName }));
       twiml.say('That queue is not available. Please try again.');
       twiml.hangup();
@@ -664,17 +680,21 @@ router.post('/outgoing', twilioWebhookGuard, async (req, res) => {
       return res.send(twiml.toString());
     }
 
+    const waitingRoom = waitingRoomForScope(scope, AGENTS_WAITING_ROOM);
+
     let waitingCaller = null;
     try {
       const result = await db.query(
-        `SELECT call_sid, to_number
+        `SELECT call_sid, to_number, jurisdiction_state, jurisdiction_lga
          FROM voice_call_events
          WHERE status = 'queued'
            AND created_at >= CURRENT_TIMESTAMP - INTERVAL '30 minutes'
          ORDER BY created_at DESC
-         LIMIT 1`
+         LIMIT 50`
       );
-      waitingCaller = result.rows[0] || null;
+      waitingCaller = geoOn
+        ? pickQueuedCallerForAgent(result.rows || [], scope, true)
+        : (result.rows && result.rows[0]) || null;
     } catch {
       waitingCaller = null;
     }
@@ -690,9 +710,9 @@ router.post('/outgoing', twilioWebhookGuard, async (req, res) => {
       });
       dialAgentIntoConference(twiml, req, waitingCaller.to_number);
     } else {
-      logger.info('Agent parked in the waiting room', webhookLogContext(req, { roomName: AGENTS_WAITING_ROOM }));
+      logger.info('Agent parked in the waiting room', webhookLogContext(req, { roomName: waitingRoom }));
       twiml.say('You are on the line. Waiting for incoming calls.');
-      dialAgentIntoConference(twiml, req, AGENTS_WAITING_ROOM, { waiting: true });
+      dialAgentIntoConference(twiml, req, waitingRoom, { waiting: true });
     }
 
     res.type('text/xml');
@@ -1065,20 +1085,32 @@ const dispatchAgentToRoom = async (roomName, callerCallSid) => {
     const conference = (await rest.conferences.list({ friendlyName: roomName, status: 'in-progress' }))[0];
     if (!conference) return false;
 
+    const geoOn = await isVoiceGeoRoutingEnabled();
     let targetIdentity = null;
     try {
-      const waiting = (await rest.conferences.list({ friendlyName: AGENTS_WAITING_ROOM, status: 'in-progress' }))[0];
-      if (waiting) {
-        const participants = await rest.conferences(waiting.sid).participants.list();
-        const parked = participants
-          .filter((p) => String(p.callSid || '').startsWith('CA'))
-          .sort((a, b) => new Date(a.dateCreated || 0) - new Date(b.dateCreated || 0));
-        for (const participant of parked) {
-          const identity = await resolveClientIdentityFromCall(participant.callSid);
-          if (!identity) continue;
-          targetIdentity = identity;
-          await rest.conferences(waiting.sid).participants(participant.sid).remove();
-          break;
+      // Pull a parked agent from the caller's OWNING tier first, then roll up
+      // (LGA room -> state room -> super). Geo OFF = today's single super room.
+      const rooms = geoOn
+        ? waitingRoomsForCaller(await existingJurisdictionFor(callerCallSid), AGENTS_WAITING_ROOM)
+        : [AGENTS_WAITING_ROOM];
+      for (const waitingRoom of rooms) {
+        if (targetIdentity) break;
+        try {
+          const waiting = (await rest.conferences.list({ friendlyName: waitingRoom, status: 'in-progress' }))[0];
+          if (!waiting) continue;
+          const participants = await rest.conferences(waiting.sid).participants.list();
+          const parked = participants
+            .filter((p) => String(p.callSid || '').startsWith('CA'))
+            .sort((a, b) => new Date(a.dateCreated || 0) - new Date(b.dateCreated || 0));
+          for (const participant of parked) {
+            const identity = await resolveClientIdentityFromCall(participant.callSid);
+            if (!identity) continue;
+            targetIdentity = identity;
+            await rest.conferences(waiting.sid).participants(participant.sid).remove();
+            break;
+          }
+        } catch {
+          continue;
         }
       }
     } catch {
@@ -1088,9 +1120,10 @@ const dispatchAgentToRoom = async (roomName, callerCallSid) => {
     const identity = targetIdentity || AGENT_IDENTITY;
     let ringIdentity = identity;
     try {
-      // Phase 2: when geo routing is on, ring the owning tier's pool first and
-      // roll up (LGA -> state -> super). Flag OFF keeps today's behaviour.
-      if (await isVoiceGeoRoutingEnabled()) {
+      // Phase 2: when geo routing is on, prefer the owning tier's configured
+      // pool (used when no tier agent is physically parked). Flag OFF keeps
+      // today's behaviour.
+      if (geoOn) {
         const jurisdiction = await existingJurisdictionFor(callerCallSid);
         const order = dispatchIdentityOrder(jurisdiction, getTierIdentityPools());
         if (order.length) ringIdentity = order[0];

@@ -7,6 +7,10 @@ const {
   chooseRoutingTarget,
   queueLineFor,
   dispatchIdentityOrder,
+  parseQueueScope,
+  waitingRoomForScope,
+  waitingRoomsForCaller,
+  pickQueuedCallerForAgent,
 } = require('../services/voiceRouting');
 
 test('voice routing: geo flag gate', () => {
@@ -82,4 +86,70 @@ test('voice routing: dispatch identity order rolls up the geo ladder', () => {
   assert.deepStrictEqual(dispatchIdentityOrder({ state: '', lga: '' }, all), ['support_agent_1']);
   // LGA + state staffed but no super: LGA first, rolls to state.
   assert.deepStrictEqual(dispatchIdentityOrder(jur, lgaState), ['lga_fct_gwagwalada']);
+});
+
+test('voice routing: queue scope parsing', () => {
+  assert.deepStrictEqual(parseQueueScope('support'), { tier: 'super', state: null, lga: null });
+  assert.deepStrictEqual(parseQueueScope('queue:super'), { tier: 'super', state: null, lga: null });
+  assert.deepStrictEqual(parseQueueScope('queue:state:Federal Capital Territory'), {
+    tier: 'state',
+    state: 'Federal Capital Territory',
+    lga: null,
+  });
+  assert.deepStrictEqual(parseQueueScope('queue:lga:FCT:Gwagwalada'), {
+    tier: 'lga',
+    state: 'FCT',
+    lga: 'Gwagwalada',
+  });
+  assert.deepStrictEqual(parseQueueScope('queue:lga:FCT:Obio/Akpor'), {
+    tier: 'lga',
+    state: 'FCT',
+    lga: 'Obio/Akpor',
+  });
+  assert.strictEqual(parseQueueScope('queue:lga:FCT'), null);
+  assert.strictEqual(parseQueueScope('+234123456'), null);
+  assert.strictEqual(parseQueueScope(''), null);
+  assert.strictEqual(parseQueueScope(null), null);
+});
+
+test('voice routing: waiting room naming + caller roll-up order', () => {
+  const superRoom = 'rentalhub_agents_waiting';
+  assert.strictEqual(waitingRoomForScope({ tier: 'super' }, superRoom), superRoom);
+  assert.strictEqual(
+    waitingRoomForScope({ tier: 'state', state: 'Federal Capital Territory' }, superRoom),
+    'rentalhub_agents_waiting_state_federalcapitalterritory'
+  );
+  assert.strictEqual(
+    waitingRoomForScope({ tier: 'lga', state: 'FCT', lga: 'Gwagwalada' }, superRoom),
+    'rentalhub_agents_waiting_lga_fct_gwagwalada'
+  );
+  assert.deepStrictEqual(
+    waitingRoomsForCaller({ state: 'FCT', lga: 'Gwagwalada' }, superRoom),
+    ['rentalhub_agents_waiting_lga_fct_gwagwalada', 'rentalhub_agents_waiting_state_fct', superRoom]
+  );
+  assert.deepStrictEqual(waitingRoomsForCaller({ state: 'FCT', lga: '' }, superRoom), [
+    'rentalhub_agents_waiting_state_fct',
+    superRoom,
+  ]);
+  assert.deepStrictEqual(waitingRoomsForCaller(null, superRoom), [superRoom]);
+});
+
+test('voice routing: direct-join picks the owning caller', () => {
+  const callers = [
+    { call_sid: 'A', jurisdiction_state: 'FCT', jurisdiction_lga: 'Gwagwalada' },
+    { call_sid: 'B', jurisdiction_state: 'FCT', jurisdiction_lga: 'Kuje' },
+    { call_sid: 'C', jurisdiction_state: null, jurisdiction_lga: null },
+  ];
+  const lgaScope = parseQueueScope('queue:lga:FCT:Gwagwalada');
+  const stateScope = parseQueueScope('queue:state:FCT');
+  const superScope = parseQueueScope('queue:super');
+
+  assert.strictEqual(pickQueuedCallerForAgent(callers, lgaScope, true).call_sid, 'A');
+  assert.strictEqual(pickQueuedCallerForAgent(callers, stateScope, true).call_sid, 'A');
+  assert.strictEqual(pickQueuedCallerForAgent(callers, superScope, true).call_sid, 'A');
+  // Geo off -> newest regardless of scope.
+  assert.strictEqual(pickQueuedCallerForAgent(callers, lgaScope, false).call_sid, 'A');
+  // An LGA with no matching caller -> park (null).
+  assert.strictEqual(pickQueuedCallerForAgent(callers, parseQueueScope('queue:lga:Lagos:Eti-Osa'), true), null);
+  assert.strictEqual(pickQueuedCallerForAgent([], superScope, true), null);
 });

@@ -78,6 +78,85 @@ const dispatchIdentityOrder = (jurisdiction, identitiesByTier = {}) => {
   return [];
 };
 
+const normalizeKey = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// Parses a dialed queue line back into a tier scope. Accepts both the legacy
+// single name (config.name, e.g. "support") and the geo forms:
+//   queue:super, queue:state:<state>, queue:lga:<state>:<lga>
+const parseQueueScope = (line) => {
+  const value = String(line || '').trim();
+  const lower = value.toLowerCase();
+  if (lower === 'support' || lower === 'super' || lower === 'queue:super') {
+    return { tier: TARGET.SUPER, state: null, lga: null };
+  }
+  if (!value.startsWith('queue:')) return null;
+  const body = value.slice('queue:'.length);
+  if (body.toLowerCase() === 'super') return { tier: TARGET.SUPER, state: null, lga: null };
+
+  if (body.toLowerCase().startsWith('state:')) {
+    const state = body.slice('state:'.length).trim();
+    if (!state) return null;
+    return { tier: TARGET.STATE, state, lga: null };
+  }
+  if (body.toLowerCase().startsWith('lga:')) {
+    const rest = body.slice('lga:'.length);
+    const sep = rest.indexOf(':');
+    if (sep <= 0) return null;
+    const state = rest.slice(0, sep).trim();
+    const lga = rest.slice(sep + 1).trim();
+    if (!state || !lga) return null;
+    return { tier: TARGET.LGA, state, lga };
+  }
+  return null;
+};
+
+// Stable Twilio conference friendly-name for a tier scope's waiting room.
+// super reuses the existing legacy room name for full backward compatibility.
+const waitingRoomForScope = (scope, superRoom) => {
+  if (!scope || scope.tier === TARGET.SUPER) return superRoom;
+  if (scope.tier === TARGET.STATE) {
+    return `${superRoom}_state_${normalizeKey(scope.state)}`;
+  }
+  return `${superRoom}_lga_${normalizeKey(scope.state)}_${normalizeKey(scope.lga)}`;
+};
+
+// Waiting rooms an agent should be pulled from for a caller, in ownership
+// order (the caller's LGA tier first, then its state tier, then super).
+// superRoom is always last so behaviour degrades exactly to today.
+const waitingRoomsForCaller = (jurisdiction, superRoom) => {
+  const state = String(jurisdiction?.state || '').trim();
+  const lga = String(jurisdiction?.lga || '').trim();
+  const rooms = [];
+  if (state && lga) rooms.push(waitingRoomForScope({ tier: TARGET.LGA, state, lga }, superRoom));
+  if (state) rooms.push(waitingRoomForScope({ tier: TARGET.STATE, state }, superRoom));
+  rooms.push(superRoom);
+  return rooms;
+};
+
+// Chooses which waiting caller an agent (who dialed `scope`) should answer.
+// Ownership (Rule B): an LGA agent only takes callers whose jurisdiction is
+// their LGA; a state agent takes callers from their state; super takes the
+// newest (today's behaviour). Callers list should be newest-first.
+const pickQueuedCallerForAgent = (callers, scope, geoOn) => {
+  const rows = Array.isArray(callers) ? callers.filter((c) => c && c.call_sid) : [];
+  if (!rows.length) return null;
+  if (!geoOn) return rows[0];
+
+  if (!scope || scope.tier === TARGET.SUPER) return rows[0];
+
+  const norm = (value) => String(value || '').toLowerCase().trim();
+  if (scope.tier === TARGET.STATE) {
+    return rows.find((c) => norm(c.jurisdiction_state) === norm(scope.state)) || null;
+  }
+  return (
+    rows.find(
+      (c) =>
+        norm(c.jurisdiction_state) === norm(scope.state) &&
+        norm(c.jurisdiction_lga) === norm(scope.lga)
+    ) || null
+  );
+};
+
 module.exports = {
   TARGET,
   isGeoEnabled,
@@ -85,4 +164,8 @@ module.exports = {
   chooseRoutingTarget,
   queueLineFor,
   dispatchIdentityOrder,
+  parseQueueScope,
+  waitingRoomForScope,
+  waitingRoomsForCaller,
+  pickQueuedCallerForAgent,
 };

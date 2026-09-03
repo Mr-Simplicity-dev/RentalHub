@@ -139,16 +139,22 @@ Super admin (review only, not on the line)
 - When the owning tier is not staffed, roll up deterministically.
 - Behaviour with no staffing == exactly today.
 
-> STATUS (Phase 2): decision + dispatch seam IMPLEMENTED behind the
-> `voice_geo_routing` flag (default OFF; commit 664f9fb groundwork +
-> dispatch wiring). services/voiceRouting.js now exposes
-> dispatchIdentityOrder() (LGA -> state -> super roll-up) and dispatchAgentToRoom
-> rings the owning tier's pool first when the flag is on, else today's default
-> identity. Tier identity pools read VOICE_LGA_IDENTITIES /
-> VOICE_STATE_IDENTITIES (empty = that tier rolls up); super = VOICE_AGENT_IDENTITIES.
-> With flag OFF behaviour is byte-for-byte today's. Honest gaps: dispatch by
-> ownership/roll-up is only observable once LGA/state desks (Phase 3) actually
-> staff those pools, and full call-path verification still needs live Twilio.
+> STATUS (Phase 2): IMPLEMENTED, flag-gated behind `voice_geo_routing`
+> (default OFF). Caller-side geo flow is wired end-to-end in routes/voice.js:
+> - dispatchAgentToRoom pulls a parked agent from the caller's OWNING tier room
+>   first, rolling up LGA room -> state room -> super room (geo OFF = today's
+>   single super room); no tier agent parked -> rings the owning tier's
+>   configured identity pool, else today's default.
+> - /voice/outgoing accepts the tier queue lines (queue:super / queue:state:<s>
+>   / queue:lga:<s>:<lga>) alongside the legacy single name; an agent who dials
+>   their line either direct-joins a waiting caller THEY own (ownership-aware
+>   pick) or parks in that line's jurisdiction waiting room.
+> - Pure helpers (parseQueueScope, waitingRoomForScope, waitingRoomsForCaller,
+>   pickQueuedCallerForAgent, dispatchIdentityOrder) are unit-tested.
+> Honest gaps that remain (not code): with the flag OFF nothing observable
+> changes; the tier rooms/pools are only actually staffed once Phase 3 desks
+> let LGA/state admins Go Available onto those lines, and full call-path
+> verification still needs a live Twilio smoke test.
 
 ### Phase 3 — scoped voice desks for state & LGA admins
 - Embed a jurisdiction-scoped `SupportVoiceDesk` (or variant) into the
