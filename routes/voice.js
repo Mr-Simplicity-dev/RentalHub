@@ -1640,10 +1640,10 @@ const getConferenceParticipantByCallSid = async (conferenceSid, callSid) => {
 
 router.post('/escalate', voiceTokenLimiter, authenticate, requireVoiceAgent, async (req, res) => {
   const action = String(req.body?.action || '').trim();
-  if (!['consult', 'transfer', 'cancel-consult'].includes(action)) {
+  if (!['consult', 'transfer', 'cancel-consult', 'relate'].includes(action)) {
     return res.status(400).json({
       success: false,
-      message: 'Escalation action must be "consult", "transfer" or "cancel-consult".',
+      message: 'Escalation action must be "consult", "transfer", "cancel-consult" or "relate".',
     });
   }
 
@@ -1669,6 +1669,40 @@ router.post('/escalate', voiceTokenLimiter, authenticate, requireVoiceAgent, asy
       message: 'This call is outside your support area.',
     });
   }
+
+  // Phase 4 relate-to-Super-Admin: top of the ladder — super support flags an
+  // unresolved call for the platform Super Admin. No conference action needed.
+  if (action === 'relate') {
+    const role = req.user.user_type;
+    if (role !== 'super_support_admin' && role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only Super Support can relate a call to the Super Admin.',
+      });
+    }
+    const note = String(req.body?.note || req.body?.handoff_note || '').trim().slice(0, 2000);
+    try {
+      const result = await db.query(
+        `INSERT INTO voice_relate_requests
+           (call_sid, caller_number, source, note, related_by)
+         VALUES ($1, $2, $3, NULLIF($4, ''), $5)
+         RETURNING id`,
+        [
+          context.callerCallSid || null,
+          context.callerNumber ? String(context.callerNumber).slice(0, 32) : null,
+          String(context.source || 'unknown').slice(0, 24),
+          note || null,
+          req.user.id,
+        ]
+      );
+      logger.info('Voice call related to Super Admin', { relateId: result.rows[0]?.id, callSid: context.callerCallSid });
+      return res.json({ success: true, data: { relateId: result.rows[0].id } });
+    } catch (error) {
+      logger.error('Voice relate persistence failed:', error.message);
+      return res.status(500).json({ success: false, message: 'Failed to save the relate request.' });
+    }
+  }
+
 
   let conference;
   try {
@@ -1988,6 +2022,60 @@ router.get('/duty-status', voiceTokenLimiter, authenticate, requireVoiceAgent, a
 // Geo OFF => everyone staffs the legacy national line. Geo ON => state/LGA
 // support staff their assigned tier line (falls back to super when their area
 // is unassigned).
+
+// Super-tier only read/action guard (relates are internal to super admin/support).
+const requireSuperVoiceRead = (req, res, next) => {
+  if (!req.user || !['super_admin', 'super_support_admin'].includes(req.user.user_type)) {
+    return res.status(403).json({ success: false, message: 'Your role cannot view super-support relates.' });
+  }
+  next();
+};
+
+// ── GET /voice/relates ───────────────────────────────────────────────────────
+// Phase 4: relate requests flagged by Super Support for the platform Super
+// Admin (open first, newest first).
+
+router.get('/relates', voiceTokenLimiter, authenticate, requireSuperVoiceRead, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, call_sid, caller_number, source, note, status, related_by,
+              handled_by, created_at, handled_at
+       FROM voice_relate_requests
+       ORDER BY (status = 'open') DESC, created_at DESC
+       LIMIT 50`
+    );
+    return res.json({ success: true, data: result.rows });
+  } catch (error) {
+    logger.error('Voice relates list failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to load relate requests.' });
+  }
+});
+
+// ── PATCH /voice/relates/:id/handle ──────────────────────────────────────────
+// Phase 4: the Super Admin marks a relate handled.
+
+router.patch('/relates/:id/handle', voiceTokenLimiter, authenticate, requireSuperVoiceRead, async (req, res) => {
+  const relateId = Number(req.params.id);
+  if (!Number.isInteger(relateId) || relateId <= 0) {
+    return res.status(400).json({ success: false, message: 'Invalid relate id.' });
+  }
+  try {
+    const result = await db.query(
+      `UPDATE voice_relate_requests
+       SET status = 'handled', handled_by = $2, handled_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status = 'open'
+       RETURNING id`,
+      [relateId, req.user.id]
+    );
+    if (!result.rowCount) {
+      return res.status(409).json({ success: false, message: 'Relate not found or already handled.' });
+    }
+    return res.json({ success: true, data: { id: result.rows[0].id } });
+  } catch (error) {
+    logger.error('Voice relate handle failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to update the relate request.' });
+  }
+});
 
 // Agent scope from the logged-in user (Phase 4 ownership). Mirror of the LGA/
 // state tiers; general admins and support tiers map onto super/state/lga.

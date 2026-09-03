@@ -158,6 +158,19 @@ export const fetchDeskScope = async () => {
   }
 };
 
+/** Phase 4: relate requests Super Support flagged for the Super Admin. */
+export const fetchRelates = async () => {
+  const data = await authedFetch('/voice/relates');
+  return Array.isArray(data?.data) ? data.data : [];
+};
+
+/** Phase 4: Super Admin marks a relate request handled. */
+export const handleRelate = async (relateId) => {
+  if (!relateId) return false;
+  const data = await authedFetch(`/voice/relates/${relateId}/handle`, { method: 'PATCH' });
+  return data?.success === true;
+};
+
 /**
  * Resolve the caller behind the agent's current call (conference legs do not
  * expose caller info to the SDK). Returns null when no caller is active.
