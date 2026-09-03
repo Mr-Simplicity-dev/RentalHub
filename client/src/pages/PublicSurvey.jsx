@@ -251,7 +251,8 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
     return () => {
       active = false;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentMode]);
 
   // In-tab boundary watcher: a respondent blocked because they were outside
   // (or GPS couldn't confirm) keeps the tab open; watch their position and
@@ -591,26 +592,6 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
     );
   }
 
-  if (type) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-10">
-        <SurveyWizard
-          surveyType={type}
-          mode="full"
-          publicMode
-          collectContacts
-          agentMode={agentMode}
-          prefillContact={prefillContact}
-          locationInfo={locationInfo}
-          onComplete={() => {
-            localStorage.removeItem(TYPE_KEY);
-            setSubmitted(true);
-          }}
-        />
-      </div>
-    );
-  }
-
   const LOCATION_MESSAGES = {
     location_required: t('public_survey.loc_required', 'We could not confirm your location. Please enable location access and try again.'),
     lga_not_allowed: t('public_survey.loc_lga', 'The survey is not available yet for you in this local government area.'),
@@ -622,6 +603,21 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
     outside_nigeria: t('public_survey.loc_country', 'This survey is only available to respondents in Nigeria.'),
     survey_closed: t('public_survey.closed_body', 'This survey is not currently open. Please check back later.'),
   };
+
+  // Gate guards come BEFORE the wizard/draft return so returning visitors with
+  // a saved draft cannot see questions while blocked or before verification.
+  if (locationState === 'checking') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
+          <p className="flex items-center justify-center gap-2 text-sm text-gray-500">
+            <span className="h-3 w-3 animate-spin rounded-full border-b-2 border-indigo-600" />
+            {t('public_survey.loc_checking', 'Confirming your location…')}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (locationState === 'blocked') {
     return (
@@ -645,6 +641,26 @@ const [surveyEnabled, setSurveyEnabled] = useState(null); // null = loading
             </p>
           )}
         </div>
+      </div>
+    );
+  }
+
+  if (type) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-10">
+        <SurveyWizard
+          surveyType={type}
+          mode="full"
+          publicMode
+          collectContacts
+          agentMode={agentMode}
+          prefillContact={prefillContact}
+          locationInfo={locationInfo}
+          onComplete={() => {
+            localStorage.removeItem(TYPE_KEY);
+            setSubmitted(true);
+          }}
+        />
       </div>
     );
   }
