@@ -128,16 +128,17 @@ const useTwilioVoice = () => {
 
   // Dial the queue through the TwiML App. The backend serves the agent-side
   // dispatch TwiML (a <Dial><Conference> leg) when To starts with "queue:".
+  const connectToQueueRef = useRef(null);
   const scheduleQueueReconnect = useCallback(() => {
     if (reconnectTimerRef.current) return;
     reconnectTimerRef.current = setTimeout(() => {
       reconnectTimerRef.current = null;
       // Re-join the line only when still available and not mid-call.
       if (deviceRef.current && statusRef.current === 'ready' && !activeCallRef.current) {
-        connectToQueue();
+        if (connectToQueueRef.current) connectToQueueRef.current();
       }
     }, 2000);
-  }, [connectToQueue]);
+  }, []);
 
   const connectToQueue = useCallback(() => {
     const device = deviceRef.current;
@@ -161,6 +162,10 @@ const useTwilioVoice = () => {
       setError('Could not join the support queue. Try again.');
     }
   }, [scheduleQueueReconnect]);
+
+  useEffect(() => {
+    connectToQueueRef.current = connectToQueue;
+  }, [connectToQueue]);
 
   const goAvailable = useCallback(async (line = '') => {
     setError(null);
