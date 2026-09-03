@@ -738,6 +738,44 @@ exports.getLocationConfigForAdmin = async (req, res) => {
   }
 };
 
+// Enables every Nigerian LGA (all 774) for the survey. Bypasses the 100-row
+// cap in saveLocationConfig, which is meant for manual whitelist editing.
+exports.enableAllLocationConfig = async (req, res) => {
+  try {
+    const { getLocationOptions } = require('../config/utils/locationDirectory');
+    const states = await getLocationOptions();
+    const locations = [];
+    for (const st of states || []) {
+      const stateName = String(st.state_name || '').trim();
+      if (!stateName) continue;
+      for (const lga of Array.isArray(st.lgas) ? st.lgas : []) {
+        const lgaName = String(lga || '').trim();
+        if (lgaName.length >= 2) locations.push({ state_name: stateName, lga_name: lgaName });
+      }
+    }
+
+    await db.query(
+      `INSERT INTO app_settings (key, value)
+       VALUES ('survey_allowed_scope', $1),
+              ('survey_allowed_locations', $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+      [
+        JSON.stringify({ value: 'lga_list' }),
+        JSON.stringify({ value: JSON.stringify(locations) }),
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: `Enabled ${locations.length} Nigerian LGAs`,
+      data: { scope: 'lga_list', locations },
+    });
+  } catch (error) {
+    req.logger.error('Survey enable-all locations error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to enable all LGAs' });
+  }
+};
+
 exports.getMarketingAgentOverview = async (req, res) => {
   try {
     const agentId = req.user.id;

@@ -10,6 +10,7 @@ const {
   computeAnalysis,
   saveLocationConfig,
   getLocationConfigForAdmin,
+  enableAllLocationConfig,
   getFxConfigForAdmin,
   saveFxConfig,
 } = require('../services/surveyAnalysisService');
@@ -37,6 +38,7 @@ router.post('/reminders/send', async (req, res) => {
 // Location gate admin controls
 router.get('/location-config', getLocationConfigForAdmin);
 router.post('/location-config', saveLocationConfig);
+router.post('/location-config/enable-all', enableAllLocationConfig);
 
 // Foreign-card FX rules
 router.get('/fx-config', getFxConfigForAdmin);

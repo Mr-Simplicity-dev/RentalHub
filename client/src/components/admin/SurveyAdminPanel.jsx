@@ -180,6 +180,23 @@ const SurveyAdminPanel = () => {
     }
   };
 
+  const enableAllLocations = async () => {
+    if (!window.confirm("Enable the survey for ALL 774 Nigerian LGAs? VPN/foreign-IP blocking and the OFF=closed switch still apply.")) {
+      return;
+    }
+    setLocSaving(true);
+    try {
+      const res = await api.post("/admin/survey/location-config/enable-all");
+      toast.success(res.data?.message || "Enabled all LGAs");
+      setLocConfig({ ...(locConfig || {}), ...res.data.data });
+      setLocList(res.data.data?.locations || []);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to enable all LGAs");
+    } finally {
+      setLocSaving(false);
+    }
+  };
+
   const sendPushReminders = async () => {
     if (!window.confirm("Send a push reminder to everyone with an unfinished survey?")) return;
     try {
@@ -834,14 +851,24 @@ const SurveyAdminPanel = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            disabled={locSaving}
-            onClick={saveLocationConfig}
-            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {locSaving ? "Saving…" : "Save Location Rules"}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={locSaving}
+              onClick={saveLocationConfig}
+              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {locSaving ? "Saving…" : "Save Location Rules"}
+            </button>
+            <button
+              type="button"
+              disabled={locSaving}
+              onClick={enableAllLocations}
+              className="rounded-lg border border-indigo-300 bg-white px-5 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+            >
+              Enable all 774 LGAs (whole Nigeria)
+            </button>
+          </div>
         </div>
       )}
       {/* ── FX rules ─────────────────────────────────────────────────────── */}
