@@ -327,7 +327,7 @@ const SuperSupportAdminDashboard = () => {
       safeGet(`/state-migrations/support/queue?stage=all&status=${f.status}`, { data: { data: [] } }),
       safeGet(`/state-migrations/support/audit?status=${f.status}`, { data: { data: [] } }),
       safeGet('/support/tickets', { data: { data: [] } }),
-      safeGet('/property-alerts', { data: { data: [] } }),
+      safeGet('/property-alerts/admin/requests?limit=50', null),
       safeGet('/dashboard/metrics', { data: { data: {} } }),
       safeGet('/financial-admin/stats/realtime', { data: { data: {} } }),
       safeGet('/financial-admin/performance/state-admins', { data: { data: [], statistics: null } }),
@@ -346,19 +346,25 @@ const SuperSupportAdminDashboard = () => {
     const pendingCommissions = Number(perfStatistics.total_pending_commissions || 0);
     const withdrawnCommissions = Number(perfStatistics.total_withdrawn_amount || 0);
 
+    const alertsList = Array.isArray(alertsRes?.data)
+      ? alertsRes.data
+      : Array.isArray(alertsRes?.data?.data)
+        ? alertsRes.data.data
+        : [];
+
     setDashboardData({
       overview: {
         totalRequests: queueRes?.data?.data?.length || 0,
         pendingApprovals: queueRes?.data?.data?.filter(item => item.status === 'pending').length || 0,
         resolvedTickets: ticketsRes?.data?.data?.filter(ticket => ticket.status === 'resolved').length || 0,
-        activeAlerts: alertsRes?.data?.data?.length || 0,
+        activeAlerts: alertsList.length,
         systemHealth: null,
         responseTime: null,
       },
       migrationQueue: queueRes?.data?.data || [],
       auditLogs: auditRes?.data?.data || [],
       supportTickets: ticketsRes?.data?.data || [],
-      systemAlerts: alertsRes?.data?.data || [],
+      systemAlerts: alertsList,
       performanceMetrics: metricsRes?.data?.data || {},
       userActivity: [],
       financialOverview: {
