@@ -887,10 +887,32 @@ const SurveyAdminPanel = () => {
                     <p className="text-xs text-gray-400">No matching LGA found.</p>
                   ) : (
                     filteredAll.map((m) => {
-                      const already = locList.some(
+                      const staged = locList.find(
                         (l) => l.state_name === m.state_name && l.lga_name === m.lga_name
                       );
-                      return already ? null : (
+                      if (staged) {
+                        if (staged.enabled !== false) {
+                          return (
+                            <span
+                              key={`${m.state_name}-${m.lga_name}`}
+                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500"
+                            >
+                              ✓ {m.lga_name} ({m.state_name}) — already enabled
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            key={`${m.state_name}-${m.lga_name}`}
+                            type="button"
+                            onClick={() => toggleStagedLoc(m.state_name, m.lga_name)}
+                            className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                          >
+                            → Enable {m.lga_name} ({m.state_name})
+                          </button>
+                        );
+                      }
+                      return (
                         <button
                           key={`${m.state_name}-${m.lga_name}`}
                           type="button"
