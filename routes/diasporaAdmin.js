@@ -11,9 +11,9 @@ router.use(authenticate);
 router.use(requireDiasporaAdmin);
 
 // Diaspora registration overview (list + stats)
-router.get('/diaspora/overview', getDiasporaAdminOverview);
+router.get('/overview', getDiasporaAdminOverview);
 
 // Mark a diaspora user's Nigerian-funded review flag as reviewed
-router.post('/diaspora/users/:userId/dismiss', dismissDiasporaReviewFlag);
+router.post('/users/:userId/dismiss', dismissDiasporaReviewFlag);
 
 module.exports = router;

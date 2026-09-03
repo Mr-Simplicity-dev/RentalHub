@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const crypto = require('crypto');
 const { body, param } = require('express-validator');
 const db = require('../config/middleware/database');
@@ -110,7 +110,7 @@ const appealDetailsQuery = ({ forUpdate = false } = {}) => `
   SELECT
     a.*,
     p.title AS property_title,
-    p.status AS property_status,
+    CASE WHEN p.is_verified THEN 'verified' WHEN p.is_available THEN 'available' ELSE 'pending' END AS property_status,
     ps.state_name AS property_state,
     p.description AS property_description,
     p.rent_amount,
@@ -249,7 +249,7 @@ const lockAndAssertAppealTarget = async (client, user, appeal) => {
     result = await client.query(
       `SELECT
          p.id,
-         p.status,
+         CASE WHEN p.is_verified THEN 'verified' WHEN p.is_available THEN 'available' ELSE 'pending' END,
          p.is_verified,
          p.deleted_at,
          s.state_name AS target_state
@@ -364,7 +364,7 @@ router.post(
         const propertyResult = await db.query(
           `SELECT
              p.id,
-             p.status,
+             CASE WHEN p.is_verified THEN 'verified' WHEN p.is_available THEN 'available' ELSE 'pending' END,
              p.rejection_reason,
              p.verified_by,
              p.landlord_id,
@@ -585,7 +585,7 @@ router.get('/appeals/my', authenticate, async (req, res) => {
     const offset = (page - 1) * limit;
     const [result, count] = await Promise.all([
       db.query(
-        `SELECT a.*, p.title AS property_title, p.status AS property_status
+        `SELECT a.*, p.title AS property_title, CASE WHEN p.is_verified THEN 'verified' WHEN p.is_available THEN 'available' ELSE 'pending' END AS property_status
          FROM admin_appeals a
          LEFT JOIN properties p ON p.id = a.property_id
          WHERE a.appellant_id = $1
@@ -681,7 +681,7 @@ router.get('/admin/appeals', authenticate, requireAppealReviewer, async (req, re
         `SELECT
            a.*,
            p.title AS property_title,
-           p.status AS property_status,
+           CASE WHEN p.is_verified THEN 'verified' WHEN p.is_available THEN 'available' ELSE 'pending' END AS property_status,
            ps.state_name AS property_state,
            appellant.full_name AS appellant_name,
            appellant.email AS appellant_email,
@@ -1007,3 +1007,4 @@ router._appealScopeForTest = {
 };
 
 module.exports = router;
+
