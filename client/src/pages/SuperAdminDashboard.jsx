@@ -22,6 +22,7 @@ import PlatformRatingsTab from "../components/admin/PlatformRatingsTab";
 import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
 import PricingRulesTab from "../components/admin/PricingRulesTab";
+import RentCalculatorFeesAdmin from "../components/admin/RentCalculatorFeesAdmin";
 import RegistrationAccessRulesTab from "../components/admin/RegistrationAccessRulesTab";
 import PaginationControls from "../components/admin/PaginationControls";
 import ModerationOverview from "../components/admin/ModerationOverview";
@@ -72,6 +73,7 @@ const tabs = [
   "appeals",
   "diaspora",
   "survey",
+  "calculator_fees",
 ];
 
 const tabLabels = {
@@ -104,6 +106,7 @@ const tabLabels = {
   appeals: "Appeals",
   diaspora: "Diaspora",
   survey: "Survey & Analysis",
+  calculator_fees: "Calculator Fees",
 };
 
 const shortcutCategories = [
@@ -118,6 +121,7 @@ const shortcutCategories = [
       { name: "properties", label: "Properties", detail: "Browse and manage property listings" },
       { name: "property_requests", label: "Property Requests", detail: "Review listing requests from landlords and agents" },
       { name: "pricing", label: "Pricing", detail: "Configure platform pricing rules and fees" },
+      { name: "calculator_fees", label: "Calculator Fees", detail: "Set rent calculator agent/legal/caution fee rates" },
       { name: "registration_access", label: "Registration Access", detail: "Control registration by state and LGA" },
     ],
   },
@@ -1543,6 +1547,10 @@ export default function SuperAdminDashboard() {
 
       {tab === "pricing" && (
         <PricingRulesTab />
+      )}
+
+      {tab === "calculator_fees" && (
+        <RentCalculatorFeesAdmin />
       )}
 
       {tab === "registration_access" && (

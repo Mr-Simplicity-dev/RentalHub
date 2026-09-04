@@ -42,6 +42,7 @@ import {
   FaIdCard,
   FaFilter,
   FaArrowUp,
+  FaCalculator,
 } from 'react-icons/fa';
 
 const scrollDashboardToTarget = (hash = '', scrollContainer = null, behavior = 'smooth') => {
@@ -1116,6 +1117,11 @@ const AdminLayout = () => {
                   <FaShieldAlt className="mr-3" />
                   Audit Trail
                 </NavLink>
+
+                <NavLink to="/admin/financial-dashboard?tab=calculator-fees" className={() => financialNavItem('calculator-fees')}>
+                  <FaCalculator className="mr-3" />
+                  Calculator Fees
+                </NavLink>
               </div>
             </div>
           )}
@@ -1175,6 +1181,11 @@ const AdminLayout = () => {
                   Withdrawal History
                 </NavLink>
 
+                <NavLink to="/admin/financial-dashboard?tab=calculator-fees#lga-finance-calculator-fees" className={() => financialNavItem('calculator-fees')}>
+                  <FaCalculator className="mr-3" />
+                  Calculator Fees
+                </NavLink>
+
               </div>
             </div>
           )}
@@ -1216,6 +1227,11 @@ const AdminLayout = () => {
                   <FaArrowUp className="mr-3" />
                   Support Escalations
                 </NavLink>
+
+                <NavLink to="/admin/super-financial-dashboard?panel=overview#super-financial-calculator-fees" className={() => superFinancialNavItem('overview')}>
+                  <FaCalculator className="mr-3" />
+                  Calculator Fees
+                </NavLink>
               </div>
             </div>
           )}
@@ -1232,6 +1248,13 @@ const AdminLayout = () => {
                     State Dashboard
                   </NavLink>
                 )}
+
+                  {isStateFinancialAdmin && (
+                   <NavLink to="/admin?tab=calculator-fees" className={navItem}>
+                      <FaCalculator className="mr-3" />
+                      Calculator Fees
+                   </NavLink>
+                  )}
 
                   {isStateFinancialAdmin && (
                    <NavLink to="/admin/withdrawals" className={navItem}>

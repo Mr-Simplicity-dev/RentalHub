@@ -96,6 +96,7 @@ const mobileDiagnosticsRoutes = require('./routes/mobileDiagnostics');
 
 const damageReportRoutes = require('./routes/damageReports');
 const rentSavingsRoutes = require('./routes/rentSavings');
+const rentCalculatorRoutes = require('./routes/rentCalculator');
 const adminInspectionRoutes = require('./routes/adminInspections');
 const appealRoutes = require('./routes/appeals');
 const voiceRoutes = require('./routes/voice');
@@ -719,6 +720,7 @@ app.use('/api/system', adminLimiter, systemRoutes);
 app.use('/api/mobile', generalOpsLimiter, mobileDiagnosticsRoutes);
 app.use('/api/damage-reports', generalOpsLimiter, damageReportRoutes);
 app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
+app.use('/api/rent-calculator', generalOpsLimiter, rentCalculatorRoutes);
 app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
 app.use('/api', generalOpsLimiter, appealRoutes);
 

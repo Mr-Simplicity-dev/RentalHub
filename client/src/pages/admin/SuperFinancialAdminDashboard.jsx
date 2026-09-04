@@ -14,6 +14,7 @@ import api from '../../services/api';
 import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
 import TwoFactorStep from '../../components/common/TwoFactorStep';
 import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
+import RentCalculatorFeesAdmin from '../../components/admin/RentCalculatorFeesAdmin';
 import { useAuth } from '../../hooks/useAuth';
 
 const currency = (value) =>
@@ -973,6 +974,10 @@ const SuperFinancialAdminDashboard = () => {
             </div>
           ))}
         </div>
+      </section>
+
+      <section id="super-financial-calculator-fees" className="mt-6">
+        <RentCalculatorFeesAdmin />
       </section>
 
       <section className="rounded-xl border border-blue-100 bg-blue-50 p-4">

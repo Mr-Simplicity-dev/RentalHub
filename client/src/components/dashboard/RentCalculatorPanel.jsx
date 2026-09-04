@@ -9,9 +9,11 @@ import {
   FaInfoCircle,
   FaCalculator,
 } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import Loader from '../common/Loader';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../hooks/useAuth';
 
 const formatNgn = (value) =>
   `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
@@ -40,6 +42,7 @@ const FeeRow = ({ label, hint, value }) => (
 
 const RentCalculatorPanel = ({ initialValues = {}, mode = 'public', onPlanReady }) => {
   const { t } = useTranslation();
+  const { isAuthenticated, user } = useAuth();
   const [form, setForm] = useState({
     rent_amount: initialValues.rent_amount || '',
     payment_frequency: initialValues.payment_frequency === 'monthly' ? 'monthly' : 'yearly',
@@ -353,18 +356,18 @@ const RentCalculatorPanel = ({ initialValues = {}, mode = 'public', onPlanReady 
 
             {mode === 'public' && (
               <div className="flex flex-col sm:flex-row gap-3">
-                <a
-                  href="/register"
+                <Link
+                  to={isAuthenticated ? '/dashboard' : '/register'}
                   className="flex-1 rounded-xl border-2 border-primary-600 text-primary-700 font-bold py-3 text-sm text-center hover:bg-primary-50 transition-colors"
                 >
                   {t('dashboardUx.create_savings')}
-                </a>
-                <a
-                  href="/properties"
+                </Link>
+                <Link
+                  to="/properties"
                   className="flex-1 rounded-xl bg-gray-900 text-white font-bold py-3 text-sm text-center hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
                 >
                   {t('dashboardUx.browse_properties')} <FaArrowRight />
-                </a>
+                </Link>
               </div>
             )}
 

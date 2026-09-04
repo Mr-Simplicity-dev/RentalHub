@@ -23,6 +23,7 @@ import {
   FaEnvelope,
   FaCheckCircle,
   FaVideo,
+  FaCalculator,
 } from 'react-icons/fa';
 import { formatCurrency, formatDate } from '../utils/helpers';
 import { useTranslation } from 'react-i18next';
@@ -35,6 +36,14 @@ const PropertyDetail = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
+  const goToCalculator = () => {
+    if (!property) return;
+    const params = new URLSearchParams();
+    if (property.rent_amount) params.set('rent', property.rent_amount);
+    params.set('freq', property.payment_frequency === 'monthly' ? 'monthly' : 'yearly');
+    if (property.state_id) params.set('state', property.state_id);
+    navigate(`/rent-calculator?${params.toString()}`);
+  };
   const { connected: realtimeConnected, startCall } = useSocket();
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -484,6 +493,12 @@ const PropertyDetail = () => {
                       : t('property_detail.month'),
                 })}
               </div>
+              <button
+                onClick={goToCalculator}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm font-semibold text-primary-700 hover:bg-primary-100 transition-colors"
+              >
+                <FaCalculator /> What's this per month & move-in?
+              </button>
             </div>
 
             {/* Features */}

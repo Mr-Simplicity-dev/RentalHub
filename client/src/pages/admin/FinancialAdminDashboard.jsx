@@ -23,6 +23,7 @@ import AdminWithdrawalModal from '../../components/admin/AdminWithdrawalModal';
 import TwoFactorStep from '../../components/common/TwoFactorStep';
 import useRetryableAction from '../../hooks/useRetryableAction';
 import DepartmentSupportEscalations from '../../components/admin/DepartmentSupportEscalations';
+import RentCalculatorFeesAdmin from '../../components/admin/RentCalculatorFeesAdmin';
 
 const FinancialAdminDashboard = () => {
   const navigate = useNavigate();
@@ -413,6 +414,9 @@ const FinancialAdminDashboard = () => {
             isLoading={personalWithdrawAction.isLoading}
             confirmLabel="Submit Withdrawal Request"
           />
+          <div id="lga-finance-calculator-fees" className="mt-4">
+            <RentCalculatorFeesAdmin />
+          </div>
         </div>
       </div>
     );
@@ -600,7 +604,7 @@ const FinancialAdminDashboard = () => {
         <div className="fin-admin-reports-section bg-white rounded-lg shadow">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
-              {['overview', 'transactions', 'state-admins', 'frozen-funds', 'withdrawals', 'support-escalations', 'audit-trail'].map((tab) => (
+              {['overview', 'transactions', 'state-admins', 'frozen-funds', 'withdrawals', 'support-escalations', 'audit-trail', 'calculator-fees'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -1132,6 +1136,12 @@ const FinancialAdminDashboard = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'calculator-fees' && (
+              <div className="fin-admin-calculator-fees-section">
+                <RentCalculatorFeesAdmin />
               </div>
             )}
 

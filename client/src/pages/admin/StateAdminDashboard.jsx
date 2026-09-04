@@ -25,6 +25,7 @@ import useRetryableAction from '../../hooks/useRetryableAction';
 import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdrawalBanner';
 import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequestWorkflowPanel';
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
+import RentCalculatorFeesAdmin from '../../components/admin/RentCalculatorFeesAdmin';
 
 const StateAdminDashboard = ({ initialTab = 'overview' }) => {
   const navigate = useNavigate();
@@ -546,7 +547,7 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
       <div className="state-admin-tools-section bg-white rounded-lg shadow">
         <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
-            {['overview', 'commissions', 'transactions', 'users', 'withdrawals'].map((tab) => (
+            {['overview', 'commissions', 'transactions', 'users', 'withdrawals', 'calculator-fees'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1158,6 +1159,11 @@ const StateAdminDashboard = ({ initialTab = 'overview' }) => {
                   </tbody>
                 </table>
                             </div>
+            </div>
+          )}
+          {activeTab === 'calculator-fees' && (
+            <div className="state-admin-calculator-fees-section space-y-6">
+              <RentCalculatorFeesAdmin />
             </div>
           )}
         </div>

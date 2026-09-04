@@ -17,8 +17,9 @@ import {
 import api from '../../services/api';
 import { paymentService } from '../../services/paymentService';
 import { toast } from 'react-toastify';
+import RentCalculatorPanel from './RentCalculatorPanel';
 
-const TABS = ['overview', 'contribute', 'withdraw', 'history'];
+const TABS = ['overview', 'contribute', 'withdraw', 'history', 'calculator'];
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -259,6 +260,15 @@ export default function RentSavingsModal({ isOpen, onClose, user, properties }) 
     c => c.saved_for_month === currentMonthStr()
   );
 
+  const handleCalculatorPlanReady = ({ target_amount } = {}) => {
+    setShowCreateForm(true);
+    setActiveTab('overview');
+    setCreateForm(prev => ({
+      ...prev,
+      monthly_rent_amount: String(Math.round(Number(target_amount || 0) * 100) / 100 || ''),
+    }));
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -292,13 +302,18 @@ export default function RentSavingsModal({ isOpen, onClose, user, properties }) 
               {tab === 'contribute'  && '💰 Contribute'}
               {tab === 'withdraw'    && '🏦 Withdraw'}
               {tab === 'history'     && '📜 History'}
+              {tab === 'calculator'  && '🧮 Calculator'}
             </button>
           ))}
         </div>
 
         {/* ── Body ───────────────────────────────────────── */}
         <div className="px-6 py-5">
-          {loading ? (
+          {activeTab === 'calculator' ? (
+            <div className="max-h-[65vh] overflow-y-auto">
+              <RentCalculatorPanel mode="savings" onPlanReady={handleCalculatorPlanReady} />
+            </div>
+          ) : loading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto" />
               <p className="text-gray-500 mt-3 text-sm">Loading savings plans…</p>
