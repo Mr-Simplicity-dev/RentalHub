@@ -515,7 +515,7 @@ const Messages = () => {
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Attach file"
+                      title={t('messages.attachment')}
                     >
                       <FaPaperclip size={16} />
                     </button>

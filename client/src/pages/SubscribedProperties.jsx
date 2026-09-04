@@ -111,11 +111,11 @@ const SubscribedProperties = () => {
                   <FaHome className="shrink-0 text-2xl text-primary-600" />
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
-                  {prop.bedrooms && <span>{prop.bedrooms} bed</span>}
-                  {prop.bathrooms && <span>{prop.bathrooms} bath</span>}
+                  {prop.bedrooms && <span>{prop.bedrooms} {t('add_property.form.bedrooms')}</span>}
+                  {prop.bathrooms && <span>{prop.bathrooms} {t('add_property.form.bathrooms')}</span>}
                   {prop.price && (
                     <span className="font-semibold text-gray-700">
-                      ₦{Number(prop.price).toLocaleString()}{prop.price_frequency ? `/${prop.price_frequency}` : ''}
+                      ₦{Number(prop.price).toLocaleString()}{prop.price_frequency ? `/${prop.price_frequency === 'monthly' ? t('dashboardUx.per_month') : t('dashboardUx.per_year')}` : ''}
                     </span>
                   )}
                 </div>

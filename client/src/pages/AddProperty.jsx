@@ -184,7 +184,7 @@ const AddProperty = () => {
           <textarea name="description" value={form.description} onChange={handleChange} className="input" rows="4" placeholder={t('add_property.form.description')} />
           {(user?.preferred_state_id || user?.preferred_lga_name) && (
             <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
-              Your registration location is prefilled below so tenant discovery and landlord posting stay aligned. You can still change it for this property.
+              {t('dashboardUx.registration_prefill')}
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">
@@ -197,7 +197,7 @@ const AddProperty = () => {
               ))}
             </select>
             <select name="lga_name" value={form.lga_name} onChange={handleChange} className="input" disabled={!form.state_id}>
-              <option value="">Select local government area</option>
+              <option value="">{t('add_property.form.lga')}</option>
               {availableLgas.map((lga) => (
                 <option key={lga} value={lga}>
                   {lga}
@@ -220,7 +220,7 @@ const AddProperty = () => {
           </div>
           <input name="amenities" value={form.amenities} onChange={handleChange} className="input" placeholder={t('add_property.form.amenities')} />
           <div className="space-y-2">
-            <label className="text-sm font-medium">Pick Property Location</label>
+            <label className="text-sm font-medium">{t('add_property.form.location')}</label>
             <MapPicker value={form.latitude && form.longitude ? { lat: Number(form.latitude), lng: Number(form.longitude) } : null} onChange={({ lat, lng }) => setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }))} />
             {form.latitude && form.longitude && <p className="text-xs text-gray-500">{Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}</p>}
           </div>
@@ -234,7 +234,7 @@ const AddProperty = () => {
             onTokensChange={setImageCaptureTokens}
             disabled={loading}
           />
-          <div><label className="mb-1 block text-sm font-medium">Short Video Clip</label><input type="file" accept="video/*" onChange={(e) => setVideo(e.target.files?.[0] || null)} /></div>
+          <div><label className="mb-1 block text-sm font-medium">{t('add_property.form.video')}</label><input type="file" accept="video/*" onChange={(e) => setVideo(e.target.files?.[0] || null)} /></div>
           <label className="flex items-center space-x-2"><input type="checkbox" name="is_available" checked={form.is_available} onChange={handleChange} /><span>{t('add_property.form.available')}</span></label>
           <button className="btn btn-primary w-full">{t('add_property.continue')}</button>
         </form>
@@ -243,11 +243,11 @@ const AddProperty = () => {
       {step === 2 && !createdPropertyId && (
         <div className="card space-y-6">
           <div className="space-y-3 text-center">
-            <h2 className="text-xl font-semibold">Verify & Publish Property</h2>
-            <p className="text-sm text-gray-500">Complete the verification step to publish your property listing.</p>
+            <h2 className="text-xl font-semibold">{t('add_property.publish')}</h2>
+            <p className="text-sm text-gray-500">{t('add_property.verify_text')}</p>
             {isAgent && (
               <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-left text-sm text-sky-800">
-                ℹ️ You are adding this property on behalf of your assigned landlord.
+                ℹ️ {t('dashboardUx.assigned_landlord_notice')}
               </div>
             )}
           </div>

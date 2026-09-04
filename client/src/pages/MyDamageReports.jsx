@@ -93,13 +93,13 @@ const MyDamageReports = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
                       <h3 className="text-lg font-semibold text-gray-900">
-                        {report.report_title || `${report.damage_type?.replace(/_/g, ' ')} in ${report.room_location || t('my_damage_reports.unknown')}`}
+                        {report.report_title || `${t(`damage_capture.type_${report.damage_type}`, { defaultValue: report.damage_type?.replace(/_/g, ' ') })} ${t('my_damage_reports.in_label', { defaultValue: 'in' })} ${report.room_location || t('my_damage_reports.unknown_room')}`}
                       </h3>
                       <span className={`rounded-full border px-3 py-0.5 text-xs font-semibold ${SEVERITY_COLORS[report.severity] || 'bg-gray-100 text-gray-700'}`}>
-                        {report.severity}
+                        {t(`damage_capture.sev_${report.severity}`, { defaultValue: report.severity })}
                       </span>
                       <span className={`rounded-full border px-3 py-0.5 text-xs font-semibold ${STATUS_COLORS[report.status] || ''}`}>
-                        {report.status}
+                        {t(`dashboardUx.damage_${report.status}`, { defaultValue: report.status })}
                       </span>
                     </div>
                     <p className="mt-2 text-sm text-gray-600 line-clamp-2">{report.description}</p>

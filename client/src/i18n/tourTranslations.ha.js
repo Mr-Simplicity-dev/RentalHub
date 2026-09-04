@@ -2,7 +2,7 @@ const tourHaTranslations = {
   titleTranslations: {
     'Your Properties': 'Gidajen Ka', 'Property Location': 'Wurin Gida', 'Wallet & Payments': 'Wallet & Biyan Kuɗi',
     'Recent Activity': 'Ayyuka Na Baya-Bayan Nan', 'Quick Actions': 'Ayyuka Masu Sauri', 'Request Legal Help': 'Nemi Taimakon Shari\'a',
-    'Chat Support': 'Tallafin Hira', 'Your Listings': 'Jerin Gidajen Ka', Messages: 'Saƙonni', Withdrawals: 'Cire Kuɗi',
+    'Chat Support': 'Tallafin Hira', 'Your Listings': 'Jerin Gidajen Ka', Messages: 'Saƙonni', Withdrawals: 'Cire Kuɗi', 'Rent Payment Withdrawals': 'Cire Kuɗin Biyan Haya',
     'State Migration': 'Ƙaura Na Jiha', 'Assigned Landlord': 'Mai Gida Da Aka Sanya', 'Agent Tools': 'Kayan Aikin Wakili',
     'Your Profile': 'Bayanan Kanka', 'Active Cases': 'Shari\'o\'i Masu Aiki', 'Evidence Review': 'Duba Shaida',
     'Your Clients': 'Abokan Cinikinka', Earnings: 'Abin Da Aka Samu', 'User Management': 'Sarrafa Masu Amfani',

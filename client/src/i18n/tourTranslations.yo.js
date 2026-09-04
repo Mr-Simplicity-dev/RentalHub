@@ -9,7 +9,7 @@ const tourYoTranslations = {
     'Chat Support': 'Ìrànwọ́ Ìfọ̀rọ̀wérọ̀',
     'Your Listings': 'Àwọn Àkójọ Rẹ',
     Messages: 'Àwọn Ifiranṣẹ́',
-    Withdrawals: 'Yíyọ̀ọ́ Owó',
+    Withdrawals: 'Yíyọ̀ọ́ Owó', 'Rent Payment Withdrawals': 'Yíyọ̀ọ́ Owó Ìsanwó Yíyà',
     'State Migration': 'Ìyípòdà Ìpínlẹ̀',
     'Assigned Landlord': 'Onílé Tí A Yàn',
     'Agent Tools': 'Àwọn Ẹrọ Aṣojú',

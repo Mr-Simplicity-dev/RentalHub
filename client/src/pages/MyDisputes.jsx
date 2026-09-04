@@ -115,10 +115,10 @@ const MyDisputes = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
                       <h3 className="text-lg font-semibold text-gray-900 truncate">
-                        {dispute.title || `Dispute #${dispute.id}`}
+                        {dispute.title || `${t('my_disputes.dispute_prefix')}${dispute.id}`}
                       </h3>
                       <span className={`rounded-full border px-3 py-0.5 text-xs font-semibold ${STATUS_COLORS[dispute.status] || 'bg-gray-100 text-gray-700'}`}>
-                        {dispute.status?.replace(/_/g, ' ')}
+                        {t(`my_disputes.status_${dispute.status}`, { defaultValue: dispute.status?.replace(/_/g, ' ') })}
                       </span>
                       {dispute.is_legally_sealed && (
                         <span className="rounded-full border border-purple-200 bg-purple-100 px-3 py-0.5 text-xs font-semibold text-purple-700">
@@ -141,7 +141,7 @@ const MyDisputes = () => {
                       <span>
                         <span className="font-medium text-gray-700">{t('my_disputes.priority')}:</span>{' '}
                         <span className={PRIORITY_COLORS[dispute.priority] || ''}>
-                          {dispute.priority}
+                          {t(`dashboardUx.priority_${dispute.priority}`, { defaultValue: dispute.priority })}
                         </span>
                       </span>
                       <span>{new Date(dispute.created_at).toLocaleDateString()}</span>

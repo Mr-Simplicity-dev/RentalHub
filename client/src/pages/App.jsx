@@ -66,6 +66,7 @@ const HowItWorks = React.lazy(() => import('./HowItWorks'));
 const AboutUs = React.lazy(() => import('./AboutUs'));
 const ListProperty = React.lazy(() => import('./ListProperty'));
 const Pricing = React.lazy(() => import('./Pricing'));
+const RentCalculatorPage = React.lazy(() => import('./RentCalculatorPage'));
 const Careers = React.lazy(() => import('./Careers'));
 const LandlordGuide = React.lazy(() => import('./LandlordGuide'));
 const VerifyEmail = React.lazy(() => import('./VerifyEmail'));
@@ -740,6 +741,7 @@ function App() {
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/pricing-plans" element={<Navigate to="/pricing" replace />} />
+              <Route path="/rent-calculator" element={<RentCalculatorPage />} />
               <Route path="/careers" element={<Careers />} />
               <Route path="/career" element={<Navigate to="/careers" replace />} />
               <Route path="/landlord-guide" element={<LandlordGuide />} />

@@ -240,7 +240,7 @@ const PaymentHistory = () => {
                           onClick={() => openReceipt(group)}
                           className="mt-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
                         >
-                          <FaReceipt className="mr-1.5" /> View Receipt
+                          <FaReceipt className="mr-1.5" /> {t('wallet.view_receipt')}
                         </button>
                       )}
                       {first.payment_status === 'pending' && PAYMENT_TYPES_WITH_RETRY.includes(first.payment_type) && (
@@ -318,7 +318,7 @@ const PaymentHistory = () => {
                         onClick={() => openReceipt(group)}
                         className="mt-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
                       >
-                        <FaReceipt className="mr-1.5" /> View Receipt
+                        <FaReceipt className="mr-1.5" /> {t('wallet.view_receipt')}
                       </button>
                     )}
                   </div>
@@ -346,7 +346,7 @@ const PaymentHistory = () => {
                   className="mx-auto h-10 w-10 rounded-xl object-contain"
                 />
                 <h2 className="mt-2 text-lg font-bold text-gray-900">RentalHub NG</h2>
-                <p className="text-xs text-gray-500">Official Payment Receipt</p>
+                <p className="text-xs text-gray-500">{t('wallet.receipt')}</p>
                 <p className="mt-1 text-xs font-semibold text-gray-700">
                   {formatReceiptNumber(selectedReceipt)}
                 </p>

@@ -57,13 +57,13 @@ const MyProperties = () => {
                 <div className="font-semibold">{p.title}</div>
                 <div className="text-sm text-gray-600">{p.city}, {p.state_name}</div>
                 {isRejected && p.rejection_reason && (
-                  <p className="mt-1 text-xs text-red-600">Reason: {p.rejection_reason}</p>
+                  <p className="mt-1 text-xs text-red-600">{t('appeal.reason_label')} {p.rejection_reason}</p>
                 )}
               </div>
               <div className="flex items-center gap-3">
                 <span className={`text-sm capitalize ${isRejected ? 'text-red-600 font-medium' : ''}`}>
                   {isRejected
-                    ? 'Rejected'
+                    ? t('verification_status.rejected_title')
                     : p.is_verified
                       ? (p.is_available ? t('my_properties.available') : t('my_properties.unavailable'))
                       : t('my_properties.pending_verification')}
@@ -73,7 +73,7 @@ const MyProperties = () => {
                     onClick={() => setAppealProperty(p)}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
                   >
-                    <FaGavel size={11} /> Appeal
+                    <FaGavel size={11} /> {t('appeal.submit')}
                   </button>
                 )}
               </div>

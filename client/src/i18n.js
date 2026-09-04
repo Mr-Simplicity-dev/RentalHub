@@ -10,6 +10,7 @@ import ha from "./i18n/ha.json";
 import yo from "./i18n/yo.json";
 import ig from "./i18n/ig.json";
 import tourTranslations from './i18n/tourTranslations';
+import dashboardUxTranslations from './i18n/dashboardUxTranslations';
 
 const SUPPORTED_LANGUAGES = ['en', 'ru', 'fr', 'ar', 'zh', 'ha', 'yo', 'ig'];
 
@@ -24,14 +25,14 @@ const getInitialLanguage = () => {
 
 i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: { ...en, tour: tourTranslations.en } },
-    ru: { translation: { ...ru, tour: tourTranslations.ru } },
-    fr: { translation: { ...fr, tour: tourTranslations.fr } },
-    ar: { translation: { ...ar, tour: tourTranslations.ar } },
-    zh: { translation: { ...zh, tour: tourTranslations.zh } },
-    ha: { translation: { ...ha, tour: tourTranslations.ha } },
-    yo: { translation: { ...yo, tour: tourTranslations.yo } },
-    ig: { translation: { ...ig, tour: tourTranslations.ig } }
+    en: { translation: { ...en, ...dashboardUxTranslations.en, tour: tourTranslations.en } },
+    ru: { translation: { ...ru, ...dashboardUxTranslations.ru, tour: tourTranslations.ru } },
+    fr: { translation: { ...fr, ...dashboardUxTranslations.fr, tour: tourTranslations.fr } },
+    ar: { translation: { ...ar, ...dashboardUxTranslations.ar, tour: tourTranslations.ar } },
+    zh: { translation: { ...zh, ...dashboardUxTranslations.zh, tour: tourTranslations.zh } },
+    ha: { translation: { ...ha, ...dashboardUxTranslations.ha, tour: tourTranslations.ha } },
+    yo: { translation: { ...yo, ...dashboardUxTranslations.yo, tour: tourTranslations.yo } },
+    ig: { translation: { ...ig, ...dashboardUxTranslations.ig, tour: tourTranslations.ig } }
   },
   lng: getInitialLanguage(),
   fallbackLng: "en",

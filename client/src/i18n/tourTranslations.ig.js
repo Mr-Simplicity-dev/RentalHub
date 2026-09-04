@@ -1,7 +1,7 @@
 const titleTranslations = {
   'Your Properties': 'Ụlọ Gị', 'Property Location': 'Ọnọdụ Ụlọ', 'Wallet & Payments': 'Akpa Ego & Ịkwụ Ụgwọ',
   'Recent Activity': 'Ihe Omume Na-Adịbeghị Anya', 'Quick Actions': 'Ihe Omume Ngwa', 'Request Legal Help': 'Rịọ Enyemaka Iwu',
-  'Chat Support': 'Nkwado Mkparịta Ụka', 'Your Listings': 'Mbipụta Gị', Messages: 'Ozi', Withdrawals: 'Iwepụ Ego',
+  'Chat Support': 'Nkwado Mkparịta Ụka', 'Your Listings': 'Mbipụta Gị', Messages: 'Ozi', Withdrawals: 'Iwepụ Ego', 'Rent Payment Withdrawals': 'Iwepụ Ego Ịkwụ Ụgwọ Ụlọ',
   'State Migration': 'Mmalite Ọhụrụ Steeti', 'Assigned Landlord': 'Onye Nwe Ụlọ E Kenye', 'Agent Tools': 'Ngwaọrụ Onye Ọrụ',
   'Your Profile': 'Nkọwa Onwe Gị', 'Active Cases': 'Ikpe Na-Arụ Ọrụ', 'Evidence Review': 'Nyocha Ihe Akaebe',
   'Your Clients': 'Ndị Ahịa Gị', Earnings: 'Ego Ị Na-Enweta', 'User Management': 'Njikwa Ndị Ọrụ',

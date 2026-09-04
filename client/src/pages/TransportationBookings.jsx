@@ -271,7 +271,7 @@ const TransportationBookings = () => {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    {status === 'all' ? t('transportation_bookings.all_bookings') : status.replace('_', ' ').toUpperCase()}
+                    {status === 'all' ? t('transportation_bookings.all_bookings') : t(`dashboardUx.transport_${status}`, { defaultValue: status.replace('_', ' ').toUpperCase() })}
                   </button>
                 ))}
               </div>

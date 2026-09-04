@@ -43,6 +43,21 @@ const flattenObject = (value, prefix = '') => Object.entries(value || {}).flatMa
   },
 );
 
+const extractDashboardSteps = (config, dashboardName) => {
+  const start = config.indexOf(`${dashboardName}: [`);
+  assert.notEqual(start, -1, `${dashboardName} must be configured`);
+  const end = config.indexOf('\n  ],', start);
+  assert.notEqual(end, -1, `${dashboardName} must have a closed step list`);
+  return config.slice(start, end);
+};
+
+const extractStepTitles = (source) => collectMatches(source, /\btitle:\s*['"]([^'"]+)['"]/g);
+
+const hasExplicitTitleTranslation = (source, title) => {
+  const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:['"]${escapedTitle}['"]|\\b${escapedTitle}\\b)\\s*:`).test(source);
+};
+
 test('every configured web tour step has a unique id and a real target', () => {
   const configPath = path.join(WEB_SOURCE, 'config', 'tourConfig.js');
   const config = read(configPath);
@@ -143,6 +158,28 @@ test('web tour dictionaries have complete keys and real translations', () => {
       `${code} must contain real translations instead of mostly English fallbacks`,
     );
   }
+});
+
+test('tenant and landlord dashboard tours have explicit eight-language step titles', () => {
+  const config = read(path.join(WEB_SOURCE, 'config', 'tourConfig.js'));
+  const dashboardTitles = [
+    ...extractStepTitles(extractDashboardSteps(config, 'TENANT_DASHBOARD')),
+    ...extractStepTitles(extractDashboardSteps(config, 'LANDLORD_DASHBOARD')),
+  ];
+  const translationSources = {
+    fr: read(path.join(WEB_SOURCE, 'i18n', 'tourTranslations.js')),
+    ar: read(path.join(WEB_SOURCE, 'i18n', 'tourTranslations.js')),
+    ru: read(path.join(WEB_SOURCE, 'i18n', 'tourTranslations.js')),
+    zh: read(path.join(WEB_SOURCE, 'i18n', 'tourTranslations.js')),
+    ha: read(path.join(WEB_SOURCE, 'i18n', 'tourTranslations.ha.js')),
+    yo: read(path.join(WEB_SOURCE, 'i18n', 'tourTranslations.yo.js')),
+    ig: read(path.join(WEB_SOURCE, 'i18n', 'tourTranslations.ig.js')),
+  };
+
+  Object.entries(translationSources).forEach(([locale, source]) => {
+    const missing = dashboardTitles.filter((title) => !hasExplicitTitleTranslation(source, title));
+    assert.deepEqual(missing, [], `${locale} must explicitly translate tenant and landlord dashboard step titles`);
+  });
 });
 
 test('every configured native target is registered outside the mobile tour config', () => {

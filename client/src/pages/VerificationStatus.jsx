@@ -311,12 +311,12 @@ const VerificationStatus = () => {
                           }}
                           className={inputClass('nin')}
                           autoComplete="off"
-                          placeholder="Enter 11-digit NIN"
+                          placeholder={t('verification_status.nin_placeholder')}
                         />
                         {fieldErrors.nin && <p className="mt-1 text-xs text-red-500">{fieldErrors.nin}</p>}
                       </label>
                       <label className="text-sm font-medium text-gray-700">
-                        Date of birth
+                        {t('verification_status.date_of_birth')}
                         <input
                           type="date"
                           value={revalidationForm.date_of_birth}

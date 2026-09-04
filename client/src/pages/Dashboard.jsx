@@ -35,6 +35,7 @@ import {
   FaGavel,
   FaKey,
   FaTicketAlt,
+  FaCalculator,
 
 } from 'react-icons/fa';
 import Loader from '../components/common/Loader';
@@ -1481,7 +1482,7 @@ const Dashboard = () => {
             <div className="flex flex-col items-center">
               <FaClock className="text-blue-600 text-2xl mb-3" />
               <h3 className="font-semibold text-blue-800">
-                Verification Submitted
+                {t('dashboardUx.verification_submitted')}
               </h3>
               <p className="text-sm text-blue-700 mt-2">
                 Your passport was submitted. It is pending admin review.
@@ -1490,7 +1491,7 @@ const Dashboard = () => {
                 onClick={() => navigate('/verification-status')}
                 className="mt-3 text-sm font-semibold text-blue-800 hover:text-blue-900"
               >
-                View Verification Status →
+                {t('dashboardUx.view_verification')} →
               </button>
             </div>
           </div>
@@ -1501,7 +1502,7 @@ const Dashboard = () => {
             <div className="flex flex-col items-center">
               <FaClock className="text-red-600 text-2xl mb-3" />
               <h3 className="font-semibold text-red-800">
-                Verification Rejected
+                {t('dashboardUx.verification_rejected')}
               </h3>
               <p className="text-sm text-red-700 mt-2">
                 Your verification was rejected. Review your details and upload a new live passport photo.
@@ -1537,7 +1538,7 @@ const Dashboard = () => {
             <div className="flex flex-col items-center">
               <FaCheckCircle className="text-blue-600 text-2xl mb-3" />
               <h3 className="font-semibold text-blue-800">
-                Pay Per Property Details
+                {t('dashboardUx.pay_property_details')}
               </h3>
               <p className="text-sm text-blue-700 mt-2 text-center">
                 Save properties first, then pay to unlock each property's full details and landlord contact.
@@ -1546,7 +1547,7 @@ const Dashboard = () => {
                 onClick={() => navigate('/properties')}
                 className="mt-4 btn btn-primary text-sm"
               >
-                Browse Properties
+                {t('dashboardUx.browse_properties')}
               </button>
             </div>
           </div>
@@ -1602,8 +1603,15 @@ const Dashboard = () => {
                 dataTourId="stat-savings"
               />
               <StatCard
+                icon={<FaCalculator className="text-violet-500" />}
+                title="Rent Calculator"
+                value="Plan your rent"
+                onClick={() => navigate('/rent-calculator')}
+                dataTourId="stat-calculator"
+              />
+              <StatCard
                 icon={<FaMoneyBillWave className="text-orange-500" />}
-                title="Refund Requests"
+                title={t('dashboardUx.refund_requests')}
                 value={stats?.refund_requests_count || 0}
                 onClick={openRefundModal}
                 note={refundCountdown?.label}
@@ -1612,7 +1620,7 @@ const Dashboard = () => {
               />
               <StatCard
                 icon={<FaClock className="text-indigo-500" />}
-                title="Grace Requests"
+                title={t('dashboardUx.grace_requests')}
                 value={tenantGraceStatValue}
                 onClick={openGraceModal}
                 note={graceCountdown?.label}
@@ -1621,7 +1629,7 @@ const Dashboard = () => {
               />
               <StatCard
                 icon={<FaWallet className="text-teal-500" />}
-                title="Wallet Balance"
+                title={t('dashboardUx.available_withdraw')}
                 className="tour-wallet"
                 value={walletBalance !== null ? `₦${Number(walletBalance).toLocaleString()}` : '—'}
                 onClick={openWithdrawModal}
@@ -1684,7 +1692,7 @@ const Dashboard = () => {
               />
               <StatCard
                 icon={<FaClock className="text-indigo-500" />}
-                title="Subscription"
+                title={t('dashboardUx.subscription')}
                 value={getTenantSubscriptionValue()}
                 onClick={() => navigate('/subscribe')}
                 dataTourId="stat-subscription"
@@ -1703,7 +1711,7 @@ const Dashboard = () => {
               <div>
                 <div className={`flex items-center gap-2 ${hasActivePropertyLocation ? 'text-emerald-700' : 'text-gray-500'}`}>
                   {hasActivePropertyLocation ? <FaMapMarkedAlt /> : <FaLock />}
-                  <h2 className="text-lg font-bold text-gray-900">Property Location</h2>
+                  <h2 className="text-lg font-bold text-gray-900">{t('dashboardUx.property_location')}</h2>
                 </div>
                 <p className="mt-1 text-sm text-gray-600">
                   {hasActivePropertyLocation
@@ -1732,7 +1740,7 @@ const Dashboard = () => {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className={`truncate font-semibold ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
-                          {property.title || 'Property location'}
+                          {property.title || t('dashboardUx.property_location')}
                         </p>
                         <p className="mt-1 break-words text-sm text-gray-600">
                           {getPropertyMapAddress(property) ||
@@ -1885,7 +1893,7 @@ const Dashboard = () => {
           <div className="tour-landlord-withdrawal-notice bg-green-50 border border-green-200 rounded-lg px-5 py-4 mb-8 flex items-start gap-3">
             <FaMoneyBillWave className="text-green-600 text-xl mt-0.5 shrink-0" />
             <div>
-              <p className="font-semibold text-green-800 text-sm">Rent Payment Withdrawals</p>
+              <p className="font-semibold text-green-800 text-sm">{t('dashboardUx.withdrawal_notice')}</p>
               <p className="text-green-700 text-sm mt-1">
                 Rent payments collected through the platform are held for <strong>14 working days</strong> before
                 they are released to your account. This period allows time for any tenant refund requests to be
@@ -1933,26 +1941,26 @@ const Dashboard = () => {
                 onClick={() => navigate('/properties')}
               />
               <QuickActionCard
-                title="Saved Properties"
-                description="Check properties you saved for shortlist"
+                title={t('dashboardUx.saved_properties')}
+                description={t('dashboardUx.saved_properties_desc')}
                 icon={<FaHeart />}
                 onClick={() => navigate('/saved-properties')}
               />
               <QuickActionCard
-                title="Payment History"
-                description="Track your property detail unlock payments"
+                title={t('dashboardUx.payment_history')}
+                description={t('dashboardUx.payment_history_desc')}
                 icon={<FaFileAlt />}
                 onClick={() => navigate('/payment-history')}
               />
               <QuickActionCard
-                title="My Disputes"
-                description="View and manage disputes you are involved in"
+                title={t('dashboardUx.my_disputes')}
+                description={t('my_disputes.desc')}
                 icon={<FaBalanceScale />}
                 onClick={() => navigate('/my-disputes')}
                 dataTourId="action-disputes"
               />
               <QuickActionCard
-                title="Damage Reports"
+                title={t('dashboardUx.damage_reports')}
                 description={
                   user?.user_type === 'landlord'
                     ? 'View damage reports for your properties'
@@ -1963,27 +1971,27 @@ const Dashboard = () => {
                 dataTourId="action-damage"
               />
               <QuickActionCard
-                title="Subscription"
+                title={t('dashboardUx.subscription')}
                 description="View Super Admin priced monthly access and multiple property add-on"
                 icon={<FaClock />}
                 onClick={() => navigate('/subscribe')}
               />
               <QuickActionCard
-                title="Subscribed Properties"
+                title={t('dashboardUx.saved_properties')}
                 description="View properties you have unlocked access to"
                 icon={<FaKey />}
                 onClick={() => navigate('/subscribed-properties')}
                 dataTourId="action-subscribed"
               />
               <QuickActionCard
-                title="Request Legal Help"
+                title={t('dashboardUx.legal_help')}
                 description="Get qualified legal assistance for your rental issues"
                 icon={<FaGavel />}
                 onClick={() => navigate('/legal-support')}
                 className="tour-legal-help"
               />
               <QuickActionCard
-                title="Help & Support"
+                title={t('dashboardUx.support')}
                 description="Submit a support ticket or view your requests"
                 icon={<FaTicketAlt />}
                 onClick={() => navigate('/support')}
@@ -2083,7 +2091,7 @@ const Dashboard = () => {
                 onClick={() => navigate('/applications')}
               />
               <QuickActionCard
-                title="Refund Requests"
+                title={t('dashboardUx.refund_requests')}
                 description="Review and approve or reject tenant refund requests"
                 icon={<FaUndo />}
                 onClick={() => openLandlordRefundModal('pending')}
@@ -2091,7 +2099,7 @@ const Dashboard = () => {
                 noteClass={refundCountdown?.className}
               />
               <QuickActionCard
-                title="Grace Requests"
+                title={t('dashboardUx.grace_requests')}
                 description="Review tenant-requested grace periods after admin enablement"
                 icon={<FaClock />}
                 onClick={() => openLandlordGraceModal('enabled')}
@@ -2099,26 +2107,26 @@ const Dashboard = () => {
                 noteClass={graceCountdown?.className}
               />
               <QuickActionCard
-                title="My Disputes"
+                title={t('dashboardUx.my_disputes')}
                 description="View and manage disputes you are involved in"
                 icon={<FaBalanceScale />}
                 onClick={() => navigate('/my-disputes')}
               />
               <QuickActionCard
-                title="Damage Reports"
+                title={t('dashboardUx.damage_reports')}
                 description="View damage reports for your properties"
                 icon={<FaTools />}
                 onClick={() => navigate('/my-damage-reports')}
               />
               <QuickActionCard
-                title="Request Legal Help"
+                title={t('dashboardUx.legal_help')}
                 description="Get qualified legal assistance for your rental issues"
                 icon={<FaGavel />}
                 onClick={() => navigate('/legal-support')}
                 className="tour-legal-help"
               />
               <QuickActionCard
-                title="Help & Support"
+                title={t('dashboardUx.support')}
                 description="Submit a support ticket or view your requests"
                 icon={<FaTicketAlt />}
                 onClick={() => navigate('/support')}
@@ -2136,7 +2144,7 @@ const Dashboard = () => {
                 onClick={openFundModal}
               />
               <QuickActionCard
-                title="Subscription"
+                title={t('dashboardUx.subscription')}
                 description="Renew your Super Admin priced monthly landlord access"
                 icon={<FaClock />}
                 onClick={() => navigate('/subscribe')}

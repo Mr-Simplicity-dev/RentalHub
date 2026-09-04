@@ -13,7 +13,7 @@ const titleTranslations = {
   fr: {
     'Your Properties': 'Vos propriétés', 'Property Location': 'Emplacement du bien', 'Wallet & Payments': 'Portefeuille et paiements',
     'Recent Activity': 'Activité récente', 'Quick Actions': 'Actions rapides', 'Request Legal Help': 'Demander une aide juridique',
-    'Chat Support': 'Assistance par chat', 'Your Listings': 'Vos annonces', Messages: 'Messages', Withdrawals: 'Retraits',
+    'Chat Support': 'Assistance par chat', 'Your Listings': 'Vos annonces', Messages: 'Messages', Withdrawals: 'Retraits', 'Rent Payment Withdrawals': 'Retraits des paiements de loyer',
     'State Migration': 'Changement d’État', 'Assigned Landlord': 'Propriétaire assigné', 'Agent Tools': 'Outils de l’agent',
     'Your Profile': 'Votre profil', 'Active Cases': 'Dossiers actifs', 'Evidence Review': 'Examen des preuves',
     'Your Clients': 'Vos clients', Earnings: 'Revenus', 'User Management': 'Gestion des utilisateurs',
@@ -62,7 +62,7 @@ const titleTranslations = {
   ar: {
     'Your Properties': 'عقاراتك', 'Property Location': 'موقع العقار', 'Wallet & Payments': 'المحفظة والمدفوعات',
     'Recent Activity': 'النشاط الأخير', 'Quick Actions': 'إجراءات سريعة', 'Request Legal Help': 'طلب مساعدة قانونية',
-    'Chat Support': 'دعم المحادثة', 'Your Listings': 'إعلاناتك', Messages: 'الرسائل', Withdrawals: 'عمليات السحب',
+    'Chat Support': 'دعم المحادثة', 'Your Listings': 'إعلاناتك', Messages: 'الرسائل', Withdrawals: 'عمليات السحب', 'Rent Payment Withdrawals': 'سحوبات مدفوعات الإيجار',
     'State Migration': 'تغيير الولاية', 'Assigned Landlord': 'المالك المعيّن', 'Agent Tools': 'أدوات الوكيل',
     'Your Profile': 'ملفك الشخصي', 'Active Cases': 'القضايا النشطة', 'Evidence Review': 'مراجعة الأدلة',
     'Your Clients': 'عملاؤك', Earnings: 'الأرباح', 'User Management': 'إدارة المستخدمين',
@@ -104,7 +104,7 @@ const titleTranslations = {
   ru: {
     'Your Properties': 'Ваши объекты', 'Property Location': 'Расположение объекта', 'Wallet & Payments': 'Кошелёк и платежи',
     'Recent Activity': 'Последние действия', 'Quick Actions': 'Быстрые действия', 'Request Legal Help': 'Запросить юридическую помощь',
-    'Chat Support': 'Поддержка в чате', 'Your Listings': 'Ваши объявления', Messages: 'Сообщения', Withdrawals: 'Вывод средств',
+    'Chat Support': 'Поддержка в чате', 'Your Listings': 'Ваши объявления', Messages: 'Сообщения', Withdrawals: 'Вывод средств', 'Rent Payment Withdrawals': 'Вывод арендных платежей',
     'State Migration': 'Смена штата', 'Assigned Landlord': 'Назначенный арендодатель', 'Agent Tools': 'Инструменты агента',
     'Your Profile': 'Ваш профиль', 'Active Cases': 'Активные дела', 'Evidence Review': 'Проверка доказательств',
     'Your Clients': 'Ваши клиенты', Earnings: 'Доходы', 'User Management': 'Управление пользователями',
@@ -149,7 +149,7 @@ const titleTranslations = {
   zh: {
     'Your Properties': '您的房源', 'Property Location': '房源位置', 'Wallet & Payments': '钱包与付款', 'Recent Activity': '近期活动',
     'Quick Actions': '快捷操作', 'Request Legal Help': '申请法律帮助', 'Chat Support': '在线客服', 'Your Listings': '您的发布',
-    Messages: '消息', Withdrawals: '提现', 'State Migration': '州属变更', 'Assigned Landlord': '已分配房东', 'Agent Tools': '代理工具',
+    Messages: '消息', Withdrawals: '提现', 'Rent Payment Withdrawals': '租金付款提现', 'State Migration': '州属变更', 'Assigned Landlord': '已分配房东', 'Agent Tools': '代理工具',
     'Your Profile': '您的资料', 'Active Cases': '进行中的案件', 'Evidence Review': '证据审查', 'Your Clients': '您的客户', Earnings: '收益',
     'User Management': '用户管理', 'Properties Management': '房源管理', Applications: '申请', 'Pending Verifications': '待处理验证',
     'Administration Tools': '管理工具', 'Transaction Management': '交易管理', 'State Admin Performance': '州管理员绩效',
