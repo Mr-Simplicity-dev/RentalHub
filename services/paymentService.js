@@ -3120,6 +3120,244 @@ exports.initializeRentPayment = async (req, res) => {
 
 
 
+// ================= OPTION 2: PAY RENT ON BEHALF =================
+// Tenant A creates a one-time link; any logged-in user (another tenant, or a
+// landlord paying for a child who is a tenant) pays A's rent. The payment row
+// belongs to tenant A (ownership/history/crediting follow A); payer_user_id
+// records who actually paid.
+
+const getActiveRentPaymentRequest = async (token) => {
+  const result = await db.query(
+    `SELECT r.id, r.tenant_user_id, r.property_id, r.amount, r.status, r.expires_at,
+            t.email AS tenant_email, t.full_name AS tenant_name
+     FROM rent_payment_requests r
+     JOIN users t ON t.id = r.tenant_user_id
+     WHERE r.token = $1`,
+    [String(token || '').trim()]
+  );
+  return result.rows[0] || null;
+};
+
+exports.createRentPaymentRequest = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    const tenantUserId = req.user.id;
+    const propertyId = Number(req.body.property_id);
+
+    const propertyResult = await db.query(
+      `SELECT id, landlord_id, title, rent_amount, payment_frequency
+       FROM properties WHERE id = $1`,
+      [propertyId]
+    );
+    const property = propertyResult.rows[0];
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found.' });
+    }
+    const rent = Number(property.rent_amount);
+    if (!Number.isFinite(rent) || rent <= 0) {
+      return res.status(400).json({ success: false, message: 'This property has no listed rent yet.' });
+    }
+
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+    const result = await db.query(
+      `INSERT INTO rent_payment_requests (tenant_user_id, property_id, amount, token, expires_at)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, amount, token, expires_at`,
+      [tenantUserId, propertyId, rent, token, expiresAt]
+    );
+    const created = result.rows[0];
+
+    return res.json({
+      success: true,
+      message: 'Rent payment link created. Share it with the person who will pay.',
+      data: {
+        request_id: created.id,
+        amount: Number(created.amount),
+        expires_at: created.expires_at,
+        token: created.token,
+        link: `${FRONTEND_URL}/pay-for-rent/${created.token}`,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Create rent payment request error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to create the rent payment link.' });
+  }
+};
+
+exports.getRentPaymentRequest = async (req, res) => {
+  try {
+    const request = await getActiveRentPaymentRequest(req.params.token);
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Payment link not found.' });
+    }
+    if (request.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'This payment link has already been used.' });
+    }
+    if (new Date(request.expires_at).getTime() < Date.now()) {
+      return res.status(400).json({ success: false, message: 'This payment link has expired. Ask the tenant for a new one.' });
+    }
+    return res.json({
+      success: true,
+      data: {
+        tenant_name: request.tenant_name,
+        property_id: request.property_id,
+        amount: Number(request.amount),
+        expires_at: request.expires_at,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Get rent payment request error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load the payment link.' });
+  }
+};
+
+exports.initializeHelpRentPayment = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    const payerUserId = req.user.id;
+    const paymentMethod = req.body.payment_method;
+    const request = await getActiveRentPaymentRequest(req.params.token);
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Payment link not found.' });
+    }
+    if (request.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'This payment link has already been used.' });
+    }
+    if (new Date(request.expires_at).getTime() < Date.now()) {
+      return res.status(400).json({ success: false, message: 'This payment link has expired. Ask the tenant for a new one.' });
+    }
+
+    const amount = Number(request.amount);
+    const tenantUserId = request.tenant_user_id;
+
+    const payerResult = await db.query(
+      'SELECT email, full_name FROM users WHERE id = $1',
+      [payerUserId]
+    );
+    const payer = payerResult.rows[0];
+    if (!payer) {
+      return res.status(404).json({ success: false, message: 'Payer not found.' });
+    }
+
+    const propertyResult = await db.query(
+      `SELECT p.id, p.landlord_id, p.title,
+              u.email AS landlord_email, u.full_name AS landlord_name
+       FROM properties p
+       JOIN users u ON p.landlord_id = u.id
+       WHERE p.id = $1`,
+      [request.property_id]
+    );
+    const property = propertyResult.rows[0];
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found.' });
+    }
+
+    const platformFee = amount * 0.025;
+    const landlordAmount = amount - platformFee;
+
+    const paymentResult = await db.query(
+      `INSERT INTO payments (user_id, payer_user_id, payment_type, amount, currency,
+                             property_id, payment_method, payment_status)
+       VALUES ($1, $2, 'rent_payment', $3, 'NGN', $4, $5, 'pending')
+       RETURNING id`,
+      [tenantUserId, payerUserId, amount, request.property_id, paymentMethod]
+    );
+    const paymentId = paymentResult.rows[0].id;
+
+    // Single use: mark the link used at initialization so it cannot be replayed.
+    await db.query(
+      `UPDATE rent_payment_requests
+       SET status = 'used', payer_user_id = $2, used_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [request.id, payerUserId]
+    );
+
+    if (paymentMethod === 'paystack') {
+      const paystackResponse = await axios.post(
+        `${PAYSTACK_BASE_URL}/transaction/initialize`,
+        {
+          email: payer.email,
+          amount: amount * 100,
+          reference: `RENT_${paymentId}_${Date.now()}`,
+          callback_url: `${FRONTEND_URL}/payment/verify-rent`,
+          metadata: {
+            payment_id: paymentId,
+            user_id: tenantUserId,
+            payer_user_id: payerUserId,
+            property_id: request.property_id,
+            landlord_id: property.landlord_id,
+            payment_type: 'rent_payment',
+            tenant_name: request.tenant_name,
+            landlord_name: property.landlord_name,
+            property_title: property.title,
+            platform_fee: platformFee,
+            landlord_amount: landlordAmount,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      await db.query(
+        'UPDATE payments SET transaction_reference = $1 WHERE id = $2',
+        [paystackResponse.data.data.reference, paymentId]
+      );
+
+      return res.json({
+        success: true,
+        message: 'Rent payment initialized',
+        data: {
+          payment_id: paymentId,
+          authorization_url: paystackResponse.data.data.authorization_url,
+          access_code: paystackResponse.data.data.access_code,
+          reference: paystackResponse.data.data.reference,
+          total_amount: amount,
+          platform_fee: platformFee,
+          landlord_receives: landlordAmount,
+          paid_on_behalf_of: tenantUserId,
+        },
+      });
+    }
+
+    // bank_transfer: mirror the existing rent payment behaviour.
+    return res.json({
+      success: true,
+      message: 'Please transfer to the account below',
+      data: {
+        payment_id: paymentId,
+        bank_name: 'Your Bank Name',
+        account_number: '1234567890',
+        account_name: 'Rental Hub NG',
+        amount,
+        reference: `RENT_${paymentId}_${Date.now()}`,
+        platform_fee: platformFee,
+        landlord_receives: landlordAmount,
+        paid_on_behalf_of: tenantUserId,
+      },
+    });
+  } catch (error) {
+    req.logger.error('Pay rent on behalf error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to initialize the rent payment.',
+      error: error.message,
+    });
+  }
+};
+
 // Verify rent payment
 exports.verifyRentPayment = async (req, res) => {
   try {
@@ -3144,7 +3382,7 @@ exports.verifyRentPayment = async (req, res) => {
     }
 
     const paymentResult = await db.query(
-      "SELECT * FROM payments WHERE transaction_reference = $1 AND user_id = $2",
+      "SELECT * FROM payments WHERE transaction_reference = $1 AND (user_id = $2 OR payer_user_id = $2)",
       [reference, userId]
     );
 

@@ -154,6 +154,28 @@ router.get('/verify-rent/:reference',
   paymentController.verifyRentPayment
 );
 
+// ============ PAY RENT ON BEHALF (OPTION 2) ============
+// Tenant A generates a one-time link; another tenant or a landlord (e.g. a
+// parent) pays A's rent. Payment is credited to A; payer is recorded.
+
+router.post('/request-rent-payment',
+  authenticate,
+  isTenant,
+  [body('property_id').isInt()],
+  paymentController.createRentPaymentRequest
+);
+
+router.get('/rent-request/:token',
+  authenticate,
+  paymentController.getRentPaymentRequest
+);
+
+router.post('/pay-rent-on-behalf/:token',
+  authenticate,
+  [body('payment_method').isIn(['paystack', 'bank_transfer'])],
+  paymentController.initializeHelpRentPayment
+);
+
 // ============ LANDLORD PROPERTY BILLING ============
 
 router.get('/landlord-property-fee/status',
