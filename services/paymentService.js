@@ -3438,6 +3438,77 @@ exports.getRentHelpEligibleProperties = async (req, res) => {
   }
 };
 
+// Receipts for on-behalf rent payments (payer B paid tenant A's rent). Sends
+// an email to both tenant A (obligor) and payer B. Idempotent via
+// payments.receipts_sent_at so the webhook and verify endpoint never double-send.
+const maybeSendRentOnBehalfReceipts = async (paymentId) => {
+  if (!paymentId) return;
+  try {
+    const result = await db.query(
+      `SELECT p.id, p.user_id, p.payer_user_id, p.amount, p.property_id, p.receipts_sent_at,
+              tenant.email AS tenant_email, tenant.full_name AS tenant_name,
+              payer.email AS payer_email, payer.full_name AS payer_name,
+              prop.title AS property_title
+       FROM payments p
+       JOIN users tenant ON tenant.id = p.user_id
+       LEFT JOIN users payer ON payer.id = p.payer_user_id
+       LEFT JOIN properties prop ON prop.id = p.property_id
+       WHERE p.id = $1 AND p.payment_type = 'rent_payment'
+         AND p.payer_user_id IS NOT NULL
+         AND p.receipts_sent_at IS NULL`,
+      [paymentId]
+    );
+    const payment = result.rows[0];
+    if (!payment || !payment.tenant_email) return;
+
+    const { sendEmail } = require('../config/utils/mailer');
+    const { getFrontendUrl } = require('../config/utils/frontendUrl');
+    const url = `${getFrontendUrl()}/payment-history`;
+    const amount = Number(payment.amount || 0).toLocaleString('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+    });
+    const propertyTitle = payment.property_title || 'your property';
+    const payerLabel = payment.payer_name ? ` (${payment.payer_name})` : '';
+
+    const esc = (value) =>
+      String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const wrap = (heading, body) => `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+        <h2 style="margin-bottom: 8px;">${esc(heading)}</h2>
+        <p>${body}</p>
+        <p><a href="${url}" style="color: #2563eb;">View your payment history</a></p>
+      </div>`;
+
+    await sendEmail({
+      to: payment.tenant_email,
+      subject: 'Someone paid your rent for you',
+      html: wrap(
+        'Your rent was paid',
+        `Your rent of <strong>${amount}</strong> for <strong>${esc(propertyTitle)}</strong> was paid on your behalf${esc(payerLabel)}.`
+      ),
+    });
+
+    if (payment.payer_email) {
+      await sendEmail({
+        to: payment.payer_email,
+        subject: `Receipt: you paid rent on behalf of ${payment.tenant_name || 'a tenant'}`,
+        html: wrap(
+          'Rent payment receipt',
+          `You paid <strong>${amount}</strong> for <strong>${esc(propertyTitle)}</strong> on behalf of <strong>${esc(payment.tenant_name || 'a tenant')}</strong>.`
+        ),
+      });
+    }
+
+    await db.query('UPDATE payments SET receipts_sent_at = CURRENT_TIMESTAMP WHERE id = $1', [payment.id]);
+  } catch (error) {
+    const logger = require('../config/utils/logger');
+    logger.warn('On-behalf rent receipt email failed (non-fatal):', error.message, { paymentId });
+  }
+};
+
 // Verify rent payment
 exports.verifyRentPayment = async (req, res) => {
   try {
@@ -3511,6 +3582,10 @@ exports.verifyRentPayment = async (req, res) => {
     if (!wasAlreadyCompleted) {
       // Calculate commission for rent payment
       await commissionService.processPaymentCommission(payment.id);
+    }
+
+    if (!wasAlreadyCompleted) {
+      await maybeSendRentOnBehalfReceipts(payment.id);
     }
 
      res.json({
@@ -4128,6 +4203,13 @@ async function handleSuccessfulPayment(data, webhookLogger) {
 
     const completedPayment = updateResult.rows[0] || null;
     const paymentId = completedPayment?.id || null;
+
+    // On-behalf rent receipts (idempotent) — never fail the webhook.
+    try {
+      await maybeSendRentOnBehalfReceipts(paymentId);
+    } catch {
+      // Best-effort.
+    }
 
     // Foreign-card adjustment for local-rate registrations: mark the pending
     // registration as having paid the black-market conversion + $5 fee.
