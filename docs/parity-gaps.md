@@ -168,6 +168,23 @@ Committed & pushed:
       not guess-built.
 - [ ] Final: commit/push Batch A–C; builds/deploy remain on your side.
 
+### Latest progress (late 2026-09-04) — #5 & #6
+
+- [x] **#5 Damage + flagged-messages moderation (mobile)** — confirmed the web has NO global damage
+      queue (only per-property list, `/my`, publish/unpublish). Built: backend `PATCH
+      /api/messages/flagged/:messageId/clear` (lga/super) + `clearFlaggedMessage`; mobile
+      `contentModerationService` + `ContentModerationHub` (Flagged-messages tab list+Clear flag; Damage
+      tab driven by property id → per-property reports → Publish/Unpublish via existing endpoints).
+      Registered in SuperAdminRoot, Profile entry (super admin).
+- [x] **#6a File libs installed** — `expo-file-system` + `expo-sharing` added via `npx expo install`
+      (SDK-55 compatible; expo-sharing config plugin added). ⚠️ Requires a native rebuild to activate;
+      PDF save/share path unverified until built.
+- [x] **#6b Voice read-only monitor (mobile)** — `voiceMonitorService` + `VoiceMonitorScreen`
+      (Summary counters `/voice/summary`; Call log `/voice/call-log`; Callbacks `/voice/callbacks`, all
+      mapped to real response fields), registered in SuperAdminRoot, Profile entry (super admin).
+- [ ] Court-bundle PDF save/share — libs installed; endpoint streaming + file writing not yet built
+      (needs the native-file code targeting expo-file-system’s SDK-55 `File` API; build + device QA).
+
 ### Known audit corrections
 
 - Diaspora registration already existed on mobile (audit overstated); only flag-gating/fee display were added.

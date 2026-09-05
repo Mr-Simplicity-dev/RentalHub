@@ -1040,4 +1040,34 @@ exports.getFlaggedMessages = async (req, res) => {
   }
 };
 
+exports.clearFlaggedMessage = async (req, res) => {
+  try {
+    await ensureMessageSchema();
+
+    const userRole = String(req.user.user_type || '').trim().toLowerCase();
+    if (!isLgaAdminRole(userRole) && userRole !== 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { messageId } = req.params;
+    const result = await db.query(
+      `UPDATE messages
+       SET flagged = FALSE,
+           flagged_reason = NULL
+       WHERE id = $1 AND flagged = TRUE
+       RETURNING id`,
+      [messageId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Flagged message not found' });
+    }
+
+    res.json({ success: true, message: 'Flag cleared', data: result.rows[0] });
+  } catch (error) {
+    req.logger.error('Clear flagged message error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to clear flag' });
+  }
+};
+
 module.exports = exports;

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 const messageController = require('../controllers/messageController');
 const { authenticate } = require('../config/middleware/auth');
@@ -99,6 +99,14 @@ router.patch('/escalations/:messageId/ticket-status',
 router.get('/flagged',
   authenticate,
   messageController.getFlaggedMessages
+);
+
+// Clear a flagged message (lga/super admin)
+router.patch('/flagged/:messageId/clear',
+  authenticate,
+  [param('messageId').isInt({ min: 1 })],
+  validateRequest,
+  messageController.clearFlaggedMessage
 );
 
 module.exports = router;
