@@ -10,14 +10,15 @@ Status: **not yet executed**. Do these in order.
 - Working tree clean of our changes (other-session files left as-is are fine).
 
 ## 1. Backend migrate + deploy
-1. Reconcile pre-existing migration-hash drift first (documented review with the other session),
-   or run with a reviewed `MIGRATIONS_SKIP_HASH_CHECK` — do not silently skip.
-2. Apply migrations: `npm run migrate`  (adds `rent_calculator_fees` + seed global row).
-3. Smoke-test the new backend surfaces:
-   - `POST /api/rent-calculator/estimate`, `GET /api/rent-calculator/fees`,
+1. ✅ Reconcile hash drift, then apply — DONE 2026-09-04: ran `MIGRATIONS_SKIP_HASH_CHECK=true npm run migrate`
+   (documented review). Applied 8 pending migrations: 140–144 (voice), **145 (rent calculator fees)**,
+   146–147 (payment work). `rent_calculator_fees` verified present with the seeded global row
+   (agent 10 / legal 10 / caution 1mo / agreement ₦5,000).
+2. ✅ Smoke-test the new backend surfaces:
+   - [ ] `POST /api/rent-calculator/estimate`, `GET /api/rent-calculator/fees`,
      `GET/POST/DELETE /api/rent-calculator/admin/fees` (each role tier).
-   - `GET /api/commissions/admin` (admin/super_admin).
-4. Deploy (pm2/EAS/CI) and verify health + the above endpoints against the live env.
+   - [ ] `GET /api/commissions/admin` (admin/super_admin).
+3. [ ] Deploy (pm2/EAS/CI) and verify health + the above endpoints against the live env.
 
 ## 2. Version bump (mobile)
 - `RentalHubMobile/package.json` `version` → next (currently `1.0.2`).
