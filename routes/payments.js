@@ -170,6 +170,13 @@ router.get('/rent-request/:token',
   paymentController.getRentPaymentRequest
 );
 
+// Properties a tenant may request rent help on (paid before OR landlord-approved).
+router.get('/rent-help/eligible',
+  authenticate,
+  isTenant,
+  paymentController.getRentHelpEligibleProperties
+);
+
 router.post('/pay-rent-on-behalf/:token',
   authenticate,
   [body('payment_method').isIn(['paystack', 'bank_transfer'])],

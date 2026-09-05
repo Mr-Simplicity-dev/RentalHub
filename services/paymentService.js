@@ -3261,6 +3261,32 @@ exports.initializeHelpRentPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Property not found.' });
     }
 
+    // On-behalf must respect the same multiple-property subscription rule as a
+    // normal rent payment, so it cannot be used to bypass that gate.
+    const multiplePropertyRequirement = await resolveTenantMultiplePropertyRequirement({
+      tenantId: tenantUserId,
+      propertyId: request.property_id,
+    });
+    if (multiplePropertyRequirement.required) {
+      const quote = await buildTenantMultiplePropertySubscriptionQuote({ userId: tenantUserId });
+      const funding = await buildSubscriptionFundingSnapshot({
+        userId: tenantUserId,
+        userType: 'tenant',
+        amount: quote.amount,
+      });
+      return res.status(402).json({
+        success: false,
+        code: 'MULTIPLE_PROPERTY_SUBSCRIPTION_REQUIRED',
+        message: `This tenant can rent one property on their account. Activate the multiple property subscription for ${Number(quote.amount).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 })} to rent another property.`,
+        data: {
+          subscription_type: 'multiple_property',
+          rented_properties_count: multiplePropertyRequirement.rented_properties_count,
+          quote,
+          funding,
+        },
+      });
+    }
+
     const platformFee = amount * 0.025;
     const landlordAmount = amount - platformFee;
 
@@ -3355,6 +3381,60 @@ exports.initializeHelpRentPayment = async (req, res) => {
       message: 'Failed to initialize the rent payment.',
       error: error.message,
     });
+  }
+};
+
+// Properties a tenant may request rent help for: (1) properties they already
+// paid rent on, and (2) properties their application was APPROVED for (landlord
+// accepted) but rent is not yet paid. Pending/submitted applications are NOT
+// included. Amounts stay server-computed from each property's listed rent.
+exports.getRentHelpEligibleProperties = async (req, res) => {
+  try {
+    const tenantUserId = req.user.id;
+
+    const paidResult = await db.query(
+      `SELECT DISTINCT p.id AS property_id, p.title, p.rent_amount, 'paid' AS source
+       FROM payments pay
+       JOIN properties p ON p.id = pay.property_id
+       WHERE pay.user_id = $1
+         AND pay.payment_type = 'rent_payment'
+         AND pay.payment_status = 'completed'`,
+      [tenantUserId]
+    );
+
+    const approvedResult = await db.query(
+      `SELECT DISTINCT p.id AS property_id, p.title, p.rent_amount, 'approved' AS source
+       FROM applications a
+       JOIN properties p ON p.id = a.property_id
+       WHERE a.tenant_id = $1
+         AND a.status = 'approved'
+         AND NOT EXISTS (
+           SELECT 1 FROM payments x
+           WHERE x.user_id = $1
+             AND x.property_id = p.id
+             AND x.payment_type = 'rent_payment'
+             AND x.payment_status = 'completed'
+         )`,
+      [tenantUserId]
+    );
+
+    const seen = new Set();
+    const properties = [];
+    for (const row of [...paidResult.rows, ...approvedResult.rows]) {
+      if (seen.has(row.property_id)) continue;
+      seen.add(row.property_id);
+      properties.push({
+        property_id: row.property_id,
+        title: row.title,
+        rent_amount: Number(row.rent_amount || 0),
+        source: row.source,
+      });
+    }
+
+    return res.json({ success: true, data: { properties } });
+  } catch (error) {
+    req.logger.error('Get rent help eligible properties error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load your rent help options.' });
   }
 };
 

@@ -57,6 +57,7 @@ const MyProperties = React.lazy(() => import('./MyProperties'));
 const AddProperty = React.lazy(() => import('./AddProperty'));
 const Subscribe = React.lazy(() => import('./Subscribe'));
 const PayRentOnBehalf = React.lazy(() => import('./PayRentOnBehalf'));
+const RequestRentHelp = React.lazy(() => import('./RequestRentHelp'));
 const PaymentHistory = React.lazy(() => import('./PaymentHistory'));
 const ForgotPassword = React.lazy(() => import('./ForgotPassword'));
 const ResetPassword = React.lazy(() => import('./ResetPassword'));
@@ -918,6 +919,7 @@ function App() {
               <Route path="/add-property" element={<PropertyManagerRoute><AddProperty /></PropertyManagerRoute>} />
               <Route path="/subscribe" element={<ProtectedRoute><Subscribe /></ProtectedRoute>} />
 <Route path="/pay-for-rent/:token" element={<ProtectedRoute><PayRentOnBehalf /></ProtectedRoute>} />
+<Route path="/rent-help" element={<ProtectedRoute><RequestRentHelp /></ProtectedRoute>} />
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
