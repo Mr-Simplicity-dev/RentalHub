@@ -111,12 +111,26 @@ Committed & pushed:
 
 ### B. NOT implemented on mobile — by design / assessed (documented decisions)
 
-- [ ] Public/anonymous survey + location/VPN gate — web-only; mobile survey is authenticated-only.
-- [ ] Forced full-screen Part-A survey overlay parity — mobile uses a dashboard CTA instead.
+- [x] Public/anonymous survey (mobile) — IMPLEMENTED via the same WebView Turnstile approach the web uses:
+      `TurnstileWidget` now supports an `action` (siteverify action binding, matching `/public/gate`
+      `rentalhub_survey_entry` + `/public/submit` `rentalhub_survey`); new `PublicSurveyScreen` runs
+      flags → Turnstile gate → type/contact (name+phone+email) → definition wizard (consent screen-out,
+      multi/likert/text/rank) → final Turnstile + `/public/submit` with idempotency `client_request_id`,
+      handling LOCATION_BLOCKED/DUPLICATE. Registered in Guest stack + deep link `survey`.
+      Note: the server location gate no longer blocks real respondents once enabled — the Survey
+      analytics screen now has an **"Enable survey in all Nigerian LGAs"** action
+      (`/admin/survey/location-config/enable-all`, all 774 LGAs), and the anonymous mobile flow now
+      collects **state + LGA pickers** and sends `state_name`/`lga_name` so nationwide respondents pass.
+      Foreign/VPN IPs remain blocked server-side (same as web).
+- [x] Forced full-screen Part-A survey overlay parity — DONE: tenant/landlord dashboard auto-opens the
+      survey on focus whenever required and Part A is incomplete (reopens until Part A completes).
 - [ ] Damage-report publish/unpublish and `/messages/flagged` moderation — ASSESSED, no clean admin
       list/action endpoint exists; left as a product decision.
-- [ ] Marketing-agent survey dashboard & zonal-admin mobile consoles — `marketing_agent`/`zonal_admin`
-      get a "web console" info screen, not their full web dashboards.
+- [x] Marketing-agent survey dashboard & zonal-admin mobile consoles — DONE (dashboards, not info screens):
+      `MarketingAgentScreen` (captured respondents via `/survey/marketing-agent/overview`) in
+      `MarketingAgentRoot`, and `ZonalAdminScreen` (zone counts + state performance via
+      `/zonal-admin/dashboard`) in `ZonalAdminRoot`. Note: zonal coverage is dashboard-level; the full
+      zonal users/properties/applications/verifications list suite remains web.
 - [ ] Diaspora `FOREIGN_CARD_ADJUSTMENT` second-payment — implemented client-side but NOT verified live.
 
 ### C. Mobile admin — C-1 & rent-savings done; C-3 subset pending product scope
