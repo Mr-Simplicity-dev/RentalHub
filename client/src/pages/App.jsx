@@ -56,6 +56,7 @@ const Messages = React.lazy(() => import('./Messages'));
 const MyProperties = React.lazy(() => import('./MyProperties'));
 const AddProperty = React.lazy(() => import('./AddProperty'));
 const Subscribe = React.lazy(() => import('./Subscribe'));
+const PayRentOnBehalf = React.lazy(() => import('./PayRentOnBehalf'));
 const PaymentHistory = React.lazy(() => import('./PaymentHistory'));
 const ForgotPassword = React.lazy(() => import('./ForgotPassword'));
 const ResetPassword = React.lazy(() => import('./ResetPassword'));
@@ -153,6 +154,7 @@ const ADMIN_SHELL_ROLES = [
   ...SUPER_ADMIN_ROLES,
   'admin',
   'lga_admin',
+  ...ZONAL_ADMIN_ROLES,
   ...FINANCIAL_ADMIN_ROLES,
   ...SUPER_FINANCIAL_ADMIN_ROLES,
   ...STATE_ADMIN_ROLES,
@@ -504,6 +506,10 @@ const PropertyManagerRoute = ({ children }) => {
 
 const AdminHomeRoute = () => {
   const { user } = useAuth();
+
+  if (SUPER_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/super-admin" replace />;
+  }
 
   if (SUPER_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
     return <Navigate to="/admin/super-financial-dashboard" replace />;
@@ -911,6 +917,7 @@ function App() {
               <Route path="/my-properties" element={<PropertyManagerRoute><MyProperties /></PropertyManagerRoute>} />
               <Route path="/add-property" element={<PropertyManagerRoute><AddProperty /></PropertyManagerRoute>} />
               <Route path="/subscribe" element={<ProtectedRoute><Subscribe /></ProtectedRoute>} />
+<Route path="/pay-for-rent/:token" element={<ProtectedRoute><PayRentOnBehalf /></ProtectedRoute>} />
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
