@@ -119,14 +119,40 @@ Committed & pushed:
       get a "web console" info screen, not their full web dashboards.
 - [ ] Diaspora `FOREIGN_CARD_ADJUSTMENT` second-payment — implemented client-side but NOT verified live.
 
-### C. NOT implemented on mobile — lower-priority / web-only admin (still absent)
+### C. Mobile admin — C-1 & rent-savings done; C-3 subset pending product scope
 
-- [ ] Agent commission verify/reverse/payout admin operations.
-- [ ] Rent-savings admin (setup-fee config, early-withdrawal approvals).
+- [x] Rent-savings admin (early-withdrawal approvals) — `RentSavingsAdminScreen` (pending/approved/rejected tabs, approve / reject-with-reason), registered in SuperAdminRoot, Profile entry for `super_admin`.
+- [x] Agent commission admin ops — NEW backend `GET /api/commissions/admin` (agent_commission_ledger joined agent/landlord; admin/super_admin guard) added to `routes/agentCommissions.js` + `controllers/agentCommissionController.js`; mobile `AgentCommissionAdminService` + `AgentCommissionAdminScreen` (status tabs earned/pending_verification/verified/paid/reversed, Verify on pending_verification, Reverse with reason) registered in AdminRoot + SuperAdminRoot, Profile entry for `admin`/`super_admin`.
 - [ ] Super-admin extras: verification reminders, create-admin/role-contract, ad-media uploads,
       survey analytics, email/SMS marketing, ads CRUD, diaspora admin desk, full SEO dashboard,
-      NDPR exports, Twilio PSTN voice desk, dispute court-bundle/seal (all web-only by design, §3c).
-- [ ] `messages/flagged` is a view-only queue (no resolution action).
+      NDPR exports, Twilio PSTN voice desk, dispute court-bundle/seal — **web-only by design (§3c)**;
+      a mobile subset is under scoping discussion (email/SMS campaign builders, SEO crawler,
+      voice desk, court-bundle/NDPR are not realistically mobile-native).
+- [ ] `messages/flagged` is a view-only queue (no resolution action) — not built.
+
+### 5b. Mobile parity batches for the C-3 consoles (in progress)
+
+> Confirmed: C-1 endpoint `GET /api/commissions/admin` is NOT a duplicate (checked backend — no other
+> cross-agent commission list existed; existing `/commissions/summary` aggregate a different ledger).
+
+- [x] Batch A-1 — Admin account creation + verification reminders (`AdminAccountsScreen`: create-admin
+      roles/state/LGA/password via `/admin/create-admin`; send `/super/users/:id/verification-reminder`).
+- [x] Batch A-2 — Ad spaces CRUD — ALREADY present on mobile (`SuperAdminDashboardScreen` `renderAdSpaces`
+      + `superAdminService` create/update/toggle/delete `/super/ad-spaces`); no new code needed.
+- [x] Batch A-3 — Survey analytics (read-only snapshot) — `SurveyAnalyticsScreen` (tenant/landlord tabs,
+      totals/completion/avg-time/states) via `/admin/survey/analysis`.
+- [x] Batch B — `MarketingScreen` (Email/SMS tabs: subscriber/campaign/30-day stats from `/…-marketing/stats`,
+      campaign list w/ status + sent/failed/opened from real `email_campaigns`/`sms_campaigns` columns,
+      Send-on-draft, SMS Retry-on-failed) and `DiasporaDeskScreen` (pending/reviewed/all from
+      `/admin/diaspora/overview` exact fields; Dismiss flag w/ notes → `/admin/diaspora/users/:id/dismiss`).
+      All fields were mapped from backend schema/response shapes (no guessed keys), registered in SuperAdminRoot.
+- [x] Batch C — SEO tools (`SeoToolsScreen`: live page inventory from `/admin/seo` summary + Regenerate
+      sitemap / Run ranking checks / Ping Google) and NDPR personal-data (`PrivacyDataScreen`: read-only
+      field summary from `/export/personal-data`, universal Profile entry).
+- [x] Batch C remaining ASSESSED, web-only: Court-bundle & dispute export return **PDF streams** (no file
+      libs in the app), and the PSTN voice desk monitor has no stable read-only shapes — kept web-only,
+      not guess-built.
+- [ ] Final: commit/push Batch A–C; builds/deploy remain on your side.
 
 ### Known audit corrections
 

@@ -13,6 +13,9 @@ const router = express.Router();
 // Middleware to ensure user is authenticated
 router.use(authenticate);
 
+// Admin commission ledger (admin / super admin)
+router.get('/admin', AgentCommissionController.listCommissions);
+
 // Get agent earnings summary
 router.get('/agents/:agentId/earnings', AgentCommissionController.getEarnings);
 

@@ -336,6 +336,51 @@ class AgentCommissionController {
       });
     }
   }
+
+  /**
+   * List commission ledger for admin moderation (admin / super_admin)
+   */
+  static async listCommissions(req, res) {
+    try {
+      if (req.user.user_type !== 'admin' && req.user.user_type !== 'super_admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to view commissions',
+        });
+      }
+
+      const db = require('../config/middleware/database');
+      const { status } = req.query;
+      const params = [];
+      let whereClause = '';
+      if (status) {
+        params.push(status);
+        whereClause = `WHERE c.status = $${params.length}`;
+      }
+
+      const result = await db.query(
+        `SELECT c.*,
+                agent.full_name AS agent_name,
+                agent.email AS agent_email,
+                landlord.full_name AS landlord_name
+         FROM agent_commission_ledger c
+         JOIN users agent ON agent.id = c.agent_user_id
+         LEFT JOIN users landlord ON landlord.id = c.landlord_user_id
+         ${whereClause}
+         ORDER BY c.created_at DESC
+         LIMIT 300`,
+        params
+      );
+
+      res.json({ success: true, data: result.rows });
+    } catch (error) {
+      req.logger.error(`Error listing commissions: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to list commissions',
+      });
+    }
+  }
 }
 
 module.exports = AgentCommissionController;
