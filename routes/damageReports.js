@@ -45,6 +45,36 @@ router.get(
 	DamageReportController.getMyDamageReports
 );
 
+// Admin-only moderation queue: all damage reports with property + reporter.
+router.get(
+	'/admin',
+	authenticate,
+	async (req, res) => {
+		try {
+			if (req.user.user_type !== 'super_admin') {
+				return res.status(403).json({ success: false, message: 'Super admin access only' });
+			}
+			const db = require('../config/middleware/database');
+			const result = await db.query(
+				`SELECT dr.*,
+				        p.title AS property_title,
+				        p.city, p.area,
+				        COALESCE(u.full_name, l.full_name) AS reporter_name
+				 FROM property_damage_reports dr
+				 JOIN properties p ON p.id = dr.property_id
+				 LEFT JOIN users u ON u.id = dr.created_by_user_id
+				 LEFT JOIN users l ON l.id = dr.landlord_id
+				 ORDER BY dr.created_at DESC
+				 LIMIT 300`
+			);
+			res.json({ success: true, data: result.rows });
+		} catch (error) {
+			req.logger.error('Admin damage reports error:', error);
+			res.status(500).json({ success: false, message: 'Failed to load damage reports' });
+		}
+	}
+);
+
 // Publish damage report (admin only)
 router.post(
 	'/:reportId/publish',
