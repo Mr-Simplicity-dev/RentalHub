@@ -18,6 +18,7 @@ import {
   FaTimes,
   FaExclamationTriangle,
   FaWallet,
+  FaHandshake,
   FaPiggyBank,
   FaUniversity,
   FaThumbsUp,
@@ -2061,6 +2062,12 @@ const Dashboard = () => {
                 description="Add money to your wallet via Paystack"
                 icon={<FaWallet />}
                 onClick={openFundModal}
+              />
+              <QuickActionCard
+                title="Ask Someone to Pay Rent"
+                description="Share a link so a friend or family member can pay your rent"
+                icon={<FaHandshake />}
+                onClick={() => navigate('/rent-help')}
               />
               <QuickActionCard
                 title="Rent Savings"
