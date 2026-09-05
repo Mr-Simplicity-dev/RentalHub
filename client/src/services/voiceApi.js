@@ -245,3 +245,34 @@ export const transferCall = async (callSid, note = '') => {
     body: JSON.stringify({ action: 'transfer', callSid, note: String(note || '').slice(0, 2000) }),
   });
 };
+
+/**
+ * Geographic hand-off UP the ladder (LGA/state agents only): starts a warm
+ * consult with the next tier (target derived on the backend from the agent's
+ * scope). No complaint slip is raised.
+ */
+export const consultUp = async (callSid, note = '') => {
+  if (!callSid) {
+    const error = new Error('Missing call for the hand-off.');
+    error.code = 'VOICE_REQUEST_ERROR';
+    throw error;
+  }
+  const data = await authedFetch('/voice/escalate', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'consult-up', callSid, note: String(note || '').slice(0, 2000) }),
+  });
+  return data?.data?.connected === true;
+};
+
+/** Completes a hand-off: bridges the next tier with the caller; the agent leaves. */
+export const transferUp = async (callSid, note = '') => {
+  if (!callSid) {
+    const error = new Error('Missing call for the hand-off.');
+    error.code = 'VOICE_REQUEST_ERROR';
+    throw error;
+  }
+  return authedFetch('/voice/escalate', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'transfer-up', callSid, note: String(note || '').slice(0, 2000) }),
+  });
+};

@@ -26,6 +26,7 @@ import {
   FaPowerOff,
   FaCheckCircle,
   FaSyncAlt,
+  FaArrowUp,
 } from 'react-icons/fa';
 import useTwilioVoice from '../../hooks/useTwilioVoice';
 import {
@@ -37,6 +38,8 @@ import {
   fetchConsultStatus,
   fetchDepartments,
   transferCall,
+  consultUp,
+  transferUp,
 } from '../../services/voiceApi';
 import { getOriginMeta } from './voiceMeta';
 
@@ -132,6 +135,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
   // department (the ladder's functional axis tops out at super support). LGA/
   // state desks are console-only for their assigned tier line.
   const isSuperScope = deskScopeLevel === 'super';
+  const nextTierLabel = deskScopeLevel === 'lga' ? 'state support' : 'super support';
 
   const [now, setNow] = useState(() => Date.now());
   const [announcement, setAnnouncement] = useState('');
@@ -143,6 +147,11 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
   const [escalateError, setEscalateError] = useState('');
   const [escalateNote, setEscalateNote] = useState('');
   const [consultState, setConsultState] = useState('idle'); // idle | ringing | connected
+  // Geographic hand-up (LGA/state -> next tier): distinct from department consult.
+  const [handUpState, setHandUpState] = useState('idle'); // idle | ringing | connected
+  const [handUpBusy, setHandUpBusy] = useState(false);
+  const [handUpNote, setHandUpNote] = useState('');
+  const [handUpError, setHandUpError] = useState('');
   // Agent line selection (multi-agent) + caller identity + persisted call log.
   const [agentLines, setAgentLines] = useState([]);
   const [agentLine, setAgentLine] = useState('');
@@ -209,6 +218,10 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     setEscalateError('');
     setEscalateDept('');
     setEscalateNote('');
+    setHandUpState('idle');
+    setHandUpBusy(false);
+    setHandUpNote('');
+    setHandUpError('');
   }, [activeCall]);
 
   const getActiveCallSid = useCallback(() => {
@@ -289,6 +302,64 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
       setEscalating(false);
     }
   }, [escalateDept, getActiveCallSid]);
+
+  // ── Geographic hand-up (LGA/state -> next tier) ──────────────────────────
+  // Warm consult with the next tier, then transfer-up (agent leaves). This is
+  // distinct from department escalation and raises no complaint slip.
+  const handleConsultUp = useCallback(async () => {
+    setHandUpBusy(true);
+    setHandUpError('');
+    try {
+      const connected = await consultUp(getActiveCallSid(), handUpNote);
+      setHandUpState(connected ? 'connected' : 'ringing');
+    } catch (err) {
+      setHandUpError(err.message || 'Could not start the hand-off.');
+      setHandUpState('idle');
+    } finally {
+      setHandUpBusy(false);
+    }
+  }, [getActiveCallSid, handUpNote]);
+
+  const handleTransferUp = useCallback(async () => {
+    setHandUpBusy(true);
+    setHandUpError('');
+    try {
+      await transferUp(getActiveCallSid(), handUpNote);
+      setHandUpState('idle');
+    } catch (err) {
+      setHandUpError(err.message || 'Could not complete the hand-off.');
+    } finally {
+      setHandUpBusy(false);
+    }
+  }, [getActiveCallSid, handUpNote]);
+
+  const handleCancelHandUp = useCallback(async () => {
+    setHandUpBusy(true);
+    setHandUpError('');
+    try {
+      await cancelConsult(getActiveCallSid());
+      setHandUpState('idle');
+    } catch (err) {
+      setHandUpError(err.message || 'Could not cancel the hand-off.');
+    } finally {
+      setHandUpBusy(false);
+    }
+  }, [getActiveCallSid]);
+
+  // Poll while a hand-up is ringing: flip to "connected" the moment the next
+  // tier answers, so "Transfer up" becomes available automatically.
+  useEffect(() => {
+    if (handUpState !== 'ringing') return undefined;
+    let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      const connected = await fetchConsultStatus(getActiveCallSid());
+      if (!stopped && connected) setHandUpState('connected');
+    };
+    const poll = setInterval(tick, 4000);
+    tick();
+    return () => { stopped = true; clearInterval(poll); };
+  }, [handUpState, getActiveCallSid]);
 
   // Agent lines (multi-agent): only the super tier may pick an identity line.
   useEffect(() => {
@@ -604,7 +675,72 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
               </button>
             </div>
           </div>
-          {!isQueueLine(activeCall) && (
+          {!isQueueLine(activeCall) && !isSuperScope && geoEnabled && (
+            <div className="mt-4 rounded-xl border border-teal-200 bg-teal-50/50 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
+                Hand off to {nextTierLabel}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {handUpState === 'idle' &&
+                  'The caller is put on hold while the next tier joins privately. No complaint slip is raised.'}
+                {handUpState === 'ringing' && `The ${nextTierLabel} is ringing. Transfer up unlocks when they answer.`}
+                {handUpState === 'connected' &&
+                  `The caller is on hold. Tell the ${nextTierLabel} the story, then press Transfer up.`}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {handUpState === 'idle' ? (
+                  <button
+                    type="button"
+                    onClick={handleConsultUp}
+                    disabled={handUpBusy}
+                    className="inline-flex items-center gap-2 rounded-lg border border-teal-300 bg-white px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-50"
+                  >
+                    {handUpBusy ? <FaSpinner className="animate-spin" size={14} /> : <FaArrowUp size={14} />}
+                    Consult {nextTierLabel}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleTransferUp}
+                      disabled={handUpBusy || handUpState !== 'connected'}
+                      className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                    >
+                      {handUpBusy ? <FaSpinner className="animate-spin" size={14} /> : <FaArrowUp size={14} />}
+                      Transfer up
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelHandUp}
+                      disabled={handUpBusy}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Cancel hand-off
+                    </button>
+                  </>
+                )}
+              </div>
+              {handUpState === 'connected' && (
+                <div className="mt-2">
+                  <label htmlFor="voice-handup-note" className="text-xs font-medium text-slate-600">
+                    Hand-off note (optional — shown to the next tier)
+                  </label>
+                  <textarea
+                    id="voice-handup-note"
+                    value={handUpNote}
+                    onChange={(e) => setHandUpNote(e.target.value)}
+                    rows={2}
+                    maxLength={2000}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-300"
+                  />
+                </div>
+              )}
+              {handUpError && (
+                <p className="mt-2 text-xs text-red-600">{handUpError}</p>
+              )}
+            </div>
+          )}
+          {!isQueueLine(activeCall) && isSuperScope && (
             <div className="mt-4 border-t border-slate-100 pt-3">
               <div className="flex flex-wrap items-center gap-2">
                 <label htmlFor="voice-escalate-department" className="text-xs font-semibold text-slate-600">
