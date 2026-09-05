@@ -84,10 +84,51 @@ downloads/app-links/webhooks (server/SEO/infra).
 - [x] Diaspora `FOREIGN_CARD_ADJUSTMENT` (mobile): when paid-registration completion returns HTTP 402 `FOREIGN_CARD_ADJUSTMENT`, `RegisterScreen` now shows a modal (amount + FX explanation) with "Pay foreign-card adjustment" → `authService.payForeignCardAdjustment` → opens Paystack `authorization_url` via `Linking`, then "I have finished paying — finish registration" re-runs completion. ⚠️ Needs real-Paystack QA (device + live/foreign test card) to verify end-to-end.
 - [x] §3a-1 Survey participation (mobile, authenticated): `surveyService` (my-status/definition/start/save/complete-part-a/complete), `SurveyScreen` wizard rendering the definition-driven questionnaire (single/consent screen-out, multi, likert, text, rank via `rankSource` when options empty, `maxPicks`), sequential Part A gate → Part B resume → final `complete` with `time_spent_seconds`; debounced autosave; registered in Tenant + Landlord stacks; Dashboard shows a required/continue survey card (`my-status` on focus). Known deviations: mobile uses a dashboard CTA (not the web's forced full-screen Part A overlay), and anonymous/public survey + location gate remain web-only (mobile is authenticated-only).
   - §3a user-facing gap set is now CLOSED.
-  - Remaining open from the wider audit: §3b admin-action gaps (inspections actions, state/finance admin screens, super-admin ratings/credential-revalidation queues), build/deploy (migration 145 apply, fresh APK/iOS + `uploads/app.apk`), and no commits made.
+  - Remaining open from the wider audit: §3b admin-action gaps (inspections actions, state/finance admin screens, super-admin ratings/credential-revalidation queues) — all closed in the status log below; build/deploy and QA remain (see §5).
 - [x] §3b inspections actions (mobile): `AdminInspectionsScreen` rewritten — per-item Assign-to-me (from paid/pending), Start (optional note), Complete (required summary + optional note) and Cancel (required reason) with a prompt modal, calling `/admin/inspections/:id/{assign,start,complete,cancel}`; ownership-scoped button visibility; reloads on focus.
 - [x] §3b ratings moderation + credential-revalidation queue (mobile): `superModerationService` + `ModerationHubScreen` (two tabs) — ratings list (`/super/platform-ratings`) with Approve/Hide/Reject (+ optional note) via `/super/platform-ratings/:id/moderate`; credential-revalidation submissions (`/super/credential-revalidations`) with Approve / Return(reject, required note) via `/super/credential-revalidations/:id/review`. Registered in SuperAdminRoot; entry on Profile (super admin only).
 - [x] §3b state-admin finance (mobile): `stateAdminService` finance methods + `StateAdminFinanceScreen` — tabs for commission summary (`/state-admin/commissions/summary`), state transactions (`/state-admin/transactions`), withdrawal history (`/state-admin/withdrawals`), and a payout request form (`/state-admin/withdraw`) with the two-factor (428 → TOTP/SMS) step reusing `WithdrawalFactorModal`. Registered in StateAdminRoot; entry on Profile for state admins.
 - [x] §3b financial-admin state management + commission-rate (mobile): `financialAdminService` methods (list/create/manage-funds/commission-rate) + `FinanceStateAdminScreen` — state-admin list with wallet/rate/commissions, per-admin Set rate (1–20%) and Freeze/Unfreeze (reason required), and (super-admin only) a Create state-admin form. Registered in SuperAdminRoot + FinancialAdminRoot; Profile entries for `super_admin`/`super_financial_admin`. Note: create is guarded to `super_admin` per backend `requireSuperAdmin`; manage/rate are `super_admin`/`super_financial_admin`.
 - [x] §3b damage-report + messages-flagged moderation (mobile) — ASSESSED, NOT BUILT: `/messages/flagged` is a view-only admin list (`lga_admin`/`super_admin`) with **no admin resolution endpoint** (the only delete is sender-only), and damage-report publish/unpublish/update/delete has **no all-reports admin list** (property-scoped only, owner/super-admin/agent permission model). No clean mobile workflow exists to mirror → left as a product decision rather than speculative UI.
-  - §3b is now otherwise complete. Remaining open: build/deploy (migration 145 apply, fresh APK/iOS + `uploads/app.apk`), device/live QA notes, and no commits made.
+  - §3b is now otherwise complete. Committed & pushed — see §5 for the full NOT-implemented list.
+
+## 5. Status: committed + what is NOT implemented (as of 2026-09-04)
+
+> Sections 2–4 above are the audit *snapshot* (pre-fix). Current state = this section +
+> the status log. Web/backend rent-calculator work was committed before this session.
+
+Committed & pushed:
+- Mobile `RentalHubApp` → `97be478` (parent submodule pointer updated), pushed to `master`.
+- Parent `RentalHub` → `ae80653`, pushed to `master`.
+
+### A. NOT implemented — ship/release blockers (need your environment, not code)
+
+- [ ] Migration `migrations/145_rent_calculator_fees.sql` applied (dry-run still blocked by pre-existing hash drift).
+- [ ] Fresh Android build (APK + Play `.aab`) and iOS build (EAS/Xcode) from current source.
+- [ ] `uploads/app.apk` replaced (still the 26-Aug artifact, no rent calculator inside).
+- [ ] Version bump (`1.0.2`, `versionCode`/`buildNumber`).
+- [ ] Device + live QA: Paystack **foreign-card adjustment**, SMS/TOTP withdrawal flows, survey wizard, and all new screens.
+
+### B. NOT implemented on mobile — by design / assessed (documented decisions)
+
+- [ ] Public/anonymous survey + location/VPN gate — web-only; mobile survey is authenticated-only.
+- [ ] Forced full-screen Part-A survey overlay parity — mobile uses a dashboard CTA instead.
+- [ ] Damage-report publish/unpublish and `/messages/flagged` moderation — ASSESSED, no clean admin
+      list/action endpoint exists; left as a product decision.
+- [ ] Marketing-agent survey dashboard & zonal-admin mobile consoles — `marketing_agent`/`zonal_admin`
+      get a "web console" info screen, not their full web dashboards.
+- [ ] Diaspora `FOREIGN_CARD_ADJUSTMENT` second-payment — implemented client-side but NOT verified live.
+
+### C. NOT implemented on mobile — lower-priority / web-only admin (still absent)
+
+- [ ] Agent commission verify/reverse/payout admin operations.
+- [ ] Rent-savings admin (setup-fee config, early-withdrawal approvals).
+- [ ] Super-admin extras: verification reminders, create-admin/role-contract, ad-media uploads,
+      survey analytics, email/SMS marketing, ads CRUD, diaspora admin desk, full SEO dashboard,
+      NDPR exports, Twilio PSTN voice desk, dispute court-bundle/seal (all web-only by design, §3c).
+- [ ] `messages/flagged` is a view-only queue (no resolution action).
+
+### Known audit corrections
+
+- Diaspora registration already existed on mobile (audit overstated); only flag-gating/fee display were added.
+- Mobile rank questions resolve options via `rankSource` (web renderer has a latent bug here).
