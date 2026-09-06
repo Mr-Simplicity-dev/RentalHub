@@ -324,7 +324,7 @@ const useTwilioVoice = () => {
       setStatus('error');
       teardown();
     }
-  }, [connectToQueue, refreshToken, teardown]);
+  }, [connectToQueue, refreshToken, teardown, scheduleQueueReconnect]);
 
   // Cleanup when the component unmounts or the admin logs out.
   const isLoggedOut = !isAuthenticated || !user;
