@@ -66,9 +66,6 @@ const useTwilioVoice = () => {
   const [deskScopeLevel, setDeskScopeLevel] = useState('super');
   const [geoEnabled, setGeoEnabled] = useState(false);
 
-  const isQueueCall = (call) =>
-    String(call?.parameters?.To || call?.customParameters?.To || '').toLowerCase().startsWith('queue:');
-
   const syncRefs = () => {
     incomingRef.current = incomingCall;
     activeCallRef.current = activeCall;

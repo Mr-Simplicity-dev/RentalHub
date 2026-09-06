@@ -1,4 +1,4 @@
-﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // SupportVoiceDesk â€” internal Twilio browser calling workspace for the Super
 // Support Admin dashboard. Complements the ticket workspace; tickets remain
 // the source of truth for support work.
@@ -137,7 +137,7 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
   const isSuperScope = deskScopeLevel === 'super';
   const nextTierLabel = deskScopeLevel === 'lga' ? 'state support' : 'super support';
 
-  const [now, setNow] = useState(() => Date.now());
+  const [, setNow] = useState(0); // ticker only — forces the elapsed timers to re-render
   const [announcement, setAnnouncement] = useState('');
 
   // Department escalation state (warm transfer: consult â†’ transfer).
