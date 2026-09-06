@@ -191,7 +191,7 @@ router.get('/app-version', (req, res) => {
   const latestVersion =
     process.env.MOBILE_LATEST_VERSION ||
     process.env.MOBILE_ANDROID_LATEST_VERSION ||
-    '1.0.2';
+    '1.0.0';
   const minimumVersion =
     process.env.MOBILE_MINIMUM_VERSION ||
     process.env.MOBILE_ANDROID_MINIMUM_VERSION ||
