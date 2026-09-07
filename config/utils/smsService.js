@@ -93,6 +93,9 @@ function getSmsProviderOrder() {
 function getTwilioConfig() {
   const accountSid = cleanEnv(process.env.TWILIO_ACCOUNT_SID);
   const authToken = cleanEnv(process.env.TWILIO_AUTH_TOKEN);
+  // API key preferred over the master Auth Token (least privilege + revocable).
+  const apiKeySid = cleanEnv(process.env.TWILIO_API_KEY);
+  const apiKeySecret = cleanEnv(process.env.TWILIO_API_SECRET);
   const from = cleanEnv(process.env.TWILIO_FROM || process.env.TWILIO_PHONE_NUMBER);
   const messagingServiceSid = cleanEnv(process.env.TWILIO_MESSAGING_SERVICE_SID);
 
@@ -100,8 +103,8 @@ function getTwilioConfig() {
     throw new Error('TWILIO_ACCOUNT_SID is not set in environment variables');
   }
 
-  if (!authToken) {
-    throw new Error('TWILIO_AUTH_TOKEN is not set in environment variables');
+  if (!authToken && !(apiKeySid && apiKeySecret)) {
+    throw new Error('TWILIO_AUTH_TOKEN (or TWILIO_API_KEY + TWILIO_API_SECRET) is not set in environment variables');
   }
 
   if (!from && !messagingServiceSid) {
@@ -111,6 +114,8 @@ function getTwilioConfig() {
   return {
     accountSid,
     authToken,
+    apiKeySid,
+    apiKeySecret,
     from,
     messagingServiceSid,
     baseUrl: cleanEnv(process.env.TWILIO_BASE_URL || DEFAULT_TWILIO_BASE_URL).replace(/\/+$/, ''),
@@ -565,8 +570,9 @@ async function sendViaTwilio(to, message, options = {}) {
     body.toString(),
     {
       auth: {
-        username: config.accountSid,
-        password: config.authToken,
+        // API key (SK...) credentials when configured; master Auth Token otherwise.
+        username: config.apiKeySid || config.accountSid,
+        password: config.apiKeySecret || config.authToken,
       },
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

@@ -260,10 +260,18 @@ const findDepartment = (name) =>
 let twilioRestClient = null;
 const getTwilioRestClient = () => {
   if (!twilioRestClient) {
-    twilioRestClient = new twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
+    if (process.env.TWILIO_API_KEY && process.env.TWILIO_API_SECRET) {
+      twilioRestClient = new twilio(
+        process.env.TWILIO_API_KEY,
+        process.env.TWILIO_API_SECRET,
+        { accountSid: process.env.TWILIO_ACCOUNT_SID }
+      );
+    } else {
+      twilioRestClient = new twilio(
+        process.env.TWILIO_ACCOUNT_SID,
+        process.env.TWILIO_AUTH_TOKEN
+      );
+    }
   }
   return twilioRestClient;
 };
