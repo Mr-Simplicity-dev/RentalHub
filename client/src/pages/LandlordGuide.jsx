@@ -576,7 +576,7 @@ const LandlordGuide = () => {
                 </div>
               </a>
               <a
-                href="tel:+2348030601238"
+                href="tel:+234+1 447 747 4743"
                 className="flex items-center gap-4 p-6 rounded-2xl bg-gray-50 hover:bg-primary-50 border border-gray-100 hover:border-primary-200 transition-all duration-300 group"
               >
                 <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">

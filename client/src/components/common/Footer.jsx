@@ -123,11 +123,11 @@ const Footer = () => {
               </li>
               <li>
                 <FooterContact
-                  href="tel:+234 8030601238"
+                  href="tel:+234 +1 447 747 4743"
                   enabled={mobileContactLinksEnabled}
                 >
                   <FaPhoneAlt className="text-primary-400 mt-1 shrink-0" />
-                  <span dir="ltr" className="inline-block">+234 8030601238</span>
+                  <span dir="ltr" className="inline-block">+234 +1 447 747 4743</span>
                 </FooterContact>
               </li>
               <li>

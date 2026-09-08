@@ -358,7 +358,7 @@ const Privacy = () => {
                     <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('privacy.scope.privacy_email', 'Privacy email')}</span>
                     <span className="mt-1 block break-all font-bold text-primary-800">support@rentalhub.com.ng</span>
                   </a>
-                  <a href="tel:+2348030601238" className="rounded-xl bg-slate-50 p-4 transition hover:bg-primary-50">
+                  <a href="tel:+234+1 447 747 4743" className="rounded-xl bg-slate-50 p-4 transition hover:bg-primary-50">
                     <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('privacy.scope.telephone', 'Telephone')}</span>
                     <span className="mt-1 block font-bold text-primary-800">+234 803 060 1238</span>
                   </a>
@@ -623,7 +623,7 @@ const Privacy = () => {
                     <span className="mt-1 block break-all font-extrabold text-slate-950">support@rentalhub.com.ng</span>
                   </a>
                   <a
-                    href="tel:+2348030601238"
+                    href="tel:+234+1 447 747 4743"
                     className="group rounded-2xl border border-primary-100 bg-primary-50 p-5 transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-primary-200"
                   >
                     <FaPhoneAlt className="text-xl text-primary-700" aria-hidden="true" />
