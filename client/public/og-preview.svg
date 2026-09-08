@@ -52,7 +52,7 @@
   </g>
 
   <text x="420" y="248" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="76" font-weight="800" fill="#ffffff" letter-spacing="-1.5" filter="url(#textGlow)">RentalHub</text>
-  <text x="800" y="248" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="76" font-weight="300" fill="#facc15" letter-spacing="-1.5" filter="url(#textGlow)">NG</text>
+  <text x="800" y="248" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="76" font-weight="300" fill="#facc15" letter-spacing="-1.5" filter="url(#textGlow)">&#160;NG</text>
 
   <rect x="420" y="272" width="64" height="4" rx="2" fill="#22c55e"/>
 
