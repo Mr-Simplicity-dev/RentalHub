@@ -114,6 +114,7 @@ const FloatingContactWidget = () => {
 
   const listRef = useRef(null);
   const widgetRef = useRef(null);
+  const rootRef = useRef(null);
   const typingTimer = useRef(null);
   const typingThrottleRef = useRef(null);
   const guestTypingThrottleRef = useRef(null);
@@ -263,6 +264,11 @@ const FloatingContactWidget = () => {
     if (!open) return;
     let mounted = true;
     const handler = (e) => {
+      // Ignore clicks inside the widget — including the floating button, which
+      // sits OUTSIDE the dialog panel. Treating the button as "outside" made it
+      // impossible to collapse the panel (mousedown closed it, then the click
+      // re-opened it).
+      if (rootRef.current?.contains(e.target)) return;
       if (widgetRef.current && !widgetRef.current.contains(e.target)) handleClose();
     };
     const timer = setTimeout(() => { if (mounted) document.addEventListener('mousedown', handler); }, 0);
@@ -746,7 +752,7 @@ const FloatingContactWidget = () => {
 
   return (
     <WidgetErrorBoundary name="FloatingContactWidget">
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+      <div ref={rootRef} className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
         <AnimatePresence>
           {!open && showGreeting && (
             <motion.div
