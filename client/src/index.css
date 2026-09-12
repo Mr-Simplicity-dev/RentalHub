@@ -190,7 +190,7 @@
 
     .ad-marquee-item {
       flex-shrink: 0;
-      width: min(74vw, 560px);
+      width: min(62vw, 340px);
       max-width: 100%;
     }
   }
