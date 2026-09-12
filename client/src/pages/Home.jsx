@@ -235,22 +235,22 @@ const Home = () => {
 
             <form
               onSubmit={handleSearch}
-              className="mx-auto mb-8 flex w-full max-w-2xl min-w-0 flex-col gap-2 rounded-2xl bg-white/95 p-2 shadow-elevated-lg backdrop-blur animate-fadeInUp sm:flex-row sm:items-center"
+              className="mx-auto mb-8 flex w-full max-w-2xl min-w-0 flex-row items-center gap-2 rounded-2xl bg-white/95 p-1.5 shadow-elevated-lg backdrop-blur animate-fadeInUp sm:p-2"
             >
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('home.search_placeholder')}
-                className="w-full min-w-0 max-w-full flex-1 rounded-xl border-0 bg-transparent px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 sm:text-base"
+                className="w-full min-w-0 max-w-full flex-1 rounded-xl border-0 bg-transparent px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 sm:px-4 sm:py-3 sm:text-base"
               />
               <button
                 type="submit"
                 aria-label={t('home.search')}
-                className="inline-flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:w-auto sm:text-base"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-600 px-0 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:h-12 sm:w-auto sm:px-6 sm:text-base"
               >
                 <FaSearch className="shrink-0" />
-                <span>{t('home.search')}</span>
+                <span className="hidden sm:inline">{t('home.search')}</span>
               </button>
             </form>
 
