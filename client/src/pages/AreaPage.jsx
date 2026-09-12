@@ -20,7 +20,7 @@ export default function AreaPage() {
 
     const loadPage = async () => {
       try {
-        const response = await fetch(`/areas/${stateSlug}/${citySlug}/${areaSlug}`, {
+        const response = await fetch(`/api/areas/${stateSlug}/${citySlug}/${areaSlug}`, {
           headers: { Accept: 'application/json' },
         });
         const payload = await response.json();

@@ -723,6 +723,7 @@ app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
 app.use('/api/rent-calculator', generalOpsLimiter, rentCalculatorRoutes);
 app.use('/api/admin/inspections', adminLimiter, adminInspectionRoutes);
 app.use('/api', generalOpsLimiter, appealRoutes);
+app.use('/api', generalOpsLimiter, locationRoutes);
 
 if (hasClientBuild) {
   app.use(express.static(clientBuildPath));

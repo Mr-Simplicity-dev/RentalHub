@@ -54,7 +54,7 @@ export default function LocationPage() {
         setError('');
 
         const response = await fetch(
-          lgaSlug ? `/nigeria/${stateSlug}/${lgaSlug}` : `/nigeria/${stateSlug}`,
+          lgaSlug ? `/api/nigeria/${stateSlug}/${lgaSlug}` : `/api/nigeria/${stateSlug}`,
           { headers: { Accept: 'application/json' } }
         );
 
