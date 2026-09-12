@@ -245,7 +245,7 @@ const AdSpace = ({
             <div
               className={`shrink-0 overflow-hidden bg-gray-100 ${
                 isMarquee
-                  ? 'w-20 h-12 sm:w-28 sm:h-14 md:w-52 md:h-20'
+                  ? 'w-24 sm:w-32 md:w-56'
                   : hasMultipleAds
                     ? 'h-40'
                     : 'h-40 md:h-auto md:w-56 lg:w-72'
@@ -259,14 +259,14 @@ const AdSpace = ({
               />
             </div>
           ) : ad.media_type === 'video' && failedMedia[ad.id] ? (
-            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-20 h-12 sm:w-28 sm:h-14 md:w-52 md:h-20' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
+            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-24 sm:w-32 md:w-56' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
               <MediaErrorFallback type="video" title={ad.title} />
             </div>
           ) : ad.image_url && !failedMedia[ad.id] ? (
             <div
               className={`shrink-0 overflow-hidden bg-gray-100 ${
                 isMarquee
-                  ? 'w-20 h-12 sm:w-28 sm:h-14 md:w-52 md:h-20'
+                  ? 'w-24 sm:w-32 md:w-56'
                   : hasMultipleAds
                     ? 'h-40'
                     : 'h-40 md:h-auto md:w-56 lg:w-72'
@@ -281,7 +281,7 @@ const AdSpace = ({
               />
             </div>
           ) : ad.image_url && failedMedia[ad.id] ? (
-            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-20 h-12 sm:w-28 sm:h-14 md:w-52 md:h-20' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
+            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-24 sm:w-32 md:w-56' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
               <MediaErrorFallback type="image" title={ad.title} />
             </div>
           ) : null}
