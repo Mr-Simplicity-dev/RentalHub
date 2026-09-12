@@ -293,7 +293,7 @@ const Home = () => {
         </div>
       </section>
 
-      <AdSpace placement="home_top" variant="marquee" className="bg-white py-6" />
+      <AdSpace placement="home_top" variant="marquee" className="bg-white py-4" />
 
       {/* Features */}
       <section
@@ -362,7 +362,7 @@ const Home = () => {
         </div>
       </section>
 
-      <AdSpace placement="home_featured" variant="marquee" className="bg-slate-50 pb-8" />
+      <AdSpace placement="home_featured" variant="marquee" className="bg-slate-50 pb-5" />
 
       {/* Popular Locations */}
       <section

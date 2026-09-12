@@ -296,7 +296,7 @@ const AdSpace = ({
             <div
               className={`shrink-0 overflow-hidden bg-gray-100 ${
                 isMarquee
-                  ? 'w-20 sm:w-28 md:w-56'
+                  ? 'w-16 sm:w-24 md:w-56'
                   : hasMultipleAds
                     ? 'h-40'
                     : 'h-40 md:h-auto md:w-56 lg:w-72'
@@ -310,14 +310,14 @@ const AdSpace = ({
               />
             </div>
           ) : ad.media_type === 'video' && failedMedia[ad.id] ? (
-            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-20 sm:w-28 md:w-56' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
+            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-16 sm:w-24 md:w-56' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
               <MediaErrorFallback type="video" title={ad.title} />
             </div>
           ) : ad.image_url && !failedMedia[ad.id] ? (
             <div
               className={`shrink-0 overflow-hidden bg-gray-100 ${
                 isMarquee
-                  ? 'w-20 sm:w-28 md:w-56'
+                  ? 'w-16 sm:w-24 md:w-56'
                   : hasMultipleAds
                     ? 'h-40'
                     : 'h-40 md:h-auto md:w-56 lg:w-72'
@@ -332,12 +332,12 @@ const AdSpace = ({
               />
             </div>
           ) : ad.image_url && failedMedia[ad.id] ? (
-            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-20 sm:w-28 md:w-56' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
+            <div className={`shrink-0 overflow-hidden ${isMarquee ? 'w-16 sm:w-24 md:w-56' : 'h-40 md:h-auto md:w-56 lg:w-72'}`}>
               <MediaErrorFallback type="image" title={ad.title} />
             </div>
           ) : null}
 
-          <div className={`flex flex-1 flex-col justify-center gap-2.5 ${isMarquee ? 'min-h-[92px] p-3.5 sm:p-4 md:p-6' : 'min-h-[140px] p-5 md:p-6'}`}>
+          <div className={`flex flex-1 flex-col justify-center gap-2 ${isMarquee ? 'min-h-[78px] p-3 sm:p-4 md:p-6' : 'min-h-[140px] p-5 md:p-6'}`}>
             <div className={`flex flex-wrap items-center gap-2 ${isMarquee ? 'text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400' : 'text-xs font-semibold uppercase tracking-wide opacity-75'}`}>
               {isMarquee && (
                 <span

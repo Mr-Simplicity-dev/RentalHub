@@ -190,8 +190,13 @@
 
     .ad-marquee-item {
       flex-shrink: 0;
-      width: min(62vw, 340px);
+      width: min(52vw, 300px);
       max-width: 100%;
+    }
+
+    .ad-marquee-group {
+      gap: 0.75rem;
+      padding-right: 0.75rem;
     }
   }
 
