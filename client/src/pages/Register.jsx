@@ -1039,7 +1039,7 @@ return (
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
           <div className="flex shrink-0 items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">
                 {t('register.modal_before')}
               </p>
               <h2 className="mt-1 text-xl font-bold text-gray-900">
@@ -1082,7 +1082,7 @@ return (
           {resumePayment.authorization_url ? (
             <a
               href={resumePayment.authorization_url}
-              className="mt-5 block w-full rounded-xl bg-indigo-600 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700"
+              className="mt-5 block w-full rounded-xl bg-primary-600 py-3 text-center text-sm font-semibold text-white hover:bg-primary-700"
             >
               Pay Now
             </a>
@@ -1119,7 +1119,7 @@ return (
                 setForeignIpBlocked('');
                 setShowRegistrationFeeModal(true);
               }}
-              className="block w-full rounded-xl bg-indigo-600 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700"
+              className="block w-full rounded-xl bg-primary-600 py-3 text-center text-sm font-semibold text-white hover:bg-primary-700"
             >
               {t('register.foreign_ip_diaspora', 'Continue as a diaspora account (USD)')}
             </button>
@@ -1206,7 +1206,7 @@ return (
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
           <div className="flex shrink-0 items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">
                 {t('register.otp_before')}
               </p>
               <h2 className="mt-1 text-xl font-bold text-gray-900">
@@ -1235,7 +1235,7 @@ return (
             value={otpCode}
             onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
             placeholder="••••••"
-            className="mt-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="mt-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
           />
 
           <button
@@ -1255,7 +1255,7 @@ return (
                 setOtpSending(false);
               }
             }}
-            className="mt-3 block w-full rounded-xl py-2.5 text-center text-sm font-semibold text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+            className="mt-3 block w-full rounded-xl py-2.5 text-center text-sm font-semibold text-primary-600 hover:bg-primary-50 disabled:opacity-50"
           >
             {otpSending
               ? t('register.otp_sending')
@@ -1297,7 +1297,7 @@ return (
                 setOtpCompleting(false);
               }
             }}
-            className="mt-2 block w-full rounded-xl bg-indigo-600 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="mt-2 block w-full rounded-xl bg-primary-600 py-3 text-center text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
           >
             {otpCompleting
               ? t('register.otp_completing')
@@ -1311,7 +1311,7 @@ return (
         <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white p-6 shadow-2xl">
           <div className="flex shrink-0 items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">
                 {t('register.modal_before')}
               </p>
               <h2 className="mt-1 text-xl font-bold text-gray-900">
@@ -1336,8 +1336,8 @@ return (
               </p>
             </div>
 
-            <div className="rounded-lg border border-purple-100 bg-purple-50 p-3">
-              <p className="font-semibold text-purple-900">{t('register.modal_landlord')}</p>
+            <div className="rounded-lg border border-primary-100 bg-primary-50 p-3">
+              <p className="font-semibold text-primary-900">{t('register.modal_landlord')}</p>
               <p className="mt-1">
                 {t('register.modal_landlord_desc')} <strong>{formatNaira(LANDLORD_REGISTRATION_FEE)}</strong>.
               </p>
@@ -1421,15 +1421,26 @@ return (
     )}
 
     {/* LEFT PANEL */}
-    <div className="hidden md:flex w-1/2 bg-gradient-to-br from-indigo-600 to-purple-600 text-white items-center justify-center">
-      <div className="text-center space-y-6 max-w-md px-10">
+    <div className="relative hidden w-1/2 overflow-hidden bg-slate-950 text-white md:flex">
+      <img
+        src="/login-terrace.avif"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-primary-900/80 to-primary-700/80" />
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-primary-500/20 blur-3xl" />
+        <div className="absolute -bottom-28 -right-24 h-96 w-96 rounded-full bg-state-500/10 blur-3xl" />
+      </div>
+      <div className="relative flex w-full flex-col items-center justify-center space-y-6 px-10 text-center">
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl flex items-center justify-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/10 backdrop-blur-xl">
             <img src="/rentalhub-mark.svg" className="h-12 w-12 rounded-xl object-contain shadow-sm" alt={t('register.logo_alt')} />
           </div>
         </div>
-        <h1 className="text-4xl font-bold">{t('register.left_panel_title')}</h1>
-        <p className="text-white/80">
+        <h1 className="max-w-md text-4xl font-extrabold leading-tight tracking-tight">{t('register.left_panel_title')}</h1>
+        <p className="max-w-md text-lg text-primary-100">
           {t('register.left_panel_desc')}
         </p>
         <p className="text-sm text-white/60">
@@ -1439,20 +1450,20 @@ return (
     </div>
 
     {/* RIGHT PANEL */}
-    <div className="flex w-full md:w-1/2 items-center justify-center px-6">
-      <div className="w-full max-w-2xl bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl space-y-6">
+    <div className="flex w-full items-center justify-center px-6 py-12 md:w-1/2">
+      <div className="w-full max-w-2xl space-y-6 rounded-2xl bg-white p-8 shadow-elevated ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
 
         {/* STEP BAR */}
         <div className="flex gap-2">
           {[1,2,3,4].map(s => (
-            <div key={s} className={`h-2 flex-1 rounded ${step >= s ? 'bg-indigo-600' : 'bg-gray-200'}`} />
+            <div key={s} className={`h-2 flex-1 rounded ${step >= s ? 'bg-primary-600' : 'bg-gray-200'}`} />
           ))}
         </div>
 
         <div className="space-y-3 text-center">
           <p className="text-sm text-gray-600">
             {t('register.already_account')}{" "}
-            <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+            <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
               {t('register.sign_in')}
             </Link>
           </p>
@@ -1526,8 +1537,8 @@ return (
                       }
                       className={`p-4 border-2 rounded-lg text-center transition-colors ${
                         formData.user_type === 'tenant'
-                          ? 'border-indigo-600 bg-indigo-50'
-                          : 'border-gray-300 hover:border-indigo-300'
+                          ? 'border-primary-600 bg-primary-50'
+                          : 'border-gray-300 hover:border-primary-300'
                       }`}
                     >
                       <div className="font-semibold">{t('register.tenant')}</div>
@@ -1539,8 +1550,8 @@ return (
                       onClick={() => setFormData(prev => ({ ...prev, user_type: 'landlord' }))}
                       className={`p-4 border-2 rounded-lg text-center transition-colors ${
                         formData.user_type === 'landlord'
-                          ? 'border-indigo-600 bg-indigo-50'
-                          : 'border-gray-300 hover:border-indigo-300'
+                          ? 'border-primary-600 bg-primary-50'
+                          : 'border-gray-300 hover:border-primary-300'
                       }`}
                     >
                       <div className="font-semibold">{t('register.landlord')}</div>
@@ -1558,8 +1569,8 @@ return (
                       onClick={() => setApplicantType(false)}
                       className={`p-3 border rounded-lg text-sm transition-colors ${
                         !formData.is_foreigner
-                          ? 'border-indigo-600 bg-indigo-50'
-                          : 'border-gray-300 hover:border-indigo-300'
+                          ? 'border-primary-600 bg-primary-50'
+                          : 'border-gray-300 hover:border-primary-300'
                       }`}
                     >
                       {t('register.local')}
@@ -1570,8 +1581,8 @@ return (
                       onClick={() => setApplicantType(true)}
                       className={`p-3 border rounded-lg text-sm transition-colors ${
                         formData.is_foreigner
-                          ? 'border-indigo-600 bg-indigo-50'
-                          : 'border-gray-300 hover:border-indigo-300'
+                          ? 'border-primary-600 bg-primary-50'
+                          : 'border-gray-300 hover:border-primary-300'
                       }`}
                     >
                       {t('register.foreign')}
@@ -1722,7 +1733,7 @@ return (
                         }));
                         setErrors((prev) => ({ ...prev, lawyer_email: null }));
                       }}
-                      className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-0.5 cursor-pointer"
+                      className="h-4 w-4 text-primary-600 border-gray-300 rounded mt-0.5 cursor-pointer"
                     />
                     <label htmlFor="use_rentalhub_lawyers" className="ml-2 text-sm text-gray-700 cursor-pointer">
                       <span>{t('register.lawyer_checkbox_label')}</span>
@@ -1768,7 +1779,7 @@ return (
                               }));
                             }
                           }}
-                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         />
                         {t('register.agent_add')}
                       </label>
@@ -1844,7 +1855,7 @@ return (
                 )}
 
                 {formData.user_type === 'landlord' && (
-                  <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-4">
+                  <div className="rounded-xl border border-primary-200 bg-primary-50 p-4 space-y-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <h3 className="text-sm font-semibold text-gray-900">{t('register.use_rentalhub_agents')}</h3>
@@ -1873,13 +1884,13 @@ return (
                               }));
                             }
                           }}
-                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         />
                         {t('register.use_our_agents')}
                       </label>
                     </div>
                     {formData.use_rentalhub_agents && (
-                      <div className="mt-2 text-xs text-purple-700">
+                      <div className="mt-2 text-xs text-primary-700">
                         {t('register.agent_auto_assigned')}
                         {!registrationPricing.location_complete && (
                           <div className="mt-1">
@@ -2229,13 +2240,13 @@ return (
                       setTermsAccepted(e.target.checked);
                       setErrors((prev) => ({ ...prev, terms: null }));
                     }}
-                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded mt-1 cursor-pointer"
+                    className="h-4 w-4 text-primary-600 border-gray-300 rounded mt-1 cursor-pointer"
                   />
                   <label htmlFor="terms" className="ml-2 block text-sm text-gray-900 cursor-pointer">
                     {t('register.terms')}{' '}
-                    <Link to="/terms" className="text-indigo-600 hover:text-indigo-500">{t('register.terms_link')}</Link>
+                    <Link to="/terms" className="text-primary-600 hover:text-primary-500">{t('register.terms_link')}</Link>
                     {' '}{t('register.and')}{' '}
-                    <Link to="/privacy" className="text-indigo-600 hover:text-indigo-500">{t('register.privacy_link')}</Link>
+                    <Link to="/privacy" className="text-primary-600 hover:text-primary-500">{t('register.privacy_link')}</Link>
                   </label>
                 </div>
                 {errors.terms && <p className="text-red-500 text-sm mt-1">{errors.terms}</p>}

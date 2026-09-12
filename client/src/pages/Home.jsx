@@ -213,7 +213,7 @@ const Home = () => {
         }`}
       >
         <img
-          src="/hero-terrace.avif"
+          src="/hero-main.avif"
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"
