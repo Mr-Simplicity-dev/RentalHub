@@ -208,28 +208,34 @@ const Home = () => {
       {/* Hero Section */}
       <section
         ref={heroRef}
-        className={`relative w-full max-w-full overflow-hidden bg-gradient-to-br from-slate-950 via-primary-900 to-primary-700 text-white transition-all duration-1000 ${
+        className={`relative w-full max-w-full overflow-hidden text-white transition-all duration-1000 ${
           heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}
       >
+        <img
+          src="/hero-terrace.avif"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-primary-900/80 to-primary-700/80" />
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary-500/20 blur-3xl" />
           <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-state-500/10 blur-3xl" />
         </div>
 
-        <div className="relative container mx-auto w-full max-w-full px-4 py-16 sm:py-20 lg:py-24">
-          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
-            <div className="text-center lg:text-left">
-              <h1 className="mb-5 max-w-full break-words text-4xl font-extrabold leading-[1.08] tracking-tight animate-fadeInUp sm:text-5xl">
-                {t('home.hero_title')}
-              </h1>
-              <p className="mb-8 max-w-2xl text-base leading-7 text-primary-100 animate-fadeInUp sm:text-lg">
-                {t('home.hero_subtitle')}
-              </p>
+        <div className="relative container mx-auto w-full max-w-full px-4 py-24 sm:py-32">
+          <div className="mx-auto w-full max-w-4xl text-center">
+            <h1 className="mb-6 max-w-full break-words text-4xl font-extrabold leading-[1.08] tracking-tight animate-fadeInUp sm:text-5xl lg:text-6xl">
+              {t('home.hero_title')}
+            </h1>
+            <p className="mx-auto mb-10 max-w-2xl text-base leading-7 text-primary-100 animate-fadeInUp sm:text-xl">
+              {t('home.hero_subtitle')}
+            </p>
 
             <form
               onSubmit={handleSearch}
-              className="mx-auto mb-7 flex w-full max-w-xl min-w-0 flex-col gap-2 rounded-2xl bg-white/95 p-2 shadow-elevated-lg backdrop-blur animate-fadeInUp sm:flex-row sm:items-center lg:mx-0"
+              className="mx-auto mb-8 flex w-full max-w-2xl min-w-0 flex-col gap-2 rounded-2xl bg-white/95 p-2 shadow-elevated-lg backdrop-blur animate-fadeInUp sm:flex-row sm:items-center"
             >
               <input
                 type="text"
@@ -248,7 +254,7 @@ const Home = () => {
               </button>
             </form>
 
-            <div className="flex flex-wrap items-center justify-center gap-3 animate-fadeInUp lg:justify-start">
+            <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-3 animate-fadeInUp">
               <Link
                 to="/legal-support"
                 className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-primary-700 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-cardHover"
@@ -269,7 +275,7 @@ const Home = () => {
               </Link>
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm lg:justify-start">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
               <Link
                 to="/legal-support"
                 className="text-primary-100 underline decoration-primary-300/60 underline-offset-4 transition-colors duration-300 hover:text-white"
@@ -282,18 +288,6 @@ const Home = () => {
               >
                 {t('home.property_request_link')}
               </Link>
-            </div>
-            </div>
-
-            <div className="relative animate-fadeInUp">
-              <div className="overflow-hidden rounded-3xl border border-white/10 shadow-elevated-lg ring-1 ring-white/10">
-                <img
-                  src="/hero-terrace.avif"
-                  alt={t('home.hero_title')}
-                  className="h-72 w-full object-cover sm:h-96 lg:h-[560px]"
-                  loading="eager"
-                />
-              </div>
             </div>
           </div>
         </div>
