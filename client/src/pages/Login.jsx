@@ -191,19 +191,30 @@ const Login = () => {
   };
 
  return (
-  <div className="min-h-screen flex dark:bg-gray-900">
-    
-    {/* LEFT PANEL */}
-    <div className="hidden md:flex w-1/2 relative bg-gradient-to-br from-indigo-600 to-purple-600 text-white overflow-hidden">
-      
-      {/* ANIMATED BACKGROUND */}
-      <div className="absolute top-[-100px] left-[-100px] w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-[-120px] right-[-100px] w-96 h-96 bg-purple-400/20 rounded-full blur-3xl"></div>
+  <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
 
-      <div className="relative w-full flex flex-col items-center justify-center text-center px-10 space-y-6">
-        
+    {/* LEFT PANEL */}
+    <div className="relative hidden w-1/2 overflow-hidden bg-slate-950 text-white md:flex">
+
+      {/* BACKGROUND IMAGE + OVERLAY */}
+      <img
+        src="/login-terrace.avif"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-primary-900/80 to-primary-700/80" />
+
+      {/* ANIMATED BACKGROUND */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-primary-500/20 blur-3xl"></div>
+        <div className="absolute -bottom-28 -right-24 h-96 w-96 rounded-full bg-state-500/10 blur-3xl"></div>
+      </div>
+
+      <div className="relative flex w-full flex-col items-center justify-center space-y-6 px-10 text-center">
+
         {/* LOGO */}
-        <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl shadow-xl border border-white/20">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/10 shadow-xl backdrop-blur-xl">
           <img src="/rentalhub-mark.svg" alt="RentalHub NG" className="h-12 w-12 rounded-xl object-contain shadow-sm" />
         </div>
 
@@ -213,12 +224,12 @@ const Login = () => {
         </div>
 
         {/* TITLE */}
-        <h1 className="text-4xl font-bold">
+        <h1 className="max-w-md text-4xl font-extrabold leading-tight tracking-tight">
           {t('login.welcome_back')}
         </h1>
 
         {/* DESCRIPTION */}
-        <p className="text-lg text-white/80 max-w-md">
+        <p className="max-w-md text-lg text-primary-100">
           {t('login.left_panel_desc')}
         </p>
 
@@ -229,28 +240,28 @@ const Login = () => {
     </div>
 
     {/* RIGHT PANEL */}
-    <div className="flex w-full md:w-1/2 items-center justify-center px-6">
-      
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl space-y-6">
+    <div className="flex w-full items-center justify-center px-6 py-12 md:w-1/2">
+
+      <div className="w-full max-w-md space-y-6 rounded-2xl bg-white p-8 shadow-elevated ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
 
         {/* HEADER */}
         <div className="text-center">
-          <h2 className="text-2xl font-semibold dark:text-white">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
             {t('login.title')}
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {t('login.or')}{' '}
-            <Link to="/register" className="text-indigo-600 hover:underline">
+            <Link to="/register" className="font-semibold text-primary-600 hover:text-primary-700 hover:underline">
               {t('login.create')}
             </Link>
           </p>
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
-          
+
           {/* EMAIL */}
           <div className="relative">
-            <FaEnvelope className="absolute left-3 top-3 text-gray-400" />
+            <FaEnvelope className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="email"
               name="email"
@@ -259,7 +270,7 @@ const Login = () => {
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
               list="login-email-suggestions"
-              className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-slate-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               placeholder={t('login.email_placeholder')}
             />
             <datalist id="login-email-suggestions">
@@ -271,20 +282,20 @@ const Login = () => {
 
           {/* PASSWORD */}
           <div className="relative">
-            <FaLock className="absolute left-3 top-3 text-gray-400" />
+            <FaLock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type={showPassword ? 'text' : 'password'}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              className="w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-10 text-slate-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               placeholder={t('login.password_placeholder')}
             />
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3 top-3 text-gray-500"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             >
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
@@ -292,17 +303,17 @@ const Login = () => {
 
           {/* REMEMBER + FORGOT */}
           <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
+            <label className="flex cursor-pointer select-none items-center gap-2 text-slate-600 dark:text-slate-300">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer"
+                className="h-4 w-4 cursor-pointer rounded border-slate-300 text-primary-600 focus:ring-primary-500"
               />
               {t('login.remember')}
             </label>
 
-            <Link to="/forgot-password" className="text-indigo-600 hover:underline">
+            <Link to="/forgot-password" className="font-semibold text-primary-600 hover:text-primary-700 hover:underline">
               {t('login.forgot')}
             </Link>
           </div>
@@ -320,7 +331,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-xl bg-primary-600 py-3 font-semibold text-white shadow-elevated transition hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {loading ? t('login.signing') : t('login.submit')}
           </button>

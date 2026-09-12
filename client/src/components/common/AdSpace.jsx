@@ -4,6 +4,7 @@ import {
   FaShareAlt,
   FaVolumeMute,
   FaVolumeUp,
+  FaArrowRight,
 } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
@@ -178,7 +179,7 @@ const AdSpace = ({
         <div className={contained ? 'container mx-auto px-4' : ''}>
           <div className={`grid gap-4 ${isMarquee ? '' : 'lg:grid-cols-2'}`}>
             {[1, 2].map((i) => (
-              <Skeleton key={i} className={isMarquee ? 'h-28 w-72' : 'h-48'} />
+              <Skeleton key={i} className={isMarquee ? 'h-32 w-80' : 'h-48'} />
             ))}
           </div>
         </div>
@@ -220,9 +221,19 @@ const AdSpace = ({
 
     const card = (
       <div
-        className={`group h-full overflow-hidden rounded-lg border border-gray-100 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${clickableClass}`}
-        style={adStyle}
+        className={`group h-full overflow-hidden transition-all duration-300 hover:-translate-y-0.5 ${
+          isMarquee
+            ? 'relative rounded-2xl bg-white shadow-card ring-1 ring-slate-100 hover:shadow-cardHover'
+            : 'rounded-lg border border-gray-100 shadow-sm hover:shadow-md'
+        } ${clickableClass}`}
+        style={isMarquee ? undefined : adStyle}
       >
+        {isMarquee && (
+          <span
+            className="absolute inset-x-0 top-0 z-10 h-1"
+            style={{ backgroundColor: ad.background_color || '#0ea5e9' }}
+          />
+        )}
         <div
           className={`flex h-full ${
             isMarquee
@@ -275,8 +286,14 @@ const AdSpace = ({
             </div>
           ) : null}
 
-          <div className={`flex flex-1 flex-col justify-center gap-3 ${isMarquee ? 'min-h-[96px] p-3 sm:p-4 md:p-5' : 'min-h-[140px] p-5 md:p-6'}`}>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide opacity-75">
+          <div className={`flex flex-1 flex-col justify-center gap-2.5 ${isMarquee ? 'min-h-[110px] p-4 sm:p-5 md:p-6' : 'min-h-[140px] p-5 md:p-6'}`}>
+            <div className={`flex flex-wrap items-center gap-2 ${isMarquee ? 'text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400' : 'text-xs font-semibold uppercase tracking-wide opacity-75'}`}>
+              {isMarquee && (
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: ad.background_color || '#0ea5e9' }}
+                />
+              )}
               <span>{t('ads.sponsored')}</span>
               {ad.sponsor_name && (
                 <>
@@ -287,20 +304,27 @@ const AdSpace = ({
             </div>
 
             <div>
-              <h2 className={`${isMarquee ? 'text-base sm:text-lg ' : 'text-lg '}font-bold leading-snug md:text-xl`}>
+              <h2 className={`${isMarquee ? 'text-[15px] font-semibold leading-snug text-slate-900 sm:text-base md:text-lg' : 'text-lg font-bold leading-snug md:text-xl'}`}>
                 {ad.title}
               </h2>
               {ad.description && (
-                <div className={`mt-1 max-w-3xl ${isMarquee ? 'text-xs sm:text-sm ' : 'text-sm '}leading-relaxed opacity-80 md:text-base whitespace-pre-line`}>
+                <div className={`mt-1 max-w-3xl whitespace-pre-line ${isMarquee ? 'text-xs leading-relaxed text-slate-500 sm:text-sm' : 'text-sm leading-relaxed opacity-80 md:text-base'}`}>
                   {ad.description}
                 </div>
               )}
             </div>
 
             {hasTarget && (
-              <span className={`inline-flex w-fit items-center rounded-lg bg-primary-600 ${isMarquee ? 'px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm ' : 'px-4 py-2 text-sm '}font-semibold text-white transition-colors duration-300 group-hover:bg-primary-700`}>
-                {ctaLabel}
-              </span>
+              isMarquee ? (
+                <span className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-primary-600 transition-colors group-hover:text-primary-700">
+                  {ctaLabel}
+                  <FaArrowRight className="text-xs transition-transform duration-300 group-hover:translate-x-0.5" />
+                </span>
+              ) : (
+                <span className="inline-flex w-fit items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-300 group-hover:bg-primary-700">
+                  {ctaLabel}
+                </span>
+              )
             )}
           </div>
         </div>
@@ -335,23 +359,31 @@ const AdSpace = ({
 
   const content = isMarquee ? (
     <div
-      className="ad-marquee"
-      style={{ '--ad-marquee-duration': `${Math.max(22, ads.length * 12)}s` }}
+      className="relative"
+      style={{
+        WebkitMaskImage: 'linear-gradient(to right, transparent 0, #000 4%, #000 96%, transparent 100%)',
+        maskImage: 'linear-gradient(to right, transparent 0, #000 4%, #000 96%, transparent 100%)',
+      }}
     >
-      <div className="ad-marquee-track">
-        <div className="ad-marquee-group">
-          {ads.map((ad) => (
-            <div key={ad.id || `${placement}-${ad.title}`} className="ad-marquee-item">
-              {renderAd(ad)}
-            </div>
-          ))}
-        </div>
-        <div className="ad-marquee-group" aria-hidden="true">
-          {ads.map((ad, index) => (
-            <div key={`${ad.id || `${placement}-${ad.title}`}-duplicate-${index}`} className="ad-marquee-item">
-              {renderAd(ad, { duplicate: true })}
-            </div>
-          ))}
+      <div
+        className="ad-marquee"
+        style={{ '--ad-marquee-duration': `${Math.max(30, ads.length * 16)}s` }}
+      >
+        <div className="ad-marquee-track">
+          <div className="ad-marquee-group">
+            {ads.map((ad) => (
+              <div key={ad.id || `${placement}-${ad.title}`} className="ad-marquee-item">
+                {renderAd(ad)}
+              </div>
+            ))}
+          </div>
+          <div className="ad-marquee-group" aria-hidden="true">
+            {ads.map((ad, index) => (
+              <div key={`${ad.id || `${placement}-${ad.title}`}-duplicate-${index}`} className="ad-marquee-item">
+                {renderAd(ad, { duplicate: true })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
