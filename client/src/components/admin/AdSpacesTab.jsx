@@ -43,6 +43,14 @@ const toDatetimeLocal = (value) => {
   return localDate.toISOString().slice(0, 16);
 };
 
+// Convert a datetime-local wall-clock value into an absolute UTC instant so the
+// stored schedule does not drift with the server/browser timezone.
+const toIsoOrNull = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
 const formatDate = (value) => {
   if (!value) return 'Anytime';
   return new Date(value).toLocaleString();
@@ -253,8 +261,8 @@ const AdSpacesTab = () => {
     sharing_enabled: form.sharing_enabled,
     is_active: form.is_active,
     sort_order: Number(form.sort_order || 0),
-    starts_at: form.starts_at || null,
-    ends_at: form.ends_at || null,
+    starts_at: toIsoOrNull(form.starts_at),
+    ends_at: toIsoOrNull(form.ends_at),
   });
 
   const handleSubmit = async (event) => {

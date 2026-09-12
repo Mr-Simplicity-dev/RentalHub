@@ -161,8 +161,8 @@ const ensureAdSpacesSchema = async () => {
       sharing_enabled BOOLEAN NOT NULL DEFAULT FALSE,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       sort_order INTEGER NOT NULL DEFAULT 0,
-      starts_at TIMESTAMP,
-      ends_at TIMESTAMP,
+      starts_at TIMESTAMPTZ,
+      ends_at TIMESTAMPTZ,
       impression_count INTEGER NOT NULL DEFAULT 0,
       click_count INTEGER NOT NULL DEFAULT 0,
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -208,6 +208,19 @@ const ensureAdSpacesSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_ad_spaces_schedule
       ON ad_spaces (starts_at, ends_at);
+
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'ad_spaces'
+          AND column_name IN ('starts_at', 'ends_at')
+          AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE ad_spaces ALTER COLUMN starts_at TYPE TIMESTAMPTZ USING starts_at AT TIME ZONE 'UTC';
+        ALTER TABLE ad_spaces ALTER COLUMN ends_at TYPE TIMESTAMPTZ USING ends_at AT TIME ZONE 'UTC';
+      END IF;
+    END $$;
 
     CREATE TABLE IF NOT EXISTS ad_space_operations (
       id SERIAL PRIMARY KEY,

@@ -5,7 +5,6 @@ import {
   FaVolumeMute,
   FaVolumeUp,
   FaArrowRight,
-  FaTimes,
 } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
@@ -69,33 +68,6 @@ const getShareUrl = (targetUrl) => {
   return window.location.href;
 };
 
-const DISMISSED_ADS_KEY = 'rentalhub_dismissed_ads';
-const DISMISSED_ADS_TTL_MS = 24 * 60 * 60 * 1000;
-
-const loadDismissedAds = () => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(DISMISSED_ADS_KEY) || '{}');
-    const now = Date.now();
-    const ids = Object.entries(raw)
-      .filter(([, ts]) => now - Number(ts) < DISMISSED_ADS_TTL_MS)
-      .map(([id]) => String(id));
-    return new Set(ids);
-  } catch {
-    return new Set();
-  }
-};
-
-const persistDismissedAds = (ids) => {
-  try {
-    const now = Date.now();
-    const payload = {};
-    ids.forEach((id) => { payload[id] = now; });
-    localStorage.setItem(DISMISSED_ADS_KEY, JSON.stringify(payload));
-  } catch {
-    // Dismissal is a convenience only; never let storage break rendering.
-  }
-};
-
 const AdShareButton = ({ ad, targetUrl }) => {
   const { t } = useTranslation();
   const shareUrl = useMemo(() => getShareUrl(targetUrl), [targetUrl]);
@@ -150,19 +122,6 @@ const AdSpace = ({
   const trackedImpressions = useRef(new Set());
   const requestLimit = useMemo(() => normalizeLimit(limit), [limit]);
   const isMarquee = variant === 'marquee';
-  const [dismissedIds, setDismissedIds] = useState(() => loadDismissedAds());
-  const visibleAds = useMemo(
-    () => ads.filter((ad) => !dismissedIds.has(String(ad.id))),
-    [ads, dismissedIds]
-  );
-  const dismissAd = useCallback((id) => {
-    setDismissedIds((prev) => {
-      const next = new Set(prev);
-      next.add(String(id));
-      persistDismissedAds(next);
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -197,8 +156,8 @@ const AdSpace = ({
   }, [placement, requestLimit]);
 
   const adIds = useMemo(
-    () => visibleAds.map((item) => item.id).filter(Boolean),
-    [visibleAds]
+    () => ads.map((item) => item.id).filter(Boolean),
+    [ads]
   );
 
   useEffect(() => {
@@ -228,9 +187,9 @@ const AdSpace = ({
     );
   }
 
-  if (visibleAds.length === 0) return null;
+  if (ads.length === 0) return null;
 
-  const hasMultipleAds = visibleAds.length > 1;
+  const hasMultipleAds = ads.length > 1;
 
   const renderAd = (ad, { duplicate = false } = {}) => {
     const targetUrl = normalizeTargetUrl(ad.target_url);
@@ -274,16 +233,6 @@ const AdSpace = ({
             className="absolute inset-x-0 top-0 z-10 h-1"
             style={{ backgroundColor: ad.background_color || '#0ea5e9' }}
           />
-        )}
-        {isMarquee && (
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); dismissAd(ad.id); }}
-            aria-label={t('common.close')}
-            className="absolute left-3 top-3 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-sm ring-1 ring-black/5 transition hover:bg-white hover:text-slate-800"
-          >
-            <FaTimes className="text-xs" />
-          </button>
         )}
         <div
           className={`flex h-full ${
@@ -418,18 +367,18 @@ const AdSpace = ({
     >
       <div
         className="ad-marquee"
-        style={{ '--ad-marquee-duration': `${Math.max(30, visibleAds.length * 16)}s` }}
+        style={{ '--ad-marquee-duration': `${Math.max(30, ads.length * 16)}s` }}
       >
         <div className="ad-marquee-track">
           <div className="ad-marquee-group">
-          {visibleAds.map((ad) => (
+          {ads.map((ad) => (
             <div key={ad.id || `${placement}-${ad.title}`} className="ad-marquee-item">
                 {renderAd(ad)}
               </div>
             ))}
           </div>
           <div className="ad-marquee-group" aria-hidden="true">
-            {visibleAds.map((ad, index) => (
+            {ads.map((ad, index) => (
               <div key={`${ad.id || `${placement}-${ad.title}`}-duplicate-${index}`} className="ad-marquee-item">
                 {renderAd(ad, { duplicate: true })}
               </div>
@@ -440,7 +389,7 @@ const AdSpace = ({
     </div>
   ) : (
     <div className={hasMultipleAds ? 'grid gap-4 lg:grid-cols-2' : ''}>
-      {visibleAds.map((ad) => (
+      {ads.map((ad) => (
         <div key={ad.id || `${placement}-${ad.title}`} className="min-w-0">
           {renderAd(ad)}
         </div>
