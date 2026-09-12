@@ -151,10 +151,28 @@ const Home = () => {
     window.location.href = `/properties?search=${encodeURIComponent(searchQuery)}`;
   };
 
+  const features = [
+    {
+      icon: <FaShieldAlt className="text-2xl" />,
+      title: t('home.features.verified.title'),
+      text: t('home.features.verified.text'),
+    },
+    {
+      icon: <FaHome className="text-2xl" />,
+      title: t('home.features.wide.title'),
+      text: t('home.features.wide.text'),
+    },
+    {
+      icon: <FaCheckCircle className="text-2xl" />,
+      title: t('home.features.easy.title'),
+      text: t('home.features.easy.text'),
+    },
+  ];
+
   return (
-    <div className="w-full max-w-full overflow-x-hidden">
+    <div className="w-full max-w-full overflow-x-hidden bg-white">
       {showAppPrompt && (
-        <section className="relative m-4 overflow-hidden rounded-2xl border border-primary-100 bg-white shadow-card animate-slideInRight transition-all duration-300 hover:-translate-y-0.5 hover:shadow-cardHover">
+        <section className="relative mx-4 mt-4 overflow-hidden rounded-2xl border border-primary-100 bg-gradient-to-r from-primary-50 to-white shadow-card animate-slideInRight transition-all duration-300 hover:-translate-y-0.5 hover:shadow-cardHover">
           <button
             type="button"
             onClick={dismissAppPrompt}
@@ -188,78 +206,81 @@ const Home = () => {
       )}
 
       {/* Hero Section */}
-      <section 
+      <section
         ref={heroRef}
-        className={`w-full max-w-full overflow-x-hidden bg-gradient-to-r from-primary-600 to-primary-800 text-white py-16 transition-all duration-1000 sm:py-20 ${
+        className={`relative w-full max-w-full overflow-hidden bg-gradient-to-br from-slate-950 via-primary-900 to-primary-700 text-white transition-all duration-1000 ${
           heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}
       >
-        <div className="container mx-auto w-full max-w-full px-4">
-          <div className="mx-auto w-full max-w-3xl text-center">
-            <h1 className="mb-6 max-w-full break-words text-3xl font-bold leading-tight animate-fadeIn sm:text-4xl md:text-5xl">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary-500/20 blur-3xl" />
+          <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-state-500/10 blur-3xl" />
+        </div>
+
+        <div className="relative container mx-auto w-full max-w-full px-4 py-20 sm:py-28">
+          <div className="mx-auto w-full max-w-4xl text-center">
+            <h1 className="mb-6 max-w-full break-words text-4xl font-extrabold leading-[1.08] tracking-tight animate-fadeInUp sm:text-5xl lg:text-6xl">
               {t('home.hero_title')}
             </h1>
-            <p className="mx-auto mb-8 max-w-full text-base leading-7 text-primary-100 animate-fadeIn delay-100 sm:text-xl">
+            <p className="mx-auto mb-10 max-w-2xl text-base leading-7 text-primary-100 animate-fadeInUp sm:text-xl">
               {t('home.hero_subtitle')}
             </p>
 
-            <form 
-              onSubmit={handleSearch} 
-              className="mx-auto flex w-full max-w-full min-w-0 flex-col gap-2 animate-fadeIn delay-200 sm:max-w-lg md:max-w-2xl md:flex-row md:gap-0"
+            <form
+              onSubmit={handleSearch}
+              className="mx-auto mb-8 flex w-full max-w-2xl min-w-0 flex-col gap-2 rounded-2xl bg-white/95 p-2 shadow-elevated-lg backdrop-blur animate-fadeInUp sm:flex-row sm:items-center"
             >
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('home.search_placeholder')}
-                className="w-full min-w-0 max-w-full flex-1 rounded-lg px-3.5 py-2.5 text-sm text-gray-900 transition-all duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 md:rounded-l-lg md:rounded-r-none md:px-6 md:py-4 md:text-base"
+                className="w-full min-w-0 max-w-full flex-1 rounded-xl border-0 bg-transparent px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 sm:text-base"
               />
               <button
                 type="submit"
                 aria-label={t('home.search')}
-                className="flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-full bg-primary-700 px-0 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-800 hover:shadow-lg md:h-auto md:w-auto md:self-stretch md:rounded-l-none md:rounded-r-lg md:px-6 md:py-4 md:text-base lg:px-8"
+                className="inline-flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:w-auto sm:text-base"
               >
-                <FaSearch className="shrink-0 md:mr-2" />
-                <span className="sr-only md:not-sr-only">{t('home.search')}</span>
+                <FaSearch className="shrink-0" />
+                <span>{t('home.search')}</span>
               </button>
             </form>
-            <div className="mt-4 animate-fadeIn delay-300">
+
+            <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-3 animate-fadeInUp">
               <Link
                 to="/legal-support"
-                className="underline text-primary-100 hover:text-white text-sm transition-colors duration-300 inline-block hover:scale-105"
+                className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-primary-700 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-cardHover"
+              >
+                <FaShieldAlt /> {t('home.use_lawyers')}
+              </Link>
+              <Link
+                to="/verify-case"
+                className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/20"
+              >
+                <FaCheckCircle /> {t('home.verify_dispute_evidence')}
+              </Link>
+              <Link
+                to="/properties?request=1#tenant-request"
+                className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/20"
+              >
+                <FaHome /> {t('home.submit_request')}
+              </Link>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+              <Link
+                to="/legal-support"
+                className="text-primary-100 underline decoration-primary-300/60 underline-offset-4 transition-colors duration-300 hover:text-white"
               >
                 {t('home.legal_support_link')}
               </Link>
-              <div className="mt-2">
-                <Link
-                  to="/properties?request=1#tenant-request"
-                  className="underline text-primary-100 hover:text-white text-sm transition-colors duration-300 inline-block hover:scale-105"
-                >
-                  {t('home.property_request_link')}
-                </Link>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
-                <Link
-                  to="/legal-support"
-                  className="inline-block bg-white text-primary-700 px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
-                >
-                  {t('home.use_lawyers')}
-                </Link>
-                <Link
-                  to="/verify-case"
-                  className="inline-block border border-white px-5 py-2 rounded-lg font-semibold text-white hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
-                >
-                  {t('home.verify_dispute_evidence')}
-                </Link>
-              </div>
-              <div className="mt-3 flex justify-center">
-                <Link
-                  to="/properties?request=1#tenant-request"
-                  className="inline-block border border-white px-5 py-2 rounded-lg font-semibold text-white hover:bg-primary-700 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg"
-                >
-                  {t('home.submit_request')}
-                </Link>
-              </div>
+              <Link
+                to="/properties?request=1#tenant-request"
+                className="text-primary-100 underline decoration-primary-300/60 underline-offset-4 transition-colors duration-300 hover:text-white"
+              >
+                {t('home.property_request_link')}
+              </Link>
             </div>
           </div>
         </div>
@@ -268,41 +289,25 @@ const Home = () => {
       <AdSpace placement="home_top" variant="marquee" className="bg-white py-6" />
 
       {/* Features */}
-      <section 
+      <section
         ref={featuresRef}
-        className={`py-16 bg-white transition-all duration-1000 ${
+        className={`bg-white py-20 transition-all duration-1000 ${
           featuresLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}
       >
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: <FaShieldAlt className="text-primary-600 text-2xl" />,
-                title: t('home.features.verified.title'),
-                text: t('home.features.verified.text'),
-              },
-              {
-                icon: <FaHome className="text-primary-600 text-2xl" />,
-                title: t('home.features.wide.title'),
-                text: t('home.features.wide.text'),
-              },
-              {
-                icon: <FaCheckCircle className="text-primary-600 text-2xl" />,
-                title: t('home.features.easy.title'),
-                text: t('home.features.easy.text'),
-              },
-            ].map((f, i) => (
-              <div 
-                key={i} 
-                className="text-center transition-all duration-500 transform hover:-translate-y-2 hover:shadow-cardHover p-6 rounded-xl2"
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            {features.map((f, i) => (
+              <div
+                key={i}
+                className="group rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-card transition-all duration-500 hover:-translate-y-2 hover:shadow-cardHover"
                 style={{ transitionDelay: `${i * 100}ms` }}
               >
-                <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 transition-all duration-300 hover:scale-110 hover:bg-primary-200">
+                <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-elevated transition-transform duration-300 group-hover:scale-110">
                   {f.icon}
                 </div>
-                <h3 className="text-xl font-semibold mb-2">{f.title}</h3>
-                <p className="text-gray-600">{f.text}</p>
+                <h3 className="mb-2 text-xl font-semibold text-slate-900">{f.title}</h3>
+                <p className="leading-relaxed text-slate-600">{f.text}</p>
               </div>
             ))}
           </div>
@@ -310,20 +315,20 @@ const Home = () => {
       </section>
 
       {/* Featured Properties */}
-      <section 
+      <section
         ref={propertiesRef}
-        className={`py-16 bg-gray-50 transition-all duration-1000 ${
+        className={`bg-slate-50 py-20 transition-all duration-1000 ${
           propertiesLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}
       >
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold animate-fadeIn">
+          <div className="mb-10 flex items-end justify-between gap-4">
+            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl animate-fadeIn">
               {t('home.featured_title')}
             </h2>
-            <Link 
-              to="/properties?featured=true" 
-              className="text-primary-600 hover:text-primary-700 font-semibold transition-all duration-300 transform hover:translate-x-1 flex items-center gap-2"
+            <Link
+              to="/properties?featured=true"
+              className="group inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-primary-600 transition-all duration-300 hover:text-primary-700"
             >
               {t('home.view_all')} <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
@@ -332,11 +337,11 @@ const Home = () => {
           {loading ? (
             <Loader />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {featuredProperties.map((property, index) => (
-                <div 
+                <div
                   key={property?.id ?? `featured-${index}`}
-                  className="transition-all duration-500 transform hover:-translate-y-2"
+                  className="transition-all duration-500 hover:-translate-y-2"
                   style={{ transitionDelay: `${index * 100}ms` }}
                 >
                   <PropertyCard
@@ -350,34 +355,34 @@ const Home = () => {
         </div>
       </section>
 
-      <AdSpace placement="home_featured" variant="marquee" className="bg-gray-50 pb-8" />
+      <AdSpace placement="home_featured" variant="marquee" className="bg-slate-50 pb-8" />
 
       {/* Popular Locations */}
-      <section 
+      <section
         ref={locationsRef}
-        className={`py-16 bg-white transition-all duration-1000 ${
+        className={`bg-white py-20 transition-all duration-1000 ${
           locationsLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}
       >
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-8 text-center animate-fadeIn">
+          <h2 className="mb-10 text-center text-2xl font-bold text-slate-900 sm:text-3xl animate-fadeIn">
             {t('home.popular_locations')}
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
             {popularLocations.map((location, index) => (
               <Link
                 key={location?.state_id ?? location?.state_name ?? `loc-${index}`}
                 to={`/properties?state_id=${location?.state_id ?? ''}`}
-                className="card text-center transition-all duration-500 transform hover:-translate-y-2 hover:shadow-cardHover group"
+                className="group rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-card transition-all duration-500 hover:-translate-y-2 hover:border-primary-200 hover:shadow-cardHover"
                 style={{ transitionDelay: `${index * 50}ms` }}
               >
-                <div className="w-12 h-12 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mx-auto mb-3 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary-200">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-600 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary-100">
                   <FaMapMarkerAlt />
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-primary-700 transition-colors duration-300">
+                <h3 className="font-semibold text-slate-900 transition-colors duration-300 group-hover:text-primary-700">
                   {location?.state_name ?? t('home.unknown')}
                 </h3>
-                <p className="text-sm text-gray-600 mt-1 group-hover:text-gray-800 transition-colors duration-300">
+                <p className="mt-1 text-sm text-slate-500 transition-colors duration-300 group-hover:text-slate-700">
                   {location?.property_count ?? 0} {t('home.properties')}
                 </p>
               </Link>
@@ -387,34 +392,39 @@ const Home = () => {
       </section>
 
       {/* CTA */}
-      <section className="py-16 bg-primary-600 text-white">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-4 animate-fadeIn">
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-primary-900 to-primary-700 py-20 text-white">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary-500/20 blur-3xl" />
+          <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-state-500/10 blur-3xl" />
+        </div>
+        <div className="relative container mx-auto px-4 text-center">
+          <h2 className="mb-4 text-3xl font-bold animate-fadeInUp sm:text-4xl">
             {t('home.cta_title')}
           </h2>
-          <p className="text-xl mb-8 text-primary-100 animate-fadeIn delay-100">
+          <p className="mx-auto mb-8 max-w-2xl text-lg text-primary-100 animate-fadeInUp">
             {t('home.cta_text')}
           </p>
-          <div className="flex flex-col justify-center gap-3 animate-fadeIn delay-200 sm:flex-row sm:gap-4">
-            <Link 
-              to="/register" 
-              className="w-full rounded-lg bg-white px-8 py-3 font-semibold text-primary-600 transition-all duration-300 hover:-translate-y-0.5 hover:bg-gray-100 hover:shadow-lg sm:w-auto"
+          <div className="flex flex-col justify-center gap-3 animate-fadeInUp sm:flex-row sm:gap-4">
+            <Link
+              to="/register"
+              className="w-full rounded-xl bg-white px-8 py-3 font-semibold text-primary-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-gray-100 hover:shadow-lg sm:w-auto"
             >
               {t('home.get_started')}
             </Link>
-            <Link 
-              to="/properties" 
-              className="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:w-auto"
+            <Link
+              to="/properties"
+              className="w-full rounded-xl border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:w-auto"
             >
               {t('home.browse')}
             </Link>
           </div>
-          <div className="mt-8 pt-8 border-t border-primary-400 animate-fadeIn delay-300">
-            <p className="text-lg mb-4 text-primary-100">{t('home.download_app_cta')}</p>
+
+          <div className="mx-auto mt-12 max-w-3xl rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur sm:p-8">
+            <p className="mb-4 text-lg font-semibold text-white">{t('home.download_app_cta')}</p>
             <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
               <Link
                 to={mobileAppPageUrl}
-                className="w-full rounded-lg bg-white px-8 py-3 font-semibold text-primary-600 transition-all duration-300 hover:-translate-y-0.5 hover:bg-gray-100 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-8 py-3 font-semibold text-primary-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-gray-100 hover:shadow-lg sm:w-auto"
               >
                 <FaMobileAlt />
                 {t('home.download_android')}
@@ -424,7 +434,7 @@ const Home = () => {
                   href={iosAppUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg sm:w-auto"
                 >
                   <FaMobileAlt />
                   {t('home.download_iphone')}
@@ -435,7 +445,7 @@ const Home = () => {
                 text={shareAppText}
                 title="RentalHub NG"
                 buttonLabel={t('home.share_app')}
-                buttonClassName="w-full rounded-lg border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-600 hover:shadow-lg sm:w-auto inline-flex items-center justify-center gap-2"
+                buttonClassName="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-white px-8 py-3 font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-600 hover:shadow-lg sm:w-auto"
                 headerLabel={`Share ${t('home.share_app')}`}
                 copySuccessMessage="App link copied to clipboard"
               />
