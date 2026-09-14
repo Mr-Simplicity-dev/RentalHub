@@ -6,6 +6,7 @@ const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminO
 const validateRequest = require('../config/middleware/validateRequest');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 const { requireWithdrawalFactor } = require('../config/utils/twoFactor');
+const audit = require('../config/middleware/auditMiddleware');
 const {
 	withdrawalCreateValidators,
 	withdrawalQueryValidators,
@@ -27,6 +28,7 @@ router.post(
 	criticalFinanceOpsLimiter,
 	withdrawalCreateValidators,
 	validateRequest,
+	audit('withdrawal.create', 'agent_withdrawal'),
 	requireWithdrawalFactor,
 	AgentWithdrawalController.createWithdrawalRequest
 );
@@ -48,15 +50,15 @@ router.get(
 );
 
 // Approve withdrawal (admin only)
-router.post('/withdrawals/:withdrawalId/approve', [param('withdrawalId').isInt(), body('note').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, requireWithdrawalFactor, AgentWithdrawalController.approveWithdrawal);
+router.post('/withdrawals/:withdrawalId/approve', [param('withdrawalId').isInt(), body('note').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, audit('withdrawal.approve', 'agent_withdrawal'), requireWithdrawalFactor, AgentWithdrawalController.approveWithdrawal);
 
 // Reject withdrawal (admin only)
-router.post('/withdrawals/:withdrawalId/reject', [param('withdrawalId').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, AgentWithdrawalController.rejectWithdrawal);
+router.post('/withdrawals/:withdrawalId/reject', [param('withdrawalId').isInt(), body('reason').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, audit('withdrawal.reject', 'agent_withdrawal'), AgentWithdrawalController.rejectWithdrawal);
 
 // Mark as processing (admin only)
-router.post('/withdrawals/:withdrawalId/mark-processing', [param('withdrawalId').isInt(), body('note').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, AgentWithdrawalController.markAsProcessing);
+router.post('/withdrawals/:withdrawalId/mark-processing', [param('withdrawalId').isInt(), body('note').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, audit('withdrawal.mark_processing', 'agent_withdrawal'), AgentWithdrawalController.markAsProcessing);
 
 // Mark as completed (admin only)
-router.post('/withdrawals/:withdrawalId/mark-completed', [param('withdrawalId').isInt(), body('note').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, AgentWithdrawalController.markAsCompleted);
+router.post('/withdrawals/:withdrawalId/mark-completed', [param('withdrawalId').isInt(), body('note').optional().isString().trim().isLength({ max: 1000 })], validateRequest, requireAdminOrSuperAdmin, criticalFinanceOpsLimiter, audit('withdrawal.mark_completed', 'agent_withdrawal'), AgentWithdrawalController.markAsCompleted);
 
 module.exports = router;

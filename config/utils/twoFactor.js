@@ -371,7 +371,21 @@ exports.requireWithdrawalFactor = async (req, res, next) => {
  */
 exports.runWithdrawalFactorCheck = async (req, res) => {
   try {
-    await exports.verifyWithdrawalFactor({ user: req.user, body: req.body || {} });
+    const factor = await exports.verifyWithdrawalFactor({ user: req.user, body: req.body || {} });
+    req.withdrawalFactor = factor;
+
+    // Persist the 2FA pass as durable evidence (method + time + IP) in the
+    // hash-chained audit ledger, so a later "I did not do it" claim can be met
+    // with proof that this account passed a second factor.
+    const { logAction } = require('./auditLogger');
+    await logAction({
+      actorId: req.user?.id,
+      action: `withdrawal_2fa_verified:${factor.method}`,
+      targetType: 'agent_withdrawal',
+      targetId: null,
+      ip: req.ip,
+    });
+
     return true;
   } catch (error) {
     if (error instanceof TwoFactorError) {

@@ -13,6 +13,7 @@ const PayRentOnBehalf = () => {
   const [info, setInfo] = useState(null);
   const [busy, setBusy] = useState(null);
   const [bankDetails, setBankDetails] = useState(null);
+  const [beneficiaryConfirmed, setBeneficiaryConfirmed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,12 +33,17 @@ const PayRentOnBehalf = () => {
   }, [load]);
 
   const pay = async (method) => {
+    if (!beneficiaryConfirmed) {
+      setError('Please confirm the person you are paying for before continuing.');
+      return;
+    }
     setBusy(method);
     setError('');
     setBankDetails(null);
     try {
       const res = await api.post(`/payments/pay-rent-on-behalf/${token}`, {
         payment_method: method,
+        beneficiary_confirm: true,
       });
       const data = res.data?.data || {};
       if (method === 'bank_transfer') {
@@ -96,10 +102,24 @@ const PayRentOnBehalf = () => {
               </p>
             </div>
 
+            <label className="mt-5 flex items-start gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs text-gray-700">
+              <input
+                type="checkbox"
+                checked={beneficiaryConfirmed}
+                onChange={(e) => setBeneficiaryConfirmed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-teal-600"
+              />
+              <span>
+                I confirm I am paying <strong>{formatMoney(info?.amount)}</strong> for{' '}
+                <strong className="text-gray-900">{info?.tenant_name || 'this tenant'}</strong>. I understand this
+                payment is credited to them and cannot be reversed.
+              </span>
+            </label>
+
             <div className="mt-5 space-y-2">
               <button
                 type="button"
-                disabled={busy !== null}
+                disabled={busy !== null || !beneficiaryConfirmed}
                 onClick={() => pay('paystack')}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 py-3 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
               >
@@ -107,7 +127,7 @@ const PayRentOnBehalf = () => {
               </button>
               <button
                 type="button"
-                disabled={busy !== null}
+                disabled={busy !== null || !beneficiaryConfirmed}
                 onClick={() => pay('bank_transfer')}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >

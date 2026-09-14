@@ -48,6 +48,8 @@ const audit = (action, targetType) => {
         const params = req.params || {};
 
         const targetId = safeInt(
+          params.withdrawalId ||
+          params.agentId ||
           params.disputeId ||
           params.propertyId ||
           params.reportId ||

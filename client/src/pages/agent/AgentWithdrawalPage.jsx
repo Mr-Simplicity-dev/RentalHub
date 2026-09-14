@@ -24,6 +24,7 @@ const AgentWithdrawalPage = () => {
     bankAccountId: '',
     requestReason: '',
   });
+  const [consent, setConsent] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -68,6 +69,11 @@ const AgentWithdrawalPage = () => {
       return;
     }
 
+    if (!consent) {
+      toast.error(t('agent_withdrawal.consent_required', 'Please confirm the withdrawal request to continue.'));
+      return;
+    }
+
     try {
       setSubmitting(true);
       const response = await api.post(`/withdrawals/agents/${agentId}/withdrawal-requests`, {
@@ -76,6 +82,7 @@ const AgentWithdrawalPage = () => {
         withdrawalMethod: formData.withdrawalMethod,
         bankAccountId: formData.bankAccountId ? parseInt(formData.bankAccountId) : null,
         requestReason: formData.requestReason,
+        consent: true,
       });
 
       if (response.data?.success) {
@@ -107,6 +114,7 @@ const AgentWithdrawalPage = () => {
       withdrawalMethod: formData.withdrawalMethod,
       bankAccountId: formData.bankAccountId ? parseInt(formData.bankAccountId) : null,
       requestReason: formData.requestReason,
+      consent: true,
       ...(withdrawTwoFactor?.method === 'totp' ? { totp_code: code } : { otp: code }),
     };
     setSubmitting(true);
@@ -269,6 +277,21 @@ const AgentWithdrawalPage = () => {
                     rows="3"
                   />
                 </div>
+
+                <label className="flex items-start gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600"
+                  />
+                  <span>
+                    {t(
+                      'agent_withdrawal.consent_label',
+                      'I confirm I am requesting this withdrawal and understand the funds will be sent to my registered bank details.'
+                    )}
+                  </span>
+                </label>
 
                 <button
                   type="submit"

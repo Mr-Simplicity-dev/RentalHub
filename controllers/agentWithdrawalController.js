@@ -3,6 +3,16 @@ const { isValidPaystackSignature } = require('../services/paystackTransfer.servi
 
 const ADMIN_WITHDRAWAL_ROLES = ['admin', 'super_admin', 'financial_admin', 'super_financial_admin'];
 
+// Request context captured on every withdrawal action so the audit trail can be
+// tied to a session/device (IP + user agent), the 2FA factor used, and consent.
+const requestContext = (req) => ({
+  ip: req.ip,
+  userAgent: req.headers['user-agent'] || null,
+  factor: req.withdrawalFactor?.method || null,
+  consent: req.body?.consent === true,
+  metadata: { route: req.originalUrl },
+});
+
 class AgentWithdrawalController {
   /**
    * Create withdrawal request
@@ -65,6 +75,7 @@ class AgentWithdrawalController {
           accountNumber: accountNumber || null,
           accountName: accountName || null,
           requestReason,
+          context: requestContext(req),
         }
       );
 
@@ -191,7 +202,8 @@ class AgentWithdrawalController {
       const withdrawal = await AgentWithdrawalService.approveWithdrawal(
         parseInt(withdrawalId),
         req.user.id,
-        notes || ''
+        notes || '',
+        requestContext(req)
       );
 
       res.json({
@@ -233,7 +245,8 @@ class AgentWithdrawalController {
       const withdrawal = await AgentWithdrawalService.rejectWithdrawal(
         parseInt(withdrawalId),
         rejectionReason,
-        req.user.id
+        req.user.id,
+        requestContext(req)
       );
 
       res.json({
@@ -264,7 +277,7 @@ class AgentWithdrawalController {
 
       const { withdrawalId } = req.params;
 
-      const withdrawal = await AgentWithdrawalService.markAsProcessing(parseInt(withdrawalId), req.user.id);
+      const withdrawal = await AgentWithdrawalService.markAsProcessing(parseInt(withdrawalId), req.user.id, requestContext(req));
 
       res.json({
         success: true,
@@ -298,7 +311,8 @@ class AgentWithdrawalController {
       const withdrawal = await AgentWithdrawalService.markAsCompleted(
         parseInt(withdrawalId),
         req.user.id,
-        paymentReference
+        paymentReference,
+        requestContext(req)
       );
 
       res.json({

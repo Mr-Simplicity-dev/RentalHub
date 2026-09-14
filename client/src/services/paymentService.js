@@ -57,7 +57,8 @@ export const paymentService = {
     const response = await api.post('/payments/pay-rent', {
       property_id: propertyId,
       amount,
-      payment_method: paymentMethod
+      payment_method: paymentMethod,
+      consent: true,
     });
     return response.data;
   },

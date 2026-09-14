@@ -24,6 +24,9 @@ const withdrawalCreateValidators = [
   body('accountNumber').optional().matches(/^\d{10}$/).withMessage('accountNumber must be exactly 10 digits'),
   body('accountName').optional().isLength({ min: 2, max: 120 }).withMessage('accountName must be between 2 and 120 characters'),
   body('requestReason').optional().isLength({ max: 500 }).withMessage('requestReason cannot exceed 500 characters'),
+body('consent')
+.custom((value) => value === true || value === 'true')
+.withMessage('You must confirm the withdrawal request to continue'),
 ];
 
 const withdrawalQueryValidators = [

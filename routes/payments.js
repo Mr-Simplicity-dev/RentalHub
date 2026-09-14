@@ -8,6 +8,7 @@ const landlordPropertyFeeController = require('../controllers/landlordPropertyFe
 const { authenticate, isTenant, isLandlord, isVerified } = require('../config/middleware/auth');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
+const audit = require('../config/middleware/auditMiddleware');
 
 // ============ TENANT SUBSCRIPTION PAYMENTS ============
 
@@ -143,14 +144,18 @@ router.post('/pay-rent',
   [
     body('property_id').isInt(),
     body('amount').isFloat({ min: 0 }),
-    body('payment_method').isIn(['paystack', 'bank_transfer'])
+    body('payment_method').isIn(['paystack', 'bank_transfer']),
+    body('consent').custom((value) => value === true || value === 'true').withMessage('You must confirm the rent payment to continue')
   ],
+  validateRequest,
+  audit('payment.rent_initiate', 'payment'),
   paymentController.initializeRentPayment
 );
 
 // Verify rent payment
 router.get('/verify-rent/:reference',
   authenticate,
+  audit('payment.rent_verify', 'payment'),
   paymentController.verifyRentPayment
 );
 
@@ -162,6 +167,8 @@ router.post('/request-rent-payment',
   authenticate,
   isTenant,
   [body('property_id').isInt()],
+  validateRequest,
+  audit('payment.rent_request', 'rent_payment_request'),
   paymentController.createRentPaymentRequest
 );
 
@@ -179,7 +186,12 @@ router.get('/rent-help/eligible',
 
 router.post('/pay-rent-on-behalf/:token',
   authenticate,
-  [body('payment_method').isIn(['paystack', 'bank_transfer'])],
+  [
+    body('payment_method').isIn(['paystack', 'bank_transfer']),
+    body('beneficiary_confirm').custom((value) => value === true || value === 'true').withMessage('You must confirm the person you are paying for')
+  ],
+  validateRequest,
+  audit('payment.rent_on_behalf', 'payment'),
   paymentController.initializeHelpRentPayment
 );
 

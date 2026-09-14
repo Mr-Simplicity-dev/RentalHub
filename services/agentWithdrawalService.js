@@ -1,9 +1,13 @@
 const logger = require('../config/utils/logger');
 const db = require('../config/middleware/database');
+const { sendEmail } = require('../config/utils/mailer');
+const { sendSMS } = require('../config/utils/smsService');
 const {
   createTransferRecipient,
   initiateTransfer,
 } = require('./paystackTransfer.service');
+
+const formatNaira = (amount) => `NGN ${Number(amount || 0).toLocaleString('en-NG')}`;
 
 class AgentWithdrawalService {
   static async getWithdrawalById(withdrawalId) {
@@ -26,6 +30,7 @@ class AgentWithdrawalService {
       accountNumber = null,
       accountName = null,
       requestReason = null,
+      context = {},
     } = options;
 
     try {
@@ -72,14 +77,18 @@ class AgentWithdrawalService {
       if (result.rows.length > 0) {
         const withdrawal = result.rows[0];
 
-        // Log audit
+        // Log audit (actor + request context, fail-closed)
         await this.logWithdrawalAudit(
           withdrawal.id,
           'withdrawal_requested',
           null,
           'pending',
-          null
+          agentUserId,
+          context.factor ? `2FA verified via ${context.factor}` : '',
+          context
         );
+
+        await this.notifyWithdrawal(withdrawal, 'requested');
 
         return withdrawal;
       }
@@ -132,7 +141,7 @@ class AgentWithdrawalService {
   /**
    * Approve withdrawal request
    */
-  static async approveWithdrawal(withdrawalId, approvedByUserId, notes = '') {
+  static async approveWithdrawal(withdrawalId, approvedByUserId, notes = '', context = {}) {
     try {
       const existing = await this.getWithdrawalById(withdrawalId);
       if (!existing) {
@@ -159,7 +168,8 @@ class AgentWithdrawalService {
           'pending',
           'approved',
           approvedByUserId,
-          notes
+          notes,
+          context
         );
 
         if (withdrawal.withdrawal_method === 'bank_transfer') {
@@ -224,11 +234,16 @@ class AgentWithdrawalService {
             'approved',
             'processing',
             approvedByUserId,
-            `Auto payout initiated: ${transfer?.reference || reference}`
+            `Auto payout initiated: ${transfer?.reference || reference}`,
+            context
           );
+
+          await this.notifyWithdrawal(updated.rows[0], 'processing');
 
           return updated.rows[0];
         }
+
+        await this.notifyWithdrawal(withdrawal, 'approved');
 
         return withdrawal;
       }
@@ -241,7 +256,7 @@ class AgentWithdrawalService {
   /**
    * Reject withdrawal request
    */
-  static async rejectWithdrawal(withdrawalId, rejectionReason, rejectedByUserId) {
+  static async rejectWithdrawal(withdrawalId, rejectionReason, rejectedByUserId, context = {}) {
     try {
       const result = await db.query(
         `UPDATE agent_withdrawal_requests
@@ -259,8 +274,11 @@ class AgentWithdrawalService {
           'pending',
           'rejected',
           rejectedByUserId,
-          rejectionReason
+          rejectionReason,
+          context
         );
+
+        await this.notifyWithdrawal(withdrawal, 'rejected', { reason: rejectionReason });
 
         return withdrawal;
       }
@@ -273,7 +291,7 @@ class AgentWithdrawalService {
   /**
    * Mark withdrawal as processing
    */
-  static async markAsProcessing(withdrawalId, processedByUserId) {
+  static async markAsProcessing(withdrawalId, processedByUserId, context = {}) {
     try {
       const result = await db.query(
         `UPDATE agent_withdrawal_requests
@@ -289,8 +307,12 @@ class AgentWithdrawalService {
           'withdrawal_processed',
           'approved',
           'processing',
-          processedByUserId
+          processedByUserId,
+          '',
+          context
         );
+
+        await this.notifyWithdrawal(result.rows[0], 'processing');
 
         return result.rows[0];
       }
@@ -303,7 +325,7 @@ class AgentWithdrawalService {
   /**
    * Mark withdrawal as completed
    */
-  static async markAsCompleted(withdrawalId, processedByUserId, paymentReference = null) {
+  static async markAsCompleted(withdrawalId, processedByUserId, paymentReference = null, context = {}) {
     try {
       const result = await db.query(
         `UPDATE agent_withdrawal_requests
@@ -320,8 +342,11 @@ class AgentWithdrawalService {
           'processing',
           'completed',
           processedByUserId,
-          paymentReference
+          paymentReference,
+          context
         );
+
+        await this.notifyWithdrawal(result.rows[0], 'completed');
 
         return result.rows[0];
       }
@@ -410,6 +435,19 @@ class AgentWithdrawalService {
       // Receipt email failures must not break the webhook reconciliation.
     }
 
+    try {
+      const contact = await this.getContact(withdrawal.agent_user_id);
+      if (contact?.phone) {
+        const label = transferStatus === 'success' ? 'completed' : transferStatus;
+        await sendSMS(
+          contact.phone,
+          `RentalHub: withdrawal #${withdrawal.id} of ${formatNaira(withdrawal.amount)} is now ${label}.`
+        );
+      }
+    } catch (smsError) {
+      // SMS failures must not break webhook reconciliation.
+    }
+
     return updated.rows[0] || null;
   }
 
@@ -439,19 +477,102 @@ class AgentWithdrawalService {
   }
 
   /**
-   * Log withdrawal audit
+   * Fetch the withdrawal owner's contact details for notifications.
    */
-  static async logWithdrawalAudit(withdrawalId, actionType, oldStatus, newStatus, performedByUserId, notes = '') {
+  static async getContact(userId) {
+    try {
+      const result = await db.query(
+        'SELECT email, phone, full_name FROM users WHERE id = $1',
+        [userId]
+      );
+      return result.rows[0] || null;
+    } catch (error) {
+      logger.error(`Error loading withdrawal contact: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Email + SMS the withdrawal owner on every state change. Creates an external,
+   * timestamped paper trail and gives the user an early chance to report fraud.
+   * Best-effort: notification failures never block the money movement.
+   */
+  static async notifyWithdrawal(withdrawal, event, extra = {}) {
+    if (!withdrawal || !withdrawal.agent_user_id) return;
+    try {
+      const contact = await this.getContact(withdrawal.agent_user_id);
+      if (!contact) return;
+
+      const amount = formatNaira(withdrawal.amount);
+      const ref = `#${withdrawal.id}`;
+      const messages = {
+        requested: `A withdrawal of ${amount} was requested from your RentalHub earnings (ref ${ref}). If you did not request this, contact support@rentalhub.com.ng immediately.`,
+        approved: `Your withdrawal of ${amount} (ref ${ref}) was approved.`,
+        rejected: `Your withdrawal of ${amount} (ref ${ref}) was rejected.${extra.reason ? ` Reason: ${extra.reason}` : ''}`,
+        processing: `Your withdrawal of ${amount} (ref ${ref}) is being processed.`,
+        completed: `Your withdrawal of ${amount} (ref ${ref}) has been completed.`,
+      };
+      const message = messages[event] || `Withdrawal ${ref} update: ${event}.`;
+      const greeting = contact.full_name ? ` ${String(contact.full_name).split(' ')[0]}` : '';
+
+      if (contact.email) {
+        await sendEmail({
+          to: contact.email,
+          subject: `RentalHub withdrawal ${ref}: ${event}`,
+          html: `<p>Hello${greeting},</p><p>${message}</p><p>— RentalHub NG</p>`,
+        }).catch((error) => logger.error(`Withdrawal email failed: ${error.message}`));
+      }
+
+      if (contact.phone) {
+        await sendSMS(contact.phone, `RentalHub: ${message}`).catch((error) =>
+          logger.error(`Withdrawal SMS failed: ${error.message}`)
+        );
+      }
+    } catch (error) {
+      logger.error(`Withdrawal notification error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Log withdrawal audit with request context (IP, device, metadata).
+   * Fail-closed for finance operations: if the audit cannot be written, the
+   * caller's action is aborted so no money moves without a record.
+   */
+  static async logWithdrawalAudit(
+    withdrawalId,
+    actionType,
+    oldStatus,
+    newStatus,
+    performedByUserId,
+    notes = '',
+    context = {}
+  ) {
     try {
       await db.query(
-        `INSERT INTO agent_withdrawal_audit 
-         (withdrawal_request_id, action_type, old_status, new_status, performed_by_user_id, notes)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [withdrawalId, actionType, oldStatus, newStatus, performedByUserId, notes]
+        `INSERT INTO agent_withdrawal_audit
+         (withdrawal_request_id, action_type, old_status, new_status,
+          performed_by_user_id, notes, ip_address, user_agent, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
+        [
+          withdrawalId,
+          actionType,
+          oldStatus,
+          newStatus,
+          performedByUserId,
+          notes,
+          context.ip || null,
+          context.userAgent || null,
+          JSON.stringify({
+            factor: context.factor || null,
+            consent: context.consent === true,
+            at: new Date().toISOString(),
+            ...(context.metadata || {}),
+          }),
+        ]
       );
     } catch (error) {
-      logger.error(`Error logging withdrawal audit: ${error.message}`);
-      // Don't throw - audit shouldn't fail the main operation
+      logger.error(`CRITICAL: withdrawal audit write failed (${actionType} #${withdrawalId}): ${error.message}`);
+      throw new Error('Could not record the withdrawal audit entry; the action was aborted.');
     }
   }
 }

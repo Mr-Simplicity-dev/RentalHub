@@ -42,6 +42,8 @@ const {
   verifyPaystackSignature,
 } = require('../config/utils/paystackWebhookSecurity');
 const logger = require('../config/utils/logger');
+const { sendSMS } = require('../config/utils/smsService');
+const { sendEmail } = require('../config/utils/mailer');
 
 // ====================== PAYSTACK CONFIG ======================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -2935,6 +2937,77 @@ exports.verifyListingPayment = async (req, res) => {
 //                 RENT PAYMENT
 // =====================================================
 
+// A tenant may pay rent for a property only if they have a completed rent
+// payment for it or an approved application. Anything else must use the
+// on-behalf flow, so a tenant cannot pay for a property that is not theirs.
+async function isTenantEligibleForProperty(tenantId, propertyId) {
+  const result = await db.query(
+    `SELECT 1 FROM payments
+       WHERE user_id = $1 AND property_id = $2
+         AND payment_type = 'rent_payment' AND payment_status = 'completed'
+     UNION
+     SELECT 1 FROM applications
+       WHERE tenant_id = $1 AND property_id = $2 AND status = 'approved'
+     LIMIT 1`,
+    [tenantId, propertyId]
+  );
+  return result.rows.length > 0;
+}
+
+// Email + SMS the parties to a rent payment. Best-effort; never blocks money.
+async function notifyRentPayment(paymentId, event) {
+  try {
+    const result = await db.query(
+      `SELECT p.id, p.user_id, p.payer_user_id, p.amount, p.property_id,
+              tenant.email AS tenant_email, tenant.phone AS tenant_phone, tenant.full_name AS tenant_name,
+              payer.email AS payer_email, payer.phone AS payer_phone, payer.full_name AS payer_name,
+              prop.title AS property_title
+       FROM payments p
+       JOIN users tenant ON tenant.id = p.user_id
+       LEFT JOIN users payer ON payer.id = p.payer_user_id
+       LEFT JOIN properties prop ON prop.id = p.property_id
+       WHERE p.id = $1`,
+      [paymentId]
+    );
+    const row = result.rows[0];
+    if (!row) return;
+
+    const amount = `NGN ${Number(row.amount || 0).toLocaleString('en-NG')}`;
+    const title = row.property_title || 'a property';
+    const started = event === 'initiated';
+    const tenantMsg = started
+      ? `A rent payment of ${amount} for ${title} has been started on your behalf${row.payer_name ? ` by ${row.payer_name}` : ''}. If you did not expect this, contact support@rentalhub.com.ng.`
+      : `Your rent payment of ${amount} for ${title} was completed.`;
+    const payerMsg = started
+      ? `You started a rent payment of ${amount} for ${title}${row.tenant_name ? ` (for ${row.tenant_name})` : ''}. If this was not you, contact support@rentalhub.com.ng immediately.`
+      : `Your rent payment of ${amount} for ${title} was completed.`;
+
+    const deliver = async (email, phone, message) => {
+      if (email) {
+        await sendEmail({
+          to: email,
+          subject: `RentalHub rent payment #${row.id}`,
+          html: `<p>${message}</p><p>— RentalHub NG</p>`,
+        }).catch((error) => logger.error(`Rent payment email failed: ${error.message}`));
+      }
+      if (phone) {
+        await sendSMS(phone, `RentalHub: ${message}`).catch((error) =>
+          logger.error(`Rent payment SMS failed: ${error.message}`)
+        );
+      }
+    };
+
+    await deliver(row.tenant_email, row.tenant_phone, tenantMsg);
+    if (row.payer_user_id && row.payer_user_id !== row.user_id) {
+      await deliver(row.payer_email, row.payer_phone, payerMsg);
+    } else {
+      await deliver(row.tenant_email, row.tenant_phone, payerMsg);
+    }
+  } catch (error) {
+    logger.error(`Rent payment notification error: ${error.message}`);
+  }
+}
+
 exports.initializeRentPayment = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -2975,6 +3048,19 @@ exports.initializeRentPayment = async (req, res) => {
     }
 
     const property = propertyResult.rows[0];
+
+    // Ownership gate: a tenant may only pay rent for a property they have an
+    // approved application for or have already paid rent on. Otherwise the
+    // on-behalf flow must be used, so a tenant cannot pay for a property that
+    // is not theirs (and cannot mistakenly pay for another tenant's property).
+    const eligibleForProperty = await isTenantEligibleForProperty(userId, property_id);
+    if (!eligibleForProperty) {
+      return res.status(403).json({
+        success: false,
+        code: 'RENT_PAYMENT_NOT_ELIGIBLE',
+        message: 'You can only pay rent for a property you have applied for and been approved, or have paid before. To pay for someone else, ask them to share a rent payment link.',
+      });
+    }
 
     // Reject amounts that are unreasonably below the listed rent for the period.
     // rent_amount is stored per payment_frequency (monthly or yearly).
@@ -3032,15 +3118,22 @@ exports.initializeRentPayment = async (req, res) => {
     const landlordAmount = amount - platformFee;
 
     // Save payment record
+    const initiatedIp = req.ip || null;
+    const initiatedUserAgent = req.headers['user-agent'] || null;
+    const consentConfirmed = req.body.consent === true || req.body.consent === 'true';
+
     const paymentResult = await db.query(
       `INSERT INTO payments (user_id, payment_type, amount, currency,
-                             property_id, payment_method, payment_status)
-       VALUES ($1, 'rent_payment', $2, 'NGN', $3, $4, 'pending')
+                             property_id, payment_method, payment_status,
+                             initiated_ip, initiated_user_agent, consent_confirmed)
+       VALUES ($1, 'rent_payment', $2, 'NGN', $3, $4, 'pending', $5, $6, $7)
        RETURNING id`,
-      [userId, amount, property_id, payment_method]
+      [userId, amount, property_id, payment_method, initiatedIp, initiatedUserAgent, consentConfirmed]
     );
 
     const paymentId = paymentResult.rows[0].id;
+
+    await notifyRentPayment(paymentId, 'initiated');
 
     if (payment_method === "paystack") {
       const paystackResponse = await axios.post(
@@ -3166,10 +3259,11 @@ exports.createRentPaymentRequest = async (req, res) => {
     const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
 
     const result = await db.query(
-      `INSERT INTO rent_payment_requests (tenant_user_id, property_id, amount, token, expires_at)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO rent_payment_requests (tenant_user_id, property_id, amount, token, expires_at,
+                                          created_ip, created_user_agent, consent_confirmed)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
        RETURNING id, amount, token, expires_at`,
-      [tenantUserId, propertyId, rent, token, expiresAt]
+      [tenantUserId, propertyId, rent, token, expiresAt, req.ip || null, req.headers['user-agent'] || null]
     );
     const created = result.rows[0];
 
@@ -3290,22 +3384,37 @@ exports.initializeHelpRentPayment = async (req, res) => {
     const platformFee = amount * 0.025;
     const landlordAmount = amount - platformFee;
 
+    const beneficiaryConfirmed = req.body.beneficiary_confirm === true || req.body.beneficiary_confirm === 'true';
+
     const paymentResult = await db.query(
       `INSERT INTO payments (user_id, payer_user_id, payment_type, amount, currency,
-                             property_id, payment_method, payment_status)
-       VALUES ($1, $2, 'rent_payment', $3, 'NGN', $4, $5, 'pending')
+                             property_id, payment_method, payment_status,
+                             initiated_ip, initiated_user_agent, consent_confirmed)
+       VALUES ($1, $2, 'rent_payment', $3, 'NGN', $4, $5, 'pending', $6, $7, $8)
        RETURNING id`,
-      [tenantUserId, payerUserId, amount, request.property_id, paymentMethod]
+      [
+        tenantUserId,
+        payerUserId,
+        amount,
+        request.property_id,
+        paymentMethod,
+        req.ip || null,
+        req.headers['user-agent'] || null,
+        beneficiaryConfirmed,
+      ]
     );
     const paymentId = paymentResult.rows[0].id;
 
     // Single use: mark the link used at initialization so it cannot be replayed.
     await db.query(
       `UPDATE rent_payment_requests
-       SET status = 'used', payer_user_id = $2, used_at = CURRENT_TIMESTAMP
+       SET status = 'used', payer_user_id = $2, used_at = CURRENT_TIMESTAMP,
+           beneficiary_confirmed_at = CASE WHEN $3 THEN CURRENT_TIMESTAMP ELSE beneficiary_confirmed_at END
        WHERE id = $1`,
-      [request.id, payerUserId]
+      [request.id, payerUserId, beneficiaryConfirmed]
     );
+
+    await notifyRentPayment(paymentId, 'initiated');
 
     if (paymentMethod === 'paystack') {
       const paystackResponse = await axios.post(
@@ -3586,6 +3695,7 @@ exports.verifyRentPayment = async (req, res) => {
 
     if (!wasAlreadyCompleted) {
       await maybeSendRentOnBehalfReceipts(payment.id);
+      await notifyRentPayment(payment.id, 'completed');
     }
 
      res.json({
@@ -4207,6 +4317,7 @@ async function handleSuccessfulPayment(data, webhookLogger) {
     // On-behalf rent receipts (idempotent) — never fail the webhook.
     try {
       await maybeSendRentOnBehalfReceipts(paymentId);
+      await notifyRentPayment(paymentId, 'completed');
     } catch {
       // Best-effort.
     }
