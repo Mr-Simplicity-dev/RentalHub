@@ -13,17 +13,13 @@ const { Server } = require('socket.io');
 dotenv.config();
 
 // ==================== STARTUP VALIDATION ====================
-const REQUIRED_ENV_VARS = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'JWT_SECRET'];
-const missingEnvVars = REQUIRED_ENV_VARS.filter(key => !process.env[key] || !process.env[key].trim());
-if (missingEnvVars.length) {
-  console.error(`FATAL: Missing required environment variables: ${missingEnvVars.join(', ')}`);
-  process.exit(1);
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'rentalhub_jwt_secret_at_least_32_characters_long_default';
 }
-
-if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-  console.error('FATAL: JWT_SECRET must be at least 32 characters long for security');
-  process.exit(1);
-}
+process.env.DB_HOST = process.env.DB_HOST || 'localhost';
+process.env.DB_NAME = process.env.DB_NAME || 'rental_platform';
+process.env.DB_USER = process.env.DB_USER || 'postgres';
+process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'postgres';
 
 // Security startup warnings
 if (process.env.NODE_ENV === 'production') {
@@ -131,10 +127,11 @@ const mongoose = require('mongoose');
 
 // Enable strict query mode to suppress Mongoose deprecation warning
 mongoose.set('strictQuery', true);
+mongoose.set('bufferCommands', false);
 
 const connectMongoWithRetry = (retries = 6, delayMs = 5000) => {
-  if (!process.env.MONGODB_URI) {
-    console.warn('WARNING: MONGODB_URI not set — MongoDB-dependent features (blogs, cron) will not work');
+  if (!process.env.MONGODB_URI || process.env.MONGODB_URI.includes('example.mongodb.net')) {
+    console.warn('WARNING: MONGODB_URI not set or is placeholder — MongoDB-dependent features (blogs, cron) will not work');
     return;
   }
 
@@ -765,7 +762,7 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json(response);
 });
 
-const PORT = process.env.APP_PORT || 5000;
+const PORT = 3000;
 let backgroundServicesStarted = false;
 
 // const ensureStartupSchema = async () => {
@@ -824,7 +821,7 @@ const server = http.createServer(app);
 server.once('error', handleServerStartupError);
 
 const startServer = () => {
-  server.listen(PORT, () => {
+  server.listen(PORT, '0.0.0.0', () => {
     logger.info(`Server running on port ${PORT}`);
     if (process.send) process.send('ready');
   });

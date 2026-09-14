@@ -1,0 +1,8 @@
+{
+  "name": "RentalHub NG",
+  "description": "Nigerian rental property platform for finding and managing properties, connecting tenants, landlords, and agents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
