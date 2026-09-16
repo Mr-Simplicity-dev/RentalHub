@@ -4269,6 +4269,14 @@ async function handleSuccessfulPayment(data, webhookLogger) {
       return;
     }
 
+    if (storedPayment.payment_status === 'completed') {
+      webhookLogger.info('Ignoring duplicate Paystack success event for already completed payment', {
+        reference,
+        paymentId: storedPayment.id,
+      });
+      return;
+    }
+
     if (!amountMatchesStoredPayment(storedPayment.amount, data.amount)) {
       webhookLogger.error('Blocked Paystack fulfillment because the amount did not match', {
         reference,
@@ -4571,6 +4579,43 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           [JSON.stringify(data), withdrawal.id]
         );
 
+        // Mark pending commissions covered by this withdrawal as paid
+        try {
+          let snapshotItems = withdrawal.commissions_snapshot;
+          if (typeof snapshotItems === 'string') {
+            try { snapshotItems = JSON.parse(snapshotItems); } catch (_) { snapshotItems = []; }
+          }
+          if (Array.isArray(snapshotItems) && snapshotItems.length > 0) {
+            const commissionIds = snapshotItems
+              .map((item) => Number(item.id))
+              .filter((id) => Number.isInteger(id) && id > 0);
+            if (commissionIds.length > 0) {
+              await db.query(
+                `UPDATE admin_commissions
+                 SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ANY($1::int[]) AND status = 'pending'`,
+                [commissionIds]
+              );
+            } else {
+              await db.query(
+                `UPDATE admin_commissions
+                 SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
+                [withdrawal.admin_id, withdrawal.requested_at || new Date()]
+              );
+            }
+          } else {
+            await db.query(
+              `UPDATE admin_commissions
+               SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+               WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
+              [withdrawal.admin_id, withdrawal.requested_at || new Date()]
+            );
+          }
+        } catch (commErr) {
+          console.error('Failed to mark admin_commissions as paid upon transfer.success:', commErr.message);
+        }
+
         // Email the admin a payout receipt with itemized commissions
         sendAdminPayoutReceipt({
           adminId: withdrawal.admin_id,
@@ -4664,14 +4709,39 @@ async function handleFailedPayment(data, webhookLogger) {
        SET payment_status = 'failed',
            gateway_response = $1
        WHERE transaction_reference = $2
-       RETURNING id`,
+       RETURNING id, user_id, amount, payment_type`,
       [JSON.stringify(data), reference]
     );
 
     if (paymentResult.rows.length > 0) {
-      const paymentId = paymentResult.rows[0].id;
-      await commissionService.clawbackCommissionsForPayment(paymentId, 
-'payment_failed');
+      const payment = paymentResult.rows[0];
+      await commissionService.clawbackCommissionsForPayment(payment.id, 'payment_failed');
+
+      try {
+        const userRes = await db.query('SELECT full_name, email FROM users WHERE id = $1', [payment.user_id]);
+        if (userRes.rows.length > 0 && userRes.rows[0].email) {
+          const user = userRes.rows[0];
+          const { sendEmail } = require('../config/utils/mailer');
+          const reason = data?.gateway_response || data?.message || 'Transaction could not be completed by your bank/card issuer.';
+          await sendEmail({
+            to: user.email,
+            subject: 'Payment Failed - RentalHub NG',
+            html: `
+              <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto; color: #111827;">
+                <h3 style="color: #dc2626; margin-top: 0;">Payment Not Completed</h3>
+                <p>Hello ${user.full_name || 'there'},</p>
+                <p>Your payment attempt of <strong>₦${Number(payment.amount || 0).toLocaleString()}</strong> (${payment.payment_type?.replace(/_/g, ' ') || 'Payment'}) with reference <strong>${reference}</strong> was not successful.</p>
+                <div style="padding: 12px 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 14px; color: #991b1b; margin: 16px 0;">
+                  <strong>Reason:</strong> ${reason}
+                </div>
+                <p style="font-size: 13px; color: #64748b;">No funds were deducted from your account. You can retry the payment anytime from your RentalHub dashboard on web or mobile.</p>
+              </div>
+            `,
+          });
+        }
+      } catch (notifyErr) {
+        // Non-blocking notification
+      }
     }
 
     // Registration payments live in tenant_registration_payments (no `payments`

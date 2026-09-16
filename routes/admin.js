@@ -214,4 +214,73 @@ router.get(
   evidenceVerificationController.adminGetVerificationLogs
 );
 
+/**
+ * =========================
+ * REGISTRATION ABANDONMENT & RECOVERY
+ * =========================
+ */
+const {
+  getAbandonedRegistrationsSummary,
+  expireAbandonedRegistrations,
+  reconcileRegisteredUsers,
+} = require('../jobs/registrationReminderJobs');
+
+router.get('/registrations/abandoned', requireAdminOrSuperAdmin, async (req, res) => {
+  try {
+    const summary = await getAbandonedRegistrationsSummary();
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+    const statusFilter = req.query.status || 'pending'; // 'pending' | 'abandoned' | 'all'
+
+    const db = require('../config/middleware/database');
+    const whereClause =
+      statusFilter === 'all'
+        ? `WHERE trp.registered_user_id IS NULL`
+        : `WHERE trp.payment_status = $1 AND trp.registered_user_id IS NULL`;
+    const queryParams = statusFilter === 'all' ? [limit, offset] : [statusFilter, limit, offset];
+
+    const records = await db.query(
+      `SELECT trp.id, trp.user_type, trp.email, trp.phone, trp.full_name, trp.amount, trp.currency,
+              trp.transaction_reference, trp.payment_status, trp.reminder_sent_at,
+              COALESCE(trp.reminder_count, 0) AS reminder_count, trp.abandoned_at, trp.created_at
+       FROM tenant_registration_payments trp
+       ${whereClause}
+       ORDER BY trp.created_at DESC
+       LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`,
+      queryParams
+    );
+
+    res.json({
+      success: true,
+      data: {
+        summary,
+        records: records.rows || [],
+        pagination: { page, limit },
+      },
+    });
+  } catch (error) {
+    req.logger ? req.logger.error('Failed to get abandoned registrations:', error) : console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to get abandoned registrations' });
+  }
+});
+
+router.post('/registrations/abandoned/expire', requireAdminOrSuperAdmin, async (req, res) => {
+  try {
+    const reconciled = await reconcileRegisteredUsers();
+    const expired = await expireAbandonedRegistrations();
+    const summary = await getAbandonedRegistrationsSummary();
+
+    res.json({
+      success: true,
+      message: `Reconciled ${reconciled} registrations and expired ${expired} abandoned registrations`,
+      data: { reconciled, expired, summary },
+    });
+  } catch (error) {
+    req.logger ? req.logger.error('Failed to expire abandoned registrations:', error) : console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to expire abandoned registrations' });
+  }
+});
+
 module.exports = router;
+

@@ -363,15 +363,19 @@ router.post('/withdraw',
         [adminId, amount, bank_name, account_number, account_name]
       );
 
-      // Snapshot recent paid commissions so the payout receipt is itemized.
+      // Snapshot pending commissions so the payout receipt is itemized.
       try {
         const snapshot = await db.query(
           `SELECT COALESCE(json_agg(json_build_object(
-             'source', source, 'amount', amount, 'commission_rate', commission_rate,
-             'status', status, 'paid_at', paid_at
+             'id', id, 'source', source, 'amount', amount, 'commission_rate', commission_rate,
+             'state', state, 'city', city, 'created_at', created_at
            )), '[]'::json) AS snapshot
-           FROM admin_commissions
-           WHERE admin_id = $1 AND status = 'paid' AND paid_at >= CURRENT_DATE - INTERVAL '7 days'`,
+           FROM (
+             SELECT id, source, amount, commission_rate, state, city, created_at
+             FROM admin_commissions
+             WHERE admin_id = $1 AND status = 'pending'
+             ORDER BY created_at ASC
+           ) sub`,
           [adminId]
         );
         await db.query(

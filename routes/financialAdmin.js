@@ -633,6 +633,58 @@ router.post('/withdrawals/:withdrawalId/approve',
         },
       });
 
+      // If transfer succeeded synchronously, mark commissions paid and send receipt
+      if (transfer?.status === 'success') {
+        try {
+          let snapshotItems = withdrawal.commissions_snapshot;
+          if (typeof snapshotItems === 'string') {
+            try { snapshotItems = JSON.parse(snapshotItems); } catch (_) { snapshotItems = []; }
+          }
+          if (Array.isArray(snapshotItems) && snapshotItems.length > 0) {
+            const commissionIds = snapshotItems
+              .map((item) => Number(item.id))
+              .filter((id) => Number.isInteger(id) && id > 0);
+            if (commissionIds.length > 0) {
+              await db.query(
+                `UPDATE admin_commissions
+                 SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ANY($1::int[]) AND status = 'pending'`,
+                [commissionIds]
+              );
+            } else {
+              await db.query(
+                `UPDATE admin_commissions
+                 SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
+                [withdrawal.admin_id, withdrawal.requested_at || new Date()]
+              );
+            }
+          } else {
+            await db.query(
+              `UPDATE admin_commissions
+               SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+               WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
+              [withdrawal.admin_id, withdrawal.requested_at || new Date()]
+            );
+          }
+        } catch (commErr) {
+          req.logger.warn('Failed to mark admin commissions paid on instant approval:', commErr.message);
+        }
+
+        try {
+          const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
+          sendAdminPayoutReceipt({
+            adminId: withdrawal.admin_id,
+            amount: withdrawal.amount,
+            bankName: withdrawal.bank_name,
+            accountNumber: withdrawal.account_number,
+            accountName: withdrawal.account_name,
+            reference: transfer?.reference || reference,
+            snapshot: withdrawal.commissions_snapshot || null,
+          }).catch(() => {});
+        } catch (_) {}
+      }
+
       await db.query('COMMIT');
       
       res.json({
@@ -748,6 +800,22 @@ router.post('/withdrawals/:withdrawalId/reject',
           refunded_to_wallet: true,
         },
       });
+
+      // Send rejection receipt/notice so the admin knows why it was rejected and that balance was refunded
+      try {
+        const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
+        sendAdminPayoutReceipt({
+          adminId: withdrawal.admin_id,
+          amount: withdrawal.amount,
+          bankName: withdrawal.bank_name,
+          accountNumber: withdrawal.account_number,
+          accountName: withdrawal.account_name,
+          reference: withdrawal.paystack_transfer_reference || `SAW_REJ_${withdrawal.id}`,
+          status: 'rejected',
+          note: `Withdrawal request was rejected: ${adminNote}. Your funds have been refunded to your admin wallet balance.`,
+          snapshot: withdrawal.commissions_snapshot || null,
+        }).catch(() => {});
+      } catch (_) {}
 
       await db.query('COMMIT');
       

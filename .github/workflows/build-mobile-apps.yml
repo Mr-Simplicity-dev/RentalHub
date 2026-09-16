@@ -65,6 +65,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify tour and navigation contracts
+        run: npm run test:tour
+
       - name: Build APK with EAS
         run: npx eas build -p android --profile preview --non-interactive
         env:
@@ -90,6 +93,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify tour and navigation contracts
+        run: npm run test:tour
 
       - name: Build IPA with EAS
         run: npx eas build -p ios --profile preview --non-interactive

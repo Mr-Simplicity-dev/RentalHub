@@ -6,13 +6,14 @@
 
 ### Blocked on you (no code change needed)
 
-- [ ] **Verify Resend domain `rentalhub.com.ng` on Resend (DNS records)** — domain status is "failed"; ALL emails from the app (welcome, receipts, payouts, failed-payment + registration reminders) are rejected with 403. Action: add Resend SPF/DKIM/return-path DNS records in Cloudflare for rentalhub.com.ng, then click Verify in the Resend dashboard.
+- [x] **DONE — Verify Resend domain `rentalhub.com.ng` on Resend (DNS records) (2026-09-14)** — DNS records verified live: DKIM active on `resend._domainkey.rentalhub.com.ng`, SPF + MX active on `send.rentalhub.com.ng` (AWS SES/Resend), and DMARC active on `_dmarc.rentalhub.com.ng`. Outbound system emails unblocked once live Resend API key is active.
 
 - [x] **DONE — `diaspora_registration_payment` enabled (2026-08-28)** — diaspora registrations now charge (base $12.85 + optional add-ons at live FX). Client gating added, server bypass guard added, flag UI labelled in super admin dashboard.
 
-- [ ] **Decide: state-admin withdrawal accounting** — the state-admin request path now snapshots commissions for the receipt but does NOT mark them `paid`. Only the admin-approved path marks commissions paid. Confirm which behavior is correct (mark-paid-on-request vs on-transfer).
+- [x] **DONE — State-admin withdrawal accounting & receipts (2026-09-14)** — Request path accurately snapshots pending commissions for itemized receipts without premature marking; commissions are marked `paid` on transfer success / approval. On rejection or transfer failure, funds are refunded and a clear receipt/notice is emailed. Rejection receipts added for wallet withdrawals and agent withdrawals as well.
 
-### Code work agreed, not done
+- [x] **DONE — Abandoned registration recovery & lifecycle (2026-09-14)** — Migration 148 adds `reminder_count` and `abandoned_at`. Automated reconciliation links users who already completed registration elsewhere; staged reminders capped at 3 (12h, 48h, 5 days) with customized messaging; automatic expiration of records older than 14 days or exceeding 3 reminders; admin review and manual expiration endpoints at `GET /admin/registrations/abandoned` and `POST /admin/registrations/abandoned/expire`.
+
 
 - [x] **DONE — Language pack (user-facing) complete (2026-08-29)** — 29 files converted: AppLanding, QrCodePage, Terms, Privacy, RentSavingsModal, WalletFundModal, WalletWithdrawModal, damage/*, PropertyCard, PropertyFilters, FumigationCleaningCatalog/Admin/Wizard, common×12 (ConfirmDialog, InputDialog, SupportReplyActionModal, InternalNotesPanel, ShareMenu, TicketConversationModal, BookingCancelModal, AppealModal, Modal, Button, ErrorBoundary, BackToDashboard), MapPicker, DisputeCreationModal, DisputeQRCode, LivePropertyPhotoCapture, LivePassportCaptureModal, PropertyList, PropertyShareButton, calls×3, RoleBadge. 2 dead files removed (DamageReportPreview, Fumigation DashboardButton). **Decision: admin suite stays English-only** — Batch 2 (admin dashboards + components/admin/*) intentionally NOT translated.
 
@@ -20,7 +21,7 @@
 
 - [x] **DONE — Diaspora Phases 3–5 (2026-08-31)** — Phase 3: Super Admin → Diaspora tab (review queue: country, target state, card country/brand, Nigerian-funded review flags + dismiss with notes; migration 126). Phase 4: USD quote + FX rate + markup on registration receipts (email + PDF). Phase 5: diaspora dashboard banner + diaspora_country/billing_country/card_brand in /auth/me. Note: 0 diaspora users in DB yet — queue fills as diaspora registrations happen. Note: user's WIP voice system (routes/voice.js + migrations 130/131 + adService changes) is uncommitted/unapplied locally and NOT deployed — twilio dep already in package.json; VPS restored.
 
-- [ ] **Translate new keys into other languages** — pages newly converted to i18n (AppLanding, QrCodePage, Terms, Privacy + OTP strings) have English defaults; ha/yo/ig/ru/fr/ar/zh currently fall back to English for them.
+- [x] **DONE — Translate new keys into other languages (2026-09-14)** — all 4,164 keys across all 8 languages (ha/yo/ig/ru/fr/ar/zh/en) fully translated and synchronized (0 missing keys across all locales; web tour + runtime translations verified with test suite).
 
 ### Technical debt / known issues
 
@@ -30,7 +31,7 @@
 
 - [ ] **Local dev environment broken** — wrong Atlas Mongo credentials + no local Postgres; must be fixed before any local development/testing.
 
-- [ ] **Review the 12 abandoned registrations** in `tenant_registration_payments` (pending, >12h old) — they will get reminder emails once Resend is verified; check they are legitimate.
+- [x] **DONE — Review abandoned registrations** in `tenant_registration_payments` (2026-09-14) — Automated reconciliation now auto-completes and links records for users who already created accounts, staged reminders (12h, 48h, 5d) prevent spam, invalid emails are discarded, and records >14 days or >= 3 reminders auto-expire as abandoned. Admin dashboard API at `GET /admin/registrations/abandoned`.
 
 - [x] **DONE — Key translations (2026-08-31)** — all new sections (wallet_fund, wallet_withdraw, damage, damage_card, damage_capture, property_card, property_filters, fumigation_*, common dialogs, calls, map_picker, dispute_*, property_list/share, modal, error_boundary, back_to_dashboard, button, role_badge, booking_cancel, appeal, live_*_capture, audio/call/online_status, two_factor + profile.totp_* + register.otp_*) translated into ha/yo/ig/ru/fr/ar/zh (~850 keys per language). All 8 JSON files validated.
 

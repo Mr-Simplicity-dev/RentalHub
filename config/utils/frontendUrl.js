@@ -8,7 +8,6 @@ const isConfiguredUrl = (url) =>
 
 const isSecureProductionOrigin = (url) => {
   if (process.env.NODE_ENV !== 'production') return true;
-  if (process.env.ALLOW_INSECURE_CORS_ORIGINS === 'true') return true;
   return normalizeUrl(url).startsWith('https://');
 };
 

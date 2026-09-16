@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCheckCircle, FaExclamationTriangle, FaTimes, FaWallet } from 'react-icons/fa';
 import ApprovalTimeline from '../common/ApprovalTimeline';
@@ -223,6 +223,11 @@ export default function WalletWithdrawModal({
                     }
                     finalStatus={w.status === 'processed' ? 'approved' : w.status}
                   />
+                  {(w.rejection_reason || w.payout_failed_reason) && (
+                    <p className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">
+                      <strong>{t('wallet_withdraw.reason', 'Reason')}:</strong> {w.rejection_reason || w.payout_failed_reason}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

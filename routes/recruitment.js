@@ -4,6 +4,7 @@ const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const recruitmentController = require('../controllers/recruitmentController');
 const { authenticate } = require('../config/middleware/auth');
@@ -128,6 +129,96 @@ const recordingUpload = multer({
   }
 });
 
+const isValidDocumentMagicBytes = (filePath) => {
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(16);
+    const bytesRead = fs.readSync(fd, buf, 0, 16, 0);
+    fs.closeSync(fd);
+    if (bytesRead < 4) return false;
+
+    // JPEG: FF D8 FF
+    if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return true;
+    // PNG: 89 50 4E 47
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return true;
+    // PDF: %PDF (25 50 44 46)
+    if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return true;
+    // DOC (OLE compound): D0 CF 11 E0
+    if (buf[0] === 0xD0 && buf[1] === 0xCF && buf[2] === 0x11 && buf[3] === 0xE0) return true;
+    // DOCX (ZIP): 50 4B 03 04
+    if (buf[0] === 0x50 && buf[1] === 0x4B && buf[2] === 0x03 && buf[3] === 0x04) return true;
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+const isValidRecordingMagicBytes = (filePath) => {
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(16);
+    const bytesRead = fs.readSync(fd, buf, 0, 16, 0);
+    fs.closeSync(fd);
+    if (bytesRead < 4) return false;
+
+    // WebM: 1A 45 DF A3
+    if (buf[0] === 0x1A && buf[1] === 0x45 && buf[2] === 0xDF && buf[3] === 0xA3) return true;
+    // MP4: bytes 4-7 are 'ftyp'
+    if (bytesRead >= 8 && buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return true;
+    // WAV: RIFF at 0, WAVE at 8
+    if (bytesRead >= 12 && buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WAVE') return true;
+    // MP3: ID3 or MPEG audio frame sync (FF FB / FF F3 / FF F2 / FF E0)
+    if (buf.slice(0, 3).toString('ascii') === 'ID3') return true;
+    if (buf[0] === 0xFF && (buf[1] & 0xE0) === 0xE0) return true;
+    // MPEG: 00 00 01 BA or 00 00 01 B3
+    if (buf[0] === 0x00 && buf[1] === 0x00 && buf[2] === 0x01 && (buf[3] === 0xBA || buf[3] === 0xB3)) return true;
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+const validateRecruitmentDocumentMagicBytes = (req, res, next) => {
+  if (!req.files) return next();
+  const allFiles = [];
+  Object.values(req.files).forEach((fileOrArray) => {
+    if (Array.isArray(fileOrArray)) {
+      allFiles.push(...fileOrArray);
+    } else if (fileOrArray) {
+      allFiles.push(fileOrArray);
+    }
+  });
+
+  for (const file of allFiles) {
+    if (file && file.path && !isValidDocumentMagicBytes(file.path)) {
+      allFiles.forEach((f) => {
+        if (f && f.path) {
+          try { fs.unlinkSync(f.path); } catch (_) {}
+        }
+      });
+      return res.status(400).json({
+        success: false,
+        message: 'Uploaded file content does not match allowed types (PDF, Word, or image).',
+      });
+    }
+  }
+  next();
+};
+
+const validateRecruitmentRecordingMagicBytes = (req, res, next) => {
+  if (!req.file) return next();
+  if (req.file.path && !isValidRecordingMagicBytes(req.file.path)) {
+    try { fs.unlinkSync(req.file.path); } catch (_) {}
+    return res.status(400).json({
+      success: false,
+      message: 'Uploaded recording content does not match allowed audio/video formats.',
+    });
+  }
+  next();
+};
+
 // ==================== PUBLIC ROUTES ====================
 
 // Check if recruitment is active
@@ -236,6 +327,7 @@ router.post(
   { name: 'proof_of_address', maxCount: 1 },
   { name: 'certificates', maxCount: 5 }
   ]),
+  validateRecruitmentDocumentMagicBytes,
   recruitmentController.uploadDocuments
 );
 
@@ -327,6 +419,7 @@ router.post('/interview/recording',
   validateRequest,
   recruitmentController.authorizeInterviewRecording,
   recordingUpload.single('recording'),
+  validateRecruitmentRecordingMagicBytes,
   recruitmentController.uploadInterviewRecording);
 
 // ==================== ADMIN ROUTES ====================

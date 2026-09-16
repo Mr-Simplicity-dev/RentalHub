@@ -306,7 +306,10 @@ const ensureTenantRegistrationPaymentSchema = async () => {
     );
 
     ALTER TABLE tenant_registration_payments
-      ADD COLUMN IF NOT EXISTS user_type VARCHAR(20) NOT NULL DEFAULT 'tenant';
+      ADD COLUMN IF NOT EXISTS user_type VARCHAR(20) NOT NULL DEFAULT 'tenant',
+      ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS reminder_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS abandoned_at TIMESTAMP;
 
     CREATE INDEX IF NOT EXISTS idx_tenant_registration_payments_reference
       ON tenant_registration_payments(transaction_reference);

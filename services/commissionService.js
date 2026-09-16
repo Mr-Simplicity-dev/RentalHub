@@ -454,26 +454,24 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
 
     const withdrawalId = withdrawalResult.rows[0].id;
 
-    // Snapshot the commissions covered by this payout so the receipt is
+    // Snapshot the pending commissions covered by this payout so the receipt is
     // accurate no matter when the transfer completes.
     const snapshotResult = await db.query(
       `SELECT COALESCE(json_agg(json_build_object(
-         'source', source, 'amount', amount, 'commission_rate', commission_rate,
-         'status', status, 'paid_at', paid_at
+         'id', id, 'source', source, 'amount', amount, 'commission_rate', commission_rate,
+         'state', state, 'city', city, 'created_at', created_at
        )), '[]'::json) AS snapshot
-       FROM admin_commissions
-       WHERE admin_id = $1 AND status = 'paid' AND paid_at >= CURRENT_DATE - INTERVAL '7 days'`,
+       FROM (
+         SELECT id, source, amount, commission_rate, state, city, created_at
+         FROM admin_commissions
+         WHERE admin_id = $1 AND status = 'pending'
+         ORDER BY created_at ASC
+       ) sub`,
       [adminId]
     );
     const commissionsSnapshot = snapshotResult.rows[0]?.snapshot || [];
 
     if (!directPayout) {
-      await db.query(
-        `UPDATE admin_commissions SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE admin_id = $1 AND status = 'pending' AND created_at >= CURRENT_DATE - INTERVAL '7 days'`,
-        [adminId]
-      );
-
       await db.query(
         `UPDATE users SET admin_wallet_balance = admin_wallet_balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
         [amount, adminId]
@@ -516,7 +514,7 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
 
       await db.query(
         `UPDATE admin_commissions SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE admin_id = $1 AND status = 'pending' AND created_at >= CURRENT_DATE - INTERVAL '7 days'`,
+         WHERE admin_id = $1 AND status = 'pending' AND created_at <= CURRENT_TIMESTAMP`,
         [adminId]
       );
 
@@ -547,6 +545,21 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
       );
 
       await db.query('COMMIT');
+
+      // Send payout receipt to the admin with itemized snapshot
+      try {
+        const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
+        sendAdminPayoutReceipt({
+          adminId,
+          amount,
+          bankName: bankDetails.bank_name,
+          accountNumber: bankDetails.account_number,
+          accountName: bankDetails.account_name,
+          reference: transfer?.reference || reference,
+          status: transfer?.status === 'success' ? 'processed' : 'processing',
+          snapshot: commissionsSnapshot,
+        }).catch(() => {});
+      } catch (_) {}
 
       return {
         withdrawal_id: withdrawalId, requested_at: withdrawalResult.rows[0].requested_at,

@@ -7,6 +7,7 @@ const ROOT = path.join(__dirname, '..');
 const WEB_SOURCE = path.join(ROOT, 'client', 'src');
 const MOBILE_ROOT = path.join(ROOT, 'RentalHubMobile');
 const MOBILE_SOURCE = path.join(MOBILE_ROOT, 'src');
+const hasMobile = fs.existsSync(MOBILE_SOURCE);
 
 const walk = (directory, extensions) => {
   if (!fs.existsSync(directory)) return [];
@@ -182,7 +183,7 @@ test('tenant and landlord dashboard tours have explicit eight-language step titl
   });
 });
 
-test('every configured native target is registered outside the mobile tour config', () => {
+test('every configured native target is registered outside the mobile tour config', { skip: !hasMobile && 'RentalHubMobile submodule not checked out' }, () => {
   const configPath = path.join(MOBILE_SOURCE, 'config', 'tourConfig.js');
   const catalogPath = path.join(MOBILE_SOURCE, 'i18n', 'tourStepCatalog.cjs');
   delete require.cache[require.resolve(catalogPath)];
@@ -205,7 +206,7 @@ test('every configured native target is registered outside the mobile tour confi
   });
 });
 
-test('native tour destinations are registered in React Navigation', () => {
+test('native tour destinations are registered in React Navigation', { skip: !hasMobile && 'RentalHubMobile submodule not checked out' }, () => {
   const config = read(path.join(MOBILE_SOURCE, 'config', 'tourConfig.js'));
   const navigator = read(path.join(MOBILE_SOURCE, 'navigation', 'AppNavigator.js'));
   const destinationNames = collectMatches(config, /\bname:\s*['"]([^'"]+)['"]/g);
@@ -219,7 +220,7 @@ test('native tour destinations are registered in React Navigation', () => {
   });
 });
 
-test('native platform configuration retains safe-area, launch, font and RTL readiness', () => {
+test('native platform configuration retains safe-area, launch, font and RTL readiness', { skip: !hasMobile && 'RentalHubMobile submodule not checked out' }, () => {
   const appSource = read(path.join(MOBILE_SOURCE, 'App.js'));
   const infoPlist = read(path.join(MOBILE_ROOT, 'ios', 'RentalHubMobile', 'Info.plist'));
   const androidManifest = read(

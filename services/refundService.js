@@ -12,6 +12,7 @@
 
 const db = require('../config/middleware/database');
 const axios = require('axios');
+const logger = require('../config/utils/logger');
 const {
   createTransferRecipient,
   initiateTransfer,
@@ -110,7 +111,7 @@ const sendEmailSafely = async (payload) => {
   try {
     await sendEmail(payload);
   } catch (error) {
-    req.logger.error('Tenancy workflow email error:', error.message);
+    logger.error('Tenancy workflow email error:', error.message);
   }
 };
 
@@ -243,9 +244,27 @@ exports.adminReviewRelocationRefund = async (req, res) => {
         refund.tenant_id,
         'relocation_refund_rejected',
         'Relocation refund not enabled',
-        `${TENANCY_HIERARCHY_LABEL} did not enable your relocation refund request for ${propertyTitle}.`,
+        `${TENANCY_HIERARCHY_LABEL} did not enable your relocation refund request for ${propertyTitle}.${admin_note ? ` Reason: ${admin_note}` : ''}`,
         '/dashboard'
       );
+      if (refund.tenant_email) {
+        await sendEmailSafely({
+          to: refund.tenant_email,
+          subject: 'Relocation refund request update',
+          html: `
+            <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto; color: #111827;">
+              <h2>Relocation Refund Request Declined</h2>
+              <p>Hello ${escapeHtml(refund.tenant_name || 'there')},</p>
+              <p>${escapeHtml(TENANCY_HIERARCHY_LABEL)} did not enable your relocation refund request for <strong>${escapeHtml(propertyTitle)}</strong>.</p>
+              ${admin_note ? `
+              <div style="padding: 12px 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 14px; color: #991b1b; margin: 16px 0;">
+                <strong>Reason:</strong> ${escapeHtml(admin_note)}
+              </div>` : ''}
+              <p><a href="${FRONTEND_URL}/dashboard" style="background:#0284c7;color:#fff;padding:12px 18px;border-radius:6px;text-decoration:none;">Open Dashboard</a></p>
+            </div>
+          `,
+        });
+      }
     }
 
     return res.json({
@@ -269,7 +288,7 @@ const createNotificationSafely = async (userId, type, title, message, link = '/d
   try {
     await createNotification(userId, type, title, message, link);
   } catch (error) {
-    req.logger.error('Tenancy workflow notification error:', error.message);
+    logger.error('Tenancy workflow notification error:', error.message);
   }
 };
 
@@ -1060,6 +1079,40 @@ exports.rejectRefundRequest = async (req, res) => {
         message: 'Refund request not found, does not belong to you, or is no longer pending.',
       });
     }
+
+    const refund = result.rows[0];
+    try {
+      const tenantRes = await db.query(
+        `SELECT full_name, email FROM users WHERE id = $1`,
+        [refund.tenant_id]
+      );
+      if (tenantRes.rows.length > 0 && tenantRes.rows[0].email) {
+        const tenant = tenantRes.rows[0];
+        await sendEmailSafely({
+          to: tenant.email,
+          subject: `Refund Request #${refundId} Update - RentalHub NG`,
+          html: `
+            <div style="font-family: sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto; color: #111827;">
+              <h3 style="color: #991b1b; margin-top: 0;">Refund Request Declined</h3>
+              <p>Hello ${escapeHtml(tenant.full_name || 'there')},</p>
+              <p>Your refund request <strong>#${refundId}</strong> has been reviewed and declined by the landlord.</p>
+              <div style="padding: 12px 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 14px; color: #991b1b; margin: 16px 0;">
+                <strong>Reason provided:</strong> ${escapeHtml(landlord_note)}
+              </div>
+              <p style="font-size: 13px; color: #64748b;">If you believe this decision is incorrect or requires resolution, you may open a dispute ticket with RentalHub Support.</p>
+              <p><a href="${FRONTEND_URL}/dashboard" style="background:#0284c7;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:8px;">Open Dashboard</a></p>
+            </div>
+          `,
+        });
+      }
+      await createNotificationSafely(
+        refund.tenant_id,
+        'refund_rejected',
+        'Refund Request Declined',
+        `Your refund request #${refundId} was declined: ${landlord_note}`,
+        '/dashboard'
+      );
+    } catch (_) {}
 
     res.json({
       success: true,
@@ -2205,6 +2258,20 @@ exports.rejectWalletWithdrawal = async (req, res) => {
        RETURNING *`,
       [reason, withdrawalId]
     );
+
+    try {
+      const { sendUserPayoutReceipt } = require('../config/utils/paymentReceipt');
+      sendUserPayoutReceipt({
+        userId: withdrawal.user_id,
+        amount: withdrawal.amount,
+        bankName: withdrawal.bank_name,
+        accountNumber: withdrawal.account_number,
+        accountName: withdrawal.account_name,
+        reference: `WDR_REJ_${withdrawalId}`,
+        status: 'rejected',
+        note: `Withdrawal request was rejected: ${reason}. Funds have been refunded to your wallet balance.`,
+      }).catch(() => {});
+    } catch (_) {}
 
     res.json({ success: true, message: 'Withdrawal rejected and funds refunded', data: result.rows[0] });
   } catch (error) {

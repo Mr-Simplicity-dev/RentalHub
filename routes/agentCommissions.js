@@ -25,10 +25,12 @@ router.get('/agents/:agentId/history', AgentCommissionController.getHistory);
 // Record a commission
 router.post('/agents/:agentId/commissions', [param('agentId').isInt(), body('amount').isFloat({ min: 0 }), body('description').optional().isString().trim().isLength({ max: 2000 })], validateRequest, AgentCommissionController.recordCommission);
 
-// Verify a commission (admin only)
+// Verify a commission (admin only) - supports both /:id/verify and legacy /commissions/:id/verify
+router.put('/:commissionId/verify', [param('commissionId').isInt()], validateRequest, AgentCommissionController.verifyCommission);
 router.put('/commissions/:commissionId/verify', [param('commissionId').isInt()], validateRequest, AgentCommissionController.verifyCommission);
 
-// Reverse/Adjust a commission (admin only)
+// Reverse/Adjust a commission (admin only) - supports both /:id/reverse and legacy /commissions/:id/reverse
+router.post('/:commissionId/reverse', [param('commissionId').isInt(), body('reason').optional().isString().trim().isLength({ max: 2000 })], validateRequest, AgentCommissionController.reverseCommission);
 router.post('/commissions/:commissionId/reverse', [param('commissionId').isInt(), body('reason').optional().isString().trim().isLength({ max: 2000 })], validateRequest, AgentCommissionController.reverseCommission);
 
 // Set commission rates

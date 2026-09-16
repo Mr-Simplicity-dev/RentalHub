@@ -1,0 +1,36 @@
+name: Backend CI & Mobile Contract Verification
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Backend Tests & Mobile API Contract Parity
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check syntax
+        run: npm run lint
+
+      - name: Verify Mobile API Contracts
+        run: node scripts/checkMobileApiContracts.js
+
+      - name: Run Test Suite
+        run: npm test

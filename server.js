@@ -13,8 +13,17 @@ const { Server } = require('socket.io');
 dotenv.config();
 
 // ==================== STARTUP VALIDATION ====================
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-  process.env.JWT_SECRET = process.env.JWT_SECRET || 'rentalhub_jwt_secret_at_least_32_characters_long_default';
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET.includes('default')) {
+    throw new Error('FATAL: JWT_SECRET must be set to a secure random string of at least 32 characters in production');
+  }
+  if (!process.env.NIN_ENCRYPTION_KEY || process.env.NIN_ENCRYPTION_KEY.length < 64) {
+    throw new Error('FATAL: NIN_ENCRYPTION_KEY must be a 64-character hex string (32 bytes AES-256) in production');
+  }
+} else {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    process.env.JWT_SECRET = process.env.JWT_SECRET || 'rentalhub_jwt_secret_at_least_32_characters_long_default';
+  }
 }
 process.env.DB_HOST = process.env.DB_HOST || 'localhost';
 process.env.DB_NAME = process.env.DB_NAME || 'rental_platform';
@@ -23,9 +32,6 @@ process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'postgres';
 
 // Security startup warnings
 if (process.env.NODE_ENV === 'production') {
-  if (!process.env.NIN_ENCRYPTION_KEY || process.env.NIN_ENCRYPTION_KEY.length < 64) {
-    console.warn('WARNING: NIN_ENCRYPTION_KEY is missing or too short — stored NINs cannot be encrypted/decrypted');
-  }
   if (!process.env.SMS_WEBHOOK_SECRET) {
     console.warn('WARNING: SMS_WEBHOOK_SECRET not set — SMS delivery webhook is blocked');
   }
@@ -91,6 +97,9 @@ const systemRoutes = require('./routes/system');
 const mobileDiagnosticsRoutes = require('./routes/mobileDiagnostics');
 
 const damageReportRoutes = require('./routes/damageReports');
+const diasporaAdminRoutes = require('./routes/diasporaAdmin');
+const surveyRoutes = require('./routes/survey');
+const adminSurveyRoutes = require('./routes/adminSurvey');
 const rentSavingsRoutes = require('./routes/rentSavings');
 const rentCalculatorRoutes = require('./routes/rentCalculator');
 const adminInspectionRoutes = require('./routes/adminInspections');
@@ -176,7 +185,11 @@ const scheduleEvidenceIntegrityMonitoring = () => {
   const runMonitor = async () => {
     try {
       const summary = await runEvidenceIntegrityMonitor({ limit: scanLimit });
-      console.log('Evidence integrity monitor completed', summary);
+      if (summary.errors > 0) {
+        console.warn(`Evidence integrity monitor finished with ${summary.errors} issues`);
+      } else {
+        console.log(`Evidence integrity monitor completed (disputes: ${summary.checked_disputes}, verified: ${summary.verified})`);
+      }
     } catch (err) {
       console.error('Evidence integrity monitor failed:', err.message);
     }
@@ -193,7 +206,12 @@ const schedulePayoutRetries = () => {
   const runRetries = async () => {
     try {
       const summary = await runPayoutRetryCycle();
-      console.log('Payout retry cycle completed', summary);
+      const totalErrors = (summary.agent?.errors || 0) + (summary.wallet?.errors || 0) + (summary.stateAdmin?.errors || 0);
+      if (totalErrors > 0) {
+        console.warn(`Payout retry cycle completed with ${totalErrors} issues`);
+      } else {
+        console.log(`Payout retry cycle completed: agent (scanned: ${summary.agent?.scanned || 0}, retried: ${summary.agent?.retried || 0}), wallet (scanned: ${summary.wallet?.scanned || 0}, retried: ${summary.wallet?.retried || 0}), stateAdmin (scanned: ${summary.stateAdmin?.scanned || 0}, retried: ${summary.stateAdmin?.retried || 0})`);
+      }
     } catch (err) {
       console.error('Payout retry cycle failed:', err.message);
     }
@@ -362,10 +380,6 @@ const authRateLimitMax =
   Number(process.env.AUTH_RATE_LIMIT_MAX) || (isProduction ? 30 : 200);
 const allowedOrigins = new Set(getAllowedFrontendOrigins());
 
-app.use('/', locationRoutes);
-app.use('/', blogRoutes);
-app.use('/.well-known', appLinksRoutes);
-
 const TRUST_PROXY_COUNT = Number(process.env.TRUST_PROXY_COUNT);
 // Default 1 because nginx is the only reverse proxy in Contabo setup.
 // Set to 0 if Node is exposed directly, or higher for multi-proxy chains.
@@ -430,6 +444,20 @@ app.use(
     credentials: true,
   })
 );
+
+app.use((err, req, res, next) => {
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({
+      success: false,
+      message: 'CORS request rejected: origin not permitted',
+    });
+  }
+  next(err);
+});
+
+app.use('/', locationRoutes);
+app.use('/', blogRoutes);
+app.use('/.well-known', appLinksRoutes);
 
 // Uploaded files are served through authenticated routes only — never via public static
 const authenticatedUploadsStaticOptions = {
@@ -678,9 +706,9 @@ app.use('/api/applications', generalOpsLimiter, applicationRoutes);
 app.use('/api/messages', generalOpsLimiter, messageRoutes);
 app.use('/api/users', generalOpsLimiter, userRoutes);
 app.use('/api/admin', adminLimiter, adminRoutes);
-app.use('/api/admin/diaspora', adminLimiter, require('./routes/diasporaAdmin'));
-app.use('/api/survey', generalOpsLimiter, require('./routes/survey'));
-app.use('/api/admin/survey', adminLimiter, require('./routes/adminSurvey'));
+app.use('/api/admin/diaspora', adminLimiter, diasporaAdminRoutes);
+app.use('/api/survey', generalOpsLimiter, surveyRoutes);
+app.use('/api/admin/survey', adminLimiter, adminSurveyRoutes);
 app.use('/api/admin/seo', adminLimiter, adminSeoRoutes);
 app.use('/api/dashboard', generalOpsLimiter, dashboardRoutes);
 app.use('/api/notifications', generalOpsLimiter, notificationRoutes);
@@ -715,6 +743,7 @@ app.use('/api/state-migrations', generalOpsLimiter, stateMigrationRoutes);
 app.use('/api/support', adminLimiter, supportRoutes);
 app.use('/api/system', adminLimiter, systemRoutes);
 app.use('/api/mobile', generalOpsLimiter, mobileDiagnosticsRoutes);
+app.use('/api/voice', voiceRoutes);
 app.use('/api/damage-reports', generalOpsLimiter, damageReportRoutes);
 app.use('/api/rent-savings', generalOpsLimiter, rentSavingsRoutes);
 app.use('/api/rent-calculator', generalOpsLimiter, rentCalculatorRoutes);
