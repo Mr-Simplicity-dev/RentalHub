@@ -476,7 +476,15 @@ const PaymentHistory = () => {
                 <FaFilePdf className="mr-1.5" /> Download PDF
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  document.body.classList.add('printing-receipt');
+                  const cleanup = () => {
+                    document.body.classList.remove('printing-receipt');
+                    window.removeEventListener('afterprint', cleanup);
+                  };
+                  window.addEventListener('afterprint', cleanup);
+                  window.print();
+                }}
                 className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
               >
                 <FaPrint className="mr-1.5" /> Print

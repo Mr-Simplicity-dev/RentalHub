@@ -228,16 +228,20 @@
   }
 
   @media print {
-    body * {
+    /* Receipt printing only: hide everything, then reveal the receipt.
+       Scoped to body.printing-receipt so other pages (Terms, Privacy, bookings,
+       QR) print normally. Unscoped, this hid the whole page and every other
+       printable page came out blank. */
+    body.printing-receipt * {
       visibility: hidden;
     }
 
-    .receipt-print-area,
-    .receipt-print-area * {
+    body.printing-receipt .receipt-print-area,
+    body.printing-receipt .receipt-print-area * {
       visibility: visible;
     }
 
-    .receipt-print-area {
+    body.printing-receipt .receipt-print-area {
       position: fixed;
       inset: 0;
       margin: 0;
