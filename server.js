@@ -791,7 +791,7 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json(response);
 });
 
-const PORT = 3000;
+const PORT = Number(process.env.APP_PORT || process.env.PORT || 5000);
 let backgroundServicesStarted = false;
 
 // const ensureStartupSchema = async () => {
