@@ -79,16 +79,24 @@ if (isProduction) {
 }
 
 /**
- * Create a child logger with a correlation ID pre-populated.
- * Use this in route handlers: req.logger = logger.child({ correlationId: req.correlationId });
+ * Create a lightweight child logger with bindings (e.g. correlationId)
+ * pre-populated.
+ *
+ * IMPORTANT: this must NOT create a new winston logger. Creating one per
+ * request and sharing the transports added listeners to the File/Console
+ * streams and re-registered process handlers on every request, leaking memory
+ * until PM2 restarted the app. This wrapper merges bindings into the log call
+ * instead, so nothing new is allocated per request.
  */
-logger.child = (bindings) => {
-  return winston.createLogger({
-    level: logger.level,
-    format: logger.format,
-    defaultMeta: { ...logger.defaultMeta, ...bindings },
-    transports: logger.transports,
-  });
+logger.child = (bindings = {}) => {
+  const merged = (meta) => ({ ...bindings, ...(meta || {}) });
+  return {
+    info: (message, meta) => logger.info(message, merged(meta)),
+    warn: (message, meta) => logger.warn(message, merged(meta)),
+    error: (message, meta) => logger.error(message, merged(meta)),
+    debug: (message, meta) => logger.debug(message, merged(meta)),
+    verbose: (message, meta) => logger.verbose(message, merged(meta)),
+  };
 };
 
 module.exports = logger;
