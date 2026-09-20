@@ -100,7 +100,12 @@ class MockPool extends EventEmitter {
 }
 
 let pool;
-const useMock = !process.env.DB_HOST || process.env.DB_HOST === 'localhost' || process.env.USE_MOCK_DB === 'true';
+// Only use the in-memory mock when EXPLICITLY requested, or when no database is
+// configured at all. Previously `DB_HOST === 'localhost'` forced the mock even
+// on production servers whose real PostgreSQL runs on localhost, which silently
+// served an empty database (no users, no properties, login always failed).
+const useMock = process.env.USE_MOCK_DB === 'true'
+  || (!process.env.DB_HOST && !process.env.DATABASE_URL);
 
 if (useMock) {
   logger.info('[AI Studio] PostgreSQL live server not detected — using in-memory MockPool');
