@@ -262,10 +262,20 @@ const emitTicketUpdated = (ticket, extra = {}) => {
   if (ticket.user_id) emitToUser(ticket.user_id, 'ticket:updated', payload);
 };
 
+// Only one cluster worker may run the support DDL at a time. Running it
+// concurrently on both workers caused PostgreSQL deadlocks (Support SLA
+// monitor on each worker racing the same CREATE/ALTER statements).
+const SUPPORT_SCHEMA_LOCK_KEY = 918273645;
+
 const ensureSupportSchema = async () => {
   if (supportSchemaReady) return;
 
-  await db.query(`
+  const client = await db.connect();
+  try {
+    await client.query('SELECT pg_advisory_lock($1)', [SUPPORT_SCHEMA_LOCK_KEY]);
+    if (supportSchemaReady) return;
+
+    await client.query(`
     CREATE TABLE IF NOT EXISTS support_tickets (
       id SERIAL PRIMARY KEY,
       subject VARCHAR(255) NOT NULL,
@@ -463,7 +473,15 @@ const ensureSupportSchema = async () => {
     );
   `);
 
-  supportSchemaReady = true;
+    supportSchemaReady = true;
+  } finally {
+    try {
+      await client.query('SELECT pg_advisory_unlock($1)', [SUPPORT_SCHEMA_LOCK_KEY]);
+    } catch (_) {
+      // Best-effort unlock; the lock is also released when the client closes.
+    }
+    client.release();
+  }
 };
 
 const requireSupportAdmin = (req, res, next) => {
