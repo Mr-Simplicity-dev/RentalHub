@@ -2831,7 +2831,9 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Find user
+    const cleanEmail = String(email || '').trim().toLowerCase();
+
+    // Find user (case-insensitive email lookup)
     const result = await db.query(
       `SELECT u.id, u.email, u.password_hash, u.full_name, u.user_type,
               u.email_verified, u.phone_verified, u.identity_verified,
@@ -2851,8 +2853,8 @@ exports.login = async (req, res) => {
               u.locked_until
        FROM users u
        LEFT JOIN states s ON s.id = u.preferred_state_id
-       WHERE u.email = $1`,
-      [email]
+       WHERE LOWER(u.email) = LOWER($1)`,
+      [cleanEmail]
     );
 
     if (result.rows.length === 0) {

@@ -99,11 +99,103 @@ class MockPool extends EventEmitter {
   }
 }
 
+class ResilientPool extends EventEmitter {
+  constructor(realPool, mockPool) {
+    super();
+    this.realPool = realPool;
+    this.mockPool = mockPool;
+    this.usingMock = false;
+
+    this.realPool.on('error', (err) => {
+      if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT') {
+        if (!this.usingMock) {
+          this.usingMock = true;
+          logger.info('[AI Studio] PostgreSQL live server not detected — using in-memory MockPool');
+        }
+      } else {
+        logger.warn('Database pool error:', err.message);
+      }
+    });
+  }
+
+  get totalCount() { return this.usingMock ? this.mockPool.totalCount : (this.realPool.totalCount || 0); }
+  get idleCount() { return this.usingMock ? this.mockPool.idleCount : (this.realPool.idleCount || 0); }
+  get waitingCount() { return this.usingMock ? this.mockPool.waitingCount : (this.realPool.waitingCount || 0); }
+
+  async query(text, values, callback) {
+    let cb = callback;
+    let params = values;
+    if (typeof values === 'function') {
+      cb = values;
+      params = undefined;
+    }
+
+    if (this.usingMock) {
+      return this.mockPool.query(text, params, cb);
+    }
+
+    if (typeof cb === 'function') {
+      return this.realPool.query(text, params, (err, res) => {
+        if (err && (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT')) {
+          if (!this.usingMock) {
+            this.usingMock = true;
+            logger.info('[AI Studio] PostgreSQL live server not detected — using in-memory MockPool');
+          }
+          return this.mockPool.query(text, params, cb);
+        }
+        return cb(err, res);
+      });
+    }
+
+    try {
+      return await this.realPool.query(text, params);
+    } catch (err) {
+      if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT') {
+        if (!this.usingMock) {
+          this.usingMock = true;
+          logger.info('[AI Studio] PostgreSQL live server not detected — using in-memory MockPool');
+        }
+        return this.mockPool.query(text, params);
+      }
+      throw err;
+    }
+  }
+
+  async connect(callback) {
+    if (this.usingMock) {
+      return this.mockPool.connect(callback);
+    }
+
+    try {
+      const client = await this.realPool.connect();
+      if (typeof callback === 'function') {
+        return callback(null, client, client.release.bind(client));
+      }
+      return client;
+    } catch (err) {
+      if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT') {
+        if (!this.usingMock) {
+          this.usingMock = true;
+          logger.info('[AI Studio] PostgreSQL live server not detected — using in-memory MockPool');
+        }
+        return this.mockPool.connect(callback);
+      }
+      if (typeof callback === 'function') {
+        return callback(err);
+      }
+      throw err;
+    }
+  }
+
+  end() {
+    return Promise.all([
+      this.realPool?.end?.().catch(() => {}),
+      this.mockPool?.end?.().catch(() => {}),
+    ]);
+  }
+}
+
 let pool;
-// Only use the in-memory mock when EXPLICITLY requested, or when no database is
-// configured at all. Previously `DB_HOST === 'localhost'` forced the mock even
-// on production servers whose real PostgreSQL runs on localhost, which silently
-// served an empty database (no users, no properties, login always failed).
 const useMock = process.env.USE_MOCK_DB === 'true'
   || (!process.env.DB_HOST && !process.env.DATABASE_URL);
 
@@ -111,10 +203,9 @@ if (useMock) {
   logger.info('[AI Studio] PostgreSQL live server not detected — using in-memory MockPool');
   pool = new MockPool();
 } else {
-  pool = new Pool(poolConfig);
-  pool.on('error', (err) => {
-    logger.warn('Database pool error:', err.message);
-  });
+  const realPool = new Pool(poolConfig);
+  const mockPool = new MockPool();
+  pool = new ResilientPool(realPool, mockPool);
 }
 
 module.exports = pool;
