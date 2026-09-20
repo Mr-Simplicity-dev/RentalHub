@@ -814,12 +814,37 @@ const ensureStartupSchema = async () => {
   return;
 };
 
+// The survey LGA boundary data (geo/nigeria_lgas.json) is intentionally NOT
+// committed to git (third-party GADM geometry — see .gitignore). To guarantee
+// it is always present, regenerate it in the background at startup if missing.
+const ensureSurveyBoundaryData = () => {
+  const boundaryPath = path.join(__dirname, 'geo', 'nigeria_lgas.json');
+  if (fs.existsSync(boundaryPath)) {
+    return;
+  }
+
+  logger.warn('Survey boundary data missing (geo/nigeria_lgas.json). Regenerating in the background...');
+
+  try {
+    const { spawn } = require('child_process');
+    const scriptPath = path.join(__dirname, 'scripts', 'fetchNigeriaLgaBoundaries.js');
+    const child = spawn(process.execPath, [scriptPath], { detached: true, stdio: 'ignore' });
+    child.on('error', (error) => {
+      logger.error('Survey boundary regeneration failed:', error.message);
+    });
+    child.unref();
+  } catch (error) {
+    logger.error('Could not start survey boundary regeneration:', error.message);
+  }
+};
+
 const startBackgroundServices = () => {
   if (backgroundServicesStarted) {
     return;
   }
 
   backgroundServicesStarted = true;
+  ensureSurveyBoundaryData();
   startPaymentJobs();
   startPropertyJobs();
   startRentSavingsJobs();
