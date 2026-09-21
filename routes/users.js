@@ -960,7 +960,7 @@ const recordTourEvent = async (userId, payload = {}) => {
              progress_updated_at = CASE WHEN $10 THEN CURRENT_TIMESTAMP ELSE progress_updated_at END,
              locale = $11,
              context = $12::jsonb,
-             last_event_type = $13,
+             last_event_type = $13::text,
              last_event_at = CURRENT_TIMESTAMP,
              resume_count = resume_count + $14,
              last_resumed_at = CASE WHEN $13 = 'resumed' THEN CURRENT_TIMESTAMP ELSE last_resumed_at END,
