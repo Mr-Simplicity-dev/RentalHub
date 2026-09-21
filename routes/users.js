@@ -927,7 +927,7 @@ const recordTourEvent = async (userId, payload = {}) => {
          ) VALUES (
            $1, $2, $3, $4, $5, $6,
            $7, $8, $9, CASE WHEN $10 THEN CURRENT_TIMESTAMP ELSE NULL END,
-           $11, $12::jsonb, $13, CURRENT_TIMESTAMP,
+           $11, $12::jsonb, $13::text, CURRENT_TIMESTAMP,
            $14, CASE WHEN $13 = 'resumed' THEN CURRENT_TIMESTAMP ELSE NULL END,
            $15, $16, 1,
            CASE WHEN $13 = 'welcome_shown' THEN CURRENT_TIMESTAMP ELSE NULL END,
