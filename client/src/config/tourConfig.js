@@ -1408,7 +1408,7 @@ export const getTourDashboardRoute = (userRole) => {
     fumigation_admin: '/admin/fumigation-cleaning',
     lga_fumigation_admin: '/admin/fumigation-cleaning',
     state_fumigation_admin: '/admin/fumigation-cleaning/state',
-    super_fumigation_admin: '/super-admin/fumigation-cleaning',
+    super_fumigation_admin: '/admin/fumigation-cleaning/super',
     recruitment_admin: '/admin/recruitment',
     lga_support_admin: '/admin/lga-support-dashboard',
     state_support_admin: '/admin/state-support-dashboard',

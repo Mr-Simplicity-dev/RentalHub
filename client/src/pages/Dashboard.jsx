@@ -501,7 +501,7 @@ const Dashboard = () => {
     }
 
     if (user.user_type === 'super_fumigation_admin') {
-      navigate('/super-admin/fumigation-cleaning', { replace: true });
+      navigate('/admin/fumigation-cleaning/super', { replace: true });
       return;
     }
 

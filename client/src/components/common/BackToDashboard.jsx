@@ -21,7 +21,7 @@ const dashboardPathByRole = {
   fumigation_admin: '/admin/fumigation-cleaning',
   lga_fumigation_admin: '/admin/fumigation-cleaning',
   state_fumigation_admin: '/admin/fumigation-cleaning/state',
-  super_fumigation_admin: '/super-admin/fumigation-cleaning',
+  super_fumigation_admin: '/admin/fumigation-cleaning/super',
   transportation_admin: '/admin/transportation',
   lga_transportation_admin: '/admin/transportation',
   state_transportation_admin: '/admin/transportation/state',

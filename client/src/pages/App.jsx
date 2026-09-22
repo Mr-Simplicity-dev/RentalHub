@@ -114,6 +114,7 @@ const FumigationOversightPanel = React.lazy(() => import('../components/admin/Fu
 const LgaFumigationAdminDashboard = React.lazy(() => import('./admin/LgaFumigationAdminDashboard'));
 const LgaSupportAdminDashboard = React.lazy(() => import('./admin/LgaSupportAdminDashboard'));
 const StateFumigationAdminDashboard = React.lazy(() => import('./admin/StateFumigationAdminDashboard'));
+const SuperFumigationAdminDashboard = React.lazy(() => import('./admin/SuperFumigationAdminDashboard'));
 const FinancialAdminDashboard = React.lazy(() => import('./admin/FinancialAdminDashboard'));
 const SuperFinancialAdminDashboard = React.lazy(() => import('./admin/SuperFinancialAdminDashboard'));
 const StateAdminDashboard = React.lazy(() => import('./admin/StateAdminDashboard'));
@@ -149,6 +150,7 @@ const LGA_TRANSPORTATION_ADMIN_ROLES = ['admin', 'lga_admin', 'transportation_ad
 const STATE_TRANSPORTATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin'];
 const LGA_FUMIGATION_ADMIN_ROLES = ['admin', 'lga_admin', 'fumigation_admin', 'lga_fumigation_admin'];
 const STATE_FUMIGATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_fumigation_admin'];
+const SUPER_FUMIGATION_ADMIN_ROLES = ['super_fumigation_admin', 'super_admin'];
 const isRecruitmentAdminUser = (user) =>
   RECRUITMENT_ADMIN_ROLES.includes(user?.user_type) || user?.is_recruitment_admin === true;
 const ADMIN_SHELL_ROLES = [
@@ -168,7 +170,7 @@ const ADMIN_SHELL_ROLES = [
 ];
 
 const getFumigationDashboardPath = (role) => {
-  if (role === 'super_fumigation_admin') return '/super-admin/fumigation-cleaning';
+  if (role === 'super_fumigation_admin') return '/admin/fumigation-cleaning/super';
   if (role === 'state_fumigation_admin') return '/admin/fumigation-cleaning/state';
   return '/admin/fumigation-cleaning';
 };
@@ -486,6 +488,19 @@ const StateFumigationAdminRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (!STATE_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
+
+  return children;
+};
+
+const SuperFumigationAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!SUPER_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
 
   return children;
 };
@@ -892,6 +907,14 @@ function App() {
                     <StateFumigationAdminRoute>
                       <StateFumigationAdminDashboard />
                     </StateFumigationAdminRoute>
+                  }
+                />
+                                <Route
+                  path="fumigation-cleaning/super"
+                  element={
+                    <SuperFumigationAdminRoute>
+                      <SuperFumigationAdminDashboard />
+                    </SuperFumigationAdminRoute>
                   }
                 />
                                 <Route path="agents" element={<AdminAgentManagement />} />

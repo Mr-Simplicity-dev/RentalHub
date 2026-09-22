@@ -116,7 +116,7 @@ const AdminLayout = () => {
   const assignedStateLabel = user?.assigned_state || 'Not Assigned';
   const assignedLgaLabel = user?.assigned_city || '';
     const fumigationBasePath = role === 'super_fumigation_admin'
-    ? '/super-admin/fumigation-cleaning'
+    ? '/admin/fumigation-cleaning/super'
     : role === 'state_fumigation_admin'
     ? '/admin/fumigation-cleaning/state'
     : '/admin/fumigation-cleaning';
@@ -491,6 +491,14 @@ const AdminLayout = () => {
   const transportationNavItem = (tab) =>
     `flex items-center px-4 py-3 rounded-lg transition-colors ${
       location.pathname === transportationBasePath && transportationTab === tab
+        ? roleTheme.activeNav
+        : roleTheme.hoverNav
+    }`;
+
+  const fumigationTab = new URLSearchParams(location.search).get('tab') || 'overview';
+  const fumigationNavItem = (tab) =>
+    `flex items-center px-4 py-3 rounded-lg transition-colors ${
+      location.pathname === fumigationBasePath && fumigationTab === tab
         ? roleTheme.activeNav
         : roleTheme.hoverNav
     }`;
@@ -941,7 +949,7 @@ const AdminLayout = () => {
           )}
 
                     {/* FUMIGATION ADMIN */}
-          {isFumigationAdmin && (
+          {isFumigationAdmin && role !== 'super_fumigation_admin' && (
             <div>
               <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
                 Fumigation & Cleaning
@@ -962,6 +970,29 @@ const AdminLayout = () => {
                 <NavLink to={`${fumigationBasePath}#fumigation-filters`} className={navItem}>
                   <FaFilter className="mr-3" />
                   Filters & Exports
+                </NavLink>
+              </div>
+            </div>
+          )}
+
+          {/* SUPER FUMIGATION ADMIN */}
+          {role === 'super_fumigation_admin' && (
+            <div>
+              <p className="text-xs uppercase text-gray-400 font-semibold mb-2">
+                Fumigation & Cleaning
+              </p>
+              <div className="space-y-2">
+                <NavLink to={`${fumigationBasePath}?tab=overview`} className={() => fumigationNavItem('overview')}>
+                  <FaSprayCan className="mr-3" />
+                  Overview
+                </NavLink>
+                <NavLink to={`${fumigationBasePath}?tab=operations`} className={() => fumigationNavItem('operations')}>
+                  <FaClipboardList className="mr-3" />
+                  Operations
+                </NavLink>
+                <NavLink to={`${fumigationBasePath}?tab=escalations`} className={() => fumigationNavItem('escalations')}>
+                  <FaArrowUp className="mr-3" />
+                  Escalations
                 </NavLink>
               </div>
             </div>
