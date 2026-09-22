@@ -1,9 +1,26 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const { body } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 const db = require('../config/middleware/database');
 
 const router = express.Router();
+
+// The deploy writes the current mobile build here. It is the authoritative
+// "latest version" so the update check stays in sync with what was shipped,
+// instead of a manually maintained env var.
+const BUILD_INFO_PATH = path.resolve(__dirname, '..', 'uploads', 'version.json');
+
+const readDeployedVersion = () => {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(BUILD_INFO_PATH, 'utf8'));
+    const version = String(parsed?.version || '').trim();
+    return version || null;
+  } catch {
+    return null;
+  }
+};
 
 const ensureMobileCrashSchema = async () => {
   await db.query(`
@@ -189,6 +206,7 @@ router.get('/app-version', (req, res) => {
   const platform = String(req.query.platform || '').toLowerCase();
   const currentVersion = String(req.query.version || '').trim();
   const latestVersion =
+    readDeployedVersion() ||
     process.env.MOBILE_LATEST_VERSION ||
     process.env.MOBILE_ANDROID_LATEST_VERSION ||
     '1.0.0';
