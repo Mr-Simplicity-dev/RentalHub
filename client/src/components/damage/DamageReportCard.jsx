@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { FaRuler, FaExclamationTriangle } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
@@ -55,9 +55,9 @@ const DamageReportCard = ({ propertyId }) => {
   };
 
   const getUrgencyIcon = (urgency) => {
-    if (urgency === 'high') return 'ðŸ”´';
-    if (urgency === 'medium') return 'ðŸŸ¡';
-    return 'ðŸŸ¢';
+    if (urgency === 'high') return '🔴';
+    if (urgency === 'medium') return '🟡';
+    return '🟢';
   };
 
   return (
@@ -104,7 +104,7 @@ const DamageReportCard = ({ propertyId }) => {
               <p className="text-xs uppercase tracking-wide text-gray-500">{t('damage_card.size', 'Size')}</p>
             </div>
             <p className="mt-2 font-semibold text-gray-900">
-              {report.width_cm}cm Ã— {report.height_cm}cm
+              {report.width_cm}cm × {report.height_cm}cm
             </p>
           </div>
         )}
