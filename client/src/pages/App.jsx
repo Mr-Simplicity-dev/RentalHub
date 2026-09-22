@@ -94,6 +94,8 @@ const VerifyCase = React.lazy(() => import('./VerifyCase'));
 const DisputeDetails = React.lazy(() => import('./DisputeDetails'));
 const MyDisputes = React.lazy(() => import('./MyDisputes'));
 const MyDamageReports = React.lazy(() => import('./MyDamageReports'));
+const TenancyAgreements = React.lazy(() => import('./TenancyAgreements'));
+const TenancyAgreementDetail = React.lazy(() => import('./TenancyAgreementDetail'));
 const SubscribedProperties = React.lazy(() => import('./SubscribedProperties'));
 const Support = React.lazy(() => import('./Support'));
 const AcceptLawyerInvite = React.lazy(() => import('./AcceptLawyerInvite'));
@@ -833,6 +835,8 @@ function App() {
               <Route path="/verify-case" element={<VerifyCase />} />
               <Route path="/my-disputes" element={<MyDisputes />} />
               <Route path="/my-damage-reports" element={<MyDamageReports />} />
+              <Route path="/tenancy-agreements" element={<TenancyAgreements />} />
+              <Route path="/tenancy-agreements/:id" element={<TenancyAgreementDetail />} />
               <Route path="/subscribed-properties" element={<SubscribedProperties />} />
               <Route path="/support" element={<Support />} />
               <Route path="/dispute/:disputeId" element={<DisputeDetails />} />
