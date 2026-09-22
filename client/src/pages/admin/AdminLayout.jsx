@@ -8,7 +8,6 @@ import CommissionWithdrawalBanner from '../../components/admin/CommissionWithdra
 import BackToSuperAdminOverview from '../../components/admin/BackToSuperAdminOverview';
 
 import { useTranslation } from 'react-i18next';
-import i18n from '../../i18n';
 import {
   FaTachometerAlt,
   FaUsers,
@@ -145,7 +144,6 @@ const AdminLayout = () => {
   const notifRefMobile = useRef(null);
   const notifDropdownRef = useRef(null);
   const prevUnreadRef = useRef(0);
-  const prevLanguageRef = useRef(null);
 
   useEffect(() => {
     setMobileSidebarOpen(false);
@@ -173,23 +171,6 @@ const AdminLayout = () => {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Force English on admin pages, restore user language on exit
-  useEffect(() => {
-    prevLanguageRef.current = i18n.language;
-    if (i18n.language !== 'en') {
-      i18n.changeLanguage('en');
-    }
-    document.documentElement.lang = 'en';
-    document.documentElement.dir = 'ltr';
-
-    return () => {
-      const prevLang = prevLanguageRef.current;
-      if (prevLang && prevLang !== 'en') {
-        i18n.changeLanguage(prevLang);
-      }
-    };
   }, []);
 
   useEffect(() => {
