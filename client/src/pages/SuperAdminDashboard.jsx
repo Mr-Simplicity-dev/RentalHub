@@ -23,6 +23,8 @@ import FlagsTab from "../components/admin/FlagsTab";
 import FraudTab from "../components/admin/FraudTab";
 import PricingRulesTab from "../components/admin/PricingRulesTab";
 import RentCalculatorFeesAdmin from "../components/admin/RentCalculatorFeesAdmin";
+import RentSavingsSetupFees from "../components/admin/RentSavingsSetupFees";
+import RentSavingsWithdrawals from "../components/admin/RentSavingsWithdrawals";
 import RegistrationAccessRulesTab from "../components/admin/RegistrationAccessRulesTab";
 import PaginationControls from "../components/admin/PaginationControls";
 import ModerationOverview from "../components/admin/ModerationOverview";
@@ -74,6 +76,8 @@ const tabs = [
   "diaspora",
   "survey",
   "calculator_fees",
+  "rent_savings_fees",
+  "rent_savings_withdrawals",
 ];
 
 const tabLabels = {
@@ -107,6 +111,8 @@ const tabLabels = {
   diaspora: "Diaspora",
   survey: "Survey & Analysis",
   calculator_fees: "Calculator Fees",
+  rent_savings_fees: "Rent Savings Fees",
+  rent_savings_withdrawals: "Rent Savings Withdrawals",
 };
 
 const shortcutCategories = [
@@ -122,6 +128,8 @@ const shortcutCategories = [
       { name: "property_requests", label: "Property Requests", detail: "Review listing requests from landlords and agents" },
       { name: "pricing", label: "Pricing", detail: "Configure platform pricing rules and fees" },
       { name: "calculator_fees", label: "Calculator Fees", detail: "Set rent calculator agent/legal/caution fee rates" },
+      { name: "rent_savings_fees", label: "Rent Savings Fees", detail: "Set location-based rent-savings activation fees" },
+      { name: "rent_savings_withdrawals", label: "Rent Savings Withdrawals", detail: "Approve or reject early rent-savings withdrawal requests" },
       { name: "registration_access", label: "Registration Access", detail: "Control registration by state and LGA" },
     ],
   },
@@ -1551,6 +1559,14 @@ export default function SuperAdminDashboard() {
 
       {tab === "calculator_fees" && (
         <RentCalculatorFeesAdmin />
+      )}
+
+      {tab === "rent_savings_fees" && (
+        <RentSavingsSetupFees />
+      )}
+
+      {tab === "rent_savings_withdrawals" && (
+        <RentSavingsWithdrawals />
       )}
 
       {tab === "registration_access" && (
