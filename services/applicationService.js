@@ -1,5 +1,6 @@
 const db = require('../config/middleware/database');
 const { validationResult } = require('express-validator');
+const { createDraftAgreementFromApplication } = require('./tenancyAgreementService');
 const {
   sendApplicationNotification,
   sendApplicationStatusUpdate,
@@ -854,10 +855,25 @@ exports.approveApplication = async (req, res) => {
       'approved'
     );
 
+    // Approval does not create a tenancy: it creates a DRAFT tenancy agreement
+    // that both parties must review and electronically execute. Failure here
+    // must never block the application approval itself.
+    let tenancyAgreement = null;
+    try {
+      tenancyAgreement = await createDraftAgreementFromApplication({
+        applicationId: Number(applicationId),
+        actorUserId: userId,
+        ip: req.ip,
+      });
+    } catch (agreementError) {
+      req.logger.error('Tenancy agreement creation error:', agreementError);
+    }
+
     return res.json({
       success: true,
       message: 'Application approved successfully' + (isNegotiatedApproval ? ' - Property rent has been updated.' : ''),
       data: sanitizeForNegotiation(approvedApp),
+      tenancy_agreement: tenancyAgreement,
     });
   } catch (error) {
     req.logger.error('Approve application error:', error);
