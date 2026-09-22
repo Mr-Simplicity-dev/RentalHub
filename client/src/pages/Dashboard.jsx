@@ -10,6 +10,7 @@ import {
   FaHome,
   FaEnvelope,
   FaFileAlt,
+  FaFileSignature,
   FaHeart,
   FaCheckCircle,
   FaClock,
@@ -1972,6 +1973,13 @@ const Dashboard = () => {
                 dataTourId="action-damage"
               />
               <QuickActionCard
+                title="Tenancy Agreements"
+                description="Review and electronically sign your tenancy agreements"
+                icon={<FaFileSignature />}
+                onClick={() => navigate('/tenancy-agreements')}
+                dataTourId="action-tenancy-agreements"
+              />
+              <QuickActionCard
                 title={t('dashboardUx.subscription')}
                 description="View Super Admin priced monthly access and multiple property add-on"
                 icon={<FaClock />}
@@ -2124,6 +2132,12 @@ const Dashboard = () => {
                 description="View damage reports for your properties"
                 icon={<FaTools />}
                 onClick={() => navigate('/my-damage-reports')}
+              />
+              <QuickActionCard
+                title="Tenancy Agreements"
+                description="Review and electronically sign your tenancy agreements"
+                icon={<FaFileSignature />}
+                onClick={() => navigate('/tenancy-agreements')}
               />
               <QuickActionCard
                 title={t('dashboardUx.legal_help')}
