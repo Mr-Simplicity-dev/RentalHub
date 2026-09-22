@@ -771,8 +771,8 @@ exports.exportPersonalData = async (req, res) => {
       db,
       tableExists,
       'disputes',
-      'complainant_id',
-      'respondent_id',
+      'opened_by',
+      'against_user',
       userId
     );
     data.disputes = {
@@ -924,8 +924,8 @@ exports.purgeAccount = async (req, res) => {
          ) AS has_active_properties,
          EXISTS(
            SELECT 1 FROM disputes
-           WHERE (complainant_id = $1 OR respondent_id = $1)
-             AND status IN ('pending', 'investigating', 'escalated')
+           WHERE (opened_by = $1 OR against_user = $1)
+             AND status IN ('open', 'investigating', 'escalated')
          ) AS has_active_disputes,
          EXISTS(
            SELECT 1 FROM payments

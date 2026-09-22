@@ -2097,7 +2097,7 @@ router.delete('/account', authenticate, sensitiveActionLimiter, async (req, res)
       `SELECT
          EXISTS(SELECT 1 FROM properties WHERE landlord_id = $1 AND is_available = TRUE) AS has_active_properties,
          EXISTS(SELECT 1 FROM applications WHERE tenant_id = $1 AND status = 'approved') AS has_active_tenancies,
-         EXISTS(SELECT 1 FROM disputes WHERE (complainant_id = $1 OR respondent_id = $1) AND status IN ('pending', 'investigating', 'escalated')) AS has_active_disputes,
+         EXISTS(SELECT 1 FROM disputes WHERE (opened_by = $1 OR against_user = $1) AND status IN ('open', 'investigating', 'escalated')) AS has_active_disputes,
          EXISTS(SELECT 1 FROM payments WHERE user_id = $1 AND payment_status = 'pending') AS has_pending_payments`,
       [userId]
     );
