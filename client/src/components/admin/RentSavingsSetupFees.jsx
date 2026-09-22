@@ -62,7 +62,7 @@ export default function RentSavingsSetupFees() {
     }
   }, []);
 
-  useEffect(() => { loadFees(); loadLocations(); }, []);
+  useEffect(() => { loadFees(); loadLocations(); }, [loadFees, loadLocations]);
 
     // Track selected state_name when state_id changes
   useEffect(() => {

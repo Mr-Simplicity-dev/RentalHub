@@ -54,7 +54,7 @@ const FumigationCleaningCatalog = () => {
     };
     
     loadCatalog();
-  }, []);
+  }, [t]);
   
   // Filter and sort services
   useEffect(() => {

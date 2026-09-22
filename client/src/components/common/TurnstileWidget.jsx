@@ -84,7 +84,7 @@ const TurnstileWidget = forwardRef(({ action, onToken, onExpire, onError }, ref)
         widgetIdRef.current = null;
       }
     };
-  }, []);
+  }, [action]);
 
   if (!SITE_KEY) return null;
 

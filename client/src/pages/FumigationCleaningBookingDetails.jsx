@@ -114,6 +114,7 @@ const FumigationCleaningBookingDetails = () => {
     };
     
     loadBookingDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId, user, navigate, t]);
   
   const handleCancelBooking = async () => {

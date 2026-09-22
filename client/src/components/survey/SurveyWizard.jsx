@@ -163,7 +163,7 @@ export default function SurveyWizard({
     } finally {
       setLoading(false);
     }
-  }, [surveyType, lang, publicMode, paperMode, onComplete]);
+  }, [surveyType, lang, publicMode, paperMode, onComplete, locationInfo]);
 
   useEffect(() => {
     loadDefinition();

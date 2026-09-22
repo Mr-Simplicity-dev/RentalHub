@@ -26,7 +26,7 @@ const DiasporaAdminPanel = () => {
     setError("");
     try {
       const res = await api.get("/admin/diaspora/overview");
-      setStats(res.data?.data?.stats || stats);
+      setStats((previous) => res.data?.data?.stats || previous);
       setUsers(res.data?.data?.users || []);
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load diaspora overview");
@@ -114,7 +114,6 @@ const DiasporaAdminPanel = () => {
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
               {users.map((u) => {
-                const isNgFlagged = String(u.billing_country || "").toUpperCase() === "NG";
                 return (
                   <tr key={u.id} className={u.review_flag ? "bg-red-50/60" : ""}>
                     <td className="px-4 py-3">

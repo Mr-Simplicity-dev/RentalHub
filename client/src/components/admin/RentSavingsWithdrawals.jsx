@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  FaTimes,
   FaCheckCircle,
   FaExclamationTriangle,
   FaMoneyBillWave,
@@ -132,15 +131,6 @@ export default function RentSavingsWithdrawals() {
     return Number(value || 0).toLocaleString('en-NG', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    });
-  }
-
-  function formatDate(dateStr) {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-NG', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
     });
   }
 

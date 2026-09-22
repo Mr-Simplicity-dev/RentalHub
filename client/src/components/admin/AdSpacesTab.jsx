@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
-import { FaEdit, FaExternalLinkAlt, FaFilm, FaHeadset, FaImage, FaMusic, FaPlus, FaShareAlt, FaTrash, FaUpload } from 'react-icons/fa';
+import { FaEdit, FaExternalLinkAlt, FaFilm, FaImage, FaMusic, FaPlus, FaShareAlt, FaTrash, FaUpload } from 'react-icons/fa';
 import api from '../../services/api';
 
 const fallbackPlacements = [

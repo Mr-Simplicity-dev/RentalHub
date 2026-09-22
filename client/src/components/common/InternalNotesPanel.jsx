@@ -28,7 +28,7 @@ const InternalNotesPanel = ({ ticketId, currentUser, readOnly }) => {
     } finally {
       setLoading(false);
     }
-  }, [ticketId]);
+  }, [ticketId, t]);
 
   useEffect(() => {
     if (ticketId) loadNotes();

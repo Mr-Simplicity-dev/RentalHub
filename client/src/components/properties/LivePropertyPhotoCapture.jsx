@@ -126,7 +126,7 @@ const LivePropertyPhotoCapture = ({
         setCameraLoading(false);
       }
     },
-    [attachStream, disabled, facingMode, stopCamera]
+    [attachStream, disabled, facingMode, stopCamera, t]
   );
 
   const switchCamera = useCallback(() => {
@@ -198,7 +198,7 @@ const LivePropertyPhotoCapture = ({
       'image/jpeg',
       0.92
     );
-  }, [captureLoading, captureTokens, maxPhotos, onChange, onTokensChange, photos]);
+  }, [captureLoading, captureTokens, maxPhotos, onChange, onTokensChange, photos, t]);
 
   const removePhoto = useCallback(
     (index) => {

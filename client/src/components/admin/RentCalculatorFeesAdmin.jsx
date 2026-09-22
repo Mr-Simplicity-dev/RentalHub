@@ -155,7 +155,6 @@ export default function RentCalculatorFeesAdmin() {
 
   const canPickGlobalRow = scope?.level === 'global';
   const canPickState = scope?.level === 'global' || scope?.level === 'state';
-  const canPickLga = scope?.level === 'global' || scope?.level === 'state';
   const creatingOwnLgaRow = scope?.level === 'lga';
 
   const handleSubmit = async (e) => {

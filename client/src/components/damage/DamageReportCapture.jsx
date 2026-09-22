@@ -133,7 +133,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
     } finally {
       setCameraLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -181,7 +181,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
     } finally {
       setAnalyzingDamage(false);
     }
-  }, [autoFillDamageForm]);
+  }, [autoFillDamageForm, t]);
 
   const capturePhoto = useCallback(() => {
     const video = videoRef.current;
@@ -215,7 +215,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
       'image/jpeg',
       0.92
     );
-  }, [stopCamera, cleanupPreview, analyzeDamagePhoto]);
+  }, [stopCamera, cleanupPreview, analyzeDamagePhoto, t]);
 
   const saveDamageReport = useCallback(async () => {
     if (!capturedPhoto || !damageForm.room_location) {
@@ -256,7 +256,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
     } finally {
       setSaving(false);
     }
-  }, [capturedPhoto, damageForm, aiResult, propertyId, cleanup, onSaved, onClose]);
+  }, [capturedPhoto, damageForm, aiResult, propertyId, cleanup, onSaved, onClose, t]);
 
   return (
     <Modal isOpen={true} onClose={onClose} title={t('damage_capture.title', '📸 Property Maintenance Assessment')}>

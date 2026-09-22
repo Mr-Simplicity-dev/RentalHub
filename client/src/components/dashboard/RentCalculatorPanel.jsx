@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  FaCalendarAlt,
   FaPiggyBank,
   FaCheckCircle,
   FaTimesCircle,
@@ -42,7 +41,7 @@ const FeeRow = ({ label, hint, value }) => (
 
 const RentCalculatorPanel = ({ initialValues = {}, mode = 'public', onPlanReady }) => {
   const { t } = useTranslation();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [form, setForm] = useState({
     rent_amount: initialValues.rent_amount || '',
     payment_frequency: initialValues.payment_frequency === 'monthly' ? 'monthly' : 'yearly',
@@ -89,7 +88,7 @@ const RentCalculatorPanel = ({ initialValues = {}, mode = 'public', onPlanReady 
     } finally {
       setLoading(false);
     }
-  }, [canCalculate, form]);
+  }, [canCalculate, form, t]);
 
   useEffect(() => {
     if (canCalculate) calculate();

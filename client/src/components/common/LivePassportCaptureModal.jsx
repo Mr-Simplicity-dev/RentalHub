@@ -194,7 +194,7 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
       setCameraError(err.message || t('live_passport_capture.could_not_access_camera', 'Could not access camera'));
       setCameraLoading(false);
     }
-  }, [stopResources, handleFaceResults]);
+  }, [stopResources, handleFaceResults, t]);
 
   useEffect(() => {
     if (!canCaptureLive || autoCaptureTriggeredRef.current || !cameraActive) return;
@@ -229,7 +229,7 @@ const LivePassportCaptureModal = ({ onCapture, onClose, title }) => {
     } finally {
       setUploadingPhoto(false);
     }
-  }, [capturedImage, liveCaptureToken, onCapture, onClose]);
+  }, [capturedImage, liveCaptureToken, onCapture, onClose, t]);
 
   useEffect(() => { return () => stopResources(); }, [stopResources]);
 

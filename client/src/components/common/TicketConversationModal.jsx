@@ -57,7 +57,7 @@ const TicketConversationModal = ({
     } finally {
       setLoadingConversation(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (ticket?.id) {

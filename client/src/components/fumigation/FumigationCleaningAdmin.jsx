@@ -109,7 +109,7 @@ const FumigationCleaningAdmin = ({
     };
     
     loadAdminData();
-  }, [user, navigate]);
+  }, [user, navigate, t]);
   
   // Filter and sort bookings
   useEffect(() => {
