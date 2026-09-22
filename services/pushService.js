@@ -12,6 +12,7 @@
 
 const webpush = require('web-push');
 const db = require('../config/middleware/database');
+const logger = require('../config/utils/logger');
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
@@ -23,7 +24,7 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 } else {
   runtimeKeys = webpush.generateVAPIDKeys();
   webpush.setVapidDetails(VAPID_SUBJECT, runtimeKeys.publicKey, runtimeKeys.privateKey);
-  console.warn('[push] VAPID keys not configured in env — using runtime keys (resets on restart). Set VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY.');
+  logger.warn('[push] VAPID keys not configured in env — using runtime keys (resets on restart). Set VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY.');
 }
 
 exports.getPublicKey = (req, res) => {

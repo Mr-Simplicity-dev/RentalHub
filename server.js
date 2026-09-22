@@ -186,18 +186,18 @@ const scheduleEvidenceIntegrityMonitoring = () => {
     try {
       const summary = await runEvidenceIntegrityMonitor({ limit: scanLimit });
       if (summary.errors > 0) {
-        console.warn(`Evidence integrity monitor finished with ${summary.errors} issues`);
+        logger.warn('Evidence integrity monitor finished with issues', { errors: summary.errors });
       } else {
-        console.log(`Evidence integrity monitor completed (disputes: ${summary.checked_disputes}, verified: ${summary.verified})`);
+        logger.info('Evidence integrity monitor completed', { disputes: summary.checked_disputes, verified: summary.verified });
       }
     } catch (err) {
-      console.error('Evidence integrity monitor failed:', err.message);
+      logger.error('Evidence integrity monitor failed', { error: err.message });
     }
   };
 
   runMonitor();
   cron.schedule(cronExpression, runMonitor);
-  console.log(`Evidence integrity monitor scheduled (${cronExpression})`);
+  logger.info('Evidence integrity monitor scheduled', { cron: cronExpression });
 };
 
 const schedulePayoutRetries = () => {
@@ -208,34 +208,38 @@ const schedulePayoutRetries = () => {
       const summary = await runPayoutRetryCycle();
       const totalErrors = (summary.agent?.errors || 0) + (summary.wallet?.errors || 0) + (summary.stateAdmin?.errors || 0);
       if (totalErrors > 0) {
-        console.warn(`Payout retry cycle completed with ${totalErrors} issues`);
+        logger.warn('Payout retry cycle completed with issues', { errors: totalErrors });
       } else {
-        console.log(`Payout retry cycle completed: agent (scanned: ${summary.agent?.scanned || 0}, retried: ${summary.agent?.retried || 0}), wallet (scanned: ${summary.wallet?.scanned || 0}, retried: ${summary.wallet?.retried || 0}), stateAdmin (scanned: ${summary.stateAdmin?.scanned || 0}, retried: ${summary.stateAdmin?.retried || 0})`);
+        logger.info('Payout retry cycle completed', {
+          agent: summary.agent,
+          wallet: summary.wallet,
+          stateAdmin: summary.stateAdmin,
+        });
       }
     } catch (err) {
-      console.error('Payout retry cycle failed:', err.message);
+      logger.error('Payout retry cycle failed', { error: err.message });
     }
   };
 
   runRetries();
   cron.schedule(cronExpression, runRetries);
-  console.log(`Payout retry scheduler started (${cronExpression})`);
+  logger.info('Payout retry scheduler started', { cron: cronExpression });
 };
 
 let mongoCronJobsStarted = false;
 
 // MongoDB connection monitoring
 mongoose.connection.on('connected', () => {
-  console.log('MongoDB connected for cron jobs');
+  logger.info('MongoDB connected for cron jobs');
   startMongoCronJobs();
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('MongoDB connection error:', err.message);
+  logger.error('MongoDB connection error', { error: err.message });
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.warn('MongoDB disconnected — cron jobs paused');
+  logger.warn('MongoDB disconnected — cron jobs paused');
 });
 
 const startMongoCronJobs = () => {

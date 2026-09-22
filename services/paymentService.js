@@ -4613,7 +4613,7 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
             );
           }
         } catch (commErr) {
-          console.error('Failed to mark admin_commissions as paid upon transfer.success:', commErr.message);
+          logger.error('Failed to mark admin_commissions as paid upon transfer.success', { error: commErr.message });
         }
 
         // Email the admin a payout receipt with itemized commissions

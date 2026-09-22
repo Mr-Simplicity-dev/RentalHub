@@ -100,7 +100,7 @@ const decryptAccessCode = (stored) => {
 const storeAccessCodeEncrypted = (code) => {
   if (hasAccessCodeEncryptionKey()) return encryptAccessCode(code);
   if (process.env.NODE_ENV !== 'production') {
-    console.warn('RECRUITMENT_ACCESS_CODE_KEY not set - access codes stored as plaintext (non-production)');
+    logger.warn('RECRUITMENT_ACCESS_CODE_KEY not set - access codes stored as plaintext (non-production)');
     return null;
   }
   return null;

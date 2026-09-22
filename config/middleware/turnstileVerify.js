@@ -1,3 +1,5 @@
+const logger = require('../utils/logger');
+
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
 const TURNSTILE_SITEVERIFY_TIMEOUT_MS = Number(process.env.TURNSTILE_SITEVERIFY_TIMEOUT_MS || 3000);
 // Fail-closed policy: verification is skipped ONLY when explicitly opted in
@@ -11,14 +13,14 @@ const TURNSTILE_SKIP_VERIFICATION = process.env.TURNSTILE_SKIP_VERIFICATION === 
 const verifyTurnstileToken = async (token, remoteIp = '', expectedAction = '') => {
   if (TURNSTILE_SKIP_VERIFICATION) {
     if (!TURNSTILE_SECRET_KEY) {
-      console.warn('Turnstile verification is explicitly SKIPPED (TURNSTILE_SKIP_VERIFICATION=true). Never use this in production.');
+      logger.warn('Turnstile verification is explicitly SKIPPED (TURNSTILE_SKIP_VERIFICATION=true). Never use this in production.');
     }
     return true;
   }
 
   if (!TURNSTILE_SECRET_KEY) {
     // Fail closed: a missing secret must never silently disable the check.
-    console.error('TURNSTILE_SECRET_KEY is not set - rejecting Turnstile-protected request (fail closed)');
+    logger.error('TURNSTILE_SECRET_KEY is not set - rejecting Turnstile-protected request (fail closed)');
     return false;
   }
 

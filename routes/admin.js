@@ -11,6 +11,7 @@ const superAdminOnly = require('../config/middleware/superAdminOnly');
 const validateRequest = require('../config/middleware/validateRequest');
 const { CREATABLE_ADMIN_ROLES, GENERAL_ADMIN_LABELS } = require('../config/utils/roleHierarchy');
 const { ZONES } = require('../config/utils/territorialZones');
+const logger = require('../config/utils/logger');
 
 
 /**
@@ -260,7 +261,7 @@ router.get('/registrations/abandoned', requireAdminOrSuperAdmin, async (req, res
       },
     });
   } catch (error) {
-    req.logger ? req.logger.error('Failed to get abandoned registrations:', error) : console.error(error);
+    (req.logger || logger).error('Failed to get abandoned registrations', { error: error.message });
     res.status(500).json({ success: false, message: 'Failed to get abandoned registrations' });
   }
 });
@@ -277,7 +278,7 @@ router.post('/registrations/abandoned/expire', requireAdminOrSuperAdmin, async (
       data: { reconciled, expired, summary },
     });
   } catch (error) {
-    req.logger ? req.logger.error('Failed to expire abandoned registrations:', error) : console.error(error);
+    (req.logger || logger).error('Failed to expire abandoned registrations', { error: error.message });
     res.status(500).json({ success: false, message: 'Failed to expire abandoned registrations' });
   }
 });

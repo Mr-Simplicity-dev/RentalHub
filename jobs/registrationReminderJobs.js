@@ -11,6 +11,7 @@
  */
 
 const db = require('../config/middleware/database');
+const logger = require('../config/utils/logger');
 const { sendCompleteRegistrationEmail } = require('../config/utils/emailService');
 
 const MAX_REMINDERS = 3;
@@ -51,11 +52,11 @@ const reconcileRegisteredUsers = async () => {
        RETURNING trp.id`
     );
     if (result.rows && result.rows.length > 0) {
-      console.log(`Reconciled ${result.rows.length} pending registrations to existing users`);
+      logger.info('Reconciled pending registrations to existing users', { count: result.rows.length });
     }
     return result.rows ? result.rows.length : 0;
   } catch (error) {
-    console.warn('Registration reconciliation error:', error.message);
+    logger.warn('Registration reconciliation error', { error: error.message });
     return 0;
   }
 };
@@ -79,11 +80,11 @@ const expireAbandonedRegistrations = async () => {
       [ABANDONED_AFTER_DAYS, MAX_REMINDERS]
     );
     if (result.rows && result.rows.length > 0) {
-      console.log(`Marked ${result.rows.length} stale registrations as abandoned`);
+      logger.info('Marked stale registrations as abandoned', { count: result.rows.length });
     }
     return result.rows ? result.rows.length : 0;
   } catch (error) {
-    console.warn('Registration expiry error:', error.message);
+    logger.warn('Registration expiry error', { error: error.message });
     return 0;
   }
 };
@@ -180,10 +181,10 @@ const runRegistrationReminders = async () => {
     }
 
     if (due.rows.length > 0) {
-      console.log(`Registration reminders: ${sent}/${due.rows.length} emailed`);
+      logger.info('Registration reminders emailed', { sent, due: due.rows.length });
     }
   } catch (error) {
-    console.error('Registration reminder job error:', error.message);
+    logger.error('Registration reminder job error', { error: error.message });
   }
 };
 
@@ -201,7 +202,7 @@ const getAbandonedRegistrationsSummary = async () => {
     `);
     return stats.rows[0] || {};
   } catch (error) {
-    console.error('getAbandonedRegistrationsSummary error:', error.message);
+    logger.error('getAbandonedRegistrationsSummary error', { error: error.message });
     return {};
   }
 };
@@ -210,7 +211,7 @@ const startRegistrationReminderJobs = () => {
   // Run hourly
   setInterval(runRegistrationReminders, 60 * 60 * 1000);
   runRegistrationReminders();
-  console.log('Registration reminder job started (hourly)');
+  logger.info('Registration reminder job started (hourly)');
 };
 
 module.exports = {

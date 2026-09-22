@@ -5,6 +5,7 @@
  */
 
 const db = require('../middleware/database');
+const logger = require('./logger');
 const { sendPaymentReceiptEmail } = require('./emailService');
 
 const PAYMENT_TYPE_LABELS = {
@@ -127,7 +128,7 @@ const sendReceiptForPayment = async (paymentId) => {
     if (!ctx) return { success: false, error: 'Receipt context not found' };
     return await sendPaymentReceiptEmail(buildReceiptData(ctx));
   } catch (error) {
-    console.error('sendReceiptForPayment error:', error.message);
+    logger.error('sendReceiptForPayment error', { error: error.message });
     return { success: false, error: error.message };
   }
 };
@@ -209,7 +210,7 @@ const sendPayoutReceiptEmail = async ({
     });
     return { success: true };
   } catch (error) {
-    console.error('sendPayoutReceiptEmail error:', error.message);
+    logger.error('sendPayoutReceiptEmail error', { error: error.message });
     return { success: false, error: error.message };
   }
 };
@@ -261,7 +262,7 @@ const sendAdminPayoutReceipt = async ({
       itemLines,
     });
   } catch (error) {
-    console.error('sendAdminPayoutReceipt error:', error.message);
+    logger.error('sendAdminPayoutReceipt error', { error: error.message });
     return { success: false, error: error.message };
   }
 };
@@ -297,7 +298,7 @@ const sendAgentPayoutReceipt = async ({ agentUserId, amount, reference, status =
       itemLines,
     });
   } catch (error) {
-    console.error('sendAgentPayoutReceipt error:', error.message);
+    logger.error('sendAgentPayoutReceipt error', { error: error.message });
     return { success: false, error: error.message };
   }
 };
@@ -329,7 +330,7 @@ const sendUserPayoutReceipt = async ({
       note,
     });
   } catch (error) {
-    console.error('sendUserPayoutReceipt error:', error.message);
+    logger.error('sendUserPayoutReceipt error', { error: error.message });
     return { success: false, error: error.message };
   }
 };

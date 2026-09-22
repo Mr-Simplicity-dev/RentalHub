@@ -14,6 +14,7 @@
 
 const axios = require('axios');
 const db = require('../middleware/database');
+const logger = require('./logger');
 
 const FX_RATE_API_URL =
   process.env.FX_RATE_API_URL || 'https://open.er-api.com/v6/latest/USD';
@@ -81,7 +82,7 @@ const refreshFxRate = async () => {
     await upsertFxRate({ rate, source: 'open.er-api.com' });
     return rate;
   } catch (error) {
-    console.warn('FX auto-refresh failed:', error.message);
+    logger.warn('FX auto-refresh failed', { error: error.message });
     return null;
   }
 };
