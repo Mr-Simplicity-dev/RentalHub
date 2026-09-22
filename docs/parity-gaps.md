@@ -203,9 +203,19 @@ Committed & pushed:
 - [x] **Rent-savings setup-fees admin** — mobile: `rentSavingsAdminService` setup-fee methods +
       `screens/shared/RentSavingsSetupFeesScreen.js` (state/LGA picker, fee amount, required governance
       note, delete). Registered in `SuperAdminRoot`; Profile entry for `super_admin`.
-- [ ] Still open (from the 2026-09-22 re-audit): **Admin Tour Analytics** (no mobile screen),
-      **rent-calculator fee admin** (mobile service exists, no screen), and **dispute detail** is
-      registered in `LawyerRoot` only.
+- [x] **Rent-calculator fee admin** — mobile: `screens/shared/RentCalculatorFeesAdminScreen.js`
+      (state/LGA + agent %/legal %/caution months/agreement fee/service charge + required governance
+      note, delete) using the existing `rentCalculatorService` admin methods. Profile entry (super admin).
+- [x] **Admin tour analytics** — mobile: `tourService.getAnalytics` +
+      `screens/shared/TourAnalyticsScreen.js` (period/platform filters, engagement funnel, completion
+      rate, top problems, recent issues) from `GET /users/tour/analytics`. Profile entry (super admin).
+- [x] **Dispute detail reachability** — `DisputeDetails` moved from `LawyerRoot`-only into
+      `commonTenancyScreens()` so every authenticated role root can open `/dispute/:disputeId`.
+- [x] **NDPR full export (mobile)** — `PrivacyDataScreen` now writes the full personal-data export to
+      a JSON file (`expo-file-system`) and shares it (`expo-sharing`), instead of deferring to web.
+- **Assessed as correctly web-only** (no mobile action): `QrCodePage` is an *app-download* QR
+  (meaningless inside the app), `MobileAppPage`/`AppLanding` are download landing pages, the Twilio
+  PSTN support desk (mobile has peer WebRTC calls + a read-only monitor), and the full SEO crawler.
 - Corrections to earlier entries: the "§3a user-facing gap set is now CLOSED" claim was inaccurate
   (PayRentOnBehalf / RequestRentHelp were never listed); the Batch-C "court-bundle kept web-only"
   line is stale (`CourtBundleScreen` is built and registered); mobile has peer WebRTC calls but
