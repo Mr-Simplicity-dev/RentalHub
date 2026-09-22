@@ -190,3 +190,20 @@ Committed & pushed:
 
 - Diaspora registration already existed on mobile (audit overstated); only flag-gating/fee display were added.
 - Mobile rank questions resolve options via `rankSource` (web renderer has a latent bug here).
+
+### Parity closure — rent help (2026-09-22)
+
+- [x] **Pay someone's rent (on behalf)** — mobile: `services/rentHelpService.js` +
+      `screens/shared/PayRentOnBehalfScreen.js` (token link → server-confirmed amount →
+      beneficiary confirmation → Paystack card via `Linking` / bank-transfer details).
+      Registered in `commonTenancyScreens()`; deep link `pay-for-rent/:token`.
+- [x] **Ask someone to pay your rent** — mobile: `screens/shared/RequestRentHelpScreen.js`
+      (eligible property picker → create one-time link → native `Share`). Deep link `rent-help`;
+      tenant Dashboard "Money" entry.
+- [ ] Still open (from the 2026-09-22 re-audit): **Admin Tour Analytics** (no mobile screen),
+      **rent-calculator fee admin** (mobile service exists, no screen), **rent-savings setup-fees
+      admin** (no mobile service/screen), and **dispute detail** is registered in `LawyerRoot` only.
+- Corrections to earlier entries: the "§3a user-facing gap set is now CLOSED" claim was inaccurate
+  (PayRentOnBehalf / RequestRentHelp were never listed); the Batch-C "court-bundle kept web-only"
+  line is stale (`CourtBundleScreen` is built and registered); mobile has peer WebRTC calls but
+  **not** the Twilio PSTN support-agent desk (only a read-only monitor).
