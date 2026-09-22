@@ -3,6 +3,7 @@ const { body, param } = require('express-validator');
 const { authenticate } = require('../config/middleware/auth');
 const validateRequest = require('../config/middleware/validateRequest');
 const tenancyAgreementService = require('../services/tenancyAgreementService');
+const { streamAgreementDocument } = require('../services/tenancyAgreementDocument');
 
 const router = express.Router();
 
@@ -192,6 +193,25 @@ router.get(
     } catch (error) {
       req.logger.error('Get tenancy agreement document error:', error);
       return handleError(res, error, 'Failed to load agreement document');
+    }
+  }
+);
+
+// Rendered PDF document (server-generated, immutable source data)
+router.get(
+  '/:id/document.pdf',
+  authenticate,
+  [param('id').isInt({ min: 1 })],
+  validateRequest,
+  async (req, res) => {
+    try {
+      const agreement = await tenancyAgreementService.getAgreementForDocument(Number(req.params.id), req.user);
+      await streamAgreementDocument(res, agreement);
+    } catch (error) {
+      req.logger.error('Stream tenancy agreement document error:', error);
+      if (!res.headersSent) {
+        return handleError(res, error, 'Failed to render agreement document');
+      }
     }
   }
 );

@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 process.env.NODE_ENV = 'test';
 
 const svc = require('../services/tenancyAgreementService');
+const jurisdiction = require('../config/utils/tenancyJurisdiction');
 
 const EXPECTED_STATUSES = [
   'DRAFT',
@@ -72,4 +73,31 @@ test('buildAgreementTerms falls back to the property rent when no agreed rent ex
     { payment_frequency: 'yearly' }
   );
   assert.equal(terms.rentAmount, 500000);
+});
+
+test('jurisdiction layer resolves distinct configurations per state (not one hard-coded rule)', () => {
+  const lagos = jurisdiction.resolveJurisdiction({ state: 'Lagos' });
+  const fct = jurisdiction.resolveJurisdiction({ state: 'FCT' });
+  const unknown = jurisdiction.resolveJurisdiction({ state: 'Nowhere' });
+
+  assert.equal(lagos.code, 'NG-LA');
+  assert.equal(fct.code, 'NG-FC');
+  assert.equal(unknown.code, 'NG-DEFAULT');
+  assert.notEqual(lagos.code, unknown.code);
+  assert.notEqual(lagos.tenancyLawReference, unknown.tenancyLawReference);
+});
+
+test('jurisdiction values are flagged as not yet legally approved', () => {
+  const lagos = jurisdiction.resolveJurisdiction({ state: 'Lagos' });
+  assert.equal(lagos.approved, false);
+});
+
+test('buildAgreementTerms applies the resolved jurisdiction notice period and clauses', () => {
+  const terms = svc.buildAgreementTerms(
+    { move_in_date: '2026-01-01', agreed_rent: 100 },
+    { state: 'Lagos', payment_frequency: 'yearly' }
+  );
+  assert.equal(terms.noticeConfiguration.noticePeriodDays, 30);
+  assert.ok(String(terms.tenancyLawReference).includes('Lagos'));
+  assert.ok(Array.isArray(terms.statutoryClauses));
 });

@@ -17,6 +17,7 @@ const db = require('../config/middleware/database');
 const logger = require('../config/utils/logger');
 const { logAction } = require('../config/utils/auditLogger');
 const { createNotification } = require('../config/utils/notificationService');
+const { resolveJurisdiction } = require('../config/utils/tenancyJurisdiction');
 
 const TENANCY_AGREEMENT_STATUS = {
   DRAFT: 'DRAFT',
@@ -153,9 +154,17 @@ const computeDocumentHash = ({ agreementId, version, terms, jurisdiction }) =>
     .update(JSON.stringify({ agreementId, version, terms, jurisdiction }))
     .digest('hex');
 
+const buildAgreementJurisdiction = (property = {}) =>
+  resolveJurisdiction({
+    state: property.state,
+    lga: property.lga_name || property.city || null,
+    tenancyType: 'residential',
+  });
+
 const buildAgreementTerms = (application, property) => {
   const commencementDate = toDateOnly(application.move_in_date) || toDateOnly(new Date());
   const rentAmount = Number(application.agreed_rent || application.rent_amount || 0);
+  const jurisdiction = buildAgreementJurisdiction(property);
   return {
     propertyId: property.id,
     propertyAddress: property.full_address || property.title || null,
@@ -176,7 +185,9 @@ const buildAgreementTerms = (application, property) => {
     occupants: 1,
     permittedUse: 'residential',
     specialTerms: [],
-    noticeConfiguration: { noticePeriodDays: 30 },
+    noticeConfiguration: { noticePeriodDays: jurisdiction.noticePeriodDays },
+    tenancyLawReference: jurisdiction.tenancyLawReference,
+    statutoryClauses: jurisdiction.clauses,
     attachments: [],
   };
 };
@@ -246,17 +257,19 @@ const createDraftAgreementFromApplication = async ({ applicationId, actorUserId 
       ]
     );
     const agreementId = agreementResult.rows[0].id;
-    const documentHash = computeDocumentHash({ agreementId, version: 1, terms, jurisdiction: {} });
+    const jurisdiction = buildAgreementJurisdiction(property);
+    const documentHash = computeDocumentHash({ agreementId, version: 1, terms, jurisdiction });
 
     await client.query(
       `INSERT INTO tenancy_agreement_versions
          (agreement_id, version, status, terms, jurisdiction, document_hash, created_by)
-       VALUES ($1, 1, $2, $3::jsonb, '{}'::jsonb, $4, $5)`,
+       VALUES ($1, 1, $2, $3::jsonb, $4::jsonb, $5, $6)`,
       [
         agreementId,
         1,
         TENANCY_AGREEMENT_STATUS.PENDING_LANDLORD_REVIEW,
         JSON.stringify(terms),
+        JSON.stringify(jurisdiction),
         documentHash,
         actorUserId,
       ]
@@ -667,6 +680,12 @@ const getAgreementAudit = async (agreementId, user) => {
   return events.rows;
 };
 
+const getAgreementForDocument = async (agreementId, user) => {
+  const agreement = await loadAgreement(agreementId);
+  assertAccess(agreement, user);
+  return agreement;
+};
+
 exports.TENANCY_AGREEMENT_STATUS = TENANCY_AGREEMENT_STATUS;
 exports.TENANCY_AGREEMENT_EVENTS = TENANCY_AGREEMENT_EVENTS;
 exports.ensureTenancyAgreementSchema = ensureTenancyAgreementSchema;
@@ -678,4 +697,6 @@ exports.signAgreement = signAgreement;
 exports.declineAgreement = declineAgreement;
 exports.requestAmendment = requestAmendment;
 exports.getAgreementAudit = getAgreementAudit;
+exports.getAgreementForDocument = getAgreementForDocument;
 exports.buildAgreementTerms = buildAgreementTerms;
+exports.buildAgreementJurisdiction = buildAgreementJurisdiction;
