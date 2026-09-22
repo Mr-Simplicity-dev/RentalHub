@@ -200,9 +200,12 @@ Committed & pushed:
 - [x] **Ask someone to pay your rent** — mobile: `screens/shared/RequestRentHelpScreen.js`
       (eligible property picker → create one-time link → native `Share`). Deep link `rent-help`;
       tenant Dashboard "Money" entry.
+- [x] **Rent-savings setup-fees admin** — mobile: `rentSavingsAdminService` setup-fee methods +
+      `screens/shared/RentSavingsSetupFeesScreen.js` (state/LGA picker, fee amount, required governance
+      note, delete). Registered in `SuperAdminRoot`; Profile entry for `super_admin`.
 - [ ] Still open (from the 2026-09-22 re-audit): **Admin Tour Analytics** (no mobile screen),
-      **rent-calculator fee admin** (mobile service exists, no screen), **rent-savings setup-fees
-      admin** (no mobile service/screen), and **dispute detail** is registered in `LawyerRoot` only.
+      **rent-calculator fee admin** (mobile service exists, no screen), and **dispute detail** is
+      registered in `LawyerRoot` only.
 - Corrections to earlier entries: the "§3a user-facing gap set is now CLOSED" claim was inaccurate
   (PayRentOnBehalf / RequestRentHelp were never listed); the Batch-C "court-bundle kept web-only"
   line is stale (`CourtBundleScreen` is built and registered); mobile has peer WebRTC calls but
