@@ -18,7 +18,7 @@ import {
   FaUsers,
 } from 'react-icons/fa';
 
-const LAST_UPDATED = '1 August 2026';
+const LAST_UPDATED = '21 September 2026';
 
 const Terms = () => {
   const { t } = useTranslation();
@@ -80,6 +80,24 @@ const Terms = () => {
         t('terms.fees.1', 'The amount, purpose, taxes (if any), and material conditions of a paid feature are shown before confirmation. Charges may include registration access, property access, rent, subscriptions, applications, inspections, bookings, professional services or other clearly identified services.'),
         t('terms.fees.2', 'Payments may be processed by Paystack, a participating bank or another approved provider. RentalHub does not ask you to place full payment-card details in messages or support tickets. Payment success is subject to provider confirmation and may be delayed while a transaction is reconciled.'),
         t('terms.fees.3', 'A RentalHub wallet, savings view, balance or ledger is a platform record for eligible transactions; it is not a bank account and RentalHub does not promise interest unless a specific regulated product expressly says so. Withdrawals, refunds and settlements may require verification, available funds, fraud review, valid destination details and any disclosed reserve or processing rule.'),
+      ],
+      subsections: [
+        {
+          id: 'circumvention',
+          number: '06.1',
+          title: t('terms.fees.circumvention.title', 'Exclusivity of In-App Payments and Anti-Circumvention'),
+          body: [
+            t('terms.fees.circumvention.routing', 'Mandatory payment routing: To secure platform interactions, protect user data, and ensure accurate corporate tax compliance under the laws of the Federal Republic of Nigeria, all financial transactions initiated on or facilitated by RentalHub — including but not limited to rent payments, listing fees, service bookings and security deposits — must be completed exclusively through the integrated Paystack payment gateway within the RentalHub application or website.'),
+            t('terms.fees.circumvention.offline', 'Prohibition of offline transactions: Users (including landlords, agents, tenants and service providers) are strictly prohibited from soliciting, offering, negotiating or accepting payments outside of the RentalHub platform for any property listing, booking or relationship established via RentalHub.'),
+            t('terms.fees.circumvention.definition', 'Definition of circumvention: Prohibited circumvention behaviours include, but are not limited to:'),
+          ],
+          bullets: [
+            t('terms.fees.circumvention.example_1', 'exchanging bank account details, phone numbers or external payment links within messages for the purpose of moving a transaction offline;'),
+            t('terms.fees.circumvention.example_2', 'invoicing users directly outside the application; or'),
+            t('terms.fees.circumvention.example_3', 'encouraging a user to cancel an application or booking on the app in order to pay by external cash, cheque or direct bank transfer.'),
+          ],
+          penalty: t('terms.fees.circumvention.penalty', 'Penalties for violation: Any attempt to bypass, circumvent or avoid RentalHub’s in-app payment system constitutes a material breach of these Terms. RentalHub reserves the right, in its sole discretion and without prior notice, to immediately suspend or permanently terminate the offending user’s account, remove all active listings, withhold platform access, and charge a circumvention penalty fee equivalent to the maximum platform commission that would have been earned on the transaction.'),
+        },
       ],
     },
     {
@@ -302,6 +320,28 @@ const Terms = () => {
                       </ul>
                     ) : null}
                   </div>
+                  {section.subsections?.map((subsection) => (
+                    <div key={subsection.id} id={subsection.id} className="terms-subsection">
+                      <p className="terms-subsection-eyebrow">
+                        {subsection.number} · {t('terms.title', 'Terms')}
+                      </p>
+                      <h3 className="terms-subsection-title">{subsection.title}</h3>
+                      <div className="terms-subsection-body">
+                        {subsection.body?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                        {subsection.bullets ? (
+                          <ul className="space-y-3">
+                            {subsection.bullets.map((item) => (
+                              <li key={item} className="flex items-start gap-3">
+                                <FaCheckCircle className="mt-1 shrink-0 text-emerald-600" aria-hidden="true" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                        {subsection.penalty ? <p className="terms-subsection-penalty">{subsection.penalty}</p> : null}
+                      </div>
+                    </div>
+                  ))}
                 </section>
               ))}
 
@@ -334,6 +374,11 @@ const Terms = () => {
         }
         .terms-section-heading { display: flex; align-items: flex-start; gap: 1rem; border-bottom: 1px solid #f1f5f9; padding: 1.25rem 1.5rem; background: linear-gradient(90deg,#f8fafc,#fff); }
         .terms-section-body { display: grid; gap: 1rem; padding: 1.5rem; color: #334155; font-size: 1rem; line-height: 1.75; }
+        .terms-subsection { border-top: 1px solid #e2e8f0; background: #f8fafc; padding: 1.25rem 1.5rem 1.5rem; }
+        .terms-subsection-eyebrow { margin: 0; font-size: .7rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: #1d4ed8; }
+        .terms-subsection-title { margin: .35rem 0 0; font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; color: #0f172a; }
+        .terms-subsection-body { display: grid; gap: .9rem; margin-top: .9rem; color: #334155; font-size: .95rem; line-height: 1.7; }
+        .terms-subsection-penalty { border-left: 3px solid #f59e0b; padding-left: .9rem; font-weight: 600; color: #7c2d12; }
         @media print {
           @page { size: A4 portrait; margin: 15mm 14mm 17mm; }
           html, body, #root { background: #fff !important; }
@@ -354,6 +399,12 @@ const Terms = () => {
           .terms-section-heading h2 { margin: 1mm 0 0 !important; font-size: 14pt !important; }
           .terms-section-body { display: block !important; padding: 3mm 0 0 !important; font-size: 9.5pt !important; line-height: 1.48 !important; }
           .terms-section-body p { margin: 0 0 3mm; orphans: 3; widows: 3; }
+          .terms-subsection { display: block !important; margin: 0 !important; padding: 3mm 0 0 !important; border: 0 !important; background: #fff !important; break-inside: auto; page-break-inside: auto; }
+          .terms-subsection-eyebrow { margin: 0; font-size: 8pt !important; }
+          .terms-subsection-title { margin: 1mm 0 0 !important; font-size: 10.5pt !important; }
+          .terms-subsection-body { display: block !important; margin: 2mm 0 0 !important; font-size: 9.5pt !important; line-height: 1.48 !important; }
+          .terms-subsection-body p { margin: 0 0 3mm; orphans: 3; widows: 3; }
+          .terms-subsection-penalty { padding-left: 4mm !important; }
           .terms-section-body li { margin-bottom: 2mm; break-inside: avoid; page-break-inside: avoid; }
           h1, h2, h3, h4 { break-after: avoid-page; page-break-after: avoid; }
           p, li { orphans: 3; widows: 3; }
