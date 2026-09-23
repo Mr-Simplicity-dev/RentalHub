@@ -799,7 +799,7 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json(response);
 });
 
-const PORT = Number(process.env.APP_PORT || process.env.PORT || 5000);
+const PORT = process.env.APPLET_ID ? 3000 : Number(process.env.APP_PORT || process.env.PORT || 5000);
 let backgroundServicesStarted = false;
 
 // const ensureStartupSchema = async () => {

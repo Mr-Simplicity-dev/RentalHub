@@ -140,6 +140,8 @@ exports.getUnreadCount = async (userId) => {
 };
 
 // Initialize notification table
-createNotificationTable();
+if (process.env.NODE_ENV !== 'test') {
+  createNotificationTable();
+}
 
 module.exports = exports;

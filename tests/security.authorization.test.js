@@ -286,8 +286,15 @@ test('department escalation access is scoped to department and jurisdiction', ()
 test('support SLA monitor applies policy timers and marks one-time alert columns', async () => {
   const { runSupportSlaMonitor } = supportRoutes._supportScopeForTest;
   const originalQuery = db.query;
+  const originalConnect = db.connect;
   const calls = [];
   const timelineEvents = [];
+
+  const mockClient = {
+    query: async () => ({ rows: [] }),
+    release: () => {},
+  };
+  db.connect = async () => mockClient;
 
   db.query = async (sql, params = []) => {
     const text = String(sql);
@@ -333,6 +340,7 @@ test('support SLA monitor applies policy timers and marks one-time alert columns
     await runSupportSlaMonitor();
   } finally {
     db.query = originalQuery;
+    db.connect = originalConnect;
   }
 
   assert.ok(calls.some((call) => call.text.includes('sla_warning_notified_at')));
