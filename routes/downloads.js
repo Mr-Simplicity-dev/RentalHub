@@ -32,7 +32,18 @@ const getBuildInfo = () => {
 router.get('/app', (req, res) => {
   const apkPath = path.resolve(UPLOADS_DIR, 'app.apk');
 
-  res.download(apkPath, 'RentalHub.apk', (err) => {
+  // The APK lives at one fixed path and is overwritten on every deploy, so it must
+  // never be cached by a browser, proxy or CDN — otherwise an older build keeps
+  // being handed out. The versioned filename also stops devices reusing a stale
+  // "RentalHub.apk" they already downloaded.
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+    Pragma: 'no-cache',
+    Expires: '0',
+  });
+
+  const { version } = getBuildInfo();
+  res.download(apkPath, `RentalHub-${version}.apk`, (err) => {
     if (err) {
       if (!res.headersSent) {
         res.status(404).json({ success: false, message: 'APK not found' });
@@ -49,7 +60,7 @@ router.get('/version', (req, res) => {
       android: {
         version: info.version,
         buildNumber: info.buildNumber,
-        downloadUrl: '/api/downloads/app',
+        downloadUrl: `/api/downloads/app?v=${encodeURIComponent(info.version)}`,
         lastUpdated: info.lastUpdated,
       },
       ios: {

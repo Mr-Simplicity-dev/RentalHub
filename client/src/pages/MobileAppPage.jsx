@@ -1,9 +1,32 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaMobileAlt, FaDownload, FaShieldAlt, FaBell, FaComments, FaHome } from 'react-icons/fa';
 
 const MobileAppPage = () => {
   const { t } = useTranslation();
+  const [build, setBuild] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/downloads/version')
+      .then((response) => response.json())
+      .then((payload) => {
+        if (active) setBuild(payload?.data?.android || null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Always point at the freshly built APK and label it with the version actually
+  // being served, so nobody accidentally installs an older file they already have.
+  const downloadUrl = build?.downloadUrl || '/api/downloads/app';
+  const downloadName = build?.version ? `RentalHub-${build.version}.apk` : 'RentalHub.apk';
+  const androidLabel = build?.version
+    ? `${t('mobile_app.download_android')} (v${build.version})`
+    : t('mobile_app.download_android');
+
   const features = [
     { icon: <FaBell />, title: t('mobile_app.feature_instant_alerts'), desc: t('mobile_app.feature_instant_alerts_desc') },
     { icon: <FaComments />, title: t('mobile_app.feature_in_app_chat'), desc: t('mobile_app.feature_in_app_chat_desc') },
@@ -22,11 +45,12 @@ const MobileAppPage = () => {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <a
-              href="/api/downloads/app"
+              href={downloadUrl}
+              download={downloadName}
               className="inline-flex items-center justify-center gap-2 bg-white text-primary-700 px-8 py-3 rounded-xl font-semibold hover:bg-gray-100 transition"
             >
               <FaDownload />
-              {t('mobile_app.download_android')}
+              {androidLabel}
             </a>
             <a
               href={process.env.REACT_APP_IOS_APP_URL || '#'}
@@ -58,11 +82,14 @@ const MobileAppPage = () => {
           <h2 className="text-xl font-bold text-slate-900 mb-2">{t('mobile_app.apk_heading')}</h2>
           <p className="text-sm text-slate-600 mb-4">{t('mobile_app.apk_desc')}</p>
           <a
-            href="/api/downloads/app"
+            href={downloadUrl}
+            download={downloadName}
             className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-700 transition"
           >
             <FaDownload />
-            {t('mobile_app.apk_download_button')}
+            {build?.version
+              ? `${t('mobile_app.apk_download_button')} (v${build.version})`
+              : t('mobile_app.apk_download_button')}
           </a>
         </div>
       </section>

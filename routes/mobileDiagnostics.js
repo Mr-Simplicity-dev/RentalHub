@@ -85,11 +85,16 @@ const platformStoreUrl = (platform) => {
 
 const platformApkUrl = (platform) => {
   if (platform !== 'android') return '';
-  return (
+  const base =
     process.env.MOBILE_ANDROID_APK_URL ||
     process.env.MOBILE_APK_URL ||
-    ''
-  );
+    '';
+  if (!base) return '';
+  // Cache-bust with the deployed version so a device or CDN can never hand out an
+  // older build that happens to sit behind the same URL.
+  const version = readDeployedVersion();
+  if (!version) return base;
+  return `${base}${base.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}`;
 };
 
 const platformUpdateUrl = (platform) =>
