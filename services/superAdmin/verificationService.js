@@ -205,6 +205,24 @@ const getIdentityVerifications = async (req, res) => {
 
 
 
+    const roleResult = await db.query(`
+
+      SELECT u.user_type AS role, COUNT(*)::INT AS count
+
+      FROM users u
+
+      WHERE u.deleted_at IS NULL
+
+        AND u.user_type <> 'super_admin'
+
+        AND ${USER_VERIFICATION_STATUS_EXPR} <> 'not_submitted'
+
+      GROUP BY u.user_type
+
+      ORDER BY COUNT(*) DESC
+
+    `);
+
     // Decrypt NIN before returning
 
     for (const row of dataResult.rows) {
@@ -224,6 +242,10 @@ const getIdentityVerifications = async (req, res) => {
       success: true,
 
       data: dataResult.rows,
+
+      // Roles that actually have rows in the verification queue, so clients can
+      // offer filters that match the data instead of a fixed list.
+      available_user_types: roleResult.rows,
 
       pagination: {
 

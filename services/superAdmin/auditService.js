@@ -84,59 +84,88 @@ const getAdminMonitor = async (req, res) => {
 };
 
 // ================= ANALYTICS =================
-
-// GET /api/super/analytics
-const getAnalytics = async (req, res) => {
+// GET /api/super/analytics
+
+// Range presets. `all` preserves the original all-time behaviour.
+const ANALYTICS_RANGES = {
+  today: { start: "date_trunc('day', NOW())", bucket: 'hour', step: "INTERVAL '1 hour'", span: "INTERVAL '23 hours'", format: 'HH24:00' },
+  week: { start: "date_trunc('week', NOW())", bucket: 'day', step: "INTERVAL '1 day'", span: "INTERVAL '6 days'", format: 'Dy DD Mon' },
+  month: { start: "date_trunc('month', NOW())", bucket: 'day', step: "INTERVAL '1 day'", span: null, format: 'DD Mon' },
+  all: { start: null, bucket: 'month', step: "INTERVAL '1 month'", span: "INTERVAL '5 months'", format: 'Mon YYYY' },
+};
+
+const getAnalytics = async (req, res) => {
   try {
     await ensureVerificationAuditSchema();
 
+    const requestedRange = String(req.query.range || 'all').toLowerCase();
+    const range = ANALYTICS_RANGES[requestedRange] ? requestedRange : 'all';
+    const config = ANALYTICS_RANGES[range];
+    const start = config.start;
+
+    const usersFilter = start ? `created_at >= ${start}` : 'TRUE';
+    const propertiesFilter = start ? `p.created_at >= ${start}` : 'TRUE';
+    const applicationsFilter = start ? `a.created_at >= ${start}` : 'TRUE';
+    const verifiedFilter = start
+      ? `COALESCE(identity_verified_at, created_at) >= ${start}`
+      : 'TRUE';
+    const growthStart = config.span
+      ? `date_trunc('${config.bucket}', NOW()) - ${config.span}`
+      : `date_trunc('month', NOW())`;
+
     const [users, properties, apps, verified, byState, userGrowth] = await Promise.all([
       db.query(
         `SELECT user_type AS role, COUNT(*)::INT AS count
          FROM users
-         WHERE deleted_at IS NULL
+         WHERE deleted_at IS NULL AND ${usersFilter}
          GROUP BY user_type`
       ),
-      db.query(`SELECT COUNT(*) FROM properties`),
-      db.query(`SELECT COUNT(*) FROM applications`),
+      db.query(`SELECT COUNT(*) FROM properties p WHERE ${propertiesFilter}`),
+      db.query(`SELECT COUNT(*) FROM applications a WHERE ${applicationsFilter}`),
       db.query(
         `SELECT COUNT(*)
          FROM users
          WHERE identity_verified = TRUE
-           AND deleted_at IS NULL`
+           AND deleted_at IS NULL
+
+           AND ${verifiedFilter}`
       ),
       db.query(
         `SELECT
            COALESCE(s.state_name, 'Unknown') AS state,
            COUNT(*)::INT AS count
-         FROM properties p
+         FROM properties p
+
          LEFT JOIN states s ON s.id = p.state_id
+         WHERE ${propertiesFilter}
          GROUP BY COALESCE(s.state_name, 'Unknown')
          ORDER BY COUNT(*) DESC`
       ),
       db.query(
-        `WITH months AS (
+        `WITH buckets AS (
            SELECT generate_series(
-             date_trunc('month', CURRENT_DATE) - INTERVAL '5 months',
-             date_trunc('month', CURRENT_DATE),
-             INTERVAL '1 month'
-           ) AS month_start
+             ${growthStart},
+             date_trunc('${config.bucket}', NOW()),
+             ${config.step}
+           ) AS bucket_start
          )
          SELECT
-           TO_CHAR(m.month_start, 'Mon YYYY') AS month,
+           TO_CHAR(b.bucket_start, '${config.format}') AS month,
            COALESCE(COUNT(u.id), 0)::INT AS users
-         FROM months m
+         FROM buckets b
          LEFT JOIN users u
-           ON date_trunc('month', u.created_at) = m.month_start
+           ON date_trunc('${config.bucket}', u.created_at) = b.bucket_start
           AND u.deleted_at IS NULL
-         GROUP BY m.month_start
-         ORDER BY m.month_start`
+         GROUP BY b.bucket_start
+         ORDER BY b.bucket_start`
       )
     ]);
 
     res.json({
       success: true,
       data: {
+        range,
+
         usersByRole: users.rows,
         totalProperties: Number(properties.rows[0].count),
         totalApplications: Number(apps.rows[0].count),
