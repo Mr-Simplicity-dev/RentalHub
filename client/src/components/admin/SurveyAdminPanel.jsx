@@ -451,6 +451,50 @@ const SurveyAdminPanel = () => {
           </div>
 
           <div className="rounded-xl border border-soft p-4">
+            <p className="mb-3 text-sm font-semibold text-gray-700">
+              Field agent leaderboard
+            </p>
+            {meta.by_agent?.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-soft text-left text-xs uppercase tracking-wide text-gray-500">
+                      <th className="px-3 py-2">#</th>
+                      <th className="px-3 py-2">Agent</th>
+                      <th className="px-3 py-2">Phone</th>
+                      <th className="px-3 py-2">LGAs</th>
+                      <th className="px-3 py-2">Captured</th>
+                      <th className="px-3 py-2">With email</th>
+                      <th className="px-3 py-2">Last activity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {meta.by_agent.map((agent, index) => (
+                      <tr key={agent.agent_user_id || index} className="border-b border-soft last:border-0">
+                        <td className="px-3 py-2 font-semibold text-indigo-700">{index + 1}</td>
+                        <td className="px-3 py-2 text-gray-800">{agent.agent_name}</td>
+                        <td className="px-3 py-2 text-gray-600">{agent.agent_phone || '-'}</td>
+                        <td className="px-3 py-2 text-gray-600">{agent.lgas}</td>
+                        <td className="px-3 py-2 font-semibold text-gray-900">{agent.captured}</td>
+                        <td className="px-3 py-2 text-gray-600">{agent.with_email}</td>
+                        <td className="px-3 py-2 text-gray-500">
+                          {agent.last_activity
+                            ? new Date(agent.last_activity).toLocaleDateString()
+                            : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="py-6 text-center text-sm text-gray-400">
+                No agent-captured responses in this range
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-soft p-4">
             <p className="mb-3 text-sm font-semibold text-gray-700">Top Pain Points (1–5 means)</p>
             {pain.length ? (
               <div className="space-y-2">

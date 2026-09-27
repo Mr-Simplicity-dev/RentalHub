@@ -273,6 +273,50 @@ const computeAnalysis = async ({ type, from, to, source }) => {
     bySource[row.source] = (bySource[row.source] || 0) + 1;
   }
 
+  // Per-agent leaderboard. Only responses that carry an agent are counted — the
+  // public self-serve responses have no agent and are not anybody's performance.
+  const byAgent = new Map();
+  for (const row of rows) {
+    if (!row.agent_user_id) continue;
+
+    const key = String(row.agent_user_id);
+    if (!byAgent.has(key)) {
+      byAgent.set(key, {
+        agent_user_id: row.agent_user_id,
+        agent_name: row.agent_name || 'Unnamed agent',
+        agent_phone: row.agent_phone || null,
+        captured: 0,
+        with_email: 0,
+        with_phone: 0,
+        lgas: new Set(),
+        last_activity: null,
+      });
+    }
+
+    const entry = byAgent.get(key);
+    entry.captured += 1;
+    if (row.has_email && row.respondent_email) entry.with_email += 1;
+    if (row.respondent_phone) entry.with_phone += 1;
+    if (row.agent_lga) entry.lgas.add(row.agent_lga);
+    const at = row.completed_at || row.created_at;
+    if (at && (!entry.last_activity || new Date(at) > new Date(entry.last_activity))) {
+      entry.last_activity = at;
+    }
+  }
+
+  const agentBreakdown = [...byAgent.values()]
+    .map((entry) => ({
+      agent_user_id: entry.agent_user_id,
+      agent_name: entry.agent_name,
+      agent_phone: entry.agent_phone,
+      captured: entry.captured,
+      with_email: entry.with_email,
+      with_phone: entry.with_phone,
+      lgas: entry.lgas.size,
+      last_activity: entry.last_activity,
+    }))
+    .sort((a, b) => b.captured - a.captured);
+
   const avgTime = rows.length
     ? Math.round(
         rows.reduce((s, r) => s + Number(r.time_spent_seconds || 0), 0) / rows.length
@@ -288,6 +332,7 @@ const computeAnalysis = async ({ type, from, to, source }) => {
       avg_time_seconds: avgTime,
       by_state: stateBreakdown,
       by_source: bySource,
+      by_agent: agentBreakdown,
     },
     nps,
     frequencies,
