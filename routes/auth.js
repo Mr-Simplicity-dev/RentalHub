@@ -2,7 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const { uploadPassportLocal, validateFileMagicBytesMiddleware } = require('../config/middleware/upload');
-const { authenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
+const { authenticate, optionalAuthenticate, requireAdminOrSuperAdmin } = require('../config/middleware/auth');
 const { checkLoginRateLimit } = require('../config/middleware/loginRateLimiter');
 const { authSensitiveLimiter, otpLimiter, otpSendLimiter, passwordResetLimiter, registrationLimiter, sensitiveActionLimiter } 
 = require('../config/middleware/securityRateLimiters');
@@ -97,6 +97,7 @@ router.get('/registration-flags', authController.getRegistrationFlags);
 
 router.post(
   '/register/payment',
+  optionalAuthenticate,
   requireTurnstile('rentalhub_register'),
   registrationLimiter,
   registerValidators,

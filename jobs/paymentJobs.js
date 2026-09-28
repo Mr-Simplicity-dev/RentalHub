@@ -71,6 +71,32 @@ exports.startPaymentJobs = () => {
 // =====================================================
 //               START PROPERTY JOBS
 // =====================================================
+// =====================================================
+//          MARKETING AGENT COMMISSION SWEEP
+// =====================================================
+exports.startMarketingCommissionJobs = () => {
+  // Pay the verification stage for agent-opened accounts that have since verified
+  // both email and phone. A sweep keeps this in one place instead of hooking every
+  // verification handler, and the unique constraint makes repeats harmless.
+  cron.schedule(
+    "*/10 * * * *",
+    async () => {
+      try {
+        const { sweepVerifiedCommissions } = require('../services/marketingAgentCommissionService');
+        const paid = await sweepVerifiedCommissions();
+        if (paid) {
+          logger.info(`Marketing agent commissions: paid ${paid} verification reward(s)`);
+        }
+      } catch (error) {
+        logger.error('Marketing agent commission sweep error:', error.message);
+      }
+    },
+    { timezone: CRON_TIMEZONE }
+  );
+
+  logger.info("Marketing commission cron jobs started");
+};
+
 exports.startPropertyJobs = () => {
   // Check expired properties daily at 01:00
   cron.schedule("0 1 * * *", async () => {

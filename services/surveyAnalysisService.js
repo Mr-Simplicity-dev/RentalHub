@@ -902,6 +902,15 @@ exports.getMarketingAgentOverview = async (req, res) => {
         stats: statsResult.rows[0] || { captured: 0, in_progress: 0, with_email: 0, with_phone: 0 },
         by_lga: byLga.rows,
         responses: recent.rows,
+        commissions: await (async () => {
+          try {
+            const { getAgentCommissionSummary } = require('./marketingAgentCommissionService');
+            return await getAgentCommissionSummary(agentId);
+          } catch (commissionError) {
+            req.logger.error('Marketing agent commission summary failed:', commissionError.message);
+            return null;
+          }
+        })(),
       },
     });
   } catch (error) {

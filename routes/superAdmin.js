@@ -456,6 +456,23 @@ router.post('/properties/bulk', authenticate, requireSuperAdmin, superCtrl.bulkP
 router.get('/flags', authenticate, requireSuperAdmin, superCtrl.getFeatureFlags);
 router.patch('/flags/:key', authenticate, requireSuperAdmin, superCtrl.updateFeatureFlag);
 
+// Marketing agent commission leaderboard: who opened which accounts and what they
+// have earned. Agents only ever see their own numbers (see the marketing-agent
+// overview endpoint, which is hard-scoped to the signed-in agent).
+router.get('/marketing-agent-commissions', authenticate, requireSuperAdmin, async (req, res) => {
+  try {
+    const { getAgentCommissionLeaderboard, getConfig } = require('../services/marketingAgentCommissionService');
+    const [agents, config] = await Promise.all([
+      getAgentCommissionLeaderboard(),
+      getConfig(),
+    ]);
+    return res.json({ success: true, data: { agents, config } });
+  } catch (error) {
+    req.logger.error('Marketing agent commission leaderboard error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load marketing commissions' });
+  }
+});
+
 router.get('/pricing-rules', authenticate, requireSuperAdmin, superCtrl.getPricingRules);
 router.post('/pricing-rules', authenticate, requireSuperAdmin, superCtrl.createPricingRule);
 router.patch('/pricing-rules/:ruleId', authenticate, requireSuperAdmin, superCtrl.updatePricingRule);

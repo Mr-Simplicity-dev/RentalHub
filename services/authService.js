@@ -2001,6 +2001,12 @@ exports.initializeRegistrationPayment = async (req, res) => {
       utm_campaign: req.body.utm_campaign || null,
       utm_term: req.body.utm_term || null,
       utm_content: req.body.utm_content || null,
+      // Set only when a marketing agent is signed in and opening the account for
+      // someone else. Comes from the authenticated session, never from the body.
+      agent_user_id:
+        String(req.user?.user_type || '').toLowerCase() === 'marketing_agent'
+          ? req.user.id
+          : null,
     };
 
     await db.query(
@@ -2574,6 +2580,29 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
         utm_content: storedPayload.utm_content || null,
       }
     });
+
+    // Marketing agent attribution: when an agent opened this account in the field,
+    // record who did it and pay the registration-paid commission now the fee cleared.
+    const openingAgentId = Number(storedPayload.agent_user_id) || null;
+    if (openingAgentId && data?.user?.id && openingAgentId !== Number(data.user.id)) {
+      try {
+        await db.query(
+          `UPDATE users
+              SET created_by_agent_id = $2
+            WHERE id = $1 AND created_by_agent_id IS NULL`,
+          [data.user.id, openingAgentId]
+        );
+        const { qualifyCommission } = require('./marketingAgentCommissionService');
+        qualifyCommission({
+          newUserId: data.user.id,
+          stage: 'registration_paid',
+          source: 'registration_payment',
+          paymentId: tenantRegistrationPayment?.id || null,
+        }).catch(() => {});
+      } catch (agentError) {
+        req.logger.error('Marketing agent attribution failed (non-fatal):', agentError.message);
+      }
+    }
 
     // Email the registration receipt (covers base + lawyer/agent add-ons)
     if (tenantRegistrationPayment?.id) {

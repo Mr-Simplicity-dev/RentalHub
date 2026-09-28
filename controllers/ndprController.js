@@ -647,6 +647,15 @@ const redactUser = async (queryable, userId) => {
      WHERE id = $1`,
     [userId]
   );
+
+  // Claw back any marketing agent commission earned on this account while it is
+  // still inside the clawback window. Best-effort: the erasure must still succeed.
+  try {
+    const { reverseCommissionsForUser } = require('../services/marketingAgentCommissionService');
+    await reverseCommissionsForUser({ newUserId: userId, reason: 'account erased (NDPR)' });
+  } catch (error) {
+    // Non-fatal by design.
+  }
 };
 
 const safeDeleteLocalFile = (filePath, allowedDirectory) => {

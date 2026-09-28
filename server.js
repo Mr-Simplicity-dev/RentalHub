@@ -107,7 +107,7 @@ const rentCalculatorRoutes = require('./routes/rentCalculator');
 const adminInspectionRoutes = require('./routes/adminInspections');
 const appealRoutes = require('./routes/appeals');
 const voiceRoutes = require('./routes/voice');
-const { startPaymentJobs, startPropertyJobs } = require('./jobs/paymentJobs');
+const { startPaymentJobs, startPropertyJobs, startMarketingCommissionJobs } = require('./jobs/paymentJobs');
 const { startRentSavingsJobs } = require('./jobs/rentSavingsJobs');
 const { startSmsDeliveryJobs } = require('./jobs/smsDeliveryJobs');
 const { startSmsMarketingJobs } = require('./jobs/smsMarketingJobs');
@@ -853,8 +853,9 @@ const startBackgroundServices = () => {
 
   backgroundServicesStarted = true;
   ensureSurveyBoundaryData();
-  startPaymentJobs();
-  startPropertyJobs();
+startPaymentJobs();
+startPropertyJobs();
+startMarketingCommissionJobs();
   startRentSavingsJobs();
   startSmsDeliveryJobs();
   startSmsMarketingJobs();
