@@ -4828,6 +4828,103 @@ exports.refreshBankCache = async (_req, res) => {
   }
 };
 
+// A NUBAN number is unique per bank, not globally — 8030601238 can be a real account
+// at OPay AND PalmPay AND Moniepoint at once. Resolving against one bank therefore
+// fails (or worse, mismatches) for a perfectly valid account. This sweeps the bank
+// list and returns every bank where the number resolves, so the person can pick the
+// one they actually use. We only ever suggest; we never auto-choose.
+const ACCOUNT_SWEEP_LIMIT = 4;          // sweeps per user per hour (each costs many API calls)
+const ACCOUNT_SWEEP_WINDOW_MS = 60 * 60 * 1000;
+const ACCOUNT_SWEEP_CONCURRENCY = 8;
+const ACCOUNT_SWEEP_MAX_MATCHES = 6;
+const ACCOUNT_SWEEP_BUDGET_MS = 9000;
+const accountSweepQuota = new Map();
+const accountSweepCache = new Map();   // account_number -> { at, matches }
+
+exports.resolveAccountAcrossBanks = async (req, res) => {
+  try {
+    const accountNumber = String(req.body?.account_number || '').trim();
+    if (!/^\d{10}$/.test(accountNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid 10-digit account number',
+      });
+    }
+
+    if (!PAYSTACK_SECRET_KEY) {
+      return res.status(500).json({ success: false, message: 'Payment service is not configured' });
+    }
+
+    // A repeat lookup of the same number inside the window is free.
+    const cached = accountSweepCache.get(accountNumber);
+    if (cached && Date.now() - cached.at < 10 * 60 * 1000) {
+      return res.json({ success: true, data: { account_number: accountNumber, matches: cached.matches, cached: true } });
+    }
+
+    const now = Date.now();
+    const quota = accountSweepQuota.get(req.user.id) || { count: 0, resetAt: 0 };
+    if (quota.resetAt <= now) {
+      accountSweepQuota.set(req.user.id, { count: 0, resetAt: now + ACCOUNT_SWEEP_WINDOW_MS });
+    } else if (quota.count >= ACCOUNT_SWEEP_LIMIT) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many account lookups. Pick your bank manually, or try again later.',
+      });
+    }
+    quota.count += 1;
+    accountSweepQuota.set(req.user.id, quota);
+
+    const banks = await fetchBanksFromPaystack(false);
+    const startedAt = Date.now();
+    const matches = [];
+
+    for (let i = 0; i < banks.length; i += ACCOUNT_SWEEP_CONCURRENCY) {
+      if (matches.length >= ACCOUNT_SWEEP_MAX_MATCHES) break;
+      if (Date.now() - startedAt > ACCOUNT_SWEEP_BUDGET_MS) break;
+
+      const batch = banks.slice(i, i + ACCOUNT_SWEEP_CONCURRENCY);
+      const results = await Promise.all(
+        batch.map(async (bank) => {
+          try {
+            const response = await axios.get(
+              `${PAYSTACK_BASE_URL}/bank/resolve?account_number=${accountNumber}&bank_code=${bank.code}`,
+              {
+                headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+                timeout: 6000,
+              }
+            );
+            const accountName = response.data?.data?.account_name;
+            if (response.data?.status === true && accountName) {
+              return { bank_code: String(bank.code), bank_name: bank.name, account_name: String(accountName) };
+            }
+          } catch {
+            // A number that does not exist at this bank is the normal case — skip it.
+          }
+          return null;
+        })
+      );
+
+      for (const match of results) {
+        if (match && !matches.some((m) => m.bank_code === match.bank_code)) {
+          matches.push(match);
+        }
+      }
+    }
+
+    if (matches.length) {
+      accountSweepCache.set(accountNumber, { at: Date.now(), matches });
+    }
+
+    return res.json({
+      success: true,
+      data: { account_number: accountNumber, matches, cached: false },
+    });
+  } catch (error) {
+    req.logger?.error?.('Account sweep failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Could not look up this account number' });
+  }
+};
+
 exports.verifyBankAccount = async (req, res) => {
   try {
     const errors = validationResult(req);

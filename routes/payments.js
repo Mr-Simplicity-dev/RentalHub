@@ -264,6 +264,19 @@ router.post('/banks/refresh',
   paymentController.refreshBankCache
 );
 
+// Sweep every bank for one account number. A NUBAN is unique per bank, so the same
+// number can be real at several fintechs at once — this returns all the matches and
+// lets the person choose, instead of guessing one bank and failing.
+router.post('/resolve-account',
+  authenticate,
+  isVerified,
+  criticalFinanceOpsLimiter,
+  [
+    body('account_number').isLength({ min: 10, max: 10 }).withMessage('Account number must be 10 digits')
+  ],
+  paymentController.resolveAccountAcrossBanks
+);
+
 // Verify bank account for withdrawals
 router.post('/verify-account',
   authenticate,

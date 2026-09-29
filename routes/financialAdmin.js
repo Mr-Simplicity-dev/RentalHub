@@ -40,6 +40,9 @@ const WITHDRAWAL_ELIGIBLE_ROLES = new Set([
   'lga_transportation_admin',
   'state_transportation_admin',
   'super_transportation_admin',
+  // Marketing agents earn a cash commission per account they open, so they withdraw
+  // through the same machinery as every other commission-earning role.
+  'marketing_agent',
 ]);
 const {
   createTransferRecipient,

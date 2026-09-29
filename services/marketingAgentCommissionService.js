@@ -86,6 +86,19 @@ const qualifyCommission = async ({ newUserId, stage, paymentId = null, source = 
     // Never pay an agent for opening an account for themselves.
     if (Number(agentUserId) === Number(newUserId)) return null;
 
+    // The agent only earns on someone they actually surveyed. Without this the
+    // generic link would pay out for accounts the agent never worked on — so the
+    // commission requires a survey capture linked to this account.
+    const surveyCheck = await db.query(
+      `SELECT 1
+         FROM survey_responses
+        WHERE user_id = $1
+          AND superseded_at IS NULL
+        LIMIT 1`,
+      [newUserId]
+    );
+    if (!surveyCheck.rows.length) return null;
+
     const amount = amountFor(config, accountType, stage);
     if (!amount || amount <= 0) return null;
 
