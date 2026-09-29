@@ -171,6 +171,45 @@ const reverseCommissionsForUser = async ({ newUserId, reason = 'account reversed
   }
 };
 
+/** The agent's shareable signup link — the person registers themselves with it. */
+const getAgentInvite = async ({ agentUserId, origin = null }) => {
+  const { getOrCreateReferralCode, buildInviteUrl } = require('./referralService');
+  const referralCode = await getOrCreateReferralCode(agentUserId);
+  if (!referralCode) return { referral_code: null, invite_url: null };
+  return {
+    referral_code: referralCode,
+    invite_url: buildInviteUrl(referralCode, origin),
+  };
+};
+
+/**
+ * Map a signup referral code back to the marketing agent who owns it.
+ * Returns null for ordinary tenant/landlord referral codes.
+ */
+const resolveMarketingAgentByCode = async (rawCode) => {
+  const code = String(rawCode || '').trim();
+  if (!code) return null;
+
+  try {
+    const result = await db.query(
+      `SELECT id, user_type
+         FROM users
+        WHERE referral_code = $1
+          AND deleted_at IS NULL
+        LIMIT 1`,
+      [code]
+    );
+    if (!result.rows.length) return null;
+
+    const owner = result.rows[0];
+    if (String(owner.user_type || '').toLowerCase() !== 'marketing_agent') return null;
+    return owner.id;
+  } catch (error) {
+    logger.error('Marketing agent referral lookup failed:', error.message);
+    return null;
+  }
+};
+
 /** Everything the agent sees about their own commissions. */
 const getAgentCommissionSummary = async (agentUserId) => {
   const [totals, recent, wallet] = await Promise.all([
@@ -281,6 +320,8 @@ module.exports = {
   qualifyCommission,
   reverseCommissionsForUser,
   sweepVerifiedCommissions,
+  getAgentInvite,
+  resolveMarketingAgentByCode,
   getAgentCommissionSummary,
   getAgentCommissionLeaderboard,
 };

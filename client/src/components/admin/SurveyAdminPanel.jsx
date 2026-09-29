@@ -3,6 +3,7 @@ import { FaChartPie, FaFilePdf, FaFileCsv, FaPlus, FaTrash, FaBell } from "react
 import { toast } from "react-toastify";
 import api from "../../services/api";
 import SurveyWizard from "../survey/SurveyWizard";
+import MarketingAgentCommissionsPanel from "./MarketingAgentCommissionsPanel";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
@@ -493,6 +494,8 @@ const SurveyAdminPanel = () => {
               </p>
             )}
           </div>
+
+          <MarketingAgentCommissionsPanel />
 
           <div className="rounded-xl border border-soft p-4">
             <p className="mb-3 text-sm font-semibold text-gray-700">Top Pain Points (1–5 means)</p>

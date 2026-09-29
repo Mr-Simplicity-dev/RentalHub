@@ -2581,10 +2581,23 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       }
     });
 
-    // Marketing agent attribution: when an agent opened this account in the field,
-    // record who did it and pay the registration-paid commission now the fee cleared.
-    const openingAgentId = Number(storedPayload.agent_user_id) || null;
-    if (openingAgentId && data?.user?.id && openingAgentId !== Number(data.user.id)) {
+    // Marketing agent attribution. Two routes in: the agent was signed in and opened
+    // the account from their dashboard, or the person signed up themselves through
+    // the agent's invite link (their referral code). Either way we record who it was
+    // and pay the registration-paid commission now the fee has cleared.
+    let openingAgentId = Number(storedPayload.agent_user_id) || null;
+    if (!openingAgentId && (storedPayload.referralCode || storedPayload.referral_code)) {
+      try {
+        const { resolveMarketingAgentByCode } = require('./marketingAgentCommissionService');
+        openingAgentId = await resolveMarketingAgentByCode(
+          storedPayload.referralCode || storedPayload.referral_code
+        );
+      } catch (agentLookupError) {
+        req.logger.error('Marketing agent referral lookup failed (non-fatal):', agentLookupError.message);
+      }
+    }
+
+    if (openingAgentId && data?.user?.id && Number(openingAgentId) !== Number(data.user.id)) {
       try {
         await db.query(
           `UPDATE users

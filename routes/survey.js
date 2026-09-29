@@ -116,9 +116,30 @@ router.post('/restart', authenticate, restartSurvey);
 // Marketing agent dashboard
 router.get('/marketing-agent/overview', authenticate, (req, res, next) => {
   if (req.user.user_type !== 'marketing_agent') {
-    return res.status(403).json({ success: false, message: 'Access denied' });
+    return res.status(403).json({ success: false, message: 'Marketing agent access only' });
   }
   next();
 }, getMarketingAgentOverview);
+
+// The agent's shareable signup link. The person registers themselves with it (they
+// set their own password and pick their lawyer), and the code attributes the account
+// back to this agent for commission.
+router.get('/marketing-agent/invite', authenticate, async (req, res) => {
+  if (req.user.user_type !== 'marketing_agent') {
+    return res.status(403).json({ success: false, message: 'Marketing agent access only' });
+  }
+
+  try {
+    const { getAgentInvite } = require('../services/marketingAgentCommissionService');
+    const invite = await getAgentInvite({
+      agentUserId: req.user.id,
+      origin: req.headers.origin || null,
+    });
+    return res.json({ success: true, data: invite });
+  } catch (error) {
+    req.logger.error('Marketing agent invite error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load your invite link' });
+  }
+});
 
 module.exports = router;

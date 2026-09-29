@@ -286,4 +286,6 @@ module.exports = {
   ensureReferralSchema,
   getReferralProgramForUser,
   creditReferralRewardForRegistration,
+  getOrCreateReferralCode,
+  buildInviteUrl,
 };
