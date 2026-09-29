@@ -2617,6 +2617,20 @@ exports.completeRegistrationAfterPayment = async (req, res) => {
       }
     }
 
+    // If a marketing agent already surveyed this person in the field, attach that
+    // capture to their new account so the app does not ask them to take it again.
+    try {
+      const { linkFieldCaptureToNewUser } = require('./surveyService');
+      await linkFieldCaptureToNewUser({
+        newUserId: data?.user?.id,
+        userType: data?.user?.user_type || preparedRegistration.user_type,
+        phone: tenantRegistrationPayment.phone,
+        email: tenantRegistrationPayment.email,
+      });
+    } catch (surveyLinkError) {
+      req.logger.error('Survey capture link failed (non-fatal):', surveyLinkError.message);
+    }
+
     // Email the registration receipt (covers base + lawyer/agent add-ons)
     if (tenantRegistrationPayment?.id) {
       const basePaymentResult = await db.query(

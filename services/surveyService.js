@@ -377,6 +377,92 @@ const ensureSchema = async () => {
   `);
 };
 
+const SURVEY_LINK_WINDOW_DAYS_DEFAULT = 365;
+
+const getSurveyLinkWindowDays = async () => {
+  try {
+    const result = await db.query(
+      `SELECT value FROM commission_config WHERE key = 'marketing_agent_survey_link_days' LIMIT 1`
+    );
+    const days = Number(result.rows[0]?.value);
+    return Number.isFinite(days) && days > 0 ? days : SURVEY_LINK_WINDOW_DAYS_DEFAULT;
+  } catch {
+    return SURVEY_LINK_WINDOW_DAYS_DEFAULT;
+  }
+};
+
+/**
+ * Attach a marketing agent's field capture to the account that person just opened.
+ *
+ * Without this the new account looks un-surveyed, so the app auto-opens the survey
+ * and asks them to do work the agent already did for them. Matching is by phone
+ * first; email only breaks a tie. The most recent capture is linked and any older
+ * duplicates for the same person are superseded, so the account keeps one record.
+ */
+exports.linkFieldCaptureToNewUser = async ({ newUserId, userType, phone, email }) => {
+  if (!newUserId || !phone) return null;
+
+  try {
+    await ensureSchema();
+
+    const surveyType = userType === 'landlord' ? 'landlord' : 'tenant';
+    const windowDays = await getSurveyLinkWindowDays();
+    const cleanEmail = String(email || '').trim();
+
+    // Phone first — that is what a field capture always has.
+    let matches = await db.query(
+      `SELECT id
+         FROM survey_responses
+        WHERE survey_type = $1
+          AND completed_at IS NOT NULL
+          AND superseded_at IS NULL
+          AND user_id IS NULL
+          AND respondent_phone = $2
+          AND completed_at >= CURRENT_TIMESTAMP - ($3::int * INTERVAL '1 day')
+        ORDER BY completed_at DESC, id DESC`,
+      [surveyType, phone, windowDays]
+    );
+
+    // Email is only a tiebreaker when the phone found nothing.
+    if (!matches.rows.length && cleanEmail) {
+      matches = await db.query(
+        `SELECT id
+           FROM survey_responses
+          WHERE survey_type = $1
+            AND completed_at IS NOT NULL
+            AND superseded_at IS NULL
+            AND user_id IS NULL
+            AND LOWER(respondent_email) = LOWER($2)
+            AND completed_at >= CURRENT_TIMESTAMP - ($3::int * INTERVAL '1 day')
+          ORDER BY completed_at DESC, id DESC`,
+        [surveyType, cleanEmail, windowDays]
+      );
+    }
+
+    if (!matches.rows.length) return null;
+
+    const [mostRecent, ...older] = matches.rows;
+
+    await db.query(
+      `UPDATE survey_responses SET user_id = $2 WHERE id = $1 AND user_id IS NULL`,
+      [mostRecent.id, newUserId]
+    );
+
+    if (older.length) {
+      await db.query(
+        `UPDATE survey_responses
+            SET superseded_at = CURRENT_TIMESTAMP
+          WHERE id = ANY($1::int[]) AND user_id IS NULL`,
+        [older.map((row) => row.id)]
+      );
+    }
+
+    return { linked_response_id: mostRecent.id, superseded: older.length };
+  } catch (error) {
+    return null;
+  }
+};
+
 exports.getMySurveyStatus = async (req, res) => {
   try {
     await ensureSchema();
