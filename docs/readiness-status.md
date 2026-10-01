@@ -4,6 +4,65 @@
 > The older audit docs are dated; where they disagree with this file, this file wins.
 > Last verified: 2026-09-29 (Phase 1 of the readiness pass).
 
+## Phase 3 — Security audit (in progress)
+
+### Fixed
+
+- **🔴 NINs were being stored in PLAINTEXT.** `users.nin` was `VARCHAR(11)` — big enough
+  for a bare NIN, but far too small for the AES-256-GCM envelope (`iv:authTag:ciphertext`
+  ≈ 90 chars). So `encryptNIN()` would have been **rejected by the column** and every NIN
+  went in unencrypted. Migration **156** widens the column to `VARCHAR(255)`; the 3 existing
+  plaintext NINs were then encrypted in place (verified round-trip: `plaintext 0, encrypted 3`).
+  This was the root cause behind the long-standing "NIN encryption can be disabled" finding.
+- **🟠 Security headers were missing on the actual pages.** Helmet covers `/api`, but nginx
+  serves the built client directly, so the HTML a browser loads had **no HSTS, no
+  `X-Frame-Options`, no `nosniff`, no `Referrer-Policy`**. Added to nginx `location /`
+  (HSTS preload, nosniff, SAMEORIGIN, strict-origin-when-cross-origin, COOP,
+  Permissions-Policy) plus a CSP header carrying only what a `<meta>` CSP cannot express
+  (`frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests`).
+  The browser enforces the intersection with the existing meta CSP, so clickjacking is now
+  closed without loosening anything. `form-action` deliberately omitted (third-party forms).
+- **🟢 Backend dependencies: 0 vulnerabilities** (was 1 high — `brace-expansion` DoS).
+
+### Verified clean
+
+- `JWT_SECRET` — 64 chars, not a placeholder.
+- `NIN_ENCRYPTION_KEY` — 64 chars, set.
+- `ALLOW_INSECURE_CORS_ORIGINS` — **no longer exists in the codebase** (the old finding is stale).
+- Static source maps — already blocked at nginx (`location ~* \.map$ → 404`) and not built.
+- `/uploads/` — blocked (403); only `/uploads/ad-spaces/` is public.
+- `.env`, `.git`, source files — all fall through to the SPA shell, not served.
+
+### Still open
+
+- **Mobile dependencies: 21 advisories (18 moderate, 3 high).** `npm audit fix` on the
+  mobile is riskier — it can break the RN build — so it needs a deliberate pass, not a
+  blind fix.
+- **`/api/health` leaks** `uptime`, `timestamp`, `database`, `redis` state publicly. Low
+  risk (no secrets) but it does advertise infrastructure state.
+- **Upload content validation** — magic-byte checks on uploads still outstanding.
+- **`SupportVoiceDesk.jsx` ~line 729** — flagged for manual review, not yet examined.
+- **Android APK self-updater vs Google Play policy** — an unresolved product decision.
+- **Persistent VAPID keys** — push subscriptions reset when the keys rotate.
+
+## Phase 2 — Web ↔ APK parity ✅ PASSED (gaps fixed)
+
+Definitive feature-level comparison done across 10 areas. Super-admin (43 workspaces),
+financial, service and public are at full parity. **Six gaps found and fixed:**
+
+1. **Marketing agents could not capture surveys** — the role's entire purpose. `MarketingAgentRoot`
+   registered no survey screen, so the role could not earn. Fixed by registering `PublicSurvey`
+   + a "Conduct Survey" action. *The backend already attributed the agent* (`surveyService.js:587,1031`)
+   — only the screen was missing.
+2. **Dispute detail was read-only on mobile** — no message composer, no evidence upload, while
+   the web had both. Added, gated on `!is_legally_sealed` like the web.
+3. **Admin properties was a dead-end list** — no `onPress`; the approve/reject detail was unreachable.
+4. **Admin user detail** — same, now navigable.
+5. **State admin tabs** — registered and surfaced Users, Transactions, Commissions, Oversight,
+   Calculator Fees, Appeals (the web had them; mobile didn't).
+6. **Four orphaned screens** (`MyDisputes`, `MyDamageReports`, `SubscribedProperties`,
+   `PlatformRatings`) had **no in-app entry point at all** — added to the dashboard.
+
 ## Phase 1 — Compile & build integrity ✅ PASSED
 
 | Check | Result |
