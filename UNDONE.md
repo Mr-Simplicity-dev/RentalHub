@@ -1,8 +1,48 @@
 # Undone Items (tracked list)
 
 > Ask the AI: "bring the undone items" to see this list.
+>
+> **⚠️ Read `docs/readiness-status.md` first — it is the verified current state.**
+> The audit docs in `docs/` are dated; several items they list as outstanding are built
+> and deployed (tenancy agreements, rent calculator, mobile rent-help/pay-on-behalf,
+> codebase cleanup, marketing agent commissions, Amana branding).
 
 ## Active
+
+### Compile & build integrity — VERIFIED 2026-09-29 (Phase 1)
+
+- [x] **DONE — Backend + client + mobile all parse.** 338 backend files (`node --check`),
+  510 client+mobile files (Babel). One real defect found and fixed: `routes/models/Dispute.js`
+  was a truncated Mongoose fragment (syntax error) with no wrapper — dead code, deleted
+  along with its re-export shim `models/Dispute.js`.
+- [x] **DONE — Backend test suite 187/187 pass.** API contract: 787 routes, 509 mobile
+  calls, 0 unmatched. Tour contract: 66 steps / 5 locales / 16 routes.
+- [x] **DONE — Amana branding inserted.** Mobile (launch screen, flash, brand mark),
+  **web app (header + footer, with `@font-face` for Ariana Violeta)**, and all **11 flyer
+  templates** in `social-ads/`.
+
+### Remaining readiness phases (see `docs/readiness-status.md`)
+
+- [ ] **Phase 2 — Web ↔ APK parity**: produce a definitive parity table (routes, screens,
+  permissions, actions).
+- [ ] **Phase 3 — Security audit**: code + nginx + dependencies + secrets + upload paths.
+- [ ] **Phase 4 — Button & navigation guards**: every action role-gated server-side, not
+  just hidden in the UI; every nav target exists; loading/error/empty/retry states.
+- [ ] **Phase 5 — Live smoke test**: auth, payments, survey, commission, downloads.
+- [ ] **Phase 6 — Broken-code sweep**: response-shape mismatches, stale closures, dead
+  endpoints, filters that don't filter.
+
+### Security (highest priority)
+
+- [ ] **Rotate every credential in `.env`**; reject placeholder/weak JWT at startup.
+- [ ] **`NIN_ENCRYPTION_KEY` must fail closed** (today a missing key only warns).
+- [ ] **Dependency advisories** — backend `qs`; mobile ~22 (18 moderate, 4 high).
+- [ ] **Upload hardening** — magic-byte validation + size limits.
+- [ ] **Reject `ALLOW_INSECURE_CORS_ORIGINS=true` in production.**
+- [ ] **Persistent VAPID keys** (currently reset on restart).
+- [ ] **Middleware ordering**; stop `/api/health` leaking uptime/DB/Redis.
+- [ ] **Review `SupportVoiceDesk.jsx` ~line 729.**
+- [ ] **Android APK self-updater vs Google Play policy** (Play forbids outside-Play installs).
 
 ### Blocked on you (no code change needed)
 

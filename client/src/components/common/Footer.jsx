@@ -63,9 +63,12 @@ const Footer = () => {
       <div className="container mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           <div className="space-y-4">
-            <h3 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-primary-200 bg-clip-text text-transparent">
-              RentalHub NG
-            </h3>
+            <div className="leading-none">
+              <span className="amana-mark amana-mark--on-dark block text-lg">Amana</span>
+              <h3 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-primary-200 bg-clip-text text-transparent">
+                RentalHub NG
+              </h3>
+            </div>
             <p className="text-sm text-gray-400 leading-relaxed">
               {t('footer.about')}
             </p>

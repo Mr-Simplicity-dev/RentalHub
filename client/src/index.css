@@ -249,3 +249,27 @@
     }
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Amana house mark                                                    */
+/*  The script wordmark above "RentalHub NG". Deep burgundy #6E1B2B is  */
+/*  the brand red taken from the flyer palette.                         */
+/* ------------------------------------------------------------------ */
+@font-face {
+  font-family: 'AmanaScript';
+  src: url('/fonts/AmanaScript.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.amana-mark {
+  font-family: 'AmanaScript', 'Segoe Script', cursive;
+  color: #6e1b2b;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.amana-mark--on-dark {
+  color: #a12a40;
+}

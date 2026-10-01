@@ -369,8 +369,11 @@ return (
           />
 
           {/* FIXED */}
-          <span className="hidden truncate text-xl font-extrabold text-primary-900 tracking-tight sm:block md:text-2xl">
-            RentalHub NG
+          <span className="hidden min-w-0 flex-col leading-none sm:flex">
+            <span className="amana-mark text-base md:text-lg">Amana</span>
+            <span className="truncate text-xl font-extrabold text-primary-900 tracking-tight md:text-2xl">
+              RentalHub NG
+            </span>
           </span>
         </Link>
 
