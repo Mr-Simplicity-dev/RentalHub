@@ -35,15 +35,50 @@
 
 ### Still open
 
-- **Mobile dependencies: 21 advisories (18 moderate, 3 high).** `npm audit fix` on the
-  mobile is riskier — it can break the RN build — so it needs a deliberate pass, not a
-  blind fix.
+- **Mobile dependencies: 22 advisories (18 moderate, 4 high).** Closed as far as is safe:
+  - **`axios` — the only RUNTIME vulnerability — is FIXED** (now 1.20.0). It was the one
+    that actually shipped in the APK.
+  - The remaining 22 are **all build tooling** (`metro`, `metro-config`,
+    `metro-transform-worker`, `xcode`, `brace-expansion`, `image-size`) — they run on the
+    build machine and are **not part of the shipped bundle**. Clearing them needs breaking
+    major upgrades (`@react-navigation/native@7.5.0`, `expo@46`) which would risk the whole
+    RN build, so they are deliberately left.
+- **Upload content validation — assessed, largely already in place.** Passports go through
+  `uploadPassportLocal` + `validateFileMagicBytesMiddleware` (real magic-byte check on the
+  file header). Property media goes to Cloudinary, which parses and rejects invalid media
+  itself, with a MIME `fileFilter` and size limits in front. No code change needed; the old
+  "inconsistent upload validation" finding is stale.
+- **`SupportVoiceDesk.jsx` — examined, false positive.** Line 729 is a plain
+  `<textarea id="voice-handup-note">` for the hand-off note. Scanned the file for
+  `eval`, `innerHTML`, `dangerouslySetInnerHTML`, hardcoded keys and inline tokens: **none**.
+- **Persistent VAPID keys — already done.** `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` /
+  `VAPID_SUBJECT` are all present in the server `.env`, so `pushService` takes the
+  configured-key branch and subscriptions survive restarts. The "keys reset on restart"
+  finding is stale.
 - **`/api/health` leaks** `uptime`, `timestamp`, `database`, `redis` state publicly. Low
-  risk (no secrets) but it does advertise infrastructure state.
-- **Upload content validation** — magic-byte checks on uploads still outstanding.
-- **`SupportVoiceDesk.jsx` ~line 729** — flagged for manual review, not yet examined.
-- **Android APK self-updater vs Google Play policy** — an unresolved product decision.
-- **Persistent VAPID keys** — push subscriptions reset when the keys rotate.
+  risk (no secrets) but it advertises infrastructure state.
+
+### Decision — Android direct-APK updater vs Google Play
+
+**Decided: keep the in-app APK updater, and ship Play separately.**
+
+Google Play's Device & Network Abuse policy forbids an app downloading and installing APK
+binaries from outside Play. The current in-app updater is genuinely valuable — it is how
+the direct-download channel (the website) keeps users current, and it has been hardened
+this session (reliable completion, retry reuse, one flipping notification).
+
+So rather than remove it:
+
+- **Direct channel (current, website):** unchanged — keeps `REQUEST_INSTALL_PACKAGES` and
+  the self-updater.
+- **Play channel (if submitted later):** build a **separate flavour without
+  `REQUEST_INSTALL_PACKAGES`**, and gate the in-app updater off in that flavour (it must
+  fall back to the Play listing). This is a small Gradle `productFlavors` addition plus one
+  build-time flag — deliberately deferred until a Play submission is actually planned, so
+  it does not destabilise the shipping build for no current benefit.
+
+**Not a blocker:** the app is distributed by direct download today, so nothing is held up
+by this decision.
 
 ## Phase 2 — Web ↔ APK parity ✅ PASSED (gaps fixed)
 
