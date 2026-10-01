@@ -257,7 +257,9 @@
 /* ------------------------------------------------------------------ */
 @font-face {
   font-family: 'AmanaScript';
-  src: url('/fonts/AmanaScript.ttf') format('truetype');
+  /* Kept inside src/ so webpack bundles it — CRA cannot resolve a /public url()
+     from CSS. */
+  src: url('./assets/fonts/AmanaScript.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
