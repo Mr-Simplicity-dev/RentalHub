@@ -3,8 +3,27 @@ import api from '../../services/api';
 import Loader from '../../components/common/Loader';
 import { FaCheckCircle, FaTimesCircle, FaIdCard, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
+import { toast } from 'react-toastify';
 
 const PAGE_SIZE = 20;
+
+const viewPassport = async (rawUrl) => {
+  const filename = String(rawUrl || '').replace(/\\/g, '/').split('/').pop();
+  if (!filename) return;
+  const preview = window.open('', '_blank', 'noopener,noreferrer');
+  try {
+    const response = await api.get(`/users/passport-photo/${encodeURIComponent(filename)}`, {
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(response.data);
+    if (preview) preview.location = url;
+    else window.open(url, '_blank', 'noopener,noreferrer');
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (error) {
+    if (preview) preview.close();
+    toast.error(error.response?.data?.message || 'Failed to open passport photo');
+  }
+};
 
 const AdminVerifications = () => {
   const { user } = useAuth();
@@ -125,14 +144,13 @@ const AdminVerifications = () => {
                   )}
 
                   {u.passport_photo_url && (
-                    <a
-                      href={u.passport_photo_url}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => viewPassport(u.passport_photo_url)}
                       className="text-sm text-primary-600 hover:underline inline-block mt-2"
                     >
                       View Passport Photo ->
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>

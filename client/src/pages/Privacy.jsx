@@ -133,7 +133,7 @@ const Privacy = () => {
     {
       title: t('privacy.data.messages.title', 'Messages, calls, support and legal evidence'),
       icon: FaUserShield,
-      collect: t('privacy.data.messages.collect', 'In-app messages, delivery/read and typing status, online state, notification history, call signalling and session metadata, support tickets and replies, attachments, disputes, damage reports, photographs, inspection notes, legal authorisations and evidence. During a WebRTC call, live audio/video is processed to connect the participants.'),
+      collect: t('privacy.data.messages.collect', 'In-app messages, delivery/read and typing status, online state, notification history, call signalling and session metadata, support tickets and replies, attachments, disputes, property reports, photographs, inspection notes, legal authorisations and evidence. During a WebRTC call, live audio/video is processed to connect the participants.'),
       source: t('privacy.data.messages.source', 'You and the other users, professionals, support staff or administrators participating in the communication or case.'),
       use: t('privacy.data.messages.use', 'Deliver real-time communications, provide support, investigate complaints, manage disputes, preserve evidence, protect users and enable authorised lawyers or administrators to perform their duties.'),
       basis: t('privacy.data.messages.basis', 'Contract; legitimate interests in support, safety and dispute resolution; legal obligations; consent where a device permission or sensitive upload requires it.'),
@@ -200,8 +200,8 @@ const Privacy = () => {
       detail: t('privacy.recipients.comms.detail', 'Configured email/SMTP or Resend services, Termii for SMS, Twilio for voice calls, Meta WhatsApp services, Google Maps and Google Analytics may process the information required to provide their feature. Support chat is provided in-house by RentalHub and stored in RentalHub’s own systems.'),
     },
     {
-      name: t('privacy.recipients.ai.title', 'AI-assisted damage analysis'),
-      detail: t('privacy.recipients.ai.detail', 'When the damage-analysis feature is used, the submitted damage photograph is sent to Anthropic’s Claude service for a non-binding analysis. RentalHub stores the resulting assessment with the damage workflow.'),
+      name: t('privacy.recipients.ai.title', 'AI-assisted condition analysis'),
+      detail: t('privacy.recipients.ai.detail', 'When the condition-analysis feature is used, the submitted condition photograph is sent to Anthropic’s Claude service for a non-binding analysis. RentalHub stores the resulting assessment with the condition workflow.'),
     },
     {
       name: t('privacy.recipients.authorities.title', 'Professional and public authorities'),
@@ -351,7 +351,7 @@ const Privacy = () => {
             <div className="privacy-policy-stack min-w-0 space-y-7">
               <PolicySection id="scope" eyebrow="01 · Controller" title={t('privacy.scope.title', 'Who we are and what this policy covers')} icon={FaShieldAlt}>
                 <p>
-                  {t('privacy.scope.1', 'RentalHub NG (“RentalHub”, “we”, “us” or “our”) operates rentalhub.com.ng and the RentalHub mobile applications from Nigeria. RentalHub is the controller of personal data it decides how and why to process. Where a landlord, agent, lawyer, employer, service provider or other user independently decides how to use information they receive, that person may also have their own responsibilities under data-protection law.')}
+                  {t('privacy.scope.1', 'RentalHub NG (“RentalHub”, “we”, “us” or “our”) operates rentalhub.com.ng and the Mobile Applications from Nigeria. RentalHub is the controller of personal data it decides how and why to process. Where a landlord, agent, lawyer, employer, service provider or other user independently decides how to use information they receive, that person may also have their own responsibilities under data-protection law.')}
                 </p>
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
                   <a href="mailto:support@rentalhub.com.ng" className="rounded-xl bg-slate-50 p-4 transition hover:bg-primary-50">
@@ -541,7 +541,7 @@ const Privacy = () => {
                       t('privacy.retention.1', 'Whether your account, property, tenancy, application, booking, support ticket or professional relationship remains active.'),
                       t('privacy.retention.2', 'The amount, sensitivity and risk of the information and whether it remains necessary for security or fraud prevention.'),
                       t('privacy.retention.3', 'Accounting, tax, audit, court, regulatory, transaction and limitation-period obligations.'),
-                      t('privacy.retention.4', 'An unresolved payment, chargeback, complaint, dispute, damage report, legal claim or investigation.'),
+                      t('privacy.retention.4', 'An unresolved payment, chargeback, complaint, dispute, property report, legal claim or investigation.'),
                       t('privacy.retention.5', 'Whether the record can be safely aggregated, anonymised or redacted instead of retained in identifiable form.'),
                     ]}
                   />
@@ -577,7 +577,7 @@ const Privacy = () => {
 
               <PolicySection id="automated-tools" eyebrow="12 · Fairness" title={t('privacy.automated.title', 'Automated checks, rankings and recommendations')} icon={FaBalanceScale}>
                 <p>
-                  {t('privacy.automated.1', 'RentalHub may use rules, scores or automated services to assist identity/liveness verification, duplicate detection, fraud and risk alerts, location or property recommendations, candidate filtering, damage or evidence analysis, and prioritisation of administrative work. These tools can use account, transaction, location, behaviour, verification or case information relevant to the task.')}
+                  {t('privacy.automated.1', 'RentalHub may use rules, scores or automated services to assist identity/liveness verification, duplicate detection, fraud and risk alerts, location or property recommendations, candidate filtering, condition or evidence analysis, and prioritisation of administrative work. These tools can use account, transaction, location, behaviour, verification or case information relevant to the task.')}
                 </p>
                 <p className="mt-4">
                   {t('privacy.automated.2', 'Automated output is a signal, not permission to ignore fairness or accuracy. Where a decision is made solely by automated processing and has a legal or similarly significant effect, you may ask for meaningful information about the logic involved, express your view, contest the outcome and request human review, subject to applicable law.')}

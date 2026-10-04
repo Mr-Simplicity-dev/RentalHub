@@ -11,7 +11,7 @@ const DAMAGE_TYPES = (t) => [
   ['hole', t('damage_capture.type_hole', '🕳️ Hole'), t('damage_capture.type_hole_desc', 'Opening or puncture')],
   ['dent', t('damage_capture.type_dent', '▼ Dent'), t('damage_capture.type_dent_desc', 'Indentation or depression')],
   ['stain', t('damage_capture.type_stain', '🩹 Stain'), t('damage_capture.type_stain_desc', 'Discoloration or marking')],
-  ['water_damage', t('damage_capture.type_water', '💧 Water Damage'), t('damage_capture.type_water_desc', 'Moisture damage or mold')],
+  ['water_damage', t('damage_capture.type_water', '💧 Water'), t('damage_capture.type_water_desc', 'Moisture or mold')],
   ['mold', t('damage_capture.type_mold', '🍃 Mold'), t('damage_capture.type_mold_desc', 'Fungal growth')],
   ['other', t('damage_capture.type_other', '❓ Other'), t('damage_capture.type_other_desc', 'Something else')],
 ];
@@ -19,7 +19,7 @@ const DAMAGE_TYPES = (t) => [
 const SEVERITY_LEVELS = (t) => [
   { value: 'minor', label: t('damage_capture.sev_minor', '🟢 Minor'), description: t('damage_capture.sev_minor_desc', 'Cosmetic only, no functional impact') },
   { value: 'moderate', label: t('damage_capture.sev_moderate', '🟡 Moderate'), description: t('damage_capture.sev_moderate_desc', 'Noticeable, may need attention') },
-  { value: 'severe', label: t('damage_capture.sev_severe', '🔴 Severe'), description: t('damage_capture.sev_severe_desc', 'Significant damage, repair needed') },
+  { value: 'severe', label: t('damage_capture.sev_severe', '🔴 Severe'), description: t('damage_capture.sev_severe_desc', 'Significant condition, repair needed') },
 ];
 
 const DEPTH_LEVELS = (t) => [
@@ -265,20 +265,20 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
         {stage === 'workflow' && (
           <div className="space-y-4">
             <div className="rounded-lg bg-sky-50 p-4">
-              <h3 className="mb-3 font-semibold text-sky-900">{t('damage_capture.how_to', 'How to Report Damage:')}</h3>
+              <h3 className="mb-3 font-semibold text-sky-900">{t('damage_capture.how_to', 'How to Report Property Condition:')}</h3>
               <div className="space-y-2 text-sm text-sky-800">
                 <div className="flex items-start gap-3">
                   <span className="rounded-full bg-sky-200 px-2.5 py-0.5 font-bold">1</span>
                   <div>
                     <strong>{t('damage_capture.step_capture', '📸 Capture')}</strong>
-                    <p>{t('damage_capture.step_capture_desc', 'Take a clear photo of the damage area')}</p>
+                    <p>{t('damage_capture.step_capture_desc', 'Take a clear photo of the affected area')}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="rounded-full bg-sky-200 px-2.5 py-0.5 font-bold">2</span>
                   <div>
                     <strong>{t('damage_capture.step_ai', '🤖 AI Review')}</strong>
-                    <p>{t('damage_capture.step_ai_desc', 'Our AI analyzes damage type, size, and severity')}</p>
+                    <p>{t('damage_capture.step_ai_desc', 'Our AI analyzes condition type, size, and severity')}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -340,7 +340,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
               </button>
             </div>
 
-            <p className="text-center text-xs text-gray-500">{t('damage_capture.focus_hint', 'Focus clearly on the damaged area within the frame')}</p>
+            <p className="text-center text-xs text-gray-500">{t('damage_capture.focus_hint', 'Focus clearly on the affected area within the frame')}</p>
           </div>
         )}
 
@@ -349,14 +349,14 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
           <div className="space-y-4">
             {capturedPhotoPreview && (
               <div className="overflow-hidden rounded-lg border border-gray-200">
-                <img src={capturedPhotoPreview} alt={t('damage_capture.captured_alt', 'Captured damage')} className="h-auto w-full" />
+                <img src={capturedPhotoPreview} alt={t('damage_capture.captured_alt', 'Captured condition photo')} className="h-auto w-full" />
               </div>
             )}
 
             {analyzingDamage && (
               <div className="rounded-lg bg-blue-50 p-4 text-center">
                 <Loader size="small" className="mx-auto mb-2" />
-                <p className="text-sm text-blue-800">{t('damage_capture.ai_analyzing', '🤖 AI is analyzing your damage photo...')}</p>
+                <p className="text-sm text-blue-800">{t('damage_capture.ai_analyzing', '🤖 AI is analyzing your photo...')}</p>
               </div>
             )}
 
@@ -371,7 +371,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   {aiResult.damage_type && (
                     <div className="rounded bg-white p-2">
-                      <p className="text-xs text-gray-600">{t('damage_capture.damage_type_short', 'Damage Type')}</p>
+                      <p className="text-xs text-gray-600">{t('damage_capture.damage_type_short', 'Condition Type')}</p>
                       <p className="font-medium text-emerald-700">{aiResult.damage_type}</p>
                     </div>
                   )}
@@ -443,7 +443,7 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
           </div>
         )}
 
-        {/* DAMAGE DETAILS FORM */}
+        {/* CONDITION DETAILS FORM */}
         {stage === 'review' && (
           <div className="space-y-4">
             {/* Room Location */}
@@ -459,9 +459,9 @@ const DamageReportCapture = ({ propertyId, onSaved, onClose, initiatedBy = 'land
               </select>
             </div>
 
-            {/* Damage Type */}
+            {/* Condition Type */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t('damage_capture.damage_type', 'Damage Type *')}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('damage_capture.damage_type', 'Condition Type *')}</label>
               <div className="grid grid-cols-2 gap-2">
                 {DAMAGE_TYPES(t).map(([value, label]) => (
                   <button

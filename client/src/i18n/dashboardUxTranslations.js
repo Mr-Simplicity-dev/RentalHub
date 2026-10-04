@@ -3,7 +3,7 @@ const copy = {
     saved_properties: 'Saved Properties',
     payment_history: 'Payment History',
     my_disputes: 'My Disputes',
-    damage_reports: 'Damage Reports',
+    damage_reports: 'Property Reports',
     subscription: 'Subscription',
     legal_help: 'Request Legal Help',
     support: 'Help & Support',

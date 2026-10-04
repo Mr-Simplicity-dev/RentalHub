@@ -69,15 +69,15 @@ const DamageReportCard = ({ propertyId }) => {
             {t('damage_card.condition_report', 'Property Condition Report')}
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            {t('damage_card.subtitle', 'Latest damage assessment for this property')}
+            {t('damage_card.subtitle', 'Latest condition assessment for this property')}
           </p>
         </div>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Damage Type */}
+        {/* Condition Type */}
         <div className="rounded-lg bg-white p-4">
-          <p className="text-xs uppercase tracking-wide text-gray-500">{t('damage_card.damage_type', 'Damage Type')}</p>
+          <p className="text-xs uppercase tracking-wide text-gray-500">{t('damage_card.damage_type', 'Condition Type')}</p>
           <p className="mt-2 font-semibold text-gray-900 capitalize">
             {report.damage_type?.replace(/_/g, ' ')}
           </p>
@@ -175,7 +175,7 @@ const DamageReportCard = ({ propertyId }) => {
               <div key={idx} className="rounded-lg overflow-hidden bg-gray-200">
                 <img
                   src={photo}
-                  alt={`Damage report ${idx + 1}`}
+                  alt={`Property report ${idx + 1}`}
                   className="h-32 w-full object-cover hover:opacity-80 transition-opacity"
                   onError={(e) => (e.target.src = '/images/broken-image.png')}
                 />

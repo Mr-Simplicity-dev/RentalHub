@@ -70,7 +70,7 @@ router.get(
 			res.json({ success: true, data: result.rows });
 		} catch (error) {
 			req.logger.error('Admin damage reports error:', error);
-			res.status(500).json({ success: false, message: 'Failed to load damage reports' });
+			res.status(500).json({ success: false, message: 'Failed to load property reports' });
 		}
 	}
 );

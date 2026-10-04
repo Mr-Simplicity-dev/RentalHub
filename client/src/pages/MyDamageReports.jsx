@@ -17,6 +17,11 @@ const STATUS_COLORS = {
   published: 'bg-green-100 text-green-800 border-green-200',
 };
 
+const formatType = (type) =>
+  type === 'water_damage'
+    ? 'Water'
+    : String(type || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
 const MyDamageReports = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -93,7 +98,7 @@ const MyDamageReports = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
                       <h3 className="text-lg font-semibold text-gray-900">
-                        {report.report_title || `${t(`damage_capture.type_${report.damage_type}`, { defaultValue: report.damage_type?.replace(/_/g, ' ') })} ${t('my_damage_reports.in_label', { defaultValue: 'in' })} ${report.room_location || t('my_damage_reports.unknown_room')}`}
+                        {report.report_title || `${t(`damage_capture.type_${report.damage_type}`, { defaultValue: formatType(report.damage_type) })} ${t('my_damage_reports.in_label', { defaultValue: 'in' })} ${report.room_location || t('my_damage_reports.unknown_room')}`}
                       </h3>
                       <span className={`rounded-full border px-3 py-0.5 text-xs font-semibold ${SEVERITY_COLORS[report.severity] || 'bg-gray-100 text-gray-700'}`}>
                         {t(`damage_capture.sev_${report.severity}`, { defaultValue: report.severity })}
@@ -109,7 +114,7 @@ const MyDamageReports = () => {
                         {report.property_title || '-'}
                       </span>
                       <span>{t('my_damage_reports.location')}: {report.room_location || '-'}</span>
-                      <span>{t('my_damage_reports.type')}: {report.damage_type?.replace(/_/g, ' ') || '-'}</span>
+                      <span>{t('my_damage_reports.type')}: {formatType(report.damage_type) || '-'}</span>
                       {report.depth_level && <span>{t('my_damage_reports.depth')}: {report.depth_level}</span>}
                       {report.created_at && (
                         <span>{new Date(report.created_at).toLocaleDateString()}</span>

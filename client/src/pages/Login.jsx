@@ -219,8 +219,9 @@ const Login = () => {
         </div>
 
         {/* BRAND */}
-        <div className="text-lg font-bold text-white">
-          RentalHub NG
+        <div className="flex flex-col items-center leading-none">
+          <span className="amana-mark amana-mark--on-dark text-2xl">Amana</span>
+          <span className="text-lg font-bold text-white">RentalHub NG</span>
         </div>
 
         {/* TITLE */}

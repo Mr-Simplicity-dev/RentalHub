@@ -1439,6 +1439,10 @@ return (
             <img src="/rentalhub-mark.svg" className="h-12 w-12 rounded-xl object-contain shadow-sm" alt={t('register.logo_alt')} />
           </div>
         </div>
+        <div className="flex flex-col items-center leading-none">
+          <span className="amana-mark amana-mark--on-dark text-2xl">Amana</span>
+          <span className="text-lg font-bold text-white">RentalHub NG</span>
+        </div>
         <h1 className="max-w-md text-4xl font-extrabold leading-tight tracking-tight">{t('register.left_panel_title')}</h1>
         <p className="max-w-md text-lg text-primary-100">
           {t('register.left_panel_desc')}

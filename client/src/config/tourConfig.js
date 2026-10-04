@@ -170,7 +170,7 @@ export const TOUR_STEPS = {
       id: 'agent_5',
       target: '.agent-permissions-section',
       title: 'Delegated Responsibilities',
-      description: 'See which property, damage, dispute, legal, and finance permissions your landlord has delegated to you.',
+      description: 'See which property, condition, dispute, legal, and finance permissions your landlord has delegated to you.',
       placement: 'top',
       highlight: true,
     },

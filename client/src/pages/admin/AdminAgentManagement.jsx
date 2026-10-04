@@ -238,7 +238,7 @@ const AdminAgentManagement = () => {
                       <p className="text-xs text-gray-600">Permissions</p>
                       <div className="mt-1 flex gap-1">
                         {assignment.can_manage_properties && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Props</span>}
-                        {assignment.can_manage_damage_reports && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Damage</span>}
+                        {assignment.can_manage_damage_reports && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Maintenance</span>}
                         {assignment.can_manage_disputes && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Disputes</span>}
                         {assignment.can_manage_legal && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Legal</span>}
                         {assignment.can_manage_finances && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Finance</span>}

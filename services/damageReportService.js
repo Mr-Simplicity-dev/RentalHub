@@ -51,7 +51,7 @@ class DamageReportController {
         return res.json({
           success: true,
           data: null,
-          message: 'No published damage reports for this property',
+          message: 'No published property reports for this property',
         });
       }
 
@@ -63,7 +63,7 @@ class DamageReportController {
       req.logger.error(`Error fetching latest published report: ${error.message}`);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch damage report',
+        message: 'Failed to fetch property report',
       });
     }
   }
@@ -395,7 +395,7 @@ class DamageReportController {
       req.logger.error('Get my damage reports error:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch damage reports'
+        message: 'Failed to fetch property reports'
       });
     }
   }

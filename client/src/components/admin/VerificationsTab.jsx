@@ -1,27 +1,24 @@
 import React, { useState } from "react";
+import api from "../../services/api";
+import { toast } from "react-toastify";
 import PaginationControls from "./PaginationControls";
 
-const getPassportPhotoUrl = (rawUrl) => {
-  if (!rawUrl) return "";
-
-  const normalized = String(rawUrl).replace(/\\/g, "/").trim();
-
-  if (/^https?:\/\//i.test(normalized)) {
-    return normalized;
+const viewPassport = async (rawUrl) => {
+  const filename = String(rawUrl || "").replace(/\\/g, "/").split("/").pop();
+  if (!filename) return;
+  const preview = window.open("", "_blank", "noopener,noreferrer");
+  try {
+    const response = await api.get(`/users/passport-photo/${encodeURIComponent(filename)}`, {
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(response.data);
+    if (preview) preview.location = url;
+    else window.open(url, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (error) {
+    if (preview) preview.close();
+    toast.error(error.response?.data?.message || "Failed to open passport photo");
   }
-
-  const apiBase = process.env.REACT_APP_API_URL || "/api";
-  const serverOrigin = apiBase.startsWith("http")
-    ? new URL(apiBase).origin
-    : window.location.origin;
-
-  const uploadsIndex = normalized.toLowerCase().indexOf("uploads/");
-  const uploadPath =
-    uploadsIndex >= 0
-      ? normalized.slice(uploadsIndex)
-      : normalized.replace(/^\/+/, "");
-
-  return `${serverOrigin}/${uploadPath}`;
 };
 
 const VerificationsTab = ({
@@ -275,14 +272,13 @@ const VerificationsTab = ({
                     <td className="p-3">
 
                       {v.passport_photo_url ? (
-                        <a
-                          href={getPassportPhotoUrl(v.passport_photo_url)}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => viewPassport(v.passport_photo_url)}
                           className="text-blue-600 hover:underline text-sm"
                         >
                           View
-                        </a>
+                        </button>
                       ) : (
                         "-"
                       )}

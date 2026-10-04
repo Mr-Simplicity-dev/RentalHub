@@ -1992,7 +1992,7 @@ exports.analyzeDamagePhoto = async (req, res) => {
     req.logger.error('Analyze damage photo error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to analyze damage photo',
+      message: 'Failed to analyze condition photo',
     });
   }
 };
@@ -2083,12 +2083,12 @@ exports.saveDamageReport = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Damage report saved successfully',
+      message: 'Property report saved successfully',
       data: result.rows[0],
     });
   } catch (error) {
     req.logger.error('Save damage report error:', error);
-    res.status(500).json({ success: false, message: 'Failed to save damage report' });
+    res.status(500).json({ success: false, message: 'Failed to save property report' });
   }
 };
 
@@ -2152,7 +2152,7 @@ exports.getDamageReports = async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (error) {
     req.logger.error('Get damage reports error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch damage reports' });
+    res.status(500).json({ success: false, message: 'Failed to fetch property reports' });
   }
 };
 

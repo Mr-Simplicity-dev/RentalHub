@@ -1965,8 +1965,8 @@ const Dashboard = () => {
                 title={t('dashboardUx.damage_reports')}
                 description={
                   user?.user_type === 'landlord'
-                    ? 'View damage reports for your properties'
-                    : 'View published damage reports for your rented properties'
+                    ? 'View property reports for your properties'
+                    : 'View published property reports for your rented properties'
                 }
                 icon={<FaTools />}
                 onClick={() => navigate('/my-damage-reports')}
@@ -2129,7 +2129,7 @@ const Dashboard = () => {
               />
               <QuickActionCard
                 title={t('dashboardUx.damage_reports')}
-                description="View damage reports for your properties"
+                description="View property reports for your properties"
                 icon={<FaTools />}
                 onClick={() => navigate('/my-damage-reports')}
               />
