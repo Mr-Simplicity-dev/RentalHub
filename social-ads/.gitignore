@@ -1,0 +1,11 @@
+# Rendered PNG output is regenerable — do not commit.
+*.png
+flyers/png/
+export/
+facebook/
+instagram/
+twitter/
+whatsapp/
+review/
+svg-review/
+templates/

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RentalHub NG — Landlord Flyer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    --navy: #15213F;
+    --navy-deep: #0B1226;
+    --gold: #E2B64A;
+    --white: #FFFFFF;
+    --muted: #B9C4DE;
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--navy);
+  }
+  .flyer {
+    display: flex; flex-direction: column;
+    width: 100vw; height: 100vh;
+    padding: 5vmin 5.5vmin;
+    gap: 3vmin;
+    background:
+      radial-gradient(60vmin 60vmin at 88% 8%, rgba(226,182,74,0.16), rgba(226,182,74,0) 70%),
+      linear-gradient(160deg, #1B2A4E 0%, var(--navy) 55%, var(--navy-deep) 100%);
+    color: var(--white);
+  }
+
+  .top { display: flex; align-items: center; gap: 2vmin; }
+  .logo { width: 8vmin; height: 8vmin; border-radius: 50%; background: #fff; box-shadow: 0 1vmin 2.4vmin rgba(0,0,0,0.35); }
+  .brand { font-weight: 800; font-size: 3.4vmin; }
+  .brand span { color: var(--gold); font-weight: 400; }
+
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 3vmin; }
+  .head .txt { flex: 1; }
+  .eyebrow { font-size: 1.9vmin; font-weight: 800; letter-spacing: 0.26em; color: var(--gold); margin-bottom: 1.6vmin; }
+  h1 { font-size: 5vmin; line-height: 1.08; font-weight: 800; letter-spacing: -0.01em; }
+  h1 .accent { color: var(--gold); }
+  .badge {
+    flex: 0 0 auto;
+    display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--gold); color: #0B1226;
+    border-radius: 2vmin;
+    padding: 1.6vmin 2.6vmin;
+    text-align: center;
+  }
+  .badge b { font-size: 4.4vmin; font-weight: 900; line-height: 1; }
+  .badge i { font-style: normal; font-size: 1.5vmin; font-weight: 800; letter-spacing: 0.08em; }
+
+  .shot {
+    flex: 1;
+    min-height: 0;
+    border-radius: 2.6vmin;
+    background-image: url('assets/photo-1704457031803-2c39a23e9faa.avif');
+    background-size: cover;
+    background-position: center;
+    border: 0.3vmin solid rgba(226,182,74,0.55);
+    box-shadow: 0 2.4vmin 6vmin rgba(0,0,0,0.4);
+  }
+
+  ul { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 1.7vmin 3vmin; }
+  li { display: flex; align-items: flex-start; gap: 1.5vmin; font-size: 2.2vmin; font-weight: 600; line-height: 1.3; color: #EAF0FB; }
+  .tick {
+    flex: 0 0 auto;
+    width: 3.6vmin; height: 3.6vmin; border-radius: 50%;
+    background: var(--gold);
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 0.1vmin;
+  }
+  .tick svg { width: 2.1vmin; height: 2.1vmin; }
+
+  .footer {
+    align-self: center;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--white); color: #0B1226;
+    font-weight: 700; font-size: 1.75vmin;
+    padding: 1.7vmin 3.2vmin;
+    border-radius: 99px;
+    white-space: nowrap;
+    box-shadow: 0 1.2vmin 2.6vmin rgba(0,0,0,0.3);
+  }
+
+    /* Amana house mark — the script wordmark above RentalHub NG. */
+    @font-face {
+      font-family: 'AmanaScript';
+      src: url('../client/public/fonts/AmanaScript.ttf') format('truetype');
+      font-display: swap;
+    }
+    .amana {
+      font-family: 'AmanaScript', 'Segoe Script', cursive;
+      color: #6E1B2B;
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
+</style>
+</head>
+<body>
+  <div class="flyer">
+    <div class="top">
+      <img class="logo" src="../client/public/rentalhub-mark.svg" alt="RentalHub NG">
+      <div class="brand"><div class="amana" style="font-size:3.1vmin;margin-bottom:0.3vmin;">Amana</div>RentalHub <span>NG</span></div>
+    </div>
+    <div class="head">
+      <div class="txt">
+        <div class="eyebrow">FOR LANDLORDS &amp; AGENTS</div>
+        <h1>Your property, run like a <span class="accent">business.</span></h1>
+      </div>
+      <div class="badge"><b>&#8358;0</b><i>HIDDEN FEES</i></div>
+    </div>
+    <div class="shot"></div>
+    <ul>
+      <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0B1226" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>List and update in minutes</li>
+      <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0B1226" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Screen verified tenants</li>
+      <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0B1226" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Transparent on-time earnings</li>
+      <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0B1226" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>No hidden platform fees</li>
+      <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0B1226" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Payouts you can track</li>
+      <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0B1226" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Dedicated landlord support</li>
+    </ul>
+    <div class="footer">rentalhub.com.ng&nbsp;&nbsp;•&nbsp;&nbsp;support@rentalhub.com.ng</div>
+  </div>
+</body>
+</html>

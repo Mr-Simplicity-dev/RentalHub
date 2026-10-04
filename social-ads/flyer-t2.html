@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RentalHub NG — Save Monthly Flyer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    --green: #0E5C46;
+    --green-deep: #0A3F31;
+    --mint: #A7F3D0;
+    --green-bright: #22C55E;
+    --cream: #F1E4C0;
+    --white: #FFFFFF;
+    --muted: #B9D8CC;
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--green);
+  }
+  .flyer { display: flex; width: 100vw; height: 100vh; }
+
+  .photo {
+    position: relative;
+    flex: 0 0 50%;
+    background-image: url('assets/istockphoto-1560745213-612x612.webp');
+    background-size: cover;
+    background-position: center;
+  }
+  .photo::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(10,63,49,0.08) 0%, rgba(10,63,49,0.30) 65%, rgba(10,63,49,0.94) 100%);
+  }
+  .logo {
+    position: absolute;
+    top: 3vmin; left: 3vmin;
+    width: 9vmin; height: 9vmin;
+    border-radius: 50%;
+    z-index: 3;
+    box-shadow: 0 1.4vmin 3vmin rgba(0,0,0,0.4);
+    background: #fff;
+  }
+  .photo-tag {
+    position: absolute;
+    left: 3.4vmin; bottom: 3.4vmin;
+    z-index: 3;
+    display: inline-flex; align-items: center; gap: 1.2vmin;
+    background: rgba(255,255,255,0.92);
+    color: #0A3F31;
+    font-weight: 800;
+    font-size: 2.1vmin;
+    letter-spacing: 0.06em;
+    padding: 1.3vmin 2.2vmin;
+    border-radius: 99px;
+  }
+  .photo-tag .dot { width: 1.4vmin; height: 1.4vmin; border-radius: 50%; background: var(--green-bright); }
+
+  .panel {
+    position: relative;
+    flex: 1;
+    background: linear-gradient(160deg, #12734F 0%, var(--green) 55%, var(--green-deep) 100%);
+    padding: 7vmin 6vmin;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: var(--white);
+    overflow: hidden;
+  }
+  .panel::before {
+    content: "";
+    position: absolute; top: -14vmin; right: -14vmin;
+    width: 42vmin; height: 42vmin; border-radius: 50%;
+    background: radial-gradient(circle, rgba(167,243,208,0.28), rgba(167,243,208,0) 70%);
+  }
+  .eyebrow {
+    position: relative;
+    font-size: 2vmin; font-weight: 800; letter-spacing: 0.28em;
+    color: var(--mint);
+    margin-bottom: 2.4vmin;
+  }
+  h1 {
+    position: relative;
+    font-size: 6vmin; line-height: 1.08; font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  h1 .accent { color: var(--mint); }
+  .rule { position: relative; width: 12vmin; height: 0.8vmin; border-radius: 99px; background: var(--cream); margin: 3vmin 0; }
+  .sub { position: relative; font-size: 2.45vmin; color: var(--muted); line-height: 1.5; margin-bottom: 3.4vmin; max-width: 44vmin; }
+
+  ul { position: relative; list-style: none; display: flex; flex-direction: column; gap: 2.1vmin; }
+  li { display: flex; align-items: flex-start; gap: 1.8vmin; font-size: 2.5vmin; font-weight: 600; line-height: 1.35; color: #EAF7F0; }
+  .tick {
+    flex: 0 0 auto;
+    width: 4.2vmin; height: 4.2vmin; border-radius: 50%;
+    background: var(--mint);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0.8vmin 1.8vmin rgba(34,197,94,0.35);
+    margin-top: 0.1vmin;
+  }
+  .tick svg { width: 2.4vmin; height: 2.4vmin; }
+
+  .progress {
+    position: relative;
+    margin-top: 4.2vmin;
+    background: rgba(255,255,255,0.10);
+    border: 0.2vmin solid rgba(255,255,255,0.18);
+    border-radius: 1.6vmin;
+    padding: 2.2vmin 2.4vmin;
+  }
+  .progress .lbl { font-size: 2vmin; color: var(--muted); margin-bottom: 1.4vmin; }
+  .bar { height: 1.4vmin; border-radius: 99px; background: rgba(255,255,255,0.18); overflow: hidden; }
+  .bar span { display: block; height: 100%; width: 62%; border-radius: 99px; background: var(--green-bright); }
+
+  .footer {
+    position: relative;
+    margin-top: 4vmin;
+    display: inline-flex; align-items: center; justify-content: center;
+    align-self: stretch;
+    background: var(--white);
+    color: #0A3F31;
+    font-weight: 700; font-size: 1.55vmin;
+    padding: 1.6vmin 1.5vmin;
+    border-radius: 99px;
+    white-space: nowrap;
+  }
+
+    /* Amana house mark — the script wordmark above RentalHub NG. */
+    @font-face {
+      font-family: 'AmanaScript';
+      src: url('../client/public/fonts/AmanaScript.ttf') format('truetype');
+      font-display: swap;
+    }
+    .amana {
+      position: absolute;
+      top: 13vmin;
+      left: 3vmin;
+      z-index: 4;
+      font-family: 'AmanaScript', 'Segoe Script', cursive;
+      color: #6E1B2B;
+      font-size: 3.4vmin;
+      line-height: 1;
+    }
+</style>
+</head>
+<body>
+  <div class="flyer">
+    <div class="photo">
+      <img class="logo" src="../client/public/rentalhub-mark.svg" alt="RentalHub NG">
+      <div class="amana" style="font-size:3.1vmin;margin-bottom:0.3vmin;">Amana</div>
+      <div class="photo-tag"><span class="dot"></span> RENT SAVINGS</div>
+    </div>
+    <div class="panel">
+      <div class="eyebrow">SAVE MONTHLY, PAY WITH EASE</div>
+      <h1>Save monthly.<br>Rent without <span class="accent">panic.</span></h1>
+      <div class="rule"></div>
+      <p class="sub">Set your target rent and let automated top-ups do the work.</p>
+      <ul>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0A3F31" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Set your target rent amount</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0A3F31" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Automated monthly top-ups</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0A3F31" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Withdraw at maturity, on time</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0A3F31" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>No lump sums, no pressure</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0A3F31" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Track progress in real time</li>
+      </ul>
+      <div class="progress">
+        <div class="lbl">Progress to your rent due date</div>
+        <div class="bar"><span></span></div>
+      </div>
+      <div class="footer">rentalhub.com.ng&nbsp;&nbsp;•&nbsp;&nbsp;support@rentalhub.com.ng</div>
+    </div>
+  </div>
+</body>
+</html>

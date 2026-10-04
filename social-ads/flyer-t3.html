@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RentalHub NG — Smart Search Flyer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    --navy: #0F0C33;
+    --navy-deep: #08061F;
+    --cyan: #22D3EE;
+    --violet: #8B5CF6;
+    --white: #FFFFFF;
+    --muted: #C7C9E6;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .flyer {
+    position: relative;
+    width: 100vw; height: 100vh;
+    background-image: url('assets/photo-1595243643203-06ba168495ea.avif');
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8vmin;
+  }
+  .flyer::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(60vmin 60vmin at 82% 12%, rgba(139,92,246,0.38), rgba(139,92,246,0) 70%),
+      radial-gradient(55vmin 55vmin at 8% 92%, rgba(34,211,238,0.30), rgba(34,211,238,0) 70%),
+      linear-gradient(180deg, rgba(15,12,51,0.78) 0%, rgba(15,12,51,0.90) 55%, rgba(8,6,31,0.96) 100%);
+  }
+  .logo {
+    position: absolute;
+    top: 3vmin; left: 3vmin;
+    width: 9vmin; height: 9vmin;
+    border-radius: 50%;
+    z-index: 4;
+    box-shadow: 0 1.4vmin 3vmin rgba(0,0,0,0.5);
+    background: #fff;
+  }
+  .brand {
+    position: absolute;
+    top: 3.2vmin; left: 13.5vmin;
+    z-index: 4;
+    font-weight: 800; font-size: 3.4vmin; color: var(--white);
+  }
+  .brand span { color: var(--cyan); font-weight: 400; }
+
+  .card {
+    position: relative;
+    z-index: 3;
+    width: 100%;
+    max-width: 74vmin;
+    background: rgba(255,255,255,0.07);
+    border: 0.25vmin solid rgba(255,255,255,0.18);
+    border-radius: 3.2vmin;
+    padding: 6vmin 6vmin;
+    box-shadow: 0 3vmin 8vmin rgba(0,0,0,0.45);
+    backdrop-filter: blur(6px);
+    text-align: center;
+    color: var(--white);
+  }
+  .eyebrow {
+    display: inline-block;
+    font-size: 2vmin; font-weight: 800; letter-spacing: 0.28em;
+    color: var(--cyan);
+    margin-bottom: 2.6vmin;
+  }
+  h1 {
+    font-size: 6.6vmin; line-height: 1.08; font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  h1 .accent { color: var(--cyan); }
+  .sub { font-size: 2.5vmin; color: var(--muted); line-height: 1.5; margin: 2.6vmin auto 4vmin; max-width: 56vmin; }
+
+  ul { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 2.2vmin 3vmin; text-align: left; }
+  li { display: flex; align-items: flex-start; gap: 1.6vmin; font-size: 2.35vmin; font-weight: 600; line-height: 1.35; color: #EEF2FB; }
+  .tick {
+    flex: 0 0 auto;
+    width: 4vmin; height: 4vmin; border-radius: 50%;
+    background: var(--cyan);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0.7vmin 1.6vmin rgba(34,211,238,0.4);
+    margin-top: 0.1vmin;
+  }
+  .tick svg { width: 2.3vmin; height: 2.3vmin; }
+
+  .footer {
+    position: relative;
+    z-index: 3;
+    position: absolute;
+    bottom: 3.6vmin; left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--white);
+    color: #0F0C33;
+    font-weight: 700; font-size: 1.9vmin;
+    padding: 1.7vmin 3.4vmin;
+    border-radius: 99px;
+    white-space: nowrap;
+    box-shadow: 0 1.4vmin 3vmin rgba(0,0,0,0.4);
+  }
+
+    /* Amana house mark — the script wordmark above RentalHub NG. */
+    @font-face {
+      font-family: 'AmanaScript';
+      src: url('../client/public/fonts/AmanaScript.ttf') format('truetype');
+      font-display: swap;
+    }
+    .amana {
+      font-family: 'AmanaScript', 'Segoe Script', cursive;
+      color: #6E1B2B;
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
+</style>
+</head>
+<body>
+  <div class="flyer">
+    <img class="logo" src="../client/public/rentalhub-mark.svg" alt="RentalHub NG">
+      <div class="brand"><div class="amana" style="font-size:3.1vmin;margin-bottom:0.3vmin;">Amana</div>RentalHub <span>NG</span></div>
+    <div class="card">
+      <span class="eyebrow">SMART RENTAL SEARCH</span>
+      <h1>Your next home,<br>one <span class="accent">tap away.</span></h1>
+      <p class="sub">Search verified rentals across Nigeria with instant alerts and honest details.</p>
+      <ul>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#08061F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Filter by area, size and budget</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#08061F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Instant alerts on new listings</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#08061F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Verified listings only</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#08061F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Save and compare favourites</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#08061F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Unlock details when ready</li>
+        <li><span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#08061F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Chat directly with landlords</li>
+      </ul>
+    </div>
+    <div class="footer">rentalhub.com.ng&nbsp;&nbsp;•&nbsp;&nbsp;support@rentalhub.com.ng</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RentalHub NG — True Move-in Cost Flyer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    --char: #26262B;
+    --char-deep: #17171B;
+    --yellow: #FFD400;
+    --light: #F5F5F5;
+    --white: #FFFFFF;
+    --muted: #B7B7BE;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .flyer {
+    position: relative;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    background-image: url('assets/photo-1746458258536-b9ee5db20a73.avif');
+    background-size: cover;
+    background-position: center;
+  }
+  .shade {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(20,20,24,0.72) 0%, rgba(20,20,24,0.45) 40%, rgba(17,17,21,0.90) 100%);
+  }
+  .logo {
+    position: absolute;
+    top: 3vmin; left: 3vmin;
+    width: 9vmin; height: 9vmin;
+    border-radius: 50%;
+    z-index: 4;
+    background: #fff;
+    box-shadow: 0 1.2vmin 3vmin rgba(0,0,0,0.45);
+  }
+  .brand {
+    position: absolute;
+    top: 3.4vmin; left: 13.5vmin;
+    z-index: 4;
+    font-weight: 800; font-size: 3.4vmin; color: var(--white);
+  }
+  .brand span { color: var(--yellow); font-weight: 400; }
+
+  .top {
+    position: absolute;
+    z-index: 3;
+    top: 17vmin; left: 6vmin; right: 6vmin;
+    color: var(--white);
+  }
+  .eyebrow { font-size: 1.9vmin; font-weight: 800; letter-spacing: 0.26em; color: var(--yellow); margin-bottom: 1.8vmin; }
+  h1 { font-size: 6.2vmin; line-height: 1.05; font-weight: 900; letter-spacing: -0.015em; max-width: 74vmin; }
+  h1 .accent { color: var(--yellow); }
+
+  .sheet {
+    position: absolute;
+    z-index: 3;
+    left: 5vmin; right: 5vmin; bottom: 4.5vmin;
+    background: rgba(30,30,35,0.94);
+    border: 0.25vmin solid rgba(255,255,255,0.14);
+    border-radius: 3vmin;
+    padding: 4vmin 4.4vmin;
+    color: var(--white);
+    box-shadow: 0 2.4vmin 6vmin rgba(0,0,0,0.5);
+    backdrop-filter: blur(6px);
+  }
+  .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 3vmin; }
+  .price .lbl { font-size: 1.9vmin; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; margin-bottom: 1vmin; }
+  .price .big { font-size: 8.4vmin; font-weight: 900; line-height: 1; }
+  .price .big .per { font-size: 2.6vmin; font-weight: 700; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 1.2vmin; justify-content: flex-end; max-width: 42vmin; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 0.9vmin;
+    background: rgba(255,212,0,0.12);
+    border: 0.2vmin solid rgba(255,212,0,0.55);
+    color: var(--yellow);
+    font-size: 1.9vmin; font-weight: 700;
+    padding: 0.9vmin 1.6vmin; border-radius: 99px;
+  }
+  .chip .p { font-weight: 900; }
+
+  .footer {
+    margin-top: 3.2vmin;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--white); color: #17171B;
+    font-weight: 700; font-size: 1.75vmin;
+    padding: 1.7vmin 1.5vmin;
+    border-radius: 99px;
+    white-space: nowrap;
+  }
+
+    /* Amana house mark — the script wordmark above RentalHub NG. */
+    @font-face {
+      font-family: 'AmanaScript';
+      src: url('../client/public/fonts/AmanaScript.ttf') format('truetype');
+      font-display: swap;
+    }
+    .amana {
+      font-family: 'AmanaScript', 'Segoe Script', cursive;
+      color: #6E1B2B;
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
+</style>
+</head>
+<body>
+  <div class="flyer">
+    <div class="shade"></div>
+    <img class="logo" src="../client/public/rentalhub-mark.svg" alt="RentalHub NG">
+      <div class="brand"><div class="amana" style="font-size:3.1vmin;margin-bottom:0.3vmin;">Amana</div>RentalHub <span>NG</span></div>
+    <div class="top">
+      <div class="eyebrow">HONEST RENT CALCULATOR</div>
+      <h1>See the true <span class="accent">move-in cost.</span></h1>
+    </div>
+    <div class="sheet">
+      <div class="row">
+        <div class="price">
+          <div class="lbl">Monthly rent equivalent</div>
+          <div class="big">&#8358;100,000<span class="per"> / mo</span></div>
+        </div>
+        <div class="chips">
+          <span class="chip"><span class="p">+</span> Agent</span>
+          <span class="chip"><span class="p">+</span> Legal</span>
+          <span class="chip"><span class="p">+</span> Caution</span>
+          <span class="chip"><span class="p">+</span> Agreement</span>
+        </div>
+      </div>
+      <div class="footer">rentalhub.com.ng&nbsp;&nbsp;•&nbsp;&nbsp;support@rentalhub.com.ng</div>
+    </div>
+  </div>
+</body>
+</html>

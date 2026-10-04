@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RentalHub NG — Tenant Stories Flyer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    --paper: #FBEEF1;
+    --pink: #E96A8A;
+    --pink-deep: #C24E6C;
+    --ink: #4A1828;
+    --white: #FFFFFF;
+    --muted: #8A6170;
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--paper);
+  }
+  .flyer {
+    position: relative;
+    display: flex; flex-direction: column;
+    width: 100vw; height: 100vh;
+    padding: 5vmin 5.5vmin;
+    gap: 2.6vmin;
+    background:
+      radial-gradient(55vmin 55vmin at 90% 6%, rgba(233,106,138,0.22), rgba(233,106,138,0) 70%),
+      linear-gradient(165deg, #FDF3F6 0%, var(--paper) 55%, #F4D9E2 100%);
+  }
+  .brandrow { display: flex; align-items: center; gap: 2vmin; }
+  .logo { width: 9vmin; height: 9vmin; border-radius: 50%; background: #fff; box-shadow: 0 1vmin 2.4vmin rgba(74,24,40,0.16); }
+  .brand { font-weight: 800; font-size: 3.4vmin; color: var(--ink); }
+  .brand span { color: var(--pink); font-weight: 400; }
+
+  .head .eyebrow { font-size: 1.9vmin; font-weight: 800; letter-spacing: 0.26em; color: var(--pink); margin-bottom: 1.6vmin; }
+  .head h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 5.2vmin; line-height: 1.1; font-weight: 700; color: var(--ink); }
+  .head h1 .accent { color: var(--pink); }
+
+  .stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .card {
+    position: relative;
+    width: 100%;
+    max-width: 92vmin;
+    background: var(--white);
+    border-radius: 3.4vmin;
+    padding: 7.5vmin 5.5vmin 5vmin;
+    text-align: center;
+    box-shadow: 0 3vmin 7vmin rgba(74,24,40,0.16);
+  }
+  .avatar {
+    position: absolute;
+    top: -7.5vmin; left: 50%;
+    transform: translateX(-50%);
+    width: 15vmin; height: 15vmin;
+    border-radius: 50%;
+    background-image: url('assets/photo-1760067537204-fe9b55b2f1b0.avif');
+    background-size: cover;
+    background-position: center;
+    border: 1vmin solid var(--white);
+    box-shadow: 0 1.4vmin 3vmin rgba(74,24,40,0.22);
+  }
+  .qmark { font-family: Georgia, serif; font-size: 12vmin; line-height: 0.6; color: var(--pink); opacity: 0.9; }
+  blockquote { font-family: Georgia, 'Times New Roman', serif; font-size: 3.4vmin; line-height: 1.4; color: var(--ink); margin: 1.6vmin 0 3vmin; }
+  .stars { font-size: 3.4vmin; letter-spacing: 0.5vmin; color: var(--pink); }
+  cite { display: block; margin-top: 1.8vmin; font-style: normal; font-size: 2.2vmin; font-weight: 700; color: var(--muted); }
+
+  .footer {
+    align-self: center;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--pink); color: var(--white);
+    font-weight: 700; font-size: 1.75vmin;
+    padding: 1.7vmin 3.2vmin;
+    border-radius: 99px;
+    white-space: nowrap;
+    box-shadow: 0 1.2vmin 2.6vmin rgba(74,24,40,0.22);
+  }
+
+    /* Amana house mark — the script wordmark above RentalHub NG. */
+    @font-face {
+      font-family: 'AmanaScript';
+      src: url('../client/public/fonts/AmanaScript.ttf') format('truetype');
+      font-display: swap;
+    }
+    .amana {
+      font-family: 'AmanaScript', 'Segoe Script', cursive;
+      color: #6E1B2B;
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
+</style>
+</head>
+<body>
+  <div class="flyer">
+    <div class="brandrow">
+      <img class="logo" src="../client/public/rentalhub-mark.svg" alt="RentalHub NG">
+      <div class="brand"><div class="amana" style="font-size:3.1vmin;margin-bottom:0.3vmin;">Amana</div>RentalHub <span>NG</span></div>
+    </div>
+    <div class="head">
+      <div class="eyebrow">TENANT STORIES</div>
+      <h1>What real tenants <span class="accent">really say.</span></h1>
+    </div>
+    <div class="stage">
+      <div class="card">
+        <div class="avatar"></div>
+        <div class="qmark">&#8220;</div>
+        <blockquote>Moved in stress-free &mdash; the photos matched the house exactly. Receipts on time, every time.</blockquote>
+        <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <cite>Amara O. &mdash; verified tenant, Lekki</cite>
+      </div>
+    </div>
+    <div class="footer">rentalhub.com.ng&nbsp;&nbsp;•&nbsp;&nbsp;support@rentalhub.com.ng</div>
+  </div>
+</body>
+</html>
