@@ -2,6 +2,7 @@
   <title id="ogTitle">Amana RentalHub NG</title>
   <desc id="ogDesc">Amana RentalHub NG — Find and manage properties in Nigeria</desc>
   <defs>
+    <style>@font-face{font-family:'AmanaScript';src:url('fonts/AmanaScript.ttf') format('truetype');}</style>
     <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#0f172a"/>
       <stop offset="0.4" stop-color="#1e3a5f"/>
