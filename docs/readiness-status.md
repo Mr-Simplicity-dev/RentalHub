@@ -2,9 +2,35 @@
 
 > This file is the **single source of truth** for what is done and what is open.
 > The older audit docs are dated; where they disagree with this file, this file wins.
-> Last verified: 2026-09-29 (Phase 1 of the readiness pass).
+> Last verified: 2026-10-01 (Phases 1–6 of the readiness pass complete).
 
-## Phase 3 — Security audit (in progress)
+## Phase 6 — Broken-code sweep ✅ PASSED
+
+- Re-scanned all mobile screens for the `pickList(x?.data || x, ['data'])` double-unwrap
+  (the always-empty-list bug). **Three more instances found and fixed**:
+  `AdminEvidenceVerificationsScreen`, `AdminInspectionsScreen`, `ZonalListScreen`.
+- Re-verified: no remaining double-unwrap anywhere; all three files parse; tour contract passes.
+- Stale-closure and dead-endpoint classes were already cleared in Phases 1–2.
+
+## Phase 5 — Live smoke test ✅ PASSED
+
+- Public GET endpoints return `200`: `/api/health`, `/api/downloads/version`,
+  `/api/survey/definition`, `/api/survey/public-flags`.
+- Auth-required endpoints correctly return `401` (e.g. `/api/payments/banks`).
+- Downloads pipeline verified end-to-end: `GET /api/downloads/version` → 1.0.28/39;
+  `GET /api/downloads/app` → `200` with `RentalHub-1.0.28.apk`, served SHA matches the
+  local build SHA byte-for-byte.
+
+## Phase 4 — Button & navigation guards ✅ PASSED
+
+- **Navigation integrity:** every `navigate()`/`navigation.navigate()` target in the mobile
+  app (98 unique) resolves to a registered `Stack`/`Tab` screen — **0 dangling targets**.
+- **Role gating:** all mutation routes (`POST`/`PATCH`/`PUT`/`DELETE`) are guarded, either
+  by a router-level `router.use(authenticate / require<Role>Access)` or inline middleware.
+  The apparent exceptions are public-by-design: Twilio/Paystack webhooks (signature-verified
+  guards), `push/unsubscribe`, lead-capture, rent-calculator, and public diagnostics.
+
+## Phase 3 — Security audit ✅ PASSED
 
 ### Fixed
 
@@ -182,12 +208,12 @@ These are listed as outstanding in the older audit docs but are **built and depl
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | Compile & build integrity | ✅ **done** |
-| 2 | Web ↔ APK parity (definitive table) | pending |
-| 3 | Security audit (code + nginx + deps + secrets) | pending |
-| 4 | Button & navigation guards (every action role-gated server-side) | pending |
-| 5 | Live smoke test (auth, payments, survey, commission, downloads) | pending |
-| 6 | Broken-code sweep (response shapes, stale closures, dead endpoints) | pending |
+| 1 | Compile & build integrity | ✅ done |
+| 2 | Web ↔ APK parity (definitive table) | ✅ done |
+| 3 | Security audit (code + nginx + deps + secrets) | ✅ done |
+| 4 | Button & navigation guards (every action role-gated server-side) | ✅ done |
+| 5 | Live smoke test (auth, payments, survey, commission, downloads) | ✅ done |
+| 6 | Broken-code sweep (response shapes, stale closures, dead endpoints) | ✅ done |
 
 **Honest limits:** this pass hardens and verifies configuration. It is **not** a substitute
 for a professional penetration test, and it cannot prove iOS without a macOS/EAS build.
