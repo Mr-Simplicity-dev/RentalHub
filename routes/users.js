@@ -13,7 +13,12 @@ const {
   sensitiveActionLimiter,
   tourEventLimiter,
 } = require('../config/middleware/securityRateLimiters');
-const { decryptNIN } = require('../config/utils/ninEncryption');
+const { encryptNIN, decryptNIN } = require('../config/utils/ninEncryption');
+const {
+  validateNIN,
+  verifyNINWithPrembly,
+  isPremblyConfigured,
+} = require('../config/utils/premblyValidator');
 const { checkPasswordBreached } = require('../config/utils/breachCheck');
 const credentialRevalidationCtrl = require('../controllers/credentialRevalidationController');
 
@@ -2034,6 +2039,116 @@ router.get('/verification/status', authenticate, async (req, res) => {
     });
   }
 });
+
+// Add NIN after signup (users who registered before NIN was required).
+// Validates the 11-digit NIN, encrypts it, verifies via Prembly and marks the
+// account nin_verified (and identity_verified when a passport photo exists).
+router.post(
+  '/identity/nin',
+  authenticate,
+  sensitiveActionLimiter,
+  [
+    body('nin').trim().matches(/^\d{11}$/).withMessage('NIN must be exactly 11 digits'),
+    body('date_of_birth').trim().notEmpty().withMessage('Date of birth is required'),
+  ],
+  validateRequest,
+  async (req, res) => {
+    try {
+      const nin = req.body.nin.trim();
+      const dateOfBirth = String(req.body.date_of_birth || '').trim();
+
+      const parsedDob = new Date(dateOfBirth);
+      if (Number.isNaN(parsedDob.getTime()) || parsedDob >= new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: 'A valid past date of birth is required',
+        });
+      }
+
+      const validation = validateNIN(nin);
+      if (!validation.valid) {
+        return res.status(400).json({ success: false, message: validation.message });
+      }
+
+      const ninHash = crypto.createHash('sha256').update(nin).digest('hex');
+      const duplicate = await db.query(
+        `SELECT id FROM users WHERE nin_hash = $1 AND id <> $2 AND deleted_at IS NULL LIMIT 1`,
+        [ninHash, req.user.id]
+      );
+      if (duplicate.rows.length) {
+        return res.status(409).json({
+          success: false,
+          message: 'This NIN is already used by another account',
+        });
+      }
+
+      const encrypted = encryptNIN(nin);
+      if (!encrypted) {
+        return res.status(500).json({
+          success: false,
+          message: 'NIN encryption is not configured',
+        });
+      }
+
+      if (!isPremblyConfigured()) {
+        return res.status(503).json({
+          success: false,
+          message: 'Prembly verification is required but is not configured on the server',
+        });
+      }
+
+      const names = String(req.user.full_name || '').trim().split(/\s+/);
+      const verification = await verifyNINWithPrembly(
+        nin,
+        names[0] || '',
+        names.slice(1).join(' ') || names[0] || '',
+        dateOfBirth
+      );
+
+      if (!verification.verified) {
+        return res.status(400).json({
+          success: false,
+          message: verification.message || 'NIN could not be verified',
+        });
+      }
+
+      const photoResult = await db.query(
+        'SELECT passport_photo_url IS NOT NULL AS has_photo FROM users WHERE id = $1',
+        [req.user.id]
+      );
+      const autoVerified = photoResult.rows[0]?.has_photo === true;
+
+      await db.query(
+        `UPDATE users
+         SET nin = $1,
+             nin_hash = $2,
+             nin_verified = TRUE,
+             identity_document_type = 'nin',
+             date_of_birth = $3,
+             identity_verified = $4,
+             identity_verification_status = CASE WHEN $4 THEN 'verified' ELSE 'pending' END,
+             identity_verified_by = NULL,
+             identity_verified_at = CASE WHEN $4 THEN NOW() ELSE NULL END,
+             updated_at = NOW()
+         WHERE id = $5`,
+        [encrypted, ninHash, dateOfBirth, autoVerified, req.user.id]
+      );
+
+      res.json({
+        success: true,
+        message: 'NIN verified successfully',
+        nin_verified: true,
+        identity_verified: autoVerified,
+      });
+    } catch (error) {
+      req.logger.error('Add NIN error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to verify NIN',
+      });
+    }
+  }
+);
 
 // Create a one-time live-capture session for passport upload
 router.post('/verification/live-capture/session', authenticate, async (req, res) => {

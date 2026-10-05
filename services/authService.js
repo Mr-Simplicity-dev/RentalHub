@@ -107,6 +107,32 @@ const otpDelete = async (key) => {
   }
 };
 
+// Forward-only audit log for OTP / verification-code lifecycle. The raw code is
+// never stored — only status, timestamps and request metadata for evidence/support.
+const logOtpEvent = async ({ userId, contact, channel, purpose, status, expiresAt, req }) => {
+  try {
+    await db.query(
+      `INSERT INTO verification_otp_log
+       (user_id, contact, channel, purpose, status, expires_at, sent_at, verified_at, ip_address, device_info)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        userId || null,
+        String(contact || '').slice(0, 255) || null,
+        channel,
+        purpose,
+        status,
+        expiresAt ? new Date(expiresAt) : null,
+        status === 'sent' ? new Date() : null,
+        status === 'verified' ? new Date() : null,
+        String(req?.ip || req?.socket?.remoteAddress || '').slice(0, 64) || null,
+        String(req?.headers?.['user-agent'] || '').slice(0, 255) || null,
+      ]
+    );
+  } catch (error) {
+    console.error('OTP log write failed:', error.message);
+  }
+};
+
 // Lawyer OTP wrappers (same pattern, separate namespace)
 const lawyerOtpGet = async (phone) => {
   if (redis) {
@@ -4436,6 +4462,15 @@ exports.verifyEmail = async (req, res) => {
 
     const user = result.rows[0];
 
+    await logOtpEvent({
+      userId: user.id,
+      contact: user.email,
+      channel: 'email',
+      purpose: 'verify_email',
+      status: 'verified',
+      req,
+    });
+
     // 🔐 Auto-login token with current token_version
     const authToken = jwt.sign(
       {
@@ -4558,6 +4593,16 @@ exports.sendPhoneOTP = async (req, res) => {
       expiresAt: Date.now() + 10 * 60 * 1000
     });
 
+    await logOtpEvent({
+      userId,
+      contact: user.phone,
+      channel: 'sms',
+      purpose: 'verify_phone',
+      status: 'sent',
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      req,
+    });
+
     res.json({
       success: true,
       message: 'OTP sent to your phone'
@@ -4576,6 +4621,7 @@ exports.verifyPhone = async (req, res) => {
   try {
     const userId = req.user.id;
     const { otp } = req.body;
+    const phone = req.user.phone || (await db.query('SELECT phone FROM users WHERE id = $1', [userId])).rows[0]?.phone;
 
     // Get stored OTP
     const storedOTP = await otpGet(userId);
@@ -4590,6 +4636,10 @@ exports.verifyPhone = async (req, res) => {
     // Check expiry
     if (Date.now() > storedOTP.expiresAt) {
       await otpDelete(userId);
+      await logOtpEvent({
+        userId, contact: phone, channel: 'sms', purpose: 'verify_phone',
+        status: 'expired', expiresAt: storedOTP.expiresAt, req,
+      });
       return res.status(400).json({
         success: false,
         message: 'OTP expired. Please request a new one.'
@@ -4601,6 +4651,10 @@ exports.verifyPhone = async (req, res) => {
     const storedStr = String(storedOTP.code);
     if (otpStr.length !== storedStr.length ||
         !crypto.timingSafeEqual(Buffer.from(otpStr), Buffer.from(storedStr))) {
+      await logOtpEvent({
+        userId, contact: phone, channel: 'sms', purpose: 'verify_phone',
+        status: 'failed', expiresAt: storedOTP.expiresAt, req,
+      });
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP'
@@ -4615,6 +4669,11 @@ exports.verifyPhone = async (req, res) => {
 
     // Clear OTP
     await otpDelete(userId);
+
+    await logOtpEvent({
+      userId, contact: phone, channel: 'sms', purpose: 'verify_phone',
+      status: 'verified', expiresAt: storedOTP.expiresAt, req,
+    });
 
     res.json({
       success: true,

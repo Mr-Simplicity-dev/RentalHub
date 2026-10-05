@@ -169,7 +169,7 @@ router.post(
       const platform = req.body?.platform ? String(req.body.platform).toLowerCase() : undefined;
       const result = await sendPushToAll(
         {
-          title: req.body?.title || 'RentalHub update available',
+          title: req.body?.title || 'Update available',
           body: req.body?.body || 'A newer RentalHub app is ready. Open RentalHub to install the latest version.',
           channelId: 'general',
           data: {
