@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const { body } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 const paymentController = require('../controllers/paymentController');
@@ -464,50 +465,76 @@ router.get('/receipt-pdf/:paymentId',
       );
       doc.pipe(res);
 
-      doc.fontSize(20).text('RentalHub NG', { align: 'center' });
-      doc.moveDown(0.2);
-      doc.fontSize(11).fillColor('#64748b').text('Official Payment Receipt', { align: 'center' });
-      doc.fontSize(11).fillColor('#0f172a').text(receipt.receiptNumber, { align: 'center' });
-      doc.moveDown();
+      const logoPath = path.join(__dirname, '..', 'assets', 'rentalhub-mark.png');
+      const amanaFontPath = path.join(__dirname, '..', 'assets', 'AmanaScript.ttf');
+      try { doc.registerFont('AmanaScript', amanaFontPath); } catch (e) { /* fall back to Helvetica */ }
 
-      doc.fontSize(10).fillColor('#334155');
-      doc.text(`Payer: ${receipt.fullName || receipt.email}`);
-      doc.text(`Date: ${receipt.date}`);
-      doc.text(`Reference: ${receipt.reference}`);
-      doc.text(`Status: ${receipt.status}`);
-      doc.text(`Method: ${receipt.method}`);
-      doc.moveDown();
+      // Header: logo + Amana wordmark + company name + contact
+      try { doc.image(logoPath, 50, 46, { width: 56, height: 56 }); } catch (e) {}
+      doc.font('AmanaScript').fontSize(21).fillColor('#6e1b2b').text('Amana', 122, 50, { width: 200 });
+      doc.font('Helvetica-Bold').fontSize(19).fillColor('#0f172a').text('RentalHub NG', 122, 74, { width: 230 });
+      doc.font('Helvetica').fontSize(8).fillColor('#64748b').text('rentalhub.com.ng   •   support@rentalhub.com.ng', 122, 98, { width: 260 });
+
+      doc.moveTo(50, 126).lineTo(545, 126).strokeColor('#e2e8f0').lineWidth(1).stroke();
+
+      // Title + receipt number
+      doc.moveDown(1.1);
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('#0f172a').text('OFFICIAL PAYMENT RECEIPT', { align: 'center' });
+      doc.moveDown(0.25);
+      doc.font('Helvetica').fontSize(10).fillColor('#0284c7').text(receipt.receiptNumber, { align: 'center' });
+      doc.moveDown(1.4);
+
+      // Details
+      const method = receipt.channel ? `${receipt.method} — ${receipt.channel}` : receipt.method;
+      const detailRows = [
+        ['Paid by', receipt.fullName || receipt.email],
+        ['Email', receipt.email || '—'],
+        ['Date', receipt.date],
+        ['Reference', receipt.reference || '—'],
+        ['Status', receipt.status],
+        ['Payment method', method],
+      ];
+      detailRows.forEach(([label, value]) => {
+        doc.font('Helvetica').fontSize(8).fillColor('#94a3b8').text(label.toUpperCase(), 50, doc.y, { width: 120 });
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text(value || '—', 180, doc.y - 12, { width: 365 });
+        doc.moveDown(0.35);
+      });
 
       if (Number(receipt.quoteUsd) > 0) {
-        doc.fontSize(10).fillColor('#166534');
+        doc.moveDown(0.5);
+        doc.font('Helvetica').fontSize(9).fillColor('#166534');
         doc.text(`Diaspora registration quote: $${Number(receipt.quoteUsd).toFixed(2)} USD${receipt.quoteCurrency ? ` (${receipt.quoteCurrency})` : ''}`);
         if (receipt.fxRate) doc.text(`FX rate applied: ₦${Number(receipt.fxRate).toLocaleString()} / USD`);
         if (receipt.fxMarkupPct) doc.text(`FX markup: ${Number(receipt.fxMarkupPct).toFixed(2)}%`);
         doc.text(`Amount charged: ${receipt.total} NGN`);
-        doc.moveDown();
       }
+      doc.moveDown(1);
 
+      // Items table
       const tableTop = doc.y;
-      doc.font('Helvetica-Bold');
-      doc.text('Item', 50, tableTop);
-      doc.text('Amount', 400, tableTop, { width: 150, align: 'right' });
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a');
+      doc.text('DESCRIPTION', 50, tableTop);
+      doc.text('AMOUNT', 400, tableTop, { width: 145, align: 'right' });
       doc.moveTo(50, tableTop + 16).lineTo(545, tableTop + 16).strokeColor('#e2e8f0').stroke();
 
-      let y = tableTop + 26;
-      doc.font('Helvetica');
+      let y = tableTop + 24;
+      doc.font('Helvetica').fontSize(10).fillColor('#334155');
       receipt.items.forEach((item) => {
-        doc.fillColor('#334155').text(item.label, 50, y, { width: 330 });
-        doc.text(item.amount, 400, y, { width: 150, align: 'right' });
+        doc.text(item.label, 50, y, { width: 330 });
+        doc.text(item.amount, 400, y, { width: 145, align: 'right' });
         y += 22;
       });
 
-      doc.moveTo(50, y).lineTo(545, y).strokeColor('#e2e8f0').stroke();
-      doc.moveDown();
-      doc.font('Helvetica-Bold');
-      doc.fillColor('#0f172a').text('Total Paid', 50, doc.y);
-      doc.text(receipt.total, 400, doc.y - 14, { width: 150, align: 'right' });
-      doc.moveDown(2);
-      doc.fontSize(9).fillColor('#94a3b8').text('Thank you for using RentalHub NG.', { align: 'center' });
+      doc.moveTo(50, y + 4).lineTo(545, y + 4).strokeColor('#e2e8f0').stroke();
+      doc.moveDown(1.2);
+      doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a').text('TOTAL PAID', 50, doc.y);
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('#0284c7').text(receipt.total, 400, doc.y - 16, { width: 145, align: 'right' });
+
+      // Footer
+      doc.moveDown(3);
+      doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text('Thank you for using Amana RentalHub NG.', { align: 'center' });
+      doc.moveDown(0.2);
+      doc.fontSize(8).fillColor('#cbd5e1').text('This is a computer-generated receipt and does not require a signature.', { align: 'center' });
 
       doc.end();
     } catch (error) {

@@ -1407,9 +1407,10 @@ exports.verifySubscription = async (req, res) => {
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = CURRENT_TIMESTAMP,
-           gateway_response = $1
+           gateway_response = $1,
+           payment_channel = $3
        WHERE id = $2 AND payment_status = 'pending'`,
-      [JSON.stringify(transaction), payment.id]
+      [JSON.stringify(transaction), payment.id, transaction.channel]
     );
 
     // Update user subscription
@@ -1711,9 +1712,10 @@ exports.verifyPropertyUnlock = async (req, res) => {
         `UPDATE payments
          SET payment_status = 'completed',
              completed_at = CURRENT_TIMESTAMP,
-             gateway_response = $1
+             gateway_response = $1,
+           payment_channel = $3
          WHERE id = $2`,
-        [JSON.stringify(transaction), payment.id]
+        [JSON.stringify(transaction), payment.id, transaction.channel]
       );
     }
 
@@ -2103,9 +2105,10 @@ exports.verifyPropertyInspectionPayment = async (req, res) => {
         `UPDATE payments
          SET payment_status = 'completed',
              completed_at = CURRENT_TIMESTAMP,
-             gateway_response = $1
+             gateway_response = $1,
+           payment_channel = $3
          WHERE id = $2`,
-        [JSON.stringify(transaction), payment.id]
+        [JSON.stringify(transaction), payment.id, transaction.channel]
       );
     }
 
@@ -2392,9 +2395,10 @@ exports.verifyTenantLocationAccess = async (req, res) => {
         `UPDATE payments
          SET payment_status = 'completed',
              completed_at = CURRENT_TIMESTAMP,
-             gateway_response = $1
+             gateway_response = $1,
+           payment_channel = $3
          WHERE id = $2`,
-        [JSON.stringify(transaction), accessPayment.payment_id]
+        [JSON.stringify(transaction), accessPayment.payment_id, transaction.channel]
       );
     }
 
@@ -2633,9 +2637,10 @@ exports.verifyLawyerDirectoryUnlock = async (req, res) => {
         `UPDATE payments
          SET payment_status = 'completed',
              completed_at = CURRENT_TIMESTAMP,
-             gateway_response = $1
+             gateway_response = $1,
+           payment_channel = $3
          WHERE id = $2`,
-        [JSON.stringify(transaction), payment.id]
+        [JSON.stringify(transaction), payment.id, transaction.channel]
       );
     }
 
@@ -2882,9 +2887,10 @@ exports.verifyListingPayment = async (req, res) => {
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = CURRENT_TIMESTAMP,
-           gateway_response = $1
+           gateway_response = $1,
+           payment_channel = $3
        WHERE id = $2 AND payment_status = 'pending'`,
-      [JSON.stringify(transaction), payment.id]
+      [JSON.stringify(transaction), payment.id, transaction.channel]
     );
 
     // Update property if needed
@@ -3676,9 +3682,10 @@ exports.verifyRentPayment = async (req, res) => {
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
-           gateway_response = $1
+           gateway_response = $1,
+           payment_channel = $3
        WHERE id = $2 AND payment_status = 'pending'`,
-      [JSON.stringify(transaction), payment.id]
+      [JSON.stringify(transaction), payment.id, transaction.channel]
     );
 
     if (!wasAlreadyCompleted) {
@@ -3883,9 +3890,10 @@ exports.verifyWalletFunding = async (req, res) => {
       `UPDATE payments
        SET payment_status = 'completed',
            completed_at   = COALESCE(completed_at, CURRENT_TIMESTAMP),
-           gateway_response = $1
+           gateway_response = $1,
+           payment_channel = $3
        WHERE id = $2`,
-      [JSON.stringify(transaction), payment.id]
+      [JSON.stringify(transaction), payment.id, transaction.channel]
     );
 
     // Credit the wallet
@@ -4313,10 +4321,11 @@ async function handleSuccessfulPayment(data, webhookLogger) {
       `UPDATE payments 
        SET payment_status = 'completed',
            completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
-           gateway_response = $1
+           gateway_response = $1,
+           payment_channel = $3
        WHERE id = $2
        RETURNING id, payment_type, user_id, amount`,
-      [JSON.stringify(data), storedPayment.id]
+      [JSON.stringify(data), storedPayment.id, data.channel]
     );
 
     const completedPayment = updateResult.rows[0] || null;
@@ -4681,7 +4690,7 @@ async function handleRefundPayment(data, webhookLogger) {
     const paymentResult = await db.query(
       `UPDATE payments
        SET payment_status = 'refunded',
-           gateway_response = $1
+           gateway_response = gateway_response = $1,
        WHERE transaction_reference = $2
        RETURNING id`,
       [JSON.stringify(data), reference]
@@ -4707,7 +4716,7 @@ async function handleFailedPayment(data, webhookLogger) {
     const paymentResult = await db.query(
       `UPDATE payments 
        SET payment_status = 'failed',
-           gateway_response = $1
+           gateway_response = gateway_response = $1,
        WHERE transaction_reference = $2
        RETURNING id, user_id, amount, payment_type`,
       [JSON.stringify(data), reference]
@@ -4751,7 +4760,7 @@ async function handleFailedPayment(data, webhookLogger) {
       const regResult = await db.query(
         `UPDATE tenant_registration_payments
          SET payment_status = 'failed',
-             gateway_response = $1
+             gateway_response = gateway_response = $1,
          WHERE transaction_reference = $2
            AND payment_status = 'pending'
          RETURNING id, email, full_name`,

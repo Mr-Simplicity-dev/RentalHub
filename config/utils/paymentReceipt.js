@@ -34,6 +34,27 @@ const humanizePaymentType = (type) =>
     .join(' ') ||
   'Payment';
 
+const CHANNEL_LABELS = {
+  card: 'Card',
+  bank_transfer: 'Bank Transfer',
+  bank: 'Bank',
+  ussd: 'USSD',
+  qr: 'QR Code',
+  mobile_money: 'Mobile Money',
+  pos: 'POS',
+  transfer: 'Transfer',
+  apple_pay: 'Apple Pay',
+  google_pay: 'Google Pay',
+};
+
+const humanizePaymentChannel = (channel) =>
+  CHANNEL_LABELS[channel] ||
+  String(channel || '')
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ') ||
+  '';
+
 const formatNgn = (amount) => `₦${Number(amount || 0).toLocaleString()}`;
 
 const baseReference = (reference) =>
@@ -81,6 +102,7 @@ const buildReceiptData = ({ payment, group, user, ref, diasporaQuote }) => {
     total: formatNgn(group.reduce((sum, p) => sum + Number(p.amount || 0), 0)),
     status: payment.payment_status,
     method: payment.payment_method || 'Paystack',
+    channel: humanizePaymentChannel(payment.payment_channel),
     // Diaspora registration quotes (USD + FX) surfaced on the receipt.
     quoteUsd: diasporaQuote?.quote_amount_usd ?? null,
     fxRate: diasporaQuote?.fx_rate ?? null,
@@ -342,6 +364,7 @@ module.exports = {
   formatNgn,
   getPaymentGroup,
   humanizePaymentType,
+  humanizePaymentChannel,
   loadReceiptContext,
   sendAdminPayoutReceipt,
   sendAgentPayoutReceipt,

@@ -26,6 +26,23 @@ const PAYMENT_STATUS_STYLES = {
   failed: 'bg-red-100 text-red-700',
 };
 
+const CHANNEL_LABELS = {
+  card: 'Card',
+  bank_transfer: 'Bank Transfer',
+  bank: 'Bank',
+  ussd: 'USSD',
+  qr: 'QR Code',
+  mobile_money: 'Mobile Money',
+  pos: 'POS',
+  transfer: 'Transfer',
+  apple_pay: 'Apple Pay',
+  google_pay: 'Google Pay',
+};
+const humanizeChannel = (channel) =>
+  CHANNEL_LABELS[channel] ||
+  String(channel || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) ||
+  '';
+
 const PAYMENT_TYPES_WITH_RETRY = ['rent_payment', 'tenant_subscription', 'property_unlock', 'wallet_funding'];
 
 const formatAmount = (amount, currency = 'NGN') => {
@@ -342,10 +359,11 @@ const PaymentHistory = () => {
               <div className="border-b border-gray-200 pb-4 text-center">
                 <img
                   src="/rentalhub-mark.svg"
-                  alt="RentalHub NG"
+                  alt="Amana RentalHub NG"
                   className="mx-auto h-10 w-10 rounded-xl object-contain"
                 />
-                <h2 className="mt-2 text-lg font-bold text-gray-900">RentalHub NG</h2>
+                <div className="amana-mark mt-1 text-lg">Amana</div>
+                <h2 className="text-lg font-bold text-gray-900">RentalHub NG</h2>
                 <p className="text-xs text-gray-500">{t('wallet.receipt')}</p>
                 <p className="mt-1 text-xs font-semibold text-gray-700">
                   {formatReceiptNumber(selectedReceipt)}
@@ -427,7 +445,9 @@ const PaymentHistory = () => {
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">{t('payment_history.method')}</span>
                   <span className="text-right font-medium text-gray-900">
-                    {selectedReceipt.payment_method || 'Paystack'}
+                    {selectedReceipt.payment_channel
+                      ? `${selectedReceipt.payment_method || 'Paystack'} — ${humanizeChannel(selectedReceipt.payment_channel)}`
+                      : selectedReceipt.payment_method || 'Paystack'}
                   </span>
                 </div>
                 {receiptDeductions.length > 0 && (
