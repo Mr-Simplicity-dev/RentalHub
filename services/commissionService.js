@@ -999,10 +999,15 @@ exports.processAutoPayouts = async () => {
          WHERE admin_id = $1 AND status = 'pending' AND created_at >= CURRENT_DATE - INTERVAL '7 days'`,
         [admin.id]
       );
-      await db.query(
-        `UPDATE users SET admin_wallet_balance = admin_wallet_balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-        [total, admin.id]
+      const deductResult = await db.query(
+        `UPDATE users SET admin_wallet_balance = admin_wallet_balance - $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 AND admin_wallet_balance >= $1`,
+        [amount, adminId]
       );
+
+      if (deductResult.rowCount === 0) {
+        throw new Error('Insufficient wallet balance');
+      }
       await db.query(
         `INSERT INTO transaction_audits (admin_id, action_type, amount, description)
          VALUES ($1, 'auto_payout', $2, $3)`,

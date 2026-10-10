@@ -2145,19 +2145,26 @@ exports.approveWalletWithdrawal = async (req, res) => {
 
     const { withdrawalId } = req.params;
 
-    const requestResult = await db.query(
-      `SELECT * FROM withdrawal_requests WHERE id = $1 LIMIT 1`,
+    const claimResult = await db.query(
+      `UPDATE withdrawal_requests
+       SET status = 'processing', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status = 'pending'
+       RETURNING *`,
       [withdrawalId]
     );
 
-    if (!requestResult.rows.length) {
-      return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
+    if (!claimResult.rows.length) {
+      const existing = await db.query(
+        `SELECT id, status FROM withdrawal_requests WHERE id = $1`,
+        [withdrawalId]
+      );
+      if (!existing.rows.length) {
+        return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
+      }
+      return res.status(400).json({ success: false, message: `Withdrawal is already ${existing.rows[0].status}` });
     }
 
-    const withdrawal = requestResult.rows[0];
-    if (withdrawal.status !== 'pending') {
-      return res.status(400).json({ success: false, message: `Withdrawal is already ${withdrawal.status}` });
-    }
+    const withdrawal = claimResult.rows[0];
 
     const bankCode = withdrawal.bank_code || await resolveBankCodeFromName(withdrawal.bank_name);
 

@@ -3,14 +3,20 @@ const bcrypt = require('bcryptjs');
 const db = require('./config/middleware/database');
 
 async function createAdmin() {
-  const email = process.env.ADMIN_EMAIL || 'admin@yourapp.com';
-  const phone = process.env.ADMIN_PHONE || '08000000000';
-  const fullName = process.env.ADMIN_NAME || 'System Administrator';
-  const nin = process.env.ADMIN_NIN || '00000000000';
+  const email = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+  const phone = String(process.env.ADMIN_PHONE || '').trim();
+  const fullName = String(process.env.ADMIN_NAME || 'System Administrator').trim();
+  const nin = String(process.env.ADMIN_NIN || '').trim();
   const password = process.env.ADMIN_PASSWORD;
+  const bootstrapSecret = String(process.env.ADMIN_BOOTSTRAP_SECRET || '');
 
-  if (!password || password.length < 8) {
-    console.error('FATAL: Set ADMIN_PASSWORD env var (min 8 chars)');
+  if (!email || !phone || !password || password.length < 14) {
+    console.error('FATAL: Set ADMIN_EMAIL, ADMIN_PHONE and ADMIN_PASSWORD env vars (password min 14 chars)');
+    process.exit(1);
+  }
+
+  if (!bootstrapSecret || bootstrapSecret.length < 16) {
+    console.error('FATAL: ADMIN_BOOTSTRAP_SECRET (min 16 chars) is required to create an admin');
     process.exit(1);
   }
 

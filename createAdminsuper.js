@@ -3,9 +3,6 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const db = require('./config/middleware/database');
 
-const DEFAULT_EMAIL = 'admin@usayddomain.com';
-const DEFAULT_PHONE = '07067012884';
-
 const ensureSuperAdminColumns = async () => {
   await db.query(`
     ALTER TABLE users
@@ -29,14 +26,19 @@ const ensureSuperAdminColumns = async () => {
 };
 
 async function createOrRepairSuperAdmin() {
-  const email = String(process.env.SUPER_ADMIN_EMAIL || DEFAULT_EMAIL).trim().toLowerCase();
-  const phone = String(process.env.SUPER_ADMIN_PHONE || DEFAULT_PHONE).trim();
+  const email = String(process.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
+  const phone = String(process.env.SUPER_ADMIN_PHONE || '').trim();
   const fullName = String(process.env.SUPER_ADMIN_NAME || 'Super Admin').trim();
-  const nin = String(process.env.SUPER_ADMIN_NIN || '00000000000').trim();
+  const nin = String(process.env.SUPER_ADMIN_NIN || '').trim();
   const password = String(process.env.SUPER_ADMIN_PASSWORD || '');
+  const bootstrapSecret = String(process.env.SUPER_ADMIN_BOOTSTRAP_SECRET || '');
 
-  if (!email || !phone || !password || password.length < 8) {
-    throw new Error('SUPER_ADMIN_EMAIL, SUPER_ADMIN_PHONE, and SUPER_ADMIN_PASSWORD (min 8 chars) are required');
+  if (!email || !phone || !password || password.length < 14) {
+    throw new Error('SUPER_ADMIN_EMAIL, SUPER_ADMIN_PHONE, and SUPER_ADMIN_PASSWORD (min 14 chars) are required');
+  }
+
+  if (!bootstrapSecret || bootstrapSecret.length < 16) {
+    throw new Error('SUPER_ADMIN_BOOTSTRAP_SECRET (min 16 chars) is required to create or repair a super admin');
   }
 
   await ensureSuperAdminColumns();

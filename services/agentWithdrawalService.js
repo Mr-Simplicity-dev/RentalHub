@@ -155,10 +155,14 @@ class AgentWithdrawalService {
       const result = await db.query(
         `UPDATE agent_withdrawal_requests
          SET status = 'approved', approved_by_user_id = $1, approved_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2
+         WHERE id = $2 AND status = 'pending'
          RETURNING *`,
         [approvedByUserId, withdrawalId]
       );
+
+      if (result.rows.length === 0) {
+        throw new Error('Withdrawal is no longer pending — it may already be processed');
+      }
 
       if (result.rows.length > 0) {
         const withdrawal = result.rows[0];
