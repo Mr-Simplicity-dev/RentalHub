@@ -56,13 +56,13 @@ $ads = @{
     'Rentalhub dot com slash download.'
   )
   text1 = @(
-    'Stop.',
-    'Stop paying agents.',
-    'For houses that do not exist.',
-    'You work too hard for this.',
-    'RentalHub verifies every listing.',
-    'Never lose your money again.',
-    'Rentalhub dot com slash download.'
+    'Twenty thousand naira gone.',
+    'You paid an agent for a house that is not there.',
+    'Fake listings. Fake agents. Real money lost.',
+    'Sound familiar?',
+    'RentalHub checks every listing before it goes live.',
+    'No agent fees. You talk to the landlord directly.',
+    'Download RentalHub. Rentalhub dot com slash download.'
   )
   text2 = @(
     'Finding a home in three steps.',

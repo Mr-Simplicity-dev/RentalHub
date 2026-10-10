@@ -20,13 +20,13 @@ const GREEN = '#166534';
 export const sellText1: VoiceAdConfig = {
   grade: 'rgba(220,38,38,0.08)',
   lines: [
-    { file: 'vo/text1-vo-1.wav', frames: 52, kicker: 'RentalHub', headline: 'STOP.', accentWords: ['STOP'], from: RED_DARK, to: RED, accent: GOLD, image: 'images/text1/1.jpg', beat: 'open', fontSize: 96 },
-    { file: 'vo/text1-vo-2.wav', frames: 80, headline: 'Paying agents for houses that do not exist.', from: RED_DARK, to: RED, accent: GOLD, image: 'images/text1/2.jpg', beat: 'build', fontSize: 50 },
-    { file: 'vo/text1-vo-3.wav', frames: 99, headline: 'Fake listings. Empty promises.', from: RED_DARK, to: RED, accent: GOLD, image: 'images/text1/3.jpg', beat: 'build', fontSize: 52 },
-    { file: 'vo/text1-vo-4.wav', frames: 86, headline: 'You work too hard for this.', from: NAVY, to: SLATE, accent: GOLD, image: 'images/text1/4.jpg', beat: 'hold', fontSize: 56 },
-    { file: 'vo/text1-vo-5.wav', frames: 104, kicker: 'Verified', headline: 'RentalHub verifies every listing.', from: SKY, to: BLUE, accent: GOLD, image: 'images/text1/5.jpg', beat: 'build', fontSize: 52 },
-    { file: 'vo/text1-vo-6.wav', frames: 86, headline: 'Never lose your money again.', accentWords: ['Never'], from: NAVY, to: SLATE, accent: GOLD, image: 'images/text1/6.jpg', beat: 'hold', fontSize: 58 },
-    { file: 'vo/text1-vo-7.wav', frames: 273, headline: 'rentalhub.com.ng/download', from: NAVY, to: BLUE, accent: GOLD, image: 'images/text1/7.jpg', beat: 'brand', fontSize: 46, fontWeight: 700 },
+    { file: 'vo/text1-vo-1.wav', frames: 93, kicker: 'Warning', headline: '₦20,000 gone.', accentWords: ['₦20,000'], from: RED_DARK, to: RED, accent: GOLD, image: 'images/flyer/photo-1704457031803-2c39a23e9faa.avif', beat: 'open', fontSize: 96 },
+    { file: 'vo/text1-vo-2.wav', frames: 117, headline: 'You paid for a house that is not there.', from: RED_DARK, to: RED, accent: GOLD, image: 'images/flyer/photo-1622015663084-307d19eabbbf.avif', beat: 'build', fontSize: 48 },
+    { file: 'vo/text1-vo-3.wav', frames: 200, headline: 'Fake listings. Real money lost.', from: RED_DARK, to: RED, accent: GOLD, image: 'images/flyer/photo-1707043697463-e0d8f81d06f3.avif', beat: 'build', fontSize: 52 },
+    { file: 'vo/text1-vo-4.wav', frames: 68, headline: 'Sound familiar?', from: NAVY, to: SLATE, accent: GOLD, image: 'images/flyer/photo-1719887805632-de5be825f72b.avif', beat: 'hold', fontSize: 56 },
+    { file: 'vo/text1-vo-5.wav', frames: 132, kicker: 'RentalHub', headline: 'Checked before it goes live.', from: SKY, to: BLUE, accent: GOLD, image: 'images/flyer/photo-1746458258536-b9ee5db20a73.avif', beat: 'build', fontSize: 52 },
+    { file: 'vo/text1-vo-6.wav', frames: 168, headline: 'No agent fees. Talk to the landlord.', accentWords: ['landlord'], from: NAVY, to: SLATE, accent: GOLD, image: 'images/flyer/photo-1761347604157-3d667ff62778.avif', beat: 'hold', fontSize: 54 },
+    { file: 'vo/text1-vo-7.wav', frames: 184, headline: 'rentalhub.com.ng/download', from: NAVY, to: BLUE, accent: GOLD, image: 'images/flyer/photo-1782392230060-be8a3984a58c.avif', beat: 'brand', fontSize: 46, fontWeight: 700 },
   ],
 };
 

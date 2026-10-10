@@ -35,6 +35,9 @@ const ScaledAspirationAd1: React.FC = () => (
 const ScaledAspirationAd1F: React.FC = () => (
   <ScaledAd><AspirationAd1F /></ScaledAd>
 );
+const ScaledSellTextAd1: React.FC = () => (
+  <ScaledAd><SellTextAd1 /></ScaledAd>
+);
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -183,7 +186,9 @@ export const RemotionRoot: React.FC = () => {
         width={1920}
         height={1080}
       />
-      <Composition id="SellTextAd1" component={SellTextAd1} durationInFrames={26 * 30} fps={30} width={1080} height={1920} />
+      <Composition id="SellTextAd1" component={SellTextAd1} durationInFrames={31 * 30} fps={30} width={1080} height={1920} />
+      <Composition id="SellTextAd1Square" component={ScaledSellTextAd1} durationInFrames={31 * 30} fps={30} width={1080} height={1080} />
+      <Composition id="SellTextAd1Landscape" component={ScaledSellTextAd1} durationInFrames={31 * 30} fps={30} width={1920} height={1080} />
       <Composition id="SellTextAd2" component={SellTextAd2} durationInFrames={26 * 30} fps={30} width={1080} height={1920} />
       <Composition id="SellTextAd3" component={SellTextAd3} durationInFrames={26 * 30} fps={30} width={1080} height={1920} />
       <Composition id="SellTextAd4" component={SellTextAd4} durationInFrames={30 * 30} fps={30} width={1080} height={1920} />

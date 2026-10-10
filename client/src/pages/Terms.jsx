@@ -29,7 +29,7 @@ const Terms = () => {
       icon: FaFileContract,
       title: t('terms.acceptance.title', 'Acceptance and scope'),
       body: [
-        t('terms.acceptance.1', 'These Terms of Service (the “Terms”) form a binding agreement between you and RentalHub NG (“RentalHub”, “we”, “us” or “our”) when you access rentalhub.com.ng, install or use a RentalHub mobile application, create an account, submit information, make a payment, or use a service that links to these Terms.'),
+        t('terms.acceptance.1', 'These Terms of Service (the “Terms”) form a binding agreement between you and RentalHub NG (“RentalHub”, “we”, “us” or “our”) when you access rentalhub.com.ng, install or use a Mobile Application, create an account, submit information, make a payment, or use a service that links to these Terms.'),
         t('terms.acceptance.2', 'If you do not agree, do not create an account or continue using the service. Additional terms shown before a particular payment, booking, subscription, recruitment application, professional service or promotion form part of these Terms for that transaction. If they conflict, the more specific terms apply to that transaction.'),
       ],
     },
