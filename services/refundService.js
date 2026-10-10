@@ -1985,6 +1985,29 @@ exports.requestWithdrawal = async (req, res) => {
       }
     }
 
+    // Duplicate bank-account detection: the same beneficiary account must not be
+    // used by another user's active withdrawal (account-sharing fraud signal).
+    const duplicateBank = await db.query(
+      `SELECT user_id FROM withdrawal_requests
+       WHERE account_number = $1
+         AND user_id <> $2
+         AND status IN ('pending', 'processing', 'approved')
+       LIMIT 1`,
+      [account_number, userId]
+    );
+    if (duplicateBank.rows.length) {
+      req.logger.warn('Duplicate bank account detected on withdrawal', {
+        userId,
+        account_number,
+        otherUserId: duplicateBank.rows[0].user_id,
+      });
+      return res.status(403).json({
+        success: false,
+        code: 'DUPLICATE_BANK_ACCOUNT',
+        message: 'This bank account is already linked to another account. Please use a different account.',
+      });
+    }
+
     const userResult = await db.query(`SELECT user_type FROM users WHERE id = $1`, [userId]);
     const userType = userResult.rows[0]?.user_type;
 

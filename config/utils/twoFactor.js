@@ -424,12 +424,30 @@ const PRIVILEGED_ROLES = new Set([
 exports.isPrivilegedRole = (role) => PRIVILEGED_ROLES.has(role);
 
 // Middleware: privileged roles must have TOTP enrolled before they can proceed.
+// A grace period (default 7 days) lets existing admins enroll before lockout.
 exports.requirePrivilegedMfa = async (req, res, next) => {
   if (!PRIVILEGED_ROLES.has(req.user?.user_type)) return next();
 
   try {
     const status = await exports.getTotpStatus(req.user.id);
     if (status.totp_enabled) return next();
+
+    const graceDays = Math.max(1, Number(process.env.MFA_GRACE_DAYS) || 7);
+    const now = new Date();
+    const graceResult = await db.query(
+      `UPDATE users
+       SET mfa_grace_until = COALESCE(mfa_grace_until, NOW() + ($2::int * INTERVAL '1 day')),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING mfa_grace_until`,
+      [req.user.id, String(graceDays)]
+    );
+
+    const graceUntil = graceResult.rows[0]?.mfa_grace_until;
+    if (graceUntil && now < new Date(graceUntil)) {
+      // Within the grace window — allow access so the admin can enroll TOTP.
+      return next();
+    }
   } catch (error) {
     console.error('Privileged MFA check failed:', error.message);
   }
