@@ -4,6 +4,7 @@ const db = require('./database');
 const { getAuthTokenFromRequest } = require('../utils/authCookies');
 const { getSessionTokenIdentity } = require('../utils/sessionToken');
 const { GENERAL_ADMIN_ROLES, normalizeRole } = require('../utils/roleHierarchy');
+const { requirePrivilegedMfa } = require('../utils/twoFactor');
 
 let userSuspensionSchemaReady = false;
 
@@ -178,15 +179,15 @@ const hasActiveSubscription = (req, res, next) => {
 };
 
 // Check for super admin
-const requireSuperAdmin = (req, res, next) => {
+const requireSuperAdmin = async (req, res, next) => {
   if (!req.user || req.user.user_type !== 'super_admin') {
     return res.status(403).json({ message: 'Super admin access only' });
   }
-  next();
+  await requirePrivilegedMfa(req, res, next);
 };
 
 // Check if user is admin OR super admin
-const requireAdminOrSuperAdmin = (req, res, next) => {
+const requireAdminOrSuperAdmin = async (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
@@ -205,7 +206,7 @@ const requireAdminOrSuperAdmin = (req, res, next) => {
     });
   }
 
-  next();
+  await requirePrivilegedMfa(req, res, next);
 };
 
 const isLandlordOrAgent = (req, res, next) => {
@@ -213,6 +214,17 @@ const isLandlordOrAgent = (req, res, next) => {
     return res.status(403).json({
       success: false,
       message: 'Access denied. Landlords or assigned agents only.',
+    });
+  }
+  next();
+};
+
+// Block sensitive, account-level actions while impersonating another account.
+const requireNotImpersonating = (req, res, next) => {
+  if (req.auth?.impersonation) {
+    return res.status(403).json({
+      success: false,
+      message: 'This action is not allowed while impersonating another account.',
     });
   }
   next();
@@ -228,4 +240,5 @@ module.exports = {
   hasActiveSubscription,
   requireSuperAdmin,
   requireAdminOrSuperAdmin,
+  requireNotImpersonating,
 };

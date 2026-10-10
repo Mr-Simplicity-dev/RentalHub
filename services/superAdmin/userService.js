@@ -267,7 +267,7 @@ const impersonateAdmin = async (req, res) => {
 
       process.env.JWT_SECRET,
 
-      { expiresIn: '2h' }
+      { expiresIn: '15m' }
 
     );
 
@@ -279,7 +279,7 @@ const impersonateAdmin = async (req, res) => {
 
     const csrfToken = setAuthCookies(res, impersonationToken, {
 
-      maxAge: 2 * 60 * 60 * 1000,
+      maxAge: 15 * 60 * 1000,
 
     });
 

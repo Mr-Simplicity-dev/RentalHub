@@ -12,6 +12,7 @@
 
 const db = require('../config/middleware/database');
 const axios = require('axios');
+const crypto = require('crypto');
 const logger = require('../config/utils/logger');
 const {
   createTransferRecipient,
@@ -1951,6 +1952,39 @@ exports.requestWithdrawal = async (req, res) => {
       });
     }
 
+    // Bank-account change cooling period: a newly changed beneficiary account
+    // is paused for a window before withdrawals to it are allowed.
+    const bankHash = crypto.createHash('sha256').update(`${account_number}:${bank_code || bank_name}`).digest('hex');
+    const bankState = await db.query(
+      `SELECT last_bank_account_hash, bank_account_changed_at FROM users WHERE id = $1`,
+      [userId]
+    );
+    const prevBank = bankState.rows[0] || {};
+    const BANK_COOLING_MS = Number(process.env.BANK_ACCOUNT_COOLING_MS) || 24 * 60 * 60 * 1000;
+
+    if (prevBank.last_bank_account_hash && prevBank.last_bank_account_hash !== bankHash) {
+      const changedAt = prevBank.bank_account_changed_at
+        ? new Date(prevBank.bank_account_changed_at).getTime()
+        : Date.now();
+      const elapsed = Date.now() - changedAt;
+      if (elapsed < BANK_COOLING_MS) {
+        await db.query(
+          `UPDATE users
+           SET bank_account_changed_at = COALESCE(bank_account_changed_at, NOW()),
+               last_bank_account_hash = $2,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [userId, bankHash]
+        );
+        const hoursLeft = Math.max(1, Math.ceil((BANK_COOLING_MS - elapsed) / (60 * 60 * 1000)));
+        return res.status(403).json({
+          success: false,
+          code: 'BANK_ACCOUNT_COOLING',
+          message: `Your bank account changed recently. Withdrawals to the new account are paused for about ${hoursLeft} hour(s).`,
+        });
+      }
+    }
+
     const userResult = await db.query(`SELECT user_type FROM users WHERE id = $1`, [userId]);
     const userType = userResult.rows[0]?.user_type;
 
@@ -2043,6 +2077,12 @@ exports.requestWithdrawal = async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
         [userId, withdrawAmount, bank_name, bank_code || null, account_number, account_name]
+      );
+
+      // Record the beneficiary account and clear any cooling marker on success.
+      await txn.query(
+        `UPDATE users SET last_bank_account_hash = $2, bank_account_changed_at = NULL, updated_at = NOW() WHERE id = $1`,
+        [userId, bankHash]
       );
 
       // Record the withdrawal in the wallet ledger so the transaction

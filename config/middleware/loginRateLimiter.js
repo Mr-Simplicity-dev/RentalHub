@@ -1,58 +1,89 @@
-// Per-account login rate limiter — prevents credential stuffing even from
-// distributed IPs by tracking failed attempts per email address.
+// Per-account login rate limiter — Redis-backed (shared across PM2 instances)
+// with an in-memory fallback when Redis is unavailable. Uses a hashed key so the
+// raw email never lands in Redis.
+const crypto = require('crypto');
+const redis = require('../utils/redis');
+
 const ATTEMPT_WINDOW_MS = Number(process.env.LOGIN_ATTEMPT_WINDOW_MS) || 15 * 60 * 1000;
 const MAX_ATTEMPTS = Number(process.env.LOGIN_MAX_ATTEMPTS) || 10;
+const WINDOW_SECONDS = Math.max(1, Math.ceil(ATTEMPT_WINDOW_MS / 1000));
 
-const attempts = new Map();
+const keyFor = (email) =>
+  `login:${crypto.createHash('sha256').update(String(email).trim().toLowerCase()).digest('hex')}`;
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of attempts) {
-    if (now - entry.start > ATTEMPT_WINDOW_MS * 2) attempts.delete(key);
+const fallback = new Map();
+
+const getLoginAttempts = async (email) => {
+  const key = keyFor(email);
+
+  if (redis) {
+    try {
+      const raw = await redis.get(key);
+      const count = Number(raw || 0);
+      return { key, count, blocked: count >= MAX_ATTEMPTS };
+    } catch (error) {
+      // fall through to memory
+    }
   }
-}, 60_000);
 
-const getLoginAttempts = (email) => {
-  const key = String(email).trim().toLowerCase();
-  const now = Date.now();
-  const entry = attempts.get(key);
-
-  if (!entry || now - entry.start > ATTEMPT_WINDOW_MS) {
+  const entry = fallback.get(key);
+  if (!entry || Date.now() - entry.start > ATTEMPT_WINDOW_MS) {
     return { key, count: 0, blocked: false };
   }
-
   return { key, count: entry.count, blocked: entry.count >= MAX_ATTEMPTS };
 };
 
-const recordFailedLogin = (email) => {
-  const key = String(email).trim().toLowerCase();
-  const now = Date.now();
-  const entry = attempts.get(key);
+const recordFailedLogin = async (email) => {
+  const key = keyFor(email);
 
-  if (!entry || now - entry.start > ATTEMPT_WINDOW_MS) {
-    attempts.set(key, { start: now, count: 1 });
+  if (redis) {
+    try {
+      const count = await redis.incr(key);
+      if (count === 1) await redis.expire(key, WINDOW_SECONDS);
+      return;
+    } catch (error) {
+      // fall through to memory
+    }
+  }
+
+  const entry = fallback.get(key);
+  if (!entry || Date.now() - entry.start > ATTEMPT_WINDOW_MS) {
+    fallback.set(key, { start: Date.now(), count: 1 });
   } else {
     entry.count += 1;
   }
 };
 
-const clearLoginAttempts = (email) => {
-  const key = String(email).trim().toLowerCase();
-  attempts.delete(key);
+const clearLoginAttempts = async (email) => {
+  const key = keyFor(email);
+
+  if (redis) {
+    try {
+      await redis.del(key);
+      return;
+    } catch (error) {
+      // fall through to memory
+    }
+  }
+
+  fallback.delete(key);
 };
 
-const checkLoginRateLimit = (req, res, next) => {
+const checkLoginRateLimit = async (req, res, next) => {
   const email = req.body?.email;
   if (!email) return next();
 
-  const { blocked, count } = getLoginAttempts(email);
-  if (blocked) {
-    const remainingMs = ATTEMPT_WINDOW_MS;
-    res.set('Retry-After', String(Math.ceil(remainingMs / 1000)));
-    return res.status(429).json({
-      success: false,
-      message: 'Too many login attempts. Please try again later.',
-    });
+  try {
+    const { blocked } = await getLoginAttempts(email);
+    if (blocked) {
+      res.set('Retry-After', String(WINDOW_SECONDS));
+      return res.status(429).json({
+        success: false,
+        message: 'Too many login attempts. Please try again later.',
+      });
+    }
+  } catch (error) {
+    // never block login on limiter failure
   }
 
   next();

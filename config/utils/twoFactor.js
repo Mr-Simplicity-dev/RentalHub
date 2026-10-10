@@ -405,3 +405,39 @@ exports.runWithdrawalFactorCheck = async (req, res) => {
 
 exports.TwoFactorError = TwoFactorError;
 
+// Privileged roles that must have TOTP enabled to use administrative routes.
+const PRIVILEGED_ROLES = new Set([
+  'super_admin',
+  'financial_admin',
+  'state_financial_admin',
+  'super_financial_admin',
+  'lga_financial_admin',
+  'recruitment_admin',
+  'state_admin',
+  'lga_admin',
+  'admin',
+  'super_support_admin',
+  'state_support_admin',
+  'lga_support_admin',
+]);
+
+exports.isPrivilegedRole = (role) => PRIVILEGED_ROLES.has(role);
+
+// Middleware: privileged roles must have TOTP enrolled before they can proceed.
+exports.requirePrivilegedMfa = async (req, res, next) => {
+  if (!PRIVILEGED_ROLES.has(req.user?.user_type)) return next();
+
+  try {
+    const status = await exports.getTotpStatus(req.user.id);
+    if (status.totp_enabled) return next();
+  } catch (error) {
+    console.error('Privileged MFA check failed:', error.message);
+  }
+
+  return res.status(403).json({
+    success: false,
+    code: 'MFA_REQUIRED',
+    message: 'Two-factor authentication is required for this account. Please enroll in TOTP first.',
+  });
+};
+

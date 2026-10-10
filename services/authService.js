@@ -2975,6 +2975,7 @@ exports.login = async (req, res) => {
         'UPDATE users SET failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1 WHERE id = $1',
         [user.id]
       );
+      await recordFailedLogin(cleanEmail).catch(() => {});
 
       // Lock after 10 failed attempts
       const updatedUser = await db.query(
@@ -3002,6 +3003,7 @@ exports.login = async (req, res) => {
       'UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1',
       [user.id]
     );
+    await clearLoginAttempts(cleanEmail).catch(() => {});
 
     if (user.deleted_at) {
       return res.status(403).json({

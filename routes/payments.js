@@ -6,7 +6,7 @@ const validateRequest = require('../config/middleware/validateRequest');
 const paymentController = require('../controllers/paymentController');
 const refundController  = require('../controllers/refundController');
 const landlordPropertyFeeController = require('../controllers/landlordPropertyFeeController');
-const { authenticate, isTenant, isLandlord, isVerified } = require('../config/middleware/auth');
+const { authenticate, isTenant, isLandlord, isVerified, requireNotImpersonating } = require('../config/middleware/auth');
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 const audit = require('../config/middleware/auditMiddleware');
@@ -823,6 +823,7 @@ router.get('/wallet/transactions',
 // Tenant + Landlord: request a withdrawal to bank account
 router.post('/wallet/withdraw',
   authenticate,
+  requireNotImpersonating,
   criticalFinanceOpsLimiter,
   [
     body('amount').isFloat({ min: 1 }).withMessage('Amount must be greater than zero'),

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/middleware/database');
-const { authenticate } = require('../config/middleware/auth');
+const { authenticate, requireNotImpersonating } = require('../config/middleware/auth');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
@@ -1919,7 +1919,7 @@ router.put('/profile', authenticate, [
 });
 
 // Change password
-router.put('/change-password', authenticate, sensitiveActionLimiter, [
+router.put('/change-password', authenticate, requireNotImpersonating, sensitiveActionLimiter, [
   body('current_password').notEmpty().withMessage('Current password is required'),
   body('new_password')
     .isLength({ min: 10 })
