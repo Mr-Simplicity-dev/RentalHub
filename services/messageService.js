@@ -69,6 +69,31 @@ const clearFailedAttempts = (userId) => {
   failedAttempts.delete(userId);
 };
 
+// Suspicious content detection: shortened links + off-platform payment requests.
+const SUSPICIOUS_URL_PATTERNS = [
+  /bit\.ly\//i, /tinyurl\.com\//i, /goo\.gl\//i, /t\.co\//i, /is\.gd\//i,
+  /rebrand\.ly\//i, /cutt\.ly\//i, /ow\.ly\//i, /buff\.ly\//i, /lnkd\.in\//i,
+  /wa\.me\//i, /wa\.link\//i, /chat\.whatsapp\.com\//i, /shorturl\//i,
+];
+
+const OFF_PLATFORM_PHRASES = [
+  /pay\s+outside/i, /pay\s+directly/i, /pay\s+me\s+direct/i, /bank\s+transfer/i,
+  /transfer\s+direct/i, /whatsapp\s+me/i, /move\s+to\s+whatsapp/i, /chat\s+on\s+whatsapp/i,
+  /telegram/i, /send\s+money\s+direct/i, /offline\s+payment/i, /cash\s+payment/i,
+];
+
+const detectSuspiciousContent = (text) => {
+  if (!text) return { detected: false, reason: '' };
+  const value = String(text);
+  for (const pattern of SUSPICIOUS_URL_PATTERNS) {
+    if (pattern.test(value)) return { detected: true, reason: 'shortened link' };
+  }
+  for (const pattern of OFF_PLATFORM_PHRASES) {
+    if (pattern.test(value)) return { detected: true, reason: 'off-platform payment request' };
+  }
+  return { detected: false, reason: '' };
+};
+
 const ensureMessageSchema = async () => {
   if (messageSchemaReady) return;
 
@@ -218,6 +243,25 @@ exports.sendMessage = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Messages cannot contain phone numbers. Please remove any phone numbers and try again.',
+      });
+    }
+
+    // Block messages with shortened links or off-platform payment requests.
+    const suspicious =
+      detectSuspiciousContent(message_text).detected ||
+      (subject && detectSuspiciousContent(subject).detected);
+    if (suspicious) {
+      const shouldFlag = trackFailedAttempt(senderId);
+      if (shouldFlag) {
+        await db.query(
+          `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
+           VALUES ($1, $2, $3, $4)`,
+          [senderId, 'REPEATED_SUSPICIOUS_CONTENT_BLOCK', 'user', senderId]
+        );
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Messages cannot contain external links or requests to pay outside RentalHub. Keep communication and payments on the platform.',
       });
     }
 
