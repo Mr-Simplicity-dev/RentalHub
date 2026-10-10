@@ -1,4 +1,5 @@
 const db = require('../config/middleware/database');
+const crypto = require('crypto');
 
 const RENT_CLEARING_DAYS = Number(process.env.RENT_WALLET_CLEARING_DAYS || 20);
 const RENT_PLATFORM_FEE_RATE = Number(process.env.RENT_PLATFORM_FEE_RATE || 0.025);
@@ -44,7 +45,9 @@ const ensureWalletLedgerSchema = async (executor = db) => {
       ADD COLUMN IF NOT EXISTS cleared_at TIMESTAMP,
       ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS previous_hash VARCHAR(64),
+      ADD COLUMN IF NOT EXISTS current_hash VARCHAR(64);
 
     DROP INDEX IF EXISTS idx_wallet_transactions_payment_source_once;
 
@@ -110,14 +113,36 @@ const createWalletTransaction = async ({
     return null;
   }
 
+  // Hash-chain the ledger: each transaction commits to the previous one so any
+  // later tampering (edit/delete/reorder) is detectable.
+  const prevResult = await executor.query(
+    `SELECT current_hash FROM wallet_transactions WHERE current_hash IS NOT NULL ORDER BY id DESC LIMIT 1`
+  );
+  const previousHash = prevResult.rows[0]?.current_hash || '0'.repeat(64);
+  const currentHash = crypto
+    .createHash('sha256')
+    .update(
+      `${previousHash}|${JSON.stringify({
+        user_id: userId,
+        payment_id: paymentId,
+        amount: normalizedAmount,
+        type,
+        status,
+        source,
+        reference,
+        description,
+      })}`
+    )
+    .digest('hex');
+
   const insert = await executor.query(
     `INSERT INTO wallet_transactions (
        user_id, payment_id, amount, type, status, source, description,
-       reference, available_at, cleared_at, metadata
+       reference, available_at, cleared_at, metadata, previous_hash, current_hash
      )
      VALUES (
        $1, $2, $3, $4, $5, $6, $7,
-       $8, $9, CASE WHEN $5 = 'cleared' THEN CURRENT_TIMESTAMP ELSE NULL END, $10::jsonb
+       $8, $9, CASE WHEN $5 = 'cleared' THEN CURRENT_TIMESTAMP ELSE NULL END, $10::jsonb, $11, $12
      )
      ON CONFLICT DO NOTHING
      RETURNING *`,
@@ -132,6 +157,8 @@ const createWalletTransaction = async ({
       reference,
       availableAt,
       JSON.stringify(metadata || {}),
+      previousHash,
+      currentHash,
     ]
   );
 
