@@ -9,6 +9,7 @@ const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { recordFailedLogin, clearLoginAttempts } = require('../config/middleware/loginRateLimiter');
 const { raiseSecurityAlert } = require('../config/utils/securityAlert');
 const { isPrivilegedRole } = require('../config/utils/twoFactor');
+const { recordDeviceLink } = require('../config/utils/deviceLink');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
 const { getLocationPricingQuote } = require('../config/utils/locationPricing');
 const {
@@ -3006,6 +3007,9 @@ exports.login = async (req, res) => {
       [user.id]
     );
     await clearLoginAttempts(cleanEmail).catch(() => {});
+
+    // Device/account-link analysis: record the device for this login.
+    await recordDeviceLink({ userId: user.id, req, deviceId: req.body?.device_id }).catch(() => {});
 
     // Security monitoring: alert on every privileged login.
     if (isPrivilegedRole(user.user_type)) {

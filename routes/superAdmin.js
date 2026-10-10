@@ -399,6 +399,30 @@ router.patch('/properties/:id/unlist', authenticate, requireSuperAdmin, audit('u
 router.patch('/properties/:id/feature', authenticate, requireSuperAdmin, audit('feature_property', 'property'), superCtrl.featureProperty);
 router.patch('/properties/:id/unfeature', authenticate, requireSuperAdmin, audit('unfeature_property', 'property'), superCtrl.unfeatureProperty);
 
+router.patch(
+  '/properties/:id/ownership-verification',
+  authenticate,
+  requireSuperAdmin,
+  [param('id').isInt(), body('status').isIn(['verified', 'unverified', 'pending'])],
+  validateRequest,
+  async (req, res) => {
+    try {
+      const result = await db.query(
+        `UPDATE properties SET ownership_verification_status = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 RETURNING id, ownership_verification_status`,
+        [req.body.status, req.params.id]
+      );
+      if (!result.rows.length) {
+        return res.status(404).json({ success: false, message: 'Property not found' });
+      }
+      res.json({ success: true, message: 'Ownership verification updated', data: result.rows[0] });
+    } catch (error) {
+      req.logger.error('Ownership verification error:', error);
+      res.status(500).json({ success: false, message: 'Failed to update ownership verification' });
+    }
+  }
+);
+
 router.patch('/verify/:userId', authenticate, requireSuperAdmin, superCtrl.verifyUser);
 router.get('/verifications', authenticate, requireSuperAdmin, superCtrl.getIdentityVerifications);
 router.patch('/verifications/:userId/approve', authenticate, requireSuperAdmin, superCtrl.approveIdentityVerification);
