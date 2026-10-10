@@ -7,6 +7,8 @@ const db = require('../config/middleware/database');
 const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { recordFailedLogin, clearLoginAttempts } = require('../config/middleware/loginRateLimiter');
+const { raiseSecurityAlert } = require('../config/utils/securityAlert');
+const { isPrivilegedRole } = require('../config/utils/twoFactor');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
 const { getLocationPricingQuote } = require('../config/utils/locationPricing');
 const {
@@ -3004,6 +3006,17 @@ exports.login = async (req, res) => {
       [user.id]
     );
     await clearLoginAttempts(cleanEmail).catch(() => {});
+
+    // Security monitoring: alert on every privileged login.
+    if (isPrivilegedRole(user.user_type)) {
+      await raiseSecurityAlert({
+        event: 'privileged_login',
+        actorId: user.id,
+        actorType: user.user_type,
+        ip: req.ip,
+        metadata: { email: user.email },
+      }).catch(() => {});
+    }
 
     if (user.deleted_at) {
       return res.status(403).json({

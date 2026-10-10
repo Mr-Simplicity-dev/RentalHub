@@ -14,6 +14,7 @@ const db = require('../config/middleware/database');
 const axios = require('axios');
 const crypto = require('crypto');
 const logger = require('../config/utils/logger');
+const { raiseSecurityAlert } = require('../config/utils/securityAlert');
 const {
   createTransferRecipient,
   initiateTransfer,
@@ -2124,6 +2125,24 @@ exports.requestWithdrawal = async (req, res) => {
       );
 
       await txn.query('COMMIT');
+
+      // Security monitoring: alert on large withdrawals.
+      const largeThreshold = Number(process.env.LARGE_WITHDRAWAL_ALERT_NGN) || 1000000;
+      if (withdrawAmount >= largeThreshold) {
+        await raiseSecurityAlert({
+          event: 'large_withdrawal',
+          actorId: userId,
+          actorType: userType,
+          targetType: 'withdrawal',
+          targetId: result.rows[0].id,
+          ip: req.ip,
+          metadata: {
+            amount: withdrawAmount,
+            bank_name,
+            account_number: String(account_number).replace(/.(?=.{4})/g, '*'),
+          },
+        }).catch(() => {});
+      }
 
       res.status(201).json({
         success: true,
