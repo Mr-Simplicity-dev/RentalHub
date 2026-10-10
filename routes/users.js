@@ -8,7 +8,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { body, query } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
-const { uploadPassportLocal, validateFileMagicBytesMiddleware } = require('../config/middleware/upload');
+const { uploadPassportLocal, validateFileMagicBytesMiddleware, reprocessPassportImage } = require('../config/middleware/upload');
 const {
   sensitiveActionLimiter,
   tourEventLimiter,
@@ -2312,7 +2312,7 @@ router.post('/verify-password', authenticate, sensitiveActionLimiter, async (req
 });
 
 // Upload passport photo
-router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileMagicBytesMiddleware, async (req, res) => {
+router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileMagicBytesMiddleware, reprocessPassportImage, async (req, res) => {
   let uploadPersisted = false;
 
   try {

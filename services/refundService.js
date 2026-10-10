@@ -2127,7 +2127,7 @@ exports.requestWithdrawal = async (req, res) => {
       await txn.query('COMMIT');
 
       // Security monitoring: alert on large withdrawals.
-      const largeThreshold = Number(process.env.LARGE_WITHDRAWAL_ALERT_NGN) || 1000000;
+      const largeThreshold = Number(process.env.LARGE_WITHDRAWAL_ALERT_NGN) || 500000;
       if (withdrawAmount >= largeThreshold) {
         await raiseSecurityAlert({
           event: 'large_withdrawal',

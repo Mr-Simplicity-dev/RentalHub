@@ -215,12 +215,43 @@ const validateFileMagicBytesMiddleware = (req, res, next) => {
   next();
 };
 
+// Re-encode an uploaded image with sharp: strips EXIF/embedded metadata and
+// normalises the image (auto-orient, resize, JPEG) so no hidden data survives.
+const reprocessPassportImage = async (req, res, next) => {
+  if (!req.file || !req.file.path) return next();
+
+  try {
+    const sharp = require('sharp');
+    const jpgPath = req.file.path.replace(/\.[^.]+$/, '') + '.jpg';
+
+    await sharp(req.file.path, { failOn: 'error' })
+      .rotate()
+      .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toFile(jpgPath);
+
+    if (jpgPath !== req.file.path) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
+    req.file.path = jpgPath;
+    req.file.filename = path.basename(jpgPath);
+    next();
+  } catch (error) {
+    try { fs.unlinkSync(req.file.path); } catch (_) {}
+    return res.status(400).json({
+      success: false,
+      message: 'Could not process the image. Please upload a valid image file.',
+    });
+  }
+};
+
 module.exports = {
   uploadPassport: withCloudinaryConfig(uploadPassportWithValidation),
   uploadPassportLocal,
   uploadPropertyMedia: withCloudinaryConfig(uploadPropertyMedia),
   uploadPropertyPhotos: withCloudinaryConfig(uploadPropertyPhotos),
   validateFileMagicBytesMiddleware,
+  reprocessPassportImage,
   cloudinary,
 };
 
