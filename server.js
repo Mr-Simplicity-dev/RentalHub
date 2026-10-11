@@ -884,7 +884,7 @@ const server = http.createServer(app);
 server.once('error', handleServerStartupError);
 
 const startServer = () => {
-  server.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, process.env.APP_HOST || '127.0.0.1', () => {
     logger.info(`Server running on port ${PORT}`);
     if (process.send) process.send('ready');
   });
