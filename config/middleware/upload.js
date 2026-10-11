@@ -245,6 +245,26 @@ const reprocessPassportImage = async (req, res, next) => {
   }
 };
 
+// ClamAV malware scan (best-effort). Deletes + rejects infected uploads.
+const scanUploadForMalware = async (req, res, next) => {
+  if (!req.file || !req.file.path) return next();
+
+  try {
+    const { scanFileForMalware } = require('../utils/clamav');
+    const result = await scanFileForMalware(req.file.path);
+    if (result.infected) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+      return res.status(400).json({
+        success: false,
+        message: 'Upload rejected: the file appears to be infected.',
+      });
+    }
+  } catch (error) {
+    // fail open — never block uploads on scanner failure
+  }
+  next();
+};
+
 module.exports = {
   uploadPassport: withCloudinaryConfig(uploadPassportWithValidation),
   uploadPassportLocal,
@@ -252,6 +272,7 @@ module.exports = {
   uploadPropertyPhotos: withCloudinaryConfig(uploadPropertyPhotos),
   validateFileMagicBytesMiddleware,
   reprocessPassportImage,
+  scanUploadForMalware,
   cloudinary,
 };
 
