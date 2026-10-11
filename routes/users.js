@@ -17,6 +17,7 @@ const { encryptNIN, decryptNIN } = require('../config/utils/ninEncryption');
 const {
   validateNIN,
   verifyNINWithPrembly,
+  performLivenessCheckWithPrembly,
   isPremblyConfigured,
 } = require('../config/utils/premblyValidator');
 const { checkPasswordBreached } = require('../config/utils/breachCheck');
@@ -2349,6 +2350,28 @@ router.post('/upload-passport', authenticate, uploadPassportLocal, validateFileM
     }
 
     const relativePath = `/uploads/passports/${req.file.filename}`;
+
+    // Prembly liveness: verify the photo is a real live person. Soft-fail when
+    // the liveness service is unavailable (never block uploads on service outages).
+    if (isPremblyConfigured()) {
+      try {
+        const imageBuffer = fs.readFileSync(req.file.path);
+        const liveness = await performLivenessCheckWithPrembly(imageBuffer, req.user.full_name);
+        if (
+          liveness.status !== 'not_configured' &&
+          liveness.status !== 'service_error' &&
+          !liveness.is_live
+        ) {
+          cleanupUploadedFile(req.file);
+          return res.status(400).json({
+            success: false,
+            message: 'Liveness check failed. Please retake your photo in good lighting.',
+          });
+        }
+      } catch (error) {
+        req.logger.error('Liveness check error:', error.message);
+      }
+    }
 
     // Check if identity is already verified via Prembly
     const currentUser = await db.query(
