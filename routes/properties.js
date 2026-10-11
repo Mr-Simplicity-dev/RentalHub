@@ -11,6 +11,31 @@ const {
 } = require('../config/middleware/auth');
 const audit = require('../config/middleware/auditMiddleware');
 const { uploadPropertyMedia, uploadPropertyPhotos } = require('../config/middleware/upload');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const ownershipUploadDir = path.join(__dirname, '..', 'uploads', 'ownership');
+if (!fs.existsSync(ownershipUploadDir)) {
+  fs.mkdirSync(ownershipUploadDir, { recursive: true });
+}
+
+const ownershipDocStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, ownershipUploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, `ownership_${req.user ? req.user.id : 'anon'}_${Date.now()}${ext}`);
+  },
+});
+
+const uploadOwnershipDoc = multer({
+  storage: ownershipDocStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /^(image\/|application\/pdf)/.test(file.mimetype || '');
+    cb(ok ? null : new Error('Only images or PDF documents are allowed'), ok);
+  },
+}).single('document');
 
 // ============ PUBLIC ROUTES ============
 
@@ -249,6 +274,44 @@ router.get(
   authenticate,
   propertyController.getDamageReports
 );
+
+// Property ownership document upload (landlord/agent). Stored locally; the URL
+// is saved on the property for super-admin review before ownership verification.
+router.post('/:propertyId/ownership-document', authenticate, isLandlordOrAgent, (req, res) => {
+  uploadOwnershipDoc(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message || 'Upload failed' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No document uploaded' });
+    }
+
+    try {
+      const relativePath = `/uploads/ownership/${req.file.filename}`;
+      const result = await require('../config/middleware/database').query(
+        `UPDATE properties
+         SET ownership_document_url = $1,
+             ownership_document_uploaded_at = CURRENT_TIMESTAMP,
+             ownership_verification_status = 'pending',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 AND landlord_id = $3
+         RETURNING id, ownership_document_url, ownership_verification_status`,
+        [relativePath, req.params.propertyId, req.user.id]
+      );
+
+      if (!result.rows.length) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+        return res.status(404).json({ success: false, message: 'Property not found or not yours' });
+      }
+
+      res.json({ success: true, message: 'Ownership document uploaded for review', data: result.rows[0] });
+    } catch (error) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+      req.logger.error('Ownership document upload error:', error);
+      res.status(500).json({ success: false, message: 'Failed to save ownership document' });
+    }
+  });
+});
 
 // Get property by ID (limited info for non-subscribers) — keep LAST
 router.get('/:propertyId', propertyController.getPropertyById);
