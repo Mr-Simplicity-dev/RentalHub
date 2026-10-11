@@ -392,6 +392,38 @@ const reverseLandlordRentCreditForPayment = async ({
   }
 };
 
+const releaseEscrowForPayment = async ({ paymentId, executor = db }) => {
+  await ensureWalletLedgerSchema(executor);
+
+  const credits = await executor.query(
+    `SELECT id, user_id, amount
+     FROM wallet_transactions
+     WHERE payment_id = $1
+       AND source = 'rent_payment'
+       AND type = 'credit'
+       AND status = 'pending'
+     FOR UPDATE`,
+    [paymentId]
+  );
+
+  for (const credit of credits.rows) {
+    await executor.query(
+      `UPDATE wallet_transactions
+       SET status = 'cleared', cleared_at = CURRENT_TIMESTAMP, available_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [credit.id]
+    );
+    await executor.query(
+      `INSERT INTO wallets (user_id, balance)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET balance = wallets.balance + $2, updated_at = CURRENT_TIMESTAMP`,
+      [credit.user_id, Number(credit.amount)]
+    );
+  }
+
+  return { released_count: credits.rows.length };
+};
+
 const getWalletCreditSummaryForUser = async (userId, executor = db) => {
   await ensureWalletLedgerSchema(executor);
   const [walletResult, rentResult] = await Promise.all([
@@ -428,6 +460,7 @@ module.exports = {
   creditLandlordRentPayment,
   clearMaturedLandlordRentCredits,
   reverseLandlordRentCreditForPayment,
+  releaseEscrowForPayment,
   getWalletBalance,
   getWalletCreditSummaryForUser,
   getLandlordRentDeductionTotal,

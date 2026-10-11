@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const path = require('path');
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 const validateRequest = require('../config/middleware/validateRequest');
 const paymentController = require('../controllers/paymentController');
 const refundController  = require('../controllers/refundController');
@@ -10,6 +10,8 @@ const { authenticate, isTenant, isLandlord, isVerified, requireNotImpersonating 
 const { requireAdminOrSuperAdmin } = require('../config/middleware/requireAdminOrSuperAdmin');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 const audit = require('../config/middleware/auditMiddleware');
+const db = require('../config/middleware/database');
+const { releaseEscrowForPayment } = require('../services/walletLedgerService');
 
 // ============ TENANT SUBSCRIPTION PAYMENTS ============
 
@@ -158,6 +160,40 @@ router.get('/verify-rent/:reference',
   authenticate,
   audit('payment.rent_verify', 'payment'),
   paymentController.verifyRentPayment
+);
+
+// Escrow: tenant confirms satisfaction → release the held rent credit early.
+router.post('/rent/:paymentId/confirm-satisfaction',
+  authenticate,
+  isTenant,
+  [param('paymentId').isInt({ min: 1 })],
+  validateRequest,
+  async (req, res) => {
+    try {
+      const paymentResult = await db.query(
+        `SELECT id, user_id, payment_type FROM payments
+         WHERE id = $1 AND payment_type = 'rent_payment' AND payment_status = 'completed'`,
+        [req.params.paymentId]
+      );
+      const payment = paymentResult.rows[0];
+      if (!payment) {
+        return res.status(404).json({ success: false, message: 'Completed rent payment not found' });
+      }
+      if (Number(payment.user_id) !== Number(req.user.id)) {
+        return res.status(403).json({ success: false, message: 'Only the tenant can confirm this rent payment' });
+      }
+
+      const result = await releaseEscrowForPayment({ paymentId: payment.id });
+      return res.json({
+        success: true,
+        message: 'Rental confirmed. Funds released to the landlord.',
+        data: result,
+      });
+    } catch (error) {
+      req.logger.error('Confirm rent satisfaction error:', error);
+      res.status(500).json({ success: false, message: 'Failed to confirm rental' });
+    }
+  }
 );
 
 // ============ PAY RENT ON BEHALF (OPTION 2) ============
