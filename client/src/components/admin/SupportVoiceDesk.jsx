@@ -29,6 +29,7 @@ import {
   FaArrowUp,
 } from 'react-icons/fa';
 import useTwilioVoice from '../../hooks/useTwilioVoice';
+import { useSocket } from '../../hooks/useSocket';
 import {
   cancelConsult,
   consultCall,
@@ -130,6 +131,20 @@ const SupportVoiceDesk = ({ tickets = [], onOpenTickets }) => {
     deskScopeLevel,
     geoEnabled,
   } = useTwilioVoice();
+
+  const { socket } = useSocket();
+
+  // Signal in-app support-call availability to the realtime socket. An agent is
+  // only "available" for in-app calls while their Twilio device is ready (i.e.
+  // they clicked "Go Available" and are on duty).
+  useEffect(() => {
+    if (!socket) return;
+    socket.emit('support:available', { available: status === 'ready' });
+  }, [socket, status]);
+
+  useEffect(() => () => {
+    socket?.emit('support:available', { available: false });
+  }, [socket]);
 
   // Phase 3: only the super tier may pick an identity line or escalate to a
   // department (the ladder's functional axis tops out at super support). LGA/

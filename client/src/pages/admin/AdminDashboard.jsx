@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
@@ -153,6 +153,12 @@ const AdminDashboard = () => {
             <p className="text-sm font-semibold text-indigo-900">Your Jurisdiction</p>
             <p className="mt-1 text-lg font-bold text-indigo-800">{scope.assignedZone}</p>
             <p className="mt-1 text-xs text-indigo-700">{(scope.states || []).join(', ')}</p>
+            <Link
+              to="/admin/zonal-support-dashboard"
+              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Open Support Desk
+            </Link>
           </div>
         )}
 

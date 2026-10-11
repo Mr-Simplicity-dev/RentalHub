@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { io as socketIO } from 'socket.io-client';
-import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaMicrophone, FaStopCircle, FaCheck } from 'react-icons/fa';
+import { FaTimes, FaPaperPlane, FaCommentAlt, FaPaperclip, FaFile, FaArrowLeft, FaCheckCircle, FaHeadset, FaMicrophone, FaStopCircle, FaCheck, FaPhoneAlt } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
@@ -84,7 +84,7 @@ const ChatBubble = ({ msg, isOwn, onRetry }) => {
 const FloatingContactWidget = () => {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
-  const { socket, connected } = useSocket();
+  const { socket, connected, startSupportCall } = useSocket();
   const authRecorder = useVoiceRecorder();
   const contactRecorder = useVoiceRecorder();
 
@@ -111,6 +111,7 @@ const FloatingContactWidget = () => {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [contactConv, setContactConv] = useState([]);
   const [viewingContactTicket, setViewingContactTicket] = useState(null);
+  const [callingSupport, setCallingSupport] = useState(false);
 
   const listRef = useRef(null);
   const widgetRef = useRef(null);
@@ -386,6 +387,22 @@ const FloatingContactWidget = () => {
     setActiveTicket(ticket);
     setView('conversation');
     loadConversation(ticket.id);
+  };
+
+  const handleCallSupport = async () => {
+    setCallingSupport(true);
+    setError('');
+    try {
+      const result = await startSupportCall();
+      if (result?.success === false && result?.code === 'NO_AGENT') {
+        setForm((p) => ({ ...p, subject: p.subject?.trim() || 'Support call request' }));
+        setError(result?.message || t('messages.widget.no_agent', 'No support agent is available right now. Please leave a message.'));
+      }
+    } catch {
+      setError(t('messages.widget.call_failed', 'Could not start the support call.'));
+    } finally {
+      setCallingSupport(false);
+    }
   };
 
   const validateFile = (file) => {
@@ -877,6 +894,15 @@ const FloatingContactWidget = () => {
             {view === 'form' && isAuthenticated && (
               <div className="py-2 text-left">
                 <p className="text-sm text-slate-600 dark:text-gray-300 mb-3 font-medium">{t('messages.widget.start_conversation', 'Start a new conversation')}</p>
+                <button
+                  type="button"
+                  onClick={handleCallSupport}
+                  disabled={callingSupport || !connected}
+                  className="flex items-center justify-center gap-2 w-full border border-indigo-600 text-indigo-600 rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-indigo-50 disabled:opacity-60 transition mb-3"
+                >
+                  <FaPhoneAlt className="w-3.5 h-3.5" />
+                  {callingSupport ? t('messages.widget.connecting_support', 'Connecting…') : t('messages.widget.call_support', 'Call support')}
+                </button>
                 <div className="space-y-3">
                   <div className="flex gap-2">
                     <div className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">

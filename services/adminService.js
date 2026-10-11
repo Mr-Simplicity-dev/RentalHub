@@ -2621,11 +2621,12 @@ exports.createAdmin = async (req, res) => {
       });
     }
 
-    if (user_type === 'zonal_admin' && !normalizedZone) {
-      return res.status(400).json({ success: false, message: 'A valid assigned zone is required for Zonal Admin' });
+    const zonalBoundRoles = ['zonal_admin', 'zonal_financial_admin', 'zonal_lawyer', 'zonal_fumigation_admin', 'zonal_transportation_admin'];
+    if (zonalBoundRoles.includes(user_type) && !normalizedZone) {
+      return res.status(400).json({ success: false, message: 'A valid assigned zone is required for this Zonal role' });
     }
 
-    if (user_type === 'zonal_admin') await requireActiveTerritory('zone', normalizedZone);
+    if (zonalBoundRoles.includes(user_type)) await requireActiveTerritory('zone', normalizedZone);
     if (stateBoundRoles.has(user_type)) await requireActiveTerritory('state', canonicalAssignedState);
     if (['lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(user_type)) {
       await requireActiveTerritory('lga', normalizedCity, canonicalAssignedState);
@@ -2702,7 +2703,7 @@ exports.createAdmin = async (req, res) => {
         normalizedNin || null,
         canonicalAssignedState || null,
         ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin', 'fumigation_admin', 'transportation_admin'].includes(user_type) ? normalizedCity : null,
-        user_type === 'zonal_admin' ? normalizedZone : null,
+        zonalBoundRoles.includes(user_type) ? normalizedZone : null,
         normalizedLawyerScope,
         pendingApproval ? 'pending' : 'approved',
         user_type === 'recruitment_admin',

@@ -486,6 +486,11 @@ const Dashboard = () => {
       return;
     }
 
+    if (user.user_type === 'zonal_financial_admin') {
+      navigate('/admin/zonal-financial-dashboard', { replace: true });
+      return;
+    }
+
     if (user.user_type === 'super_support_admin') {
       navigate('/admin/super-support-dashboard', { replace: true });
       return;

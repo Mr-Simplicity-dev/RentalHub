@@ -10,15 +10,19 @@ const ROLE_GROUPS = {
   lgaFinance: ['lga_financial_admin'],
   platformFinance: ['financial_admin'],
   stateFinance: ['state_financial_admin'],
+  zonalFinance: ['zonal_financial_admin'],
   superFinance: ['super_financial_admin'],
   lgaLegal: ['lawyer'],
   stateLegal: ['state_lawyer'],
+  zonalLegal: ['zonal_lawyer'],
   superLegal: ['super_lawyer'],
   lgaFumigation: ['fumigation_admin', 'lga_fumigation_admin'],
   stateFumigation: ['state_fumigation_admin'],
+  zonalFumigation: ['zonal_fumigation_admin'],
   superFumigation: ['super_fumigation_admin'],
   lgaTransportation: ['transportation_admin', 'lga_transportation_admin'],
   stateTransportation: ['state_transportation_admin'],
+  zonalTransportation: ['zonal_transportation_admin'],
   superTransportation: ['super_transportation_admin'],
   marketing: ['marketing_agent'],
 };
@@ -45,7 +49,13 @@ const STATE_SCOPED_ROLES = unique(all(
   ROLE_GROUPS.stateTransportation
 ));
 
-const ZONAL_SCOPED_ROLES = unique(ROLE_GROUPS.zonalOperations);
+const ZONAL_SCOPED_ROLES = unique(all(
+  ROLE_GROUPS.zonalOperations,
+  ROLE_GROUPS.zonalFinance,
+  ROLE_GROUPS.zonalLegal,
+  ROLE_GROUPS.zonalFumigation,
+  ROLE_GROUPS.zonalTransportation
+));
 
 const SUPER_SCOPED_ROLES = unique(all(
   ROLE_GROUPS.superOperations,

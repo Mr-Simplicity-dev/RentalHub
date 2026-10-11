@@ -131,6 +131,8 @@ const Login = () => {
           navigate('/admin/super-financial-dashboard');
         } else if (role === 'financial_admin' || role === 'lga_financial_admin') {
           navigate('/admin/financial-dashboard');
+        } else if (role === 'zonal_financial_admin') {
+          navigate('/admin/zonal-financial-dashboard');
         } else if (role === 'state_admin' || role === 'state_financial_admin') {
           navigate('/admin');
         } else if (role === 'admin' || role === 'lga_admin') {

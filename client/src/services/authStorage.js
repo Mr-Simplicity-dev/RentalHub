@@ -79,6 +79,7 @@ const KNOWN_USER_TYPES = new Set([
   'state_transportation_admin', 'super_transportation_admin',
   'fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin',
   'super_fumigation_admin', 'financial_admin', 'support_admin', 'recruitment_admin',
+  'zonal_financial_admin', 'zonal_lawyer', 'zonal_fumigation_admin', 'zonal_transportation_admin',
 ]);
 
 const isValidStoredUser = (value) => {

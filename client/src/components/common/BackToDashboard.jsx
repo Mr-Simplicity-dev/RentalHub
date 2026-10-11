@@ -15,6 +15,7 @@ const dashboardPathByRole = {
   lga_financial_admin: '/admin/financial-dashboard',
   financial_admin: '/admin/financial-dashboard',
   super_financial_admin: '/admin/super-financial-dashboard',
+  zonal_financial_admin: '/admin/zonal-financial-dashboard',
   lga_support_admin: '/admin/lga-support-dashboard',
   state_support_admin: '/admin/state-support-dashboard',
   super_support_admin: '/admin/super-support-dashboard',

@@ -115,6 +115,8 @@ const TransportationSuperAdminDashboard = React.lazy(() => import('./admin/Trans
 const FumigationOversightPanel = React.lazy(() => import('../components/admin/FumigationOversightPanel'));
 const LgaFumigationAdminDashboard = React.lazy(() => import('./admin/LgaFumigationAdminDashboard'));
 const LgaSupportAdminDashboard = React.lazy(() => import('./admin/LgaSupportAdminDashboard'));
+const ZonalSupportAdminDashboard = React.lazy(() => import('./admin/ZonalSupportAdminDashboard'));
+const ZonalFinancialAdminDashboard = React.lazy(() => import('./admin/ZonalFinancialAdminDashboard'));
 const StateFumigationAdminDashboard = React.lazy(() => import('./admin/StateFumigationAdminDashboard'));
 const SuperFumigationAdminDashboard = React.lazy(() => import('./admin/SuperFumigationAdminDashboard'));
 const FinancialAdminDashboard = React.lazy(() => import('./admin/FinancialAdminDashboard'));
@@ -138,6 +140,10 @@ const LANGUAGE_OPTIONS = [
 ];
 
 const FINANCIAL_ADMIN_ROLES = ['financial_admin', 'lga_financial_admin'];
+const ZONAL_FINANCIAL_ADMIN_ROLES = ['zonal_financial_admin'];
+const ZONAL_LAWYER_ROLES = ['zonal_lawyer'];
+const ZONAL_FUMIGATION_ADMIN_ROLES = ['zonal_fumigation_admin'];
+const ZONAL_TRANSPORTATION_ADMIN_ROLES = ['zonal_transportation_admin'];
 const SUPER_FINANCIAL_ADMIN_ROLES = ['super_financial_admin'];
 const STATE_ADMIN_ROLES = ['state_admin', 'state_financial_admin'];
 const ZONAL_ADMIN_ROLES = ['zonal_admin'];
@@ -254,6 +260,32 @@ const StateSupportAdminRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (!STATE_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+
+  return children;
+};
+
+const ZonalSupportAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!ZONAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
+
+  return children;
+};
+
+const ZonalFinancialAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!ZONAL_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
 
   return children;
 };
@@ -555,6 +587,10 @@ const AdminHomeRoute = () => {
 
   if (SUPER_SUPPORT_ADMIN_ROLES.includes(user?.user_type)) {
     return <Navigate to="/admin/super-support-dashboard" replace />;
+  }
+
+  if (ZONAL_FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin/zonal-financial-dashboard" replace />;
   }
 
   if (isRecruitmentAdminUser(user)) {
@@ -930,6 +966,8 @@ function App() {
                 <Route path="state-dashboard" element={<StateAdminRoute><Navigate to="/admin" replace /></StateAdminRoute>} />
                 <Route path="withdrawals" element={<AdminWithdrawalsRoute />} />
                 <Route path="lga-support-dashboard" element={<LgaSupportAdminRoute><LgaSupportAdminDashboard /></LgaSupportAdminRoute>} />
+                <Route path="zonal-support-dashboard" element={<ZonalSupportAdminRoute><ZonalSupportAdminDashboard /></ZonalSupportAdminRoute>} />
+                <Route path="zonal-financial-dashboard" element={<ZonalFinancialAdminRoute><ZonalFinancialAdminDashboard /></ZonalFinancialAdminRoute>} />
                 <Route path="state-support-dashboard" element={<StateSupportAdminRoute><StateSupportAdminDashboard /></StateSupportAdminRoute>} />
                 <Route path="super-support-dashboard" element={<SuperSupportAdminRoute><SuperSupportAdminDashboard /></SuperSupportAdminRoute>} />
                 <Route path="recruitment" element={<RecruitmentAdminRoute><RecruitmentAdminDashboard /></RecruitmentAdminRoute>} />

@@ -29,6 +29,14 @@ const SUPPORT_ROLES = new Set([
   'super_support_admin',
 ]);
 
+const ZONAL_BOUND_ROLES = new Set([
+  'zonal_admin',
+  'zonal_financial_admin',
+  'zonal_lawyer',
+  'zonal_fumigation_admin',
+  'zonal_transportation_admin',
+]);
+
 const LAWYER_ROLES = new Set([
   'lawyer',
   'state_lawyer',
@@ -127,7 +135,7 @@ const CreateAdminTab = () => {
           assigned_city: ['admin', 'lga_admin', 'lga_support_admin', 'lga_financial_admin', 'lawyer', 'lga_transportation_admin', 'lga_fumigation_admin'].includes(formData.user_type)
             ? String(formData.assigned_city || '').trim()
             : null,
-          assigned_zone: formData.user_type === 'zonal_admin' ? formData.assigned_zone : null,
+          assigned_zone: ZONAL_BOUND_ROLES.has(formData.user_type) ? formData.assigned_zone : null,
           lawyer_client_scope: LAWYER_ROLES.has(formData.user_type)
             ? formData.lawyer_client_scope
             : null,
@@ -245,26 +253,30 @@ const CreateAdminTab = () => {
           <optgroup label="Finance">
             <option value="lga_financial_admin">LGA Financial Admin</option>
             <option value="state_financial_admin">State Financial Admin</option>
+            <option value="zonal_financial_admin">Zonal Financial Admin</option>
             <option value="super_financial_admin">Super Financial Admin</option>
           </optgroup>
           <optgroup label="Legal">
             <option value="lawyer">LGA Lawyer</option>
             <option value="state_lawyer">State Lawyer</option>
+            <option value="zonal_lawyer">Zonal Lawyer</option>
             <option value="super_lawyer">Super Lawyer</option>
           </optgroup>
           <optgroup label="Transportation">
             <option value="lga_transportation_admin">LGA Transportation Admin</option>
             <option value="state_transportation_admin">State Transportation Admin</option>
+            <option value="zonal_transportation_admin">Zonal Transportation Admin</option>
             <option value="super_transportation_admin">Super Transportation Admin</option>
           </optgroup>
           <optgroup label="Fumigation">
             <option value="lga_fumigation_admin">LGA Fumigation Admin</option>
             <option value="state_fumigation_admin">State Fumigation Admin</option>
+            <option value="zonal_fumigation_admin">Zonal Fumigation Admin</option>
             <option value="super_fumigation_admin">Super Fumigation Admin</option>
           </optgroup>
         </select>
-                                                                                                                                                                     
-        {formData.user_type === 'zonal_admin' && (
+                                                                                                                                                                      
+        {ZONAL_BOUND_ROLES.has(formData.user_type) && (
           <select name="assigned_zone" value={formData.assigned_zone} onChange={handleChange} required>
             <option value="">Select Assigned Zone</option>
             {roleContract.zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}

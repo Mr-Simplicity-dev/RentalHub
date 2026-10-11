@@ -31,7 +31,7 @@ test('zonal scope includes assigned-zone states and rejects outside states', () 
 test('territorial scope collections remain separated', () => {
   assert.equal(roles.LGA_SCOPED_ROLES.includes('state_admin'), false);
   assert.equal(roles.STATE_SCOPED_ROLES.includes('lga_admin'), false);
-  assert.deepEqual(roles.ZONAL_SCOPED_ROLES, ['zonal_admin']);
+  assert.deepEqual(roles.ZONAL_SCOPED_ROLES, ['zonal_admin', 'zonal_financial_admin', 'zonal_lawyer', 'zonal_fumigation_admin', 'zonal_transportation_admin']);
   assert.equal(roles.SUPER_SCOPED_ROLES.includes('super_admin'), true);
 });
 

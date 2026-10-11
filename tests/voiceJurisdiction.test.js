@@ -14,8 +14,9 @@ test('voice jurisdiction: role allow-list', () => {
   assert.strictEqual(isVoiceReadRole('lga_support_admin'), true);
   assert.strictEqual(isVoiceReadRole('state_admin'), true);
   assert.strictEqual(isVoiceReadRole('lga_admin'), true);
+  assert.strictEqual(isVoiceReadRole('zonal_admin'), true);
   assert.strictEqual(isVoiceReadRole('agent'), false);
-  assert.strictEqual(VOICE_READ_ROLES.length, 6);
+  assert.strictEqual(VOICE_READ_ROLES.length, 7);
 });
 
 test('voice jurisdiction: scope resolution', () => {
@@ -54,6 +55,15 @@ test('voice jurisdiction: scope resolution', () => {
   assert.throws(() => resolveVoiceReadScope({ user_type: 'agent' }), /cannot view/);
   assert.throws(() => resolveVoiceReadScope({ user_type: 'state_support_admin' }), /state/);
   assert.throws(() => resolveVoiceReadScope({ user_type: 'lga_admin', assigned_state: 'FCT' }), /LGA/);
+
+  const zonalScope = resolveVoiceReadScope({
+    user_type: 'zonal_admin',
+    assigned_zone: 'North Central',
+  });
+  assert.strictEqual(zonalScope.level, 'zone');
+  assert.strictEqual(zonalScope.zone, 'North Central');
+  assert.ok(zonalScope.states.includes('FCT'));
+  assert.throws(() => resolveVoiceReadScope({ user_type: 'zonal_admin' }), /zone/);
 });
 
 test('voice jurisdiction: SQL scope clause', () => {
@@ -68,4 +78,8 @@ test('voice jurisdiction: SQL scope clause', () => {
   const lgaClause = buildScopeClause({ level: 'lga', state: 'FCT', lga: 'Gwagwalada' }, '');
   assert.match(lgaClause.clause, /jurisdiction_lga/);
   assert.deepStrictEqual(lgaClause.params, ['FCT', 'Gwagwalada']);
+
+  const zonalClause = buildScopeClause({ level: 'zone', states: ['FCT', 'Benue'] }, 'latest');
+  assert.match(zonalClause.clause, /ANY/);
+  assert.deepStrictEqual(zonalClause.params, [['fct', 'benue']]);
 });

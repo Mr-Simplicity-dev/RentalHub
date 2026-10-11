@@ -4,6 +4,7 @@ const db = require('../middleware/database');
 const { logAction } = require('./auditLogger');
 const { getSocketAuthToken } = require('./authCookies');
 const { getSessionTokenIdentity } = require('./sessionToken');
+const { zoneForState } = require('./territorialZones');
 const {
   verifyGuestAccessToken,
   canUseLegacyGuestEmailAccess,
@@ -19,10 +20,18 @@ const SUPPORT_ADMIN_ROLES = new Set([
   'lga_support_admin',
 ]);
 
+const SUPPORT_AGENT_ROLES = new Set([
+  'super_support_admin',
+  'state_support_admin',
+  'lga_support_admin',
+  'zonal_admin',
+]);
+
 const onlineUsers = new Map();
 const socketUsers = new Map();
 const activeCalls = new Map();
 const guestSocketAuthFailures = new Map();
+const supportAvailability = new Map();
 let callHistorySchemaReady = false;
 
 const GUEST_SOCKET_AUTH_WINDOW_MS = Number(process.env.GUEST_SOCKET_AUTH_WINDOW_MS || 15 * 60 * 1000);
@@ -119,7 +128,8 @@ const fetchSocketUser = async (token) => {
   const { userId, tokenVersion } = getSessionTokenIdentity(decoded);
 
   const result = await db.query(
-    `SELECT id, full_name, email, user_type, deleted_at, is_active, token_version
+    `SELECT id, full_name, email, user_type, deleted_at, is_active, token_version,
+            assigned_state, assigned_city, assigned_lga, assigned_zone
      FROM users
      WHERE id = $1
      LIMIT 1`,
@@ -201,6 +211,8 @@ const ensureCallHistorySchema = async () => {
       property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL,
       call_type VARCHAR(30) NOT NULL CHECK (call_type IN ('audio', 'video', 'virtual_tour')),
       status VARCHAR(30) NOT NULL CHECK (status IN ('ringing', 'accepted', 'rejected', 'missed', 'ended', 'failed')),
+      is_support_call BOOLEAN NOT NULL DEFAULT FALSE,
+      support_tier VARCHAR(30),
       requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       started_at TIMESTAMPTZ,
       ended_at TIMESTAMPTZ,
@@ -231,11 +243,13 @@ const recordCallSession = async (call, status, timestamps = {}) => {
          property_id,
          call_type,
          status,
+         is_support_call,
+         support_tier,
          requested_at,
          started_at,
          ended_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (id) DO UPDATE SET
          status = EXCLUDED.status,
          started_at = COALESCE(EXCLUDED.started_at, call_sessions.started_at),
@@ -248,6 +262,8 @@ const recordCallSession = async (call, status, timestamps = {}) => {
         call.propertyId || null,
         call.callType,
         status,
+        call.isSupport === true,
+        call.supportTier || null,
         call.createdAt || new Date().toISOString(),
         timestamps.startedAt || null,
         timestamps.endedAt || null,
@@ -267,6 +283,85 @@ const logVirtualTourAudit = async (call, action, actorId) => {
     targetType: 'property',
     targetId: call.propertyId || null,
   });
+};
+
+const normLocation = (value) => String(value || '').trim().toLowerCase();
+
+const resolveCallerLocation = async (userId) => {
+  const result = await db.query(
+    `SELECT s.state_name, u.preferred_lga_name
+     FROM users u
+     LEFT JOIN states s ON s.id = u.preferred_state_id
+     WHERE u.id = $1
+     LIMIT 1`,
+    [userId]
+  );
+  const state = String(result.rows[0]?.state_name || '').trim();
+  const lga = String(result.rows[0]?.preferred_lga_name || '').trim();
+  return { state, lga, zone: state ? zoneForState(state) : null };
+};
+
+const resolveSupportChain = async (callerLoc) => {
+  const chain = [];
+
+  if (callerLoc.state && callerLoc.lga) {
+    const lgaResult = await db.query(
+      `SELECT id FROM users
+       WHERE user_type = 'lga_support_admin'
+         AND LOWER(TRIM(COALESCE(assigned_state, ''))) = $1
+         AND LOWER(TRIM(COALESCE(NULLIF(assigned_city, ''), assigned_lga, ''))) = $2
+         AND deleted_at IS NULL AND COALESCE(is_active, TRUE) = TRUE
+       ORDER BY id ASC`,
+      [normLocation(callerLoc.state), normLocation(callerLoc.lga)]
+    );
+    chain.push({ name: 'lga', userIds: lgaResult.rows.map((row) => row.id) });
+  }
+
+  if (callerLoc.state) {
+    const stateResult = await db.query(
+      `SELECT id FROM users
+       WHERE user_type = 'state_support_admin'
+         AND LOWER(TRIM(COALESCE(assigned_state, ''))) = $1
+         AND deleted_at IS NULL AND COALESCE(is_active, TRUE) = TRUE
+       ORDER BY id ASC`,
+      [normLocation(callerLoc.state)]
+    );
+    chain.push({ name: 'state', userIds: stateResult.rows.map((row) => row.id) });
+  }
+
+  if (callerLoc.zone) {
+    const zonalResult = await db.query(
+      `SELECT id FROM users
+       WHERE user_type = 'zonal_admin'
+         AND LOWER(TRIM(COALESCE(assigned_zone, ''))) = $1
+         AND deleted_at IS NULL AND COALESCE(is_active, TRUE) = TRUE
+       ORDER BY id ASC`,
+      [normLocation(callerLoc.zone)]
+    );
+    chain.push({ name: 'zonal', userIds: zonalResult.rows.map((row) => row.id) });
+  }
+
+  const nationalResult = await db.query(
+    `SELECT id FROM users
+     WHERE user_type = 'super_support_admin'
+       AND deleted_at IS NULL AND COALESCE(is_active, TRUE) = TRUE
+     ORDER BY id ASC`
+  );
+  chain.push({ name: 'national', userIds: nationalResult.rows.map((row) => row.id) });
+
+  return chain;
+};
+
+const findAvailableSupportAgent = async (callerLoc) => {
+  const chain = await resolveSupportChain(callerLoc);
+  for (const tier of chain) {
+    for (const userId of tier.userIds) {
+      if (supportAvailability.get(String(userId)) === true) {
+        return { tier: tier.name, userId };
+      }
+    }
+  }
+  return null;
 };
 
 const configureRealtimeSocket = (io) => {
@@ -310,6 +405,29 @@ const configureRealtimeSocket = (io) => {
 
       if (typeof callback === 'function') {
         callback({ success: true, statuses });
+      }
+    });
+
+    socket.on('support:available', (payload = {}, callback) => {
+      try {
+        const role = String(user.user_type || '').toLowerCase();
+        if (!SUPPORT_AGENT_ROLES.has(role)) {
+          throw new Error('Only support agents can set availability');
+        }
+
+        if (payload.available) {
+          supportAvailability.set(String(user.id), true);
+        } else {
+          supportAvailability.delete(String(user.id));
+        }
+
+        if (typeof callback === 'function') {
+          callback({ success: true, available: Boolean(payload.available) });
+        }
+      } catch (error) {
+        if (typeof callback === 'function') {
+          callback({ success: false, message: error.message });
+        }
       }
     });
 
@@ -515,6 +633,111 @@ const configureRealtimeSocket = (io) => {
       }
     });
 
+    socket.on('call:support', async (payload = {}, callback) => {
+      try {
+        if (!CALL_ALLOWED_ROLES.has(user.user_type)) {
+          throw new Error('Only tenants, landlords and agents can call support');
+        }
+
+        const callerLoc = await resolveCallerLocation(user.id);
+        const target = await findAvailableSupportAgent(callerLoc);
+
+        if (!target) {
+          if (typeof callback === 'function') {
+            callback({
+              success: false,
+              code: 'NO_AGENT',
+              message: 'No support agent is available right now. Please leave a message.',
+            });
+          }
+          return;
+        }
+
+        const receiverResult = await db.query(
+          `SELECT id, full_name, email, user_type, deleted_at, is_active
+           FROM users
+           WHERE id = $1
+           LIMIT 1`,
+          [target.userId]
+        );
+        const receiver = receiverResult.rows[0];
+
+        if (!receiver || receiver.deleted_at || receiver.is_active === false) {
+          throw new Error('Support agent is not available');
+        }
+
+        const call = {
+          id: crypto.randomUUID(),
+          caller: getPublicUser(user),
+          receiver: getPublicUser(receiver),
+          callType: 'audio',
+          propertyId: null,
+          propertyTitle: '',
+          status: 'ringing',
+          isSupport: true,
+          supportTier: target.tier,
+          createdAt: new Date().toISOString(),
+        };
+
+        call.timeoutId = setTimeout(() => {
+          const currentCall = activeCalls.get(call.id);
+          if (!currentCall || currentCall.status !== 'ringing') return;
+
+          currentCall.status = 'missed';
+          activeCalls.delete(call.id);
+          const endedAt = new Date().toISOString();
+          void recordCallSession(currentCall, 'missed', { endedAt });
+          emitCallEvent(io, currentCall, 'call:missed', { endedAt });
+        }, CALL_RING_TIMEOUT_MS);
+
+        activeCalls.set(call.id, call);
+        await recordCallSession(call, 'ringing');
+
+        io.to(toUserRoom(receiver.id)).emit('call:incoming', {
+          callId: call.id,
+          callType: call.callType,
+          propertyId: call.propertyId,
+          propertyTitle: call.propertyTitle,
+          status: call.status,
+          caller: call.caller,
+          isSupport: true,
+          supportTier: call.supportTier,
+          createdAt: call.createdAt,
+        });
+
+        socket.emit('call:outgoing', {
+          callId: call.id,
+          callType: call.callType,
+          propertyId: call.propertyId,
+          propertyTitle: call.propertyTitle,
+          status: call.status,
+          receiver: call.receiver,
+          isSupport: true,
+          supportTier: call.supportTier,
+          createdAt: call.createdAt,
+          receiverOnline: isUserOnline(receiver.id),
+        });
+
+        if (typeof callback === 'function') {
+          callback({
+            success: true,
+            call: {
+              callId: call.id,
+              status: call.status,
+              receiver: call.receiver,
+              receiverOnline: isUserOnline(receiver.id),
+              isSupport: true,
+              supportTier: call.supportTier,
+            },
+          });
+        }
+      } catch (error) {
+        if (typeof callback === 'function') {
+          callback({ success: false, message: error.message });
+        }
+      }
+    });
+
     socket.on('call:accept', async (payload = {}, callback) => {
       const call = activeCalls.get(payload.callId);
       if (!call || call.status !== 'ringing') {
@@ -677,6 +900,7 @@ const configureRealtimeSocket = (io) => {
 
     socket.on('disconnect', () => {
       const wentOffline = removeOnlineSocket(socket);
+      supportAvailability.delete(String(user.id));
       if (wentOffline) {
         socket.broadcast.emit('presence:offline', {
           userId: user.id,

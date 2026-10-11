@@ -47,6 +47,10 @@ const DEFAULT_MAP = {
     label: 'FINANCIAL ADMIN',
     className: 'bg-cyan-100 text-cyan-700 border-cyan-200',
   },
+  zonal_financial_admin: {
+    label: 'ZONAL FINANCIAL ADMIN',
+    className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  },
   state_support_admin: {
     label: 'STATE SUPPORT ADMIN',
     className: 'bg-amber-100 text-amber-700 border-amber-200',

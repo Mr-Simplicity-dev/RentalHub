@@ -25,6 +25,8 @@ const WITHDRAWAL_ELIGIBLE_ROLES = new Set([
   'super_admin',
   'state_admin',
   'state_financial_admin',
+  'zonal_admin',
+  'zonal_financial_admin',
   'lga_support_admin',
   'state_support_admin',
   'state_lawyer',

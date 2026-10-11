@@ -367,13 +367,19 @@ export const SocketProvider = ({ children }) => {
 
     nextSocket.on('call:incoming', (call) => {
       setIncomingCall(call);
-      toast.info(`${call.caller?.full_name || 'Someone'} is calling you`);
+      if (call.isSupport) {
+        toast.info(`Support call from ${call.caller?.full_name || 'a user'}`);
+      } else {
+        toast.info(`${call.caller?.full_name || 'Someone'} is calling you`);
+      }
     });
 
     nextSocket.on('call:outgoing', (call) => {
       setOutgoingCall(call);
       if (call.receiverOnline === false) {
         toast.info('Call notification sent. The receiver is currently offline.');
+      } else if (call.isSupport) {
+        toast.info('Connecting you to support...');
       } else {
         toast.info(`Calling ${call.receiver?.full_name || 'receiver'}...`);
       }
@@ -535,6 +541,31 @@ export const SocketProvider = ({ children }) => {
     [socket]
   );
 
+  const startSupportCall = useCallback(
+    () => new Promise((resolve) => {
+      if (!socket?.connected) {
+        toast.error('Realtime connection is not ready yet');
+        resolve({ success: false });
+        return;
+      }
+
+      socket.timeout(8000).emit('call:support', {}, (error, response) => {
+        if (error || !response?.success) {
+          if (response?.code === 'NO_AGENT') {
+            resolve({ success: false, code: 'NO_AGENT', message: response?.message });
+            return;
+          }
+          toast.error(response?.message || 'Could not call support');
+          resolve({ success: false, message: response?.message });
+          return;
+        }
+
+        resolve(response);
+      });
+    }),
+    [socket]
+  );
+
   const acceptCall = useCallback(
     (callId) => new Promise((resolve) => {
       if (!socket?.connected || !callId) {
@@ -616,6 +647,7 @@ export const SocketProvider = ({ children }) => {
       isUserOnline,
       requestPresence,
       startCall,
+      startSupportCall,
       acceptCall,
       rejectCall,
       endCall,
@@ -641,6 +673,7 @@ export const SocketProvider = ({ children }) => {
       isUserOnline,
       requestPresence,
       startCall,
+      startSupportCall,
       acceptCall,
       rejectCall,
       endCall,

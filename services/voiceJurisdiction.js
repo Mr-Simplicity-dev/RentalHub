@@ -10,12 +10,15 @@
 // as the LGA). Reads filter rows on the jurisdiction_* columns added by
 // migration 142; legacy rows with NULL jurisdiction are super-tier only.
 
+const { ZONE_STATES, canonicalZone } = require('../config/utils/territorialZones');
+
 const SUPER_ADMIN = 'super_admin';
 const SUPER_SUPPORT = 'super_support_admin';
 const STATE_SUPPORT = 'state_support_admin';
 const LGA_SUPPORT = 'lga_support_admin';
 const STATE_ADMIN = 'state_admin';
 const LGA_ADMIN = 'lga_admin';
+const ZONAL_ADMIN = 'zonal_admin';
 
 const VOICE_READ_ROLES = [
   SUPER_ADMIN,
@@ -24,6 +27,7 @@ const VOICE_READ_ROLES = [
   LGA_SUPPORT,
   STATE_ADMIN,
   LGA_ADMIN,
+  ZONAL_ADMIN,
 ];
 
 const isVoiceReadRole = (role) => VOICE_READ_ROLES.includes(role);
@@ -40,6 +44,16 @@ const resolveVoiceReadScope = (user) => {
 
   if (role === SUPER_ADMIN || role === SUPER_SUPPORT) {
     return { level: 'super', state: null, lga: null };
+  }
+
+  if (role === ZONAL_ADMIN) {
+    const zone = canonicalZone(user.assigned_zone);
+    if (!zone) {
+      const error = new Error('Your zone is not assigned yet.');
+      error.statusCode = 403;
+      throw error;
+    }
+    return { level: 'zone', zone, states: ZONE_STATES[zone] };
   }
 
   const state = String(user.assigned_state || '').trim();
@@ -78,6 +92,14 @@ const buildScopeClause = (scope, alias) => {
       params: [scope.state],
     };
   }
+
+  if (scope.level === 'zone') {
+    return {
+      clause: ` AND ${lower('jurisdiction_state')} = ANY($1)`,
+      params: [scope.states.map((state) => state.toLowerCase())],
+    };
+  }
+
   return {
     clause:
       ` AND ${lower('jurisdiction_state')} = LOWER(TRIM($1))` +
