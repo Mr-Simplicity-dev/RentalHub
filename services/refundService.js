@@ -477,8 +477,12 @@ const ensureRefundSchema = async () => {
       id          SERIAL PRIMARY KEY,
       user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
       balance     NUMERIC(12,2) NOT NULL DEFAULT 0,
+      reserved_balance NUMERIC(12,2) NOT NULL DEFAULT 0,
       updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    ALTER TABLE wallets
+      ADD COLUMN IF NOT EXISTS reserved_balance NUMERIC(12,2) NOT NULL DEFAULT 0;
 
     -- Withdrawal requests
     CREATE TABLE IF NOT EXISTS withdrawal_requests (
@@ -2073,20 +2077,23 @@ exports.requestWithdrawal = async (req, res) => {
       // (admin reviews all withdrawals before processing)
     }
 
-    // Deduct from wallet atomically. The balance guard (WHERE balance >= $1)
-    // closes the check-then-deduct race so concurrent requests can never
-    // over-withdraw below zero.
+    // Reserve funds instead of debiting them immediately. This prevents a user
+    // from spending the same wallet balance across concurrent withdrawal requests
+    // and keeps the withdrawal amount protected until settlement or rejection.
     const txn = await db.connect();
     try {
       await txn.query('BEGIN');
 
-      const deductResult = await txn.query(
-        `UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = $2 AND balance >= $1`,
+      const reserveResult = await txn.query(
+        `UPDATE wallets
+         SET reserved_balance = reserved_balance + $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $2
+           AND (balance - reserved_balance) >= $1`,
         [withdrawAmount, userId]
       );
 
-      if (!deductResult.rowCount) {
+      if (!reserveResult.rowCount) {
         await txn.query('ROLLBACK');
         return res.status(400).json({
           success: false,
@@ -2332,9 +2339,9 @@ exports.rejectWalletWithdrawal = async (req, res) => {
 
     await db.query(
       `UPDATE wallets
-       SET balance = balance + $1,
+       SET reserved_balance = GREATEST(reserved_balance - $1, 0),
            updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $2`,
+       WHERE user_id = $2 AND reserved_balance >= $1`,
       [withdrawal.amount, withdrawal.user_id]
     );
 

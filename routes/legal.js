@@ -12,7 +12,7 @@ const audit = require('../config/middleware/auditMiddleware');
 const validateRequest = require('../config/middleware/validateRequest');
 const { grantLawyerAccessValidators } = require('../config/validators/securityValidators');
 
-const LAWYER_ROLES = ['lawyer', 'state_lawyer', 'super_lawyer'];
+const LAWYER_ROLES = ['lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer'];
 
 
 /* ---------------------------------------------------

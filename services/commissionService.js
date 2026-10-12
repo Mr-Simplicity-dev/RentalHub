@@ -78,7 +78,19 @@ const loadAgentFeeConfig = async () => {
   };
 };
 
+const ensureCommissionIdempotency = async (executor = db) => {
+  await executor.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_commissions_payment_admin_once
+      ON admin_commissions (payment_id, admin_id)
+      WHERE payment_id IS NOT NULL;
+  `);
+  return true;
+};
+
+exports.ensureCommissionIdempotency = ensureCommissionIdempotency;
+
 exports.calculateCommission = async (paymentId, userId, amount, paymentType, propertyId = null) => {
+  await ensureCommissionIdempotency();
   try {
     const COMMISSION_RATES = await loadCommissionRates();
     const suspendedAdminPct = await cfg.get('suspended_admin_redistribution_pct', 0.60);
@@ -198,7 +210,15 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
 
         const distResult = await db.query(
           `INSERT INTO admin_commissions (admin_id, user_id, payment_id, amount, source, commission_rate, state, city, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending') RETURNING id`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+           ON CONFLICT (payment_id, admin_id) WHERE payment_id IS NOT NULL DO UPDATE
+             SET amount = EXCLUDED.amount,
+                 source = EXCLUDED.source,
+                 commission_rate = EXCLUDED.commission_rate,
+                 state = EXCLUDED.state,
+                 city = EXCLUDED.city,
+                 updated_at = CURRENT_TIMESTAMP
+           RETURNING id`,
           [distAdminId, userId, paymentId, distAmount, paymentType, finalCommissionRate, propertyState, propertyCity]
         );
         commissionIds.push(distResult.rows[0].id);
@@ -231,7 +251,15 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
 
     const commissionResult = await db.query(
       `INSERT INTO admin_commissions (admin_id, user_id, payment_id, amount, source, commission_rate, state, city, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending') RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+       ON CONFLICT (payment_id, admin_id) WHERE payment_id IS NOT NULL DO UPDATE
+         SET amount = EXCLUDED.amount,
+             source = EXCLUDED.source,
+             commission_rate = EXCLUDED.commission_rate,
+             state = EXCLUDED.state,
+             city = EXCLUDED.city,
+             updated_at = CURRENT_TIMESTAMP
+       RETURNING id`,
       [admin.id, userId, paymentId, finalCommission, paymentType, finalCommissionRate, propertyState, propertyCity]
     );
 
@@ -262,6 +290,8 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
 
 exports.processPaymentCommission = async (paymentId) => {
   try {
+    await ensureCommissionIdempotency();
+
     // Idempotency guard: a payment must never mint commissions twice. The
     // verify-* endpoints and Paystack webhook can both fire for the same
     // payment (retries, client polling), which previously credited admin

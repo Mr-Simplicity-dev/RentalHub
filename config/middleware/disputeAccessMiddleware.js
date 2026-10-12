@@ -1,30 +1,31 @@
 const logger = require('../utils/logger');
 const db = require('./database');
-const { statesMatch } = require('../utils/stateScope');
+const { statesMatch, lawyerTerritoryMatches } = require('../utils/stateScope');
 
 exports.canAccessDispute = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { disputeId } = req.params;
-    const lawyerRoles = ['lawyer', 'state_lawyer', 'super_lawyer'];
+    const lawyerRoles = ['lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer'];
 
     if (lawyerRoles.includes(req.user.user_type)) {
       const lawyerAccess = await db.query(
         `SELECT
            d.id,
            u.assigned_state AS lawyer_assigned_state,
+           u.assigned_zone AS lawyer_assigned_zone,
            s.state_name AS property_state
          FROM disputes d
          JOIN legal_authorizations la
            ON la.status = 'active'
-          AND la.lawyer_user_id = $2
-          AND (
-            la.property_id = d.property_id
-            OR (
-              la.property_id IS NULL
-              AND la.client_user_id IN (d.opened_by, d.against_user)
-             )
-           )
+           AND la.lawyer_user_id = $2
+           AND (
+             la.property_id = d.property_id
+             OR (
+               la.property_id IS NULL
+               AND la.client_user_id IN (d.opened_by, d.against_user)
+              )
+            )
          JOIN users u ON u.id = la.lawyer_user_id
          JOIN properties p ON p.id = d.property_id
          LEFT JOIN states s ON s.id = p.state_id
@@ -37,7 +38,7 @@ exports.canAccessDispute = async (req, res, next) => {
       if (
         access
         && access.lawyer_assigned_state
-        && statesMatch(access.lawyer_assigned_state, access.property_state)
+        && lawyerTerritoryMatches(access.lawyer_assigned_state, access.lawyer_assigned_zone, access.property_state)
       ) {
         return next();
       }

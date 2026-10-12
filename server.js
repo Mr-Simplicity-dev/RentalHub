@@ -204,7 +204,13 @@ const scheduleEvidenceIntegrityMonitoring = () => {
 };
 
 const schedulePayoutRetries = () => {
+  const payoutRetryEnabled = String(process.env.PAYOUT_RETRY_ENABLED || 'false').toLowerCase() === 'true';
   const cronExpression = process.env.PAYOUT_RETRY_CRON?.trim() || '*/10 * * * *';
+
+  if (!payoutRetryEnabled) {
+    logger.warn('Payout retry scheduler disabled by environment (PAYOUT_RETRY_ENABLED=false).');
+    return;
+  }
 
   const runRetries = async () => {
     try {
@@ -571,6 +577,7 @@ app.use(csrfProtection);
 // Add correlation ID for request tracing
 const { v4: uuidv4 } = require('uuid');
 const logger = require('./config/utils/logger');
+const { buildHealthCheckPayload } = require('./config/utils/healthCheck');
 app.use((req, res, next) => {
   req.correlationId = req.headers['x-correlation-id'] || uuidv4();
   res.setHeader('x-correlation-id', req.correlationId);
@@ -592,34 +599,28 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', async (req, res) => {
-  const checks = { status: 'OK', uptime: process.uptime(), timestamp: new Date().toISOString() };
+  let healthStatus = 'OK';
 
   try {
     await db.query('SELECT 1');
-    checks.database = 'OK';
   } catch {
-    checks.database = 'FAIL';
-    checks.status = 'DEGRADED';
+    healthStatus = 'DEGRADED';
   }
 
-  if (process.env.REDIS_URL) {
+  if (healthStatus === 'OK' && process.env.REDIS_URL) {
     try {
       const redis = require('ioredis');
       const client = new redis(process.env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
       await client.connect();
       await client.ping();
       await client.quit();
-      checks.redis = 'OK';
     } catch {
-      checks.redis = 'FAIL';
-      if (checks.status === 'OK') checks.status = 'DEGRADED';
+      healthStatus = 'DEGRADED';
     }
-  } else {
-    checks.redis = 'DISABLED';
   }
 
-  const statusCode = checks.status === 'OK' ? 200 : 503;
-  res.status(statusCode).json(checks);
+  const statusCode = healthStatus === 'OK' ? 200 : 503;
+  res.status(statusCode).json(buildHealthCheckPayload({ status: healthStatus }));
 });
 
 app.get('/sitemap.xml', async (req, res) => {

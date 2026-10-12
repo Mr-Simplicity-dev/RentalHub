@@ -36,6 +36,8 @@ const {
   ensureWalletLedgerSchema: ensureSharedWalletLedgerSchema,
   creditWallet,
   creditLandlordRentPayment,
+  releaseWalletReservation,
+  settleWalletPayout,
 } = require('../services/walletLedgerService');
 const {
   amountMatchesStoredPayment,
@@ -4504,6 +4506,21 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
       const withdrawal = result.rows[0];
 
       if (eventName === 'transfer.success') {
+        const settled = await settleWalletPayout({
+          userId: withdrawal.user_id,
+          amount: withdrawal.amount,
+        });
+
+        if (!settled) {
+          await db.query(
+            `UPDATE wallets
+             SET balance = balance - $1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE user_id = $2 AND balance >= $1`,
+            [withdrawal.amount, withdrawal.user_id]
+          );
+        }
+
         await db.query(
           `UPDATE withdrawal_requests
            SET status = 'processed',
@@ -4526,7 +4543,13 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
         }).catch(() => {});
       } else if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
         const failureReason = data?.failure_reason || data?.reason || 'Transfer failed';
-        if (withdrawal.status !== 'pending' && withdrawal.status !== 'rejected') {
+
+        const released = await releaseWalletReservation({
+          userId: withdrawal.user_id,
+          amount: withdrawal.amount,
+        });
+
+        if (!released) {
           await db.query(
             `UPDATE wallets
              SET balance = balance + $1,
@@ -4690,7 +4713,7 @@ async function handleRefundPayment(data, webhookLogger) {
     const paymentResult = await db.query(
       `UPDATE payments
        SET payment_status = 'refunded',
-           gateway_response = gateway_response = $1,
+           gateway_response = $1
        WHERE transaction_reference = $2
        RETURNING id`,
       [JSON.stringify(data), reference]
@@ -4716,7 +4739,7 @@ async function handleFailedPayment(data, webhookLogger) {
     const paymentResult = await db.query(
       `UPDATE payments 
        SET payment_status = 'failed',
-           gateway_response = gateway_response = $1,
+           gateway_response = $1
        WHERE transaction_reference = $2
        RETURNING id, user_id, amount, payment_type`,
       [JSON.stringify(data), reference]

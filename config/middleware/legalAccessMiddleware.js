@@ -1,12 +1,12 @@
 const logger = require('../utils/logger');
 const db = require('./database');
-const { statesMatch } = require('../utils/stateScope');
+const { statesMatch, lawyerTerritoryMatches } = require('../utils/stateScope');
 
 exports.canLawyerAccessProperty = async (req, res, next) => {
   try {
     const lawyerId = req.user.id;
     const { propertyId } = req.params;
-    const allowedLawyerRoles = ['lawyer', 'state_lawyer', 'super_lawyer'];
+    const allowedLawyerRoles = ['lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer'];
 
     if (!allowedLawyerRoles.includes(req.user.user_type)) {
       return res.status(403).json({
@@ -17,7 +17,8 @@ exports.canLawyerAccessProperty = async (req, res, next) => {
 
         const result = await db.query(
       `SELECT COALESCE(s.state_name, '') AS property_state,
-              u.assigned_state AS lawyer_assigned_state
+              u.assigned_state AS lawyer_assigned_state,
+              u.assigned_zone AS lawyer_assigned_zone
        FROM legal_authorizations la
        JOIN users u ON u.id = la.lawyer_user_id
        JOIN properties p ON p.id = $1
@@ -48,10 +49,10 @@ exports.canLawyerAccessProperty = async (req, res, next) => {
     }
 
     const row = result.rows[0];
-    if (!row.lawyer_assigned_state || !statesMatch(row.lawyer_assigned_state, row.property_state)) {
+    if (!row.lawyer_assigned_state || !lawyerTerritoryMatches(row.lawyer_assigned_state, row.lawyer_assigned_zone, row.property_state)) {
       return res.status(403).json({
         success: false,
-        message: 'Lawyer state lock violation: property is outside your assigned state',
+        message: 'Lawyer territory lock violation: property is outside your assigned territory',
       });
     }
 

@@ -527,135 +527,169 @@ router.post('/withdrawals/:withdrawalId/approve',
 
       const { withdrawalId } = req.params;
       const adminNote = String(req.body?.admin_note || '').trim() || 'Approved by finance review';
+      const client = await db.connect();
 
-      await db.query('BEGIN');
+      try {
+        await client.query('BEGIN');
 
-      const existing = await db.query(
-        `SELECT * FROM admin_withdrawals WHERE id = $1 LIMIT 1 FOR UPDATE`,
-        [withdrawalId]
-      );
+        const existing = await client.query(
+          `SELECT * FROM admin_withdrawals WHERE id = $1 LIMIT 1 FOR UPDATE`,
+          [withdrawalId]
+        );
 
-      if (existing.rows.length === 0) {
-        await db.query('ROLLBACK');
-        return res.status(404).json({
-          success: false,
-          message: 'Withdrawal request not found'
-        });
-      }
+        if (existing.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({
+            success: false,
+            message: 'Withdrawal request not found'
+          });
+        }
 
-      const withdrawal = existing.rows[0];
-      if (withdrawal.status !== 'pending') {
-        await db.query('ROLLBACK');
-        return res.status(400).json({
-          success: false,
-          message: `Withdrawal request is already ${withdrawal.status}`
-        });
-      }
+        const withdrawal = existing.rows[0];
+        if (withdrawal.status !== 'pending') {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            success: false,
+            message: `Withdrawal request is already ${withdrawal.status}`
+          });
+        }
 
-      const bankCode = withdrawal.bank_code || await resolveBankCodeFromName(withdrawal.bank_name);
+        const claimed = await client.query(
+          `UPDATE admin_withdrawals
+           SET status = 'processing',
+               processed_by = $1,
+               processed_at = CURRENT_TIMESTAMP,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2 and status = 'pending'
+           RETURNING *`,
+          [req.user.id, withdrawalId]
+        );
 
-      let recipientCode = withdrawal.paystack_recipient_code;
-      if (!recipientCode) {
-        const recipient = await createTransferRecipient({
-          name: withdrawal.account_name,
-          accountNumber: withdrawal.account_number,
-          bankCode,
-        });
-        recipientCode = recipient.recipient_code;
-      }
+        if (claimed.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            success: false,
+            message: 'Withdrawal is no longer pending.'
+          });
+        }
 
-      const reference = `SAW_${withdrawal.id}_${Date.now()}`;
-      const transfer = await initiateTransfer({
-        amount: withdrawal.amount,
-        recipientCode,
-        reason: `State admin withdrawal #${withdrawal.id}`,
-        reference,
-      });
-      
-      // Update withdrawal status
-      const result = await db.query(
-        `UPDATE admin_withdrawals 
-         SET status = 'approved',
-             bank_code = $1,
-             paystack_recipient_code = $2,
-             paystack_transfer_code = $3,
-             paystack_transfer_reference = $4,
-             paystack_transfer_status = $5,
-             paystack_last_response = $6,
-             payout_attempted_at = CURRENT_TIMESTAMP,
-           processed_by = $8,
-             processed_at = CURRENT_TIMESTAMP,
-             admin_note = $7,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $9 AND status = 'pending'
-         RETURNING *`,
-        [
-          bankCode,
+        await client.query('COMMIT');
+
+        const bankCode = withdrawal.bank_code || await resolveBankCodeFromName(withdrawal.bank_name);
+
+        let recipientCode = withdrawal.paystack_recipient_code;
+        if (!recipientCode) {
+          const recipient = await createTransferRecipient({
+            name: withdrawal.account_name,
+            accountNumber: withdrawal.account_number,
+            bankCode,
+          });
+          recipientCode = recipient.recipient_code;
+        }
+
+        const reference = `SAW_${withdrawal.id}_${Date.now()}`;
+        const transfer = await initiateTransfer({
+          amount: withdrawal.amount,
           recipientCode,
-          transfer?.transfer_code || null,
-          transfer?.reference || reference,
-          transfer?.status || 'pending',
-          JSON.stringify(transfer || {}),
-          adminNote,
-          req.user.id,
-          withdrawalId,
-        ]
-      );
-      
-      if (result.rows.length === 0) {
-        await db.query('ROLLBACK');
-        return res.status(404).json({
-          success: false,
-          message: 'Withdrawal request not found or already processed'
+          reason: `State admin withdrawal #${withdrawal.id}`,
+          reference,
         });
-      }
-      
-      // Log audit
-      await db.query(
-        `INSERT INTO transaction_audits 
-         (admin_id, action_type, amount, description, performed_by)
-         VALUES ($1, 'withdrawal_approved', $2, $3, $4)`,
-        [
-          result.rows[0].admin_id,
-          result.rows[0].amount,
-          `Withdrawal approved: ₦${result.rows[0].amount.toLocaleString()}`,
-          req.user.id
-        ]
-      );
 
-      await createAdminWithdrawalOperation({
-        withdrawalId: Number(withdrawalId),
-        adminId: result.rows[0].admin_id,
-        actorId: req.user.id,
-        actorName: getFinanceActorName(req.user),
-        eventType: 'withdrawal_approved',
-        note: adminNote,
-        withdrawalSnapshot: withdrawal,
-        metadata: {
-          amount: Number(result.rows[0].amount || 0),
-          transfer_reference: transfer?.reference || reference,
-          transfer_status: transfer?.status || 'pending',
-        },
-      });
+        const result = await db.query(
+          `UPDATE admin_withdrawals
+           SET status = 'approved',
+               bank_code = $1,
+               paystack_recipient_code = $2,
+               paystack_transfer_code = $3,
+               paystack_transfer_reference = $4,
+               paystack_transfer_status = $5,
+               paystack_last_response = $6,
+               payout_attempted_at = CURRENT_TIMESTAMP,
+               processed_by = $7,
+               processed_at = CURRENT_TIMESTAMP,
+               admin_note = $8,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $9 AND status = 'processing'
+           RETURNING *`,
+          [
+            bankCode,
+            recipientCode,
+            transfer?.transfer_code || null,
+            transfer?.reference || reference,
+            transfer?.status || 'pending',
+            JSON.stringify(transfer || {}),
+            req.user.id,
+            adminNote,
+            withdrawalId,
+          ]
+        );
 
-      // If transfer succeeded synchronously, mark commissions paid and send receipt
-      if (transfer?.status === 'success') {
-        try {
-          let snapshotItems = withdrawal.commissions_snapshot;
-          if (typeof snapshotItems === 'string') {
-            try { snapshotItems = JSON.parse(snapshotItems); } catch (_) { snapshotItems = []; }
-          }
-          if (Array.isArray(snapshotItems) && snapshotItems.length > 0) {
-            const commissionIds = snapshotItems
-              .map((item) => Number(item.id))
-              .filter((id) => Number.isInteger(id) && id > 0);
-            if (commissionIds.length > 0) {
-              await db.query(
-                `UPDATE admin_commissions
-                 SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ANY($1::int[]) AND status = 'pending'`,
-                [commissionIds]
-              );
+        if (result.rows.length === 0) {
+          await db.query(
+            `UPDATE admin_withdrawals
+             SET status = 'pending',
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [withdrawalId]
+          );
+          return res.status(409).json({
+            success: false,
+            message: 'Withdrawal state changed while processing. Please retry.'
+          });
+        }
+
+        await db.query(
+          `INSERT INTO transaction_audits
+           (admin_id, action_type, amount, description, performed_by)
+           VALUES ($1, 'withdrawal_approved', $2, $3, $4)`,
+          [
+            result.rows[0].admin_id,
+            result.rows[0].amount,
+            `Withdrawal approved: ₦${result.rows[0].amount.toLocaleString()}`,
+            req.user.id
+          ]
+        );
+
+        await createAdminWithdrawalOperation({
+          withdrawalId: Number(withdrawalId),
+          adminId: result.rows[0].admin_id,
+          actorId: req.user.id,
+          actorName: getFinanceActorName(req.user),
+          eventType: 'withdrawal_approved',
+          note: adminNote,
+          withdrawalSnapshot: withdrawal,
+          metadata: {
+            amount: Number(result.rows[0].amount || 0),
+            transfer_reference: transfer?.reference || reference,
+            transfer_status: transfer?.status || 'pending',
+          },
+        });
+
+        if (transfer?.status === 'success') {
+          try {
+            let snapshotItems = withdrawal.commissions_snapshot;
+            if (typeof snapshotItems === 'string') {
+              try { snapshotItems = JSON.parse(snapshotItems); } catch (_) { snapshotItems = []; }
+            }
+            if (Array.isArray(snapshotItems) && snapshotItems.length > 0) {
+              const commissionIds = snapshotItems
+                .map((item) => Number(item.id))
+                .filter((id) => Number.isInteger(id) && id > 0);
+              if (commissionIds.length > 0) {
+                await db.query(
+                  `UPDATE admin_commissions
+                   SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ANY($1::int[]) AND status = 'pending'`,
+                  [commissionIds]
+                );
+              } else {
+                await db.query(
+                  `UPDATE admin_commissions
+                   SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                   WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
+                  [withdrawal.admin_id, withdrawal.requested_at || new Date()]
+                );
+              }
             } else {
               await db.query(
                 `UPDATE admin_commissions
@@ -664,41 +698,36 @@ router.post('/withdrawals/:withdrawalId/approve',
                 [withdrawal.admin_id, withdrawal.requested_at || new Date()]
               );
             }
-          } else {
-            await db.query(
-              `UPDATE admin_commissions
-               SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-               WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
-              [withdrawal.admin_id, withdrawal.requested_at || new Date()]
-            );
+          } catch (commErr) {
+            req.logger.warn('Failed to mark admin commissions paid on instant approval:', commErr.message);
           }
-        } catch (commErr) {
-          req.logger.warn('Failed to mark admin commissions paid on instant approval:', commErr.message);
+
+          try {
+            const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
+            sendAdminPayoutReceipt({
+              adminId: withdrawal.admin_id,
+              amount: withdrawal.amount,
+              bankName: withdrawal.bank_name,
+              accountNumber: withdrawal.account_number,
+              accountName: withdrawal.account_name,
+              reference: transfer?.reference || reference,
+              snapshot: withdrawal.commissions_snapshot || null,
+            }).catch(() => {});
+          } catch (_) {}
         }
 
-        try {
-          const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
-          sendAdminPayoutReceipt({
-            adminId: withdrawal.admin_id,
-            amount: withdrawal.amount,
-            bankName: withdrawal.bank_name,
-            accountNumber: withdrawal.account_number,
-            accountName: withdrawal.account_name,
-            reference: transfer?.reference || reference,
-            snapshot: withdrawal.commissions_snapshot || null,
-          }).catch(() => {});
-        } catch (_) {}
+        res.json({
+          success: true,
+          message: 'Withdrawal approved and payout initiated successfully',
+          data: result.rows[0]
+        });
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally {
+        client.release();
       }
-
-      await db.query('COMMIT');
-      
-      res.json({
-        success: true,
-        message: 'Withdrawal approved and payout initiated successfully',
-        data: result.rows[0]
-      });
     } catch (error) {
-      await db.query('ROLLBACK');
       req.logger.error('Approve withdrawal error:', error);
       res.status(500).json({
         success: false,
@@ -732,105 +761,96 @@ router.post('/withdrawals/:withdrawalId/reject',
         });
       }
 
-      await db.query('BEGIN');
-      
-      // Get withdrawal details first
-      const withdrawalResult = await db.query(
-        `SELECT * FROM admin_withdrawals WHERE id = $1 FOR UPDATE`,
-        [withdrawalId]
-      );
-      
-      if (withdrawalResult.rows.length === 0) {
-        await db.query('ROLLBACK');
-        return res.status(404).json({
-          success: false,
-          message: 'Withdrawal request not found'
-        });
-      }
-      
-      const withdrawal = withdrawalResult.rows[0];
+      const client = await db.connect();
 
-      if (withdrawal.status !== 'pending') {
-        await db.query('ROLLBACK');
-        return res.status(400).json({
-          success: false,
-          message: `Withdrawal request is already ${withdrawal.status}`
-        });
-      }
-      
-      // Return funds to admin wallet
-      await db.query(
-        `UPDATE users 
-         SET admin_wallet_balance = admin_wallet_balance + $1
-         WHERE id = $2`,
-        [withdrawal.amount, withdrawal.admin_id]
-      );
-      
-      // Update withdrawal status
-      const result = await db.query(
-        `UPDATE admin_withdrawals 
-         SET status = 'rejected',
-             processed_by = $1,
-             processed_at = CURRENT_TIMESTAMP,
-             admin_note = $2,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3
-         RETURNING *`,
-        [req.user.id, adminNote, withdrawalId]
-      );
-      
-      // Log audit
-      await db.query(
-        `INSERT INTO transaction_audits 
-         (admin_id, action_type, amount, description, performed_by)
-         VALUES ($1, 'withdrawal_rejected', $2, $3, $4)`,
-        [
-          withdrawal.admin_id,
-          withdrawal.amount,
-          `Withdrawal rejected: ${adminNote}`,
-          req.user.id
-        ]
-      );
-
-      await createAdminWithdrawalOperation({
-        withdrawalId: Number(withdrawalId),
-        adminId: withdrawal.admin_id,
-        actorId: req.user.id,
-        actorName: getFinanceActorName(req.user),
-        eventType: 'withdrawal_rejected',
-        note: adminNote,
-        withdrawalSnapshot: withdrawal,
-        metadata: {
-          amount: Number(withdrawal.amount || 0),
-          refunded_to_wallet: true,
-        },
-      });
-
-      // Send rejection receipt/notice so the admin knows why it was rejected and that balance was refunded
       try {
-        const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
-        sendAdminPayoutReceipt({
-          adminId: withdrawal.admin_id,
-          amount: withdrawal.amount,
-          bankName: withdrawal.bank_name,
-          accountNumber: withdrawal.account_number,
-          accountName: withdrawal.account_name,
-          reference: withdrawal.paystack_transfer_reference || `SAW_REJ_${withdrawal.id}`,
-          status: 'rejected',
-          note: `Withdrawal request was rejected: ${adminNote}. Your funds have been refunded to your admin wallet balance.`,
-          snapshot: withdrawal.commissions_snapshot || null,
-        }).catch(() => {});
-      } catch (_) {}
+        await client.query('BEGIN');
 
-      await db.query('COMMIT');
-      
-      res.json({
-        success: true,
-        message: 'Withdrawal rejected successfully',
-        data: result.rows[0]
-      });
+        const withdrawalResult = await client.query(
+          `UPDATE admin_withdrawals
+           SET status = 'rejected',
+               processed_by = $1,
+               processed_at = CURRENT_TIMESTAMP,
+               admin_note = $2,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $3 AND status = 'pending'
+           RETURNING *`,
+          [req.user.id, adminNote, withdrawalId]
+        );
+
+        if (withdrawalResult.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            success: false,
+            message: 'Withdrawal request is no longer pending.'
+          });
+        }
+
+        const withdrawal = withdrawalResult.rows[0];
+
+        await client.query(
+          `UPDATE users
+           SET admin_wallet_balance = admin_wallet_balance + $1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [withdrawal.amount, withdrawal.admin_id]
+        );
+
+        await client.query(
+          `INSERT INTO transaction_audits
+           (admin_id, action_type, amount, description, performed_by)
+           VALUES ($1, 'withdrawal_rejected', $2, $3, $4)`,
+          [
+            withdrawal.admin_id,
+            withdrawal.amount,
+            `Withdrawal rejected: ${adminNote}`,
+            req.user.id
+          ]
+        );
+
+        await createAdminWithdrawalOperation({
+          withdrawalId: Number(withdrawalId),
+          adminId: withdrawal.admin_id,
+          actorId: req.user.id,
+          actorName: getFinanceActorName(req.user),
+          eventType: 'withdrawal_rejected',
+          note: adminNote,
+          withdrawalSnapshot: withdrawal,
+          metadata: {
+            amount: Number(withdrawal.amount || 0),
+            refunded_to_wallet: true,
+          },
+        });
+
+        await client.query('COMMIT');
+
+        try {
+          const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
+          sendAdminPayoutReceipt({
+            adminId: withdrawal.admin_id,
+            amount: withdrawal.amount,
+            bankName: withdrawal.bank_name,
+            accountNumber: withdrawal.account_number,
+            accountName: withdrawal.account_name,
+            reference: withdrawal.paystack_transfer_reference || `SAW_REJ_${withdrawal.id}`,
+            status: 'rejected',
+            note: `Withdrawal request was rejected: ${adminNote}. Your funds have been refunded to your admin wallet balance.`,
+            snapshot: withdrawal.commissions_snapshot || null,
+          }).catch(() => {});
+        } catch (_) {}
+
+        res.json({
+          success: true,
+          message: 'Withdrawal rejected successfully',
+          data: withdrawalResult.rows[0]
+        });
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally {
+        client.release();
+      }
     } catch (error) {
-      await db.query('ROLLBACK');
       req.logger.error('Reject withdrawal error:', error);
       res.status(500).json({
         success: false,

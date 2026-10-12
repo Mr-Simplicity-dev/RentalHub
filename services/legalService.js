@@ -12,7 +12,7 @@ const {
 const {
   ensureLawyerCaseNotesSchema,
 } = require('../config/utils/legalSchema');
-const { statesMatch } = require('../config/utils/stateScope');
+const { statesMatch, lawyerTerritoryMatches } = require('../config/utils/stateScope');
 
 const maskEmail = (value = '') => {
   const cleanValue = String(value || '').trim();
@@ -82,9 +82,10 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
        la.client_user_id,
        d.id AS dispute_id,
        d.property_id AS dispute_property_id,
-       d.status AS dispute_status,
-       u.assigned_state AS lawyer_assigned_state,
-       s.state_name AS property_state
+        d.status AS dispute_status,
+        u.assigned_state AS lawyer_assigned_state,
+        u.assigned_zone AS lawyer_assigned_zone,
+        s.state_name AS property_state
      FROM legal_authorizations la
      JOIN disputes d ON d.id = $2
      JOIN users u ON u.id = la.lawyer_user_id
@@ -105,7 +106,7 @@ const getLawyerDisputeAccess = async (lawyerId, disputeId) => {
   );
   const row = result.rows[0] || null;
   if (!row) return null;
-  if (!row.lawyer_assigned_state || !statesMatch(row.lawyer_assigned_state, row.property_state)) {
+  if (!row.lawyer_assigned_state || !lawyerTerritoryMatches(row.lawyer_assigned_state, row.lawyer_assigned_zone, row.property_state)) {
     return null;
   }
 
@@ -354,9 +355,9 @@ exports.grantLawyerAccess = async (req, res) => {
 
     // Verify the target user is actually a lawyer
     const lawyerCheck = await db.query(
-      `SELECT id, assigned_state, lawyer_client_scope
+      `SELECT id, assigned_state, assigned_zone, lawyer_client_scope
        FROM users
-       WHERE id = $1 AND user_type IN ('lawyer', 'state_lawyer', 'super_lawyer')
+       WHERE id = $1 AND user_type IN ('lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer')
        LIMIT 1`,
       [lawyer_id]
     );
@@ -377,12 +378,13 @@ exports.grantLawyerAccess = async (req, res) => {
 
     const propertyState = propertyStateResult.rows[0]?.state || null;
     const lawyerAssignedState = lawyerCheck.rows[0]?.assigned_state || null;
+    const lawyerAssignedZone = lawyerCheck.rows[0]?.assigned_zone || null;
     const lawyerClientScope = String(lawyerCheck.rows[0]?.lawyer_client_scope || '').trim().toLowerCase();
 
-    if (!lawyerAssignedState || !statesMatch(lawyerAssignedState, propertyState)) {
+    if (!lawyerAssignedState || !lawyerTerritoryMatches(lawyerAssignedState, lawyerAssignedZone, propertyState)) {
       return res.status(403).json({
         success: false,
-        message: 'Lawyer state lock violation: selected lawyer is outside this property state',
+        message: 'Lawyer territory lock violation: selected lawyer is outside this property territory',
       });
     }
 
@@ -639,7 +641,7 @@ exports.resolveDispute = async (req, res) => {
 exports.getLegalAuditLogs = async (req, res) => {
   try {
     const { disputeId = null, limit = 50 } = req.query;
-    const isLawyerRole = ['lawyer', 'state_lawyer', 'super_lawyer'].includes(req.user?.user_type);
+    const isLawyerRole = ['lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer'].includes(req.user?.user_type);
     const params = [];
     const where = [];
 

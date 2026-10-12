@@ -1,5 +1,8 @@
 const db = require('../config/middleware/database');
 const {
+  reserveWalletBalance,
+} = require('./walletLedgerService');
+const {
   createTransferRecipient,
   initiateTransfer,
   resolveBankCodeFromName,
@@ -62,6 +65,7 @@ const ensurePayoutSchema = async () => {
 
 const RETRY_MAX_ATTEMPTS = Math.max(Number(process.env.PAYOUT_RETRY_MAX_ATTEMPTS) || 3, 1);
 const RETRY_COOLDOWN_MINUTES = Math.max(Number(process.env.PAYOUT_RETRY_COOLDOWN_MINUTES) || 15, 1);
+const PAYOUT_RETRY_ENABLED = String(process.env.PAYOUT_RETRY_ENABLED || 'false').toLowerCase() === 'true';
 
 const canRetry = (item) => {
   const attempts = Number(item.payout_retry_count || 0);
@@ -258,6 +262,25 @@ const retryWalletWithdrawals = async (limit) => {
           bankCode,
         });
         recipientCode = recipient.recipient_code;
+      }
+
+      const reserved = await reserveWalletBalance({
+        userId: item.user_id,
+        amount: item.amount,
+      });
+
+      if (!reserved) {
+        summary.skipped += 1;
+        await insertRetryAudit({
+          sourceTable: 'withdrawal_requests',
+          sourceId: item.id,
+          retryAttempt: attempt,
+          oldStatus: item.status,
+          newStatus: item.status,
+          outcome: 'skipped_insufficient_funds',
+          message: 'Wallet reserve unavailable for retry',
+        });
+        continue;
       }
 
       const reference = `WLW_${item.id}_R${attempt}_${Date.now()}`;
@@ -461,6 +484,19 @@ const retryStateAdminWithdrawals = async (limit) => {
 };
 
 const runPayoutRetryCycle = async () => {
+  if (!PAYOUT_RETRY_ENABLED) {
+    return {
+      disabled: true,
+      config: {
+        maxAttempts: RETRY_MAX_ATTEMPTS,
+        cooldownMinutes: RETRY_COOLDOWN_MINUTES,
+      },
+      agent: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
+      wallet: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
+      stateAdmin: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
+    };
+  }
+
   await ensurePayoutSchema();
   const limitPerTable = Math.max(Number(process.env.PAYOUT_RETRY_BATCH_SIZE) || 20, 1);
 

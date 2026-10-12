@@ -21,6 +21,7 @@ const { sendVerificationCode } = require('./smsService');
 const SERVICE_NAME = 'RentalHub NG';
 const MAX_TOTP_ATTEMPTS = 5;
 const TOTP_LOCK_MS = 15 * 60 * 1000;
+const PRIVILEGED_MFA_TTL_MS = 15 * 60 * 1000;
 const SMS_OTP_TTL_SECONDS = 300;
 const RECOVERY_CODE_COUNT = 10;
 const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -66,10 +67,26 @@ const otpStoreDelete = async (key) => {
   memoryOtpStore.delete(key);
 };
 
+const ensurePrivilegedMfaSchema = async () => {
+  await db.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS mfa_grace_until TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS mfa_last_verified_at TIMESTAMP;
+  `);
+};
+
+const isFreshPrivilegedMfa = (checkedAt) => {
+  if (!checkedAt) return false;
+  const value = new Date(checkedAt).getTime();
+  if (Number.isNaN(value)) return false;
+  return Date.now() - value <= PRIVILEGED_MFA_TTL_MS;
+};
+
 const loadUserTotp = async (userId) => {
   const result = await db.query(
     `SELECT totp_secret, totp_enabled, totp_failed_attempts,
-            totp_locked_until, totp_recovery_codes
+            totp_locked_until, totp_recovery_codes,
+            mfa_grace_until, mfa_last_verified_at
      FROM users WHERE id = $1`,
     [userId]
   );
@@ -213,6 +230,14 @@ exports.verifyTotpCode = async ({ userId, code }) => {
 
   if (valid) {
     await resetTotpFailures(userId);
+    await db.query(
+      `UPDATE users
+       SET mfa_last_verified_at = NOW(),
+           mfa_grace_until = NULL,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [userId]
+    );
     return true;
   }
 
@@ -429,8 +454,38 @@ exports.requirePrivilegedMfa = async (req, res, next) => {
   if (!PRIVILEGED_ROLES.has(req.user?.user_type)) return next();
 
   try {
-    const status = await exports.getTotpStatus(req.user.id);
-    if (status.totp_enabled) return next();
+    await ensurePrivilegedMfaSchema();
+
+    const userRow = await loadUserTotp(req.user.id);
+    const status = { totp_enabled: userRow?.totp_enabled === true };
+
+    if (status.totp_enabled) {
+      const incomingCode = String(
+        req.body?.totp_code || req.body?.code || req.headers?.['x-rentalhub-mfa-code'] || req.headers?.['x-mfa-code'] || ''
+      ).trim();
+
+      if (incomingCode) {
+        await exports.verifyTotpCode({ userId: req.user.id, code: incomingCode });
+        req.auth = req.auth || {};
+        req.auth.mfa_verified = true;
+        req.mfa_verified = true;
+        return next();
+      }
+
+      const freshVerifiedAt = userRow?.mfa_last_verified_at;
+      if (isFreshPrivilegedMfa(freshVerifiedAt)) {
+        req.auth = req.auth || {};
+        req.auth.mfa_verified = true;
+        req.mfa_verified = true;
+        return next();
+      }
+
+      return res.status(403).json({
+        success: false,
+        code: 'MFA_REQUIRED',
+        message: 'Two-factor authentication is required for this account. Please verify the code from your authenticator app to continue.',
+      });
+    }
 
     const graceDays = Math.max(1, Number(process.env.MFA_GRACE_DAYS) || 7);
     const now = new Date();
@@ -445,7 +500,6 @@ exports.requirePrivilegedMfa = async (req, res, next) => {
 
     const graceUntil = graceResult.rows[0]?.mfa_grace_until;
     if (graceUntil && now < new Date(graceUntil)) {
-      // Within the grace window — allow access so the admin can enroll TOTP.
       return next();
     }
   } catch (error) {

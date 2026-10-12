@@ -16,8 +16,12 @@ const ensureWalletLedgerSchema = async (executor = db) => {
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
       balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+      reserved_balance NUMERIC(12,2) NOT NULL DEFAULT 0,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    ALTER TABLE wallets
+      ADD COLUMN IF NOT EXISTS reserved_balance NUMERIC(12,2) NOT NULL DEFAULT 0;
 
     CREATE TABLE IF NOT EXISTS wallet_transactions (
       id SERIAL PRIMARY KEY,
@@ -74,13 +78,82 @@ const ensureWalletLedgerSchema = async (executor = db) => {
 const getWalletBalance = async (userId, executor = db) => {
   await ensureWalletLedgerSchema(executor);
   const result = await executor.query(
-    `SELECT COALESCE(balance, 0)::NUMERIC AS balance
+    `SELECT COALESCE(balance, 0)::NUMERIC - COALESCE(reserved_balance, 0)::NUMERIC AS available_balance,
+            COALESCE(balance, 0)::NUMERIC AS balance,
+            COALESCE(reserved_balance, 0)::NUMERIC AS reserved_balance
      FROM wallets
      WHERE user_id = $1
      LIMIT 1`,
     [userId]
   );
-  return Number(result.rows[0]?.balance || 0);
+  const row = result.rows[0] || {};
+  return Number(row.available_balance || 0);
+};
+
+const reserveWalletBalance = async ({ userId, amount, executor = db }) => {
+  await ensureWalletLedgerSchema(executor);
+  const normalizedAmount = money(amount);
+  if (!userId || normalizedAmount <= 0) return null;
+
+  const walletRow = await executor.query(
+    `SELECT balance, reserved_balance
+     FROM wallets
+     WHERE user_id = $1
+     LIMIT 1`,
+    [userId]
+  );
+
+  if (!walletRow.rows.length) return null;
+
+  const available = Number(walletRow.rows[0].balance || 0) - Number(walletRow.rows[0].reserved_balance || 0);
+  if (available < normalizedAmount) return null;
+
+  const updateResult = await executor.query(
+    `UPDATE wallets
+     SET reserved_balance = reserved_balance + $1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $2
+       AND (balance - reserved_balance) >= $1
+     RETURNING id, user_id, balance, reserved_balance`,
+    [normalizedAmount, userId]
+  );
+
+  return updateResult.rows[0] || null;
+};
+
+const releaseWalletReservation = async ({ userId, amount, executor = db }) => {
+  await ensureWalletLedgerSchema(executor);
+  const normalizedAmount = money(amount);
+  if (!userId || normalizedAmount <= 0) return null;
+
+  const updateResult = await executor.query(
+    `UPDATE wallets
+     SET reserved_balance = GREATEST(reserved_balance - $1, 0),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $2 AND reserved_balance >= $1
+     RETURNING id, user_id, balance, reserved_balance`,
+    [normalizedAmount, userId]
+  );
+
+  return updateResult.rows[0] || null;
+};
+
+const settleWalletPayout = async ({ userId, amount, executor = db }) => {
+  await ensureWalletLedgerSchema(executor);
+  const normalizedAmount = money(amount);
+  if (!userId || normalizedAmount <= 0) return null;
+
+  const updateResult = await executor.query(
+    `UPDATE wallets
+     SET balance = balance - $1,
+         reserved_balance = GREATEST(reserved_balance - $1, 0),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $2 AND reserved_balance >= $1
+     RETURNING id, user_id, balance, reserved_balance`,
+    [normalizedAmount, userId]
+  );
+
+  return updateResult.rows[0] || null;
 };
 
 const getLandlordRentDeductionTotal = async (landlordId, executor = db) => {
@@ -461,6 +534,9 @@ module.exports = {
   clearMaturedLandlordRentCredits,
   reverseLandlordRentCreditForPayment,
   releaseEscrowForPayment,
+  reserveWalletBalance,
+  releaseWalletReservation,
+  settleWalletPayout,
   getWalletBalance,
   getWalletCreditSummaryForUser,
   getLandlordRentDeductionTotal,
