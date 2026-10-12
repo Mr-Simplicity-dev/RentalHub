@@ -541,6 +541,85 @@ export const SocketProvider = ({ children }) => {
     [socket]
   );
 
+  const joinCallRoom = useCallback(
+    (callId, role = 'participant') => new Promise((resolve) => {
+      if (!socket?.connected || !callId) {
+        resolve({ success: false });
+        return;
+      }
+
+      socket.timeout(5000).emit('call:room:join', { callId, role }, (error, response) => {
+        if (error || !response?.success) {
+          resolve({ success: false, message: response?.message || 'Could not join the call room' });
+          return;
+        }
+
+        resolve(response);
+      });
+    }),
+    [socket]
+  );
+
+  const addParticipantToCall = useCallback(
+    (callId, userId, role = 'participant') => new Promise((resolve) => {
+      if (!socket?.connected || !callId || !userId) {
+        resolve({ success: false });
+        return;
+      }
+
+      socket.timeout(5000).emit('call:room:add-participant', { callId, userId, role }, (error, response) => {
+        if (error || !response?.success) {
+          toast.error(response?.message || 'Could not add this user to the call');
+          resolve({ success: false, message: response?.message || 'Could not add this user to the call' });
+          return;
+        }
+
+        resolve(response);
+      });
+    }),
+    [socket]
+  );
+
+  const removeParticipantFromCall = useCallback(
+    (callId, userId) => new Promise((resolve) => {
+      if (!socket?.connected || !callId || !userId) {
+        resolve({ success: false });
+        return;
+      }
+
+      socket.timeout(5000).emit('call:room:remove-participant', { callId, userId }, (error, response) => {
+        if (error || !response?.success) {
+          toast.error(response?.message || 'Could not remove this participant from the call');
+          resolve({ success: false, message: response?.message || 'Could not remove this participant from the call' });
+          return;
+        }
+
+        resolve(response);
+      });
+    }),
+    [socket]
+  );
+
+  const transferCallHost = useCallback(
+    (callId, userId) => new Promise((resolve) => {
+      if (!socket?.connected || !callId || !userId) {
+        resolve({ success: false });
+        return;
+      }
+
+      socket.timeout(5000).emit('call:room:transfer-host', { callId, userId }, (error, response) => {
+        if (error || !response?.success) {
+          toast.error(response?.message || 'Could not transfer host access');
+          resolve({ success: false, message: response?.message || 'Could not transfer host access' });
+          return;
+        }
+
+        resolve(response);
+      });
+    }),
+    [socket]
+  );
+
   const startSupportCall = useCallback(
     () => new Promise((resolve) => {
       if (!socket?.connected) {
@@ -648,6 +727,10 @@ export const SocketProvider = ({ children }) => {
       requestPresence,
       startCall,
       startSupportCall,
+      joinCallRoom,
+      addParticipantToCall,
+      removeParticipantFromCall,
+      transferCallHost,
       acceptCall,
       rejectCall,
       endCall,
@@ -674,6 +757,10 @@ export const SocketProvider = ({ children }) => {
       requestPresence,
       startCall,
       startSupportCall,
+      joinCallRoom,
+      addParticipantToCall,
+      removeParticipantFromCall,
+      transferCallHost,
       acceptCall,
       rejectCall,
       endCall,
@@ -708,6 +795,9 @@ export const SocketProvider = ({ children }) => {
         onToggleCamera={toggleCamera}
         onToggleScreenShare={toggleScreenShare}
         onEnd={endCall}
+        onAddParticipant={(callId, userId) => addParticipantToCall(callId, userId)}
+        onRemoveParticipant={(callId, userId) => removeParticipantFromCall(callId, userId)}
+        onTransferHost={(callId, userId) => transferCallHost(callId, userId)}
       />
     </SocketContext.Provider>
   );

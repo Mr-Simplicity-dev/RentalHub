@@ -12,7 +12,7 @@ import {
   FaExclamationTriangle,
   FaPhoneVolume,
 } from 'react-icons/fa';
-import { fetchCallLog, fetchCallbackRequests, fetchDutyStatus } from '../../services/voiceApi';
+import { fetchCallLog, fetchCallbackRequests, fetchCallRoomEvents, fetchDutyStatus } from '../../services/voiceApi';
 import { getOriginMeta } from './voiceMeta';
 
 const STATUS_TONES = {
@@ -62,6 +62,7 @@ const SourceBadge = ({ source }) => {
 const VoiceOperationsPanel = () => {
   const [calls, setCalls] = useState([]);
   const [callbacks, setCallbacks] = useState([]);
+  const [roomEvents, setRoomEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -71,12 +72,14 @@ const VoiceOperationsPanel = () => {
     else setLoading(true);
     setError('');
     try {
-      const [callLog, callbackList] = await Promise.all([
+      const [callLog, callbackList, callRoomList] = await Promise.all([
         fetchCallLog(),
         fetchCallbackRequests(),
+        fetchCallRoomEvents(),
       ]);
       setCalls(callLog);
       setCallbacks(callbackList);
+      setRoomEvents(callRoomList);
     } catch (err) {
       setError(err.message || 'Could not load the voice operations panel.');
     } finally {
@@ -221,6 +224,62 @@ const VoiceOperationsPanel = () => {
                           ) : (
                             <span className="text-xs text-slate-400">—</span>
                           )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── In-app call-room evidence ── */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <FaPhoneAlt className="text-indigo-600" size={15} />
+              Call-room evidence log
+            </h3>
+            {roomEvents.length === 0 ? (
+              <p className="mt-3 text-sm text-slate-500">
+                No in-app call-room events recorded yet.
+              </p>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <th className="py-2 pr-3 font-semibold">Time</th>
+                      <th className="py-2 pr-3 font-semibold">Action</th>
+                      <th className="py-2 pr-3 font-semibold">Actor</th>
+                      <th className="py-2 pr-3 font-semibold">Target</th>
+                      <th className="py-2 pr-3 font-semibold">Call</th>
+                      <th className="py-2 font-semibold">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roomEvents.map((event) => (
+                      <tr key={event.id} className="border-b border-slate-100 align-top">
+                        <td className="py-2.5 pr-3 whitespace-nowrap text-xs text-slate-500">
+                          {formatTime(event.created_at)}
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 uppercase">
+                            {String(event.action || '').replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="py-2.5 pr-3 text-slate-700">
+                          {event.actor_name || event.actor_user_id || 'System'}
+                        </td>
+                        <td className="py-2.5 pr-3 text-slate-700">
+                          {event.target_name || event.target_user_id || '—'}
+                        </td>
+                        <td className="py-2.5 pr-3 font-mono text-[11px] text-slate-500">
+                          {event.call_id || '—'}
+                        </td>
+                        <td className="py-2.5 text-slate-600">
+                          <pre className="whitespace-pre-wrap break-words text-[11px] leading-5 text-slate-600">
+                            {JSON.stringify(event.metadata || {}, null, 2)}
+                          </pre>
                         </td>
                       </tr>
                     ))}

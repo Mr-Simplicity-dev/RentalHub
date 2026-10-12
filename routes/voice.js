@@ -51,6 +51,7 @@ const {
   resolveVoiceReadScope,
   buildScopeClause,
 } = require('../services/voiceJurisdiction');
+const { fetchUserCallRoomHistory } = require('../services/callRoomHistory');
 const { resolveCallerArea } = require('../services/callerArea');
 const {
   dispatchIdentityOrder,
@@ -1411,6 +1412,57 @@ router.get('/call-log', voiceTokenLimiter, authenticate, requireVoiceRead, async
   } catch (error) {
     logger.error('Voice call log failed:', error.message);
     res.status(500).json({ success: false, message: 'Failed to load the call log.' });
+  }
+});
+
+router.get('/my-call-room-history', voiceTokenLimiter, authenticate, async (req, res) => {
+  try {
+    const userId = Number(req.user?.id);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    const history = await fetchUserCallRoomHistory(db, userId, 25);
+    res.json({ success: true, data: history });
+  } catch (error) {
+    logger.error('User call room history failed:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to load your call-room history.' });
+  }
+});
+
+router.get('/call-room-events', voiceTokenLimiter, authenticate, requireVoiceRead, async (req, res) => {
+  try {
+    const scopeClause = buildScopeClause(req.voiceScope, 'event');
+    const where = scopeClause.clause ? `WHERE TRUE ${scopeClause.clause}` : '';
+    const result = await db.query(
+      `SELECT e.id,
+              e.call_id,
+              e.action,
+              e.actor_user_id,
+              e.target_user_id,
+              actor.full_name AS actor_name,
+              target.full_name AS target_name,
+              e.metadata,
+              e.created_at
+       FROM call_room_events e
+       LEFT JOIN users actor ON actor.id = e.actor_user_id
+       LEFT JOIN users target ON target.id = e.target_user_id
+       ${where}
+       ORDER BY e.created_at DESC
+       LIMIT 200`,
+      scopeClause.params
+    );
+
+    res.json({
+      success: true,
+      data: result.rows.map((row) => ({
+        ...row,
+        metadata: row.metadata || {},
+      })),
+    });
+  } catch (error) {
+    logger.error('Call room evidence log failed:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to load the call-room evidence log.' });
   }
 });
 

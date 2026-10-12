@@ -30,9 +30,13 @@ const SUPPORT_AGENT_ROLES = new Set([
 const onlineUsers = new Map();
 const socketUsers = new Map();
 const activeCalls = new Map();
+const multiPartyCallRooms = new Map();
 const guestSocketAuthFailures = new Map();
 const supportAvailability = new Map();
 let callHistorySchemaReady = false;
+let callRoomEventSchemaReady = false;
+const MULTI_PARTY_CALL_LIMIT = 5;
+const CALL_ROOM_ACTIONS = new Set(['created', 'accepted', 'join', 'leave', 'add_participant', 'remove_participant', 'host_transfer']);
 
 const GUEST_SOCKET_AUTH_WINDOW_MS = Number(process.env.GUEST_SOCKET_AUTH_WINDOW_MS || 15 * 60 * 1000);
 const GUEST_SOCKET_AUTH_MAX = Number(process.env.GUEST_SOCKET_AUTH_MAX || 30);
@@ -150,7 +154,204 @@ const fetchSocketUser = async (token) => {
   return user;
 };
 
+const normalizeRoomParticipants = (participants = []) => {
+  const deduped = [];
+  const seen = new Set();
+
+  for (const participant of Array.isArray(participants) ? participants : []) {
+    const id = Number(participant?.id ?? participant?.userId ?? 0);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    deduped.push({
+      id,
+      name: participant?.name || participant?.full_name || participant?.displayName || 'Support participant',
+      role: participant?.role || participant?.status || 'participant',
+      status: participant?.status || 'connected',
+    });
+  }
+
+  return deduped.slice(0, MULTI_PARTY_CALL_LIMIT);
+};
+
+const addParticipantToRoom = (participants = [], nextParticipant = {}) => {
+  const normalized = normalizeRoomParticipants(participants);
+  const nextId = Number(nextParticipant?.id ?? nextParticipant?.userId ?? 0);
+
+  if (!nextId) {
+    return {
+      added: false,
+      participants: normalized,
+      message: 'A valid user must be selected to add to the call.',
+    };
+  }
+
+  const existing = normalized.find((participant) => Number(participant.id) === Number(nextId));
+  if (existing) {
+    existing.name = nextParticipant?.name || nextParticipant?.full_name || existing.name || 'Support participant';
+    existing.role = nextParticipant?.role || nextParticipant?.status || existing.role || 'participant';
+    existing.status = nextParticipant?.status || 'connected';
+    return {
+      added: false,
+      participants: normalized,
+      message: 'This participant is already in the call room.',
+    };
+  }
+
+  if (normalized.length >= MULTI_PARTY_CALL_LIMIT) {
+    return {
+      added: false,
+      participants: normalized,
+      message: 'This call room is full. Maximum 5 participants allowed.',
+    };
+  }
+
+  normalized.push({
+    id: nextId,
+    name: nextParticipant?.name || nextParticipant?.full_name || nextParticipant?.displayName || 'Support participant',
+    role: nextParticipant?.role || nextParticipant?.status || 'participant',
+    status: nextParticipant?.status || 'connected',
+  });
+
+  return {
+    added: true,
+    participants: normalized.slice(0, MULTI_PARTY_CALL_LIMIT),
+    message: 'Participant added to the call room.',
+  };
+};
+
+const removeParticipantFromRoom = (participants = [], targetUserId = 0) => {
+  const normalized = normalizeRoomParticipants(participants);
+  const targetId = Number(targetUserId || 0);
+
+  if (!targetId) {
+    return {
+      removed: false,
+      participants: normalized,
+      message: 'A valid participant must be selected to remove.',
+    };
+  }
+
+  const filtered = normalized.filter((participant) => Number(participant.id) !== Number(targetId));
+  if (filtered.length === normalized.length) {
+    return {
+      removed: false,
+      participants: normalized,
+      message: 'That participant is not in this call room.',
+    };
+  }
+
+  return {
+    removed: true,
+    participants: filtered.slice(0, MULTI_PARTY_CALL_LIMIT),
+    message: 'Participant removed from the call room.',
+  };
+};
+
+const transferCallHost = (participants = [], currentHostUserId = 0, nextHostUserId = 0) => {
+  const normalized = normalizeRoomParticipants(participants);
+  const currentHostId = Number(currentHostUserId || 0);
+  const nextHostId = Number(nextHostUserId || 0);
+
+  if (!currentHostId) {
+    return {
+      transferred: false,
+      participants: normalized,
+      message: 'There is no active host to transfer from.',
+    };
+  }
+
+  if (!nextHostId) {
+    return {
+      transferred: false,
+      participants: normalized,
+      message: 'Select a valid participant to become the new host.',
+    };
+  }
+
+  if (currentHostId === nextHostId) {
+    return {
+      transferred: false,
+      participants: normalized,
+      message: 'This participant is already the active host.',
+    };
+  }
+
+  const currentExists = normalized.some((participant) => Number(participant.id) === currentHostId);
+  const nextExists = normalized.some((participant) => Number(participant.id) === nextHostId);
+
+  if (!currentExists || !nextExists) {
+    return {
+      transferred: false,
+      participants: normalized,
+      message: 'The selected host transfer target is not in this room.',
+    };
+  }
+
+  const updated = normalized.map((participant) => {
+    const participantId = Number(participant.id);
+    if (participantId === currentHostId) {
+      return { ...participant, role: 'participant', status: participant.status || 'connected' };
+    }
+    if (participantId === nextHostId) {
+      return { ...participant, role: 'host', status: participant.status || 'connected' };
+    }
+    return participant;
+  });
+
+  return {
+    transferred: true,
+    participants: updated,
+    message: 'Host transferred to the selected participant.',
+  };
+};
+
+const ensureCallRoom = (call) => {
+  if (!call) return null;
+  const callId = String(call.id);
+  const room = multiPartyCallRooms.get(callId) || {
+    callId,
+    participants: [],
+    createdAt: call.createdAt || new Date().toISOString(),
+  };
+
+  const baseParticipants = normalizeRoomParticipants(call.participants || [
+    { id: call.caller?.id, name: call.caller?.full_name || call.caller?.name || 'Caller', role: 'caller', status: 'connected' },
+    { id: call.receiver?.id, name: call.receiver?.full_name || call.receiver?.name || 'Receiver', role: 'receiver', status: 'connected' },
+  ]);
+
+  const mergedParticipants = normalizeRoomParticipants([
+    ...baseParticipants,
+    ...room.participants,
+  ]);
+
+  room.participants = mergedParticipants;
+  call.participants = mergedParticipants.map((participant) => ({
+    ...participant,
+    userId: participant.id,
+  }));
+  multiPartyCallRooms.set(callId, room);
+  return room;
+};
+
+const emitCallRoomUpdate = (io, call, extra = {}) => {
+  const room = ensureCallRoom(call);
+  const payload = {
+    callId: call.id,
+    callType: call.callType,
+    propertyId: call.propertyId,
+    propertyTitle: call.propertyTitle,
+    status: call.status,
+    participants: room?.participants || [],
+    ...extra,
+  };
+
+  for (const participant of payload.participants || []) {
+    io.to(toUserRoom(participant.id)).emit('call:room:updated', payload);
+  }
+};
+
 const emitCallEvent = (io, call, eventName, payload = {}) => {
+  const room = ensureCallRoom(call);
   const message = {
     callId: call.id,
     callType: call.callType,
@@ -159,12 +360,18 @@ const emitCallEvent = (io, call, eventName, payload = {}) => {
     status: call.status,
     caller: call.caller,
     receiver: call.receiver,
+    participants: room?.participants || [],
     createdAt: call.createdAt,
     ...payload,
   };
 
-  io.to(toUserRoom(call.caller.id)).emit(eventName, message);
-  io.to(toUserRoom(call.receiver.id)).emit(eventName, message);
+  if (call.caller?.id) io.to(toUserRoom(call.caller.id)).emit(eventName, message);
+  if (call.receiver?.id) io.to(toUserRoom(call.receiver.id)).emit(eventName, message);
+  for (const participant of room?.participants || []) {
+    if (Number(participant.id) !== Number(call.caller?.id) && Number(participant.id) !== Number(call.receiver?.id)) {
+      io.to(toUserRoom(participant.id)).emit(eventName, message);
+    }
+  }
 };
 
 const clearCallTimer = (call) => {
@@ -176,6 +383,86 @@ const clearCallTimer = (call) => {
 const isCallParticipant = (call, userId) =>
   Number(call?.caller?.id) === Number(userId) ||
   Number(call?.receiver?.id) === Number(userId);
+
+const validateCallRoomParticipantAccess = async ({ propertyId, userId, targetUserId }) => {
+  const normalizedPropertyId = Number(propertyId || 0);
+  const normalizedUserId = Number(userId || 0);
+  const normalizedTargetUserId = Number(targetUserId || 0);
+
+  if (!normalizedPropertyId || !normalizedUserId || !normalizedTargetUserId) {
+    return { allowed: true, message: null };
+  }
+
+  try {
+    const propertyResult = await db.query(
+      `SELECT landlord_id FROM properties WHERE id = $1 LIMIT 1`,
+      [normalizedPropertyId]
+    );
+    const property = propertyResult.rows[0];
+
+    if (!property) {
+      return {
+        allowed: false,
+        message: 'This property is no longer available for a call.',
+      };
+    }
+
+    if (
+      Number(property.landlord_id) === normalizedUserId ||
+      Number(property.landlord_id) === normalizedTargetUserId
+    ) {
+      return { allowed: true, message: null };
+    }
+
+    const applicationResult = await db.query(
+      `SELECT 1 FROM applications
+       WHERE property_id = $1
+         AND tenant_id IN ($2, $3)
+         AND status IN ('pending', 'approved', 'active', 'accepted')
+       LIMIT 1`,
+      [normalizedPropertyId, normalizedUserId, normalizedTargetUserId]
+    );
+
+    if (applicationResult.rows.length) {
+      return { allowed: true, message: null };
+    }
+
+    const agreementResult = await db.query(
+      `SELECT 1 FROM tenancy_agreements
+       WHERE property_id = $1
+         AND (
+           landlord_id IN ($2, $3)
+           OR tenant_id IN ($2, $3)
+           OR agent_id IN ($2, $3)
+         )
+         AND status IN (
+           'DRAFT',
+           'PENDING_LANDLORD_REVIEW',
+           'PENDING_LANDLORD_SIGNATURE',
+           'PENDING_TENANT_REVIEW',
+           'PENDING_TENANT_SIGNATURE',
+           'PARTIALLY_EXECUTED',
+           'FULLY_EXECUTED'
+         )
+       LIMIT 1`,
+      [normalizedPropertyId, normalizedUserId, normalizedTargetUserId]
+    );
+
+    if (agreementResult.rows.length) {
+      return { allowed: true, message: null };
+    }
+
+    return {
+      allowed: false,
+      message: 'This call is only available to the landlord, tenant, or agent linked to this property.',
+    };
+  } catch (error) {
+    return {
+      allowed: false,
+      message: 'This call relationship could not be verified. Please try again.',
+    };
+  }
+};
 
 const getOtherParticipantId = (call, userId) => {
   if (Number(call?.caller?.id) === Number(userId)) {
@@ -229,6 +516,75 @@ const ensureCallHistorySchema = async () => {
   `);
 
   callHistorySchemaReady = true;
+};
+
+const buildCallRoomEvent = ({ callId, action, actorUserId, targetUserId, metadata = {} }) => {
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (!callId || !CALL_ROOM_ACTIONS.has(normalizedAction)) {
+    return null;
+  }
+
+  return {
+    callId: String(callId),
+    action: normalizedAction,
+    actorUserId: Number(actorUserId) || null,
+    targetUserId: Number(targetUserId) || null,
+    metadata: metadata && typeof metadata === 'object' ? metadata : {},
+    createdAt: new Date().toISOString(),
+  };
+};
+
+const ensureCallRoomEventSchema = async () => {
+  if (callRoomEventSchemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS call_room_events (
+      id UUID PRIMARY KEY,
+      call_id UUID NOT NULL,
+      action VARCHAR(40) NOT NULL CHECK (action IN ('created', 'accepted', 'join', 'leave', 'add_participant', 'remove_participant', 'host_transfer')),
+      actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      target_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_call_room_events_call_id ON call_room_events(call_id);
+    CREATE INDEX IF NOT EXISTS idx_call_room_events_actor_user_id ON call_room_events(actor_user_id);
+    CREATE INDEX IF NOT EXISTS idx_call_room_events_created_at ON call_room_events(created_at DESC);
+  `);
+
+  callRoomEventSchemaReady = true;
+};
+
+const recordCallRoomEvent = async ({ callId, action, actorUserId, targetUserId, metadata = {} }) => {
+  try {
+    const event = buildCallRoomEvent({ callId, action, actorUserId, targetUserId, metadata });
+    if (!event) return;
+
+    await ensureCallRoomEventSchema();
+    await db.query(
+      `INSERT INTO call_room_events (
+         id,
+         call_id,
+         action,
+         actor_user_id,
+         target_user_id,
+         metadata,
+         created_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        crypto.randomUUID(),
+        event.callId,
+        event.action,
+        event.actorUserId,
+        event.targetUserId,
+        JSON.stringify(event.metadata || {}),
+        event.createdAt,
+      ]
+    );
+  } catch (error) {
+    logger.error('Call room event audit failed:', error.message);
+  }
 };
 
 const recordCallSession = async (call, status, timestamps = {}) => {
@@ -561,6 +917,17 @@ const configureRealtimeSocket = (io) => {
           throw new Error('Calls can only be sent to tenants, landlords or agents');
         }
 
+        if (payload.propertyId) {
+          const access = await validateCallRoomParticipantAccess({
+            propertyId: payload.propertyId,
+            userId: user.id,
+            targetUserId: receiver.id,
+          });
+          if (!access.allowed) {
+            throw new Error(access.message || 'This user cannot be called for this property.');
+          }
+        }
+
         const call = {
           id: crypto.randomUUID(),
           caller: getPublicUser(user),
@@ -590,8 +957,25 @@ const configureRealtimeSocket = (io) => {
           });
         }, CALL_RING_TIMEOUT_MS);
 
+        call.participants = normalizeRoomParticipants([
+          { id: call.caller.id, name: call.caller.full_name || call.caller.name || 'Caller', role: 'caller', status: 'connected' },
+          { id: call.receiver.id, name: call.receiver.full_name || call.receiver.name || 'Receiver', role: 'receiver', status: 'connected' },
+        ]);
+
         activeCalls.set(call.id, call);
+        ensureCallRoom(call);
         await recordCallSession(call, 'ringing');
+        await recordCallRoomEvent({
+          callId: call.id,
+          action: 'created',
+          actorUserId: user.id,
+          targetUserId: receiver.id,
+          metadata: {
+            callType: call.callType,
+            propertyId: call.propertyId,
+            propertyTitle: call.propertyTitle,
+          },
+        });
         await logVirtualTourAudit(call, 'VIRTUAL_TOUR_REQUESTED', user.id);
 
         io.to(toUserRoom(receiver.id)).emit('call:incoming', {
@@ -757,12 +1141,25 @@ const configureRealtimeSocket = (io) => {
       clearCallTimer(call);
       call.status = 'accepted';
       call.acceptedAt = new Date().toISOString();
+      call.participants = ensureCallRoom(call)?.participants || call.participants || normalizeRoomParticipants([
+        { id: call.caller.id, name: call.caller.full_name || call.caller.name || 'Caller', role: 'caller', status: 'connected' },
+        { id: call.receiver.id, name: call.receiver.full_name || call.receiver.name || 'Receiver', role: 'receiver', status: 'connected' },
+      ]);
       activeCalls.set(call.id, call);
       await recordCallSession(call, 'accepted', {
         startedAt: call.acceptedAt,
       });
+      await recordCallRoomEvent({
+        callId: call.id,
+        action: 'accepted',
+        actorUserId: user.id,
+        metadata: {
+          acceptedAt: call.acceptedAt,
+        },
+      });
       await logVirtualTourAudit(call, 'VIRTUAL_TOUR_ACCEPTED', user.id);
       emitCallEvent(io, call, 'call:accepted', { acceptedAt: call.acceptedAt });
+      emitCallRoomUpdate(io, call, { status: 'accepted', action: 'accept' });
 
       if (typeof callback === 'function') {
         callback({ success: true, callId: call.id });
@@ -823,6 +1220,7 @@ const configureRealtimeSocket = (io) => {
       clearCallTimer(call);
       call.status = 'ended';
       activeCalls.delete(call.id);
+      multiPartyCallRooms.delete(String(call.id));
       const endedAt = new Date().toISOString();
       await recordCallSession(call, 'ended', { endedAt });
       await logVirtualTourAudit(call, 'VIRTUAL_TOUR_ENDED', user.id);
@@ -832,6 +1230,345 @@ const configureRealtimeSocket = (io) => {
 
       if (typeof callback === 'function') {
         callback({ success: true, callId: call.id });
+      }
+    });
+
+    socket.on('call:room:join', async (payload = {}, callback) => {
+      try {
+        const call = activeCalls.get(payload.callId);
+        if (!call || call.status !== 'accepted') {
+          throw new Error('This call room is not active');
+        }
+        if (!isCallParticipant(call, user.id) && !call.participants?.some((participant) => Number(participant.id) === Number(user.id))) {
+          throw new Error('You are not a participant in this call');
+        }
+
+        const room = ensureCallRoom(call);
+        const existing = room.participants.find((participant) => Number(participant.id) === Number(user.id));
+        if (existing) {
+          existing.role = String(payload.role || existing.role || 'participant');
+          existing.status = 'connected';
+        } else {
+          const roomUpdate = addParticipantToRoom(room.participants, {
+            id: Number(user.id),
+            name: user.full_name || user.email || 'Support participant',
+            role: String(payload.role || 'participant'),
+            status: 'connected',
+          });
+          if (!roomUpdate.added) {
+            throw new Error(roomUpdate.message || 'This call room is full.');
+          }
+          room.participants = roomUpdate.participants;
+        }
+
+        call.participants = room.participants.map((participant) => ({
+          ...participant,
+          userId: participant.id,
+        }));
+        await recordCallRoomEvent({
+          callId: call.id,
+          action: 'join',
+          actorUserId: user.id,
+          metadata: {
+            participants: room.participants,
+            role: payload.role || 'participant',
+          },
+        });
+        emitCallRoomUpdate(io, call, { action: 'join' });
+        if (typeof callback === 'function') {
+          callback({ success: true, participants: room.participants });
+        }
+      } catch (error) {
+        if (typeof callback === 'function') {
+          callback({ success: false, message: error.message });
+        }
+      }
+    });
+
+    socket.on('call:room:add-participant', async (payload = {}, callback) => {
+      try {
+        const call = activeCalls.get(payload.callId);
+        if (!call || call.status !== 'accepted') {
+          throw new Error('This call room is not active');
+        }
+
+        const currentUserIsParticipant = isCallParticipant(call, user.id)
+          || call.participants?.some((participant) => Number(participant.id) === Number(user.id));
+        if (!currentUserIsParticipant) {
+          throw new Error('Only current participants can add another user to this call');
+        }
+
+        const invitedUserId = Number(payload.userId || payload.memberId || payload.receiverId || payload.targetUserId || 0);
+        if (!invitedUserId || invitedUserId === Number(user.id)) {
+          throw new Error('Select a valid user to add to the call');
+        }
+
+        const invitedResult = await db.query(
+          `SELECT id, full_name, email, user_type, deleted_at, is_active
+           FROM users
+           WHERE id = $1
+           LIMIT 1`,
+          [invitedUserId]
+        );
+        const invitedUser = invitedResult.rows[0];
+
+        if (!invitedUser || invitedUser.deleted_at || invitedUser.is_active === false) {
+          throw new Error('That user is not available to join the call');
+        }
+
+        if (!CALL_ALLOWED_ROLES.has(invitedUser.user_type)) {
+          throw new Error('Only tenants, landlords and agents can join an in-app call room');
+        }
+
+        if (call.propertyId) {
+          const access = await validateCallRoomParticipantAccess({
+            propertyId: call.propertyId,
+            userId: user.id,
+            targetUserId: invitedUser.id,
+          });
+          if (!access.allowed) {
+            throw new Error(access.message || 'This user cannot join this property call.');
+          }
+        }
+
+        const room = ensureCallRoom(call);
+        const roomUpdate = addParticipantToRoom(room.participants, {
+          id: invitedUser.id,
+          name: invitedUser.full_name || invitedUser.email || 'Platform user',
+          role: invitedUser.user_type || 'participant',
+          status: 'connected',
+        });
+
+        if (!roomUpdate.added && roomUpdate.message && !/already in the call room/i.test(roomUpdate.message)) {
+          throw new Error(roomUpdate.message);
+        }
+
+        room.participants = roomUpdate.participants;
+        call.participants = room.participants.map((participant) => ({
+          ...participant,
+          userId: participant.id,
+        }));
+        const roomPayload = {
+          action: 'participant:add',
+          addedUserId: invitedUser.id,
+          addedByUserId: user.id,
+          addedUser: getPublicUser(invitedUser),
+          status: call.status,
+        };
+
+        await recordCallRoomEvent({
+          callId: call.id,
+          action: 'add_participant',
+          actorUserId: user.id,
+          targetUserId: invitedUser.id,
+          metadata: {
+            addedUser: getPublicUser(invitedUser),
+            participants: room.participants,
+            role: payload.role || 'participant',
+          },
+        });
+        emitCallRoomUpdate(io, call, roomPayload);
+        io.to(toUserRoom(invitedUser.id)).emit('call:incoming', {
+          callId: call.id,
+          callType: call.callType,
+          propertyId: call.propertyId,
+          propertyTitle: call.propertyTitle,
+          status: call.status,
+          caller: call.caller,
+          receiver: call.receiver,
+          participants: room.participants,
+          addedByUserId: user.id,
+          addedToRoom: true,
+          createdAt: call.createdAt,
+        });
+
+        if (typeof callback === 'function') {
+          callback({
+            success: true,
+            participants: room.participants,
+            added: roomUpdate.added,
+            message: roomUpdate.message,
+          });
+        }
+      } catch (error) {
+        if (typeof callback === 'function') {
+          callback({ success: false, message: error.message });
+        }
+      }
+    });
+
+    socket.on('call:room:transfer-host', async (payload = {}, callback) => {
+      try {
+        const call = activeCalls.get(payload.callId);
+        if (!call || call.status !== 'accepted') {
+          throw new Error('This call room is not active');
+        }
+
+        const currentHostUserId = Number(call.hostUserId || call.caller?.id || call.receiver?.id || 0);
+        const targetUserId = Number(payload.userId || payload.memberId || payload.targetUserId || 0);
+        if (!targetUserId) {
+          throw new Error('Select a valid participant to promote to host');
+        }
+
+        const room = ensureCallRoom(call);
+        const isCurrentHost = Number(user.id) === currentHostUserId || Number(user.id) === Number(call.caller?.id);
+        if (!isCurrentHost) {
+          throw new Error('Only the current host can transfer host access');
+        }
+
+        const transfer = transferCallHost(room.participants, currentHostUserId, targetUserId);
+        if (!transfer.transferred) {
+          throw new Error(transfer.message || 'Host transfer failed.');
+        }
+
+        room.participants = transfer.participants;
+        call.participants = room.participants.map((participant) => ({
+          ...participant,
+          userId: participant.id,
+        }));
+        call.hostUserId = targetUserId;
+
+        await recordCallRoomEvent({
+          callId: call.id,
+          action: 'host_transfer',
+          actorUserId: user.id,
+          targetUserId,
+          metadata: {
+            previousHostUserId: currentHostUserId,
+            newHostUserId: targetUserId,
+            participants: room.participants,
+          },
+        });
+
+        emitCallRoomUpdate(io, call, {
+          action: 'host:transfer',
+          hostUserId: targetUserId,
+          previousHostUserId: currentHostUserId,
+        });
+        io.to(toUserRoom(targetUserId)).emit('call:room:host-assigned', {
+          callId: call.id,
+          hostUserId: targetUserId,
+          participants: room.participants,
+          message: 'You are now the host of this call room.',
+        });
+
+        if (typeof callback === 'function') {
+          callback({
+            success: true,
+            participants: room.participants,
+            transferred: true,
+            message: transfer.message,
+          });
+        }
+      } catch (error) {
+        if (typeof callback === 'function') {
+          callback({ success: false, message: error.message });
+        }
+      }
+    });
+
+    socket.on('call:room:remove-participant', async (payload = {}, callback) => {
+      try {
+        const call = activeCalls.get(payload.callId);
+        if (!call || call.status !== 'accepted') {
+          throw new Error('This call room is not active');
+        }
+
+        const targetUserId = Number(payload.userId || payload.memberId || payload.targetUserId || 0);
+        if (!targetUserId || targetUserId === Number(user.id)) {
+          throw new Error('Select a valid participant to remove from the call');
+        }
+
+        const currentUserIsParticipant = isCallParticipant(call, user.id)
+          || call.participants?.some((participant) => Number(participant.id) === Number(user.id));
+        if (!currentUserIsParticipant) {
+          throw new Error('Only current participants can manage this room');
+        }
+
+        const room = ensureCallRoom(call);
+        const removal = removeParticipantFromRoom(room.participants, targetUserId);
+        if (!removal.removed) {
+          throw new Error(removal.message || 'That participant cannot be removed from this room.');
+        }
+
+        room.participants = removal.participants;
+        call.participants = room.participants.map((participant) => ({
+          ...participant,
+          userId: participant.id,
+        }));
+
+        await recordCallRoomEvent({
+          callId: call.id,
+          action: 'remove_participant',
+          actorUserId: user.id,
+          targetUserId,
+          metadata: {
+            removedUserId: targetUserId,
+            participants: room.participants,
+          },
+        });
+
+        emitCallRoomUpdate(io, call, {
+          action: 'participant:remove',
+          removedUserId: targetUserId,
+        });
+        io.to(toUserRoom(targetUserId)).emit('call:room:removed', {
+          callId: call.id,
+          removedUserId: targetUserId,
+          participants: room.participants,
+          message: 'You were removed from the call room.',
+        });
+
+        if (typeof callback === 'function') {
+          callback({
+            success: true,
+            participants: room.participants,
+            removed: true,
+            message: removal.message,
+          });
+        }
+      } catch (error) {
+        if (typeof callback === 'function') {
+          callback({ success: false, message: error.message });
+        }
+      }
+    });
+
+    socket.on('call:room:leave', async (payload = {}, callback) => {
+      try {
+        const call = activeCalls.get(payload.callId);
+        if (!call) {
+          throw new Error('This call room is no longer available');
+        }
+
+        const room = ensureCallRoom(call);
+        const nextParticipants = room.participants.filter((participant) => Number(participant.id) !== Number(user.id));
+        room.participants = nextParticipants;
+        call.participants = nextParticipants.map((participant) => ({
+          ...participant,
+          userId: participant.id,
+        }));
+
+        if (!room.participants.length) {
+          multiPartyCallRooms.delete(String(call.id));
+        }
+
+        await recordCallRoomEvent({
+          callId: call.id,
+          action: 'leave',
+          actorUserId: user.id,
+          metadata: {
+            participants: room.participants,
+          },
+        });
+        emitCallRoomUpdate(io, call, { action: 'leave' });
+        if (typeof callback === 'function') {
+          callback({ success: true, participants: room.participants });
+        }
+      } catch (error) {
+        if (typeof callback === 'function') {
+          callback({ success: false, message: error.message });
+        }
       }
     });
 
@@ -994,4 +1731,12 @@ const configureRealtimeSocket = (io) => {
   };
 };
 
-module.exports = configureRealtimeSocket;
+module.exports = Object.assign(configureRealtimeSocket, {
+  addParticipantToRoom,
+  removeParticipantFromRoom,
+  transferCallHost,
+  validateCallRoomParticipantAccess,
+  buildCallRoomEvent,
+  normalizeRoomParticipants,
+  MULTI_PARTY_CALL_LIMIT,
+});

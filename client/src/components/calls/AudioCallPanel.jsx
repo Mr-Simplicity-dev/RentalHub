@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   FaMicrophone,
   FaMicrophoneSlash,
@@ -6,6 +6,7 @@ import {
   FaDesktop,
   FaVideo,
   FaVideoSlash,
+  FaUserPlus,
 } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
@@ -23,11 +24,16 @@ const AudioCallPanel = ({
   onToggleCamera,
   onToggleScreenShare,
   onEnd,
+  onAddParticipant,
+  onRemoveParticipant,
+  onTransferHost,
 }) => {
   const { t } = useTranslation();
   const audioRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localVideoRef = useRef(null);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [participantUserId, setParticipantUserId] = useState('');
 
   const statusText = {
     requesting_microphone: t('audio_call.requesting_microphone', 'Requesting microphone access'),
@@ -50,6 +56,23 @@ const AudioCallPanel = ({
     if (call?.callType === 'video') return t('audio_call.video', 'Video');
     return t('audio_call.audio', 'Audio');
   };
+
+  const handleAddParticipant = async () => {
+    const parsedId = Number(String(participantUserId).trim());
+    if (!onAddParticipant || !call?.callId || !parsedId) {
+      return;
+    }
+
+    const response = await onAddParticipant(call.callId, parsedId);
+    if (response?.success) {
+      setParticipantUserId('');
+      setShowAddParticipant(false);
+    }
+  };
+
+  const participants = Array.isArray(call?.participants) ? call.participants : [];
+  const activeHostUserId = Number(call?.hostUserId || call?.caller?.id || 0);
+  const isCurrentHost = Number(currentUserId) === activeHostUserId;
 
   const isVideoCall = ['video', 'virtual_tour'].includes(call?.callType);
   const mediaLabel = getCallLabel(call);
@@ -142,6 +165,15 @@ const AudioCallPanel = ({
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
+              onClick={() => setShowAddParticipant((current) => !current)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:w-auto"
+            >
+              <FaUserPlus className="text-xs" />
+              {t('audio_call.add_user', 'Add participant')}
+            </button>
+
+            <button
+              type="button"
               onClick={onToggleMute}
               className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition sm:w-auto ${
                 microphoneEnabled
@@ -207,6 +239,67 @@ const AudioCallPanel = ({
               {t('audio_call.end_call', 'End call')}
             </button>
           </div>
+
+          {showAddParticipant && (
+            <div className="mt-3 flex gap-2">
+              <input
+                type="number"
+                min="1"
+                value={participantUserId}
+                onChange={(event) => setParticipantUserId(event.target.value)}
+                placeholder={t('audio_call.user_id_placeholder', 'User ID to add')}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none ring-0 focus:border-indigo-400"
+              />
+              <button
+                type="button"
+                onClick={handleAddParticipant}
+                className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                {t('audio_call.add_button', 'Add')}
+              </button>
+            </div>
+          )}
+
+          {participants.length > 1 && (
+            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                Room participants
+              </div>
+              <div className="space-y-2">
+                {participants.map((participant) => {
+                  const participantId = Number(participant.id ?? participant.userId ?? 0);
+                  const isParticipantHost = Number(activeHostUserId) === participantId;
+                  return (
+                    <div key={participantId || participant.name || participant.role} className="flex items-center justify-between gap-2 rounded-lg bg-white px-2 py-1.5">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-gray-800">{participant.name || 'Participant'}</div>
+                        <div className="text-[11px] text-gray-500">{participant.role || 'participant'}</div>
+                      </div>
+
+                      {isCurrentHost && !isParticipantHost && (
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => onTransferHost?.(call.callId, participantId)}
+                            className="rounded bg-indigo-100 px-2 py-1 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-200"
+                          >
+                            Host
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveParticipant?.(call.callId, participantId)}
+                            className="rounded bg-red-100 px-2 py-1 text-[10px] font-semibold text-red-700 hover:bg-red-200"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

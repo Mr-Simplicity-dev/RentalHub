@@ -130,6 +130,12 @@ export const fetchCallbackRequests = async () => {
   return Array.isArray(data?.data) ? data.data : [];
 };
 
+/** Admin-only audit trail for in-app call-room join and participant-add actions. */
+export const fetchCallRoomEvents = async () => {
+  const data = await authedFetch('/voice/call-room-events');
+  return Array.isArray(data?.data) ? data.data : [];
+};
+
 /** Admin-only summary counters for the super-admin overview widget. */
 export const fetchVoiceSummary = async () => {
   const data = await authedFetch('/voice/summary');
