@@ -149,7 +149,7 @@ const AdminVerifications = () => {
                       onClick={() => viewPassport(u.passport_photo_url)}
                       className="text-sm text-primary-600 hover:underline inline-block mt-2"
                     >
-                      View Passport Photo ->
+                      View Passport Photo
                     </button>
                   )}
                 </div>

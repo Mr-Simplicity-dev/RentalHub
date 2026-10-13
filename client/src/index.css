@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+@plugin "@tailwindcss/forms";
 
 @layer base {
   html {
@@ -68,24 +68,28 @@
   }
 
   /* Badge component */
-  .badge {
+  .badge,
+  .badge-primary,
+  .badge-success,
+  .badge-warning,
+  .badge-danger {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 
   .badge-primary {
-    @apply badge bg-primary-100 text-primary-700;
+    @apply bg-primary-100 text-primary-700;
   }
 
   .badge-success {
-    @apply badge bg-green-100 text-green-700;
+    @apply bg-green-100 text-green-700;
   }
 
   .badge-warning {
-    @apply badge bg-amber-100 text-amber-700;
+    @apply bg-amber-100 text-amber-700;
   }
 
   .badge-danger {
-    @apply badge bg-red-100 text-red-700;
+    @apply bg-red-100 text-red-700;
   }
 }
 

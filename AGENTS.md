@@ -9,8 +9,8 @@ treat the git history as shared and never run destructive git commands
 
 - Backend tests: `npm test` (node --test runner; do NOT break the suite)
 - Syntax check a file: `node --check <file>`
-- Client build: `cd client && node --max-old-space-size=1800 node_modules/react-scripts/scripts/build.js`
-- Client tests: `cd client && npx react-scripts test --watchAll=false --ci`
+- Client build: `cd client && npm run build`
+- Client tests: `cd client && npm test`
 - Migrations: `npm run migrate` / `npm run migrate:dry-run`
 - Migration files must have unique numeric prefixes (others add migrations
   concurrently — re-check `migrations/` before adding one)

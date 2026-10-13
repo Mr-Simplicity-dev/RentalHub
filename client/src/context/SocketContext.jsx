@@ -426,6 +426,24 @@ export const SocketProvider = ({ children }) => {
       toast.info('Call ended');
     });
 
+    nextSocket.on('call:room:updated', (room = {}) => {
+      setActiveMediaCall((current) => {
+        const merged = {
+          ...(current || {}),
+          ...room,
+          callId: room.callId || current?.callId,
+          status: room.status || current?.status || 'accepted',
+          participants: room.participants || current?.participants || [],
+          callType: room.callType || current?.callType,
+          propertyId: room.propertyId ?? current?.propertyId,
+          propertyTitle: room.propertyTitle ?? current?.propertyTitle,
+          hostUserId: room.hostUserId ?? current?.hostUserId ?? current?.caller?.id ?? current?.receiver?.id,
+        };
+
+        return merged;
+      });
+    });
+
     nextSocket.on('call:signal:offer', async (payload) => {
       try {
         const call = activeMediaCallRef.current?.callId === payload.callId
