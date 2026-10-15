@@ -1,7 +1,5 @@
 const db = require('../config/middleware/database');
-const {
-  reserveWalletBalance,
-} = require('./walletLedgerService');
+const { reserveWalletBalance } = require('./walletLedgerService');
 const {
   createTransferRecipient,
   initiateTransfer,
@@ -65,7 +63,7 @@ const ensurePayoutSchema = async () => {
 
 const RETRY_MAX_ATTEMPTS = Math.max(Number(process.env.PAYOUT_RETRY_MAX_ATTEMPTS) || 3, 1);
 const RETRY_COOLDOWN_MINUTES = Math.max(Number(process.env.PAYOUT_RETRY_COOLDOWN_MINUTES) || 15, 1);
-const PAYOUT_RETRY_ENABLED = String(process.env.PAYOUT_RETRY_ENABLED || 'false').toLowerCase() === 'true';
+const isPayoutRetryEnabled = () => String(process.env.PAYOUT_RETRY_ENABLED || 'false').toLowerCase() === 'true';
 
 const canRetry = (item) => {
   const attempts = Number(item.payout_retry_count || 0);
@@ -74,6 +72,76 @@ const canRetry = (item) => {
   if (!item.last_retry_at) return true;
   const elapsedMs = Date.now() - new Date(item.last_retry_at).getTime();
   return elapsedMs >= RETRY_COOLDOWN_MINUTES * 60 * 1000;
+};
+
+const buildRetryReference = (prefix, itemId, attempt) => `${prefix}_${itemId}_R${attempt}`;
+
+const claimRetryAttempt = async ({
+  table,
+  item,
+  attempt,
+  reference,
+  claimedStatus,
+  eligibleStatuses,
+}) => {
+  const result = await db.query(
+    `UPDATE ${table}
+     SET status = $1,
+         payout_retry_count = $2,
+         last_retry_at = CURRENT_TIMESTAMP,
+         payout_attempted_at = CURRENT_TIMESTAMP,
+         paystack_transfer_reference = $3,
+         paystack_transfer_status = 'processing',
+         payout_failed_reason = NULL,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $4
+       AND COALESCE(payout_retry_count, 0) = $5
+       AND COALESCE(payout_retry_count, 0) < $6
+       AND paystack_transfer_status IN ('failed', 'reversed')
+       AND status = ANY($7::text[])
+       AND (last_retry_at IS NULL OR last_retry_at <= CURRENT_TIMESTAMP - ($8 * INTERVAL '1 minute'))
+     RETURNING id`,
+    [
+      claimedStatus,
+      attempt,
+      reference,
+      item.id,
+      Number(item.payout_retry_count || 0),
+      RETRY_MAX_ATTEMPTS,
+      eligibleStatuses,
+      RETRY_COOLDOWN_MINUTES,
+    ]
+  );
+
+  return result.rows[0] || null;
+};
+
+const restoreRetryClaim = async ({ table, item, attempt, reference, message }) => {
+  await db.query(
+    `UPDATE ${table}
+     SET status = $1,
+         paystack_transfer_status = $2,
+         payout_failed_reason = $3,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $4
+       AND payout_retry_count = $5
+       AND paystack_transfer_reference = $6
+       AND paystack_transfer_status = 'processing'`,
+    [item.status, item.paystack_transfer_status, message, item.id, attempt, reference]
+  );
+};
+
+const keepRetryClaimForReconciliation = async ({ table, item, attempt, reference, message }) => {
+  await db.query(
+    `UPDATE ${table}
+     SET payout_failed_reason = $1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2
+       AND payout_retry_count = $3
+       AND paystack_transfer_reference = $4
+       AND paystack_transfer_status = 'processing'`,
+    [message, item.id, attempt, reference]
+  );
 };
 
 const insertRetryAudit = async ({
@@ -137,6 +205,23 @@ const retryAgentWithdrawals = async (limit) => {
     }
 
     const attempt = Number(item.payout_retry_count || 0) + 1;
+    const reference = buildRetryReference('AGW', item.id, attempt);
+    const claim = await claimRetryAttempt({
+      table: 'agent_withdrawal_requests',
+      item,
+      attempt,
+      reference,
+      claimedStatus: 'processing',
+      eligibleStatuses: ['approved', 'processing'],
+    });
+
+    if (!claim) {
+      summary.skipped += 1;
+      continue;
+    }
+
+    let transferInitiationStarted = false;
+    let transferStatePersisted = false;
 
     try {
       let recipientCode = item.paystack_recipient_code;
@@ -149,7 +234,7 @@ const retryAgentWithdrawals = async (limit) => {
         recipientCode = recipient.recipient_code;
       }
 
-      const reference = `AGW_${item.id}_R${attempt}_${Date.now()}`;
+      transferInitiationStarted = true;
       const transfer = await initiateTransfer({
         amount: item.amount,
         recipientCode,
@@ -163,23 +248,23 @@ const retryAgentWithdrawals = async (limit) => {
              paystack_recipient_code = $1,
              paystack_transfer_code = $2,
              paystack_transfer_reference = $3,
-             paystack_transfer_status = $4,
-             paystack_last_response = $5,
-             payout_attempted_at = CURRENT_TIMESTAMP,
-             payout_retry_count = $6,
-             last_retry_at = CURRENT_TIMESTAMP,
+             paystack_transfer_status = 'pending',
+             paystack_last_response = $4,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $7`,
+         WHERE id = $5
+           AND payout_retry_count = $6
+           AND paystack_transfer_reference = $3
+           AND paystack_transfer_status = 'processing'`,
         [
           recipientCode,
           transfer?.transfer_code || null,
-          transfer?.reference || reference,
-          transfer?.status || 'pending',
+          reference,
           JSON.stringify(transfer || {}),
-          attempt,
           item.id,
+          attempt,
         ]
       );
+      transferStatePersisted = true;
 
       await db.query(
         `INSERT INTO agent_withdrawal_audit
@@ -194,7 +279,7 @@ const retryAgentWithdrawals = async (limit) => {
         retryAttempt: attempt,
         oldStatus: item.status,
         newStatus: 'processing',
-        transferReference: transfer?.reference || reference,
+        transferReference: reference,
         transferCode: transfer?.transfer_code,
         outcome: 'initiated',
         message: 'Retry transfer initiated',
@@ -203,24 +288,34 @@ const retryAgentWithdrawals = async (limit) => {
 
       summary.retried += 1;
     } catch (error) {
-      await db.query(
-        `UPDATE agent_withdrawal_requests
-         SET payout_retry_count = $1,
-             last_retry_at = CURRENT_TIMESTAMP,
-             payout_failed_reason = $2,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3`,
-        [attempt, error.message, item.id]
-      );
+      if (transferInitiationStarted && !transferStatePersisted) {
+        await keepRetryClaimForReconciliation({
+          table: 'agent_withdrawal_requests',
+          item,
+          attempt,
+          reference,
+          message: 'Transfer submission outcome is uncertain; reconcile with Paystack before retrying.',
+        });
+      } else if (!transferInitiationStarted) {
+        await restoreRetryClaim({
+          table: 'agent_withdrawal_requests',
+          item,
+          attempt,
+          reference,
+          message: error.message,
+        });
+      }
 
       await insertRetryAudit({
         sourceTable: 'agent_withdrawal_requests',
         sourceId: item.id,
         retryAttempt: attempt,
         oldStatus: item.status,
-        newStatus: item.status,
-        outcome: 'failed_to_initiate',
-        message: error.message,
+        newStatus: transferInitiationStarted ? 'processing' : item.status,
+        outcome: transferInitiationStarted ? 'outcome_unknown' : 'failed_to_initiate',
+        message: transferInitiationStarted
+          ? 'Transfer submission outcome is uncertain; manual reconciliation required.'
+          : error.message,
       });
 
       summary.errors += 1;
@@ -250,6 +345,24 @@ const retryWalletWithdrawals = async (limit) => {
     }
 
     const attempt = Number(item.payout_retry_count || 0) + 1;
+    const reference = buildRetryReference('WLW', item.id, attempt);
+    const claim = await claimRetryAttempt({
+      table: 'withdrawal_requests',
+      item,
+      attempt,
+      reference,
+      claimedStatus: item.status,
+      eligibleStatuses: ['pending', 'approved'],
+    });
+
+    if (!claim) {
+      summary.skipped += 1;
+      continue;
+    }
+
+    let walletReservationAttempted = false;
+    let transferInitiationStarted = false;
+    let transferStatePersisted = false;
 
     try {
       const bankCode = item.bank_code || await resolveBankCodeFromName(item.bank_name);
@@ -264,6 +377,11 @@ const retryWalletWithdrawals = async (limit) => {
         recipientCode = recipient.recipient_code;
       }
 
+      if (!process.env.PAYSTACK_SECRET_KEY) {
+        throw new Error('Paystack secret key is not configured');
+      }
+
+      walletReservationAttempted = true;
       const reserved = await reserveWalletBalance({
         userId: item.user_id,
         amount: item.amount,
@@ -271,6 +389,13 @@ const retryWalletWithdrawals = async (limit) => {
 
       if (!reserved) {
         summary.skipped += 1;
+        await restoreRetryClaim({
+          table: 'withdrawal_requests',
+          item,
+          attempt,
+          reference,
+          message: 'Wallet reserve unavailable for retry',
+        });
         await insertRetryAudit({
           sourceTable: 'withdrawal_requests',
           sourceId: item.id,
@@ -283,7 +408,7 @@ const retryWalletWithdrawals = async (limit) => {
         continue;
       }
 
-      const reference = `WLW_${item.id}_R${attempt}_${Date.now()}`;
+      transferInitiationStarted = true;
       const transfer = await initiateTransfer({
         amount: item.amount,
         recipientCode,
@@ -298,30 +423,30 @@ const retryWalletWithdrawals = async (limit) => {
              paystack_recipient_code = $2,
              paystack_transfer_code = $3,
              paystack_transfer_reference = $4,
-             paystack_transfer_status = $5,
-             paystack_last_response = $6,
-             payout_attempted_at = CURRENT_TIMESTAMP,
-             payout_retry_count = $7,
-             last_retry_at = CURRENT_TIMESTAMP,
+             paystack_transfer_status = 'pending',
+             paystack_last_response = $5,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $8`,
+         WHERE id = $6
+           AND payout_retry_count = $7
+           AND paystack_transfer_reference = $4
+           AND paystack_transfer_status = 'processing'`,
         [
           bankCode,
           recipientCode,
           transfer?.transfer_code || null,
-          transfer?.reference || reference,
-          transfer?.status || 'pending',
+          reference,
           JSON.stringify(transfer || {}),
-          attempt,
           item.id,
+          attempt,
         ]
       );
+      transferStatePersisted = true;
 
       await logSecurityAudit({
         action: 'wallet_withdrawal_retry_initiated',
         targetType: 'wallet_withdrawal',
         targetId: item.id,
-        metadata: { retry_attempt: attempt, reference: transfer?.reference || reference },
+        metadata: { retry_attempt: attempt, reference },
       });
 
       await insertRetryAudit({
@@ -330,7 +455,7 @@ const retryWalletWithdrawals = async (limit) => {
         retryAttempt: attempt,
         oldStatus: item.status,
         newStatus: 'approved',
-        transferReference: transfer?.reference || reference,
+        transferReference: reference,
         transferCode: transfer?.transfer_code,
         outcome: 'initiated',
         message: 'Retry transfer initiated',
@@ -339,24 +464,42 @@ const retryWalletWithdrawals = async (limit) => {
 
       summary.retried += 1;
     } catch (error) {
-      await db.query(
-        `UPDATE withdrawal_requests
-         SET payout_retry_count = $1,
-             last_retry_at = CURRENT_TIMESTAMP,
-             payout_failed_reason = $2,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3`,
-        [attempt, error.message, item.id]
-      );
+      if (transferInitiationStarted && !transferStatePersisted) {
+        await keepRetryClaimForReconciliation({
+          table: 'withdrawal_requests',
+          item,
+          attempt,
+          reference,
+          message: 'Transfer submission outcome is uncertain; reconcile with Paystack before retrying.',
+        });
+      } else if (!transferInitiationStarted && walletReservationAttempted) {
+        await keepRetryClaimForReconciliation({
+          table: 'withdrawal_requests',
+          item,
+          attempt,
+          reference,
+          message: 'Wallet reserve outcome is uncertain; reconcile the wallet ledger before retrying.',
+        });
+      } else if (!transferInitiationStarted) {
+        await restoreRetryClaim({
+          table: 'withdrawal_requests',
+          item,
+          attempt,
+          reference,
+          message: error.message,
+        });
+      }
 
       await insertRetryAudit({
         sourceTable: 'withdrawal_requests',
         sourceId: item.id,
         retryAttempt: attempt,
         oldStatus: item.status,
-        newStatus: item.status,
-        outcome: 'failed_to_initiate',
-        message: error.message,
+        newStatus: transferInitiationStarted ? 'processing' : item.status,
+        outcome: transferInitiationStarted ? 'outcome_unknown' : 'failed_to_initiate',
+        message: transferInitiationStarted
+          ? 'Transfer submission outcome is uncertain; manual reconciliation required.'
+          : error.message,
       });
 
       summary.errors += 1;
@@ -386,6 +529,23 @@ const retryStateAdminWithdrawals = async (limit) => {
     }
 
     const attempt = Number(item.payout_retry_count || 0) + 1;
+    const reference = buildRetryReference('SAW', item.id, attempt);
+    const claim = await claimRetryAttempt({
+      table: 'admin_withdrawals',
+      item,
+      attempt,
+      reference,
+      claimedStatus: 'processing',
+      eligibleStatuses: ['pending', 'approved'],
+    });
+
+    if (!claim) {
+      summary.skipped += 1;
+      continue;
+    }
+
+    let transferInitiationStarted = false;
+    let transferStatePersisted = false;
 
     try {
       const bankCode = item.bank_code || await resolveBankCodeFromName(item.bank_name);
@@ -400,7 +560,7 @@ const retryStateAdminWithdrawals = async (limit) => {
         recipientCode = recipient.recipient_code;
       }
 
-      const reference = `SAW_${item.id}_R${attempt}_${Date.now()}`;
+      transferInitiationStarted = true;
       const transfer = await initiateTransfer({
         amount: item.amount,
         recipientCode,
@@ -410,35 +570,35 @@ const retryStateAdminWithdrawals = async (limit) => {
 
       await db.query(
         `UPDATE admin_withdrawals
-         SET status = 'approved',
+         SET status = 'processing',
              bank_code = $1,
              paystack_recipient_code = $2,
              paystack_transfer_code = $3,
              paystack_transfer_reference = $4,
-             paystack_transfer_status = $5,
-             paystack_last_response = $6,
-             payout_attempted_at = CURRENT_TIMESTAMP,
-             payout_retry_count = $7,
-             last_retry_at = CURRENT_TIMESTAMP,
+             paystack_transfer_status = 'pending',
+             paystack_last_response = $5,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $8`,
+         WHERE id = $6
+           AND payout_retry_count = $7
+           AND paystack_transfer_reference = $4
+           AND paystack_transfer_status = 'processing'`,
         [
           bankCode,
           recipientCode,
           transfer?.transfer_code || null,
-          transfer?.reference || reference,
-          transfer?.status || 'pending',
+          reference,
           JSON.stringify(transfer || {}),
-          attempt,
           item.id,
+          attempt,
         ]
       );
+      transferStatePersisted = true;
 
       await logSecurityAudit({
         action: 'state_admin_withdrawal_retry_initiated',
         targetType: 'admin_withdrawal',
         targetId: item.id,
-        metadata: { retry_attempt: attempt, reference: transfer?.reference || reference },
+        metadata: { retry_attempt: attempt, reference },
       });
 
       await insertRetryAudit({
@@ -446,8 +606,8 @@ const retryStateAdminWithdrawals = async (limit) => {
         sourceId: item.id,
         retryAttempt: attempt,
         oldStatus: item.status,
-        newStatus: 'approved',
-        transferReference: transfer?.reference || reference,
+        newStatus: 'processing',
+        transferReference: reference,
         transferCode: transfer?.transfer_code,
         outcome: 'initiated',
         message: 'Retry transfer initiated',
@@ -456,24 +616,34 @@ const retryStateAdminWithdrawals = async (limit) => {
 
       summary.retried += 1;
     } catch (error) {
-      await db.query(
-        `UPDATE admin_withdrawals
-         SET payout_retry_count = $1,
-             last_retry_at = CURRENT_TIMESTAMP,
-             payout_failed_reason = $2,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3`,
-        [attempt, error.message, item.id]
-      );
+      if (transferInitiationStarted && !transferStatePersisted) {
+        await keepRetryClaimForReconciliation({
+          table: 'admin_withdrawals',
+          item,
+          attempt,
+          reference,
+          message: 'Transfer submission outcome is uncertain; reconcile with Paystack before retrying.',
+        });
+      } else if (!transferInitiationStarted) {
+        await restoreRetryClaim({
+          table: 'admin_withdrawals',
+          item,
+          attempt,
+          reference,
+          message: error.message,
+        });
+      }
 
       await insertRetryAudit({
         sourceTable: 'admin_withdrawals',
         sourceId: item.id,
         retryAttempt: attempt,
         oldStatus: item.status,
-        newStatus: item.status,
-        outcome: 'failed_to_initiate',
-        message: error.message,
+        newStatus: transferInitiationStarted ? 'processing' : item.status,
+        outcome: transferInitiationStarted ? 'outcome_unknown' : 'failed_to_initiate',
+        message: transferInitiationStarted
+          ? 'Transfer submission outcome is uncertain; manual reconciliation required.'
+          : error.message,
       });
 
       summary.errors += 1;
@@ -484,7 +654,7 @@ const retryStateAdminWithdrawals = async (limit) => {
 };
 
 const runPayoutRetryCycle = async () => {
-  if (!PAYOUT_RETRY_ENABLED) {
+  if (!isPayoutRetryEnabled()) {
     return {
       disabled: true,
       config: {
