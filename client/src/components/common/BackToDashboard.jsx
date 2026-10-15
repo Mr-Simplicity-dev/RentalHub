@@ -29,6 +29,7 @@ const dashboardPathByRole = {
   super_transportation_admin: '/super-admin/transportation',
   lawyer: '/lawyer',
   state_lawyer: '/lawyer/state',
+  zonal_lawyer: '/lawyer/zonal',
   super_lawyer: '/lawyer/super',
 };
 

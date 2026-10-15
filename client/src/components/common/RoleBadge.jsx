@@ -103,6 +103,10 @@ const DEFAULT_MAP = {
     label: 'STATE LAWYER',
     className: 'bg-violet-100 text-violet-700 border-violet-200',
   },
+  zonal_lawyer: {
+    label: 'ZONAL LAWYER',
+    className: 'bg-purple-100 text-purple-700 border-purple-200',
+  },
   super_lawyer: {
     label: 'SUPER LAWYER',
     className: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200',

@@ -81,6 +81,7 @@ const DEPARTMENT_ESCALATION_ROLES = {
     'transportation_admin',
     'lga_transportation_admin',
     'state_transportation_admin',
+    'zonal_transportation_admin',
     'super_transportation_admin',
     'super_admin',
     'super_support_admin',
@@ -89,6 +90,7 @@ const DEPARTMENT_ESCALATION_ROLES = {
     'fumigation_admin',
     'lga_fumigation_admin',
     'state_fumigation_admin',
+    'zonal_fumigation_admin',
     'super_fumigation_admin',
     'super_admin',
     'super_support_admin',
@@ -104,6 +106,7 @@ const DEPARTMENT_ESCALATION_ROLES = {
   legal: new Set([
     'lawyer',
     'state_lawyer',
+    'zonal_lawyer',
     'super_lawyer',
     'super_admin',
     'super_support_admin',

@@ -229,6 +229,7 @@ exports.getDisputeDetails = async (req, res) => {
     const canViewAllCaseNotes = [
       'lawyer',
       'state_lawyer',
+      'zonal_lawyer',
       'super_lawyer',
       'admin',
       'super_admin',

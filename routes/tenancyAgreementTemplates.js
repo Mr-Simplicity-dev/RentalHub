@@ -11,6 +11,7 @@ const TEMPLATE_ADMIN_ROLES = new Set([
   'super_admin',
   'lawyer',
   'state_lawyer',
+  'zonal_lawyer',
   'super_lawyer',
   'state_admin',
 ]);

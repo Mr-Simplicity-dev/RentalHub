@@ -153,6 +153,8 @@ const Login = () => {
           navigate('/lawyer/super');
         } else if (role === 'state_lawyer') {
           navigate('/lawyer/state');
+        } else if (role === 'zonal_lawyer') {
+          navigate('/lawyer/zonal');
         } else if (role === 'lawyer') {
           navigate('/lawyer');
         } else if (role === 'agent') {

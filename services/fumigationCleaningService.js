@@ -3,6 +3,7 @@ const { validationResult } = require('express-validator');
 const NotificationService = require('../services/notificationService');
 const db = require('../config/middleware/database');
 const logger = require('../config/utils/logger');
+const { ZONE_STATES, canonicalZone } = require('../config/utils/territorialZones');
 
 const FUMIGATION_ADMIN_ROLES = new Set([
   'admin',
@@ -13,7 +14,12 @@ const FUMIGATION_ADMIN_ROLES = new Set([
   'fumigation_admin',
   'lga_fumigation_admin',
   'state_fumigation_admin',
+  'zonal_fumigation_admin',
   'super_fumigation_admin',
+]);
+
+const ZONAL_FUMIGATION_ADMIN_ROLES = new Set([
+  'zonal_fumigation_admin',
 ]);
 
 const LGA_FUMIGATION_ADMIN_ROLES = new Set([
@@ -77,6 +83,18 @@ const getFumigationAdminScope = (user) => {
     return { valid: true, level: 'state', state, city: null };
   }
 
+  if (ZONAL_FUMIGATION_ADMIN_ROLES.has(role)) {
+    const zone = canonicalZone(user?.assigned_zone);
+    if (!zone) {
+      return {
+        valid: false,
+        message:
+          'This zonal fumigation admin account has no assigned zone. Ask a super admin to update its jurisdiction.',
+      };
+    }
+    return { valid: true, level: 'zone', states: ZONE_STATES[zone] };
+  }
+
   return { valid: false, message: 'Fumigation admin access only' };
 };
 
@@ -104,6 +122,12 @@ const bookingMatchesScope = (booking, scope) => {
 
   const bookingState = normalizeState(booking?.property_state);
   const bookingStateCode = normalizeState(booking?.property_state_code);
+
+  if (scope.level === 'zone') {
+    const zoneStates = (scope.states || []).map((s) => normalizeState(s));
+    return zoneStates.includes(bookingState) || zoneStates.includes(bookingStateCode);
+  }
+
   const assignedState = normalizeState(scope.state);
   const stateMatches =
     assignedState &&

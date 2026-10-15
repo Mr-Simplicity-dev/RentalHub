@@ -30,6 +30,7 @@ const WITHDRAWAL_ELIGIBLE_ROLES = new Set([
   'lga_support_admin',
   'state_support_admin',
   'state_lawyer',
+  'zonal_lawyer',
   'financial_admin',
   'super_financial_admin',
   'super_support_admin',
@@ -37,10 +38,12 @@ const WITHDRAWAL_ELIGIBLE_ROLES = new Set([
   'fumigation_admin',
   'lga_fumigation_admin',
   'state_fumigation_admin',
+  'zonal_fumigation_admin',
   'super_fumigation_admin',
   'transportation_admin',
   'lga_transportation_admin',
   'state_transportation_admin',
+  'zonal_transportation_admin',
   'super_transportation_admin',
   // Marketing agents earn a cash commission per account they open, so they withdraw
   // through the same machinery as every other commission-earning role.

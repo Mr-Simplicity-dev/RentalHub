@@ -4,6 +4,7 @@ const router = express.Router();
 const { authenticate } = require('../config/middleware/auth');
 const db = require('../config/middleware/database');
 const validateRequest = require('../config/middleware/validateRequest');
+const { ZONE_STATES, canonicalZone } = require('../config/utils/territorialZones');
 
 const TRANSPORTATION_ADMIN_ROLES = new Set([
   'admin',
@@ -17,7 +18,12 @@ const TRANSPORTATION_ADMIN_ROLES = new Set([
   'transportation_admin',
   'lga_transportation_admin',
   'state_transportation_admin',
+  'zonal_transportation_admin',
   'super_transportation_admin',
+]);
+
+const ZONAL_TRANSPORTATION_ADMIN_ROLES = new Set([
+  'zonal_transportation_admin',
 ]);
 
 const LGA_TRANSPORTATION_ADMIN_ROLES = new Set([
@@ -112,6 +118,18 @@ const getTransportationAdminScope = (user) => {
     return { valid: true, level: 'state', state, city: null };
   }
 
+  if (ZONAL_TRANSPORTATION_ADMIN_ROLES.has(role)) {
+    const zone = canonicalZone(user?.assigned_zone);
+    if (!zone) {
+      return {
+        valid: false,
+        message:
+          'This zonal transportation admin account has no assigned zone. Ask a super admin to update its jurisdiction.',
+      };
+    }
+    return { valid: true, level: 'zone', states: ZONE_STATES[zone] };
+  }
+
   return { valid: false, message: 'Transportation admin access only' };
 };
 
@@ -129,6 +147,13 @@ const buildTransportationScopeSql = (
 ) => {
   if (scope.level === 'national') {
     return { sql: '', params: [] };
+  }
+
+  if (scope.level === 'zone') {
+    return {
+      sql: ` AND LOWER(TRIM(${stateAlias}.state_name)) = ANY($${startIndex})`,
+      params: [scope.states.map((s) => s.toLowerCase())],
+    };
   }
 
   const params = [scope.state];

@@ -551,6 +551,11 @@ const Dashboard = () => {
       return;
     }
 
+    if (user.user_type === 'zonal_lawyer') {
+      navigate('/lawyer/zonal', { replace: true });
+      return;
+    }
+
     if (user.user_type === 'lawyer') {
       navigate('/lawyer', { replace: true });
       return;

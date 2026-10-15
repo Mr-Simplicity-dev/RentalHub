@@ -255,6 +255,10 @@ const getDashboardPathForRole = (userType) => {
 
       return '/lawyer/super';
 
+    case 'zonal_lawyer':
+
+      return '/lawyer/zonal';
+
     case 'state_lawyer':
 
       return '/lawyer/state';

@@ -19,7 +19,7 @@ const TEMPLATE_STATUS = {
 };
 
 const PRODUCTION_STATUSES = [TEMPLATE_STATUS.APPROVED, TEMPLATE_STATUS.ACTIVE];
-const APPROVER_ROLES = new Set(['super_admin', 'lawyer', 'state_lawyer', 'super_lawyer']);
+const APPROVER_ROLES = new Set(['super_admin', 'lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer']);
 
 let schemaEnsured = false;
 const ensureTemplateSchema = async () => {

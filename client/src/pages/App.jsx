@@ -87,6 +87,7 @@ const SupportGovernancePanel = React.lazy(() => import('../components/admin/Supp
 const LawyerDashboard = React.lazy(() => import('./lawyer/LawyerDashboard'));
 const LawyerLayout = React.lazy(() => import('./lawyer/LawyerLayout'));
 const StateLawyerDashboard = React.lazy(() => import('./lawyer/StateLawyerDashboard'));
+const ZonalLawyerDashboard = React.lazy(() => import('./lawyer/ZonalLawyerDashboard'));
 const SuperLawyerDashboard = React.lazy(() => import('./lawyer/SuperLawyerDashboard'));
 const AgentDashboard = React.lazy(() => import('./agent/AgentDashboard'));
 const MarketingAgentDashboard = React.lazy(() => import('./marketing/MarketingAgentDashboard'));
@@ -152,8 +153,8 @@ const STATE_SUPPORT_ADMIN_ROLES = ['state_support_admin'];
 const SUPER_SUPPORT_ADMIN_ROLES = ['super_support_admin'];
 const RECRUITMENT_ADMIN_ROLES = ['recruitment_admin'];
 const SUPER_ADMIN_ROLES = ['super_admin'];
-const FUMIGATION_ADMIN_ROLES = ['fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'super_fumigation_admin'];
-const TRANSPORTATION_ADMIN_ROLES = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'super_transportation_admin'];
+const FUMIGATION_ADMIN_ROLES = ['fumigation_admin', 'lga_fumigation_admin', 'state_fumigation_admin', 'zonal_fumigation_admin', 'super_fumigation_admin'];
+const TRANSPORTATION_ADMIN_ROLES = ['transportation_admin', 'lga_transportation_admin', 'state_transportation_admin', 'zonal_transportation_admin', 'super_transportation_admin'];
 const LGA_TRANSPORTATION_ADMIN_ROLES = ['admin', 'lga_admin', 'transportation_admin', 'lga_transportation_admin'];
 const STATE_TRANSPORTATION_ADMIN_ROLES = ['state_admin', 'state_financial_admin', 'state_support_admin', 'state_transportation_admin'];
 const LGA_FUMIGATION_ADMIN_ROLES = ['admin', 'lga_admin', 'fumigation_admin', 'lga_fumigation_admin'];
@@ -180,12 +181,14 @@ const ADMIN_SHELL_ROLES = [
 const getFumigationDashboardPath = (role) => {
   if (role === 'super_fumigation_admin') return '/admin/fumigation-cleaning/super';
   if (role === 'state_fumigation_admin') return '/admin/fumigation-cleaning/state';
+  if (role === 'zonal_fumigation_admin') return '/admin/fumigation-cleaning/zonal';
   return '/admin/fumigation-cleaning';
 };
 
 const getTransportationDashboardPath = (role) => {
   if (role === 'super_transportation_admin') return '/super-admin/transportation';
   if (role === 'state_transportation_admin') return '/admin/transportation/state';
+  if (role === 'zonal_transportation_admin') return '/admin/transportation/zonal';
   return '/admin/transportation';
 };
 
@@ -360,6 +363,7 @@ const LandlordRoute = ({ children }) => {
     if (user?.user_type === 'agent') return <Navigate to="/agent/dashboard" />;
     if (user?.user_type === 'lawyer') return <Navigate to="/lawyer" />;
     if (user?.user_type === 'state_lawyer') return <Navigate to="/lawyer/state" />;
+    if (user?.user_type === 'zonal_lawyer') return <Navigate to="/lawyer/zonal" />;
     if (user?.user_type === 'super_lawyer') return <Navigate to="/lawyer/super" />;
     if (user?.user_type === 'admin' || user?.user_type === 'lga_admin' || ZONAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" />;
     if (FINANCIAL_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin/financial-dashboard" />;
@@ -434,6 +438,19 @@ const StateLawyerRoute = ({ children }) => {
   return children;
 };
 
+const ZonalLawyerRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.user_type !== 'zonal_lawyer') return <Navigate to="/dashboard" />;
+
+  return children;
+};
+
 const SuperLawyerRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -500,6 +517,21 @@ const TransportationStateAdminRoute = ({ children }) => {
   return children;
 };
 
+const ZonalTransportationAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!ZONAL_TRANSPORTATION_ADMIN_ROLES.includes(user?.user_type)) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return children;
+};
+
 const LgaFumigationAdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -522,6 +554,19 @@ const StateFumigationAdminRoute = ({ children }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (!STATE_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
+
+  return children;
+};
+
+const ZonalFumigationAdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">{i18n.t('app.loading')}</div>;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!ZONAL_FUMIGATION_ADMIN_ROLES.includes(user?.user_type)) return <Navigate to="/admin" replace />;
 
   return children;
 };
@@ -854,6 +899,16 @@ function App() {
                 <Route index element={<StateLawyerDashboard />} />
               </Route>
               <Route
+                path="/lawyer/zonal"
+                element={
+                  <ZonalLawyerRoute>
+                    <LawyerLayout />
+                  </ZonalLawyerRoute>
+                }
+              >
+                <Route index element={<ZonalLawyerDashboard />} />
+              </Route>
+              <Route
                 path="/lawyer/super"
                 element={
                   <SuperLawyerRoute>
@@ -941,12 +996,27 @@ function App() {
                     </TransportationStateAdminRoute>
                   }
                 />
+                <Route path="transportation/zonal"
+                  element={
+                    <ZonalTransportationAdminRoute>
+                      <TransportationAdminStateDashboard />
+                    </ZonalTransportationAdminRoute>
+                  }
+                />
                                 <Route
                   path="fumigation-cleaning/state"
                   element={
                     <StateFumigationAdminRoute>
                       <StateFumigationAdminDashboard />
                     </StateFumigationAdminRoute>
+                  }
+                />
+                                <Route
+                  path="fumigation-cleaning/zonal"
+                  element={
+                    <ZonalFumigationAdminRoute>
+                      <StateFumigationAdminDashboard />
+                    </ZonalFumigationAdminRoute>
                   }
                 />
                                 <Route

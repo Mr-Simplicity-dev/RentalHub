@@ -169,12 +169,16 @@ const ensureAdminRoleSchema = async () => {
           'landlord',
           'lawyer',
           'state_lawyer',
+          'zonal_lawyer',
           'super_lawyer',
           'admin',
           'lga_admin',
           'lga_support_admin',
           'state_admin',
           'zonal_admin',
+          'zonal_financial_admin',
+          'zonal_fumigation_admin',
+          'zonal_transportation_admin',
           'lga_financial_admin',
           'lga_transportation_admin',
           'state_transportation_admin',
@@ -2531,6 +2535,7 @@ exports.createAdmin = async (req, res) => {
     const lawyerRoles = new Set([
       'lawyer',
       'state_lawyer',
+      'zonal_lawyer',
       'super_lawyer',
     ]);
 
@@ -2674,6 +2679,7 @@ exports.createAdmin = async (req, res) => {
       'recruitment_admin',
       'super_lawyer',
       'state_lawyer',
+      'zonal_lawyer',
       'lawyer',
       'agent',
       'fumigation_admin',

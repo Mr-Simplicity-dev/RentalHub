@@ -90,6 +90,7 @@ if (role === 'zonal_financial_admin') return '/admin/zonal-financial-dashboard';
     if (role === 'transportation_admin' || role === 'lga_transportation_admin') return '/admin/transportation';
     if (role === 'lawyer') return '/lawyer';
     if (role === 'state_lawyer') return '/lawyer/state';
+    if (role === 'zonal_lawyer') return '/lawyer/zonal';
     if (role === 'super_lawyer') return '/lawyer/super';
     if (role === 'agent') return '/agent/dashboard';
     return '/dashboard';

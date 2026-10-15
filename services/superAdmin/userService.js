@@ -211,6 +211,8 @@ const impersonateAdmin = async (req, res) => {
 
       'state_lawyer',
 
+      'zonal_lawyer',
+
       'super_lawyer',
 
       'super_admin',

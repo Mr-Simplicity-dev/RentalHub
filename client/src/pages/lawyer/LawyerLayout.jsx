@@ -31,6 +31,11 @@ const ROLE_CONFIG = {
     gradient: 'from-emerald-700 via-emerald-600 to-teal-600',
     softPanel: 'bg-emerald-50 border-emerald-200 text-emerald-800',
   },
+  zonal_lawyer: {
+    homePath: '/lawyer/zonal',
+    gradient: 'from-violet-700 via-purple-600 to-fuchsia-600',
+    softPanel: 'bg-violet-50 border-violet-200 text-violet-800',
+  },
   super_lawyer: {
     homePath: '/lawyer/super',
     gradient: 'from-slate-900 via-slate-800 to-indigo-900',
