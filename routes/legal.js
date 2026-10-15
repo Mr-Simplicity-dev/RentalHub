@@ -14,19 +14,53 @@ const { grantLawyerAccessValidators } = require('../config/validators/securityVa
 
 const LAWYER_ROLES = ['lawyer', 'state_lawyer', 'zonal_lawyer', 'super_lawyer'];
 
+const INTERNAL_LEGAL_ACCESS_ROLES = [
+  'super_admin',
+  'super_support_admin',
+  'super_lawyer',
+  'super_transportation_admin',
+  'super_fumigation_admin',
+  'super_financial_admin',
+  'lga_support_admin',
+  'state_support_admin',
+  'zonal_admin',
+  'zonal_support_admin',
+];
 
 /* ---------------------------------------------------
-   Public Lawyer Directory
+   Public Treated-Cases Showcase (anonymized)
+--------------------------------------------------- */
+
+router.get(
+  '/treated-cases',
+  legalController.getTreatedCases
+);
+
+/* ---------------------------------------------------
+   Internal Lawyer + Case Directory (scoped)
+--------------------------------------------------- */
+
+router.get(
+  '/lawyer-directory',
+  authenticate,
+  legalController.getInternalLawyerDirectory
+);
+
+/* ---------------------------------------------------
+   Platform Lawyer Directory (internal only)
 --------------------------------------------------- */
 
 router.get(
   '/directory',
+  authenticate,
+  allowRoles(...INTERNAL_LEGAL_ACCESS_ROLES),
   legalController.getPublicLawyerDirectory
 );
 
 router.get(
   '/directory/full',
   authenticate,
+  allowRoles(...INTERNAL_LEGAL_ACCESS_ROLES),
   legalController.getUnlockedLawyerDirectory
 );
 

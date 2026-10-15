@@ -13,6 +13,7 @@ const {
   ensureLawyerCaseNotesSchema,
 } = require('../config/utils/legalSchema');
 const { statesMatch, lawyerTerritoryMatches } = require('../config/utils/stateScope');
+const { ZONE_STATES, canonicalZone } = require('../config/utils/territorialZones');
 
 const maskEmail = (value = '') => {
   const cleanValue = String(value || '').trim();
@@ -183,6 +184,152 @@ exports.getUnlockedLawyerDirectory = async (req, res) => {
       success: false,
       message: 'Failed to load unlocked lawyer details',
     });
+  }
+};
+
+/* ---------------------------------------------------
+   Public Treated-Cases Showcase (anonymized resolved disputes)
+--------------------------------------------------- */
+
+exports.getTreatedCases = async (req, res) => {
+  try {
+    const [stats, cases] = await Promise.all([
+      db.query(
+        `SELECT COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE ou.user_type = 'tenant')::int AS tenant_against_landlord,
+                COUNT(*) FILTER (WHERE ou.user_type = 'landlord')::int AS landlord_against_tenant
+         FROM disputes d
+         JOIN users ou ON ou.id = d.opened_by
+         WHERE d.status = 'resolved'`
+      ),
+      db.query(
+        `SELECT d.id, d.resolved_at, ou.user_type AS direction, s.state_name AS state
+         FROM disputes d
+         JOIN users ou ON ou.id = d.opened_by
+         LEFT JOIN properties p ON p.id = d.property_id
+         LEFT JOIN states s ON s.id = p.state_id
+         WHERE d.status = 'resolved'
+         ORDER BY d.resolved_at DESC
+         LIMIT 50`
+      ),
+    ]);
+
+    const row = stats.rows[0] || {};
+    return res.json({
+      success: true,
+      data: {
+        stats: {
+          total_resolved: Number(row.total || 0),
+          tenant_against_landlord: Number(row.tenant_against_landlord || 0),
+          landlord_against_tenant: Number(row.landlord_against_tenant || 0),
+        },
+        cases: cases.rows.map((c) => ({
+          id: c.id,
+          direction: c.direction === 'tenant' ? 'tenant_landlord' : 'landlord_tenant',
+          state: c.state || null,
+          resolved_at: c.resolved_at,
+        })),
+      },
+    });
+  } catch (error) {
+    req.logger.error('Get treated cases error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load treated cases' });
+  }
+};
+
+/* ---------------------------------------------------
+   Internal Lawyer + Case Directory (scoped by tier)
+--------------------------------------------------- */
+
+const resolveLawyerDirectoryScope = (user) => {
+  const role = String(user?.user_type || '').toLowerCase();
+  if (role === 'super_admin' || role.startsWith('super_')) {
+    return { level: 'national' };
+  }
+  if (role === 'lga_support_admin') {
+    return {
+      level: 'lga',
+      state: String(user.assigned_state || '').trim(),
+      lga: String(user.assigned_lga || user.assigned_city || '').trim(),
+    };
+  }
+  if (role === 'state_support_admin') {
+    return { level: 'state', state: String(user.assigned_state || '').trim() };
+  }
+  if (role === 'zonal_admin' || role === 'zonal_support_admin') {
+    const zone = canonicalZone(user.assigned_zone);
+    return zone ? { level: 'zone', states: ZONE_STATES[zone] } : null;
+  }
+  return null;
+};
+
+exports.getInternalLawyerDirectory = async (req, res) => {
+  try {
+    const scope = resolveLawyerDirectoryScope(req.user);
+    if (!scope) {
+      return res.status(403).json({ success: false, message: 'You do not have access to the lawyer directory' });
+    }
+
+    let where = "u.deleted_at IS NULL AND u.user_type IN ('lawyer','state_lawyer','zonal_lawyer','super_lawyer')";
+    const params = [];
+
+    if (scope.level === 'lga') {
+      params.push(scope.state.toLowerCase(), scope.lga.toLowerCase());
+      where += " AND LOWER(TRIM(u.assigned_state)) = $1 AND LOWER(TRIM(COALESCE(u.assigned_lga, u.assigned_city, ''))) = $2";
+    } else if (scope.level === 'state') {
+      params.push(scope.state.toLowerCase());
+      where += " AND LOWER(TRIM(u.assigned_state)) = $1";
+    } else if (scope.level === 'zone') {
+      params.push(scope.states.map((s) => s.toLowerCase()));
+      where += " AND (LOWER(TRIM(u.assigned_state)) = ANY($1) OR LOWER(TRIM(u.assigned_zone)) = ANY($1))";
+    }
+
+    const lawyersResult = await db.query(
+      `SELECT u.id, u.full_name, u.email, u.user_type, u.assigned_state, u.assigned_city, u.assigned_zone
+       FROM users u
+       WHERE ${where}
+       ORDER BY u.user_type, u.assigned_state, u.full_name`,
+      params
+    );
+
+    const caseResult = await db.query(
+      `SELECT la.lawyer_user_id, la.client_user_id, d.id AS dispute_id, d.status AS dispute_status, d.title, d.resolved_at
+       FROM legal_authorizations la
+       LEFT JOIN disputes d ON d.opened_by = la.client_user_id AND d.property_id = la.property_id
+       WHERE la.lawyer_user_id = ANY($1) AND la.status = 'active'
+       ORDER BY la.created_at DESC`,
+      [lawyersResult.rows.map((l) => l.id)]
+    );
+
+    const casesByLawyer = new Map();
+    for (const c of caseResult.rows) {
+      const list = casesByLawyer.get(c.lawyer_user_id) || [];
+      list.push({
+        dispute_id: c.dispute_id,
+        status: c.dispute_status,
+        title: c.title,
+        resolved_at: c.resolved_at,
+      });
+      casesByLawyer.set(c.lawyer_user_id, list);
+    }
+
+    return res.json({
+      success: true,
+      data: lawyersResult.rows.map((l) => ({
+        id: l.id,
+        full_name: l.full_name,
+        email: l.email,
+        user_type: l.user_type,
+        assigned_state: l.assigned_state,
+        assigned_city: l.assigned_city,
+        assigned_zone: l.assigned_zone,
+        cases: casesByLawyer.get(l.id) || [],
+      })),
+      scope: { level: scope.level },
+    });
+  } catch (error) {
+    req.logger.error('Get internal lawyer directory error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load lawyer directory' });
   }
 };
 

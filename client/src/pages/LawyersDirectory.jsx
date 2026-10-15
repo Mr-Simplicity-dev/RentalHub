@@ -12,6 +12,7 @@ const LegalSupport = () => {
   const [loading, setLoading] = useState(true);
   const [hasCoverage, setHasCoverage] = useState(false);
   const [requests, setRequests] = useState([]);
+  const [treatedCases, setTreatedCases] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
@@ -45,10 +46,20 @@ const LegalSupport = () => {
     }
   }, []);
 
+  const loadTreatedCases = useCallback(async () => {
+    try {
+      const res = await api.get('/legal/treated-cases');
+      setTreatedCases(res.data?.data || null);
+    } catch {
+      // public showcase is optional
+    }
+  }, []);
+
   useEffect(() => {
     loadCoverageStatus();
+    loadTreatedCases();
     if (isAuthenticated) loadRequests();
-  }, [isAuthenticated, loadCoverageStatus, loadRequests]);
+  }, [isAuthenticated, loadCoverageStatus, loadRequests, loadTreatedCases]);
 
   const handleSubmitRequest = async (e) => {
     e.preventDefault();
@@ -114,6 +125,43 @@ const LegalSupport = () => {
       </section>
 
       <section className="container mx-auto px-4 py-10">
+        {treatedCases && (
+          <div className="mb-10">
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 text-center">{t('lawyers_directory.treated_cases_title', 'Disputes we have treated')}</h2>
+            <div className="mb-6 grid grid-cols-3 gap-4 text-center">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-2xl font-bold text-primary-600">{treatedCases.stats?.total_resolved || 0}</p>
+                <p className="text-sm text-slate-500">{t('lawyers_directory.resolved', 'Resolved')}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-2xl font-bold text-primary-600">{treatedCases.stats?.tenant_against_landlord || 0}</p>
+                <p className="text-sm text-slate-500">{t('lawyers_directory.tenant_cases', 'Tenant cases')}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-2xl font-bold text-primary-600">{treatedCases.stats?.landlord_against_tenant || 0}</p>
+                <p className="text-sm text-slate-500">{t('lawyers_directory.landlord_cases', 'Landlord cases')}</p>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {(treatedCases.cases || []).map((c) => (
+                <div key={c.id} className="rounded-xl border border-slate-200 bg-white p-4 flex items-start gap-3">
+                  <FaCheckCircle className="mt-0.5 text-green-500" />
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      {c.direction === 'tenant_landlord'
+                        ? t('lawyers_directory.tenant_to_landlord', 'Tenant → landlord')
+                        : t('lawyers_directory.landlord_to_tenant', 'Landlord → tenant')}
+                    </p>
+                    <p className="text-sm text-slate-500 mt-1">
+                      {[c.state, c.resolved_at ? new Date(c.resolved_at).toLocaleDateString() : null].filter(Boolean).join(' · ') || t('lawyers_directory.resolved_matter', 'Resolved matter')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {!hasCoverage ? (
           <div className="max-w-lg mx-auto rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center">
             <FaGavel className="mx-auto text-4xl text-amber-600 mb-3" />

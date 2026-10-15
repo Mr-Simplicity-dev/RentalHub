@@ -10,6 +10,7 @@ const { recordFailedLogin, clearLoginAttempts } = require('../config/middleware/
 const { raiseSecurityAlert } = require('../config/utils/securityAlert');
 const { isPrivilegedRole } = require('../config/utils/twoFactor');
 const { recordDeviceLink } = require('../config/utils/deviceLink');
+const { zoneForState } = require('../config/utils/territorialZones');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
 const { getLocationPricingQuote } = require('../config/utils/locationPricing');
 const {
@@ -1114,60 +1115,89 @@ const validateAndPrepareRegistration = async (payload) => {
  * in the client's state and LGA.
  */
 const assignLawyerRoundRobin = async ({ clientUserId, stateId, lgaName }) => {
-  // Get all active lawyers in the specified state/LGA
-  let lawyersQuery = `
-    SELECT id, full_name, email
-    FROM users
-    WHERE user_type = 'lawyer'
-      AND assigned_state_id = $1
-      AND assigned_lga_name = $2
-      AND account_suspended_at IS NULL
-      AND deleted_at IS NULL
-    ORDER BY id ASC
-  `;
-  let lawyersParams = [stateId, lgaName];
+  const norm = (value) => String(value || '').trim().toLowerCase();
 
-  // If no lawyers found at LGA level, try state level
-  let lawyersResult = await db.query(lawyersQuery, lawyersParams);
+  // Resolve the client's state name (and zone) from stateId.
+  const stateResult = await db.query(`SELECT state_name FROM states WHERE id = $1 LIMIT 1`, [stateId]);
+  const stateName = String(stateResult.rows[0]?.state_name || '').trim();
+  const zone = stateName ? zoneForState(stateName) : null;
 
-  if (lawyersResult.rows.length === 0) {
-    // Fallback to state-wide lawyers if no LGA-specific lawyers
-    lawyersQuery = `
-      SELECT id, full_name, email
-      FROM users
-      WHERE user_type = 'lawyer'
-        AND assigned_state_id = $1
-        AND account_suspended_at IS NULL
-        AND deleted_at IS NULL
-      ORDER BY id ASC
-    `;
-    lawyersResult = await db.query(lawyersQuery, [stateId]);
+  // Ladder of lawyer pools: LGA -> state -> zonal -> national.
+  const pools = [];
+  if (stateName && lgaName) {
+    pools.push({
+      label: 'lga',
+      query: `SELECT id, full_name, email FROM users
+              WHERE user_type = 'lawyer'
+                AND LOWER(TRIM(COALESCE(assigned_state, ''))) = $1
+                AND LOWER(TRIM(COALESCE(assigned_lga, assigned_city, ''))) = $2
+                AND account_suspended_at IS NULL AND deleted_at IS NULL
+              ORDER BY id ASC`,
+      params: [norm(stateName), norm(lgaName)],
+    });
+  }
+  if (stateName) {
+    pools.push({
+      label: 'state',
+      query: `SELECT id, full_name, email FROM users
+              WHERE user_type IN ('lawyer', 'state_lawyer')
+                AND LOWER(TRIM(COALESCE(assigned_state, ''))) = $1
+                AND account_suspended_at IS NULL AND deleted_at IS NULL
+              ORDER BY id ASC`,
+      params: [norm(stateName)],
+    });
+  }
+  if (zone) {
+    pools.push({
+      label: 'zonal',
+      query: `SELECT id, full_name, email FROM users
+              WHERE user_type = 'zonal_lawyer'
+                AND LOWER(TRIM(COALESCE(assigned_zone, ''))) = $1
+                AND account_suspended_at IS NULL AND deleted_at IS NULL
+              ORDER BY id ASC`,
+      params: [norm(zone)],
+    });
+  }
+  pools.push({
+    label: 'national',
+    query: `SELECT id, full_name, email FROM users
+            WHERE user_type = 'super_lawyer'
+              AND account_suspended_at IS NULL AND deleted_at IS NULL
+            ORDER BY id ASC`,
+    params: [],
+  });
+
+  let lawyersResult = null;
+  for (const pool of pools) {
+    const result = await db.query(pool.query, pool.params);
+    if (result.rows.length > 0) {
+      lawyersResult = result;
+      break;
+    }
   }
 
-  if (lawyersResult.rows.length === 0) {
+  if (!lawyersResult || lawyersResult.rows.length === 0) {
     req.logger.error(`No available lawyers found for state_id ${stateId} / LGA ${lgaName}`);
     return null;
   }
 
-  // Find the last assigned lawyer index for round-robin
+  // Find the last assigned lawyer index for round-robin within this pool.
   const lastAssignmentResult = await db.query(
     `SELECT la.lawyer_user_id
      FROM legal_authorizations la
-     JOIN users u ON u.id = la.lawyer_user_id
-     WHERE u.user_type = 'lawyer'
-       AND (u.assigned_state_id = $1 OR u.assigned_state_id IS NULL)
+     WHERE la.lawyer_user_id = ANY($1)
        AND la.status = 'active'
        AND la.property_id IS NULL
      ORDER BY la.created_at DESC
      LIMIT 1`,
-    [stateId]
+    [lawyersResult.rows.map((l) => l.id)]
   );
 
   let nextIndex = 0;
 
   if (lastAssignmentResult.rows.length > 0) {
     const lastLawyerId = lastAssignmentResult.rows[0].lawyer_user_id;
-    const lastIndex = lawyersResult.rows.findIndex(l => l.id === lastLawyerId);
+    const lastIndex = lawyersResult.rows.findIndex((l) => l.id === lastLawyerId);
     if (lastIndex !== -1) {
       nextIndex = (lastIndex + 1) % lawyersResult.rows.length;
     }
@@ -1190,7 +1220,7 @@ const assignLawyerRoundRobin = async ({ clientUserId, stateId, lgaName }) => {
     await sendNotification(
       selectedLawyer.id,
       'New Client Assignment',
-      `You have been assigned a new client (ID: ${clientUserId}) from your area as a RentalHub NG lawyer. Please check your dashboard for details.`,
+      `You have been assigned a new client (ID: ${clientUserId}) from your area. Please check your dashboard for details.`,
       'lawyer_assignment',
       clientUserId,
       'client'
@@ -1202,7 +1232,7 @@ const assignLawyerRoundRobin = async ({ clientUserId, stateId, lgaName }) => {
   return {
     assignedLawyer: selectedLawyer,
     roundRobinIndex: nextIndex,
-    totalLawyers: lawyersResult.rows.length
+    totalLawyers: lawyersResult.rows.length,
   };
 };
 
