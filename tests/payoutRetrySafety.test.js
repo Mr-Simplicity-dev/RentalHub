@@ -14,6 +14,7 @@ const previousPaystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
 let selectedRows = {};
 let claimSucceeds = false;
 let reserveError = null;
+let adminWalletBalance = 5000;
 let databaseCalls = [];
 let reserveCalls = [];
 let transferCalls = [];
@@ -24,6 +25,7 @@ const resetFakes = () => {
   selectedRows = {};
   claimSucceeds = false;
   reserveError = null;
+  adminWalletBalance = 5000;
   databaseCalls = [];
   reserveCalls = [];
   transferCalls = [];
@@ -71,6 +73,18 @@ const resetFakes = () => {
       return { rows: [{ id: params[3] }] };
     }
 
+    if (normalizedSql.includes('SET admin_wallet_balance = COALESCE(admin_wallet_balance, 0) - $1')) {
+      const amount = Number(params[0]);
+      if (adminWalletBalance < amount) return { rows: [] };
+      adminWalletBalance -= amount;
+      return { rows: [{ id: params[1] }] };
+    }
+
+    if (normalizedSql.includes('SET admin_wallet_balance = COALESCE(admin_wallet_balance, 0) + $1')) {
+      adminWalletBalance += Number(params[0]);
+      return { rows: [{ id: params[1] }] };
+    }
+
     return { rows: [] };
   };
 
@@ -98,6 +112,18 @@ test('payout retries default to disabled without database or provider calls', as
   assert.equal(summary.disabled, true);
   assert.equal(databaseCalls.length, 0);
   assert.equal(transferCalls.length, 0);
+});
+
+test('enabled retries require Paystack configuration before touching payout rows', async () => {
+  process.env.PAYOUT_RETRY_ENABLED = 'true';
+  resetFakes();
+  delete process.env.PAYSTACK_SECRET_KEY;
+
+  await assert.rejects(runPayoutRetryCycle(), /PAYOUT_RETRY_ENABLED|PAYSTACK_SECRET_KEY/);
+
+  assert.equal(databaseCalls.length, 0);
+  assert.equal(transferCalls.length, 0);
+  if (previousPaystackSecretKey !== undefined) process.env.PAYSTACK_SECRET_KEY = previousPaystackSecretKey;
 });
 
 test('a lost atomic claim skips each payout without calling Paystack', async () => {
@@ -223,6 +249,40 @@ test('an uncertain wallet reservation stays claimed without sending a transfer',
   const followUpSummary = await runPayoutRetryCycle();
   assert.equal(followUpSummary.wallet.scanned, 0);
   assert.equal(reserveCalls.length, 1);
+});
+
+test('state-admin retry re-debits the refunded balance once and holds it through provider timeout', async () => {
+  process.env.PAYOUT_RETRY_ENABLED = 'true';
+  resetFakes();
+  claimSucceeds = true;
+  selectedRows = {
+    admin_withdrawals: [{
+      id: 94,
+      admin_id: 19,
+      amount: '1200.00',
+      status: 'pending',
+      bank_code: '044',
+      account_name: 'Test Admin',
+      account_number: '0123456789',
+      paystack_recipient_code: 'RCP_admin',
+      payout_retry_count: 0,
+      last_retry_at: null,
+      paystack_transfer_status: 'failed',
+    }],
+  };
+  const startingBalance = adminWalletBalance;
+
+  const summary = await runPayoutRetryCycle();
+
+  assert.equal(summary.stateAdmin.errors, 1);
+  assert.equal(transferCalls.length, 1);
+  assert.equal(transferCalls[0].reference, 'SAW_94_R1');
+  assert.equal(adminWalletBalance, startingBalance - 1200);
+
+  const followUpSummary = await runPayoutRetryCycle();
+  assert.equal(followUpSummary.stateAdmin.scanned, 0);
+  assert.equal(transferCalls.length, 1);
+  assert.equal(adminWalletBalance, startingBalance - 1200);
 });
 
 test.after(() => {

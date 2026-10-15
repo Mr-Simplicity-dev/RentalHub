@@ -544,6 +544,9 @@ const retryStateAdminWithdrawals = async (limit) => {
       continue;
     }
 
+    let adminWalletDebitAttempted = false;
+    let adminWalletDebited = false;
+    let reconciliationRequired = false;
     let transferInitiationStarted = false;
     let transferStatePersisted = false;
 
@@ -560,6 +563,39 @@ const retryStateAdminWithdrawals = async (limit) => {
         recipientCode = recipient.recipient_code;
       }
 
+      adminWalletDebitAttempted = true;
+      const debit = await db.query(
+        `UPDATE users
+         SET admin_wallet_balance = COALESCE(admin_wallet_balance, 0) - $1
+         WHERE id = $2
+           AND COALESCE(admin_funds_frozen, FALSE) = FALSE
+           AND COALESCE(admin_wallet_balance, 0) >= $1
+         RETURNING id`,
+        [item.amount, item.admin_id]
+      );
+
+      if (!debit.rows.length) {
+        summary.skipped += 1;
+        await restoreRetryClaim({
+          table: 'admin_withdrawals',
+          item,
+          attempt,
+          reference,
+          message: 'Admin wallet balance unavailable or frozen for retry',
+        });
+        await insertRetryAudit({
+          sourceTable: 'admin_withdrawals',
+          sourceId: item.id,
+          retryAttempt: attempt,
+          oldStatus: item.status,
+          newStatus: item.status,
+          outcome: 'skipped_insufficient_funds',
+          message: 'Admin wallet balance unavailable or frozen for retry',
+        });
+        continue;
+      }
+
+      adminWalletDebited = true;
       transferInitiationStarted = true;
       const transfer = await initiateTransfer({
         amount: item.amount,
@@ -617,12 +653,60 @@ const retryStateAdminWithdrawals = async (limit) => {
       summary.retried += 1;
     } catch (error) {
       if (transferInitiationStarted && !transferStatePersisted) {
+        reconciliationRequired = true;
         await keepRetryClaimForReconciliation({
           table: 'admin_withdrawals',
           item,
           attempt,
           reference,
           message: 'Transfer submission outcome is uncertain; reconcile with Paystack before retrying.',
+        });
+      } else if (!transferInitiationStarted && adminWalletDebitAttempted && adminWalletDebited) {
+        try {
+          const refund = await db.query(
+            `UPDATE users
+             SET admin_wallet_balance = COALESCE(admin_wallet_balance, 0) + $1
+             WHERE id = $2
+             RETURNING id`,
+            [item.amount, item.admin_id]
+          );
+
+          if (refund.rows.length) {
+            await restoreRetryClaim({
+              table: 'admin_withdrawals',
+              item,
+              attempt,
+              reference,
+              message: error.message,
+            });
+          } else {
+            reconciliationRequired = true;
+            await keepRetryClaimForReconciliation({
+              table: 'admin_withdrawals',
+              item,
+              attempt,
+              reference,
+              message: 'Retry stopped before transfer, but admin wallet refund needs reconciliation.',
+            });
+          }
+        } catch (refundError) {
+          reconciliationRequired = true;
+          await keepRetryClaimForReconciliation({
+            table: 'admin_withdrawals',
+            item,
+            attempt,
+            reference,
+            message: 'Retry stopped before transfer, but admin wallet refund outcome is uncertain.',
+          });
+        }
+      } else if (!transferInitiationStarted && adminWalletDebitAttempted) {
+        reconciliationRequired = true;
+        await keepRetryClaimForReconciliation({
+          table: 'admin_withdrawals',
+          item,
+          attempt,
+          reference,
+          message: 'Admin wallet debit outcome is uncertain; reconcile the wallet ledger before retrying.',
         });
       } else if (!transferInitiationStarted) {
         await restoreRetryClaim({
@@ -639,9 +723,9 @@ const retryStateAdminWithdrawals = async (limit) => {
         sourceId: item.id,
         retryAttempt: attempt,
         oldStatus: item.status,
-        newStatus: transferInitiationStarted ? 'processing' : item.status,
-        outcome: transferInitiationStarted ? 'outcome_unknown' : 'failed_to_initiate',
-        message: transferInitiationStarted
+        newStatus: reconciliationRequired ? 'processing' : item.status,
+        outcome: reconciliationRequired ? 'outcome_unknown' : 'failed_to_initiate',
+        message: reconciliationRequired
           ? 'Transfer submission outcome is uncertain; manual reconciliation required.'
           : error.message,
       });
@@ -665,6 +749,10 @@ const runPayoutRetryCycle = async () => {
       wallet: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
       stateAdmin: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
     };
+  }
+
+  if (!process.env.PAYSTACK_SECRET_KEY) {
+    throw new Error('Payout retries require PAYSTACK_SECRET_KEY');
   }
 
   await ensurePayoutSchema();
