@@ -3,6 +3,7 @@ const crypto = require('crypto');
 
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const PAYSTACK_TIMEOUT_MS = Math.max(Number(process.env.PAYSTACK_TRANSFER_TIMEOUT_MS) || 30000, 5000);
 
 const getHeaders = () => ({
   Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
@@ -13,6 +14,19 @@ const assertPaystackConfigured = () => {
   if (!PAYSTACK_SECRET_KEY) {
     throw new Error('Paystack secret key is not configured');
   }
+};
+
+// A timeout/network failure means the transfer may still have been created on
+// Paystack's side (we sent the request but never read the response). Callers use
+// this to mark the payout "outcome uncertain" instead of "failed".
+const isOutcomeUncertainError = (error) => {
+  if (!error) return false;
+  if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET') return true;
+  if (error.code === 'ERR_NETWORK' || error.code === 'EAI_AGAIN') return true;
+  // No HTTP response at all => request may have reached Paystack.
+  if (!error.response) return true;
+  // A 5xx gateway response is also ambiguous.
+  return Number(error.response?.status) >= 500;
 };
 
 const createTransferRecipient = async ({ name, accountNumber, bankCode }) => {
@@ -27,7 +41,7 @@ const createTransferRecipient = async ({ name, accountNumber, bankCode }) => {
       bank_code: bankCode,
       currency: 'NGN',
     },
-    { headers: getHeaders() }
+    { headers: getHeaders(), timeout: PAYSTACK_TIMEOUT_MS }
   );
 
   const recipient = response.data?.data;
@@ -51,7 +65,7 @@ const initiateTransfer = async ({ amount, recipientCode, reason, reference }) =>
       reference,
       currency: 'NGN',
     },
-    { headers: getHeaders() }
+    { headers: getHeaders(), timeout: PAYSTACK_TIMEOUT_MS }
   );
 
   return response.data?.data || null;
@@ -62,6 +76,7 @@ const resolveBankCodeFromName = async (bankName) => {
 
   const response = await axios.get(`${PAYSTACK_BASE_URL}/bank`, {
     headers: getHeaders(),
+    timeout: PAYSTACK_TIMEOUT_MS,
   });
 
   const list = response.data?.data || [];
@@ -102,4 +117,5 @@ module.exports = {
   initiateTransfer,
   resolveBankCodeFromName,
   isValidPaystackSignature,
+  isOutcomeUncertainError,
 };

@@ -5,6 +5,7 @@ const { sendSMS } = require('../config/utils/smsService');
 const {
   createTransferRecipient,
   initiateTransfer,
+  isOutcomeUncertainError,
 } = require('./paystackTransfer.service');
 
 const formatNaira = (amount) => `NGN ${Number(amount || 0).toLocaleString('en-NG')}`;
@@ -225,12 +226,44 @@ class AgentWithdrawalService {
           }
 
           const reference = `AGW_${withdrawalId}_${Date.now()}`;
-          const transfer = await initiateTransfer({
-            amount: withdrawal.amount,
-            recipientCode,
-            reason: `Agent withdrawal #${withdrawalId}`,
-            reference,
-          });
+
+          let transfer;
+          try {
+            transfer = await initiateTransfer({
+              amount: withdrawal.amount,
+              recipientCode,
+              reason: `Agent withdrawal #${withdrawalId}`,
+              reference,
+            });
+          } catch (transferError) {
+            // A timeout/network failure may still have created the transfer on
+            // Paystack. Persist the deterministic reference and flag the payout
+            // for reconciliation rather than leaving it stuck in "approved".
+            if (isOutcomeUncertainError(transferError)) {
+              await db.query(
+                `UPDATE agent_withdrawal_requests
+                 SET status = 'processing',
+                     payout_attempted_at = CURRENT_TIMESTAMP,
+                     paystack_transfer_reference = $1,
+                     paystack_transfer_status = 'unknown',
+                     payout_failed_reason = $2,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $3`,
+                [reference, 'Transfer submission outcome uncertain; reconcile with Paystack before retrying.', withdrawalId]
+              );
+              await this.logWithdrawalAudit(
+                withdrawalId,
+                'withdrawal_outcome_unknown',
+                'approved',
+                'processing',
+                approvedByUserId,
+                'Transfer submission timed out; manual reconciliation required.',
+                context
+              );
+              return null;
+            }
+            throw transferError;
+          }
 
           const transferStatus = transfer?.status || 'pending';
 
