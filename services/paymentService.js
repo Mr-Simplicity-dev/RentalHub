@@ -4511,33 +4511,43 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
       const withdrawal = result.rows[0];
 
       if (eventName === 'transfer.success') {
-        // Atomic claim: only the webhook that flips the state to success wins.
-        // Concurrent/duplicate success deliveries update 0 rows and become no-ops,
-        // so the wallet is settled exactly once.
-        const claimed = await db.query(
-          `UPDATE withdrawal_requests
-           SET status = 'processed', processed_at = CURRENT_TIMESTAMP,
-               paystack_transfer_status = 'success', paystack_last_response = $1, updated_at = CURRENT_TIMESTAMP
-           WHERE id = $2 AND paystack_transfer_status <> 'success'
-           RETURNING id`,
-          [JSON.stringify(data), withdrawal.id]
-        );
-        if (!claimed.rows.length) return;
+        // Claim + wallet settlement run in ONE transaction so a crash between
+        // them cannot leave a claimed/settled state with an unsettled wallet.
+        let claimedId = null;
+        const client = await db.connect();
+        try {
+          await client.query('BEGIN');
 
-        const settled = await settleWalletPayout({
-          userId: withdrawal.user_id,
-          amount: withdrawal.amount,
-        });
-
-        if (!settled) {
-          await db.query(
-            `UPDATE wallets
-             SET balance = balance - $1,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE user_id = $2 AND balance >= $1`,
-            [withdrawal.amount, withdrawal.user_id]
+          const claimed = await client.query(
+            `UPDATE withdrawal_requests
+             SET status = 'processed', processed_at = CURRENT_TIMESTAMP,
+                 paystack_transfer_status = 'success', paystack_last_response = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2 AND paystack_transfer_status NOT IN ('success', 'reversed')
+             RETURNING id`,
+            [JSON.stringify(data), withdrawal.id]
           );
+
+          if (claimed.rows.length) {
+            claimedId = claimed.rows[0].id;
+            const settled = await settleWalletPayout({ userId: withdrawal.user_id, amount: withdrawal.amount, executor: client });
+            if (!settled) {
+              await client.query(
+                `UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP
+                 WHERE user_id = $2 AND balance >= $1`,
+                [withdrawal.amount, withdrawal.user_id]
+              );
+            }
+          }
+
+          await client.query('COMMIT');
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
         }
+
+        if (!claimedId) return;
 
         // Email the tenant/landlord a payout receipt
         sendUserPayoutReceipt({
@@ -4555,45 +4565,50 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
         const failureReason = data?.failure_reason || data?.reason || 'Transfer failed';
         const nextStatus = eventName === 'transfer.failed' ? 'failed' : 'reversed';
 
-        // Atomic claim. A reversal may legitimately follow a prior success
-        // (Paystack reverses an already-debited transfer), so "reversed" may
-        // transition from any state except an already-processed reversal. A
-        // "failed" event only ever finalises a pending transfer and must never
-        // downgrade a settled or reversed one.
+        // A reversal may follow a prior success; a failed event only finalises a
+        // pending transfer and must never downgrade a settled/reversed one.
         const guard = eventName === 'transfer.reversed'
           ? `paystack_transfer_status <> 'reversed'`
           : `paystack_transfer_status NOT IN ('success', 'failed', 'reversed')`;
 
-        const claimed = await db.query(
-          `UPDATE withdrawal_requests
-           SET status = 'pending',
-               paystack_transfer_status = $1,
-               paystack_last_response = $2,
-               payout_failed_reason = $3,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = $4 AND ${guard}
-           RETURNING id`,
-          [nextStatus, JSON.stringify(data), failureReason, withdrawal.id]
-        );
-        if (!claimed.rows.length) return;
+        let claimedId = null;
+        const client = await db.connect();
+        try {
+          await client.query('BEGIN');
 
-        const released = await releaseWalletReservation({
-          userId: withdrawal.user_id,
-          amount: withdrawal.amount,
-        });
-
-        if (!released) {
-          // Reservation already gone: a reversal of a settled payout must refund
-          // the balance. Only the winning webhook reaches this line, so the refund
-          // happens exactly once.
-          await db.query(
-            `UPDATE wallets
-             SET balance = balance + $1,
+          const claimed = await client.query(
+            `UPDATE withdrawal_requests
+             SET status = 'pending',
+                 paystack_transfer_status = $1,
+                 paystack_last_response = $2,
+                 payout_failed_reason = $3,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE user_id = $2`,
-            [withdrawal.amount, withdrawal.user_id]
+             WHERE id = $4 AND ${guard}
+             RETURNING id`,
+            [nextStatus, JSON.stringify(data), failureReason, withdrawal.id]
           );
+
+          if (claimed.rows.length) {
+            claimedId = claimed.rows[0].id;
+            const released = await releaseWalletReservation({ userId: withdrawal.user_id, amount: withdrawal.amount, executor: client });
+            if (!released) {
+              await client.query(
+                `UPDATE wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP
+                 WHERE user_id = $2`,
+                [withdrawal.amount, withdrawal.user_id]
+              );
+            }
+          }
+
+          await client.query('COMMIT');
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
         }
+
+        if (!claimedId) return;
 
         // Notify the customer that the payout failed and funds were returned
         sendUserPayoutReceipt({
@@ -4612,7 +4627,7 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
 
     if (reference.startsWith('SAW_')) {
       const result = await db.query(
-        `SELECT id, admin_id, amount, bank_name, account_number, account_name, commissions_snapshot
+        `SELECT id, admin_id, amount, bank_name, account_number, account_name, commissions_snapshot, requested_at
          FROM admin_withdrawals WHERE paystack_transfer_reference = $1 LIMIT 1`,
         [reference]
       );
@@ -4621,56 +4636,73 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
       const withdrawal = result.rows[0];
 
       if (eventName === 'transfer.success') {
-        // Atomic claim: only the winning webhook finalises the payout.
-        const claimed = await db.query(
-          `UPDATE admin_withdrawals
-           SET status = 'processed',
-               processed_at = CURRENT_TIMESTAMP,
-               paystack_transfer_status = 'success',
-               paystack_last_response = $1,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = $2 AND paystack_transfer_status <> 'success'
-           RETURNING id`,
-          [JSON.stringify(data), withdrawal.id]
-        );
-        if (!claimed.rows.length) return;
-
-        // Mark pending commissions covered by this withdrawal as paid
+        let claimedId = null;
+        const client = await db.connect();
         try {
-          let snapshotItems = withdrawal.commissions_snapshot;
-          if (typeof snapshotItems === 'string') {
-            try { snapshotItems = JSON.parse(snapshotItems); } catch (_) { snapshotItems = []; }
-          }
-          if (Array.isArray(snapshotItems) && snapshotItems.length > 0) {
-            const commissionIds = snapshotItems
-              .map((item) => Number(item.id))
-              .filter((id) => Number.isInteger(id) && id > 0);
-            if (commissionIds.length > 0) {
-              await db.query(
-                `UPDATE admin_commissions
-                 SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ANY($1::int[]) AND status = 'pending'`,
-                [commissionIds]
-              );
-            } else {
-              await db.query(
-                `UPDATE admin_commissions
-                 SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                 WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
-                [withdrawal.admin_id, withdrawal.requested_at || new Date()]
-              );
+          await client.query('BEGIN');
+
+          const claimed = await client.query(
+            `UPDATE admin_withdrawals
+             SET status = 'processed',
+                 processed_at = CURRENT_TIMESTAMP,
+                 paystack_transfer_status = 'success',
+                 paystack_last_response = $1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2 AND paystack_transfer_status NOT IN ('success', 'reversed')
+             RETURNING id`,
+            [JSON.stringify(data), withdrawal.id]
+          );
+
+          if (claimed.rows.length) {
+            claimedId = claimed.rows[0].id;
+
+            // Mark pending commissions covered by this withdrawal as paid
+            try {
+              let snapshotItems = withdrawal.commissions_snapshot;
+              if (typeof snapshotItems === 'string') {
+                try { snapshotItems = JSON.parse(snapshotItems); } catch (_) { snapshotItems = []; }
+              }
+              if (Array.isArray(snapshotItems) && snapshotItems.length > 0) {
+                const commissionIds = snapshotItems
+                  .map((item) => Number(item.id))
+                  .filter((id) => Number.isInteger(id) && id > 0);
+                if (commissionIds.length > 0) {
+                  await client.query(
+                    `UPDATE admin_commissions
+                     SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                     WHERE id = ANY($1::int[]) AND status = 'pending'`,
+                    [commissionIds]
+                  );
+                } else {
+                  await client.query(
+                    `UPDATE admin_commissions
+                     SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                     WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
+                    [withdrawal.admin_id, withdrawal.requested_at || new Date()]
+                  );
+                }
+              } else {
+                await client.query(
+                  `UPDATE admin_commissions
+                   SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                   WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
+                  [withdrawal.admin_id, withdrawal.requested_at || new Date()]
+                );
+              }
+            } catch (commErr) {
+              logger.error('Failed to mark admin_commissions as paid upon transfer.success', { error: commErr.message });
             }
-          } else {
-            await db.query(
-              `UPDATE admin_commissions
-               SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-               WHERE admin_id = $1 AND status = 'pending' AND created_at <= $2`,
-              [withdrawal.admin_id, withdrawal.requested_at || new Date()]
-            );
           }
-        } catch (commErr) {
-          logger.error('Failed to mark admin_commissions as paid upon transfer.success', { error: commErr.message });
+
+          await client.query('COMMIT');
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
         }
+
+        if (!claimedId) return;
 
         // Email the admin a payout receipt with itemized commissions
         sendAdminPayoutReceipt({
@@ -4689,33 +4721,46 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
         const failureReason = data?.failure_reason || data?.reason || 'Transfer failed';
         const nextStatus = eventName === 'transfer.failed' ? 'failed' : 'reversed';
 
-        // Atomic claim (mirrors WLW): a reversal may follow a prior success and
-        // must refund exactly once; a failed event only finalises a pending
-        // transfer and must never downgrade a settled/reversed one.
         const guard = eventName === 'transfer.reversed'
           ? `paystack_transfer_status <> 'reversed'`
           : `paystack_transfer_status NOT IN ('success', 'failed', 'reversed')`;
 
-        const claimed = await db.query(
-          `UPDATE admin_withdrawals
-           SET status = 'pending',
-               paystack_transfer_status = $1,
-               paystack_last_response = $2,
-               payout_failed_reason = $3,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = $4 AND ${guard}
-           RETURNING id`,
-          [nextStatus, JSON.stringify(data), failureReason, withdrawal.id]
-        );
-        if (!claimed.rows.length) return;
+        let claimedId = null;
+        const client = await db.connect();
+        try {
+          await client.query('BEGIN');
 
-        // Refund the admin wallet exactly once (only the winning webhook).
-        await db.query(
-          `UPDATE users
-           SET admin_wallet_balance = admin_wallet_balance + $1
-           WHERE id = $2`,
-          [withdrawal.amount, withdrawal.admin_id]
-        );
+          const claimed = await client.query(
+            `UPDATE admin_withdrawals
+             SET status = 'pending',
+                 paystack_transfer_status = $1,
+                 paystack_last_response = $2,
+                 payout_failed_reason = $3,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $4 AND ${guard}
+             RETURNING id`,
+            [nextStatus, JSON.stringify(data), failureReason, withdrawal.id]
+          );
+
+          if (claimed.rows.length) {
+            claimedId = claimed.rows[0].id;
+            await client.query(
+              `UPDATE users
+               SET admin_wallet_balance = admin_wallet_balance + $1
+               WHERE id = $2`,
+              [withdrawal.amount, withdrawal.admin_id]
+            );
+          }
+
+          await client.query('COMMIT');
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+
+        if (!claimedId) return;
 
         // Notify the admin that the payout failed and funds were returned
         sendAdminPayoutReceipt({

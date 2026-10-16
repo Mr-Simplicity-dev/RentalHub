@@ -455,7 +455,7 @@ class AgentWithdrawalService {
     // payout. Duplicate/concurrent deliveries update 0 rows and become no-ops.
     const guard =
       transferStatus === 'success'
-        ? `paystack_transfer_status <> 'success'`
+        ? `paystack_transfer_status NOT IN ('success', 'reversed')`
         : transferStatus === 'reversed'
           ? `paystack_transfer_status <> 'reversed'`
           : `paystack_transfer_status NOT IN ('success', 'failed', 'reversed')`;

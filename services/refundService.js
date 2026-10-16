@@ -20,6 +20,7 @@ const {
   initiateTransfer,
   resolveBankCodeFromName,
   isValidPaystackSignature,
+  isOutcomeUncertainError,
 } = require('../services/paystackTransfer.service');
 const {
   getLandlordPropertyFeeStatus,
@@ -2268,12 +2269,48 @@ exports.approveWalletWithdrawal = async (req, res) => {
     }
 
     const reference = `WLW_${withdrawal.id}_${Date.now()}`;
-    const transfer = await initiateTransfer({
-      amount: withdrawal.amount,
-      recipientCode,
-      reason: `Wallet withdrawal #${withdrawal.id}`,
-      reference,
-    });
+
+    let transfer;
+    try {
+      transfer = await initiateTransfer({
+        amount: withdrawal.amount,
+        recipientCode,
+        reason: `Wallet withdrawal #${withdrawal.id}`,
+        reference,
+      });
+    } catch (transferError) {
+      // A timeout/network failure may still have created the transfer on
+      // Paystack. Persist the deterministic reference and flag the payout as
+      // "outcome unknown" so the retry service can reconcile it instead of
+      // leaving a processing row with no transfer reference.
+      if (isOutcomeUncertainError(transferError)) {
+        const uncertain = await db.query(
+          `UPDATE withdrawal_requests
+           SET bank_code = $1,
+               paystack_recipient_code = $2,
+               paystack_transfer_reference = $3,
+               paystack_transfer_status = 'unknown',
+               payout_failed_reason = $4,
+               payout_attempted_at = CURRENT_TIMESTAMP,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $5
+           RETURNING *`,
+          [
+            bankCode,
+            recipientCode,
+            reference,
+            'Transfer submission outcome uncertain; reconcile with Paystack before retrying.',
+            withdrawalId,
+          ]
+        );
+        return res.status(200).json({
+          success: true,
+          message: 'Payout submission outcome is uncertain; it will be reconciled.',
+          data: uncertain.rows[0],
+        });
+      }
+      throw transferError;
+    }
 
     const result = await db.query(
       `UPDATE withdrawal_requests
