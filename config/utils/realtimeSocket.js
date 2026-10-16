@@ -1292,10 +1292,9 @@ const configureRealtimeSocket = (io) => {
           throw new Error('This call room is not active');
         }
 
-        const currentUserIsParticipant = isCallParticipant(call, user.id)
-          || call.participants?.some((participant) => Number(participant.id) === Number(user.id));
-        if (!currentUserIsParticipant) {
-          throw new Error('Only current participants can add another user to this call');
+        const currentHostUserId = Number(call.hostUserId || call.caller?.id || 0);
+        if (Number(user.id) !== currentHostUserId) {
+          throw new Error('Only the host can add another user to this call');
         }
 
         const invitedUserId = Number(payload.userId || payload.memberId || payload.receiverId || payload.targetUserId || 0);
@@ -1479,10 +1478,9 @@ const configureRealtimeSocket = (io) => {
           throw new Error('Select a valid participant to remove from the call');
         }
 
-        const currentUserIsParticipant = isCallParticipant(call, user.id)
-          || call.participants?.some((participant) => Number(participant.id) === Number(user.id));
-        if (!currentUserIsParticipant) {
-          throw new Error('Only current participants can manage this room');
+        const currentHostUserId = Number(call.hostUserId || call.caller?.id || 0);
+        if (Number(user.id) !== currentHostUserId) {
+          throw new Error('Only the host can remove participants from this call');
         }
 
         const room = ensureCallRoom(call);
