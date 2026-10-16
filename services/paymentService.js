@@ -4505,6 +4505,13 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
       if (!result.rows.length) return;
       const withdrawal = result.rows[0];
 
+      // Idempotent + monotonic guard: a settled payout is terminal. Ignore
+      // duplicate success deliveries and never downgrade a settled payout on a
+      // late failed/reversed event.
+      if (withdrawal.paystack_transfer_status === 'success' || withdrawal.status === 'processed') {
+        return;
+      }
+
       if (eventName === 'transfer.success') {
         const settled = await settleWalletPayout({
           userId: withdrawal.user_id,
@@ -4598,6 +4605,11 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
 
       if (!result.rows.length) return;
       const withdrawal = result.rows[0];
+
+      // Idempotent + monotonic guard: never downgrade or re-process a settled payout.
+      if (withdrawal.paystack_transfer_status === 'success' || withdrawal.status === 'processed') {
+        return;
+      }
 
       if (eventName === 'transfer.success') {
         await db.query(

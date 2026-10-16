@@ -99,7 +99,8 @@ const getAllUsers = async (req, res) => {
 
         if (row.nin) {
 
-          row.nin = decryptNIN(row.nin);
+          const { maskCredentialValue } = require('../../config/utils/credentialRevalidation');
+          row.nin = maskCredentialValue(decryptNIN(row.nin));
 
         }
 

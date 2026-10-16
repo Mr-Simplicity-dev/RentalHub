@@ -444,6 +444,19 @@ const PRIVILEGED_ROLES = new Set([
   'super_support_admin',
   'state_support_admin',
   'lga_support_admin',
+  'zonal_admin',
+  'zonal_financial_admin',
+  'zonal_lawyer',
+  'zonal_fumigation_admin',
+  'zonal_transportation_admin',
+  'transportation_admin',
+  'lga_transportation_admin',
+  'state_transportation_admin',
+  'super_transportation_admin',
+  'fumigation_admin',
+  'lga_fumigation_admin',
+  'state_fumigation_admin',
+  'super_fumigation_admin',
 ]);
 
 exports.isPrivilegedRole = (role) => PRIVILEGED_ROLES.has(role);

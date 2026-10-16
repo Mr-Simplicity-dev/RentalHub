@@ -480,12 +480,18 @@ const releaseEscrowForPayment = async ({ paymentId, executor = db }) => {
   );
 
   for (const credit of credits.rows) {
-    await executor.query(
+    // Atomic claim: only the process that actually flips pending -> cleared may
+    // credit the wallet. A concurrent release (or a webhook retry) finds the row
+    // already cleared, updates 0 rows, and skips the credit — no double-credit.
+    const cleared = await executor.query(
       `UPDATE wallet_transactions
        SET status = 'cleared', cleared_at = CURRENT_TIMESTAMP, available_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
+       WHERE id = $1 AND status = 'pending'
+       RETURNING id`,
       [credit.id]
     );
+    if (!cleared.rows.length) continue;
+
     await executor.query(
       `INSERT INTO wallets (user_id, balance)
        VALUES ($1, $2)
