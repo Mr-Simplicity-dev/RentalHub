@@ -34,23 +34,38 @@ class AgentWithdrawalService {
     } = options;
 
     try {
-      // Check if agent has sufficient balance
-      const earningsResult = await db.query(
-        `SELECT total_pending FROM agent_earnings_summary 
-         WHERE agent_user_id = $1 AND landlord_user_id = $2`,
-        [agentUserId, landlordUserId]
+      // Atomically reserve the agent's pending earnings so concurrent or repeated
+      // requests can never double-claim the same balance (check-and-insert is
+      // non-atomic and previously allowed over-withdrawal).
+      const reserveResult = await db.query(
+        `UPDATE agent_earnings_summary
+         SET total_pending = total_pending - $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE agent_user_id = $2
+           AND landlord_user_id = $3
+           AND total_pending >= $1
+         RETURNING total_pending`,
+        [parseFloat(amount), agentUserId, landlordUserId]
       );
 
-      if (earningsResult.rows.length === 0) {
-        throw new Error('No earnings record found for this agent');
-      }
-
-      const availableBalance = earningsResult.rows[0].total_pending;
-      if (parseFloat(amount) > parseFloat(availableBalance)) {
-        throw new Error(`Insufficient balance. Available: ₦${availableBalance}`);
+      if (reserveResult.rows.length === 0) {
+        const current = await db.query(
+          `SELECT total_pending FROM agent_earnings_summary
+           WHERE agent_user_id = $1 AND landlord_user_id = $2`,
+          [agentUserId, landlordUserId]
+        );
+        const available = current.rows[0]?.total_pending ?? 0;
+        throw new Error(`Insufficient balance. Available: ₦${Number(available).toLocaleString()}`);
       }
 
       if (withdrawalMethod === 'bank_transfer' && (!bankCode || !accountNumber || !accountName)) {
+        // Roll back the reservation so a malformed request cannot hold funds.
+        await db.query(
+          `UPDATE agent_earnings_summary
+           SET total_pending = total_pending + $1, updated_at = CURRENT_TIMESTAMP
+           WHERE agent_user_id = $2 AND landlord_user_id = $3`,
+          [parseFloat(amount), agentUserId, landlordUserId]
+        );
         throw new Error('bankCode, accountNumber and accountName are required for bank_transfer withdrawals');
       }
 
@@ -92,6 +107,14 @@ class AgentWithdrawalService {
 
         return withdrawal;
       }
+
+      // If the insert somehow returned no rows, restore the reservation.
+      await db.query(
+        `UPDATE agent_earnings_summary
+         SET total_pending = total_pending + $1, updated_at = CURRENT_TIMESTAMP
+         WHERE agent_user_id = $2 AND landlord_user_id = $3`,
+        [parseFloat(amount), agentUserId, landlordUserId]
+      );
     } catch (error) {
       logger.error(`Error creating withdrawal request: ${error.message}`);
       throw error;
@@ -265,13 +288,23 @@ class AgentWithdrawalService {
       const result = await db.query(
         `UPDATE agent_withdrawal_requests
          SET status = 'rejected', reason_for_rejection = $1, approved_by_user_id = $2, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3
+         WHERE id = $3 AND status = 'pending'
          RETURNING *`,
         [rejectionReason, rejectedByUserId, withdrawalId]
       );
 
       if (result.rows.length > 0) {
         const withdrawal = result.rows[0];
+
+        // Restore the earnings reserved at request time so a rejected request
+        // does not permanently shrink the agent's withdrawable balance.
+        await db.query(
+          `UPDATE agent_earnings_summary
+           SET total_pending = total_pending + $1, updated_at = CURRENT_TIMESTAMP
+           WHERE agent_user_id = $2 AND landlord_user_id = $3`,
+          [Number(withdrawal.amount), withdrawal.agent_user_id, withdrawal.landlord_user_id]
+        );
+
         await this.logWithdrawalAudit(
           withdrawalId,
           'withdrawal_rejected',

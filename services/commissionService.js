@@ -474,57 +474,61 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
     }
 
     const shouldUseTransaction = directPayout;
-    if (shouldUseTransaction) await db.query('BEGIN');
-
-    const withdrawalResult = await db.query(
-      `INSERT INTO admin_withdrawals (admin_id, amount, bank_name, bank_code, account_number, account_name, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending') RETURNING id, requested_at`,
-      [adminId, amount, bankDetails.bank_name, bankDetails.bank_code || null, bankDetails.account_number, bankDetails.account_name]
-    );
-
-    const withdrawalId = withdrawalResult.rows[0].id;
-
-    // Snapshot the pending commissions covered by this payout so the receipt is
-    // accurate no matter when the transfer completes.
-    const snapshotResult = await db.query(
-      `SELECT COALESCE(json_agg(json_build_object(
-         'id', id, 'source', source, 'amount', amount, 'commission_rate', commission_rate,
-         'state', state, 'city', city, 'created_at', created_at
-       )), '[]'::json) AS snapshot
-       FROM (
-         SELECT id, source, amount, commission_rate, state, city, created_at
-         FROM admin_commissions
-         WHERE admin_id = $1 AND status = 'pending'
-         ORDER BY created_at ASC
-       ) sub`,
-      [adminId]
-    );
-    const commissionsSnapshot = snapshotResult.rows[0]?.snapshot || [];
-
-    if (!directPayout) {
-      await db.query(
-        `UPDATE users SET admin_wallet_balance = admin_wallet_balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-        [amount, adminId]
-      );
-
-      await db.query(
-        `UPDATE admin_withdrawals SET commissions_snapshot = $2::jsonb WHERE id = $1`,
-        [withdrawalId, JSON.stringify(commissionsSnapshot)]
-      );
-
-      await db.query(
-        `INSERT INTO transaction_audits (admin_id, action_type, amount, description)
-         VALUES ($1, 'withdrawal_requested', $2, $3)`,
-        [adminId, amount, `Withdrawal requested: ₦${amount.toLocaleString()} to ${bankDetails.bank_name}`]
-      );
-
-      return {
-        withdrawal_id: withdrawalId, requested_at: withdrawalResult.rows[0].requested_at,
-        amount: amount, new_balance: parseFloat(admin.admin_wallet_balance) - amount,
-      };
-    }
+    const client = shouldUseTransaction ? await db.connect() : null;
+    const q = client || db;
+    if (client) await client.query('BEGIN');
 
     try {
+      const withdrawalResult = await q.query(
+        `INSERT INTO admin_withdrawals (admin_id, amount, bank_name, bank_code, account_number, account_name, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pending') RETURNING id, requested_at`,
+        [adminId, amount, bankDetails.bank_name, bankDetails.bank_code || null, bankDetails.account_number, bankDetails.account_name]
+      );
+
+      const withdrawalId = withdrawalResult.rows[0].id;
+
+      // Snapshot the pending commissions covered by this payout so the receipt is
+      // accurate no matter when the transfer completes.
+      const snapshotResult = await q.query(
+        `SELECT COALESCE(json_agg(json_build_object(
+           'id', id, 'source', source, 'amount', amount, 'commission_rate', commission_rate,
+           'state', state, 'city', city, 'created_at', created_at
+         )), '[]'::json) AS snapshot
+         FROM (
+           SELECT id, source, amount, commission_rate, state, city, created_at
+           FROM admin_commissions
+           WHERE admin_id = $1 AND status = 'pending'
+           ORDER BY created_at ASC
+         ) sub`,
+        [adminId]
+      );
+      const commissionsSnapshot = snapshotResult.rows[0]?.snapshot || [];
+
+      if (!directPayout) {
+        await q.query(
+          `UPDATE users SET admin_wallet_balance = admin_wallet_balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+          [amount, adminId]
+        );
+
+        await q.query(
+          `UPDATE admin_withdrawals SET commissions_snapshot = $2::jsonb WHERE id = $1`,
+          [withdrawalId, JSON.stringify(commissionsSnapshot)]
+        );
+
+        await q.query(
+          `INSERT INTO transaction_audits (admin_id, action_type, amount, description)
+           VALUES ($1, 'withdrawal_requested', $2, $3)`,
+          [adminId, amount, `Withdrawal requested: ₦${amount.toLocaleString()} to ${bankDetails.bank_name}`]
+        );
+
+        if (client) await client.query('COMMIT');
+
+        return {
+          withdrawal_id: withdrawalId, requested_at: withdrawalResult.rows[0].requested_at,
+          amount: amount, new_balance: parseFloat(admin.admin_wallet_balance) - amount,
+        };
+      }
+
       if (!bankDetails.bank_code && bankDetails.bank_name) {
         bankDetails.bank_code = await resolveBankCodeFromName(bankDetails.bank_name);
       }
@@ -542,23 +546,23 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
         amount, recipientCode, reason: `Admin direct withdrawal #${withdrawalId}`, reference,
       });
 
-      await db.query(
+      await q.query(
         `UPDATE admin_commissions SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
          WHERE admin_id = $1 AND status = 'pending' AND created_at <= CURRENT_TIMESTAMP`,
         [adminId]
       );
 
-      await db.query(
+      await q.query(
         `UPDATE users SET admin_wallet_balance = admin_wallet_balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
         [amount, adminId]
       );
 
-      await db.query(
+      await q.query(
         `UPDATE admin_withdrawals SET commissions_snapshot = $2::jsonb WHERE id = $1`,
         [withdrawalId, JSON.stringify(commissionsSnapshot)]
       );
 
-      await db.query(
+      await q.query(
         `UPDATE admin_withdrawals SET status = 'approved', bank_code = $1, paystack_recipient_code = $2,
          paystack_transfer_code = $3, paystack_transfer_reference = $4, paystack_transfer_status = $5,
          paystack_last_response = $6, payout_attempted_at = CURRENT_TIMESTAMP, processed_by = $7,
@@ -568,13 +572,13 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
          processedBy, adminNote || 'Direct payout initiated', withdrawalId]
       );
 
-      await db.query(
+      await q.query(
         `INSERT INTO transaction_audits (admin_id, action_type, amount, description, performed_by)
          VALUES ($1, 'withdrawal_approved', $2, $3, $4)`,
         [adminId, amount, `Direct withdrawal approved: ₦${amount.toLocaleString()}`, processedBy || adminId]
       );
 
-      await db.query('COMMIT');
+      await client.query('COMMIT');
 
       // Send payout receipt to the admin with itemized snapshot
       try {
@@ -597,8 +601,10 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
         paystack_status: transfer?.status || 'pending', new_balance: parseFloat(admin.admin_wallet_balance) - amount,
       };
     } catch (directError) {
-      await db.query('ROLLBACK');
+      if (client) await client.query('ROLLBACK');
       throw directError;
+    } finally {
+      if (client) client.release();
     }
   } catch (error) {
     logger.error('Process admin withdrawal error:', error);

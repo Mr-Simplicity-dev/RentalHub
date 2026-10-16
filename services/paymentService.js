@@ -2443,7 +2443,7 @@ exports.verifyTenantLocationAccess = async (req, res) => {
 // =====================================================
 
 exports.initializeLawyerDirectoryUnlock = async (req, res) => {
-  let transactionStarted = false;
+  let transactionClient = null;
 
   try {
     await ensureLawyerDirectoryUnlockSchema();
@@ -2486,10 +2486,10 @@ exports.initializeLawyerDirectoryUnlock = async (req, res) => {
       });
     }
 
-    await db.query('BEGIN');
-    transactionStarted = true;
+    transactionClient = await db.connect();
+    await transactionClient.query('BEGIN');
 
-    const walletResult = await db.query(
+    const walletResult = await transactionClient.query(
       `SELECT balance
        FROM wallets
        WHERE user_id = $1
@@ -2502,8 +2502,9 @@ exports.initializeLawyerDirectoryUnlock = async (req, res) => {
       : 0;
 
     if (walletBalance < LAWYER_DIRECTORY_UNLOCK_PRICE_NGN) {
-      await db.query('ROLLBACK');
-      transactionStarted = false;
+      await transactionClient.query('ROLLBACK');
+      transactionClient.release();
+      transactionClient = null;
       return res.status(402).json({
         success: false,
         message: `Insufficient wallet balance. Fund your wallet from the dashboard before unlocking. Available: ₦${walletBalance.toLocaleString()}`,
@@ -2516,7 +2517,7 @@ exports.initializeLawyerDirectoryUnlock = async (req, res) => {
 
     const reference = `LAWYERDIR_WALLET_${userId}_${Date.now()}`;
 
-    const paymentResult = await db.query(
+    const paymentResult = await transactionClient.query(
       `INSERT INTO payments (
          user_id,
          payment_type,
@@ -2542,7 +2543,7 @@ exports.initializeLawyerDirectoryUnlock = async (req, res) => {
       ]
     );
 
-    await db.query(
+    await transactionClient.query(
       `UPDATE wallets
        SET balance = balance - $2,
            updated_at = CURRENT_TIMESTAMP
@@ -2550,7 +2551,7 @@ exports.initializeLawyerDirectoryUnlock = async (req, res) => {
       [userId, LAWYER_DIRECTORY_UNLOCK_PRICE_NGN]
     );
 
-    await db.query(
+    await transactionClient.query(
       `INSERT INTO lawyer_directory_unlocks (
          user_id, payment_id, transaction_reference
        )
@@ -2563,8 +2564,9 @@ exports.initializeLawyerDirectoryUnlock = async (req, res) => {
       [userId, paymentResult.rows[0].id, reference]
     );
 
-    await db.query('COMMIT');
-    transactionStarted = false;
+    await transactionClient.query('COMMIT');
+    transactionClient.release();
+    transactionClient = null;
 
     return res.json({
       success: true,
@@ -2578,12 +2580,14 @@ exports.initializeLawyerDirectoryUnlock = async (req, res) => {
       },
     });
   } catch (error) {
-    if (transactionStarted) {
+    if (transactionClient) {
       try {
-        await db.query('ROLLBACK');
+        await transactionClient.query('ROLLBACK');
       } catch (rollbackError) {
         req.logger.error('Lawyer directory unlock rollback error:', rollbackError);
       }
+      transactionClient.release();
+      transactionClient = null;
     }
     req.logger.error('Lawyer directory unlock initialization error:', error);
     return res.status(500).json({
