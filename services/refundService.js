@@ -2270,6 +2270,20 @@ exports.approveWalletWithdrawal = async (req, res) => {
 
     const reference = `WLW_${withdrawal.id}_${Date.now()}`;
 
+    // Persist the deterministic reference BEFORE contacting Paystack. A hard
+    // process crash between the transfer request and the response would otherwise
+    // lose the reference; storing it first gives us an authoritative key to
+    // reconcile against Paystack's "verify transfer by reference" endpoint.
+    await db.query(
+      `UPDATE withdrawal_requests
+       SET paystack_transfer_reference = $1,
+           paystack_transfer_status = 'processing',
+           payout_attempted_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [reference, withdrawal.id]
+    );
+
     let transfer;
     try {
       transfer = await initiateTransfer({
@@ -2280,27 +2294,20 @@ exports.approveWalletWithdrawal = async (req, res) => {
       });
     } catch (transferError) {
       // A timeout/network failure may still have created the transfer on
-      // Paystack. Persist the deterministic reference and flag the payout as
-      // "outcome unknown" so the retry service can reconcile it instead of
-      // leaving a processing row with no transfer reference.
+      // Paystack. The reference is already persisted, so just flag the payout
+      // "unknown" for the retry worker to reconcile.
       if (isOutcomeUncertainError(transferError)) {
         const uncertain = await db.query(
           `UPDATE withdrawal_requests
-           SET bank_code = $1,
-               paystack_recipient_code = $2,
-               paystack_transfer_reference = $3,
-               paystack_transfer_status = 'unknown',
-               payout_failed_reason = $4,
-               payout_attempted_at = CURRENT_TIMESTAMP,
+           SET paystack_transfer_status = 'unknown',
+               payout_failed_reason = $1,
                updated_at = CURRENT_TIMESTAMP
-           WHERE id = $5
+           WHERE id = $2 AND paystack_transfer_reference = $3
            RETURNING *`,
           [
-            bankCode,
-            recipientCode,
-            reference,
             'Transfer submission outcome uncertain; reconcile with Paystack before retrying.',
             withdrawalId,
+            reference,
           ]
         );
         return res.status(200).json({

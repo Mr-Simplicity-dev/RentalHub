@@ -1,8 +1,10 @@
 const db = require('../config/middleware/database');
-const { reserveWalletBalance } = require('./walletLedgerService');
+const logger = require('../config/utils/logger');
+const { reserveWalletBalance, settleWalletPayout, releaseWalletReservation } = require('./walletLedgerService');
 const {
   createTransferRecipient,
   initiateTransfer,
+  verifyTransferByReference,
   resolveBankCodeFromName,
 } = require('./paystackTransfer.service');
 
@@ -737,6 +739,97 @@ const retryStateAdminWithdrawals = async (limit) => {
   return summary;
 };
 
+const reconcileUnknownWalletPayouts = async (limit) => {
+  const result = await db.query(
+    `SELECT id, user_id, amount
+     FROM withdrawal_requests
+     WHERE paystack_transfer_status = 'unknown'
+     ORDER BY updated_at ASC
+     LIMIT $1`,
+    [limit]
+  );
+
+  const summary = { scanned: result.rows.length, reconciled: 0, pending: 0, errors: 0 };
+
+  for (const row of result.rows) {
+    try {
+      const transfer = await verifyTransferByReference(row.paystack_transfer_reference || `WLW_${row.id}`);
+      const status = transfer?.status;
+
+      if (status === 'success') {
+        const client = await db.connect();
+        try {
+          await client.query('BEGIN');
+          const claimed = await client.query(
+            `UPDATE withdrawal_requests
+             SET status = 'processed', processed_at = CURRENT_TIMESTAMP,
+                 paystack_transfer_status = 'success', paystack_last_response = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2 AND paystack_transfer_status = 'unknown'
+             RETURNING id`,
+            [JSON.stringify(transfer || {}), row.id]
+          );
+          if (claimed.rows.length) {
+            const settled = await settleWalletPayout({ userId: row.user_id, amount: row.amount, executor: client });
+            if (!settled) {
+              await client.query(
+                `UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP
+                 WHERE user_id = $2 AND balance >= $1`,
+                [row.amount, row.user_id]
+              );
+            }
+          }
+          await client.query('COMMIT');
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+        summary.reconciled += 1;
+      } else if (status === 'failed' || status === 'reversed') {
+        const client = await db.connect();
+        try {
+          await client.query('BEGIN');
+          const claimed = await client.query(
+            `UPDATE withdrawal_requests
+             SET status = 'pending',
+                 paystack_transfer_status = $1,
+                 paystack_last_response = $2,
+                 payout_failed_reason = $3,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $4 AND paystack_transfer_status = 'unknown'
+             RETURNING id`,
+            [status, JSON.stringify(transfer || {}), transfer?.failure_reason || 'Transfer failed', row.id]
+          );
+          if (claimed.rows.length) {
+            const released = await releaseWalletReservation({ userId: row.user_id, amount: row.amount, executor: client });
+            if (!released) {
+              await client.query(
+                `UPDATE wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+                [row.amount, row.user_id]
+              );
+            }
+          }
+          await client.query('COMMIT');
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+        summary.reconciled += 1;
+      } else {
+        summary.pending += 1;
+      }
+    } catch (error) {
+      logger.error('Unknown wallet payout reconciliation error:', error.message);
+      summary.errors += 1;
+    }
+  }
+
+  return summary;
+};
+
 const runPayoutRetryCycle = async () => {
   if (!isPayoutRetryEnabled()) {
     return {
@@ -748,6 +841,7 @@ const runPayoutRetryCycle = async () => {
       agent: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
       wallet: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
       stateAdmin: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
+      unknown: { scanned: 0, reconciled: 0, pending: 0, errors: 0 },
     };
   }
 
@@ -758,10 +852,11 @@ const runPayoutRetryCycle = async () => {
   await ensurePayoutSchema();
   const limitPerTable = Math.max(Number(process.env.PAYOUT_RETRY_BATCH_SIZE) || 20, 1);
 
-  const [agent, wallet, stateAdmin] = await Promise.all([
+  const [agent, wallet, stateAdmin, unknown] = await Promise.all([
     retryAgentWithdrawals(limitPerTable),
     retryWalletWithdrawals(limitPerTable),
     retryStateAdminWithdrawals(limitPerTable),
+    reconcileUnknownWalletPayouts(limitPerTable),
   ]);
 
   return {
@@ -773,6 +868,7 @@ const runPayoutRetryCycle = async () => {
     agent,
     wallet,
     stateAdmin,
+    unknown,
   };
 };
 

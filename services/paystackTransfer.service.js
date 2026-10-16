@@ -71,6 +71,16 @@ const initiateTransfer = async ({ amount, recipientCode, reason, reference }) =>
   return response.data?.data || null;
 };
 
+const verifyTransferByReference = async (reference) => {
+  assertPaystackConfigured();
+  if (!reference) return null;
+  const response = await axios.get(`${PAYSTACK_BASE_URL}/transfer/verify/${encodeURIComponent(reference)}`, {
+    headers: getHeaders(),
+    timeout: PAYSTACK_TIMEOUT_MS,
+  });
+  return response.data?.data || null;
+};
+
 const resolveBankCodeFromName = async (bankName) => {
   assertPaystackConfigured();
 
@@ -115,6 +125,7 @@ const isValidPaystackSignature = (rawBody, signature) => {
 module.exports = {
   createTransferRecipient,
   initiateTransfer,
+  verifyTransferByReference,
   resolveBankCodeFromName,
   isValidPaystackSignature,
   isOutcomeUncertainError,
