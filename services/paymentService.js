@@ -4799,7 +4799,7 @@ async function handleFailedPayment(data, webhookLogger) {
       const regResult = await db.query(
         `UPDATE tenant_registration_payments
          SET payment_status = 'failed',
-             gateway_response = gateway_response = $1,
+             gateway_response = $1
          WHERE transaction_reference = $2
            AND payment_status = 'pending'
          RETURNING id, email, full_name`,
