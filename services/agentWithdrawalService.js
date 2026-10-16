@@ -450,6 +450,16 @@ class AgentWithdrawalService {
       nextStatus = 'processing';
     }
 
+    // Atomic claim + monotonic guard: a "success" is terminal; a "reversed" may
+    // follow a prior success; a "failed" must not downgrade a settled/reversed
+    // payout. Duplicate/concurrent deliveries update 0 rows and become no-ops.
+    const guard =
+      transferStatus === 'success'
+        ? `paystack_transfer_status <> 'success'`
+        : transferStatus === 'reversed'
+          ? `paystack_transfer_status <> 'reversed'`
+          : `paystack_transfer_status NOT IN ('success', 'failed', 'reversed')`;
+
     const updated = await db.query(
       `UPDATE agent_withdrawal_requests
        SET status = $1,
@@ -458,7 +468,7 @@ class AgentWithdrawalService {
            paystack_last_response = $3,
            payout_failed_reason = CASE WHEN $2 IN ('failed','reversed') THEN $4 ELSE payout_failed_reason END,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5
+       WHERE id = $5 AND ${guard}
        RETURNING *`,
       [
         nextStatus,
@@ -468,6 +478,8 @@ class AgentWithdrawalService {
         withdrawal.id,
       ]
     );
+
+    if (!updated.rows.length) return null;
 
     await this.logWithdrawalAudit(
       withdrawal.id,

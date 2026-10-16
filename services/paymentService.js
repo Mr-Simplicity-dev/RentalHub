@@ -4502,21 +4502,28 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
 
     if (reference.startsWith('WLW_')) {
       const result = await db.query(
-        `SELECT * FROM withdrawal_requests WHERE paystack_transfer_reference = $1 LIMIT 1`,
+        `SELECT id, user_id, amount, bank_name, account_number, account_name
+         FROM withdrawal_requests WHERE paystack_transfer_reference = $1 LIMIT 1`,
         [reference]
       );
 
       if (!result.rows.length) return;
       const withdrawal = result.rows[0];
 
-      // Idempotent + monotonic guard: a settled payout is terminal. Ignore
-      // duplicate success deliveries and never downgrade a settled payout on a
-      // late failed/reversed event.
-      if (withdrawal.paystack_transfer_status === 'success' || withdrawal.status === 'processed') {
-        return;
-      }
-
       if (eventName === 'transfer.success') {
+        // Atomic claim: only the webhook that flips the state to success wins.
+        // Concurrent/duplicate success deliveries update 0 rows and become no-ops,
+        // so the wallet is settled exactly once.
+        const claimed = await db.query(
+          `UPDATE withdrawal_requests
+           SET status = 'processed', processed_at = CURRENT_TIMESTAMP,
+               paystack_transfer_status = 'success', paystack_last_response = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2 AND paystack_transfer_status <> 'success'
+           RETURNING id`,
+          [JSON.stringify(data), withdrawal.id]
+        );
+        if (!claimed.rows.length) return;
+
         const settled = await settleWalletPayout({
           userId: withdrawal.user_id,
           amount: withdrawal.amount,
@@ -4532,17 +4539,6 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           );
         }
 
-        await db.query(
-          `UPDATE withdrawal_requests
-           SET status = 'processed',
-               processed_at = CURRENT_TIMESTAMP,
-               paystack_transfer_status = 'success',
-               paystack_last_response = $1,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = $2`,
-          [JSON.stringify(data), withdrawal.id]
-        );
-
         // Email the tenant/landlord a payout receipt
         sendUserPayoutReceipt({
           userId: withdrawal.user_id,
@@ -4552,8 +4548,34 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           accountName: withdrawal.account_name,
           reference,
         }).catch(() => {});
-      } else if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
+        return;
+      }
+
+      if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
         const failureReason = data?.failure_reason || data?.reason || 'Transfer failed';
+        const nextStatus = eventName === 'transfer.failed' ? 'failed' : 'reversed';
+
+        // Atomic claim. A reversal may legitimately follow a prior success
+        // (Paystack reverses an already-debited transfer), so "reversed" may
+        // transition from any state except an already-processed reversal. A
+        // "failed" event only ever finalises a pending transfer and must never
+        // downgrade a settled or reversed one.
+        const guard = eventName === 'transfer.reversed'
+          ? `paystack_transfer_status <> 'reversed'`
+          : `paystack_transfer_status NOT IN ('success', 'failed', 'reversed')`;
+
+        const claimed = await db.query(
+          `UPDATE withdrawal_requests
+           SET status = 'pending',
+               paystack_transfer_status = $1,
+               paystack_last_response = $2,
+               payout_failed_reason = $3,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4 AND ${guard}
+           RETURNING id`,
+          [nextStatus, JSON.stringify(data), failureReason, withdrawal.id]
+        );
+        if (!claimed.rows.length) return;
 
         const released = await releaseWalletReservation({
           userId: withdrawal.user_id,
@@ -4561,6 +4583,9 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
         });
 
         if (!released) {
+          // Reservation already gone: a reversal of a settled payout must refund
+          // the balance. Only the winning webhook reaches this line, so the refund
+          // happens exactly once.
           await db.query(
             `UPDATE wallets
              SET balance = balance + $1,
@@ -4570,22 +4595,6 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           );
         }
 
-        await db.query(
-          `UPDATE withdrawal_requests
-           SET status = 'pending',
-               paystack_transfer_status = $1,
-               paystack_last_response = $2,
-               payout_failed_reason = $3,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = $4`,
-          [
-            eventName === 'transfer.failed' ? 'failed' : 'reversed',
-            JSON.stringify(data),
-            failureReason,
-            withdrawal.id,
-          ]
-        );
-
         // Notify the customer that the payout failed and funds were returned
         sendUserPayoutReceipt({
           userId: withdrawal.user_id,
@@ -4594,7 +4603,7 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           accountNumber: withdrawal.account_number,
           accountName: withdrawal.account_name,
           reference,
-          status: eventName === 'transfer.failed' ? 'failed' : 'reversed',
+          status: nextStatus,
           note: `${failureReason}. The amount has been returned to your wallet.`,
         }).catch(() => {});
       }
@@ -4603,29 +4612,28 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
 
     if (reference.startsWith('SAW_')) {
       const result = await db.query(
-        `SELECT * FROM admin_withdrawals WHERE paystack_transfer_reference = $1 LIMIT 1`,
+        `SELECT id, admin_id, amount, bank_name, account_number, account_name, commissions_snapshot
+         FROM admin_withdrawals WHERE paystack_transfer_reference = $1 LIMIT 1`,
         [reference]
       );
 
       if (!result.rows.length) return;
       const withdrawal = result.rows[0];
 
-      // Idempotent + monotonic guard: never downgrade or re-process a settled payout.
-      if (withdrawal.paystack_transfer_status === 'success' || withdrawal.status === 'processed') {
-        return;
-      }
-
       if (eventName === 'transfer.success') {
-        await db.query(
+        // Atomic claim: only the winning webhook finalises the payout.
+        const claimed = await db.query(
           `UPDATE admin_withdrawals
            SET status = 'processed',
                processed_at = CURRENT_TIMESTAMP,
                paystack_transfer_status = 'success',
                paystack_last_response = $1,
                updated_at = CURRENT_TIMESTAMP
-           WHERE id = $2`,
+           WHERE id = $2 AND paystack_transfer_status <> 'success'
+           RETURNING id`,
           [JSON.stringify(data), withdrawal.id]
         );
+        if (!claimed.rows.length) return;
 
         // Mark pending commissions covered by this withdrawal as paid
         try {
@@ -4674,31 +4682,39 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           reference,
           snapshot: withdrawal.commissions_snapshot || null,
         }).catch(() => {});
-      } else if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
-        const failureReason = data?.failure_reason || data?.reason || 'Transfer failed';
-        if (withdrawal.status !== 'pending' && withdrawal.status !== 'rejected') {
-          await db.query(
-            `UPDATE users
-             SET admin_wallet_balance = admin_wallet_balance + $1
-             WHERE id = $2`,
-            [withdrawal.amount, withdrawal.admin_id]
-          );
-        }
+        return;
+      }
 
-        await db.query(
+      if (eventName === 'transfer.failed' || eventName === 'transfer.reversed') {
+        const failureReason = data?.failure_reason || data?.reason || 'Transfer failed';
+        const nextStatus = eventName === 'transfer.failed' ? 'failed' : 'reversed';
+
+        // Atomic claim (mirrors WLW): a reversal may follow a prior success and
+        // must refund exactly once; a failed event only finalises a pending
+        // transfer and must never downgrade a settled/reversed one.
+        const guard = eventName === 'transfer.reversed'
+          ? `paystack_transfer_status <> 'reversed'`
+          : `paystack_transfer_status NOT IN ('success', 'failed', 'reversed')`;
+
+        const claimed = await db.query(
           `UPDATE admin_withdrawals
            SET status = 'pending',
                paystack_transfer_status = $1,
                paystack_last_response = $2,
                payout_failed_reason = $3,
                updated_at = CURRENT_TIMESTAMP
-           WHERE id = $4`,
-          [
-            eventName === 'transfer.failed' ? 'failed' : 'reversed',
-            JSON.stringify(data),
-            failureReason,
-            withdrawal.id,
-          ]
+           WHERE id = $4 AND ${guard}
+           RETURNING id`,
+          [nextStatus, JSON.stringify(data), failureReason, withdrawal.id]
+        );
+        if (!claimed.rows.length) return;
+
+        // Refund the admin wallet exactly once (only the winning webhook).
+        await db.query(
+          `UPDATE users
+           SET admin_wallet_balance = admin_wallet_balance + $1
+           WHERE id = $2`,
+          [withdrawal.amount, withdrawal.admin_id]
         );
 
         // Notify the admin that the payout failed and funds were returned
@@ -4709,11 +4725,12 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
           accountNumber: withdrawal.account_number,
           accountName: withdrawal.account_name,
           reference,
-          status: eventName === 'transfer.failed' ? 'failed' : 'reversed',
+          status: nextStatus,
           note: `${failureReason}. The amount has been returned to your admin wallet.`,
           snapshot: withdrawal.commissions_snapshot || null,
         }).catch(() => {});
       }
+      return;
     }
   } catch (error) {
     webhookLogger.error('Transfer webhook handler error:', error);
