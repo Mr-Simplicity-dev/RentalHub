@@ -18,6 +18,36 @@ const propertyImageCaptureSessions = new Map();
 
 const getPropertyImageCaptureKey = (userId, token) => `${userId}:${token}`;
 
+// Ownership gate: when the super admin enables require_property_ownership_verification,
+// unverified listings are hidden from public browse/search/featured. Returns false
+// when the gate is off, the enable timestamp when on (for grandfathering), or null
+// when on but no timestamp is recorded yet (hide all unverified).
+const getOwnershipGateEnabledAt = async () => {
+  try {
+    const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
+    const flags = await getFeatureFlagsMap();
+    if (!flags.require_property_ownership_verification) return false;
+    const { rows } = await db.query(
+      `SELECT ownership_gate_enabled_at FROM feature_flags WHERE key = 'require_property_ownership_verification'`
+    );
+    return rows[0]?.ownership_gate_enabled_at || null;
+  } catch {
+    return false;
+  }
+};
+
+const applyOwnershipGate = (whereConditions, params, paramCountRef, gateEnabledAt) => {
+  if (gateEnabledAt === false) return paramCountRef;
+  if (gateEnabledAt) {
+    whereConditions.push(`(p.ownership_verification_status = 'verified' OR p.created_at <= $${paramCountRef})`);
+    params.push(gateEnabledAt);
+    return paramCountRef + 1;
+  }
+  whereConditions.push(`p.ownership_verification_status = 'verified'`);
+  return paramCountRef;
+};
+
+
 const prunePropertyImageCaptureSessions = () => {
   const now = Date.now();
 
@@ -376,6 +406,9 @@ exports.browseProperties = async (req, res) => {
 
     paramCount = tenantScope.paramCount;
 
+    const gateEnabledAt = await getOwnershipGateEnabledAt();
+    paramCount = applyOwnershipGate(whereConditions, params, paramCount, gateEnabledAt);
+
     const result = await db.query(
       `SELECT 
         p.id, p.title, p.property_type, p.bedrooms, p.bathrooms,
@@ -450,6 +483,9 @@ exports.getFeaturedProperties = async (req, res) => {
     }
 
     paramCount = tenantScope.paramCount;
+
+    const gateEnabledAt = await getOwnershipGateEnabledAt();
+    paramCount = applyOwnershipGate(whereConditions, params, paramCount, gateEnabledAt);
 
     const result = await db.query(
       `SELECT 
@@ -639,6 +675,9 @@ exports.searchProperties = async (req, res) => {
     const validSortFields = ['created_at', 'rent_amount', 'bedrooms'];
     const sortField = validSortFields.includes(sort_by) ? sort_by : 'created_at';
     const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const gateEnabledAt = await getOwnershipGateEnabledAt();
+    paramCount = applyOwnershipGate(whereConditions, params, paramCount, gateEnabledAt);
 
     const query = `
       SELECT 

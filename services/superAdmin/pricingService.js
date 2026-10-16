@@ -158,9 +158,19 @@ const updateFeatureFlag = async (req, res) => {
         [enabled, key]
       );
     }
-
-    if (!result.rowCount) {
+    if (!result.rowCount) {
+
       return res.status(404).json({ message: 'Feature flag not found' });
+    }
+
+    // Record when the ownership gate is switched on so existing listings can be
+    // grandfathered (kept public) while new listings must be verified first.
+    if (key === 'require_property_ownership_verification' && enabled) {
+      await db.query(
+        `UPDATE feature_flags
+         SET ownership_gate_enabled_at = COALESCE(ownership_gate_enabled_at, NOW())
+         WHERE key = 'require_property_ownership_verification'`
+      );
     }
 
     await createFeatureFlagOperation({

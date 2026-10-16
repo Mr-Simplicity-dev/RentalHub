@@ -20,6 +20,11 @@ const DEFAULT_FEATURE_FLAGS = [
     description: 'Allow landlords to create new property listings.',
   },
   {
+    key: 'require_property_ownership_verification',
+    enabled: false,
+    description: 'Hide public listings until the landlord\'s ownership document is verified. Existing listings are grandfathered when the gate is switched on.',
+  },
+  {
     key: 'allow_registration',
     enabled: true,
     description: 'Master switch for all registration. When off, tenant and landlord registration are disabled.',
