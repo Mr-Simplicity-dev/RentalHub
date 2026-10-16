@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const crypto = require('crypto');
 
 process.env.NODE_ENV = 'test';
+process.env.PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || 'test-key';
 
 const axios = require('axios');
 const db = require('../config/middleware/database');

@@ -739,11 +739,16 @@ const retryStateAdminWithdrawals = async (limit) => {
   return summary;
 };
 
-const reconcileUnknownWalletPayouts = async (limit) => {
+const UNCERTAIN_STALE_MINUTES = Math.max(Number(process.env.PAYOUT_RECONCILE_STALE_MINUTES) || 10, 1);
+
+const reconcileUncertainTable = async ({ table, limit, settleStatus, releaseStatus, onSettle, onRelease }) => {
   const result = await db.query(
-    `SELECT id, user_id, amount, paystack_transfer_reference
-     FROM withdrawal_requests
-     WHERE paystack_transfer_status = 'unknown'
+    `SELECT * FROM ${table}
+     WHERE paystack_transfer_reference IS NOT NULL
+       AND (
+         paystack_transfer_status = 'unknown'
+         OR (paystack_transfer_status = 'processing' AND payout_attempted_at < CURRENT_TIMESTAMP - INTERVAL '${UNCERTAIN_STALE_MINUTES} minutes')
+       )
      ORDER BY updated_at ASC
      LIMIT $1`,
     [limit]
@@ -752,14 +757,6 @@ const reconcileUnknownWalletPayouts = async (limit) => {
   const summary = { scanned: result.rows.length, reconciled: 0, pending: 0, errors: 0 };
 
   for (const row of result.rows) {
-    if (!row.paystack_transfer_reference) {
-      // Never guess a transfer reference — a missing reference requires manual
-      // reconciliation. Log and skip.
-      logger.warn('Unknown wallet payout has no transfer reference; manual reconciliation required', { id: row.id });
-      summary.errors += 1;
-      continue;
-    }
-
     try {
       const transfer = await verifyTransferByReference(row.paystack_transfer_reference);
       const status = transfer?.status;
@@ -769,23 +766,13 @@ const reconcileUnknownWalletPayouts = async (limit) => {
         try {
           await client.query('BEGIN');
           const claimed = await client.query(
-            `UPDATE withdrawal_requests
-             SET status = 'processed', processed_at = CURRENT_TIMESTAMP,
-                 paystack_transfer_status = 'success', paystack_last_response = $1, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $2 AND paystack_transfer_status = 'unknown'
+            `UPDATE ${table}
+             SET status = $1, paystack_transfer_status = 'success', paystack_last_response = $2, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3 AND paystack_transfer_status IN ('unknown', 'processing')
              RETURNING id`,
-            [JSON.stringify(transfer || {}), row.id]
+            [settleStatus, JSON.stringify(transfer || {}), row.id]
           );
-          if (claimed.rows.length) {
-            const settled = await settleWalletPayout({ userId: row.user_id, amount: row.amount, executor: client });
-            if (!settled) {
-              await client.query(
-                `UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP
-                 WHERE user_id = $2 AND balance >= $1`,
-                [row.amount, row.user_id]
-              );
-            }
-          }
+          if (claimed.rows.length) await onSettle(row, client);
           await client.query('COMMIT');
         } catch (error) {
           await client.query('ROLLBACK');
@@ -799,25 +786,17 @@ const reconcileUnknownWalletPayouts = async (limit) => {
         try {
           await client.query('BEGIN');
           const claimed = await client.query(
-            `UPDATE withdrawal_requests
-             SET status = 'pending',
-                 paystack_transfer_status = $1,
-                 paystack_last_response = $2,
-                 payout_failed_reason = $3,
+            `UPDATE ${table}
+             SET status = $1,
+                 paystack_transfer_status = $2,
+                 paystack_last_response = $3,
+                 payout_failed_reason = $4,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE id = $4 AND paystack_transfer_status = 'unknown'
+             WHERE id = $5 AND paystack_transfer_status IN ('unknown', 'processing')
              RETURNING id`,
-            [status, JSON.stringify(transfer || {}), transfer?.failure_reason || 'Transfer failed', row.id]
+            [releaseStatus, status, JSON.stringify(transfer || {}), transfer?.failure_reason || 'Transfer failed', row.id]
           );
-          if (claimed.rows.length) {
-            const released = await releaseWalletReservation({ userId: row.user_id, amount: row.amount, executor: client });
-            if (!released) {
-              await client.query(
-                `UPDATE wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
-                [row.amount, row.user_id]
-              );
-            }
-          }
+          if (claimed.rows.length) await onRelease(row, client);
           await client.query('COMMIT');
         } catch (error) {
           await client.query('ROLLBACK');
@@ -830,13 +809,75 @@ const reconcileUnknownWalletPayouts = async (limit) => {
         summary.pending += 1;
       }
     } catch (error) {
-      logger.error('Unknown wallet payout reconciliation error:', error.message);
+      logger.error(`${table} uncertain payout reconciliation error:`, error.message);
       summary.errors += 1;
     }
   }
 
   return summary;
 };
+
+const reconcileUncertainWalletPayouts = (limit) => reconcileUncertainTable({
+  table: 'withdrawal_requests',
+  limit,
+  settleStatus: 'processed',
+  releaseStatus: 'pending',
+  onSettle: async (row, client) => {
+    const settled = await settleWalletPayout({ userId: row.user_id, amount: row.amount, executor: client });
+    if (!settled) {
+      await client.query(
+        `UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2 AND balance >= $1`,
+        [row.amount, row.user_id]
+      );
+    }
+  },
+  onRelease: async (row, client) => {
+    const released = await releaseWalletReservation({ userId: row.user_id, amount: row.amount, executor: client });
+    if (!released) {
+      await client.query(
+        `UPDATE wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+        [row.amount, row.user_id]
+      );
+    }
+  },
+});
+
+const reconcileUncertainAdminPayouts = (limit) => reconcileUncertainTable({
+  table: 'admin_withdrawals',
+  limit,
+  settleStatus: 'processed',
+  releaseStatus: 'pending',
+  // The admin wallet was already debited at payout initiation, so settling only
+  // finalises the withdrawal state.
+  onSettle: async () => {},
+  onRelease: async (row, client) => {
+    await client.query(
+      `UPDATE users SET admin_wallet_balance = admin_wallet_balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [row.amount, row.admin_id]
+    );
+  },
+});
+
+const reconcileUncertainAgentPayouts = (limit) => reconcileUncertainTable({
+  table: 'agent_withdrawal_requests',
+  limit,
+  settleStatus: 'completed',
+  releaseStatus: 'approved',
+  onSettle: async (row, client) => {
+    await client.query(
+      `UPDATE agent_earnings_summary SET total_paid = total_paid + $1, updated_at = CURRENT_TIMESTAMP
+       WHERE agent_user_id = $2 AND landlord_user_id = $3`,
+      [row.amount, row.agent_user_id, row.landlord_user_id]
+    );
+  },
+  onRelease: async (row, client) => {
+    await client.query(
+      `UPDATE agent_earnings_summary SET total_pending = total_pending + $1, updated_at = CURRENT_TIMESTAMP
+       WHERE agent_user_id = $2 AND landlord_user_id = $3`,
+      [row.amount, row.agent_user_id, row.landlord_user_id]
+    );
+  },
+});
 
 const runPayoutRetryCycle = async () => {
   if (!isPayoutRetryEnabled()) {
@@ -849,7 +890,7 @@ const runPayoutRetryCycle = async () => {
       agent: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
       wallet: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
       stateAdmin: { scanned: 0, retried: 0, skipped: 0, errors: 0 },
-      unknown: { scanned: 0, reconciled: 0, pending: 0, errors: 0 },
+      unknown: { wallet: { scanned: 0, reconciled: 0, pending: 0, errors: 0 }, admin: { scanned: 0, reconciled: 0, pending: 0, errors: 0 }, agent: { scanned: 0, reconciled: 0, pending: 0, errors: 0 } },
     };
   }
 
@@ -860,11 +901,13 @@ const runPayoutRetryCycle = async () => {
   await ensurePayoutSchema();
   const limitPerTable = Math.max(Number(process.env.PAYOUT_RETRY_BATCH_SIZE) || 20, 1);
 
-  const [agent, wallet, stateAdmin, unknown] = await Promise.all([
+  const [agent, wallet, stateAdmin, unknownWallet, unknownAdmin, unknownAgent] = await Promise.all([
     retryAgentWithdrawals(limitPerTable),
     retryWalletWithdrawals(limitPerTable),
     retryStateAdminWithdrawals(limitPerTable),
-    reconcileUnknownWalletPayouts(limitPerTable),
+    reconcileUncertainWalletPayouts(limitPerTable),
+    reconcileUncertainAdminPayouts(limitPerTable),
+    reconcileUncertainAgentPayouts(limitPerTable),
   ]);
 
   return {
@@ -876,7 +919,7 @@ const runPayoutRetryCycle = async () => {
     agent,
     wallet,
     stateAdmin,
-    unknown,
+    unknown: { wallet: unknownWallet, admin: unknownAdmin, agent: unknownAgent },
   };
 };
 

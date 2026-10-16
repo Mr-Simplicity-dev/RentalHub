@@ -227,6 +227,19 @@ class AgentWithdrawalService {
 
           const reference = `AGW_${withdrawalId}_${Date.now()}`;
 
+          // Persist the deterministic reference BEFORE contacting Paystack so a
+          // hard crash cannot lose the link between this withdrawal and its
+          // transfer (reconcile-able via verify-by-reference).
+          await db.query(
+            `UPDATE agent_withdrawal_requests
+             SET paystack_transfer_reference = $1,
+                 paystack_transfer_status = 'processing',
+                 payout_attempted_at = CURRENT_TIMESTAMP,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2`,
+            [reference, withdrawalId]
+          );
+
           let transfer;
           try {
             transfer = await initiateTransfer({
@@ -237,19 +250,17 @@ class AgentWithdrawalService {
             });
           } catch (transferError) {
             // A timeout/network failure may still have created the transfer on
-            // Paystack. Persist the deterministic reference and flag the payout
-            // for reconciliation rather than leaving it stuck in "approved".
+            // Paystack. The reference is already persisted, so just flag the
+            // payout "unknown" for the retry worker to reconcile.
             if (isOutcomeUncertainError(transferError)) {
               await db.query(
                 `UPDATE agent_withdrawal_requests
                  SET status = 'processing',
-                     payout_attempted_at = CURRENT_TIMESTAMP,
-                     paystack_transfer_reference = $1,
                      paystack_transfer_status = 'unknown',
-                     payout_failed_reason = $2,
+                     payout_failed_reason = $1,
                      updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $3`,
-                [reference, 'Transfer submission outcome uncertain; reconcile with Paystack before retrying.', withdrawalId]
+                 WHERE id = $2 AND paystack_transfer_reference = $3 AND paystack_transfer_status = 'processing'`,
+                ['Transfer submission outcome uncertain; reconcile with Paystack before retrying.', withdrawalId, reference]
               );
               await this.logWithdrawalAudit(
                 withdrawalId,

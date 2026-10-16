@@ -124,6 +124,7 @@ test('enabled retries require Paystack configuration before touching payout rows
   assert.equal(databaseCalls.length, 0);
   assert.equal(transferCalls.length, 0);
   if (previousPaystackSecretKey !== undefined) process.env.PAYSTACK_SECRET_KEY = previousPaystackSecretKey;
+  else process.env.PAYSTACK_SECRET_KEY = 'test-key';
 });
 
 test('a lost atomic claim skips each payout without calling Paystack', async () => {
