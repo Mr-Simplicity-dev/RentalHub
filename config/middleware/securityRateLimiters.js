@@ -1,9 +1,66 @@
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
+const redis = require('../utils/redis');
+
+// Redis-backed store so rate limits are shared across all PM2 instances and
+// survive deploys/reloads. Falls back to express-rate-limit's in-memory store
+// when Redis is unavailable. Keys are hashed so raw client identifiers (IP +
+// route) never land in Redis.
+const { MemoryStore } = rateLimit;
+
+class RedisRateLimitStore {
+  constructor() {
+    this.memory = new MemoryStore();
+    this.windowMs = 60 * 1000;
+  }
+
+  init(options) {
+    this.memory.init(options);
+    this.windowMs = options.windowMs;
+  }
+
+  _hash(key) {
+    return crypto.createHash('sha256').update(String(key)).digest('hex');
+  }
+
+  async increment(key) {
+    if (!redis) return this.memory.increment(key);
+    try {
+      const hashed = this._hash(key);
+      const count = await redis.incr(hashed);
+      if (count === 1) await redis.pexpire(hashed, this.windowMs);
+      return { totalHits: count, resetTime: new Date(Date.now() + this.windowMs) };
+    } catch (error) {
+      return this.memory.increment(key);
+    }
+  }
+
+  async decrement(key) {
+    if (!redis) return this.memory.decrement(key);
+    try {
+      await redis.decr(this._hash(key));
+    } catch (error) {
+      await this.memory.decrement(key);
+    }
+  }
+
+  async resetKey(key) {
+    if (!redis) return this.memory.resetKey(key);
+    try {
+      await redis.del(this._hash(key));
+    } catch (error) {
+      await this.memory.resetKey(key);
+    }
+  }
+}
+
+const sharedStore = new RedisRateLimitStore();
 
 const buildLimiter = ({ windowMs, max, message }) =>
   rateLimit({
     windowMs,
     max,
+    store: sharedStore,
     standardHeaders: true,
     legacyHeaders: false,
     message: {
