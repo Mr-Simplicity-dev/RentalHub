@@ -17,10 +17,11 @@ class RedisRateLimitStore {
   init(options) {
     this.memory.init(options);
     this.windowMs = options.windowMs;
+    this.prefix = options.prefix || '';
   }
 
   _hash(key) {
-    return crypto.createHash('sha256').update(String(key)).digest('hex');
+    return crypto.createHash('sha256').update(`${this.prefix}:${key}`).digest('hex');
   }
 
   async increment(key) {
@@ -54,13 +55,11 @@ class RedisRateLimitStore {
   }
 }
 
-const sharedStore = new RedisRateLimitStore();
-
 const buildLimiter = ({ windowMs, max, message }) =>
   rateLimit({
     windowMs,
     max,
-    store: sharedStore,
+    store: new RedisRateLimitStore(),
     standardHeaders: true,
     legacyHeaders: false,
     message: {
