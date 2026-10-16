@@ -13,6 +13,7 @@ import PropertyRequestWorkflowPanel from '../../components/admin/PropertyRequest
 import TenancyWorkflowPanel from '../../components/admin/TenancyWorkflowPanel';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 import TicketConversationModal from '../../components/common/TicketConversationModal';
+import LawyerDirectoryPanel from '../../components/admin/LawyerDirectoryPanel';
 
 // Lazy: the desk pulls in the Twilio SDK — keep it out of the dashboard chunk.
 const SupportVoiceDesk = lazy(() => import('../../components/admin/SupportVoiceDesk'));
@@ -53,7 +54,7 @@ const StateSupportAdminDashboard = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const activeTab = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab') || 'overview';
-    return ['overview', 'queue', 'property_requests', 'tenancy', 'tickets', 'escalations', 'voice'].includes(tab) ? tab : 'overview';
+    return ['overview', 'queue', 'property_requests', 'tenancy', 'tickets', 'escalations', 'voice', 'lawyers'].includes(tab) ? tab : 'overview';
   }, [location.search]);
 
   const workspaceTabs = [
@@ -64,6 +65,7 @@ const StateSupportAdminDashboard = () => {
     { key: 'tickets', label: 'Support Tickets', to: '/admin/state-support-dashboard?tab=tickets' },
     { key: 'escalations', label: 'Escalations', to: '/admin/state-support-dashboard?tab=escalations' },
     { key: 'voice', label: 'Voice Desk', to: '/admin/state-support-dashboard?tab=voice' },
+    { key: 'lawyers', label: 'Lawyer Directory', to: '/admin/state-support-dashboard?tab=lawyers' },
   ];
 
   const loadTickets = useCallback(async () => {
@@ -464,6 +466,13 @@ const StateSupportAdminDashboard = () => {
           <Suspense fallback={<p className="px-4 py-8 text-sm text-gray-500">Loading voice desk…</p>}>
             <SupportVoiceDesk tickets={tickets} onOpenTickets={() => { setSelectedTicket(null); }} />
           </Suspense>
+        </section>
+      )}
+
+      {/* Internal Lawyer Directory */}
+      {activeTab === 'lawyers' && (
+        <section className="mt-4">
+          <LawyerDirectoryPanel />
         </section>
       )}
 

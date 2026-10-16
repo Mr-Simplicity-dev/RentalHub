@@ -39,6 +39,7 @@ import TicketConversationModal from '../../components/common/TicketConversationM
 // chunk's top-level evaluation.
 const SupportVoiceDesk = lazy(() => import('../../components/admin/SupportVoiceDesk'));
 const VoiceOperationsPanel = lazy(() => import('../../components/admin/VoiceOperationsPanel'));
+import LawyerDirectoryPanel from '../../components/admin/LawyerDirectoryPanel';
 
 // Utility functions
 const badgeClass = (status) => {
@@ -390,7 +391,7 @@ const SuperSupportAdminDashboard = () => {
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'escalations', 'alerts', 'reports', 'activity', 'pool', 'voice', 'voice_ops'];
+    const allowedTabs = ['overview', 'queue', 'property_requests', 'audit', 'tickets', 'escalations', 'alerts', 'reports', 'activity', 'pool', 'voice', 'voice_ops', 'lawyers'];
     if (tab && allowedTabs.includes(tab)) {
       setActiveTab(tab);
       return;
@@ -775,6 +776,7 @@ const SuperSupportAdminDashboard = () => {
           { key: 'pool', label: 'Admin Pool' },
           { key: 'voice', label: 'Voice Desk' },
           { key: 'voice_ops', label: 'Voice Ops' },
+          { key: 'lawyers', label: 'Lawyer Directory' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -1306,6 +1308,13 @@ const SuperSupportAdminDashboard = () => {
             <Suspense fallback={<div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading Voice Operations...</div>}>
               <VoiceOperationsPanel />
             </Suspense>
+          </div>
+        )}
+
+        {/* Internal Lawyer Directory Tab */}
+        {activeTab === 'lawyers' && (
+          <div className="super-support-lawyers-section">
+            <LawyerDirectoryPanel />
           </div>
         )}
 

@@ -7,6 +7,7 @@ import { useSocket } from '../../hooks/useSocket';
 import api from '../../services/api';
 import SupportTicketWorkspace from '../../components/admin/SupportTicketWorkspace';
 import TicketConversationModal from '../../components/common/TicketConversationModal';
+import LawyerDirectoryPanel from '../../components/admin/LawyerDirectoryPanel';
 
 // Lazy: the desk pulls in the Twilio SDK — keep it out of the dashboard chunk.
 const SupportVoiceDesk = lazy(() => import('../../components/admin/SupportVoiceDesk'));
@@ -20,7 +21,7 @@ const ZonalSupportAdminDashboard = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const activeTab = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab') || 'overview';
-    return ['overview', 'tickets', 'escalations', 'voice'].includes(tab) ? tab : 'overview';
+    return ['overview', 'tickets', 'escalations', 'voice', 'lawyers'].includes(tab) ? tab : 'overview';
   }, [location.search]);
 
   const workspaceTabs = [
@@ -28,6 +29,7 @@ const ZonalSupportAdminDashboard = () => {
     { key: 'tickets', label: 'Support Tickets', to: '/admin/zonal-support-dashboard?tab=tickets' },
     { key: 'escalations', label: 'Escalations', to: '/admin/zonal-support-dashboard?tab=escalations' },
     { key: 'voice', label: 'Voice Desk', to: '/admin/zonal-support-dashboard?tab=voice' },
+    { key: 'lawyers', label: 'Lawyer Directory', to: '/admin/zonal-support-dashboard?tab=lawyers' },
   ];
 
   // Socket listener for real-time ticket list updates
@@ -181,6 +183,13 @@ const ZonalSupportAdminDashboard = () => {
           <Suspense fallback={<p className="px-4 py-8 text-sm text-gray-500">Loading voice desk…</p>}>
             <SupportVoiceDesk tickets={data.tickets} onOpenTickets={openTicket} />
           </Suspense>
+        </section>
+        )}
+
+        {/* Internal Lawyer Directory */}
+        {activeTab === 'lawyers' && (
+        <section className="zonal-support-lawyers-section">
+          <LawyerDirectoryPanel />
         </section>
         )}
       </div>
