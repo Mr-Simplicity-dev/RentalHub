@@ -218,15 +218,17 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
                  state = EXCLUDED.state,
                  city = EXCLUDED.city,
                  updated_at = CURRENT_TIMESTAMP
-           RETURNING id`,
+           RETURNING id, (xmax = 0) AS inserted`,
           [distAdminId, userId, paymentId, distAmount, paymentType, finalCommissionRate, propertyState, propertyCity]
         );
         commissionIds.push(distResult.rows[0].id);
 
-        await db.query(
-          `UPDATE users SET admin_wallet_balance = admin_wallet_balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-          [distAmount, distAdminId]
-        );
+        if (distResult.rows[0]?.inserted) {
+          await db.query(
+            `UPDATE users SET admin_wallet_balance = admin_wallet_balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+            [distAmount, distAdminId]
+          );
+        }
 
         await db.query(
           `INSERT INTO transaction_audits (payment_id, user_id, admin_id, action_type, amount, description)
@@ -259,14 +261,18 @@ exports.calculateCommission = async (paymentId, userId, amount, paymentType, pro
              state = EXCLUDED.state,
              city = EXCLUDED.city,
              updated_at = CURRENT_TIMESTAMP
-       RETURNING id`,
+       RETURNING id, (xmax = 0) AS inserted`,
       [admin.id, userId, paymentId, finalCommission, paymentType, finalCommissionRate, propertyState, propertyCity]
     );
 
-    await db.query(
-      `UPDATE users SET admin_wallet_balance = admin_wallet_balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      [finalCommission, admin.id]
-    );
+    // Idempotent wallet credit: only credit when the commission row was freshly
+    // inserted. An upsert of an already-existing row must not re-credit the admin.
+    if (commissionResult.rows[0]?.inserted) {
+      await db.query(
+        `UPDATE users SET admin_wallet_balance = admin_wallet_balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [finalCommission, admin.id]
+      );
+    }
 
     await db.query(
       `INSERT INTO transaction_audits (payment_id, user_id, admin_id, action_type, amount, description)
