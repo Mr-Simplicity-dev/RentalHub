@@ -7,6 +7,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const accentLast = (h) => h.replace(/(\S+)(\s*)$/, '<span class="accent">$1</span>$2');
 const LOGO = '<img class="logo" src="../../client/public/rentalhub-mark.svg" alt="RentalHub NG">';
+const BRAND = `<div class="brand"><span class="amana">Amana</span><span class="name">RentalHub <span>NG</span></span></div>`;
 const FOOTER = '<div class="footer">rentalhub.com.ng&nbsp;&nbsp;&bull;&nbsp;&nbsp;support@rentalhub.com.ng</div>';
 const tick = (p) => `<span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" style="stroke:${p.onAccent}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 
@@ -78,8 +79,10 @@ html,body{width:100%;height:100%;overflow:hidden}
 body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink)}
 .flyer{position:relative;width:100vw;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .logo{width:8.5vmin;height:8.5vmin;border-radius:50%;background:#fff;box-shadow:0 1vmin 2.4vmin rgba(0,0,0,.28)}
-.brand{font-weight:800;font-size:3.3vmin}
-.brand span{font-weight:400;color:var(--accent)}
+@font-face{font-family:'AmanaScript';src:url('../../client/public/fonts/AmanaScript.ttf') format('truetype');font-display:swap}
+.brand{position:absolute;top:2.4vmin;left:3vmin;z-index:10;display:flex;flex-direction:column;align-items:flex-start;font-weight:800;font-size:3.1vmin;color:var(--ink)}
+.brand .amana{font-family:'AmanaScript','Segoe Script',cursive;color:#6E1B2B;font-size:2.7vmin;line-height:1.15;letter-spacing:.02em}
+.brand .name span{font-weight:400;color:var(--accent)}
 .eyebrow{font-size:1.85vmin;font-weight:800;letter-spacing:.24em;color:var(--accent)}
 h1{font-size:4.6vmin;line-height:1.08;font-weight:800;letter-spacing:-.01em}
 h1 .accent{color:var(--accent)}
@@ -147,6 +150,7 @@ for (let k = 0; k < 48; k++) {
   const c = CONTENT[idx];
   const n = String(idx + 1).padStart(2, '0');
   const name = `t${n}-${mode.key}-${arr}-${pal.key}.html`;
+  const body = mode.body(pal, c, arr).replace('<div class="flyer">', `<div class="flyer">${BRAND}`);
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -158,7 +162,7 @@ for (let k = 0; k < 48; k++) {
 </style>
 </head>
 <body>
-${mode.body(pal, c, arr)}
+${body}
 </body>
 </html>
 `;
