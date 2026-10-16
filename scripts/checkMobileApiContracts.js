@@ -8,6 +8,15 @@ const MOBILE_SRC = path.join(ROOT, 'RentalHubMobile', 'src');
 const HTTP_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete']);
 const CHECK_ALL = process.argv.includes('--all');
 
+// The mobile code lives in the RentalHubMobile git submodule. In CI the submodule
+// may not be checked out (private submodule / no token), so skip gracefully
+// instead of failing the whole pipeline and blocking the backend test suite.
+if (!fs.existsSync(MOBILE_SRC) || !fs.existsSync(path.join(MOBILE_ROOT, 'index.js'))) {
+  console.log('⚠️  Mobile submodule not checked out — skipping mobile API contract check.');
+  console.log('    Run locally with the RentalHubMobile submodule present to verify contracts.');
+  process.exit(0);
+}
+
 const read = (file) => fs.readFileSync(file, 'utf8');
 
 const walk = (directory) => fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

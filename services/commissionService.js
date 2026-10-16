@@ -6,6 +6,7 @@ const {
   createTransferRecipient,
   initiateTransfer,
   resolveBankCodeFromName,
+  isOutcomeUncertainError,
 } = require('./paystackTransfer.service');
 
 // Namespace helpers for DB-backed config keys
@@ -548,10 +549,10 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
       }
 
       const reference = `SAW_${withdrawalId}_${Date.now()}`;
-      const transfer = await initiateTransfer({
-        amount, recipientCode, reason: `Admin direct withdrawal #${withdrawalId}`, reference,
-      });
 
+      // Persist the withdrawal + reference + wallet debit + commission mark and
+      // COMMIT BEFORE contacting Paystack, so a hard crash cannot lose the
+      // reference (reconcile-able via verify-by-reference).
       await q.query(
         `UPDATE admin_commissions SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
          WHERE admin_id = $1 AND status = 'pending' AND created_at <= CURRENT_TIMESTAMP`,
@@ -569,13 +570,10 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
       );
 
       await q.query(
-        `UPDATE admin_withdrawals SET status = 'approved', bank_code = $1, paystack_recipient_code = $2,
-         paystack_transfer_code = $3, paystack_transfer_reference = $4, paystack_transfer_status = $5,
-         paystack_last_response = $6, payout_attempted_at = CURRENT_TIMESTAMP, processed_by = $7,
-         processed_at = CURRENT_TIMESTAMP, admin_note = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9`,
-        [bankDetails.bank_code || null, recipientCode, transfer?.transfer_code || null,
-         transfer?.reference || reference, transfer?.status || 'pending', JSON.stringify(transfer || {}),
-         processedBy, adminNote || 'Direct payout initiated', withdrawalId]
+        `UPDATE admin_withdrawals SET status = 'processing', bank_code = $1, paystack_recipient_code = $2,
+         paystack_transfer_reference = $3, paystack_transfer_status = 'processing', payout_attempted_at = CURRENT_TIMESTAMP,
+         processed_by = $4, admin_note = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6`,
+        [bankDetails.bank_code || null, recipientCode, reference, processedBy, adminNote || 'Direct payout initiated', withdrawalId]
       );
 
       await q.query(
@@ -585,6 +583,57 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
       );
 
       await client.query('COMMIT');
+
+      // Contact Paystack for the actual money transfer — the withdrawal row and
+      // reference are now durable.
+      let transfer;
+      try {
+        transfer = await initiateTransfer({
+          amount, recipientCode, reason: `Admin direct withdrawal #${withdrawalId}`, reference,
+        });
+      } catch (transferError) {
+        if (isOutcomeUncertainError(transferError)) {
+          await db.query(
+            `UPDATE admin_withdrawals SET paystack_transfer_status = 'unknown', payout_failed_reason = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2 AND paystack_transfer_reference = $3 AND paystack_transfer_status = 'processing'`,
+            ['Transfer submission outcome uncertain; reconcile with Paystack before retrying.', withdrawalId, reference]
+          );
+          return {
+            withdrawal_id: withdrawalId, requested_at: withdrawalResult.rows[0].requested_at,
+            amount, status: 'processing', paystack_reference: reference, paystack_status: 'unknown',
+            new_balance: parseFloat(admin.admin_wallet_balance) - amount,
+          };
+        }
+
+        // Definite failure — compensate: refund the wallet + un-mark the
+        // commissions + mark the withdrawal failed.
+        const commissionIds = (Array.isArray(commissionsSnapshot) ? commissionsSnapshot : [])
+          .map((c) => Number(c?.id))
+          .filter((id) => Number.isInteger(id) && id > 0);
+        await db.query(
+          `UPDATE users SET admin_wallet_balance = admin_wallet_balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+          [amount, adminId]
+        );
+        if (commissionIds.length) {
+          await db.query(
+            `UPDATE admin_commissions SET status = 'pending', paid_at = NULL, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ANY($1::int[]) AND status = 'paid'`,
+            [commissionIds]
+          );
+        }
+        await db.query(
+          `UPDATE admin_withdrawals SET status = 'failed', paystack_transfer_status = 'failed', payout_failed_reason = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+          [transferError.message, withdrawalId]
+        );
+        throw transferError;
+      }
+
+      // Persist the transfer result.
+      await db.query(
+        `UPDATE admin_withdrawals SET status = 'approved', paystack_transfer_code = $1, paystack_transfer_status = $2,
+         paystack_last_response = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+        [transfer?.transfer_code || null, transfer?.status || 'pending', JSON.stringify(transfer || {}), withdrawalId]
+      );
 
       // Send payout receipt to the admin with itemized snapshot
       try {

@@ -741,7 +741,7 @@ const retryStateAdminWithdrawals = async (limit) => {
 
 const reconcileUnknownWalletPayouts = async (limit) => {
   const result = await db.query(
-    `SELECT id, user_id, amount
+    `SELECT id, user_id, amount, paystack_transfer_reference
      FROM withdrawal_requests
      WHERE paystack_transfer_status = 'unknown'
      ORDER BY updated_at ASC
@@ -752,8 +752,16 @@ const reconcileUnknownWalletPayouts = async (limit) => {
   const summary = { scanned: result.rows.length, reconciled: 0, pending: 0, errors: 0 };
 
   for (const row of result.rows) {
+    if (!row.paystack_transfer_reference) {
+      // Never guess a transfer reference — a missing reference requires manual
+      // reconciliation. Log and skip.
+      logger.warn('Unknown wallet payout has no transfer reference; manual reconciliation required', { id: row.id });
+      summary.errors += 1;
+      continue;
+    }
+
     try {
-      const transfer = await verifyTransferByReference(row.paystack_transfer_reference || `WLW_${row.id}`);
+      const transfer = await verifyTransferByReference(row.paystack_transfer_reference);
       const status = transfer?.status;
 
       if (status === 'success') {

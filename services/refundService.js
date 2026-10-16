@@ -2302,7 +2302,7 @@ exports.approveWalletWithdrawal = async (req, res) => {
            SET paystack_transfer_status = 'unknown',
                payout_failed_reason = $1,
                updated_at = CURRENT_TIMESTAMP
-           WHERE id = $2 AND paystack_transfer_reference = $3
+           WHERE id = $2 AND paystack_transfer_reference = $3 AND paystack_transfer_status = 'processing'
            RETURNING *`,
           [
             'Transfer submission outcome uncertain; reconcile with Paystack before retrying.',
