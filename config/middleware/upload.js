@@ -10,6 +10,7 @@ const MAGIC_BYTE_CHECKS = {
   webp: { offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] },
   mp4: { offset: 4, bytes: [0x66, 0x74, 0x79, 0x70] },
   webm: { offset: 0, bytes: [0x1A, 0x45, 0xDF, 0xA3] },
+  pdf: { offset: 0, bytes: [0x25, 0x50, 0x44, 0x46] },
 };
 
 const validateFileMagicBytes = (filePath) => {
@@ -270,6 +271,7 @@ module.exports = {
   uploadPassportLocal,
   uploadPropertyMedia: withCloudinaryConfig(uploadPropertyMedia),
   uploadPropertyPhotos: withCloudinaryConfig(uploadPropertyPhotos),
+  validateFileMagicBytes,
   validateFileMagicBytesMiddleware,
   reprocessPassportImage,
   scanUploadForMalware,

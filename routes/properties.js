@@ -286,6 +286,31 @@ router.post('/:propertyId/ownership-document', authenticate, isLandlordOrAgent, 
       return res.status(400).json({ success: false, message: 'No document uploaded' });
     }
 
+    // Validate actual file content (magic bytes), not the client-declared MIME
+    // type, and reject anything the antivirus scanner flags.
+    try {
+      const { validateFileMagicBytes } = require('../config/middleware/upload');
+      const validMagic = validateFileMagicBytes(req.file.path);
+      let infected = false;
+      try {
+        const { scanFileForMalware } = require('../config/utils/clamav');
+        infected = (await scanFileForMalware(req.file.path)).infected === true;
+      } catch (_) { /* scanner fail-open */ }
+
+      if (!validMagic || infected) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+        return res.status(400).json({
+          success: false,
+          message: infected
+            ? 'Upload rejected: the file appears to be infected.'
+            : 'File content does not match an allowed document type (image or PDF).',
+        });
+      }
+    } catch (_) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+      return res.status(400).json({ success: false, message: 'Could not validate the uploaded document.' });
+    }
+
     try {
       const relativePath = `/uploads/ownership/${req.file.filename}`;
       const result = await require('../config/middleware/database').query(
