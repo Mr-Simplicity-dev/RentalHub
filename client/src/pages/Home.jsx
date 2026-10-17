@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
 import FloatingContactWidget from '../components/common/FloatingContactWidget';
 import WhatsAppBotWidget from '../components/common/WhatsAppBotWidget';
+import api from '../services/api';
 
 const HUBSPOT_LANG_MAP = {
   en: 'en',
@@ -26,6 +27,7 @@ const Home = () => {
 
   const [featuredProperties, setFeaturedProperties] = useState([]);
   const [popularLocations, setPopularLocations] = useState([]);
+  const [treatedCases, setTreatedCases] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAppPrompt, setShowAppPrompt] = useState(false);
@@ -66,6 +68,26 @@ const Home = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTreatedCases = async () => {
+      try {
+        const response = await api.get('/legal/treated-cases');
+        if (isMounted) {
+          setTreatedCases(response.data?.data || null);
+        }
+      } catch (error) {
+        console.error('Error loading legal treated cases:', error);
+      }
+    };
+
+    loadTreatedCases();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -294,6 +316,75 @@ const Home = () => {
       </section>
 
       <AdSpace placement="home_top" variant="marquee" className="bg-white py-4" />
+
+      {treatedCases && (
+        <section className="bg-slate-50 py-16">
+          <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-5xl">
+              <div className="mb-8 flex flex-col items-center gap-3 text-center">
+                <FaShieldAlt className="text-3xl text-primary-600" aria-hidden="true" />
+                <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+                  {t('home.legal_protection_title', 'Legal protection: solved cases')}
+                </h2>
+                <p className="max-w-2xl text-slate-600">
+                  {t('home.legal_cases_intro', 'See anonymized rental disputes resolved with legal support.')}
+                </p>
+              </div>
+
+              <div className="mb-6 grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-2xl font-bold text-primary-600">{treatedCases.stats?.total_resolved || 0}</p>
+                  <p className="text-sm text-slate-500">{t('home.solved_cases', 'Solved cases')}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-2xl font-bold text-primary-600">{treatedCases.stats?.tenant_against_landlord || 0}</p>
+                  <p className="text-sm text-slate-500">{t('lawyers_directory.tenant_cases', 'Tenant cases')}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-2xl font-bold text-primary-600">{treatedCases.stats?.landlord_against_tenant || 0}</p>
+                  <p className="text-sm text-slate-500">{t('lawyers_directory.landlord_cases', 'Landlord cases')}</p>
+                </div>
+              </div>
+
+              {(treatedCases.cases || []).length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {(treatedCases.cases || []).slice(0, 3).map((caseItem) => (
+                    <div key={caseItem.id} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                      <FaCheckCircle className="mt-0.5 shrink-0 text-green-500" aria-hidden="true" />
+                      <div>
+                        <p className="font-semibold text-slate-900">
+                          {caseItem.direction === 'tenant_landlord'
+                            ? t('lawyers_directory.tenant_to_landlord', 'Tenant → landlord')
+                            : t('lawyers_directory.landlord_to_tenant', 'Landlord → tenant')}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {[caseItem.state, caseItem.resolved_at ? new Date(caseItem.resolved_at).toLocaleDateString() : null]
+                            .filter(Boolean)
+                            .join(' · ') || t('lawyers_directory.resolved_matter', 'Resolved matter')}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-sm text-slate-500">
+                  {t('home.no_solved_cases', 'No resolved cases to show yet.')}
+                </p>
+              )}
+
+              <div className="mt-8 text-center">
+                <Link
+                  to="/legal-support"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-primary-700"
+                >
+                  <FaShieldAlt aria-hidden="true" />
+                  {t('home.use_lawyers')}
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Features */}
       <section
