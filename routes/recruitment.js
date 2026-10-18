@@ -42,7 +42,8 @@ const referenceBodyValidation = body('reference_number')
   .isString()
   .trim()
   .isLength({ min: 12, max: 50 })
-  .matches(/^RH-APP-[A-Z0-9]+$/i)
+  // LEGACY compatibility: accept both the new ARH-APP- and historical RH-APP- forms.
+  .matches(/^(ARH|RH)-APP-[A-Z0-9]+$/i)
   .withMessage('A valid application reference is required');
 
 // NOTE: no normalizeEmail() on applicant emails — stored emails are lowercased
@@ -56,7 +57,8 @@ const referenceQueryValidation = query('reference_number')
   .isString()
   .trim()
   .isLength({ min: 12, max: 50 })
-  .matches(/^RH-APP-[A-Z0-9]+$/i)
+  // LEGACY compatibility: accept both the new ARH-APP- and historical RH-APP- forms.
+  .matches(/^(ARH|RH)-APP-[A-Z0-9]+$/i)
   .withMessage('A valid application reference is required');
 
 const emailQueryValidation = query('email')

@@ -10,6 +10,7 @@ const { recordFailedLogin, clearLoginAttempts } = require('../config/middleware/
 const { raiseSecurityAlert } = require('../config/utils/securityAlert');
 const { isPrivilegedRole } = require('../config/utils/twoFactor');
 const { recordDeviceLink } = require('../config/utils/deviceLink');
+const { buildReference } = require('../config/utils/referenceGenerator');
 const { zoneForState } = require('../config/utils/territorialZones');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
 const { getLocationPricingQuote } = require('../config/utils/locationPricing');
@@ -2027,7 +2028,7 @@ exports.initializeRegistrationPayment = async (req, res) => {
     const passwordHash = await bcrypt.hash(plainPassword, salt);
     // Unguessable reference: a timestamp-only reference lets an attacker
     // enumerate pending registrations and complete (hijack) them first.
-    const reference = `REGPAY_${preparedRegistration.user_type.toUpperCase()}_${Date.now()}_${require('crypto').randomBytes(16).toString('hex')}`;
+    const reference = buildReference('REGPAY', preparedRegistration.user_type.toUpperCase(), Date.now(), require('crypto').randomBytes(16).toString('hex'));
 
     // NIN / passport numbers are stored encrypted at rest (same AES-256-GCM
     // used for users.nin). Falls back to plaintext only when the encryption

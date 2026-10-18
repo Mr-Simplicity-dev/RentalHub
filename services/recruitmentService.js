@@ -8,6 +8,7 @@ const { sendEmail } = require('../config/utils/mailer');
 const { sendSMS } = require('../config/utils/smsService');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const logger = require('../config/utils/logger');
+const { buildHyphenReference, buildReference } = require('../config/utils/referenceGenerator');
 
 const optionalRequire = (moduleName, featureName) => {
   try {
@@ -41,13 +42,13 @@ const generateAccessCode = () => {
   for (let i = 0; i < 5; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return `RH-CR-${code}`;
+  return buildHyphenReference('CR', code);
 };
 
 const generateReferenceNumber = () => {
   // 128 bits of cryptographic randomness makes the applicant reference safe
   // to use as the possession factor alongside the applicant's email address.
-  return `RH-APP-${crypto.randomBytes(16).toString('hex').toUpperCase()}`;
+  return buildHyphenReference('APP', crypto.randomBytes(16).toString('hex').toUpperCase());
 };
 
 // ==================== Access Code Encryption at Rest ====================
@@ -2540,7 +2541,7 @@ const ensureUniqueAccessCode = async () => {
     );
     if (!existing.rows.length) return code;
   }
-  return `RH-CR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+  return buildHyphenReference('CR', crypto.randomBytes(4).toString('hex').toUpperCase());
 };
 
 const appendSecurityLog = (currentLog, message) =>
@@ -3271,7 +3272,7 @@ exports.initiatePayment = async (req, res) => {
       return res.status(500).json({ success: false, message: 'The recruitment fee is not configured correctly' });
     }
 
-    const reference = `RH_CR_${application.id}_${Date.now()}`;
+    const reference = buildReference('CR', application.id, Date.now());
     await db.query(
       'UPDATE recruitment_applications SET payment_reference = $1, updated_at = NOW() WHERE id = $2',
       [reference, application.id]

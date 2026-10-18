@@ -1,5 +1,6 @@
 const db = require('../config/middleware/database');
 const crypto = require('crypto');
+const { buildReference } = require('../config/utils/referenceGenerator');
 
 const RENT_CLEARING_DAYS = Number(process.env.RENT_WALLET_CLEARING_DAYS || 20);
 const RENT_PLATFORM_FEE_RATE = Number(process.env.RENT_PLATFORM_FEE_RATE || 0.025);
@@ -318,7 +319,7 @@ const creditLandlordRentPayment = async ({ paymentId, reference = null, executor
     amount: amounts.net,
     status: 'pending',
     source: 'rent_payment',
-    reference: reference || payment.transaction_reference || `RENT_${payment.id}`,
+    reference: reference || payment.transaction_reference || buildReference('RENT', payment.id),
     availableAt,
     description: `Pending rent credit for ${payment.property_title || 'property'} (Payment #${payment.id})`,
     metadata: {

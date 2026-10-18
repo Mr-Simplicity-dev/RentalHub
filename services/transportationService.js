@@ -1,5 +1,6 @@
 const TransportationService = require('../models/Transportation');
 const { validationResult } = require('express-validator');
+const { buildReference } = require('../config/utils/referenceGenerator');
 
 const allowMockPayments = () =>
   process.env.NODE_ENV !== 'production' && process.env.ALLOW_MOCK_PAYMENTS === 'true';
@@ -285,7 +286,7 @@ class TransportationController {
       const axios = require('axios');
       const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
       const PAYSTACK_BASE_URL = 'https://api.paystack.co';
-      const reference = `TRANSPORT_${Date.now()}_${bookingId}`;
+      const reference = buildReference('TRANSPORT', Date.now(), bookingId);
 
       let paymentResult;
       if (payment_method === 'paystack') {

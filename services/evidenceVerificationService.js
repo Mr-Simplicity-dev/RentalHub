@@ -1,6 +1,7 @@
 const axios = require('axios');
 const db = require('../config/middleware/database');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+const { buildReference } = require('../config/utils/referenceGenerator');
 const verificationService =
   require('../services/evidenceVerification.service');
 
@@ -100,7 +101,7 @@ exports.initializeVerificationPayment = async (req, res) => {
       });
     }
 
-    const reference = `EVID_${disputeId}_${Date.now()}`;
+    const reference = buildReference('EVID', disputeId, Date.now());
 
     await db.query(
       `INSERT INTO evidence_verification_payments (

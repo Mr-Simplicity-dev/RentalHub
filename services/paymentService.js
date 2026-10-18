@@ -43,6 +43,8 @@ const {
   amountMatchesStoredPayment,
   verifyPaystackSignature,
 } = require('../config/utils/paystackWebhookSecurity');
+const { buildReference } = require('../config/utils/referenceGenerator');
+const { matchesPrefix } = require('../config/utils/referenceGenerator');
 const logger = require('../config/utils/logger');
 const { sendSMS } = require('../config/utils/smsService');
 const { sendEmail } = require('../config/utils/mailer');
@@ -903,7 +905,7 @@ exports.initializeSubscription = async (req, res) => {
       const amount = Number(
         quote.amount || TENANT_MULTIPLE_PROPERTY_SUBSCRIPTION_BASE_AMOUNT_NGN
       );
-      const reference = `MULTI_PROP_SUB_${userId}_${Date.now()}`;
+      const reference = buildReference('MULTI_PROP_SUB', userId, Date.now());
 
       await client.query('BEGIN');
 
@@ -1102,7 +1104,7 @@ exports.initializeSubscription = async (req, res) => {
     });
     const amount = Number(quote.amount || MONTHLY_SUBSCRIPTION_BASE_AMOUNT_NGN);
     const paymentType = getMonthlySubscriptionPaymentType(userType);
-    const reference = `SUB_INTERNAL_${userId}_${Date.now()}`;
+    const reference = buildReference('SUB_INTERNAL', userId, Date.now());
 
     await client.query('BEGIN');
 
@@ -1595,7 +1597,7 @@ exports.initializePropertyUnlock = async (req, res) => {
         {
           email: user.email,
           amount: PROPERTY_UNLOCK_PRICE_NGN * 100,
-          reference: `UNLOCK_${paymentId}_${Date.now()}`,
+          reference: buildReference('UNLOCK', paymentId, Date.now()),
           callback_url: `${FRONTEND_URL}/properties/${property_id}`,
           metadata: {
             payment_id: paymentId,
@@ -1633,7 +1635,7 @@ exports.initializePropertyUnlock = async (req, res) => {
     }
 
     if (payment_method === "bank_transfer") {
-      const reference = `UNLOCK_${paymentId}_${Date.now()}`;
+      const reference = buildReference('UNLOCK', paymentId, Date.now());
       await db.query(
         "UPDATE payments SET transaction_reference = $1 WHERE id = $2",
         [reference, paymentId]
@@ -1978,7 +1980,7 @@ exports.initializePropertyInspectionPayment = async (req, res) => {
       [userId, PROPERTY_INSPECTION_FEE_NGN, application.property_id]
     );
     const paymentId = paymentResult.rows[0].id;
-    const reference = `INSPECTION_${userId}_${applicationId}_${paymentId}_${Date.now()}`;
+    const reference = buildReference('INSPECTION', userId, applicationId, paymentId, Date.now());
 
     await db.query(
       'UPDATE payments SET transaction_reference = $1 WHERE id = $2',
@@ -2259,7 +2261,7 @@ exports.initializeTenantLocationAccess = async (req, res) => {
       [userId, quote.amount]
     );
     const paymentId = paymentResult.rows[0].id;
-    const reference = `LOC_${paymentId}_${Date.now()}`;
+    const reference = buildReference('LOC', paymentId, Date.now());
 
     const query = new URLSearchParams({
       state_id: String(access.location.state_id),
@@ -2515,7 +2517,7 @@ exports.initializeLawyerDirectoryUnlock = async (req, res) => {
       });
     }
 
-    const reference = `LAWYERDIR_WALLET_${userId}_${Date.now()}`;
+    const reference = buildReference('LAWYERDIR_WALLET', userId, Date.now());
 
     const paymentResult = await transactionClient.query(
       `INSERT INTO payments (
@@ -2757,7 +2759,7 @@ exports.initializeListingPayment = async (req, res) => {
         {
           email: user.email,
           amount: plan.price * 100,
-          reference: `LIST_${paymentId}_${Date.now()}`,
+           reference: buildReference('LIST', paymentId, Date.now()),
           callback_url: `${FRONTEND_URL}/payment/verify-listing`,
           metadata: {
             payment_id: paymentId,
@@ -2805,7 +2807,7 @@ exports.initializeListingPayment = async (req, res) => {
           account_number: "1234567890",
           account_name: "Rental Hub NG",
           amount: plan.price,
-          reference: `LIST_${paymentId}_${Date.now()}`
+          reference: buildReference('LIST', paymentId, Date.now())
         }
       });
     }
@@ -3153,7 +3155,7 @@ exports.initializeRentPayment = async (req, res) => {
         {
           email: user.email,
           amount: amount * 100,
-          reference: `RENT_${paymentId}_${Date.now()}`,
+          reference: buildReference('RENT', paymentId, Date.now()),
           callback_url: `${FRONTEND_URL}/payment/verify-rent`,
           metadata: {
             payment_id: paymentId,
@@ -3206,7 +3208,7 @@ exports.initializeRentPayment = async (req, res) => {
           account_number: "1234567890",
           account_name: "Rental Hub NG",
           amount,
-          reference: `RENT_${paymentId}_${Date.now()}`,
+          reference: buildReference('RENT', paymentId, Date.now()),
           platform_fee: platformFee,
           landlord_receives: landlordAmount
         }
@@ -3434,7 +3436,7 @@ exports.initializeHelpRentPayment = async (req, res) => {
         {
           email: payer.email,
           amount: amount * 100,
-          reference: `RENT_${paymentId}_${Date.now()}`,
+          reference: buildReference('RENT', paymentId, Date.now()),
           callback_url: `${FRONTEND_URL}/payment/verify-rent`,
           metadata: {
             payment_id: paymentId,
@@ -3489,7 +3491,7 @@ exports.initializeHelpRentPayment = async (req, res) => {
         account_number: '1234567890',
         account_name: 'Rental Hub NG',
         amount,
-        reference: `RENT_${paymentId}_${Date.now()}`,
+        reference: buildReference('RENT', paymentId, Date.now()),
         platform_fee: platformFee,
         landlord_receives: landlordAmount,
         paid_on_behalf_of: tenantUserId,
@@ -3776,7 +3778,7 @@ exports.initializeWalletFunding = async (req, res) => {
     );
 
     const paymentId = paymentResult.rows[0].id;
-    const reference = `WALLET_${userId}_${paymentId}_${Date.now()}`;
+    const reference = buildReference('WALLET', userId, paymentId, Date.now());
 
     // Update reference
     await db.query(
@@ -4127,7 +4129,7 @@ exports.retryPayment = async (req, res) => {
       property_inspection_fee: 'RETRY_INSPECTION',
     };
     const refPrefix = REF_PREFIX_MAP[payment.payment_type] || 'RETRY';
-    const retryReference = `${refPrefix}_${newPaymentId}_${Date.now()}`;
+    const retryReference = buildReference(refPrefix, newPaymentId, Date.now());
     const CALLBACK_MAP = {
       rent_payment:       `${FRONTEND_URL}/payment/verify-rent`,
       tenant_subscription:`${FRONTEND_URL}/payment/verify-subscription`,
@@ -4490,7 +4492,8 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
     const reference = data?.reference;
     if (!reference) return;
 
-    if (reference.startsWith('AGW_')) {
+    // LEGACY compatibility: accept ARH_AGW_ (new) and AGW_ (historical).
+    if (matchesPrefix(reference, 'AGW')) {
       let status = 'pending';
       if (eventName === 'transfer.success') status = 'success';
       else if (eventName === 'transfer.failed') status = 'failed';
@@ -4500,7 +4503,8 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
       return;
     }
 
-    if (reference.startsWith('WLW_')) {
+    // LEGACY compatibility: accept ARH_WLW_ (new) and WLW_ (historical).
+    if (matchesPrefix(reference, 'WLW')) {
       const result = await db.query(
         `SELECT id, user_id, amount, bank_name, account_number, account_name
          FROM withdrawal_requests WHERE paystack_transfer_reference = $1 LIMIT 1`,
@@ -4625,7 +4629,8 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
       return;
     }
 
-    if (reference.startsWith('SAW_')) {
+    // LEGACY compatibility: accept ARH_SAW_ (new) and SAW_ (historical).
+    if (matchesPrefix(reference, 'SAW')) {
       const result = await db.query(
         `SELECT id, admin_id, amount, bank_name, account_number, account_name, commissions_snapshot, requested_at
          FROM admin_withdrawals WHERE paystack_transfer_reference = $1 LIMIT 1`,
@@ -4857,7 +4862,8 @@ async function handleFailedPayment(data, webhookLogger) {
     // Registration payments live in tenant_registration_payments (no `payments`
     // row exists yet). Mark the pending row failed and email the registrant a
     // secure resume link so they can retry exactly where they stopped.
-    if (reference && reference.startsWith('REGPAY_')) {
+    // LEGACY compatibility: accept ARH_REGPAY_ (new) and REGPAY_ (historical).
+    if (reference && matchesPrefix(reference, 'REGPAY')) {
       const regResult = await db.query(
         `UPDATE tenant_registration_payments
          SET payment_status = 'failed',

@@ -8,6 +8,7 @@ const { getFeatureFlagsMap } = require('../config/middleware/featureFlags');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
 const { resolveLocationSelection } = require('../config/utils/locationDirectory');
 const { getLocationPricingQuote } = require('../config/utils/locationPricing');
+const { buildReference } = require('../config/utils/referenceGenerator');
 const {
   ALERT_REQUEST_FEE_NGN,
   createTenantAlert,
@@ -165,7 +166,7 @@ router.post(
         });
       }
 
-      const reference = `ALERT_${Date.now()}`;
+      const reference = buildReference('ALERT', Date.now());
 
       await createTenantAlertPayment({
         ...payload,
