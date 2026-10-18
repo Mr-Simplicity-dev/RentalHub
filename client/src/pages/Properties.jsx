@@ -35,7 +35,8 @@ const Properties = () => {
     searchParams.get('reference') || searchParams.get('trxref') || '';
   const locationAccessReference =
     searchParams.get('location_access_ref') ||
-    (genericPaymentReference.startsWith('LOC_') ? genericPaymentReference : '');
+    (genericPaymentReference.startsWith('LOC_') ||
+    genericPaymentReference.startsWith('ARH_LOC_') ? genericPaymentReference : '');
   const alertRequestReference =
     searchParams.get('alert_ref') ||
     (!locationAccessReference ? genericPaymentReference : '');

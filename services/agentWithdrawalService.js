@@ -225,7 +225,8 @@ class AgentWithdrawalService {
             );
           }
 
-          const reference = `AGW_${withdrawalId}_${Date.now()}`;
+          const { agentWithdrawalReference } = require('../config/utils/referenceGenerator');
+          const reference = agentWithdrawalReference(withdrawalId);
 
           // Persist the deterministic reference BEFORE contacting Paystack so a
           // hard crash cannot lose the link between this withdrawal and its

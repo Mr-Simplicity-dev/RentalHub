@@ -548,7 +548,8 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
         recipientCode = recipient.recipient_code;
       }
 
-      const reference = `SAW_${withdrawalId}_${Date.now()}`;
+      const { stateAdminWithdrawalReference } = require('../config/utils/referenceGenerator');
+      const reference = stateAdminWithdrawalReference(withdrawalId);
 
       // Persist the withdrawal + reference + wallet debit + commission mark and
       // COMMIT BEFORE contacting Paystack, so a hard crash cannot lose the

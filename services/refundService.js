@@ -27,6 +27,7 @@ const {
 } = require('../config/utils/landlordPropertyFee');
 const { sendEmail } = require('../config/utils/mailer');
 const { getFrontendUrl } = require('../config/utils/frontendUrl');
+const { buildReference, walletWithdrawalReference } = require('../config/utils/referenceGenerator');
 const { formatDate } = require('../config/utils/helpers');
 const { createNotification } = require('../config/utils/notificationService');
 const {
@@ -996,7 +997,7 @@ exports.approveRefundRequest = async (req, res) => {
       paymentId: refund.payment_id,
       amount: finalAmount,
       source: 'rent_refund',
-      reference: `REFUND_${refundId}_${refund.payment_id}`,
+      reference: buildReference('REFUND', refundId, refund.payment_id),
       description: `Approved rent refund request #${refundId}`,
       metadata: {
         refund_id: refundId,
@@ -2128,7 +2129,8 @@ exports.requestWithdrawal = async (req, res) => {
           userId,
           withdrawAmount,
           `Withdrawal request #${result.rows[0].id} to ${bank_name}`,
-          `WITHDRAWAL_${userId}_${result.rows[0].id}`,
+          // Ledger-only reference (never sent to Paystack) — ARH form for new rows.
+          buildReference('WITHDRAWAL', userId, result.rows[0].id),
         ]
       );
 
@@ -2268,7 +2270,7 @@ exports.approveWalletWithdrawal = async (req, res) => {
       recipientCode = recipient.recipient_code;
     }
 
-    const reference = `WLW_${withdrawal.id}_${Date.now()}`;
+    const reference = walletWithdrawalReference(withdrawal.id);
 
     // Persist the deterministic reference BEFORE contacting Paystack. A hard
     // process crash between the transfer request and the response would otherwise
@@ -2407,7 +2409,7 @@ exports.rejectWalletWithdrawal = async (req, res) => {
         bankName: withdrawal.bank_name,
         accountNumber: withdrawal.account_number,
         accountName: withdrawal.account_name,
-        reference: `WDR_REJ_${withdrawalId}`,
+        reference: buildReference('WDR_REJ', withdrawalId),
         status: 'rejected',
         note: `Withdrawal request was rejected: ${reason}. Funds have been refunded to your wallet balance.`,
       }).catch(() => {});

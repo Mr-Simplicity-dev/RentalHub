@@ -1,6 +1,7 @@
 const db = require('../config/middleware/database');
 const NotificationService = require('../services/NotificationService');
 const nigeriaLocations = require('../data/nigeriaLocations');
+const { buildReference } = require('../config/utils/referenceGenerator');
 
 const resolveLgaName = (stateName, lgaId) => {
   const numericLgaId = Number(lgaId);
@@ -513,7 +514,7 @@ exports.makeContribution = async (req, res) => {
     const netSaved       = Math.round((contributionAmount - commission1pct) * 100) / 100;
 
     // Deduct from wallet
-    const ref = `RSC_${id}_${month}_${Date.now()}`;
+    const ref = buildReference('RSC', id, month, Date.now());
     await client.query(
       `INSERT INTO wallet_transactions (user_id, amount, type, description, reference)
        VALUES ($1, $2, 'debit', $3, $4)`,

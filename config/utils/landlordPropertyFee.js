@@ -1,5 +1,6 @@
 const db = require('../middleware/database');
 const { getLocationPricingQuote } = require('./locationPricing');
+const { buildReference } = require('./referenceGenerator');
 
 const numberFromEnv = (key, fallback) => {
   const value = Number(process.env[key]);
@@ -724,7 +725,7 @@ const settleLandlordPropertyFee = async (landlordId) => {
 
     const walletDebit = Math.min(Number(funding.wallet_balance || 0), totalAmountDue);
     const rentDebit = Math.round((totalAmountDue - walletDebit) * 100) / 100;
-    const reference = `LPB_${Date.now()}`;
+    const reference = buildReference('LPB', Date.now());
 
     if (walletDebit > 0) {
       await client.query(

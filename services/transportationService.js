@@ -439,8 +439,10 @@ class TransportationController {
       const { reference } = req.params;
       const tenantId = req.user.id;
       
-      // Extract booking ID from reference (format: TRANSPORT_TIMESTAMP_BOOKINGID)
-      const parts = reference.split('_');
+      // Extract booking ID from reference. LEGACY compatibility: both
+      // ARH_TRANSPORT_<ts>_<bookingId> (new) and TRANSPORT_<ts>_<bookingId>
+      // (historical) are accepted; the booking ID is always the last segment.
+      const parts = String(reference || '').split('_');
       if (parts.length < 3) {
         return res.status(400).json({
           success: false,
@@ -448,7 +450,7 @@ class TransportationController {
         });
       }
       
-      const bookingId = parts[2];
+      const bookingId = parts[parts.length - 1];
       
       // Get booking details
       const booking = await TransportationService.getBookingById(bookingId);

@@ -590,7 +590,8 @@ router.post('/withdrawals/:withdrawalId/approve',
           recipientCode = recipient.recipient_code;
         }
 
-        const reference = `SAW_${withdrawal.id}_${Date.now()}`;
+        const { stateAdminWithdrawalReference } = require('../config/utils/referenceGenerator');
+        const reference = stateAdminWithdrawalReference(withdrawal.id);
         const transfer = await initiateTransfer({
           amount: withdrawal.amount,
           recipientCode,

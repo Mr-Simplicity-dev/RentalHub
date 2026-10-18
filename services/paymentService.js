@@ -43,8 +43,7 @@ const {
   amountMatchesStoredPayment,
   verifyPaystackSignature,
 } = require('../config/utils/paystackWebhookSecurity');
-const { buildReference } = require('../config/utils/referenceGenerator');
-const { matchesPrefix } = require('../config/utils/referenceGenerator');
+const { buildReference, matchesPrefix } = require('../config/utils/referenceGenerator');
 const logger = require('../config/utils/logger');
 const { sendSMS } = require('../config/utils/smsService');
 const { sendEmail } = require('../config/utils/mailer');

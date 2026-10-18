@@ -76,7 +76,11 @@ const canRetry = (item) => {
   return elapsedMs >= RETRY_COOLDOWN_MINUTES * 60 * 1000;
 };
 
-const buildRetryReference = (prefix, itemId, attempt) => `${prefix}_${itemId}_R${attempt}`;
+// LEGACY compatibility: buildRetryReference used to emit `<prefix>_<id>_R<n>`;
+// it now emits the ARH form ARH_<prefix>_<id>_R<n>. Claim/reconcile lookups
+// always match the persisted string exactly, so both forms keep working.
+const buildRetryReference = (prefix, itemId, attempt) =>
+  require('../config/utils/referenceGenerator').payoutRetryReference(prefix, itemId, attempt);
 
 const claimRetryAttempt = async ({
   table,

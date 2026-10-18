@@ -455,7 +455,7 @@ const reverseLandlordRentCreditForPayment = async ({
         paymentId,
         amount: reversalAmount,
         source: 'rent_refund',
-        reference: `REFUND_REVERSAL_${paymentId}_${credit.id}`,
+        reference: buildReference('REFUND_REVERSAL', paymentId, credit.id),
         description: reason,
         metadata: { original_credit_id: credit.id },
         executor,
