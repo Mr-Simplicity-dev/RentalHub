@@ -641,6 +641,7 @@ exports.processAdminWithdrawal = async (adminId, amount, bankDetails, options = 
         const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
         sendAdminPayoutReceipt({
           adminId,
+          withdrawalId,
           amount,
           bankName: bankDetails.bank_name,
           accountNumber: bankDetails.account_number,

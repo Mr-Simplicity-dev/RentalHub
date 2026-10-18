@@ -2405,6 +2405,7 @@ exports.rejectWalletWithdrawal = async (req, res) => {
       const { sendUserPayoutReceipt } = require('../config/utils/paymentReceipt');
       sendUserPayoutReceipt({
         userId: withdrawal.user_id,
+        withdrawalId,
         amount: withdrawal.amount,
         bankName: withdrawal.bank_name,
         accountNumber: withdrawal.account_number,

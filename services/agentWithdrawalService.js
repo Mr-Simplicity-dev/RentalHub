@@ -556,6 +556,7 @@ class AgentWithdrawalService {
           : `${payload?.failure_reason || payload?.reason || 'Transfer failed'}. The amount has been returned to your earnings.`;
       sendAgentPayoutReceipt({
         agentUserId: withdrawal.agent_user_id,
+        withdrawalId: withdrawal.id,
         amount: withdrawal.amount,
         reference,
         status: statusLabel,

@@ -128,12 +128,12 @@ const formatNigerianDate = (value) => {
   }).format(date);
 };
 
-// Mask a bank account number for user-facing documents: ****7890
+// Mask a bank account number for user-facing documents: ••••••7890
 const maskAccountNumber = (accountNumber) => {
   const value = String(accountNumber || '').replace(/\s+/g, '');
   if (!value) return '';
-  if (value.length <= 4) return '*'.repeat(value.length);
-  return `${'*'.repeat(value.length - 4)}${value.slice(-4)}`;
+  if (value.length <= 4) return '•'.repeat(value.length);
+  return `${'•'.repeat(value.length - 4)}${value.slice(-4)}`;
 };
 
 module.exports = {

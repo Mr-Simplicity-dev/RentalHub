@@ -4555,6 +4555,7 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
         // Email the tenant/landlord a payout receipt
         sendUserPayoutReceipt({
           userId: withdrawal.user_id,
+          withdrawalId: withdrawal.id,
           amount: withdrawal.amount,
           bankName: withdrawal.bank_name,
           accountNumber: withdrawal.account_number,
@@ -4616,6 +4617,7 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
         // Notify the customer that the payout failed and funds were returned
         sendUserPayoutReceipt({
           userId: withdrawal.user_id,
+          withdrawalId: withdrawal.id,
           amount: withdrawal.amount,
           bankName: withdrawal.bank_name,
           accountNumber: withdrawal.account_number,
@@ -4711,6 +4713,7 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
         // Email the admin a payout receipt with itemized commissions
         sendAdminPayoutReceipt({
           adminId: withdrawal.admin_id,
+          withdrawalId: withdrawal.id,
           amount: withdrawal.amount,
           bankName: withdrawal.bank_name,
           accountNumber: withdrawal.account_number,
@@ -4769,6 +4772,7 @@ async function handleTransferWebhook(eventName, data, webhookLogger) {
         // Notify the admin that the payout failed and funds were returned
         sendAdminPayoutReceipt({
           adminId: withdrawal.admin_id,
+          withdrawalId: withdrawal.id,
           amount: withdrawal.amount,
           bankName: withdrawal.bank_name,
           accountNumber: withdrawal.account_number,

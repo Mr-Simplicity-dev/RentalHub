@@ -711,6 +711,7 @@ router.post('/withdrawals/:withdrawalId/approve',
             const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
             sendAdminPayoutReceipt({
               adminId: withdrawal.admin_id,
+              withdrawalId: withdrawal.id,
               amount: withdrawal.amount,
               bankName: withdrawal.bank_name,
               accountNumber: withdrawal.account_number,
@@ -833,6 +834,7 @@ router.post('/withdrawals/:withdrawalId/reject',
           const { sendAdminPayoutReceipt } = require('../config/utils/paymentReceipt');
           sendAdminPayoutReceipt({
             adminId: withdrawal.admin_id,
+            withdrawalId: withdrawal.id,
             amount: withdrawal.amount,
             bankName: withdrawal.bank_name,
             accountNumber: withdrawal.account_number,

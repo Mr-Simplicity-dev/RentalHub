@@ -1,18 +1,12 @@
 const logger = require('./logger');
-const { sendEmail } = require('./mailer');
+const mailer = require('./mailer');
 const { getFrontendUrl } = require('./frontendUrl');
+const { esc, RECEIPT_NOTICE } = require('./receiptFormat');
 
 const FRONTEND_URL = getFrontendUrl();
 
-const esc = (str) => {
-  if (str == null) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-};
+// Late-bound so tests can intercept outgoing mail by patching mailer.sendEmail.
+const sendEmail = (payload) => mailer.sendEmail(payload);
 
 // Send verification email
 exports.sendVerificationEmail = async (email, verificationToken) => {
@@ -54,6 +48,10 @@ exports.sendPaymentReceiptEmail = async ({
   status,
   method,
   channel,
+  documentType,
+  methodLine,
+  currency = 'NGN',
+  rent = null,
   quoteUsd,
   fxRate,
   fxMarkupPct,
@@ -70,6 +68,37 @@ exports.sendPaymentReceiptEmail = async ({
       )
       .join('');
 
+    // Detailed rent context - every line renders only when the value exists.
+    const rentLines = [
+      ['Payment For', rent?.paymentFor],
+      ['Property', rent?.propertyTitle],
+      ['Property Address', rent?.propertyAddress],
+      ['Tenant', rent?.tenantName],
+      ['Landlord', rent?.landlordName],
+      [
+        'Rental Period',
+        rent?.rentalPeriod
+          ? rent.rentalPeriod.end
+            ? `${rent.rentalPeriod.start} - ${rent.rentalPeriod.end}`
+            : rent.rentalPeriod.start
+          : null,
+      ],
+    ]
+      .filter(([, value]) => value)
+      .map(
+        ([label, value]) => `
+      <p style="margin:4px 0;"><strong>${esc(label)}:</strong> ${esc(value)}</p>`
+      )
+      .join('');
+
+    const platformFeeHtml =
+      Number(rent?.platformFee) > 0
+        ? `
+      <div style="margin-top:12px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;color:#475569;">
+        <p style="margin:0;"><strong>Platform/Service Fee:</strong> ₦${Number(rent.platformFee).toLocaleString()} (deducted from the landlord's payout - not charged to you)</p>
+      </div>`
+        : '';
+
     const quoteHtml =
       Number(quoteUsd) > 0
         ? `
@@ -82,7 +111,8 @@ exports.sendPaymentReceiptEmail = async ({
       </div>`
         : '';
 
-    const methodLine = channel ? `${method || 'Paystack'} — ${channel}` : (method || 'Paystack');
+    const methodLineHtml =
+      methodLine || (channel ? `${method || 'Paystack'} — ${channel}` : (method || 'Paystack'));
 
     await sendEmail({
       to: email,
@@ -93,16 +123,19 @@ exports.sendPaymentReceiptEmail = async ({
             <div style="font-family:'Segoe Script','Brush Script MT',cursive; font-size:26px; color:#6e1b2b;">Amana</div>
             <h2 style="margin:0 0 2px; color:#0f172a;">Amana RentalHub NG</h2>
             <p style="margin:0; color:#64748b; font-size:12px;">rentalhub.com.ng &nbsp;•&nbsp; support@rentalhub.com.ng</p>
-            <p style="margin:10px 0 0; color:#64748b;">Official Payment Receipt</p>
+            <p style="margin:10px 0 0; color:#64748b;">${esc(documentType || 'OFFICIAL PAYMENT RECEIPT')}</p>
             <p style="margin:6px 0 0; font-weight:600; color:#0f172a;">${esc(receiptNumber)}</p>
           </div>
           <div style="padding:16px 0; font-size:14px;">
             <p style="margin:4px 0;"><strong>Paid by:</strong> ${esc(fullName || email)}</p>
+            <p style="margin:4px 0;"><strong>Email:</strong> ${esc(email)}</p>
             <p style="margin:4px 0;"><strong>Date:</strong> ${esc(date)}</p>
             <p style="margin:4px 0;"><strong>Reference:</strong> ${esc(reference)}</p>
             <p style="margin:4px 0;"><strong>Status:</strong> ${esc(status)}</p>
-            <p style="margin:4px 0;"><strong>Payment method:</strong> ${esc(methodLine)}</p>
+            <p style="margin:4px 0;"><strong>Payment method:</strong> ${esc(methodLineHtml)}</p>
+            <p style="margin:4px 0;"><strong>Currency:</strong> ${esc(currency)}</p>
           </div>
+          ${rentLines ? `<div style="padding:0 0 8px; font-size:14px;">${rentLines}</div>` : ''}
           <table style="width:100%; border-collapse:collapse; font-size:14px;">
             <thead>
               <tr style="background:#f8fafc;">
@@ -120,12 +153,13 @@ exports.sendPaymentReceiptEmail = async ({
               </tr>
             </tfoot>
           </table>
+          ${platformFeeHtml}
           ${quoteHtml}
           <p style="padding-top:16px; font-size:12px; color:#94a3b8; text-align:center;">
             Thank you for using Amana RentalHub NG. You can view and print this receipt from your Payment History.
           </p>
           <p style="font-size:10px; color:#cbd5e1; text-align:center; margin-top:4px;">
-            This is a computer-generated receipt and does not require a signature.
+            ${esc(RECEIPT_NOTICE)}
           </p>
         </div>
       `,
