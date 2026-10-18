@@ -12,6 +12,7 @@ const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRate
 const audit = require('../config/middleware/auditMiddleware');
 const db = require('../config/middleware/database');
 const { releaseEscrowForPayment } = require('../services/walletLedgerService');
+const { savingsReceiptNumber, buildReference } = require('../config/utils/referenceGenerator');
 
 // ============ TENANT SUBSCRIPTION PAYMENTS ============
 
@@ -628,13 +629,13 @@ router.get('/savings-receipt.pdf',
       doc.fontSize(20).text('Amana RentalHub NG', { align: 'center' });
       doc.moveDown(0.2);
       doc.fontSize(11).fillColor('#64748b').text('Rent Savings Contribution Receipt', { align: 'center' });
-      doc.fontSize(11).fillColor('#0f172a').text(`RCPT-SAV-${String(contributionId).padStart(6, '0')}`, { align: 'center' });
+      doc.fontSize(11).fillColor('#0f172a').text(savingsReceiptNumber(contributionId), { align: 'center' });
       doc.moveDown();
 
       doc.fontSize(10).fillColor('#334155');
       doc.text(`Payer: ${req.user.full_name || req.user.email}`);
       doc.text(`Date: ${new Date(contribution.contributed_at).toLocaleString('en-NG')}`);
-      doc.text(`Reference: ${contribution.payment_reference || `RSC_${contribution.plan_id}`}`);
+      doc.text(`Reference: ${contribution.payment_reference || buildReference('RSC', contribution.plan_id)}`);
       doc.text(`Savings Month: ${contribution.saved_for_month}`);
       doc.text(`Status: Saved`);
       doc.text(`Method: Wallet Balance`);

@@ -8,8 +8,10 @@ const db = require('../config/middleware/database');
 const survey = require('../config/survey');
 const surveyBoundary = require('./surveyBoundary');
 
+// New codes carry the ARH platform prefix; historical RH... codes remain
+// valid because respondent_code lookups are exact-match.
 const generateRespondentCode = () =>
-  `RH${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+  `ARH${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
 const generateResumeToken = () =>
   crypto.randomBytes(24).toString('base64url');

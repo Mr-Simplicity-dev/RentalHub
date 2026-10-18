@@ -431,7 +431,7 @@ const FumigationCleaningPayment = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600">{t('fumigation_cleaning_payment.booking_id')}:</span>
-                    <span className="font-mono text-sm">FC-{booking.id.toString().padStart(6, '0')}</span>
+                    <span className="font-mono text-sm">ARH-FC-{booking.id.toString().padStart(6, '0')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">{t('fumigation_cleaning_payment.created')}:</span>

@@ -285,7 +285,7 @@ const FumigationCleaningBookingDetails = () => {
               </h1>
               <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                 <div className="text-gray-600">
-                  {t('fumigation_cleaning_booking_details.booking_id')}: <span className="font-mono font-semibold">FC-{booking.id.toString().padStart(6, '0')}</span>
+                  {t('fumigation_cleaning_booking_details.booking_id')}: <span className="font-mono font-semibold">ARH-FC-{booking.id.toString().padStart(6, '0')}</span>
                 </div>
                 <div>
                   {getStatusBadge(booking.booking_status)}

@@ -470,7 +470,7 @@ const FumigationCleaningBookings = () => {
                               {booking.category_name}
                             </div>
                             <div className="text-xs text-gray-500 mt-1">
-                              ID: <span className="font-mono">FC-{booking.id.toString().padStart(6, '0')}</span>
+                              ID: <span className="font-mono">ARH-FC-{booking.id.toString().padStart(6, '0')}</span>
                             </div>
                           </div>
                         </div>

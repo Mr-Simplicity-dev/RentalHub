@@ -14,6 +14,7 @@ const { requireSuperAdmin } = require('../config/middleware/requireSuperAdmin');
 const { isStateFinancialAdmin, isSuperAdminOrSuperFinancialAdmin: isSuperOrFinancialRole } = require('../config/utils/roleScopes');
 const { criticalFinanceOpsLimiter } = require('../config/middleware/securityRateLimiters');
 const { requireWithdrawalFactor } = require('../config/utils/twoFactor');
+const { buildReference } = require('../config/utils/referenceGenerator');
 
 /**
  * All admin roles that earn commissions and can request withdrawals.
@@ -836,7 +837,7 @@ router.post('/withdrawals/:withdrawalId/reject',
             bankName: withdrawal.bank_name,
             accountNumber: withdrawal.account_number,
             accountName: withdrawal.account_name,
-            reference: withdrawal.paystack_transfer_reference || `SAW_REJ_${withdrawal.id}`,
+            reference: withdrawal.paystack_transfer_reference || buildReference('SAW_REJ', withdrawal.id),
             status: 'rejected',
             note: `Withdrawal request was rejected: ${adminNote}. Your funds have been refunded to your admin wallet balance.`,
             snapshot: withdrawal.commissions_snapshot || null,

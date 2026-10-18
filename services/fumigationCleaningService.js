@@ -4,6 +4,7 @@ const NotificationService = require('../services/notificationService');
 const db = require('../config/middleware/database');
 const logger = require('../config/utils/logger');
 const { ZONE_STATES, canonicalZone } = require('../config/utils/territorialZones');
+const { buildReference } = require('../config/utils/referenceGenerator');
 
 const FUMIGATION_ADMIN_ROLES = new Set([
   'admin',
@@ -800,7 +801,7 @@ class FumigationCleaningController {
       const paymentData = {
         amount: booking.total_price,
         email: booking.tenant_email,
-        reference: `FC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        reference: buildReference('FC', Date.now(), Math.random().toString(36).substr(2, 9)),
         metadata: {
           booking_id: booking.id,
           booking_reference: booking.booking_reference,

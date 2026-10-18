@@ -85,7 +85,9 @@ const ensureReferralSchema = async () => {
 const buildReferralCode = (userId) => {
   const idPart = Number(userId).toString(36).toUpperCase();
   const randomPart = crypto.randomBytes(3).toString('hex').toUpperCase();
-  return `RH${idPart}${randomPart}`;
+  // New codes carry the ARH platform prefix; historical RH... codes stay
+  // valid because lookups are exact-match (never parsed structurally).
+  return `ARH${idPart}${randomPart}`;
 };
 
 const getOrCreateReferralCode = async (userId) => {

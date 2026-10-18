@@ -1,5 +1,6 @@
 const db = require('../config/middleware/database');
 const { v4: uuidv4 } = require('uuid');
+const { buildHyphenReference } = require('../config/utils/referenceGenerator');
 
 class FumigationCleaningService {
   static operationsSchemaReady = false;
@@ -173,7 +174,7 @@ class FumigationCleaningService {
     } = bookingData;
 
     // Generate unique booking reference
-    const booking_reference = `FC-${uuidv4().substring(0, 8).toUpperCase()}`;
+    const booking_reference = buildHyphenReference('FC', uuidv4().substring(0, 8).toUpperCase());
 
     const result = await db.query(
       `INSERT INTO fumigation_cleaning_bookings (
@@ -1168,7 +1169,7 @@ class FumigationCleaningService {
   static generateBookingReference() {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substring(2, 6);
-    return `FC-${timestamp}-${random}`.toUpperCase();
+    return buildHyphenReference('FC', timestamp, random);
   }
 
   // Validate booking date and time
