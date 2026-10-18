@@ -90,7 +90,7 @@ const WhatsAppBotWidget = () => {
             setMessages([{
               id: 'bot-greeting',
               type: 'bot',
-              text: t('messages.whatsapp.bot_greeting', "Hi! I'm Amana RentalHub\u2019s virtual assistant. How can I help you today?"),
+              text: t('messages.whatsapp.bot_greeting', "Hi! I'm Amana RentalHub NG's virtual assistant. How can I help you today?"),
               showQuickReplies: true,
               created_at: new Date().toISOString(),
             }]);

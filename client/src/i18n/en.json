@@ -143,8 +143,8 @@
     "download_iphone": "Download iPhone",
     "close_app_prompt": "Close app download notification",
     "download_app_cta": "Get the Mobile App",
-    "share_app": "Share RentalHub",
-    "share_app_text": "Check out RentalHub — Nigeria’s trusted property platform:",
+    "share_app": "Share Amana RentalHub NG",
+    "share_app_text": "Check out Amana RentalHub NG — Nigeria’s trusted property platform:",
     "legal_support_link": "Need legal assistance? Legal Protection Coverage gives you access to qualified lawyers in your area.",
     "property_request_link": "Can't find your preferred property type? Submit a request on the properties page.",
     "use_lawyers": "Legal Protection Coverage",
@@ -276,7 +276,10 @@
     "qa_my_props": "My Properties",
     "qa_my_props_desc": "Manage your listings",
     "qa_apps_landlord": "Applications",
-    "qa_apps_landlord_desc": "Review tenant applications"
+    "qa_apps_landlord_desc": "Review tenant applications",
+    "survey_reminder_title": "Finish your Surveyresearch survey",
+    "survey_reminder_body": "Your answers help us improve Amana RentalHub NG. It takes about 10 more minutes — you can finish anytime.",
+    "survey_continue": "Continue Survey"
   },
   "profile": {
     "title": "My Profile",
@@ -539,15 +542,15 @@
       "rejected": "Rejected"
     },
     "whatsapp": {
-      "title": "Amana RentalHub Assistant",
+      "title": "Amana RentalHub NG Assistant",
       "subtitle": "Need help? Chat with us!",
-      "bot_greeting": "Hi! I'm Amana RentalHub’s virtual assistant. How can I help you today?",
+      "bot_greeting": "Hi! I'm Amana RentalHub NG's virtual assistant. How can I help you today?",
       "greeting_bubble": "Need help? Chat with us!",
       "open": "Open WhatsApp assistant",
       "close": "Close",
       "input_placeholder": "Type your question...",
       "send": "Send",
-      "bot_label": "RentalHub",
+      "bot_label": "Amana RentalHub NG",
       "no_match": "I'm not sure I have the answer to that. Would you like to speak with a human agent?",
       "talk_to_agent": "Talk to a human agent →",
       "connected": "Connected to agent on WhatsApp",
@@ -564,7 +567,7 @@
       "youre_welcome": "You’re welcome! Happy to help."
     },
     "widget": {
-      "support_title": "RentalHub Support",
+      "support_title": "Amana RentalHub NG Support",
       "reply_minutes": "We typically reply within minutes",
       "close": "Close",
       "back": "Back",
@@ -781,7 +784,7 @@
   },
   "install_prompt": {
     "eyebrow": "ANDROID APP",
-    "title": "Install the RentalHub app",
+    "title": "Install the Amana RentalHub NG app",
     "subtitle": "Get the full native app experience on your device.",
     "install": "Install",
     "downloading": "Starting download…",
@@ -801,7 +804,7 @@
     "features_heading": "Everything in the app",
     "apk_heading": "APK direct download",
     "apk_desc": "Download the APK and install it manually on your Android device.",
-    "apk_download_button": "Download RentalHub.apk",
+    "apk_download_button": "Download Amana RentalHub NG.apk",
     "download_android": "Download for Android",
     "download_ios": "iOS (Coming Soon)"
   },
@@ -1746,19 +1749,6 @@
     "no_photo": "No photo",
     "property_fallback_type": "Rental"
   },
-  "nigeria_page": {
-    "loading": "Loading Nigeria rental directory...",
-    "unavailable": "Directory unavailable",
-    "title": "Nigeria SEO Hub",
-    "desc": "Nigeria rental directory by state, LGA, and area",
-    "all_states": "All States",
-    "lgas_label": "LGAs",
-    "high_intent": "High-intent area pages",
-    "high_intent_desc": "These pages help target queries like \"cheap rent in Lugbe\" and similar location-intent searches.",
-    "verified_listing": "verified listing",
-    "plural_suffix": "s",
-    "load_failed": "Failed to load Nigeria directory"
-  },
   "dispute_details": {
     "loading": "Loading dispute...",
     "not_found": "Dispute not found.",
@@ -2341,7 +2331,7 @@
     "payment_issues": "Payment Issues",
     "payment_email": "support@rentalhub.com",
     "fumigation_support": "Fumigation/Cleaning Support",
-    "support_phone": "+234 800 123 4567",
+    "support_phone": "+234 80 3060 1238",
     "operating_hours": "Operating Hours",
     "op_hours": "Mon - Sat: 7:00 AM - 6:00 PM",
     "safety_notice": "Safety Notice",
@@ -2496,7 +2486,7 @@
     "email_support": "Email Support",
     "support_email": "transport@rentalhub.com",
     "emergency_contact": "Emergency Contact",
-    "emergency_phone": "+234 700 123 4567",
+    "emergency_phone": "+234 80 3060 1238",
     "important_notes": "Important Notes",
     "note_contact": "Driver will contact you 1 hour before arrival",
     "note_ready": "Have items ready for loading at pickup time",
@@ -2617,7 +2607,7 @@
     "payment_issues": "Payment Issues",
     "payment_email": "support@rentalhub.com",
     "transportation_support": "Transportation Support",
-    "support_phone": "+234 800 123 4567",
+    "support_phone": "+234 80 3060 1238",
     "operating_hours": "Operating Hours",
     "op_hours": "Mon - Sun: 7:00 AM - 10:00 PM",
     "security_notice": "Security Notice",
@@ -3002,9 +2992,9 @@
   "tour": {
     "locale_code": "en",
     "ui": {
-      "dashboard_title": "RentalHub dashboard",
+      "dashboard_title": "Amana RentalHub NG dashboard",
       "dialog_label": "{{title}} guided tour",
-      "eyebrow": "RentalHub guided tour",
+      "eyebrow": "Amana RentalHub NG guided tour",
       "close_and_skip": "Close and skip the guided tour",
       "finding_target": "Finding this control on the dashboard…",
       "not_available_for_account": "This step is not available for this account.",
@@ -3022,19 +3012,19 @@
       "skip_complete": "Skip the complete tour",
       "searching_sr": "Searching for the dashboard control.",
       "unavailable_sr": "The dashboard control is currently unavailable.",
-      "generic_step_description": "Learn how to use __TITLE__ safely and confidently in RentalHub. Follow the highlighted control to continue.",
+      "generic_step_description": "Learn how to use __TITLE__ safely and confidently in Amana RentalHub NG. Follow the highlighted control to continue.",
       "generic_workflow_description": "Follow the complete __TITLE__ workflow with safe, contextual guidance.",
       "generic_action_hint": "Use the highlighted control to continue automatically."
     },
     "welcome": {
       "benefit_controls": "Highlights the real controls on your dashboard",
-      "benefit_role": "Personalized for your RentalHub account role",
+      "benefit_role": "Personalized for your Amana RentalHub NG account role",
       "benefit_replay": "Available to replay whenever you need a refresher",
       "close_intro": "Close guided tour introduction",
       "skip_label": "Skip the guided tour",
       "eyebrow": "Your personal dashboard guide",
       "resume_title": "Continue where you stopped",
-      "returning_title": "Welcome back to RentalHub",
+      "returning_title": "Welcome back to Amana RentalHub NG",
       "new_title": "Welcome to Amana RentalHub NG",
       "resume_description": "Your progress is saved. Resume from the last step you viewed, or restart later from your profile.",
       "returning_description": "Take a quick refresher and rediscover the controls that matter most for your account.",
@@ -3304,7 +3294,7 @@
     "referral_placeholder": "Enter referral code",
     "referral_hint": "Enter a referral code if you were invited by someone.",
 "lawyer_email": "Your legal representative's email",
-"lawyer_using_rentalhub": "Using RentalHub legal support",
+"lawyer_using_rentalhub": "Using Amana RentalHub NG legal support",
 "lawyer_placeholder": "Enter your legal representative's email (optional)",
 "lawyer_checkbox_label": "Enroll in legal support",
 "lawyer_checkbox_desc": "Our legal team will be assigned to assist with tenancy and property disputes (fee applies).",
@@ -3566,7 +3556,7 @@
     "liveness_challenge_hint": "Respond within {{seconds}} seconds"
   },
   "widget": {
-    "support_title": "RentalHub Support",
+    "support_title": "Amana RentalHub NG Support",
     "reply_minutes": "We typically reply within minutes",
     "close": "Close",
     "back": "Back",
@@ -4559,7 +4549,7 @@
     "contact_continue": "Continue to the survey",
     "contact_required": "Please fill in your name, phone, current location and state of origin.",
     "agent_step": "Step 1 of 3 — your interview details",
-    "agent_intro": "You are conducting this survey as a RentalHub marketing agent. Your name and phone are recorded from your account — just tell us where this interview is happening.",
+    "agent_intro": "You are conducting this survey as an Amana RentalHub NG marketing agent. Your name and phone are recorded from your account — just tell us where this interview is happening.",
     "agent_lga": "LGA where the survey is carried out *",
     "agent_location": "Location / area",
     "agent_location_ph": "e.g. Phase 1, Gwagwalada Surveyarea",
@@ -4607,7 +4597,7 @@
     "thanks_body": "Your answers have been recorded. They will help improve rental services in Nigeria.",
     "draft_found": "You have an unfinished survey",
     "continue": "Continue where you left off →",
-    "notif_title": "Finish your RentalHub survey",
+    "notif_title": "Finish your Amana RentalHub NG survey",
     "notif_body": "You have an unfinished survey. Continue where you left off.",
     "notif_ok": "Reminders on!",
     "notif_ok_body": "We'll remind you to finish your survey.",
@@ -4640,11 +4630,6 @@
     "gate_skip": "Continue without email",
     "gate_google_hint": "Prefer Google? Use the sign-in button above and your email will be filled in automatically."
   },
-  "dashboard": {
-    "survey_reminder_title": "Finish your Surveyresearch survey",
-    "survey_reminder_body": "Your answers help us improve Amana RentalHub NG. It takes about 10 more minutes — you can finish anytime.",
-    "survey_continue": "Continue Survey"
-  },
   "nigeria_page": {
     "load_failed": "Could not load Nigerian property data. Please try again.",
     "loading": "Loading Nigerian property data…",
@@ -4652,9 +4637,10 @@
     "title": "Properties Across Nigeria",
     "subtitle": "Browse rental supply by state, LGA and high-intent areas, powered by verified Amana RentalHub NG listings.",
     "all_states": "All States",
+    "lgas_label": "LGAs",
     "lgas_count": "{{count}} LGAs",
     "high_intent": "High-Intent Areas",
-    "high_intent_desc": "Locations where renters are actively searching right now.",
+    "high_intent_desc": "Locations where renters are actively searching right now. These pages help target queries like \"cheap rent in Lugbe\" and similar location-intent searches.",
     "verified_listing": "{{count}} verified listings"
   }
 }
