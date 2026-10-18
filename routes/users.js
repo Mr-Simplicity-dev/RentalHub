@@ -2107,9 +2107,16 @@ router.post(
       );
 
       if (!verification.verified) {
+        if (['service_error', 'wallet_error'].includes(verification.status)) {
+          return res.status(503).json({
+            success: false,
+            message: 'Identity verification provider is temporarily unavailable. Please try again later.',
+          });
+        }
+
         return res.status(400).json({
           success: false,
-          message: verification.message || 'NIN could not be verified',
+          message: 'NIN could not be verified. Please check your details and try again.',
         });
       }
 
@@ -2142,10 +2149,17 @@ router.post(
         identity_verified: autoVerified,
       });
     } catch (error) {
-      req.logger.error('Add NIN error:', error);
+      req.logger.error('Add NIN verification request failed', {
+        code: typeof error?.code === 'string' && /^[a-z0-9_-]{1,64}$/i.test(error.code)
+          ? error.code
+          : 'UNKNOWN',
+        upstream_status: Number.isInteger(error?.response?.status)
+          ? error.response.status
+          : undefined,
+      });
       res.status(500).json({
         success: false,
-        message: 'Failed to verify NIN',
+        message: 'NIN verification could not be completed. Please try again later.',
       });
     }
   }
