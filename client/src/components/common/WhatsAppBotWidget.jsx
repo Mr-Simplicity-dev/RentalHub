@@ -90,7 +90,7 @@ const WhatsAppBotWidget = () => {
             setMessages([{
               id: 'bot-greeting',
               type: 'bot',
-              text: t('messages.whatsapp.bot_greeting', "Hi! I'm RentalHub\u2019s virtual assistant. How can I help you today?"),
+              text: t('messages.whatsapp.bot_greeting', "Hi! I'm Amana RentalHub\u2019s virtual assistant. How can I help you today?"),
               showQuickReplies: true,
               created_at: new Date().toISOString(),
             }]);
@@ -213,7 +213,7 @@ const WhatsAppBotWidget = () => {
   const handleTalkToAgent = useCallback(() => {
     setConnectedToAgent(true);
     setAwaitingResponse(null);
-    const waMsg = t('home.whatsapp_message', 'Hello RentalHub NG, I need help finding a home.');
+    const waMsg = t('home.whatsapp_message', 'Hello Amana RentalHub NG, I need help finding a home.');
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(waMsg)}%0A%0A${encodeURIComponent(window.location.href)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }, [t]);
@@ -402,7 +402,7 @@ const WhatsAppBotWidget = () => {
                       <span className="flex items-center gap-1.5 mb-1">
                         <img src="/rentalhub-mark.svg" alt="" className="w-4 h-4 shrink-0" />
                         <span className="text-xs font-semibold text-green-700 tracking-wide">
-                          {t('messages.whatsapp.bot_label', 'RentalHub')}
+                          {t('messages.whatsapp.bot_label', 'Amana RentalHub NG')}
                         </span>
                       </span>
                     )}
