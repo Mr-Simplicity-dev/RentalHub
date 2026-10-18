@@ -239,7 +239,6 @@ const retryAgentWithdrawals = async (limit) => {
 
       // The failed/reversed reconciliation released the earnings back to the
       // agent, so every retry must reserve them again before money can move.
-      earningsReserveAttempted = true;
       const reserved = await db.query(
         `UPDATE agent_earnings_summary
          SET total_pending = total_pending - $1,
