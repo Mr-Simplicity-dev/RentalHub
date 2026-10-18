@@ -358,7 +358,7 @@ const WhatsAppBotWidget = () => {
             ref={widgetRef}
             role="dialog"
             aria-modal="true"
-            aria-label={t('messages.whatsapp.title', 'RentalHub Assistant')}
+            aria-label={t('messages.whatsapp.title', 'Amana RentalHub Assistant')}
             initial={prefersReducedMotion ? false : { opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20, scale: 0.95 }}
@@ -372,7 +372,7 @@ const WhatsAppBotWidget = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-white font-semibold text-sm truncate">
-                  {t('messages.whatsapp.title', 'RentalHub Assistant')}
+                  {t('messages.whatsapp.title', 'Amana RentalHub Assistant')}
                 </h3>
                 <p className="text-green-200 text-xs">
                   {t('messages.whatsapp.subtitle', 'Need help? Chat with us!')}
