@@ -23,7 +23,7 @@ const whatsappFaqData = [
   {
     id: 'legal',
     keywords: ['legal', 'lawyer', 'attorney', 'protection', 'coverage', 'law', 'document', 'agreement', 'dispute', 'nba', 'access fee', '2000'],
-    answer: 'For a one-time fee of ₦2,000 at registration, you get Legal Protection Coverage. WE ensures that all processes a delegency observed and due assistance is given right from your dashboard anytime. This covers document reviews, agreements, and advisory.',
+    answer: 'For a one-time fee of ₦2,000 at registration, you get the needed assistance . We ensures that all processes are delegently observed and due assistance is given right from your dashboard anytime. This covers document reviews, agreements, and advisory.',
     link: null,
     linkText: null,
   },
