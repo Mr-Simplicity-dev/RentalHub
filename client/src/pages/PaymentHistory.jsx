@@ -43,6 +43,85 @@ const humanizeChannel = (channel) =>
   String(channel || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) ||
   '';
 
+const RECEIPT_STATUS_LABELS = {
+  completed: 'PAID',
+  success: 'PAID',
+  paid: 'PAID',
+  pending: 'PENDING',
+  processing: 'PROCESSING',
+  failed: 'FAILED',
+  reversed: 'REVERSED',
+  refunded: 'REFUNDED',
+  cancelled: 'CANCELLED',
+  abandoned: 'ABANDONED',
+};
+
+const STATUS_LABELS = {
+  completed: 'Completed',
+  success: 'Success',
+  paid: 'Paid',
+  pending: 'Pending',
+  processing: 'Processing',
+  failed: 'Failed',
+  reversed: 'Reversed',
+  refunded: 'Refunded',
+  processed: 'Processed',
+  rejected: 'Rejected',
+  approved: 'Approved',
+  cancelled: 'Cancelled',
+};
+
+const humanizeStatus = (status) =>
+  STATUS_LABELS[status] ||
+  String(status || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const receiptStatus = (status) =>
+  RECEIPT_STATUS_LABELS[status] || humanizeStatus(status).toUpperCase();
+
+const METHOD_LABELS = {
+  paystack: 'Paystack',
+  wallet: 'Wallet',
+  card: 'Card',
+  bank_transfer: 'Bank Transfer',
+  banktransfer: 'Bank Transfer',
+  transfer: 'Bank Transfer',
+  ussd: 'USSD',
+  qr: 'QR',
+  pos: 'POS',
+  mobile_money: 'Mobile Money',
+  apple_pay: 'Apple Pay',
+  google_pay: 'Google Pay',
+  credit_card: 'Credit Card',
+  debit_card: 'Debit Card',
+};
+
+const humanizeMethod = (method) => METHOD_LABELS[method] || humanizeChannel(method) || 'Paystack';
+
+const humanizeMethodLine = (method, channel) => {
+  const methodLabel = humanizeMethod(method);
+  const channelLabel = channel ? humanizeChannel(channel) : '';
+  if (!channelLabel || channelLabel.toLowerCase() === methodLabel.toLowerCase()) return methodLabel;
+  return `${methodLabel} — ${channelLabel}`;
+};
+
+const formatNigerianDateTime = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const datePart = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Lagos',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Lagos',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
+  return `${datePart}, ${timePart} WAT`;
+};
+
 const PAYMENT_TYPES_WITH_RETRY = ['rent_payment', 'tenant_subscription', 'property_unlock', 'wallet_funding'];
 
 const formatAmount = (amount, currency = 'NGN') => {
@@ -76,8 +155,7 @@ const PaymentHistory = () => {
   const [payingPaymentId, setPayingPaymentId] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [selectedReceiptGroup, setSelectedReceiptGroup] = useState([]);
-  const [receiptDeductions, setReceiptDeductions] = useState([]);
-  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
 
   // Group payments that were paid in ONE combined transaction (registration
   // base + lawyer + agent share a base reference). Separate transactions keep
@@ -95,21 +173,16 @@ const PaymentHistory = () => {
   const openReceipt = async (group) => {
     setSelectedReceiptGroup(group);
     setSelectedReceipt(group[0] || null);
-    setReceiptDeductions([]);
-    const ids = group.map((p) => p.id).filter(Boolean);
-    if (!ids.length) return;
-    setReceiptLoading(true);
+    setReceiptData(null);
+    const base = group[0];
+    if (!base?.id) return;
     try {
-      const all = [];
-      for (const id of ids) {
-        const res = await paymentService.getWalletTransactions({ payment_id: id, limit: 20 });
-        if (res.data) all.push(...res.data);
-      }
-      setReceiptDeductions(all);
+      // Same shared receipt data the email and PDF are built from, so the
+      // modal can never disagree with them.
+      const res = await paymentService.getReceiptData(base.id);
+      if (res?.success) setReceiptData(res.data);
     } catch {
-      setReceiptDeductions([]);
-    } finally {
-      setReceiptLoading(false);
+      setReceiptData(null);
     }
   };
 
@@ -117,7 +190,7 @@ const PaymentHistory = () => {
     group.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
   const formatReceiptNumber = (payment) =>
-    `RCPT-${String(payment?.id || 0).padStart(6, '0')}`;
+    `ARH-RCPT-${String(payment?.id || 0).padStart(6, '0')}`;
 
   const downloadPdf = async (group) => {
     const base = group[0];
@@ -226,7 +299,7 @@ const PaymentHistory = () => {
                         {first.property_title || t('payment_history.general_payment')}
                       </div>
                       <div className="text-sm text-gray-500 mt-2">
-                        {new Date(first.created_at).toLocaleString()}
+                        {formatNigerianDateTime(first.created_at)}
                       </div>
                     </div>
 
@@ -241,11 +314,11 @@ const PaymentHistory = () => {
                             'bg-gray-100 text-gray-700'
                           }`}
                         >
-                          {first.payment_status}
+                          {humanizeStatus(first.payment_status)}
                         </span>
                       </div>
                       <div className="text-xs text-gray-500 mt-2">
-                        {t('payment_history.method')}: {first.payment_method || 'N/A'}
+                        {t('payment_history.method')}: {humanizeMethodLine(first.payment_method, first.payment_channel)}
                       </div>
                       {first.transaction_reference && (
                         <div className="text-xs text-gray-500 mt-1 break-all">
@@ -308,7 +381,7 @@ const PaymentHistory = () => {
                       <span>{formatAmount(groupTotal(group), first.currency || 'NGN')}</span>
                     </div>
                     <div className="text-sm text-gray-500 mt-2">
-                      {new Date(first.created_at).toLocaleString()}
+                      {formatNigerianDateTime(first.created_at)}
                     </div>
                   </div>
 
@@ -319,11 +392,11 @@ const PaymentHistory = () => {
                           PAYMENT_STATUS_STYLES[combinedStatus] || 'bg-gray-100 text-gray-700'
                         }`}
                       >
-                        {combinedStatus}
+                        {humanizeStatus(combinedStatus)}
                       </span>
                     </div>
                     <div className="text-xs text-gray-500 mt-2">
-                      {t('payment_history.method')}: {first.payment_method || 'N/A'}
+                      {t('payment_history.method')}: {humanizeMethodLine(first.payment_method, first.payment_channel)}
                     </div>
                     {first.transaction_reference && (
                       <div className="text-xs text-gray-500 mt-1 break-all">
@@ -364,33 +437,102 @@ const PaymentHistory = () => {
                 />
                 <div className="amana-mark mt-1 text-lg">Amana</div>
                 <h2 className="text-lg font-bold text-gray-900">Amana RentalHub NG</h2>
-                <p className="text-xs text-gray-500">{t('wallet.receipt')}</p>
+                <p className="text-xs text-gray-500">{receiptData?.documentType || t('wallet.receipt')}</p>
                 <p className="mt-1 text-xs font-semibold text-gray-700">
-                  {formatReceiptNumber(selectedReceipt)}
+                  {receiptData?.receiptNumber || formatReceiptNumber(selectedReceipt)}
                 </p>
               </div>
               <div className="mt-4 space-y-2 text-sm">
                 <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">{t('payment_history.payer')}</span>
+                  <span className="text-right font-medium text-gray-900">
+                    {receiptData?.fullName || user?.full_name || user?.email}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">Email</span>
+                  <span className="break-all text-right font-medium text-gray-900">
+                    {receiptData?.email || user?.email || '—'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">{t('payment_history.ref')}</span>
                   <span className="break-all text-right font-medium text-gray-900">
-                    {selectedReceipt.group_key || selectedReceipt.transaction_reference}
+                    {receiptData?.reference || selectedReceipt.group_key || selectedReceipt.transaction_reference}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">{t('payment_history.date')}</span>
                   <span className="text-right font-medium text-gray-900">
-                    {new Date(selectedReceipt.created_at).toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-gray-500">{t('payment_history.payer')}</span>
-                  <span className="text-right font-medium text-gray-900">
-                    {user?.full_name || user?.email}
+                    {receiptData?.date || formatNigerianDateTime(selectedReceipt.created_at)}
                   </span>
                 </div>
               </div>
 
-              {selectedReceiptGroup.length > 1 && (
+              {receiptData?.rent && (
+                <div className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3 text-sm">
+                  {receiptData.rent.paymentFor && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-gray-500">Payment For</span>
+                      <span className="text-right font-medium text-gray-900">{receiptData.rent.paymentFor}</span>
+                    </div>
+                  )}
+                  {receiptData.rent.propertyTitle && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-gray-500">Property</span>
+                      <span className="text-right font-medium text-gray-900">{receiptData.rent.propertyTitle}</span>
+                    </div>
+                  )}
+                  {receiptData.rent.propertyAddress && (
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="text-gray-500">Property Address</span>
+                      <span className="text-right font-medium text-gray-900">{receiptData.rent.propertyAddress}</span>
+                    </div>
+                  )}
+                  {receiptData.rent.tenantName && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-gray-500">Tenant</span>
+                      <span className="text-right font-medium text-gray-900">{receiptData.rent.tenantName}</span>
+                    </div>
+                  )}
+                  {receiptData.rent.landlordName && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-gray-500">Landlord</span>
+                      <span className="text-right font-medium text-gray-900">{receiptData.rent.landlordName}</span>
+                    </div>
+                  )}
+                  {receiptData.rent.rentalPeriod && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-gray-500">Rental Period</span>
+                      <span className="text-right font-medium text-gray-900">
+                        {receiptData.rent.rentalPeriod.end
+                          ? `${receiptData.rent.rentalPeriod.start} - ${receiptData.rent.rentalPeriod.end}`
+                          : receiptData.rent.rentalPeriod.start}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {receiptData?.items?.length ? (
+                <div className="mt-3 rounded-lg border border-gray-200">
+                  {receiptData.items.map((item, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-center justify-between gap-4 px-3 py-2 text-sm ${
+                        index > 0 ? 'border-t border-gray-100' : ''
+                      }`}
+                    >
+                      <span className="text-gray-700">{item.label}</span>
+                      <span className="font-medium text-gray-900">{item.amount}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between gap-4 border-t border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-gray-900">
+                    <span>Total Paid</span>
+                    <span>{receiptData.total}</span>
+                  </div>
+                </div>
+              ) : selectedReceiptGroup.length > 1 ? (
                 <div className="mt-3 rounded-lg border border-gray-200">
                   {selectedReceiptGroup.map((item, index) => (
                     <div
@@ -410,28 +552,22 @@ const PaymentHistory = () => {
                     <span>{formatAmount(groupTotal(selectedReceiptGroup), selectedReceipt.currency || 'NGN')}</span>
                   </div>
                 </div>
-              )}
-              {selectedReceiptGroup.length === 1 && (
-                <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                  <span className="text-gray-700">{t('payment_history.payment_for')}</span>
-                  <span className="font-medium text-gray-900">
-                    {formatPaymentType(selectedReceipt.payment_type, t)}
-                  </span>
+              ) : (
+                <div className="mt-3 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
+                    <span className="text-gray-700">{t('payment_history.payment_for')}</span>
+                    <span className="font-medium text-gray-900">
+                      {formatPaymentType(selectedReceipt.payment_type, t)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-t border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-gray-900">
+                    <span>Total Paid</span>
+                    <span>{formatAmount(selectedReceipt.amount, selectedReceipt.currency || 'NGN')}</span>
+                  </div>
                 </div>
               )}
 
               <div className="mt-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-gray-500">{t('payment_history.amount')}</span>
-                  <span className="text-right text-base font-bold text-gray-900">
-                    {formatAmount(
-                      selectedReceiptGroup.length > 1
-                        ? groupTotal(selectedReceiptGroup)
-                        : selectedReceipt.amount,
-                      selectedReceipt.currency || 'NGN'
-                    )}
-                  </span>
-                </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">{t('payment_history.status')}</span>
                   <span
@@ -439,47 +575,32 @@ const PaymentHistory = () => {
                       PAYMENT_STATUS_STYLES[selectedReceipt.payment_status] || 'bg-gray-100 text-gray-700'
                     }`}
                   >
-                    {selectedReceipt.payment_status}
+                    {receiptData?.status || receiptStatus(selectedReceipt.payment_status)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">{t('payment_history.method')}</span>
                   <span className="text-right font-medium text-gray-900">
-                    {selectedReceipt.payment_channel
-                      ? `${selectedReceipt.payment_method || 'Paystack'} — ${humanizeChannel(selectedReceipt.payment_channel)}`
-                      : selectedReceipt.payment_method || 'Paystack'}
+                    {receiptData?.methodLine ||
+                      humanizeMethodLine(selectedReceipt.payment_method, selectedReceipt.payment_channel)}
                   </span>
                 </div>
-                {receiptDeductions.length > 0 && (
-                  <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs font-semibold text-gray-700">Breakdown</p>
-                    {receiptDeductions.map((tx) => {
-                      const fee = Number(tx.metadata?.platform_fee || 0);
-                      return (
-                        <div key={tx.id} className="mt-1.5 space-y-0.5 text-xs text-gray-600">
-                          <div className="flex items-center justify-between">
-                            <span>{tx.type === 'credit' ? 'Amount credited' : 'Amount deducted'}</span>
-                            <span className="font-semibold text-gray-900">
-                              {tx.type === 'credit' ? '+' : '−'}₦{Number(tx.amount).toLocaleString()}
-                            </span>
-                          </div>
-                          {fee > 0 && (
-                            <div className="flex items-center justify-between">
-                              <span>Platform fee deducted ({tx.metadata?.platform_fee_rate ? `${Number(tx.metadata.platform_fee_rate) * 100}%` : ''})</span>
-                              <span className="font-semibold text-red-600">−₦{fee.toLocaleString()}</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {receiptLoading && (
-                  <p className="mt-2 text-xs text-gray-400">Loading breakdown…</p>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">Currency</span>
+                  <span className="text-right font-medium text-gray-900">
+                    {receiptData?.currency || selectedReceipt.currency || 'NGN'}
+                  </span>
+                </div>
+                {Number(receiptData?.rent?.platformFee) > 0 && (
+                  <p className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+                    Platform/Service Fee: ₦{Number(receiptData.rent.platformFee).toLocaleString()} (deducted
+                    from the landlord&apos;s payout — not charged to you)
+                  </p>
                 )}
               </div>
               <div className="mt-6 border-t border-gray-200 pt-4 text-center text-xs text-gray-400">
-                Thank you for using Amana RentalHub NG.
+                Thank you for using Amana RentalHub NG. This is a computer-generated receipt and does not
+                require a signature.
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t border-gray-100 p-4 print:hidden">

@@ -81,6 +81,12 @@ export const paymentService = {
     return response.data;
   },
 
+  // Get the shared receipt data (same source as PDF/email) for the receipt modal
+  getReceiptData: async (paymentId) => {
+    const response = await api.get(`/payments/receipt/${paymentId}`);
+    return response.data;
+  },
+
   // Download a payment receipt as PDF
   downloadReceiptPdf: async (paymentId) => {
     const response = await api.get(`/payments/receipt-pdf/${paymentId}`, {

@@ -38,7 +38,7 @@ test('new recruitment references use 128 bits of cryptographic randomness', () =
   );
 
   references.forEach((reference) => {
-    assert.match(reference, /^RH-APP-[A-F0-9]{32}$/);
+    assert.match(reference, /^ARH-APP-[A-F0-9]{32}$/);
   });
   assert.equal(new Set(references).size, references.length);
 });
