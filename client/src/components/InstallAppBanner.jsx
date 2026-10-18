@@ -50,7 +50,7 @@ const InstallAppBanner = ({ disabled = false }) => {
     setStarting(true);
     const anchor = document.createElement('a');
     anchor.href = '/api/downloads/app';
-    anchor.download = 'RentalHub.apk';
+    anchor.download = 'Amana RentalHub NG.apk';
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);

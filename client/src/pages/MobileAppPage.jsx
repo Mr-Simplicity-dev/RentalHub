@@ -22,7 +22,8 @@ const MobileAppPage = () => {
   // Always point at the freshly built APK and label it with the version actually
   // being served, so nobody accidentally installs an older file they already have.
   const downloadUrl = build?.downloadUrl || '/api/downloads/app';
-  const downloadName = build?.version ? `RentalHub-${build.version}.apk` : 'RentalHub.apk';
+  const downloadName =
+    build?.fileName || (build?.version ? `Amana RentalHub NG-${build.version}.apk` : 'Amana RentalHub NG.apk');
   const androidLabel = build?.version
     ? `${t('mobile_app.download_android')} (v${build.version})`
     : t('mobile_app.download_android');

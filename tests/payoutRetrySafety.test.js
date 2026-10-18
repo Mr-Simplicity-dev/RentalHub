@@ -271,7 +271,7 @@ test('a timed-out wallet transfer remains claimed with a stable reference for re
   assert.equal(summary.wallet.errors, 1);
   assert.equal(reserveCalls.length, 1);
   assert.equal(transferCalls.length, 1);
-  assert.equal(transferCalls[0].reference, 'WLW_91_R1');
+  assert.equal(transferCalls[0].reference, 'ARH_WLW_91_R1');
 
   const followUpSummary = await runPayoutRetryCycle();
   assert.equal(followUpSummary.wallet.scanned, 0);
@@ -279,7 +279,7 @@ test('a timed-out wallet transfer remains claimed with a stable reference for re
   assert.equal(reserveCalls.length, 1);
 
   const claim = databaseCalls.find((call) => call.sql.includes('COALESCE(payout_retry_count, 0)'));
-  assert.equal(claim.params[2], 'WLW_91_R1');
+  assert.equal(claim.params[2], 'ARH_WLW_91_R1');
   assert.match(claim.sql, /paystack_transfer_status = 'processing'/);
 
   const reconciliationUpdate = databaseCalls.find((call) => call.sql.includes('SET payout_failed_reason = $1'));
@@ -310,7 +310,7 @@ test('parallel cycles submit an agent payout at most once', async () => {
   const summaries = await Promise.all([runPayoutRetryCycle(), runPayoutRetryCycle()]);
 
   assert.equal(transferCalls.length, 1);
-  assert.equal(transferCalls[0].reference, 'AGW_92_R1');
+  assert.equal(transferCalls[0].reference, 'ARH_AGW_92_R1');
   assert.equal(summaries.reduce((errors, summary) => errors + summary.agent.errors, 0), 1);
 });
 
@@ -374,7 +374,7 @@ test('state-admin retry re-debits the refunded balance once and holds it through
 
   assert.equal(summary.stateAdmin.errors, 1);
   assert.equal(transferCalls.length, 1);
-  assert.equal(transferCalls[0].reference, 'SAW_94_R1');
+  assert.equal(transferCalls[0].reference, 'ARH_SAW_94_R1');
   assert.equal(adminWalletBalance, startingBalance - 1200);
 
   const followUpSummary = await runPayoutRetryCycle();

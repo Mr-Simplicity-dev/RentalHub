@@ -30,6 +30,7 @@ test('paymentReceipt functions handle missing or empty snapshots gracefully with
   await assert.doesNotReject(async () => {
     await sendAdminPayoutReceipt({
       adminId: null,
+      withdrawalId: 1,
       amount: 50000,
       bankName: 'GTBank',
       accountNumber: '0123456789',
@@ -42,6 +43,7 @@ test('paymentReceipt functions handle missing or empty snapshots gracefully with
   await assert.doesNotReject(async () => {
     await sendAdminPayoutReceipt({
       adminId: null,
+      withdrawalId: 2,
       amount: 50000,
       bankName: 'GTBank',
       accountNumber: '0123456789',
@@ -59,6 +61,7 @@ test('paymentReceipt functions handle missing or empty snapshots gracefully with
   await assert.doesNotReject(async () => {
     await sendAgentPayoutReceipt({
       agentUserId: null,
+      withdrawalId: 1,
       amount: 25000,
       reference: 'AG_TEST_1',
       status: 'rejected',
@@ -69,6 +72,7 @@ test('paymentReceipt functions handle missing or empty snapshots gracefully with
   await assert.doesNotReject(async () => {
     await sendUserPayoutReceipt({
       userId: null,
+      withdrawalId: 1,
       amount: 15000,
       bankName: 'Access Bank',
       accountNumber: '1234567890',

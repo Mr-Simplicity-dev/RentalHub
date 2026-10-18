@@ -4,56 +4,93 @@ const fs = require('fs');
 
 const router = express.Router();
 
-const UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads');
-const MOBILE_PKG_PATH = path.resolve(__dirname, '..', 'RentalHubMobile', 'package.json');
+const ROOT_DIR = path.resolve(__dirname, '..');
+const UPLOADS_DIR = path.resolve(ROOT_DIR, 'uploads');
+const MOBILE_DIR = path.resolve(ROOT_DIR, 'RentalHubMobile');
+const MOBILE_APP_JSON_PATH = path.resolve(MOBILE_DIR, 'app.json');
+const MOBILE_PKG_PATH = path.resolve(MOBILE_DIR, 'package.json');
 const BUILD_INFO_PATH = path.resolve(UPLOADS_DIR, 'version.json');
 
-const getBuildInfo = () => {
+// The brand name is part of the downloaded file name users see on their device.
+const DOWNLOAD_BASENAME = 'Amana RentalHub NG';
+
+const readJson = (filePath) => {
   try {
-    const pkg = JSON.parse(fs.readFileSync(MOBILE_PKG_PATH, 'utf8'));
-    const buildInfo = {
-      version: pkg.version || '1.0.0',
-      buildNumber: '1',
-      lastUpdated: new Date().toISOString(),
-    };
-
-    if (fs.existsSync(BUILD_INFO_PATH)) {
-      const saved = JSON.parse(fs.readFileSync(BUILD_INFO_PATH, 'utf8'));
-      buildInfo.buildNumber = saved.buildNumber || '1';
-      buildInfo.lastUpdated = saved.lastUpdated || buildInfo.lastUpdated;
-    }
-
-    return buildInfo;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch {
-    return { version: '1.0.0', buildNumber: '1', lastUpdated: new Date().toISOString() };
+    return null;
+  }
+};
+
+// Version is read from what was actually shipped (uploads/version.json written by the
+// release step), then falls back to the mobile app metadata so a stale version file
+// never mislabels a fresh build.
+const getBuildInfo = () => {
+  const saved = readJson(BUILD_INFO_PATH) || {};
+  const appJson = readJson(MOBILE_APP_JSON_PATH) || {};
+  const pkg = readJson(MOBILE_PKG_PATH) || {};
+  const expo = appJson.expo || {};
+
+  return {
+    version: saved.version || expo.version || pkg.version || '1.0.0',
+    buildNumber: String(
+      saved.buildNumber || (expo.android && expo.android.versionCode) || '1'
+    ),
+    lastUpdated: saved.lastUpdated || new Date().toISOString(),
+  };
+};
+
+// The release APK is written to uploads/app.apk by the release step, but operators
+// sometimes drop a renamed file there instead. Serve whichever APK is present
+// (newest first) so a branding rename can never 404 the download again.
+const findApk = () => {
+  const preferred = path.resolve(UPLOADS_DIR, 'app.apk');
+  if (fs.existsSync(preferred)) return preferred;
+
+  try {
+    const candidates = fs
+      .readdirSync(UPLOADS_DIR)
+      .filter((name) => /\.apk$/i.test(name))
+      .map((name) => path.resolve(UPLOADS_DIR, name))
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    return candidates[0] || null;
+  } catch {
+    return null;
   }
 };
 
 router.get('/app', (req, res) => {
-  const apkPath = path.resolve(UPLOADS_DIR, 'app.apk');
-
   // The APK lives at one fixed path and is overwritten on every deploy, so it must
   // never be cached by a browser, proxy or CDN — otherwise an older build keeps
   // being handed out. The versioned filename also stops devices reusing a stale
-  // "RentalHub.apk" they already downloaded.
+  // "Amana RentalHub NG.apk" they already downloaded.
   res.set({
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     Pragma: 'no-cache',
     Expires: '0',
   });
 
+  const apkPath = findApk();
+
+  if (!apkPath) {
+    return res.status(404).json({
+      success: false,
+      message: 'APK not found',
+      hint: 'Place the built release APK at uploads/app.apk on the server (see docs/release-runbook.md).',
+    });
+  }
+
   const { version } = getBuildInfo();
-  res.download(apkPath, `RentalHub-${version}.apk`, (err) => {
-    if (err) {
-      if (!res.headersSent) {
-        res.status(404).json({ success: false, message: 'APK not found' });
-      }
+  res.download(apkPath, `${DOWNLOAD_BASENAME}-${version}.apk`, (err) => {
+    if (err && !res.headersSent) {
+      res.status(404).json({ success: false, message: 'APK not found' });
     }
   });
 });
 
 router.get('/version', (req, res) => {
   const info = getBuildInfo();
+  const apkAvailable = Boolean(findApk());
   res.json({
     success: true,
     data: {
@@ -61,6 +98,8 @@ router.get('/version', (req, res) => {
         version: info.version,
         buildNumber: info.buildNumber,
         downloadUrl: `/api/downloads/app?v=${encodeURIComponent(info.version)}`,
+        fileName: `${DOWNLOAD_BASENAME}-${info.version}.apk`,
+        apkAvailable,
         lastUpdated: info.lastUpdated,
       },
       ios: {
@@ -75,3 +114,4 @@ router.get('/version', (req, res) => {
 
 module.exports = router;
 module.exports.getBuildInfo = getBuildInfo;
+module.exports.findApk = findApk;
