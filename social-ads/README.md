@@ -1,4 +1,4 @@
-# Amana Amana RentalHub NG — Social Flyers
+# Amana RentalHub NG — Social Flyers
 
 Single source of truth for the Amana-branded social flyers. Every flyer renders
 the "Amana" house mark above "Amana RentalHub NG".

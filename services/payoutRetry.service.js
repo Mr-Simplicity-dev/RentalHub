@@ -222,6 +222,7 @@ const retryAgentWithdrawals = async (limit) => {
       continue;
     }
 
+    let earningsReserved = false;
     let transferInitiationStarted = false;
     let transferStatePersisted = false;
 
@@ -235,6 +236,42 @@ const retryAgentWithdrawals = async (limit) => {
         });
         recipientCode = recipient.recipient_code;
       }
+
+      // The failed/reversed reconciliation released the earnings back to the
+      // agent, so every retry must reserve them again before money can move.
+      earningsReserveAttempted = true;
+      const reserved = await db.query(
+        `UPDATE agent_earnings_summary
+         SET total_pending = total_pending - $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE agent_user_id = $2
+           AND landlord_user_id = $3
+           AND total_pending >= $1
+         RETURNING total_pending`,
+        [item.amount, item.agent_user_id, item.landlord_user_id]
+      );
+
+      if (!reserved.rows.length) {
+        summary.skipped += 1;
+        await restoreRetryClaim({
+          table: 'agent_withdrawal_requests',
+          item,
+          attempt,
+          reference,
+          message: 'Agent earnings reserve unavailable for retry',
+        });
+        await insertRetryAudit({
+          sourceTable: 'agent_withdrawal_requests',
+          sourceId: item.id,
+          retryAttempt: attempt,
+          oldStatus: item.status,
+          newStatus: item.status,
+          outcome: 'skipped_insufficient_funds',
+          message: 'Agent earnings reserve unavailable for retry',
+        });
+        continue;
+      }
+      earningsReserved = true;
 
       transferInitiationStarted = true;
       const transfer = await initiateTransfer({
@@ -298,7 +335,46 @@ const retryAgentWithdrawals = async (limit) => {
           reference,
           message: 'Transfer submission outcome is uncertain; reconcile with Paystack before retrying.',
         });
+      } else if (!transferInitiationStarted && earningsReserved) {
+        try {
+          const refund = await db.query(
+            `UPDATE agent_earnings_summary
+             SET total_pending = total_pending + $1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE agent_user_id = $2 AND landlord_user_id = $3
+             RETURNING agent_user_id`,
+            [item.amount, item.agent_user_id, item.landlord_user_id]
+          );
+
+          if (refund.rows.length) {
+            await restoreRetryClaim({
+              table: 'agent_withdrawal_requests',
+              item,
+              attempt,
+              reference,
+              message: error.message,
+            });
+          } else {
+            await keepRetryClaimForReconciliation({
+              table: 'agent_withdrawal_requests',
+              item,
+              attempt,
+              reference,
+              message: 'Retry stopped before transfer, but agent earnings refund needs reconciliation.',
+            });
+          }
+        } catch (refundError) {
+          await keepRetryClaimForReconciliation({
+            table: 'agent_withdrawal_requests',
+            item,
+            attempt,
+            reference,
+            message: 'Retry stopped before transfer, but agent earnings refund outcome is uncertain.',
+          });
+        }
       } else if (!transferInitiationStarted) {
+        // A failed reserve UPDATE is statement-atomic (nothing was deducted),
+        // so the claim can be restored without an earnings reconciliation.
         await restoreRetryClaim({
           table: 'agent_withdrawal_requests',
           item,
@@ -768,9 +844,11 @@ const reconcileUncertainTable = async ({ table, limit, settleStatus, releaseStat
           const claimed = await client.query(
             `UPDATE ${table}
              SET status = $1, paystack_transfer_status = 'success', paystack_last_response = $2, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $3 AND paystack_transfer_status IN ('unknown', 'processing')
+             WHERE id = $3
+               AND paystack_transfer_reference = $4
+               AND paystack_transfer_status IN ('unknown', 'processing')
              RETURNING id`,
-            [settleStatus, JSON.stringify(transfer || {}), row.id]
+            [settleStatus, JSON.stringify(transfer || {}), row.id, row.paystack_transfer_reference]
           );
           if (claimed.rows.length) await onSettle(row, client);
           await client.query('COMMIT');
@@ -792,9 +870,11 @@ const reconcileUncertainTable = async ({ table, limit, settleStatus, releaseStat
                  paystack_last_response = $3,
                  payout_failed_reason = $4,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE id = $5 AND paystack_transfer_status IN ('unknown', 'processing')
+             WHERE id = $5
+               AND paystack_transfer_reference = $6
+               AND paystack_transfer_status IN ('unknown', 'processing')
              RETURNING id`,
-            [releaseStatus, status, JSON.stringify(transfer || {}), transfer?.failure_reason || 'Transfer failed', row.id]
+            [releaseStatus, status, JSON.stringify(transfer || {}), transfer?.failure_reason || 'Transfer failed', row.id, row.paystack_transfer_reference]
           );
           if (claimed.rows.length) await onRelease(row, client);
           await client.query('COMMIT');

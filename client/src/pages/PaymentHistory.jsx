@@ -359,7 +359,7 @@ const PaymentHistory = () => {
               <div className="border-b border-gray-200 pb-4 text-center">
                 <img
                   src="/rentalhub-mark.svg"
-                  alt="Amana Amana RentalHub NG"
+                  alt="Amana RentalHub NG"
                   className="mx-auto h-10 w-10 rounded-xl object-contain"
                 />
                 <div className="amana-mark mt-1 text-lg">Amana</div>

@@ -464,6 +464,8 @@ class AgentWithdrawalService {
     // Atomic claim + monotonic guard: a "success" is terminal; a "reversed" may
     // follow a prior success; a "failed" must not downgrade a settled/reversed
     // payout. Duplicate/concurrent deliveries update 0 rows and become no-ops.
+    // The claim is bound to the reference the webhook reported so a stale
+    // delivery can never apply its result to a newer retry transfer.
     const guard =
       transferStatus === 'success'
         ? `paystack_transfer_status NOT IN ('success', 'reversed')`
@@ -471,24 +473,58 @@ class AgentWithdrawalService {
           ? `paystack_transfer_status <> 'reversed'`
           : `paystack_transfer_status NOT IN ('success', 'failed', 'reversed')`;
 
-    const updated = await db.query(
-      `UPDATE agent_withdrawal_requests
-       SET status = $1,
-           completed_date = CASE WHEN $1 = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_date END,
-           paystack_transfer_status = $2,
-           paystack_last_response = $3,
-           payout_failed_reason = CASE WHEN $2 IN ('failed','reversed') THEN $4 ELSE payout_failed_reason END,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5 AND ${guard}
-       RETURNING *`,
-      [
-        nextStatus,
-        transferStatus,
-        JSON.stringify(payload || {}),
-        payload?.failure_reason || payload?.reason || null,
-        withdrawal.id,
-      ]
-    );
+    const client = await db.connect();
+    let updated;
+    try {
+      await client.query('BEGIN');
+      updated = await client.query(
+        `UPDATE agent_withdrawal_requests
+         SET status = $1,
+             completed_date = CASE WHEN $1 = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_date END,
+             paystack_transfer_status = $2,
+             paystack_last_response = $3,
+             payout_failed_reason = CASE WHEN $2 IN ('failed','reversed') THEN $4 ELSE payout_failed_reason END,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $5 AND paystack_transfer_reference = $6 AND ${guard}
+         RETURNING *`,
+        [
+          nextStatus,
+          transferStatus,
+          JSON.stringify(payload || {}),
+          payload?.failure_reason || payload?.reason || null,
+          withdrawal.id,
+          reference,
+        ]
+      );
+
+      // Mirror the verification-reconciliation accounting in the same
+      // transaction: success moves the reserved amount to total_paid;
+      // failed/reversed returns it to total_pending so a retry can re-reserve.
+      if (updated.rows.length) {
+        if (transferStatus === 'success') {
+          await client.query(
+            `UPDATE agent_earnings_summary
+             SET total_paid = total_paid + $1, updated_at = CURRENT_TIMESTAMP
+             WHERE agent_user_id = $2 AND landlord_user_id = $3`,
+            [withdrawal.amount, withdrawal.agent_user_id, withdrawal.landlord_user_id]
+          );
+        } else if (transferStatus === 'failed' || transferStatus === 'reversed') {
+          await client.query(
+            `UPDATE agent_earnings_summary
+             SET total_pending = total_pending + $1, updated_at = CURRENT_TIMESTAMP
+             WHERE agent_user_id = $2 AND landlord_user_id = $3`,
+            [withdrawal.amount, withdrawal.agent_user_id, withdrawal.landlord_user_id]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
 
     if (!updated.rows.length) return null;
 

@@ -568,7 +568,7 @@ router.get('/receipt-pdf/:paymentId',
 
       // Footer
       doc.moveDown(3);
-      doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text('Thank you for using Amana Amana RentalHub NG.', { align: 'center' });
+      doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text('Thank you for using Amana RentalHub NG.', { align: 'center' });
       doc.moveDown(0.2);
       doc.fontSize(8).fillColor('#cbd5e1').text('This is a computer-generated receipt and does not require a signature.', { align: 'center' });
 

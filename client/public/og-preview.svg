@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="ogTitle ogDesc">
-  <title id="ogTitle">Amana Amana RentalHub NG</title>
-  <desc id="ogDesc">Amana Amana RentalHub NG — Find and manage properties in Nigeria</desc>
+  <title id="ogTitle">Amana RentalHub NG</title>
+  <desc id="ogDesc">Amana RentalHub NG — Find and manage properties in Nigeria</desc>
   <defs>
     <style>@font-face{font-family:'AmanaScript';src:url('fonts/AmanaScript.ttf') format('truetype');}</style>
     <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">

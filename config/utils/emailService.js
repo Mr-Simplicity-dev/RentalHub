@@ -86,7 +86,7 @@ exports.sendPaymentReceiptEmail = async ({
 
     await sendEmail({
       to: email,
-      subject: `Payment Receipt ${receiptNumber} - Amana Amana RentalHub NG`,
+      subject: `Payment Receipt ${receiptNumber} - Amana RentalHub NG`,
       html: `
         <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.6; max-width: 560px; margin: 0 auto; color:#334155;">
           <div style="text-align:center; padding-bottom:16px; border-bottom:2px solid #0284c7;">
@@ -122,7 +122,7 @@ exports.sendPaymentReceiptEmail = async ({
           </table>
           ${quoteHtml}
           <p style="padding-top:16px; font-size:12px; color:#94a3b8; text-align:center;">
-            Thank you for using Amana Amana RentalHub NG. You can view and print this receipt from your Payment History.
+            Thank you for using Amana RentalHub NG. You can view and print this receipt from your Payment History.
           </p>
           <p style="font-size:10px; color:#cbd5e1; text-align:center; margin-top:4px;">
             This is a computer-generated receipt and does not require a signature.
